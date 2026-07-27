@@ -69,6 +69,7 @@ suspend fun RunAnywhere.registerModel(
     supportsThinking: Boolean = false,
     supportsLora: Boolean = false,
     downloadSize: Long? = memoryRequirement,
+    cuaProfile: String? = null,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -93,6 +94,9 @@ suspend fun RunAnywhere.registerModel(
             supports_thinking = if (supportsThinking) true else null,
             supports_lora = if (supportsLora) true else null,
             artifact_type = artifactType,
+            // Computer-Use-Agent profile id (idl/cua.proto); lands on
+            // ModelInfo.cua_profile so callers can discover CUA-drivable models.
+            cua_profile = cuaProfile?.takeIf { it.isNotEmpty() },
         )
 
     val saved =
@@ -114,6 +118,7 @@ suspend fun RunAnywhere.registerModel(
     memoryRequirement: Long? = null,
     supportsThinking: Boolean = false,
     supportsLora: Boolean = false,
+    cuaProfile: String? = null,
 ): RAModelInfo {
     val resolvedArtifactType: ModelArtifactType? =
         archiveType?.let { type ->
@@ -137,6 +142,7 @@ suspend fun RunAnywhere.registerModel(
             memoryRequirement = memoryRequirement,
             supportsThinking = supportsThinking,
             supportsLora = supportsLora,
+            cuaProfile = cuaProfile,
         )
 
     // Preserve the structure on the archive artifact. The URL-form inferred
@@ -169,6 +175,7 @@ suspend fun RunAnywhere.registerModel(
     supportsThinking: Boolean = false,
     source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
     downloadSize: Long? = memoryRequirement,
+    cuaProfile: String? = null,
 ): RAModelInfo {
     requireStorageInitialized(this)
 
@@ -191,6 +198,7 @@ suspend fun RunAnywhere.registerModel(
             supports_thinking = if (supportsThinking) true else null,
             source = source,
             files = multiFile,
+            cua_profile = cuaProfile?.takeIf { it.isNotEmpty() },
         )
 
     val saved =

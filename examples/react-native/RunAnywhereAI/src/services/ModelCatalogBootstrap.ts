@@ -255,6 +255,8 @@ export async function registerAll(
         modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         // Approximate total: primary Q4_K_M text model + f16 mmproj projector.
         memoryRequirement: 3_300_000_000,
+        // Declares the model drivable through `RunAnywhere.cua`.
+        cuaProfile: RunAnywhere.cua.faraProfile,
       }),
     ]);
   }

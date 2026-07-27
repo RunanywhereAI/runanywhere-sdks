@@ -45,6 +45,7 @@ class RunAnywhereStorage {
     int? memoryRequirement,
     bool supportsThinking = false,
     bool supportsLora = false,
+    String? cuaProfile,
   }) async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
@@ -70,6 +71,11 @@ class RunAnywhereStorage {
     }
     if (memoryRequirement != null) {
       request.memoryRequiredBytes = Int64(memoryRequirement);
+    }
+    // Computer-Use-Agent profile id (idl/cua.proto); lands on
+    // ModelInfo.cuaProfile so callers can discover CUA-drivable models.
+    if (cuaProfile != null && cuaProfile.isNotEmpty) {
+      request.cuaProfile = cuaProfile;
     }
     // Intentionally NOT setting downloadSizeBytes from memoryRequirement: that
     // value gates the post-finalize download-size check, and the RAM estimate
@@ -109,6 +115,7 @@ class RunAnywhereStorage {
     int? memoryRequirement,
     bool supportsThinking = false,
     bool supportsLora = false,
+    String? cuaProfile,
   }) async {
     // Map an explicit caller archive type to its artifact-type override.
     // When the caller passes none, leave the override unset so commons
@@ -151,6 +158,7 @@ class RunAnywhereStorage {
       memoryRequirement: memoryRequirement,
       supportsThinking: supportsThinking,
       supportsLora: supportsLora,
+      cuaProfile: cuaProfile,
     );
 
     // Preserve the caller-specified layout on the archive artifact. Commons
@@ -188,6 +196,7 @@ class RunAnywhereStorage {
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? cuaProfile,
   }) async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
@@ -208,6 +217,9 @@ class RunAnywhereStorage {
     if (memoryRequirement != null) {
       request.memoryRequiredBytes = Int64(memoryRequirement);
     }
+    if (cuaProfile != null && cuaProfile.isNotEmpty) {
+      request.cuaProfile = cuaProfile;
+    }
     // See registerModel: downloadSizeBytes is intentionally left unset so the
     // post-finalize size guard validates against the actual transfer rather
     // than the RAM-estimate placeholder.
@@ -217,8 +229,9 @@ class RunAnywhereStorage {
       request.contextLength = resolvedContextLength;
     }
 
-    final model =
-        await DartBridgeModelRegistry.instance.registerMultiFileModel(request);
+    final model = await DartBridgeModelRegistry.instance.registerMultiFileModel(
+      request,
+    );
     if (model == null) {
       throw SDKException.internalError(
         'rac_register_multi_file_model_proto failed for model "$name"',

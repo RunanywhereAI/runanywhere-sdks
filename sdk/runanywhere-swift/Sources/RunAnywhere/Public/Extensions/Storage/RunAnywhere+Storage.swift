@@ -15,6 +15,10 @@ public extension RunAnywhere {
     /// id/name/format/artifact, resolves `hf.co/org/repo[:quant]` refs (quant
     /// selection, mmproj pairing, sharded GGUF sets, per-file checksums), and
     /// preserves prior download state when a catalog re-seeds on launch.
+    ///
+    /// Pass `cuaProfile` (e.g. `RunAnywhere.CUA.faraProfile`) for a computer-use
+    /// agent model; it lands on `RAModelInfo.cuaProfile` so callers can discover
+    /// which registered models are drivable through `RunAnywhere.CUA`.
     @discardableResult
     static func registerModel(
         id: String? = nil,
@@ -25,7 +29,8 @@ public extension RunAnywhere {
         artifactType: RAModelArtifactType? = nil,
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false,
-        supportsLora: Bool = false
+        supportsLora: Bool = false,
+        cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
@@ -38,6 +43,9 @@ public extension RunAnywhere {
         request.category = modality
         if let id {
             request.id = id
+        }
+        if let cuaProfile, !cuaProfile.isEmpty {
+            request.cuaProfile = cuaProfile
         }
         if let memoryRequirement {
             request.memoryRequiredBytes = memoryRequirement
@@ -77,7 +85,8 @@ public extension RunAnywhere {
         archiveType: RAArchiveType? = nil,
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false,
-        supportsLora: Bool = false
+        supportsLora: Bool = false,
+        cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
@@ -114,6 +123,9 @@ public extension RunAnywhere {
         if supportsLora {
             model.supportsLora = true
         }
+        if let cuaProfile, !cuaProfile.isEmpty {
+            model.cuaProfile = cuaProfile
+        }
 
         try await CppBridge.ModelRegistry.shared.save(model)
         return model
@@ -134,7 +146,8 @@ public extension RunAnywhere {
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
         source: RAModelSource = .remote,
-        downloadSize: Int64? = nil
+        downloadSize: Int64? = nil,
+        cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
@@ -159,6 +172,9 @@ public extension RunAnywhere {
         }
         if supportsThinking {
             request.supportsThinking = true
+        }
+        if let cuaProfile, !cuaProfile.isEmpty {
+            request.cuaProfile = cuaProfile
         }
 
         return try await CppBridge.ModelRegistry.shared.registerMultiFile(request)

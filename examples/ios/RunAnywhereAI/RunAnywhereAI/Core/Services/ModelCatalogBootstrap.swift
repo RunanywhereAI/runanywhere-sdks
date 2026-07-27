@@ -497,7 +497,8 @@ enum ModelCatalogBootstrap {
             url: "https://huggingface.co/runanywhere/Fara1.5-4B-mlx-4bit",
             framework: .mlx,
             modality: .multimodal,
-            memoryRequirement: 4_000_000_000
+            memoryRequirement: 4_000_000_000,
+            cuaProfile: RunAnywhere.CUA.faraProfile
         )
         // Speaker diarization / semantic segmentation catalog rows are registered
         // under `#if canImport(ONNXRuntime)` below (ONNX Sortformer + SegFormer).
@@ -583,7 +584,8 @@ enum ModelCatalogBootstrap {
             ],
             framework: .llamaCpp,
             modality: .multimodal,
-            memoryRequirement: 3_300_000_000
+            memoryRequirement: 3_300_000_000,
+            cuaProfile: RunAnywhere.CUA.faraProfile
         )
         await registerMultiFile(
             id: "gemma-4-e2b-it-q8_0",
@@ -1354,7 +1356,8 @@ enum ModelCatalogBootstrap {
         modality: ModelCategory = .language,
         memoryRequirement: Int64,
         supportsThinking: Bool = false,
-        supportsLora: Bool = false
+        supportsLora: Bool = false,
+        cuaProfile: String? = nil
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
         do {
@@ -1366,7 +1369,8 @@ enum ModelCatalogBootstrap {
                 modality: modality,
                 memoryRequirement: memoryRequirement,
                 supportsThinking: supportsThinking,
-                supportsLora: supportsLora
+                supportsLora: supportsLora,
+                cuaProfile: cuaProfile
             )
         } catch {
             logger.warning("Failed to register model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
@@ -1409,7 +1413,8 @@ enum ModelCatalogBootstrap {
         memoryRequirement: Int64,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
-        downloadSize: Int64? = nil
+        downloadSize: Int64? = nil,
+        cuaProfile: String? = nil
     ) async {
         await registerMultiFile(
             id: id,
@@ -1420,7 +1425,8 @@ enum ModelCatalogBootstrap {
             memoryRequirement: memoryRequirement,
             contextLength: contextLength,
             supportsThinking: supportsThinking,
-            downloadSize: downloadSize
+            downloadSize: downloadSize,
+            cuaProfile: cuaProfile
         )
     }
 
@@ -1433,7 +1439,8 @@ enum ModelCatalogBootstrap {
         memoryRequirement: Int64,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
-        downloadSize: Int64? = nil
+        downloadSize: Int64? = nil,
+        cuaProfile: String? = nil
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
         let descriptors = files.compactMap { makeDescriptor(for: $0, modality: modality) }
@@ -1451,7 +1458,8 @@ enum ModelCatalogBootstrap {
                 memoryRequirement: memoryRequirement,
                 contextLength: contextLength,
                 supportsThinking: supportsThinking,
-                downloadSize: downloadSize
+                downloadSize: downloadSize,
+                cuaProfile: cuaProfile
             )
         } catch {
             logger.warning("Failed to register multi-file model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")

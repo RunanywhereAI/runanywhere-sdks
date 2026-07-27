@@ -94,6 +94,12 @@ export interface RegisterModelInput {
   supportsThinking?: boolean;
   /** Optional LoRA adapter compatibility flag (Swift parity). */
   supportsLora?: boolean;
+  /**
+   * Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`).
+   * Lands on `ModelInfo.cuaProfile` so callers can discover which registered
+   * models are drivable through `RunAnywhere.cua`.
+   */
+  cuaProfile?: string;
 }
 
 /**
@@ -119,6 +125,12 @@ export interface RegisterMultiFileModelInput {
   framework: InferenceFramework;
   modality?: ModelCategory;
   memoryRequirement?: number;
+  /**
+   * Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`).
+   * Lands on `ModelInfo.cuaProfile` so callers can discover which registered
+   * models are drivable through `RunAnywhere.cua`.
+   */
+  cuaProfile?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,6 +180,7 @@ export async function registerModel(
     ...(input.supportsThinking ? { supportsThinking: true } : {}),
     ...(input.supportsLora ? { supportsLora: true } : {}),
     ...(input.artifactType !== undefined ? { artifactType: input.artifactType } : {}),
+    ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
   });
 
   const saved = arrayBufferToBytes(
@@ -220,6 +233,8 @@ export interface RegisterArchiveModelInput {
   memoryRequirement?: number;
   supportsThinking?: boolean;
   supportsLora?: boolean;
+  /** Optional Computer-Use-Agent profile id (see `RunAnywhere.cua.faraProfile`). */
+  cuaProfile?: string;
 }
 
 /** Infer the archive type from a URL extension. Mirrors Swift `ArchiveType.from(url:)`. */
@@ -282,6 +297,7 @@ export async function registerArchiveModel(
     ...(memoryHint !== undefined
       ? { memoryRequiredBytes: memoryHint }
       : {}),
+    ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     ...(input.supportsThinking
       ? { thinkingPattern: ThinkingTagPattern.fromPartial({}) }
       : {}),
@@ -329,6 +345,7 @@ export async function registerMultiFileModel(
           memoryRequiredBytes: input.memoryRequirement,
         }
       : {}),
+    ...(input.cuaProfile ? { cuaProfile: input.cuaProfile } : {}),
     files: input.files.map((file) => ({
       role:
         file.role ??

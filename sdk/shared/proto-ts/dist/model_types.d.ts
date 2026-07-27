@@ -948,6 +948,11 @@ export interface RegisterModelFromUrlRequest {
     downloadSizeBytes?: number | undefined;
     /** Explicit id override. Empty -> derived from URL/name. */
     id?: string | undefined;
+    /**
+     * Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+     * registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+     */
+    cuaProfile?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------

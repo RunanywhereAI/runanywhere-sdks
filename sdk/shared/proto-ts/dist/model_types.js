@@ -7011,6 +7011,7 @@ function createBaseRegisterModelFromUrlRequest() {
         description: undefined,
         downloadSizeBytes: undefined,
         id: undefined,
+        cuaProfile: undefined,
     };
 }
 exports.RegisterModelFromUrlRequest = {
@@ -7053,6 +7054,9 @@ exports.RegisterModelFromUrlRequest = {
         }
         if (message.id !== undefined) {
             writer.uint32(106).string(message.id);
+        }
+        if (message.cuaProfile !== undefined) {
+            writer.uint32(114).string(message.cuaProfile);
         }
         return writer;
     },
@@ -7154,6 +7158,13 @@ exports.RegisterModelFromUrlRequest = {
                     message.id = reader.string();
                     continue;
                 }
+                case 14: {
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.cuaProfile = reader.string();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -7201,6 +7212,11 @@ exports.RegisterModelFromUrlRequest = {
                     ? globalThis.Number(object.download_size_bytes)
                     : undefined,
             id: isSet(object.id) ? globalThis.String(object.id) : undefined,
+            cuaProfile: isSet(object.cuaProfile)
+                ? globalThis.String(object.cuaProfile)
+                : isSet(object.cua_profile)
+                    ? globalThis.String(object.cua_profile)
+                    : undefined,
         };
     },
     toJSON(message) {
@@ -7244,6 +7260,9 @@ exports.RegisterModelFromUrlRequest = {
         if (message.id !== undefined) {
             obj.id = message.id;
         }
+        if (message.cuaProfile !== undefined) {
+            obj.cuaProfile = message.cuaProfile;
+        }
         return obj;
     },
     create(base) {
@@ -7264,6 +7283,7 @@ exports.RegisterModelFromUrlRequest = {
         message.description = object.description ?? undefined;
         message.downloadSizeBytes = object.downloadSizeBytes ?? undefined;
         message.id = object.id ?? undefined;
+        message.cuaProfile = object.cuaProfile ?? undefined;
         return message;
     },
 };

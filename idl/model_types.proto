@@ -925,6 +925,9 @@ message RegisterModelFromUrlRequest {
     optional int64             download_size_bytes   = 12;
     // Explicit id override. Empty -> derived from URL/name.
     optional string            id                    = 13;
+    // Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+    // registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+    optional string            cua_profile           = 14;
 }
 
 // ---------------------------------------------------------------------------

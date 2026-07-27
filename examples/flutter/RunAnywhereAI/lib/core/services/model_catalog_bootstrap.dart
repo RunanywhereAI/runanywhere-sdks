@@ -272,6 +272,7 @@ abstract final class ModelCatalogBootstrap {
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
       memoryRequirement: 3300000000,
+      cuaProfile: RunAnywhereCUA.faraProfile,
     );
     debugPrint('VLM models registered');
 
@@ -616,6 +617,7 @@ abstract final class ModelCatalogBootstrap {
     required InferenceFramework framework,
     required ModelCategory modality,
     required int memoryRequirement,
+    String? cuaProfile,
   }) async {
     final descriptors = files
         .map(
@@ -640,6 +642,7 @@ abstract final class ModelCatalogBootstrap {
         framework: framework,
         modality: modality,
         memoryRequirement: memoryRequirement,
+        cuaProfile: cuaProfile,
       );
     } catch (e) {
       debugPrint('Failed to register multi-file model $id: $e');

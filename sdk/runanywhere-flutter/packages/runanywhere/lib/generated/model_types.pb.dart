@@ -4703,6 +4703,7 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
     $core.String? description,
     $fixnum.Int64? downloadSizeBytes,
     $core.String? id,
+    $core.String? cuaProfile,
   }) {
     final result = create();
     if (url != null) result.url = url;
@@ -4719,6 +4720,7 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
     if (description != null) result.description = description;
     if (downloadSizeBytes != null) result.downloadSizeBytes = downloadSizeBytes;
     if (id != null) result.id = id;
+    if (cuaProfile != null) result.cuaProfile = cuaProfile;
     return result;
   }
 
@@ -4752,6 +4754,7 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
     ..aOS(11, _omitFieldNames ? '' : 'description')
     ..aInt64(12, _omitFieldNames ? '' : 'downloadSizeBytes')
     ..aOS(13, _omitFieldNames ? '' : 'id')
+    ..aOS(14, _omitFieldNames ? '' : 'cuaProfile')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4907,6 +4910,17 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
   $core.bool hasId() => $_has(12);
   @$pb.TagNumber(13)
   void clearId() => $_clearField(13);
+
+  /// Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+  /// registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+  @$pb.TagNumber(14)
+  $core.String get cuaProfile => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set cuaProfile($core.String value) => $_setString(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasCuaProfile() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearCuaProfile() => $_clearField(14);
 }
 
 /// ---------------------------------------------------------------------------

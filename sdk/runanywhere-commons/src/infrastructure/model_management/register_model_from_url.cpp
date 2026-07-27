@@ -468,6 +468,9 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     if (request.has_download_size_bytes()) {
         made_model.set_download_size_bytes(request.download_size_bytes());
     }
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        made_model.set_cua_profile(request.cua_profile());
+    }
 
     // -------------------------------------------------------------------------
     // 2) Persist via the existing registry save path.

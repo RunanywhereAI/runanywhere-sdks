@@ -104,7 +104,9 @@ class DartBridgeCua {
         decode: pb.CuaAction.fromBuffer,
         symbol: 'rac_cua_parse_action_proto',
       );
-      final coordinate = proto.coordinateValid ? (x: proto.x, y: proto.y) : null;
+      final coordinate = proto.coordinateValid
+          ? (x: proto.x, y: proto.y)
+          : null;
       return CuaAction(
         kind: CuaActionKind.fromValue(proto.type.value),
         coordinate: coordinate,

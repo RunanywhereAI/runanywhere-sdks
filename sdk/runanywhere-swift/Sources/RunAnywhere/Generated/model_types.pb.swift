@@ -2774,6 +2774,17 @@ public nonisolated struct RARegisterModelFromUrlRequest: Sendable {
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
   public mutating func clearID() {self._id = nil}
 
+  /// Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+  /// registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+  public var cuaProfile: String {
+    get {_cuaProfile ?? String()}
+    set {_cuaProfile = newValue}
+  }
+  /// Returns true if `cuaProfile` has been explicitly set.
+  public var hasCuaProfile: Bool {self._cuaProfile != nil}
+  /// Clears the value of `cuaProfile`. Subsequent reads from it will return its default value.
+  public mutating func clearCuaProfile() {self._cuaProfile = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -2789,6 +2800,7 @@ public nonisolated struct RARegisterModelFromUrlRequest: Sendable {
   fileprivate var _description_p: String? = nil
   fileprivate var _downloadSizeBytes: Int64? = nil
   fileprivate var _id: String? = nil
+  fileprivate var _cuaProfile: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -5451,7 +5463,7 @@ nonisolated extension RAModelInfoMakeRequest: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RegisterModelFromUrlRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}name\0\u{1}framework\0\u{1}category\0\u{1}source\0\u{3}memory_required_bytes\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{3}artifact_type\0\u{3}context_length\0\u{1}description\0\u{3}download_size_bytes\0\u{1}id\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}name\0\u{1}framework\0\u{1}category\0\u{1}source\0\u{3}memory_required_bytes\0\u{3}supports_thinking\0\u{3}supports_lora\0\u{3}artifact_type\0\u{3}context_length\0\u{1}description\0\u{3}download_size_bytes\0\u{1}id\0\u{3}cua_profile\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -5472,6 +5484,7 @@ nonisolated extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, Swif
       case 11: try { try decoder.decodeSingularStringField(value: &self._description_p) }()
       case 12: try { try decoder.decodeSingularInt64Field(value: &self._downloadSizeBytes) }()
       case 13: try { try decoder.decodeSingularStringField(value: &self._id) }()
+      case 14: try { try decoder.decodeSingularStringField(value: &self._cuaProfile) }()
       default: break
       }
     }
@@ -5521,6 +5534,9 @@ nonisolated extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, Swif
     try { if let v = self._id {
       try visitor.visitSingularStringField(value: v, fieldNumber: 13)
     } }()
+    try { if let v = self._cuaProfile {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 14)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5538,6 +5554,7 @@ nonisolated extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, Swif
     if lhs._description_p != rhs._description_p {return false}
     if lhs._downloadSizeBytes != rhs._downloadSizeBytes {return false}
     if lhs._id != rhs._id {return false}
+    if lhs._cuaProfile != rhs._cuaProfile {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

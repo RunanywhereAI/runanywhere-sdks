@@ -1268,6 +1268,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RegisterModelFromUrlRequest final :
     kNameFieldNumber = 2,
     kDescriptionFieldNumber = 11,
     kIdFieldNumber = 13,
+    kCuaProfileFieldNumber = 14,
     kFrameworkFieldNumber = 3,
     kCategoryFieldNumber = 4,
     kMemoryRequiredBytesFieldNumber = 6,
@@ -1340,6 +1341,23 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RegisterModelFromUrlRequest final :
   const ::std::string& _internal_id() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_id(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_id();
+
+  public:
+  // optional string cua_profile = 14;
+  [[nodiscard]] bool has_cua_profile()
+      const;
+  void clear_cua_profile() ;
+  [[nodiscard]] const ::std::string& cua_profile() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_cua_profile(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_cua_profile();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_cua_profile();
+  void set_allocated_cua_profile(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_cua_profile() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_cua_profile(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_cua_profile();
 
   public:
   // optional .runanywhere.v1.InferenceFramework framework = 3;
@@ -1454,8 +1472,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RegisterModelFromUrlRequest final :
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 13,
-                          0, 79,
+      ::google::protobuf::internal::TcParseTable<4, 14,
+                          0, 90,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1487,6 +1505,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RegisterModelFromUrlRequest final :
     ::google::protobuf::internal::ArenaStringPtr name_;
     ::google::protobuf::internal::ArenaStringPtr description_;
     ::google::protobuf::internal::ArenaStringPtr id_;
+    ::google::protobuf::internal::ArenaStringPtr cua_profile_;
     int framework_;
     int category_;
     ::int64_t memory_required_bytes_;
@@ -23860,13 +23879,13 @@ inline void RegisterModelFromUrlRequest::set_allocated_name(::std::string* PROTO
 
 // optional .runanywhere.v1.InferenceFramework framework = 3;
 inline bool RegisterModelFromUrlRequest::has_framework() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
   return value;
 }
 inline void RegisterModelFromUrlRequest::clear_framework() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.framework_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::runanywhere::v1::InferenceFramework RegisterModelFromUrlRequest::framework() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RegisterModelFromUrlRequest.framework)
@@ -23874,7 +23893,7 @@ inline ::runanywhere::v1::InferenceFramework RegisterModelFromUrlRequest::framew
 }
 inline void RegisterModelFromUrlRequest::set_framework(::runanywhere::v1::InferenceFramework value) {
   _internal_set_framework(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RegisterModelFromUrlRequest.framework)
 }
 inline ::runanywhere::v1::InferenceFramework RegisterModelFromUrlRequest::_internal_framework() const {
@@ -23888,13 +23907,13 @@ inline void RegisterModelFromUrlRequest::_internal_set_framework(::runanywhere::
 
 // optional .runanywhere.v1.ModelCategory category = 4;
 inline bool RegisterModelFromUrlRequest::has_category() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
   return value;
 }
 inline void RegisterModelFromUrlRequest::clear_category() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.category_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::runanywhere::v1::ModelCategory RegisterModelFromUrlRequest::category() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RegisterModelFromUrlRequest.category)
@@ -23902,7 +23921,7 @@ inline ::runanywhere::v1::ModelCategory RegisterModelFromUrlRequest::category() 
 }
 inline void RegisterModelFromUrlRequest::set_category(::runanywhere::v1::ModelCategory value) {
   _internal_set_category(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RegisterModelFromUrlRequest.category)
 }
 inline ::runanywhere::v1::ModelCategory RegisterModelFromUrlRequest::_internal_category() const {
@@ -23916,13 +23935,13 @@ inline void RegisterModelFromUrlRequest::_internal_set_category(::runanywhere::v
 
 // optional .runanywhere.v1.ModelSource source = 5;
 inline bool RegisterModelFromUrlRequest::has_source() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
   return value;
 }
 inline void RegisterModelFromUrlRequest::clear_source() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.source_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline ::runanywhere::v1::ModelSource RegisterModelFromUrlRequest::source() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RegisterModelFromUrlRequest.source)
@@ -23930,7 +23949,7 @@ inline ::runanywhere::v1::ModelSource RegisterModelFromUrlRequest::source() cons
 }
 inline void RegisterModelFromUrlRequest::set_source(::runanywhere::v1::ModelSource value) {
   _internal_set_source(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RegisterModelFromUrlRequest.source)
 }
 inline ::runanywhere::v1::ModelSource RegisterModelFromUrlRequest::_internal_source() const {
@@ -23944,13 +23963,13 @@ inline void RegisterModelFromUrlRequest::_internal_set_source(::runanywhere::v1:
 
 // optional int64 memory_required_bytes = 6;
 inline bool RegisterModelFromUrlRequest::has_memory_required_bytes() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
   return value;
 }
 inline void RegisterModelFromUrlRequest::clear_memory_required_bytes() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.memory_required_bytes_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline ::int64_t RegisterModelFromUrlRequest::memory_required_bytes() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RegisterModelFromUrlRequest.memory_required_bytes)
@@ -23958,7 +23977,7 @@ inline ::int64_t RegisterModelFromUrlRequest::memory_required_bytes() const {
 }
 inline void RegisterModelFromUrlRequest::set_memory_required_bytes(::int64_t value) {
   _internal_set_memory_required_bytes(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RegisterModelFromUrlRequest.memory_required_bytes)
 }
 inline ::int64_t RegisterModelFromUrlRequest::_internal_memory_required_bytes() const {
@@ -23972,13 +23991,13 @@ inline void RegisterModelFromUrlRequest::_internal_set_memory_required_bytes(::i
 
 // optional bool supports_thinking = 7;
 inline bool RegisterModelFromUrlRequest::has_supports_thinking() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
   return value;
 }
 inline void RegisterModelFromUrlRequest::clear_supports_thinking() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.supports_thinking_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
 inline bool RegisterModelFromUrlRequest::supports_thinking() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RegisterModelFromUrlRequest.supports_thinking)
@@ -23986,7 +24005,7 @@ inline bool RegisterModelFromUrlRequest::supports_thinking() const {
 }
 inline void RegisterModelFromUrlRequest::set_supports_thinking(bool value) {
   _internal_set_supports_thinking(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RegisterModelFromUrlRequest.supports_thinking)
 }
 inline bool RegisterModelFromUrlRequest::_internal_supports_thinking() const {
@@ -24000,13 +24019,13 @@ inline void RegisterModelFromUrlRequest::_internal_set_supports_thinking(bool va
 
 // optional bool supports_lora = 8;
 inline bool RegisterModelFromUrlRequest::has_supports_lora() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000200U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000400U);
   return value;
 }
 inline void RegisterModelFromUrlRequest::clear_supports_lora() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.supports_lora_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
 }
 inline bool RegisterModelFromUrlRequest::supports_lora() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RegisterModelFromUrlRequest.supports_lora)
@@ -24014,7 +24033,7 @@ inline bool RegisterModelFromUrlRequest::supports_lora() const {
 }
 inline void RegisterModelFromUrlRequest::set_supports_lora(bool value) {
   _internal_set_supports_lora(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RegisterModelFromUrlRequest.supports_lora)
 }
 inline bool RegisterModelFromUrlRequest::_internal_supports_lora() const {
@@ -24028,13 +24047,13 @@ inline void RegisterModelFromUrlRequest::_internal_set_supports_lora(bool value)
 
 // optional .runanywhere.v1.ModelArtifactType artifact_type = 9;
 inline bool RegisterModelFromUrlRequest::has_artifact_type() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000400U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000800U);
   return value;
 }
 inline void RegisterModelFromUrlRequest::clear_artifact_type() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.artifact_type_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
 }
 inline ::runanywhere::v1::ModelArtifactType RegisterModelFromUrlRequest::artifact_type() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RegisterModelFromUrlRequest.artifact_type)
@@ -24042,7 +24061,7 @@ inline ::runanywhere::v1::ModelArtifactType RegisterModelFromUrlRequest::artifac
 }
 inline void RegisterModelFromUrlRequest::set_artifact_type(::runanywhere::v1::ModelArtifactType value) {
   _internal_set_artifact_type(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RegisterModelFromUrlRequest.artifact_type)
 }
 inline ::runanywhere::v1::ModelArtifactType RegisterModelFromUrlRequest::_internal_artifact_type() const {
@@ -24056,13 +24075,13 @@ inline void RegisterModelFromUrlRequest::_internal_set_artifact_type(::runanywhe
 
 // optional int32 context_length = 10;
 inline bool RegisterModelFromUrlRequest::has_context_length() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000800U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00001000U);
   return value;
 }
 inline void RegisterModelFromUrlRequest::clear_context_length() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.context_length_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
 }
 inline ::int32_t RegisterModelFromUrlRequest::context_length() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RegisterModelFromUrlRequest.context_length)
@@ -24070,7 +24089,7 @@ inline ::int32_t RegisterModelFromUrlRequest::context_length() const {
 }
 inline void RegisterModelFromUrlRequest::set_context_length(::int32_t value) {
   _internal_set_context_length(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RegisterModelFromUrlRequest.context_length)
 }
 inline ::int32_t RegisterModelFromUrlRequest::_internal_context_length() const {
@@ -24152,13 +24171,13 @@ inline void RegisterModelFromUrlRequest::set_allocated_description(::std::string
 
 // optional int64 download_size_bytes = 12;
 inline bool RegisterModelFromUrlRequest::has_download_size_bytes() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00001000U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00002000U);
   return value;
 }
 inline void RegisterModelFromUrlRequest::clear_download_size_bytes() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.download_size_bytes_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
 }
 inline ::int64_t RegisterModelFromUrlRequest::download_size_bytes() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RegisterModelFromUrlRequest.download_size_bytes)
@@ -24166,7 +24185,7 @@ inline ::int64_t RegisterModelFromUrlRequest::download_size_bytes() const {
 }
 inline void RegisterModelFromUrlRequest::set_download_size_bytes(::int64_t value) {
   _internal_set_download_size_bytes(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RegisterModelFromUrlRequest.download_size_bytes)
 }
 inline ::int64_t RegisterModelFromUrlRequest::_internal_download_size_bytes() const {
@@ -24244,6 +24263,74 @@ inline void RegisterModelFromUrlRequest::set_allocated_id(::std::string* PROTOBU
     _impl_.id_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RegisterModelFromUrlRequest.id)
+}
+
+// optional string cua_profile = 14;
+inline bool RegisterModelFromUrlRequest::has_cua_profile() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  return value;
+}
+inline void RegisterModelFromUrlRequest::clear_cua_profile() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.cua_profile_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
+inline const ::std::string& RegisterModelFromUrlRequest::cua_profile() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RegisterModelFromUrlRequest.cua_profile)
+  return _internal_cua_profile();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void RegisterModelFromUrlRequest::set_cua_profile(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.cua_profile_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RegisterModelFromUrlRequest.cua_profile)
+}
+inline ::std::string* PROTOBUF_NONNULL RegisterModelFromUrlRequest::mutable_cua_profile()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ::std::string* _s = _internal_mutable_cua_profile();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RegisterModelFromUrlRequest.cua_profile)
+  return _s;
+}
+inline const ::std::string& RegisterModelFromUrlRequest::_internal_cua_profile() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.cua_profile_.Get();
+}
+inline void RegisterModelFromUrlRequest::_internal_set_cua_profile(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.cua_profile_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL RegisterModelFromUrlRequest::_internal_mutable_cua_profile() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.cua_profile_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE RegisterModelFromUrlRequest::release_cua_profile() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.RegisterModelFromUrlRequest.cua_profile)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  auto* released = _impl_.cua_profile_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.cua_profile_.Set("", GetArena());
+  }
+  return released;
+}
+inline void RegisterModelFromUrlRequest::set_allocated_cua_profile(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  }
+  _impl_.cua_profile_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.cua_profile_.IsDefault()) {
+    _impl_.cua_profile_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RegisterModelFromUrlRequest.cua_profile)
 }
 
 // -------------------------------------------------------------------

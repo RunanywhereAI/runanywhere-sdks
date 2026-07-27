@@ -126,11 +126,11 @@ constexpr RegisterModelFromUrlRequest::ParseTableT_ RegisterModelFromUrlRequest:
     {
       PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_._has_bits_),
       0, // no _extensions_
-      13, 120,  // max_field_number, fast_idx_mask
+      14, 120,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294959104,  // skipmap
+      4294950912,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      13,  // num_field_entries
+      14,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -150,50 +150,53 @@ constexpr RegisterModelFromUrlRequest::ParseTableT_ RegisterModelFromUrlRequest:
        {18, 1, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.name_)}},
       // optional .runanywhere.v1.InferenceFramework framework = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.framework_), 4>(),
-       {24, 4, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.framework_), 5>(),
+       {24, 5, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.framework_)}},
       // optional .runanywhere.v1.ModelCategory category = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.category_), 5>(),
-       {32, 5, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.category_), 6>(),
+       {32, 6, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.category_)}},
       // optional .runanywhere.v1.ModelSource source = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.source_), 7>(),
-       {40, 7, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.source_), 8>(),
+       {40, 8, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.source_)}},
       // optional int64 memory_required_bytes = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(RegisterModelFromUrlRequest, _impl_.memory_required_bytes_), 6>(),
-       {48, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(RegisterModelFromUrlRequest, _impl_.memory_required_bytes_), 7>(),
+       {48, 7, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.memory_required_bytes_)}},
       // optional bool supports_thinking = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(RegisterModelFromUrlRequest, _impl_.supports_thinking_), 8>(),
-       {56, 8, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(RegisterModelFromUrlRequest, _impl_.supports_thinking_), 9>(),
+       {56, 9, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.supports_thinking_)}},
       // optional bool supports_lora = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(RegisterModelFromUrlRequest, _impl_.supports_lora_), 9>(),
-       {64, 9, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(RegisterModelFromUrlRequest, _impl_.supports_lora_), 10>(),
+       {64, 10, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.supports_lora_)}},
       // optional .runanywhere.v1.ModelArtifactType artifact_type = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.artifact_type_), 10>(),
-       {72, 10, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.artifact_type_), 11>(),
+       {72, 11, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.artifact_type_)}},
       // optional int32 context_length = 10;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.context_length_), 11>(),
-       {80, 11, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.context_length_), 12>(),
+       {80, 12, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.context_length_)}},
       // optional string description = 11;
       {::_pbi::TcParser::FastUS1,
        {90, 2, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.description_)}},
       // optional int64 download_size_bytes = 12;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(RegisterModelFromUrlRequest, _impl_.download_size_bytes_), 12>(),
-       {96, 12, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(RegisterModelFromUrlRequest, _impl_.download_size_bytes_), 13>(),
+       {96, 13, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.download_size_bytes_)}},
       // optional string id = 13;
       {::_pbi::TcParser::FastUS1,
        {106, 3, 0,
         PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.id_)}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // optional string cua_profile = 14;
+      {::_pbi::TcParser::FastUS1,
+       {114, 4, 0,
+        PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.cua_profile_)}},
       {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
@@ -203,36 +206,39 @@ constexpr RegisterModelFromUrlRequest::ParseTableT_ RegisterModelFromUrlRequest:
       // string name = 2;
       {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.name_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // optional .runanywhere.v1.InferenceFramework framework = 3;
-      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.framework_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.framework_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional .runanywhere.v1.ModelCategory category = 4;
-      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.category_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.category_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional .runanywhere.v1.ModelSource source = 5;
-      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.source_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.source_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional int64 memory_required_bytes = 6;
-      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.memory_required_bytes_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.memory_required_bytes_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // optional bool supports_thinking = 7;
-      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.supports_thinking_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.supports_thinking_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // optional bool supports_lora = 8;
-      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.supports_lora_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.supports_lora_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // optional .runanywhere.v1.ModelArtifactType artifact_type = 9;
-      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.artifact_type_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.artifact_type_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional int32 context_length = 10;
-      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.context_length_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.context_length_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional string description = 11;
       {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.description_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // optional int64 download_size_bytes = 12;
-      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.download_size_bytes_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.download_size_bytes_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // optional string id = 13;
       {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional string cua_profile = 14;
+      {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.cua_profile_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     // no aux_entries
     {{
-      "\52\3\4\0\0\0\0\0\0\0\0\13\0\2\0\0"
+      "\52\3\4\0\0\0\0\0\0\0\0\13\0\2\13\0"
       "runanywhere.v1.RegisterModelFromUrlRequest"
       "url"
       "name"
       "description"
       "id"
+      "cua_profile"
     }},
   };
 }
@@ -252,6 +258,9 @@ inline constexpr RegisterModelFromUrlRequest::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        cua_profile_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)},
@@ -8510,7 +8519,7 @@ const ::uint32_t
         4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_._has_bits_),
-        16, // hasbit index offset
+        17, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.url_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.name_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.framework_),
@@ -8524,19 +8533,21 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.description_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.download_size_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.cua_profile_),
         0,
         1,
-        4,
         5,
-        7,
         6,
         8,
+        7,
         9,
         10,
         11,
-        2,
         12,
+        2,
+        13,
         3,
+        4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterMultiFileModelRequest, _impl_._has_bits_),
         17, // hasbit index offset
@@ -8611,7 +8622,7 @@ static const ::_pbi::MigrationSchema
         {560, sizeof(::runanywhere::v1::ModelRegistryFetchAssignmentsResult)},
         {575, sizeof(::runanywhere::v1::ModelInfoMakeRequest)},
         {588, sizeof(::runanywhere::v1::RegisterModelFromUrlRequest)},
-        {617, sizeof(::runanywhere::v1::RegisterMultiFileModelRequest)},
+        {619, sizeof(::runanywhere::v1::RegisterMultiFileModelRequest)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -8902,7 +8913,7 @@ const char descriptor_table_protodef_model_5ftypes_2eproto[] ABSL_ATTRIBUTE_SECT
     "\001\001\0224\n\010category\030\004 \001(\0162\035.runanywhere.v1.Mo"
     "delCategoryH\001\210\001\001\0220\n\006source\030\005 \001(\0162\033.runan"
     "ywhere.v1.ModelSourceH\002\210\001\001B\014\n\n_framework"
-    "B\013\n\t_categoryB\t\n\007_source\"\241\005\n\033RegisterMod"
+    "B\013\n\t_categoryB\t\n\007_source\"\313\005\n\033RegisterMod"
     "elFromUrlRequest\022\013\n\003url\030\001 \001(\t\022\014\n\004name\030\002 "
     "\001(\t\022:\n\tframework\030\003 \001(\0162\".runanywhere.v1."
     "InferenceFrameworkH\000\210\001\001\0224\n\010category\030\004 \001("
@@ -8914,167 +8925,168 @@ const char descriptor_table_protodef_model_5ftypes_2eproto[] ABSL_ATTRIBUTE_SECT
     "\030\t \001(\0162!.runanywhere.v1.ModelArtifactTyp"
     "eH\006\210\001\001\022\033\n\016context_length\030\n \001(\005H\007\210\001\001\022\030\n\013d"
     "escription\030\013 \001(\tH\010\210\001\001\022 \n\023download_size_b"
-    "ytes\030\014 \001(\003H\t\210\001\001\022\017\n\002id\030\r \001(\tH\n\210\001\001B\014\n\n_fra"
-    "meworkB\013\n\t_categoryB\t\n\007_sourceB\030\n\026_memor"
-    "y_required_bytesB\024\n\022_supports_thinkingB\020"
-    "\n\016_supports_loraB\020\n\016_artifact_typeB\021\n\017_c"
-    "ontext_lengthB\016\n\014_descriptionB\026\n\024_downlo"
-    "ad_size_bytesB\005\n\003_id\"\301\005\n\035RegisterMultiFi"
-    "leModelRequest\022\n\n\002id\030\001 \001(\t\022\014\n\004name\030\002 \001(\t"
-    "\0225\n\tframework\030\003 \001(\0162\".runanywhere.v1.Inf"
-    "erenceFramework\0222\n\005files\030\004 \003(\0132#.runanyw"
-    "here.v1.ModelFileDescriptor\0224\n\010category\030"
-    "\005 \001(\0162\035.runanywhere.v1.ModelCategoryH\000\210\001"
-    "\001\0220\n\006format\030\006 \001(\0162\033.runanywhere.v1.Model"
-    "FormatH\001\210\001\001\022\"\n\025memory_required_bytes\030\007 \001"
-    "(\003H\002\210\001\001\022 \n\023download_size_bytes\030\010 \001(\003H\003\210\001"
-    "\001\022\033\n\016context_length\030\t \001(\005H\004\210\001\001\022\036\n\021suppor"
-    "ts_thinking\030\n \001(\010H\005\210\001\001\022\032\n\rsupports_lora\030"
-    "\013 \001(\010H\006\210\001\001\022\030\n\013description\030\014 \001(\tH\007\210\001\001\0220\n\006"
-    "source\030\r \001(\0162\033.runanywhere.v1.ModelSourc"
-    "eH\010\210\001\001\022\030\n\013cua_profile\030\016 \001(\tH\t\210\001\001B\013\n\t_cat"
-    "egoryB\t\n\007_formatB\030\n\026_memory_required_byt"
-    "esB\026\n\024_download_size_bytesB\021\n\017_context_l"
-    "engthB\024\n\022_supports_thinkingB\020\n\016_supports"
-    "_loraB\016\n\014_descriptionB\t\n\007_sourceB\016\n\014_cua"
-    "_profile*\343\002\n\013AudioFormat\022-\n\030AUDIO_FORMAT"
-    "_UNSPECIFIED\020\000\032\017\342\265\030\013unspecified\022\035\n\020AUDIO"
-    "_FORMAT_PCM\020\001\032\007\342\265\030\003pcm\022\035\n\020AUDIO_FORMAT_W"
-    "AV\020\002\032\007\342\265\030\003wav\022\035\n\020AUDIO_FORMAT_MP3\020\003\032\007\342\265\030"
-    "\003mp3\022\037\n\021AUDIO_FORMAT_OPUS\020\004\032\010\342\265\030\004opus\022\035\n"
-    "\020AUDIO_FORMAT_AAC\020\005\032\007\342\265\030\003aac\022\037\n\021AUDIO_FO"
-    "RMAT_FLAC\020\006\032\010\342\265\030\004flac\022\035\n\020AUDIO_FORMAT_OG"
-    "G\020\007\032\007\342\265\030\003ogg\022\035\n\020AUDIO_FORMAT_M4A\020\010\032\007\342\265\030\003"
-    "m4a\022)\n\026AUDIO_FORMAT_PCM_S16LE\020\t\032\r\342\265\030\tpcm"
-    "_s16le*\247\003\n\013ModelFormat\022\034\n\030MODEL_FORMAT_U"
-    "NSPECIFIED\020\000\022\025\n\021MODEL_FORMAT_GGUF\020\001\022\025\n\021M"
-    "ODEL_FORMAT_GGML\020\002\022\025\n\021MODEL_FORMAT_ONNX\020"
-    "\003\022\024\n\020MODEL_FORMAT_ORT\020\004\022\024\n\020MODEL_FORMAT_"
-    "BIN\020\005\022\027\n\023MODEL_FORMAT_COREML\020\006\022\030\n\024MODEL_"
-    "FORMAT_MLMODEL\020\007\022\032\n\026MODEL_FORMAT_MLPACKA"
-    "GE\020\010\022\027\n\023MODEL_FORMAT_TFLITE\020\t\022\034\n\030MODEL_F"
-    "ORMAT_SAFETENSORS\020\n\022\034\n\030MODEL_FORMAT_QNN_"
-    "CONTEXT\020\013\022\024\n\020MODEL_FORMAT_ZIP\020\014\022\027\n\023MODEL"
-    "_FORMAT_FOLDER\020\r\022\034\n\030MODEL_FORMAT_PROPRIE"
-    "TARY\020\016\022\030\n\024MODEL_FORMAT_UNKNOWN\020\017*\337\005\n\022Inf"
-    "erenceFramework\022#\n\037INFERENCE_FRAMEWORK_U"
-    "NSPECIFIED\020\000\022\034\n\030INFERENCE_FRAMEWORK_ONNX"
-    "\020\001\022!\n\035INFERENCE_FRAMEWORK_LLAMA_CPP\020\002\022)\n"
-    "%INFERENCE_FRAMEWORK_FOUNDATION_MODELS\020\003"
-    "\022\"\n\036INFERENCE_FRAMEWORK_SYSTEM_TTS\020\004\022#\n\037"
-    "INFERENCE_FRAMEWORK_FLUID_AUDIO\020\005\022\036\n\032INF"
-    "ERENCE_FRAMEWORK_COREML\020\006\022\033\n\027INFERENCE_F"
-    "RAMEWORK_MLX\020\007\022\036\n\032INFERENCE_FRAMEWORK_TF"
-    "LITE\020\013\022\"\n\036INFERENCE_FRAMEWORK_EXECUTORCH"
-    "\020\014\022!\n\035INFERENCE_FRAMEWORK_MEDIAPIPE\020\r\022\033\n"
-    "\027INFERENCE_FRAMEWORK_MLC\020\016\022 \n\034INFERENCE_"
-    "FRAMEWORK_PICO_LLM\020\017\022!\n\035INFERENCE_FRAMEW"
-    "ORK_PIPER_TTS\020\020\022*\n&INFERENCE_FRAMEWORK_S"
-    "WIFT_TRANSFORMERS\020\023\022 \n\034INFERENCE_FRAMEWO"
-    "RK_BUILT_IN\020\024\022\034\n\030INFERENCE_FRAMEWORK_NON"
-    "E\020\025\022\037\n\033INFERENCE_FRAMEWORK_UNKNOWN\020\026\022\036\n\032"
-    "INFERENCE_FRAMEWORK_SHERPA\020\027\022\036\n\032INFERENC"
-    "E_FRAMEWORK_QHEXRT\020\030\"\004\010\010\020\010\"\004\010\t\020\t\"\004\010\n\020\n\"\004"
-    "\010\021\020\021\"\004\010\022\020\022*\231\005\n\rModelCategory\022/\n\032MODEL_CA"
-    "TEGORY_UNSPECIFIED\020\000\032\017\342\265\030\013unspecified\022)\n"
-    "\027MODEL_CATEGORY_LANGUAGE\020\001\032\014\342\265\030\010language"
-    "\022=\n!MODEL_CATEGORY_SPEECH_RECOGNITION\020\002\032"
-    "\026\342\265\030\022speech-recognition\0229\n\037MODEL_CATEGOR"
-    "Y_SPEECH_SYNTHESIS\020\003\032\024\342\265\030\020speech-synthes"
-    "is\022%\n\025MODEL_CATEGORY_VISION\020\004\032\n\342\265\030\006visio"
-    "n\0229\n\037MODEL_CATEGORY_IMAGE_GENERATION\020\005\032\024"
-    "\342\265\030\020image-generation\022-\n\031MODEL_CATEGORY_M"
-    "ULTIMODAL\020\006\032\016\342\265\030\nmultimodal\022#\n\024MODEL_CAT"
-    "EGORY_AUDIO\020\007\032\t\342\265\030\005audio\022+\n\030MODEL_CATEGO"
-    "RY_EMBEDDING\020\010\032\r\342\265\030\tembedding\022I\n\'MODEL_C"
-    "ATEGORY_VOICE_ACTIVITY_DETECTION\020\t\032\034\342\265\030\030"
-    "voice-activity-detection\022\?\n\"MODEL_CATEGO"
-    "RY_SPEAKER_DIARIZATION\020\n\032\027\342\265\030\023speaker-di"
-    "arization\022C\n$MODEL_CATEGORY_SEMANTIC_SEG"
-    "MENTATION\020\013\032\031\342\265\030\025semantic-segmentation*\303"
-    "\001\n\016SDKEnvironment\0220\n\033SDK_ENVIRONMENT_UNS"
-    "PECIFIED\020\000\032\017\342\265\030\013unspecified\0220\n\033SDK_ENVIR"
-    "ONMENT_DEVELOPMENT\020\001\032\017\342\265\030\013development\022.\n"
-    "\032SDK_ENVIRONMENT_PRODUCTION\020\003\032\016\342\265\030\nprodu"
-    "ction\"\004\010\002\020\002*\027SDK_ENVIRONMENT_STAGING*\255\001\n"
-    "\013ModelSource\022-\n\030MODEL_SOURCE_UNSPECIFIED"
-    "\020\000\032\017\342\265\030\013unspecified\022#\n\023MODEL_SOURCE_REMO"
-    "TE\020\001\032\n\342\265\030\006remote\022!\n\022MODEL_SOURCE_LOCAL\020\002"
-    "\032\t\342\265\030\005local\022\'\n\025MODEL_SOURCE_BUILT_IN\020\003\032\014"
-    "\342\265\030\010built-in*\215\001\n\013ArchiveType\022\034\n\030ARCHIVE_"
-    "TYPE_UNSPECIFIED\020\000\022\024\n\020ARCHIVE_TYPE_ZIP\020\001"
-    "\022\030\n\024ARCHIVE_TYPE_TAR_BZ2\020\002\022\027\n\023ARCHIVE_TY"
-    "PE_TAR_GZ\020\003\022\027\n\023ARCHIVE_TYPE_TAR_XZ\020\004*\252\002\n"
-    "\020ArchiveStructure\0222\n\035ARCHIVE_STRUCTURE_U"
-    "NSPECIFIED\020\000\032\017\342\265\030\013unspecified\022>\n$ARCHIVE"
-    "_STRUCTURE_SINGLE_FILE_NESTED\020\001\032\024\342\265\030\020sin"
-    "gleFileNested\0229\n!ARCHIVE_STRUCTURE_DIREC"
-    "TORY_BASED\020\002\032\022\342\265\030\016directoryBased\022;\n\"ARCH"
-    "IVE_STRUCTURE_NESTED_DIRECTORY\020\003\032\023\342\265\030\017ne"
-    "stedDirectory\022*\n\031ARCHIVE_STRUCTURE_UNKNO"
-    "WN\020\004\032\013\342\265\030\007unknown*\245\003\n\021ModelArtifactType\022"
-    "#\n\037MODEL_ARTIFACT_TYPE_UNSPECIFIED\020\000\022#\n\037"
-    "MODEL_ARTIFACT_TYPE_SINGLE_FILE\020\001\022&\n\"MOD"
-    "EL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE\020\002\022!\n\035MOD"
-    "EL_ARTIFACT_TYPE_DIRECTORY\020\003\022#\n\037MODEL_AR"
-    "TIFACT_TYPE_ZIP_ARCHIVE\020\004\022\036\n\032MODEL_ARTIF"
-    "ACT_TYPE_CUSTOM\020\005\022\037\n\033MODEL_ARTIFACT_TYPE"
-    "_ARCHIVE\020\006\022\"\n\036MODEL_ARTIFACT_TYPE_MULTI_"
-    "FILE\020\007\022 \n\034MODEL_ARTIFACT_TYPE_BUILT_IN\020\010"
-    "\022\'\n#MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE\020"
-    "\t\022&\n\"MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE\020"
-    "\n*\225\002\n\023ModelRegistryStatus\022%\n!MODEL_REGIS"
-    "TRY_STATUS_UNSPECIFIED\020\000\022$\n MODEL_REGIST"
-    "RY_STATUS_REGISTERED\020\001\022%\n!MODEL_REGISTRY"
-    "_STATUS_DOWNLOADING\020\002\022$\n MODEL_REGISTRY_"
-    "STATUS_DOWNLOADED\020\003\022!\n\035MODEL_REGISTRY_ST"
-    "ATUS_LOADING\020\004\022 \n\034MODEL_REGISTRY_STATUS_"
-    "LOADED\020\005\022\037\n\033MODEL_REGISTRY_STATUS_ERROR\020"
-    "\006*\305\002\n\023ModelQuerySortField\022&\n\"MODEL_QUERY"
-    "_SORT_FIELD_UNSPECIFIED\020\000\022\037\n\033MODEL_QUERY"
-    "_SORT_FIELD_NAME\020\001\022-\n)MODEL_QUERY_SORT_F"
-    "IELD_CREATED_AT_UNIX_MS\020\002\022-\n)MODEL_QUERY"
-    "_SORT_FIELD_UPDATED_AT_UNIX_MS\020\003\022.\n*MODE"
-    "L_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES\020\004"
-    "\022/\n+MODEL_QUERY_SORT_FIELD_LAST_USED_AT_"
-    "UNIX_MS\020\005\022&\n\"MODEL_QUERY_SORT_FIELD_USAG"
-    "E_COUNT\020\006*\212\001\n\023ModelQuerySortOrder\022&\n\"MOD"
-    "EL_QUERY_SORT_ORDER_UNSPECIFIED\020\000\022$\n MOD"
-    "EL_QUERY_SORT_ORDER_ASCENDING\020\001\022%\n!MODEL"
-    "_QUERY_SORT_ORDER_DESCENDING\020\002*\253\002\n\rModel"
-    "FileRole\022\037\n\033MODEL_FILE_ROLE_UNSPECIFIED\020"
-    "\000\022!\n\035MODEL_FILE_ROLE_PRIMARY_MODEL\020\001\022\035\n\031"
-    "MODEL_FILE_ROLE_COMPANION\020\002\022$\n MODEL_FIL"
-    "E_ROLE_VISION_PROJECTOR\020\003\022\035\n\031MODEL_FILE_"
-    "ROLE_TOKENIZER\020\004\022\032\n\026MODEL_FILE_ROLE_CONF"
-    "IG\020\005\022\036\n\032MODEL_FILE_ROLE_VOCABULARY\020\006\022\032\n\026"
-    "MODEL_FILE_ROLE_MERGES\020\007\022\032\n\026MODEL_FILE_R"
-    "OLE_LABELS\020\010*\325\001\n\rRoutingPolicy\022\036\n\032ROUTIN"
-    "G_POLICY_UNSPECIFIED\020\000\022\037\n\033ROUTING_POLICY"
-    "_PREFER_LOCAL\020\001\022\037\n\033ROUTING_POLICY_PREFER"
-    "_CLOUD\020\002\022!\n\035ROUTING_POLICY_COST_OPTIMIZE"
-    "D\020\003\022$\n ROUTING_POLICY_LATENCY_OPTIMIZED\020"
-    "\004\022\031\n\025ROUTING_POLICY_MANUAL\020\0052\203\005\n\rModelRe"
-    "gistry\022@\n\010Register\022\031.runanywhere.v1.Mode"
-    "lInfo\032\031.runanywhere.v1.ModelInfo\022>\n\006Upda"
-    "te\022\031.runanywhere.v1.ModelInfo\032\031.runanywh"
-    "ere.v1.ModelInfo\022F\n\003Get\022\037.runanywhere.v1"
-    ".ModelGetRequest\032\036.runanywhere.v1.ModelG"
-    "etResult\022I\n\004List\022 .runanywhere.v1.ModelL"
-    "istRequest\032\037.runanywhere.v1.ModelListRes"
-    "ult\022O\n\006Remove\022\".runanywhere.v1.ModelDele"
-    "teRequest\032!.runanywhere.v1.ModelDeleteRe"
-    "sult\022O\n\006Import\022\".runanywhere.v1.ModelImp"
-    "ortRequest\032!.runanywhere.v1.ModelImportR"
-    "esult\022W\n\010Discover\022%.runanywhere.v1.Model"
-    "DiscoveryRequest\032$.runanywhere.v1.ModelD"
-    "iscoveryResult\022b\n\007Refresh\022+.runanywhere."
-    "v1.ModelRegistryRefreshRequest\032*.runanyw"
-    "here.v1.ModelRegistryRefreshResultB\212\001\n\027a"
-    "i.runanywhere.proto.v1B\017ModelTypesProtoP"
-    "\001Z<github.com/runanywhere/runanywhere-sd"
-    "ks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runa"
-    "nywhere.V1\272\002\002RAb\006proto3"
+    "ytes\030\014 \001(\003H\t\210\001\001\022\017\n\002id\030\r \001(\tH\n\210\001\001\022\030\n\013cua_"
+    "profile\030\016 \001(\tH\013\210\001\001B\014\n\n_frameworkB\013\n\t_cat"
+    "egoryB\t\n\007_sourceB\030\n\026_memory_required_byt"
+    "esB\024\n\022_supports_thinkingB\020\n\016_supports_lo"
+    "raB\020\n\016_artifact_typeB\021\n\017_context_lengthB"
+    "\016\n\014_descriptionB\026\n\024_download_size_bytesB"
+    "\005\n\003_idB\016\n\014_cua_profile\"\301\005\n\035RegisterMulti"
+    "FileModelRequest\022\n\n\002id\030\001 \001(\t\022\014\n\004name\030\002 \001"
+    "(\t\0225\n\tframework\030\003 \001(\0162\".runanywhere.v1.I"
+    "nferenceFramework\0222\n\005files\030\004 \003(\0132#.runan"
+    "ywhere.v1.ModelFileDescriptor\0224\n\010categor"
+    "y\030\005 \001(\0162\035.runanywhere.v1.ModelCategoryH\000"
+    "\210\001\001\0220\n\006format\030\006 \001(\0162\033.runanywhere.v1.Mod"
+    "elFormatH\001\210\001\001\022\"\n\025memory_required_bytes\030\007"
+    " \001(\003H\002\210\001\001\022 \n\023download_size_bytes\030\010 \001(\003H\003"
+    "\210\001\001\022\033\n\016context_length\030\t \001(\005H\004\210\001\001\022\036\n\021supp"
+    "orts_thinking\030\n \001(\010H\005\210\001\001\022\032\n\rsupports_lor"
+    "a\030\013 \001(\010H\006\210\001\001\022\030\n\013description\030\014 \001(\tH\007\210\001\001\0220"
+    "\n\006source\030\r \001(\0162\033.runanywhere.v1.ModelSou"
+    "rceH\010\210\001\001\022\030\n\013cua_profile\030\016 \001(\tH\t\210\001\001B\013\n\t_c"
+    "ategoryB\t\n\007_formatB\030\n\026_memory_required_b"
+    "ytesB\026\n\024_download_size_bytesB\021\n\017_context"
+    "_lengthB\024\n\022_supports_thinkingB\020\n\016_suppor"
+    "ts_loraB\016\n\014_descriptionB\t\n\007_sourceB\016\n\014_c"
+    "ua_profile*\343\002\n\013AudioFormat\022-\n\030AUDIO_FORM"
+    "AT_UNSPECIFIED\020\000\032\017\342\265\030\013unspecified\022\035\n\020AUD"
+    "IO_FORMAT_PCM\020\001\032\007\342\265\030\003pcm\022\035\n\020AUDIO_FORMAT"
+    "_WAV\020\002\032\007\342\265\030\003wav\022\035\n\020AUDIO_FORMAT_MP3\020\003\032\007\342"
+    "\265\030\003mp3\022\037\n\021AUDIO_FORMAT_OPUS\020\004\032\010\342\265\030\004opus\022"
+    "\035\n\020AUDIO_FORMAT_AAC\020\005\032\007\342\265\030\003aac\022\037\n\021AUDIO_"
+    "FORMAT_FLAC\020\006\032\010\342\265\030\004flac\022\035\n\020AUDIO_FORMAT_"
+    "OGG\020\007\032\007\342\265\030\003ogg\022\035\n\020AUDIO_FORMAT_M4A\020\010\032\007\342\265"
+    "\030\003m4a\022)\n\026AUDIO_FORMAT_PCM_S16LE\020\t\032\r\342\265\030\tp"
+    "cm_s16le*\247\003\n\013ModelFormat\022\034\n\030MODEL_FORMAT"
+    "_UNSPECIFIED\020\000\022\025\n\021MODEL_FORMAT_GGUF\020\001\022\025\n"
+    "\021MODEL_FORMAT_GGML\020\002\022\025\n\021MODEL_FORMAT_ONN"
+    "X\020\003\022\024\n\020MODEL_FORMAT_ORT\020\004\022\024\n\020MODEL_FORMA"
+    "T_BIN\020\005\022\027\n\023MODEL_FORMAT_COREML\020\006\022\030\n\024MODE"
+    "L_FORMAT_MLMODEL\020\007\022\032\n\026MODEL_FORMAT_MLPAC"
+    "KAGE\020\010\022\027\n\023MODEL_FORMAT_TFLITE\020\t\022\034\n\030MODEL"
+    "_FORMAT_SAFETENSORS\020\n\022\034\n\030MODEL_FORMAT_QN"
+    "N_CONTEXT\020\013\022\024\n\020MODEL_FORMAT_ZIP\020\014\022\027\n\023MOD"
+    "EL_FORMAT_FOLDER\020\r\022\034\n\030MODEL_FORMAT_PROPR"
+    "IETARY\020\016\022\030\n\024MODEL_FORMAT_UNKNOWN\020\017*\337\005\n\022I"
+    "nferenceFramework\022#\n\037INFERENCE_FRAMEWORK"
+    "_UNSPECIFIED\020\000\022\034\n\030INFERENCE_FRAMEWORK_ON"
+    "NX\020\001\022!\n\035INFERENCE_FRAMEWORK_LLAMA_CPP\020\002\022"
+    ")\n%INFERENCE_FRAMEWORK_FOUNDATION_MODELS"
+    "\020\003\022\"\n\036INFERENCE_FRAMEWORK_SYSTEM_TTS\020\004\022#"
+    "\n\037INFERENCE_FRAMEWORK_FLUID_AUDIO\020\005\022\036\n\032I"
+    "NFERENCE_FRAMEWORK_COREML\020\006\022\033\n\027INFERENCE"
+    "_FRAMEWORK_MLX\020\007\022\036\n\032INFERENCE_FRAMEWORK_"
+    "TFLITE\020\013\022\"\n\036INFERENCE_FRAMEWORK_EXECUTOR"
+    "CH\020\014\022!\n\035INFERENCE_FRAMEWORK_MEDIAPIPE\020\r\022"
+    "\033\n\027INFERENCE_FRAMEWORK_MLC\020\016\022 \n\034INFERENC"
+    "E_FRAMEWORK_PICO_LLM\020\017\022!\n\035INFERENCE_FRAM"
+    "EWORK_PIPER_TTS\020\020\022*\n&INFERENCE_FRAMEWORK"
+    "_SWIFT_TRANSFORMERS\020\023\022 \n\034INFERENCE_FRAME"
+    "WORK_BUILT_IN\020\024\022\034\n\030INFERENCE_FRAMEWORK_N"
+    "ONE\020\025\022\037\n\033INFERENCE_FRAMEWORK_UNKNOWN\020\026\022\036"
+    "\n\032INFERENCE_FRAMEWORK_SHERPA\020\027\022\036\n\032INFERE"
+    "NCE_FRAMEWORK_QHEXRT\020\030\"\004\010\010\020\010\"\004\010\t\020\t\"\004\010\n\020\n"
+    "\"\004\010\021\020\021\"\004\010\022\020\022*\231\005\n\rModelCategory\022/\n\032MODEL_"
+    "CATEGORY_UNSPECIFIED\020\000\032\017\342\265\030\013unspecified\022"
+    ")\n\027MODEL_CATEGORY_LANGUAGE\020\001\032\014\342\265\030\010langua"
+    "ge\022=\n!MODEL_CATEGORY_SPEECH_RECOGNITION\020"
+    "\002\032\026\342\265\030\022speech-recognition\0229\n\037MODEL_CATEG"
+    "ORY_SPEECH_SYNTHESIS\020\003\032\024\342\265\030\020speech-synth"
+    "esis\022%\n\025MODEL_CATEGORY_VISION\020\004\032\n\342\265\030\006vis"
+    "ion\0229\n\037MODEL_CATEGORY_IMAGE_GENERATION\020\005"
+    "\032\024\342\265\030\020image-generation\022-\n\031MODEL_CATEGORY"
+    "_MULTIMODAL\020\006\032\016\342\265\030\nmultimodal\022#\n\024MODEL_C"
+    "ATEGORY_AUDIO\020\007\032\t\342\265\030\005audio\022+\n\030MODEL_CATE"
+    "GORY_EMBEDDING\020\010\032\r\342\265\030\tembedding\022I\n\'MODEL"
+    "_CATEGORY_VOICE_ACTIVITY_DETECTION\020\t\032\034\342\265"
+    "\030\030voice-activity-detection\022\?\n\"MODEL_CATE"
+    "GORY_SPEAKER_DIARIZATION\020\n\032\027\342\265\030\023speaker-"
+    "diarization\022C\n$MODEL_CATEGORY_SEMANTIC_S"
+    "EGMENTATION\020\013\032\031\342\265\030\025semantic-segmentation"
+    "*\303\001\n\016SDKEnvironment\0220\n\033SDK_ENVIRONMENT_U"
+    "NSPECIFIED\020\000\032\017\342\265\030\013unspecified\0220\n\033SDK_ENV"
+    "IRONMENT_DEVELOPMENT\020\001\032\017\342\265\030\013development\022"
+    ".\n\032SDK_ENVIRONMENT_PRODUCTION\020\003\032\016\342\265\030\npro"
+    "duction\"\004\010\002\020\002*\027SDK_ENVIRONMENT_STAGING*\255"
+    "\001\n\013ModelSource\022-\n\030MODEL_SOURCE_UNSPECIFI"
+    "ED\020\000\032\017\342\265\030\013unspecified\022#\n\023MODEL_SOURCE_RE"
+    "MOTE\020\001\032\n\342\265\030\006remote\022!\n\022MODEL_SOURCE_LOCAL"
+    "\020\002\032\t\342\265\030\005local\022\'\n\025MODEL_SOURCE_BUILT_IN\020\003"
+    "\032\014\342\265\030\010built-in*\215\001\n\013ArchiveType\022\034\n\030ARCHIV"
+    "E_TYPE_UNSPECIFIED\020\000\022\024\n\020ARCHIVE_TYPE_ZIP"
+    "\020\001\022\030\n\024ARCHIVE_TYPE_TAR_BZ2\020\002\022\027\n\023ARCHIVE_"
+    "TYPE_TAR_GZ\020\003\022\027\n\023ARCHIVE_TYPE_TAR_XZ\020\004*\252"
+    "\002\n\020ArchiveStructure\0222\n\035ARCHIVE_STRUCTURE"
+    "_UNSPECIFIED\020\000\032\017\342\265\030\013unspecified\022>\n$ARCHI"
+    "VE_STRUCTURE_SINGLE_FILE_NESTED\020\001\032\024\342\265\030\020s"
+    "ingleFileNested\0229\n!ARCHIVE_STRUCTURE_DIR"
+    "ECTORY_BASED\020\002\032\022\342\265\030\016directoryBased\022;\n\"AR"
+    "CHIVE_STRUCTURE_NESTED_DIRECTORY\020\003\032\023\342\265\030\017"
+    "nestedDirectory\022*\n\031ARCHIVE_STRUCTURE_UNK"
+    "NOWN\020\004\032\013\342\265\030\007unknown*\245\003\n\021ModelArtifactTyp"
+    "e\022#\n\037MODEL_ARTIFACT_TYPE_UNSPECIFIED\020\000\022#"
+    "\n\037MODEL_ARTIFACT_TYPE_SINGLE_FILE\020\001\022&\n\"M"
+    "ODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE\020\002\022!\n\035M"
+    "ODEL_ARTIFACT_TYPE_DIRECTORY\020\003\022#\n\037MODEL_"
+    "ARTIFACT_TYPE_ZIP_ARCHIVE\020\004\022\036\n\032MODEL_ART"
+    "IFACT_TYPE_CUSTOM\020\005\022\037\n\033MODEL_ARTIFACT_TY"
+    "PE_ARCHIVE\020\006\022\"\n\036MODEL_ARTIFACT_TYPE_MULT"
+    "I_FILE\020\007\022 \n\034MODEL_ARTIFACT_TYPE_BUILT_IN"
+    "\020\010\022\'\n#MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIV"
+    "E\020\t\022&\n\"MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIV"
+    "E\020\n*\225\002\n\023ModelRegistryStatus\022%\n!MODEL_REG"
+    "ISTRY_STATUS_UNSPECIFIED\020\000\022$\n MODEL_REGI"
+    "STRY_STATUS_REGISTERED\020\001\022%\n!MODEL_REGIST"
+    "RY_STATUS_DOWNLOADING\020\002\022$\n MODEL_REGISTR"
+    "Y_STATUS_DOWNLOADED\020\003\022!\n\035MODEL_REGISTRY_"
+    "STATUS_LOADING\020\004\022 \n\034MODEL_REGISTRY_STATU"
+    "S_LOADED\020\005\022\037\n\033MODEL_REGISTRY_STATUS_ERRO"
+    "R\020\006*\305\002\n\023ModelQuerySortField\022&\n\"MODEL_QUE"
+    "RY_SORT_FIELD_UNSPECIFIED\020\000\022\037\n\033MODEL_QUE"
+    "RY_SORT_FIELD_NAME\020\001\022-\n)MODEL_QUERY_SORT"
+    "_FIELD_CREATED_AT_UNIX_MS\020\002\022-\n)MODEL_QUE"
+    "RY_SORT_FIELD_UPDATED_AT_UNIX_MS\020\003\022.\n*MO"
+    "DEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES"
+    "\020\004\022/\n+MODEL_QUERY_SORT_FIELD_LAST_USED_A"
+    "T_UNIX_MS\020\005\022&\n\"MODEL_QUERY_SORT_FIELD_US"
+    "AGE_COUNT\020\006*\212\001\n\023ModelQuerySortOrder\022&\n\"M"
+    "ODEL_QUERY_SORT_ORDER_UNSPECIFIED\020\000\022$\n M"
+    "ODEL_QUERY_SORT_ORDER_ASCENDING\020\001\022%\n!MOD"
+    "EL_QUERY_SORT_ORDER_DESCENDING\020\002*\253\002\n\rMod"
+    "elFileRole\022\037\n\033MODEL_FILE_ROLE_UNSPECIFIE"
+    "D\020\000\022!\n\035MODEL_FILE_ROLE_PRIMARY_MODEL\020\001\022\035"
+    "\n\031MODEL_FILE_ROLE_COMPANION\020\002\022$\n MODEL_F"
+    "ILE_ROLE_VISION_PROJECTOR\020\003\022\035\n\031MODEL_FIL"
+    "E_ROLE_TOKENIZER\020\004\022\032\n\026MODEL_FILE_ROLE_CO"
+    "NFIG\020\005\022\036\n\032MODEL_FILE_ROLE_VOCABULARY\020\006\022\032"
+    "\n\026MODEL_FILE_ROLE_MERGES\020\007\022\032\n\026MODEL_FILE"
+    "_ROLE_LABELS\020\010*\325\001\n\rRoutingPolicy\022\036\n\032ROUT"
+    "ING_POLICY_UNSPECIFIED\020\000\022\037\n\033ROUTING_POLI"
+    "CY_PREFER_LOCAL\020\001\022\037\n\033ROUTING_POLICY_PREF"
+    "ER_CLOUD\020\002\022!\n\035ROUTING_POLICY_COST_OPTIMI"
+    "ZED\020\003\022$\n ROUTING_POLICY_LATENCY_OPTIMIZE"
+    "D\020\004\022\031\n\025ROUTING_POLICY_MANUAL\020\0052\203\005\n\rModel"
+    "Registry\022@\n\010Register\022\031.runanywhere.v1.Mo"
+    "delInfo\032\031.runanywhere.v1.ModelInfo\022>\n\006Up"
+    "date\022\031.runanywhere.v1.ModelInfo\032\031.runany"
+    "where.v1.ModelInfo\022F\n\003Get\022\037.runanywhere."
+    "v1.ModelGetRequest\032\036.runanywhere.v1.Mode"
+    "lGetResult\022I\n\004List\022 .runanywhere.v1.Mode"
+    "lListRequest\032\037.runanywhere.v1.ModelListR"
+    "esult\022O\n\006Remove\022\".runanywhere.v1.ModelDe"
+    "leteRequest\032!.runanywhere.v1.ModelDelete"
+    "Result\022O\n\006Import\022\".runanywhere.v1.ModelI"
+    "mportRequest\032!.runanywhere.v1.ModelImpor"
+    "tResult\022W\n\010Discover\022%.runanywhere.v1.Mod"
+    "elDiscoveryRequest\032$.runanywhere.v1.Mode"
+    "lDiscoveryResult\022b\n\007Refresh\022+.runanywher"
+    "e.v1.ModelRegistryRefreshRequest\032*.runan"
+    "ywhere.v1.ModelRegistryRefreshResultB\212\001\n"
+    "\027ai.runanywhere.proto.v1B\017ModelTypesProt"
+    "oP\001Z<github.com/runanywhere/runanywhere-"
+    "sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Ru"
+    "nanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_model_5ftypes_2eproto_deps[3] = {
@@ -9086,7 +9098,7 @@ static ::absl::once_flag descriptor_table_model_5ftypes_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_model_5ftypes_2eproto = {
     false,
     false,
-    16663,
+    16705,
     descriptor_table_protodef_model_5ftypes_2eproto,
     "model_types.proto",
     &descriptor_table_model_5ftypes_2eproto_once,
@@ -22985,7 +22997,8 @@ PROTOBUF_NDEBUG_INLINE RegisterModelFromUrlRequest::Impl_::Impl_(
         url_(arena, from.url_),
         name_(arena, from.name_),
         description_(arena, from.description_),
-        id_(arena, from.id_) {}
+        id_(arena, from.id_),
+        cua_profile_(arena, from.cua_profile_) {}
 
 RegisterModelFromUrlRequest::RegisterModelFromUrlRequest(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -23018,7 +23031,8 @@ PROTOBUF_NDEBUG_INLINE RegisterModelFromUrlRequest::Impl_::Impl_(
         url_(arena),
         name_(arena),
         description_(arena),
-        id_(arena) {}
+        id_(arena),
+        cua_profile_(arena) {}
 
 inline void RegisterModelFromUrlRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -23044,6 +23058,7 @@ inline void RegisterModelFromUrlRequest::SharedDtor(MessageLite& self) {
   this_._impl_.name_.Destroy();
   this_._impl_.description_.Destroy();
   this_._impl_.id_.Destroy();
+  this_._impl_.cua_profile_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -23081,7 +23096,7 @@ PROTOBUF_NOINLINE void RegisterModelFromUrlRequest::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.url_.ClearNonDefaultToEmpty();
     }
@@ -23094,16 +23109,19 @@ PROTOBUF_NOINLINE void RegisterModelFromUrlRequest::Clear() {
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       _impl_.id_.ClearNonDefaultToEmpty();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      _impl_.cua_profile_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000f0U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
     ::memset(&_impl_.framework_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.source_) -
-        reinterpret_cast<char*>(&_impl_.framework_)) + sizeof(_impl_.source_));
+        reinterpret_cast<char*>(&_impl_.memory_required_bytes_) -
+        reinterpret_cast<char*>(&_impl_.framework_)) + sizeof(_impl_.memory_required_bytes_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
-    ::memset(&_impl_.supports_thinking_, 0, static_cast<::size_t>(
+  if (BatchCheckHasBit(cached_has_bits, 0x00003f00U)) {
+    ::memset(&_impl_.source_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.download_size_bytes_) -
-        reinterpret_cast<char*>(&_impl_.supports_thinking_)) + sizeof(_impl_.download_size_bytes_));
+        reinterpret_cast<char*>(&_impl_.source_)) + sizeof(_impl_.download_size_bytes_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -23149,56 +23167,56 @@ PROTOBUF_NOINLINE void RegisterModelFromUrlRequest::Clear() {
   }
 
   // optional .runanywhere.v1.InferenceFramework framework = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteEnumToArray(
         3, this_._internal_framework(), target);
   }
 
   // optional .runanywhere.v1.ModelCategory category = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteEnumToArray(
         4, this_._internal_category(), target);
   }
 
   // optional .runanywhere.v1.ModelSource source = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteEnumToArray(
         5, this_._internal_source(), target);
   }
 
   // optional int64 memory_required_bytes = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     target =
         ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<6>(
             stream, this_._internal_memory_required_bytes(), target);
   }
 
   // optional bool supports_thinking = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteBoolToArray(
         7, this_._internal_supports_thinking(), target);
   }
 
   // optional bool supports_lora = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteBoolToArray(
         8, this_._internal_supports_lora(), target);
   }
 
   // optional .runanywhere.v1.ModelArtifactType artifact_type = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteEnumToArray(
         9, this_._internal_artifact_type(), target);
   }
 
   // optional int32 context_length = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
     target =
         ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<10>(
             stream, this_._internal_context_length(), target);
@@ -23213,7 +23231,7 @@ PROTOBUF_NOINLINE void RegisterModelFromUrlRequest::Clear() {
   }
 
   // optional int64 download_size_bytes = 12;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
     target =
         ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<12>(
             stream, this_._internal_download_size_bytes(), target);
@@ -23225,6 +23243,14 @@ PROTOBUF_NOINLINE void RegisterModelFromUrlRequest::Clear() {
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.RegisterModelFromUrlRequest.id");
     target = stream->WriteStringMaybeAliased(13, _s, target);
+  }
+
+  // optional string cua_profile = 14;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    const ::std::string& _s = this_._internal_cua_profile();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.RegisterModelFromUrlRequest.cua_profile");
+    target = stream->WriteStringMaybeAliased(14, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -23252,7 +23278,7 @@ PROTOBUF_NOINLINE void RegisterModelFromUrlRequest::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  total_size += ::absl::popcount(0x00000300U & cached_has_bits) * 2;
+  total_size += ::absl::popcount(0x00000600U & cached_has_bits) * 2;
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // string url = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
@@ -23278,40 +23304,45 @@ PROTOBUF_NOINLINE void RegisterModelFromUrlRequest::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_id());
     }
-    // optional .runanywhere.v1.InferenceFramework framework = 3;
+    // optional string cua_profile = 14;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_cua_profile());
+    }
+    // optional .runanywhere.v1.InferenceFramework framework = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       total_size += 1 +
                     ::_pbi::WireFormatLite::EnumSize(this_._internal_framework());
     }
     // optional .runanywhere.v1.ModelCategory category = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       total_size += 1 +
                     ::_pbi::WireFormatLite::EnumSize(this_._internal_category());
     }
     // optional int64 memory_required_bytes = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
           this_._internal_memory_required_bytes());
     }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00003900U)) {
     // optional .runanywhere.v1.ModelSource source = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       total_size += 1 +
                     ::_pbi::WireFormatLite::EnumSize(this_._internal_source());
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00001c00U)) {
     // optional .runanywhere.v1.ModelArtifactType artifact_type = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       total_size += 1 +
                     ::_pbi::WireFormatLite::EnumSize(this_._internal_artifact_type());
     }
     // optional int32 context_length = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
           this_._internal_context_length());
     }
     // optional int64 download_size_bytes = 12;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
           this_._internal_download_size_bytes());
     }
@@ -23359,32 +23390,35 @@ void RegisterModelFromUrlRequest::MergeImpl(::google::protobuf::MessageLite& to_
       _this->_internal_set_id(from._internal_id());
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _this->_impl_.framework_ = from._impl_.framework_;
+      _this->_internal_set_cua_profile(from._internal_cua_profile());
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      _this->_impl_.category_ = from._impl_.category_;
+      _this->_impl_.framework_ = from._impl_.framework_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      _this->_impl_.memory_required_bytes_ = from._impl_.memory_required_bytes_;
+      _this->_impl_.category_ = from._impl_.category_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      _this->_impl_.source_ = from._impl_.source_;
+      _this->_impl_.memory_required_bytes_ = from._impl_.memory_required_bytes_;
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00001f00U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00003f00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      _this->_impl_.supports_thinking_ = from._impl_.supports_thinking_;
+      _this->_impl_.source_ = from._impl_.source_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      _this->_impl_.supports_lora_ = from._impl_.supports_lora_;
+      _this->_impl_.supports_thinking_ = from._impl_.supports_thinking_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      _this->_impl_.artifact_type_ = from._impl_.artifact_type_;
+      _this->_impl_.supports_lora_ = from._impl_.supports_lora_;
     }
     if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      _this->_impl_.context_length_ = from._impl_.context_length_;
+      _this->_impl_.artifact_type_ = from._impl_.artifact_type_;
     }
     if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+      _this->_impl_.context_length_ = from._impl_.context_length_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       _this->_impl_.download_size_bytes_ = from._impl_.download_size_bytes_;
     }
   }
@@ -23411,6 +23445,7 @@ void RegisterModelFromUrlRequest::InternalSwap(RegisterModelFromUrlRequest* PROT
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.name_, &other->_impl_.name_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.description_, &other->_impl_.description_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.id_, &other->_impl_.id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.cua_profile_, &other->_impl_.cua_profile_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.download_size_bytes_)
       + sizeof(RegisterModelFromUrlRequest::_impl_.download_size_bytes_)
