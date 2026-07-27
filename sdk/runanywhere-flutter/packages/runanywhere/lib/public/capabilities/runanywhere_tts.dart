@@ -15,6 +15,7 @@ import 'package:runanywhere/generated/component_types.pbenum.dart'
 import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
@@ -243,7 +244,7 @@ class RunAnywhereTTS {
       }
       final wavData = DartBridgeAudio.float32ToWav(
         Uint8List.fromList(output.audioData),
-        sampleRate > 0 ? sampleRate : 22050,
+        sampleRate > 0 ? sampleRate : RADefaultsAudioCapture.ttsSampleRateHz,
       );
 
       if (wavData != null && wavData.isNotEmpty) {
@@ -326,7 +327,7 @@ class RunAnywhereTTS {
       opts.audioFormat = model_pb.AudioFormat.AUDIO_FORMAT_PCM;
     }
     if (!opts.hasSampleRate()) {
-      opts.sampleRate = 22050;
+      opts.sampleRate = RADefaultsAudioCapture.ttsSampleRateHz;
     }
     return opts;
   }

@@ -65,7 +65,7 @@ import java.util.concurrent.atomic.AtomicReference
 object OkHttpHttpTransport {
     private const val TAG = "OkHttpHttpTransport"
 
-    /** Chunk size used for streaming body delivery (32 KB matches Okio's default). */
+    /** Chunk size for streaming body delivery; see NetworkDefaults in idl/sdk_defaults.proto. */
     private const val STREAM_CHUNK_SIZE = RADefaults.Network.STREAM_CHUNK_BYTES
 
     /** Default OkHttp client. Lazily built on first use. Mirrors Swift's `sharedSession`. */
@@ -84,7 +84,8 @@ object OkHttpHttpTransport {
      * Dedicated streaming OkHttp client. Mirrors the Swift adapter's per-call
      * streaming session built with `timeoutIntervalForResource = 24 * 60 * 60`.
      * A multi-GB GGUF download over a slow cellular link can legitimately run
-     * for hours, so the read timeout is bumped from the default 120s to 24h.
+     * for hours, so the read timeout uses the pool's streaming window, not the
+     * per-request one.
      */
     private val streamingClient: OkHttpClient
         get() {
