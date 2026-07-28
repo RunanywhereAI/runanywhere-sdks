@@ -55,7 +55,16 @@ const TOOLS = [
 ];
 
 // ---- settings + conversations + custom models (persisted via appStore) ----
-let settings = { systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7, maxTokens: 512, reasoning: false };
+// The system prompt has to establish WHO IS WHO — without it a small model
+// answers "what is my name" with its own identity. Temperature is low because
+// this is factual recall, not creative writing.
+const DEFAULT_SYSTEM_PROMPT =
+  'You are a helpful assistant talking with a user. ' +
+  'Facts the user states are about the USER, never about you. ' +
+  'When asked about their name, age or preferences, answer using what the user said earlier, ' +
+  'in the second person ("Your name is ..."). Never claim the user\'s details as your own. ' +
+  'Answer in one or two short sentences unless asked for more.';
+let settings = { systemPrompt: DEFAULT_SYSTEM_PROMPT, temperature: 0.3, maxTokens: 512, reasoning: false };
 let conversations = [];
 let activeId = null;
 let nextConvId = 1;
@@ -64,7 +73,10 @@ let customModels = []; // [{ id, source, type, label, downloaded }]
 // ---- lazily-loaded model handles ----
 const handles = {};
 const ensure = (k, fn) => (handles[k] ??= fn());
-const DEFAULT_LLM = 'qwen3.5-0.8b';
+// 2B rather than 0.8B: at 0.8B the model absorbs the user's facts but
+// re-attributes them to itself ("I am 21 years old"). Measured 1/3 vs 3/3 on a
+// multi-fact recall probe. 1.2GB is still a small download.
+const DEFAULT_LLM = 'qwen3.5-2b';
 // The chat's active LLM. Loading another LLM from the Models tab replaces it (the
 // backend keeps one loaded at a time), so we track it in loadedById/loadedType too
 // to keep the Models badges coherent — exactly one LLM ever shows "loaded".
