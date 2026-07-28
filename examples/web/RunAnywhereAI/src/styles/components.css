@@ -10,15 +10,21 @@
   bottom: 14px;
   right: 16px;
   z-index: 140;
-  padding: 3px 10px;
-  border-radius: var(--radius-full);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.02em;
   pointer-events: none;
   font-family: var(--font-family);
   border: 1px solid var(--border-light);
+  line-height: 1.25;
+  text-align: right;
 }
+.accel-badge__line { display: block; white-space: nowrap; }
 .accel-badge--gpu { background: var(--badge-green); color: var(--color-green); }
 .accel-badge--cpu { background: var(--bg-tertiary); color: var(--text-tertiary); }
 

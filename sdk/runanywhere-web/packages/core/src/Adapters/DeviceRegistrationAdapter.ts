@@ -19,9 +19,10 @@ import {
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import type { EmscriptenRunanywhereModule } from '../runtime/EmscriptenModule.js';
 import type { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
+import { networkDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('DeviceRegistrationAdapter');
-const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = networkDefaults.adapterTimeoutMs;
 const DEFAULT_DEVICE_MEMORY_GIB = 4;
 const BYTES_PER_GIB = 1024 * 1024 * 1024;
 const MAX_OS_VERSION_LENGTH = 32;

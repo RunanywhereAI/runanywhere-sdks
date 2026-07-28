@@ -46,6 +46,16 @@ RAC_WIRE_STRING_FIELD_NUM   = 50012
 
 RUNANYWHERE_PACKAGE = "runanywhere.v1"
 
+# Schemas that exist only to carry annotations. Nothing sends their messages
+# over a wire, so no language generates message types for them and the four
+# convenience post-processors must not emit `defaults()` factories against
+# types that will never exist. generate_defaults_pool.py emits plain constants
+# for these instead, and generate_cpp_defaults.py folds them into the C header.
+#
+# Keep this in step with the RAC_PROTO_EXCLUDES_* arrays in generate_swift.sh,
+# generate_kotlin.sh, generate_dart.sh, and generate_ts.sh.
+DECLARATION_ONLY_FILES = frozenset({"sdk_defaults.proto"})
+
 # ---------------------------------------------------------------------------
 # Proto wire-format type enums (mirror google/protobuf/descriptor.proto).
 # ---------------------------------------------------------------------------
@@ -252,12 +262,22 @@ def load_file_descriptor_set(proto_dir: Path) -> Optional[descriptor_pb2.FileDes
 
 def iter_runanywhere_files(
     fds: descriptor_pb2.FileDescriptorSet,
+    *,
+    include_declaration_only: bool = False,
 ) -> Iterator[descriptor_pb2.FileDescriptorProto]:
     """Yield only the schemas RunAnywhere owns; skips Google's transitive
-    `descriptor.proto` and any other imported third-party schemas."""
+    `descriptor.proto` and any other imported third-party schemas.
+
+    Declaration-only schemas (`DECLARATION_ONLY_FILES`) are skipped too, since
+    no language generates message types for them. Pass
+    `include_declaration_only=True` from generators that emit plain constants
+    rather than accessors on a generated message type."""
     for f in fds.file:
-        if f.package == RUNANYWHERE_PACKAGE:
-            yield f
+        if f.package != RUNANYWHERE_PACKAGE:
+            continue
+        if not include_declaration_only and f.name in DECLARATION_ONLY_FILES:
+            continue
+        yield f
 
 
 def iter_top_level_enums(

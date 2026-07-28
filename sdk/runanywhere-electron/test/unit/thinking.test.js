@@ -27,9 +27,9 @@ test('splitThinking: an unclosed <think> makes the rest thinking', () => {
   assert.equal(thinking, 'still reasoning and never closed');
 });
 
-test('splitThinking: text before and after the block is stitched into the response', () => {
+test('splitThinking: text before and after the block is joined with a newline (commons parity)', () => {
   const { response } = splitThinking('A<think>x</think>B');
-  assert.equal(response, 'AB');
+  assert.equal(response, 'A\nB');
 });
 
 test('splitThinking: empty / nullish input is safe', () => {

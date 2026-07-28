@@ -5,6 +5,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { asSDKException } from './errors';
+
 // Re-exported for existing importers (RunAnywhere.ts imports it from here); the
 // implementation now lives in stream.ts so it stays addon-free and testable.
 export { toAsyncIterable } from './stream';
@@ -51,9 +53,11 @@ export interface NativeAddon {
   // registry so RAG can resolve embedding/LLM ids to paths; the rag* methods take
   // and return serialized runanywhere.v1 RAG protos as bytes.
   registerModel(id: string, localPath: string, category?: number, framework?: number): void;
-  ragCreateSession(configProtoBytes: Uint8Array): number;
-  ragIngest(handle: number, documentProtoBytes: Uint8Array): Uint8Array;
-  ragQuery(handle: number, queryProtoBytes: Uint8Array): Uint8Array;
+  // create/ingest/query run on a worker thread (model load / embedding / LLM), so
+  // they return a Promise; the utility-host dispatch awaits it.
+  ragCreateSession(configProtoBytes: Uint8Array): Promise<number>;
+  ragIngest(handle: number, documentProtoBytes: Uint8Array): Promise<Uint8Array>;
+  ragQuery(handle: number, queryProtoBytes: Uint8Array): Promise<Uint8Array>;
   ragStats(handle: number): Uint8Array;
   ragClear(handle: number): Uint8Array;
   ragDestroySession(handle: number): void;
@@ -88,4 +92,30 @@ function resolveAddon(): NativeAddon {
   );
 }
 
-export const addon: NativeAddon = resolveAddon();
+/**
+ * Wrap every native binding so thrown / rejected values become SDKException
+ * with `.code` / `.category` parsed from ``"… failed: -<rac>"`` messages.
+ */
+function wrapNative(raw: NativeAddon): NativeAddon {
+  return new Proxy(raw, {
+    get(target, prop, receiver) {
+      const v = Reflect.get(target, prop, receiver);
+      if (typeof v !== 'function') return v;
+      return (...args: unknown[]) => {
+        try {
+          const r = (v as (...a: unknown[]) => unknown).apply(target, args);
+          if (r != null && typeof (r as { then?: unknown }).then === 'function') {
+            return (r as Promise<unknown>).catch((e) => {
+              throw asSDKException(e);
+            });
+          }
+          return r;
+        } catch (e) {
+          throw asSDKException(e);
+        }
+      };
+    },
+  }) as NativeAddon;
+}
+
+export const addon: NativeAddon = wrapNative(resolveAddon());

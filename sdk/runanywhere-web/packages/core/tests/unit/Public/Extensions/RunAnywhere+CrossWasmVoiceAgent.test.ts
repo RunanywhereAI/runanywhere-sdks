@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { AudioFormat, ModelCategory } from '@runanywhere/proto-ts/model_types';
 
 const mocks = vi.hoisted(() => ({
@@ -139,7 +140,11 @@ describe('CrossWasmVoiceAgentProvider', () => {
     const firstOptions = mocks.generate.mock.calls[0]?.[0];
     const secondOptions = mocks.generate.mock.calls[1]?.[0];
     expect(firstOptions.systemPrompt).toContain('one or two short, natural, spoken sentences');
-    expect(firstOptions.maxTokens).toBe(200);
+    // Assert against the pool rather than a literal. This line pinned 200,
+    // which was Web's own voice-agent cap while the other four platforms
+    // inherited 96 from the C++ orchestrator; re-pinning a number here would
+    // just recreate that divergence in the test suite.
+    expect(firstOptions.maxTokens).toBe(voiceAgentDefaults.maxTokens);
     expect(firstOptions.history).toEqual([]);
     expect(secondOptions.history).toHaveLength(2);
     expect(secondOptions.history.map((message: { content: string }) => message.content))

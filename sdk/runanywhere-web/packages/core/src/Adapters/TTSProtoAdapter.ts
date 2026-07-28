@@ -15,7 +15,7 @@ import {
 } from '@runanywhere/proto-ts/tts_options';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
 import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
-import { hasBackendWorkerOwnedModels } from '../runtime/BackendWorkerModelOwnership.js';
+import { mustUseOnnxBackendWorker } from '../runtime/BackendWorkerModelOwnership.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { SDKException } from '../Foundation/SDKException.js';
 import {
@@ -34,11 +34,11 @@ import {
 function requireLiveOnnxWorkerOrMain(operation: string) {
   const host = getActiveBackendWorkerHost('onnx');
   if (host?.diagnostics.executionContext === 'worker') return host;
-  if (hasBackendWorkerOwnedModels('onnx')) {
+  if (mustUseOnnxBackendWorker()) {
     throw SDKException.backendNotAvailable(
       operation,
-      'ONNX BackendWorker owns loaded speech models; reload after recovering the worker. '
-        + 'Main-thread fallback is disabled for worker-owned models.',
+      'ONNX BackendWorker is required for speech (or owns loaded models); '
+        + 'reload after recovering the worker. Main-thread fallback is disabled.',
     );
   }
   return null;

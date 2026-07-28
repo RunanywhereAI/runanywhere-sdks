@@ -18,12 +18,14 @@ import 'dart:typed_data';
 import 'package:runanywhere/generated/hybrid_router.pb.dart' as pb;
 import 'package:runanywhere/generated/hybrid_router.pbenum.dart'
     show HybridRank;
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
 
 /// Suggested default confidence threshold for an STT confidence cascade.
 /// Mirrors `RAC_HYBRID_STT_CONFIDENCE_THRESHOLD` in rac_hybrid_types.h — the
 /// router uses the threshold carried in the installed policy; this is only the
 /// recommended value to build it with.
-const double kHybridSttConfidenceThreshold = 0.5;
+const double kHybridSttConfidenceThreshold =
+    RADefaultsHybrid.sttConfidenceThreshold;
 
 /// A hard eligibility predicate. Every filter in a policy must pass for a
 /// candidate to survive the filter phase (filters AND-compose). Concrete

@@ -1,23 +1,22 @@
 # @runanywhere/web-llamacpp
 
-The independent llama.cpp backend for the RunAnywhere Web SDK. It provides
-LLM, VLM, LoRA, tool calling, and structured-output capabilities through
-the public `RunAnywhere` facade.
+**Llama.cpp WASM backend for the RunAnywhere Web SDK** — LLM, GGUF embeddings, VLM, LoRA, tools, and structured output in the browser.
 
-Web embeddings are provided by `@runanywhere/web-onnx`; the core package
-composes those embeddings with llama.cpp generation for cross-WASM RAG.
+---
 
-This browser package integrates with core only through
-`@runanywhere/web/backend`; it does not depend on the ONNX backend or core's
-private `/internal` entrypoint.
-
-## Install and initialize
+## Installation
 
 ```bash
-npm install @runanywhere/web @runanywhere/web-llamacpp
+npm install @runanywhere/web@0.20.11 @runanywhere/web-llamacpp@0.20.11
 ```
 
-```ts
+See the [Web SDK README](../../README.md) for bundler configuration and cross-origin isolation headers.
+
+---
+
+## Usage
+
+```typescript
 import { RunAnywhere, SDKEnvironment } from '@runanywhere/web';
 import { LlamaCPP } from '@runanywhere/web-llamacpp';
 
@@ -25,49 +24,29 @@ await RunAnywhere.initialize({
   environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
 await LlamaCPP.register({ acceleration: 'auto' });
+await RunAnywhere.completeServicesInitialization();
 
-// Register/download/load a compatible GGUF through RunAnywhere first.
 const stream = await RunAnywhere.generateStream({
-  prompt: 'Write a short haiku about local AI.',
-  maxTokens: 96,
+  prompt: 'Write a haiku about local AI.',
+  maxTokens: 64,
 });
-for await (const token of stream.stream) renderToken(token);
+for await (const token of stream.stream) {
+  renderToken(token);
+}
 ```
 
-## Capabilities
+See the [Web SDK README](../../README.md) for model lifecycle and Vite setup.
 
-- LLM generation and cancellation.
-- VLM image/video-frame inference through llama.cpp mtmd.
-- LoRA adapter registration and application.
-- Tool calling and JSON-schema structured output.
-- CPU fallback and WebGPU/Asyncify acceleration selected at runtime.
+---
 
-## Artifacts
+## Support
 
-The package ships two self-contained variants:
+- [Web SDK documentation](../../README.md)
+- [Discord](https://discord.gg/N359FBbDVd)
+- [founders@runanywhere.ai](mailto:founders@runanywhere.ai)
 
-```text
-wasm/racommons-llamacpp.{js,wasm}
-wasm/racommons-llamacpp-webgpu.{js,wasm}
-```
-
-No symbols are shared with core or ONNX WASM. Configure your bundler to retain
-package-relative `import.meta.url` asset resolution. Vite users should exclude
-`@runanywhere/web-llamacpp` from dependency pre-bundling and serve the app with
-COOP/COEP headers.
-
-Build and verify from `sdk/runanywhere-web`:
-
-```bash
-npm run build:wasm -- --llamacpp
-npm run build:wasm -- --webgpu
-npm run build -w packages/llamacpp
-npm run verify:package -w packages/llamacpp
-```
-
-This is a browser-bundler package, not a server-side Node.js inference runtime.
+---
 
 ## License
 
-Copyright (c) 2025 RunAnywhere, Inc. See the included `LICENSE` file for the
-custom RunAnywhere License.
+RunAnywhere License. See [LICENSE](LICENSE).

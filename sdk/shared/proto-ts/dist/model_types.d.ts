@@ -134,6 +134,8 @@ export declare enum ModelCategory {
     MODEL_CATEGORY_EMBEDDING = 8,
     /** MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION - present in Swift only pre-IDL */
     MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9,
+    MODEL_CATEGORY_SPEAKER_DIARIZATION = 10,
+    MODEL_CATEGORY_SEMANTIC_SEGMENTATION = 11,
     UNRECOGNIZED = -1
 }
 export declare function modelCategoryFromJSON(object: any): ModelCategory;
@@ -450,6 +452,7 @@ export interface ModelFileDescriptor {
      * Swift ModelTypes.swift:~350). `is_required` (field 3) remains the
      * canonical "required" flag — the documented `required` boolean from
      * newer SDK sources maps onto it (default true, mirrored in Swift).
+     * Exact on-disk artifact size, verified after download.
      */
     sizeBytes?: number | undefined;
     /**
@@ -461,6 +464,7 @@ export interface ModelFileDescriptor {
     destinationPath?: string | undefined;
     role?: ModelFileRole | undefined;
     localPath?: string | undefined;
+    /** Exact on-disk artifact checksum, verified after download. */
     checksumSha256?: string | undefined;
 }
 export interface MultiFileArtifact {

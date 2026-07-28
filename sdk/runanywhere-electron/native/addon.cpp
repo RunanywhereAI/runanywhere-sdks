@@ -12,16 +12,18 @@
 #include <napi.h>
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstring>
 #include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include "win32_platform_adapter.h"
 
-#include "rac/backends/rac_llm_llamacpp.h"
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/llm/rac_llm_component.h"
@@ -29,8 +31,6 @@
 #include "rac/features/vlm/rac_vlm_types.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/embeddings/rac_embeddings_types.h"
-#include "rac/plugin/rac_plugin_entry_onnx.h"
-#include "rac/plugin/rac_plugin_entry_sherpa.h"
 #include "rac/features/stt/rac_stt_component.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/features/tts/rac_tts_component.h"
@@ -42,6 +42,32 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/features/rag/rac_rag.h"
 #include "rac/foundation/rac_proto_buffer.h"
+
+// Engine backends — linked when present (see native/CMakeLists.txt foreach).
+// Required backends keep their commons headers; optional ones declare register only.
+#ifdef RAC_HAVE_BACKEND_LLAMACPP
+#include "rac/backends/rac_llm_llamacpp.h"
+#endif
+#ifdef RAC_HAVE_BACKEND_ONNX
+#include "rac/plugin/rac_plugin_entry_onnx.h"
+#endif
+#ifdef RAC_HAVE_BACKEND_SHERPA
+#include "rac/plugin/rac_plugin_entry_sherpa.h"
+#endif
+extern "C" {
+#ifdef RAC_HAVE_BACKEND_QHEXRT
+rac_result_t rac_backend_qhexrt_register(void);
+#endif
+#ifdef RAC_HAVE_BACKEND_MLX
+rac_result_t rac_backend_mlx_register(void);
+#endif
+#ifdef RAC_HAVE_BACKEND_COREML
+rac_result_t rac_backend_coreml_register(void);
+#endif
+#ifdef RAC_HAVE_BACKEND_CLOUD
+rac_result_t rac_backend_cloud_register(void);
+#endif
+}
 
 // Internal (non-proto) embeddings service factory — its header lives under
 // commons/src/, not include/, so re-declare the prototype here. The addon
@@ -77,6 +103,83 @@ rac_handle_t handle_for(const std::unordered_map<int32_t, rac_handle_t>& map, in
 }
 
 // =============================================================================
+// In-flight operation tracking — prevents destroy-during-call use-after-free.
+//
+// Blocking rac_* calls (generate/embed/transcribe/synthesize/rag_*) may run on a
+// worker thread while another thread calls unload_*()/shutdown(). Mark a handle
+// busy for every blocking op (keyed by the globally-unique integer id) and make
+// unload/shutdown WAIT for the handle to go idle before destroying it.
+// =============================================================================
+std::condition_variable g_inflight_cv;
+std::unordered_map<int32_t, int> g_inflight;  // handle id -> active blocking-op count
+
+rac_handle_t begin_op(const std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
+    std::lock_guard<std::mutex> lock(g_handles_mutex);
+    auto it = map.find(id);
+    if (it == map.end()) return nullptr;
+    ++g_inflight[id];
+    return it->second;
+}
+
+void end_op(int32_t id) {
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        auto it = g_inflight.find(id);
+        if (it != g_inflight.end() && --it->second <= 0) g_inflight.erase(it);
+    }
+    g_inflight_cv.notify_all();
+}
+
+struct OpScope {
+    int32_t id;
+    explicit OpScope(int32_t i) : id(i) {}
+    ~OpScope() { end_op(id); }
+    OpScope(const OpScope&) = delete;
+    OpScope& operator=(const OpScope&) = delete;
+};
+
+// Bound so a stuck in-flight op cannot freeze the sync JS unload/destroy path
+// forever. Callers treat nullptr as "gone / unavailable" and skip destroy.
+constexpr auto kTakeHandleIdleTimeout = std::chrono::seconds(60);
+
+rac_handle_t take_handle_when_idle(std::unordered_map<int32_t, rac_handle_t>& map, int32_t id) {
+    std::unique_lock<std::mutex> lock(g_handles_mutex);
+    const bool idle = g_inflight_cv.wait_for(lock, kTakeHandleIdleTimeout, [&] {
+        auto it = g_inflight.find(id);
+        return it == g_inflight.end() || it->second == 0;
+    });
+    if (!idle) return nullptr;
+    auto it = map.find(id);
+    if (it == map.end()) return nullptr;
+    rac_handle_t h = it->second;
+    map.erase(it);
+    return h;
+}
+
+int rac_code_abs(rac_result_t code) {
+    int value = static_cast<int>(code);
+    return value < 0 ? -value : value;
+}
+
+// Build a structured JS Error for a rac_result_t so the TS layer can recover a
+// typed SDKException without depending on string parsing alone.
+Napi::Error make_rac_error(Napi::Env env, rac_result_t code, const std::string& message) {
+    Napi::Error error = Napi::Error::New(env, message);
+    Napi::Object value = error.Value();
+    value.Set("code", Napi::Number::New(env, rac_code_abs(code)));  // canonical positive ErrorCode
+    value.Set("cAbiCode", Napi::Number::New(env, static_cast<int>(code)));  // raw rac_result_t
+    return error;
+}
+
+// Throw a structured Error whose message still ends with "failed: <rac_code>"
+// so older string-only callers remain parseable too.
+void throw_rac_error(Napi::Env env, rac_result_t code, const std::string& context) {
+    std::string msg = context.empty() ? ("rac error failed: " + std::to_string(code))
+                                      : (context + " failed: " + std::to_string(code));
+    make_rac_error(env, code, msg).ThrowAsJavaScriptException();
+}
+
+// =============================================================================
 // initialize(secureDir[, baseDir])
 // =============================================================================
 Napi::Value Initialize(const Napi::CallbackInfo& info) {
@@ -103,27 +206,42 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
 
     rac_result_t rc = rac_init(&cfg);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "rac_init failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "rac_init");
         return env.Undefined();
     }
     // Backend/plugin registration is process-global and persists across
     // rac_shutdown(), so register exactly once — re-registering after a
     // shutdown+re-init would fail (RAC already-registered), which is why
     // initialize() must be safe to call again after shutdown().
+    // Each call is gated by RAC_HAVE_BACKEND_<X> from native/CMakeLists.txt.
     static bool backends_registered = false;
     if (!backends_registered) {
+#ifdef RAC_HAVE_BACKEND_LLAMACPP
         rc = rac_backend_llamacpp_register();
         if (rc != RAC_SUCCESS) {
             rac_shutdown();
-            Napi::Error::New(env, "rac_backend_llamacpp_register failed: " + std::to_string(rc))
-                .ThrowAsJavaScriptException();
+            throw_rac_error(env, rc, "rac_backend_llamacpp_register");
             return env.Undefined();
         }
-        // Embeddings engine (optional): register the ONNX backend. A failure here
-        // just means embeddings are unavailable, not a fatal init error.
-        rac_backend_onnx_register();
-        // Speech engine (optional): register sherpa for STT / TTS.
-        rac_backend_sherpa_register();
+#endif
+#ifdef RAC_HAVE_BACKEND_ONNX
+        rac_backend_onnx_register();  // embeddings (optional)
+#endif
+#ifdef RAC_HAVE_BACKEND_SHERPA
+        rac_backend_sherpa_register();  // STT / TTS (optional)
+#endif
+#ifdef RAC_HAVE_BACKEND_QHEXRT
+        rac_backend_qhexrt_register();  // Hexagon NPU when linked (not claimed for Win NPU yet)
+#endif
+#ifdef RAC_HAVE_BACKEND_MLX
+        rac_backend_mlx_register();
+#endif
+#ifdef RAC_HAVE_BACKEND_COREML
+        rac_backend_coreml_register();
+#endif
+#ifdef RAC_HAVE_BACKEND_CLOUD
+        rac_backend_cloud_register();
+#endif
         backends_registered = true;
     }
     g_initialized.store(true);
@@ -142,6 +260,8 @@ struct StreamCtx {
     rac_result_t result = RAC_SUCCESS;
     std::string error_msg;
     std::function<rac_result_t(StreamCtx*)> run;  // performs the rac streaming call
+    int32_t lease_id = 0;  // begin_op id; end_op when the worker finishes
+    bool leased = false;
     explicit StreamCtx(Napi::Env env) : deferred(Napi::Promise::Deferred::New(env)) {}
 };
 
@@ -157,7 +277,12 @@ rac_bool_t stream_token_cb(const char* token, void* ud) {
 void stream_error_cb(rac_result_t code, const char* msg, void* ud) {
     auto* ctx = static_cast<StreamCtx*>(ud);
     ctx->result = code;
-    ctx->error_msg = msg ? msg : "generation error";
+    // Keep a parseable "… failed: <code>" form for asSDKException / raiseForRac.
+    if (msg && msg[0]) {
+        ctx->error_msg = std::string(msg) + " failed: " + std::to_string(code);
+    } else {
+        ctx->error_msg = "stream failed: " + std::to_string(code);
+    }
 }
 
 void stream_llm_complete_cb(const rac_llm_result_t*, void* ud) {
@@ -170,31 +295,50 @@ void stream_vlm_complete_cb(const rac_vlm_result_t*, void* ud) {
 
 // Create the TSFN + worker thread; resolve/reject the returned Promise in the
 // finalizer (JS loop, after the producer thread Release()d).
+// When lease_id != 0, the caller already called begin_op; we end_op when the
+// worker finishes (covers unload-during-generate).
 Napi::Promise start_stream(Napi::Env env, Napi::Function on_token,
-                           std::function<rac_result_t(StreamCtx*)> run) {
+                           std::function<rac_result_t(StreamCtx*)> run, int32_t lease_id = 0) {
     auto* ctx = new StreamCtx(env);
     ctx->run = std::move(run);
-    ctx->tsfn = Napi::ThreadSafeFunction::New(
-        env, on_token, "ra-stream", /*maxQueueSize*/ 256, /*initialThreadCount*/ 1, ctx,
-        [](Napi::Env env, void* /*data*/, StreamCtx* c) {
-            if (c->worker.joinable()) c->worker.join();
-            if (c->result == RAC_SUCCESS) {
-                c->deferred.Resolve(env.Undefined());
-            } else {
-                std::string msg = c->error_msg.empty()
-                                      ? ("stream failed: " + std::to_string(c->result))
-                                      : c->error_msg;
-                c->deferred.Reject(Napi::Error::New(env, msg).Value());
-            }
-            delete c;
-        },
-        static_cast<void*>(nullptr));
+    ctx->lease_id = lease_id;
+    ctx->leased = lease_id != 0;
+    try {
+        ctx->tsfn = Napi::ThreadSafeFunction::New(
+            env, on_token, "ra-stream", /*maxQueueSize*/ 256, /*initialThreadCount*/ 1, ctx,
+            [](Napi::Env env, void* /*data*/, StreamCtx* c) {
+                if (c->worker.joinable()) c->worker.join();
+                // Safety net if the worker aborted before releasing the lease.
+                if (c->leased) {
+                    end_op(c->lease_id);
+                    c->leased = false;
+                }
+                if (c->result == RAC_SUCCESS) {
+                    c->deferred.Resolve(env.Undefined());
+                } else {
+                    std::string msg = c->error_msg.empty()
+                                          ? ("stream failed: " + std::to_string(c->result))
+                                          : c->error_msg;
+                    c->deferred.Reject(make_rac_error(env, c->result, msg).Value());
+                }
+                delete c;
+            },
+            static_cast<void*>(nullptr));
 
-    ctx->worker = std::thread([ctx]() {
-        rac_result_t rc = ctx->run(ctx);
-        if (rc != RAC_SUCCESS && ctx->result == RAC_SUCCESS) ctx->result = rc;
-        ctx->tsfn.Release();  // last TSFN call from this thread -> finalizer on JS loop
-    });
+        ctx->worker = std::thread([ctx]() {
+            rac_result_t rc = ctx->run(ctx);
+            if (rc != RAC_SUCCESS && ctx->result == RAC_SUCCESS) ctx->result = rc;
+            if (ctx->leased) {
+                end_op(ctx->lease_id);
+                ctx->leased = false;
+            }
+            ctx->tsfn.Release();  // last TSFN call from this thread -> finalizer on JS loop
+        });
+    } catch (...) {
+        if (ctx->leased) end_op(ctx->lease_id);
+        delete ctx;
+        throw;
+    }
     return ctx->deferred.Promise();
 }
 
@@ -220,15 +364,13 @@ Napi::Value LoadModel(const Napi::CallbackInfo& info) {
     rac_handle_t h = nullptr;
     rac_result_t rc = rac_llm_component_create(&h);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "llm_component_create failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "llm_component_create");
         return env.Undefined();
     }
     rc = rac_llm_component_load_model(h, path.c_str(), id.c_str(), name.c_str());
     if (rc != RAC_SUCCESS) {
         rac_llm_component_destroy(h);
-        Napi::Error::New(env, "load_model failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "load_model");
         return env.Undefined();
     }
     int32_t hid;
@@ -285,7 +427,8 @@ Napi::Value Generate(const Napi::CallbackInfo& info) {
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    rac_handle_t h = handle_for(g_llm_handles, info[0].As<Napi::Number>().Int32Value());
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = begin_op(g_llm_handles, hid);
     if (!h) {
         Napi::Error::New(env, "invalid handle").ThrowAsJavaScriptException();
         return env.Undefined();
@@ -299,33 +442,34 @@ Napi::Value Generate(const Napi::CallbackInfo& info) {
     } else {
         o = parse_gen_opts(info[2]);
         if (info.Length() < 4 || !info[3].IsFunction()) {
+            end_op(hid);
             Napi::TypeError::New(env, "generate: onToken callback required").ThrowAsJavaScriptException();
             return env.Undefined();
         }
         on_token = info[3].As<Napi::Function>();
     }
 
-    return start_stream(env, on_token, [h, prompt, o](StreamCtx* c) {
-        rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
-        apply_gen_opts(opts, o);
-        return rac_llm_component_generate_stream(h, prompt.c_str(), &opts, stream_token_cb,
-                                                 stream_llm_complete_cb, stream_error_cb, c);
-    });
+    try {
+        return start_stream(
+            env, on_token,
+            [h, prompt, o](StreamCtx* c) {
+                rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
+                apply_gen_opts(opts, o);
+                return rac_llm_component_generate_stream(h, prompt.c_str(), &opts, stream_token_cb,
+                                                         stream_llm_complete_cb, stream_error_cb, c);
+            },
+            hid);
+    } catch (...) {
+        end_op(hid);
+        throw;
+    }
 }
 
 Napi::Value UnloadModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        auto it = g_llm_handles.find(hid);
-        if (it != g_llm_handles.end()) {
-            h = it->second;
-            g_llm_handles.erase(it);
-        }
-    }
+    rac_handle_t h = take_handle_when_idle(g_llm_handles, hid);
     if (h) rac_llm_component_destroy(h);
     return env.Undefined();
 }
@@ -354,15 +498,13 @@ Napi::Value LoadVlmModel(const Napi::CallbackInfo& info) {
     rac_handle_t h = nullptr;
     rac_result_t rc = rac_vlm_component_create(&h);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "vlm_component_create failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "vlm_component_create");
         return env.Undefined();
     }
     rc = rac_vlm_component_load_model(h, model.c_str(), mmproj.c_str(), id.c_str(), name.c_str());
     if (rc != RAC_SUCCESS) {
         rac_vlm_component_destroy(h);
-        Napi::Error::New(env, "vlm load_model failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "vlm load_model");
         return env.Undefined();
     }
     int32_t hid;
@@ -382,39 +524,40 @@ Napi::Value GenerateVlm(const Napi::CallbackInfo& info) {
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    rac_handle_t h = handle_for(g_vlm_handles, info[0].As<Napi::Number>().Int32Value());
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = begin_op(g_vlm_handles, hid);
     if (!h) {
         Napi::Error::New(env, "invalid vlm handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
     std::string image_path = info[1].As<Napi::String>().Utf8Value();
     std::string prompt = info[2].As<Napi::String>().Utf8Value();
-    return start_stream(env, info[3].As<Napi::Function>(), [h, image_path, prompt](StreamCtx* c) {
-        rac_vlm_image_t image;
-        std::memset(&image, 0, sizeof(image));
-        image.format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
-        image.file_path = image_path.c_str();
-        // Pass explicit defaults: NULL options leaves the VLM sampler config
-        // (top_k / seed / ...) reading uninitialized memory, which can crash.
-        rac_vlm_options_t opts = RAC_VLM_OPTIONS_DEFAULT;
-        return rac_vlm_component_process_stream(h, &image, prompt.c_str(), &opts, stream_token_cb,
-                                                stream_vlm_complete_cb, stream_error_cb, c);
-    });
+    try {
+        return start_stream(
+            env, info[3].As<Napi::Function>(),
+            [h, image_path, prompt](StreamCtx* c) {
+                rac_vlm_image_t image;
+                std::memset(&image, 0, sizeof(image));
+                image.format = RAC_VLM_IMAGE_FORMAT_FILE_PATH;
+                image.file_path = image_path.c_str();
+                // Pass explicit defaults: NULL options leaves the VLM sampler config
+                // (top_k / seed / ...) reading uninitialized memory, which can crash.
+                rac_vlm_options_t opts = RAC_VLM_OPTIONS_DEFAULT;
+                return rac_vlm_component_process_stream(h, &image, prompt.c_str(), &opts, stream_token_cb,
+                                                        stream_vlm_complete_cb, stream_error_cb, c);
+            },
+            hid);
+    } catch (...) {
+        end_op(hid);
+        throw;
+    }
 }
 
 Napi::Value UnloadVlmModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        auto it = g_vlm_handles.find(hid);
-        if (it != g_vlm_handles.end()) {
-            h = it->second;
-            g_vlm_handles.erase(it);
-        }
-    }
+    rac_handle_t h = take_handle_when_idle(g_vlm_handles, hid);
     if (h) rac_vlm_component_destroy(h);
     return env.Undefined();
 }
@@ -441,8 +584,7 @@ Napi::Value LoadEmbeddingModel(const Napi::CallbackInfo& info) {
     rac_result_t rc = rac::embeddings::create_service(
         model.c_str(), config.empty() ? nullptr : config.c_str(), &h);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "embeddings create_service failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "embeddings create_service");
         return env.Undefined();
     }
     int32_t hid;
@@ -460,17 +602,19 @@ Napi::Value Embed(const Napi::CallbackInfo& info) {
         Napi::TypeError::New(env, "embed(handleId, text) bad args").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    rac_handle_t h = handle_for(g_embed_handles, info[0].As<Napi::Number>().Int32Value());
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = begin_op(g_embed_handles, hid);
     if (!h) {
         Napi::Error::New(env, "invalid embedding handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
+    OpScope op(hid);
     std::string text = info[1].As<Napi::String>().Utf8Value();
     rac_embeddings_result_t result;
     std::memset(&result, 0, sizeof(result));
     rac_result_t rc = rac_embeddings_embed(h, text.c_str(), nullptr, &result);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "embed failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "embed");
         return env.Undefined();
     }
     if (result.num_embeddings == 0 || result.embeddings == nullptr ||
@@ -490,15 +634,7 @@ Napi::Value UnloadEmbeddingModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        auto it = g_embed_handles.find(hid);
-        if (it != g_embed_handles.end()) {
-            h = it->second;
-            g_embed_handles.erase(it);
-        }
-    }
+    rac_handle_t h = take_handle_when_idle(g_embed_handles, hid);
     if (h) rac_embeddings_destroy(h);
     return env.Undefined();
 }
@@ -525,15 +661,13 @@ Napi::Value LoadSttModel(const Napi::CallbackInfo& info) {
     rac_handle_t h = nullptr;
     rac_result_t rc = rac_stt_component_create(&h);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "stt_component_create failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "stt_component_create");
         return env.Undefined();
     }
     rc = rac_stt_component_load_model(h, dir.c_str(), id.c_str(), name.c_str());
     if (rc != RAC_SUCCESS) {
         rac_stt_component_destroy(h);
-        Napi::Error::New(env, "stt load_model failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "stt load_model");
         return env.Undefined();
     }
     int32_t hid;
@@ -558,11 +692,13 @@ Napi::Value Transcribe(const Napi::CallbackInfo& info) {
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    rac_handle_t h = handle_for(g_stt_handles, info[0].As<Napi::Number>().Int32Value());
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = begin_op(g_stt_handles, hid);
     if (!h) {
         Napi::Error::New(env, "invalid stt handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
+    OpScope op(hid);
     const uint8_t* pcm_data = nullptr;
     size_t pcm_len = 0;
     if (info[1].IsBuffer()) {
@@ -580,8 +716,7 @@ Napi::Value Transcribe(const Napi::CallbackInfo& info) {
     rac_result_t rc =
         rac_stt_component_transcribe(h, pcm_data, pcm_len, nullptr, &result);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "transcribe failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "transcribe");
         return env.Undefined();
     }
     std::string text = result.text ? result.text : "";
@@ -593,15 +728,7 @@ Napi::Value UnloadSttModel(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        auto it = g_stt_handles.find(hid);
-        if (it != g_stt_handles.end()) {
-            h = it->second;
-            g_stt_handles.erase(it);
-        }
-    }
+    rac_handle_t h = take_handle_when_idle(g_stt_handles, hid);
     if (h) rac_stt_component_destroy(h);
     return env.Undefined();
 }
@@ -628,15 +755,13 @@ Napi::Value LoadTtsVoice(const Napi::CallbackInfo& info) {
     rac_handle_t h = nullptr;
     rac_result_t rc = rac_tts_component_create(&h);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "tts_component_create failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "tts_component_create");
         return env.Undefined();
     }
     rc = rac_tts_component_load_voice(h, dir.c_str(), id.c_str(), name.c_str());
     if (rc != RAC_SUCCESS) {
         rac_tts_component_destroy(h);
-        Napi::Error::New(env, "tts load_voice failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "tts load_voice");
         return env.Undefined();
     }
     int32_t hid;
@@ -656,18 +781,19 @@ Napi::Value Synthesize(const Napi::CallbackInfo& info) {
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    rac_handle_t h = handle_for(g_tts_handles, info[0].As<Napi::Number>().Int32Value());
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = begin_op(g_tts_handles, hid);
     if (!h) {
         Napi::Error::New(env, "invalid tts handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
+    OpScope op(hid);
     std::string text = info[1].As<Napi::String>().Utf8Value();
     rac_tts_result_t result;
     std::memset(&result, 0, sizeof(result));
     rac_result_t rc = rac_tts_component_synthesize(h, text.c_str(), nullptr, &result);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "synthesize failed: " + std::to_string(rc))
-            .ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "synthesize");
         return env.Undefined();
     }
     size_t n = result.audio_size / sizeof(float);  // audio_data is float32 PCM
@@ -685,15 +811,7 @@ Napi::Value UnloadTtsVoice(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        auto it = g_tts_handles.find(hid);
-        if (it != g_tts_handles.end()) {
-            h = it->second;
-            g_tts_handles.erase(it);
-        }
-    }
+    rac_handle_t h = take_handle_when_idle(g_tts_handles, hid);
     if (h) rac_tts_component_destroy(h);
     return env.Undefined();
 }
@@ -707,7 +825,17 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
         // outlives the runtime — a later unload/use can't touch freed native
         // state, and a re-init starts from a clean slate.
         {
-            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            // Wait for every in-flight blocking op to drain before freeing its
+            // component — otherwise destroy / rac_shutdown() could race a live
+            // rac_* call on a worker thread (use-after-free).
+            std::unique_lock<std::mutex> lock(g_handles_mutex);
+            g_inflight_cv.wait(lock, [] {
+                for (auto& kv : g_inflight) {
+                    if (kv.second > 0) return false;
+                }
+                return true;
+            });
+            for (auto& kv : g_rag_handles) rac_rag_session_destroy_proto(kv.second);
             for (auto& kv : g_llm_handles) rac_llm_component_destroy(kv.second);
             for (auto& kv : g_vlm_handles) rac_vlm_component_destroy(kv.second);
             for (auto& kv : g_embed_handles) rac_embeddings_destroy(kv.second);
@@ -720,6 +848,8 @@ Napi::Value Shutdown(const Napi::CallbackInfo& info) {
             g_stt_handles.clear();
             g_tts_handles.clear();
             g_vad_handles.clear();
+            g_rag_handles.clear();
+            g_inflight.clear();
         }
         rac_shutdown();
     }
@@ -748,7 +878,7 @@ Napi::Value SecureSet(const Napi::CallbackInfo& info) {
     std::string value = info[1].As<Napi::String>().Utf8Value();
     rac_result_t rc = g_adapter.secure_set(key.c_str(), value.c_str(), g_adapter.user_data);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "secure_set failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "secure_set");
     }
     return env.Undefined();
 }
@@ -835,16 +965,18 @@ Napi::Value VadProcess(const Napi::CallbackInfo& info) {
             .ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    rac_handle_t h = handle_for(g_vad_handles, info[0].As<Napi::Number>().Int32Value());
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = begin_op(g_vad_handles, hid);
     if (!h) {
         Napi::Error::New(env, "invalid vad handle").ThrowAsJavaScriptException();
         return env.Undefined();
     }
+    OpScope op(hid);
     Napi::Float32Array arr = ta.As<Napi::Float32Array>();
     rac_bool_t is_speech = RAC_FALSE;
     rac_result_t rc = rac_vad_component_process(h, arr.Data(), arr.ElementLength(), &is_speech);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "vad process failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "vad process");
         return env.Undefined();
     }
     return Napi::Boolean::New(env, is_speech == RAC_TRUE);
@@ -878,15 +1010,9 @@ Napi::Value UnloadVad(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        auto it = g_vad_handles.find(hid);
-        if (it != g_vad_handles.end()) {
-            h = it->second;
-            g_vad_handles.erase(it);
-        }
-    }
+    // VAD process is sync on the JS thread (no lease); still wait in case a
+    // future async path adds one.
+    rac_handle_t h = take_handle_when_idle(g_vad_handles, hid);
     if (h) rac_vad_component_destroy(h);
     return env.Undefined();
 }
@@ -904,12 +1030,122 @@ static Napi::Value rag_out_to_js(Napi::Env env, rac_proto_buffer_t* buf, const c
         std::string msg = std::string(what) + " failed: " + std::to_string(buf->status);
         if (buf->error_message) { msg += " ("; msg += buf->error_message; msg += ")"; }
         rac_proto_buffer_free(buf);
-        Napi::Error::New(env, msg).ThrowAsJavaScriptException();
+        make_rac_error(env, buf->status, msg).ThrowAsJavaScriptException();
         return env.Undefined();
     }
     Napi::Buffer<uint8_t> out = Napi::Buffer<uint8_t>::Copy(env, buf->data, buf->size);
     rac_proto_buffer_free(buf);
     return out;
+}
+
+// rac_rag_ingest_proto / rac_rag_query_proto run a full embedding / LLM
+// generation and can take seconds, so run them on a worker thread and resolve a
+// Promise (parity with generate()). A synchronous call would block the entire
+// utility-host JS event loop — starving every other RPC — for the whole query.
+// The input bytes are copied because the worker outlives the JS call.
+using RagProtoOp = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t, rac_proto_buffer_t*);
+
+class RagProtoWorker : public Napi::AsyncWorker {
+ public:
+    RagProtoWorker(Napi::Env env, rac_handle_t session, int32_t handle_id,
+                   std::vector<uint8_t> input, RagProtoOp op, const char* what)
+        : Napi::AsyncWorker(env),
+          deferred_(Napi::Promise::Deferred::New(env)),
+          session_(session),
+          handle_id_(handle_id),
+          leased_(true),
+          input_(std::move(input)),
+          op_(op),
+          what_(what) {}
+
+    Napi::Promise Promise() { return deferred_.Promise(); }
+
+    void Execute() override {
+        // Release the inflight lease when Execute finishes (success or fail).
+        struct LeaseGuard {
+            int32_t id;
+            bool* leased;
+            ~LeaseGuard() {
+                if (*leased) {
+                    end_op(id);
+                    *leased = false;
+                }
+            }
+        } guard{handle_id_, &leased_};
+
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        rac_result_t rc = op_(session_, input_.data(), input_.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
+        if (out.status == RAC_SUCCESS && out.data != nullptr) {
+            result_.assign(out.data, out.data + out.size);
+            ok_ = true;
+        } else {
+            code_ = out.status;
+            err_ = std::string(what_) + " failed: " + std::to_string(out.status);
+            if (out.error_message) { err_ += " ("; err_ += out.error_message; err_ += ")"; }
+        }
+        rac_proto_buffer_free(&out);
+    }
+
+    void OnOK() override {
+        Napi::HandleScope scope(Env());
+        if (ok_) {
+            deferred_.Resolve(Napi::Buffer<uint8_t>::Copy(Env(), result_.data(), result_.size()));
+        } else {
+            deferred_.Reject(make_rac_error(Env(), code_, err_).Value());
+        }
+    }
+
+    void OnError(const Napi::Error& e) override {
+        if (leased_) {
+            end_op(handle_id_);
+            leased_ = false;
+        }
+        Napi::HandleScope scope(Env());
+        deferred_.Reject(e.Value());
+    }
+
+    ~RagProtoWorker() override {
+        if (leased_) end_op(handle_id_);
+    }
+
+ private:
+    Napi::Promise::Deferred deferred_;
+    rac_handle_t session_;
+    int32_t handle_id_;
+    bool leased_;
+    std::vector<uint8_t> input_;
+    RagProtoOp op_;
+    std::string what_;
+    std::vector<uint8_t> result_;
+    std::string err_;
+    bool ok_ = false;
+    rac_result_t code_ = RAC_SUCCESS;
+};
+
+// Validate (handleId, protoBytes) and dispatch a RagProtoWorker; returns its Promise.
+static Napi::Value rag_async_op(const Napi::CallbackInfo& info, RagProtoOp op, const char* what) {
+    Napi::Env env = info.Env();
+    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
+        Napi::TypeError::New(env, std::string(what) + "(handleId, protoBytes) bad args").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = begin_op(g_rag_handles, hid);
+    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    Napi::Uint8Array bytes = info[1].As<Napi::Uint8Array>();
+    std::vector<uint8_t> copy(bytes.Data(), bytes.Data() + bytes.ByteLength());
+    auto* worker = new RagProtoWorker(env, h, hid, std::move(copy), op, what);
+    Napi::Promise promise = worker->Promise();
+    try {
+        worker->Queue();
+    } catch (...) {
+        end_op(hid);
+        delete worker;
+        throw;
+    }
+    return promise;
 }
 
 // Register a downloaded model in commons' global registry (id -> local_path) so
@@ -948,11 +1184,84 @@ Napi::Value RegisterModel(const Napi::CallbackInfo& info) {
     rac_result_t rc = rac_register_model(mi);
     rac_model_info_free(mi);
     if (rc != RAC_SUCCESS) {
-        Napi::Error::New(env, "registerModel failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
+        throw_rac_error(env, rc, "registerModel");
         return env.Undefined();
     }
     return env.Undefined();
 }
+
+// Async (worker-thread) — session create resolves model ids and loads embedding
+// (+ optional LLM) services, which can take seconds. A sync call would block the
+// utility-host event loop the same way ingest/query used to.
+class RagCreateSessionWorker : public Napi::AsyncWorker {
+ public:
+    RagCreateSessionWorker(Napi::Env env, std::vector<uint8_t> config)
+        : Napi::AsyncWorker(env),
+          deferred_(Napi::Promise::Deferred::New(env)),
+          config_(std::move(config)) {}
+
+    Napi::Promise Promise() { return deferred_.Promise(); }
+
+    void Execute() override {
+        rac_result_t rc = rac_rag_session_create_proto(config_.data(), config_.size(), &session_);
+        code_ = rc;
+        if (rc != RAC_SUCCESS || session_ == nullptr) {
+            err_ = "rag session create failed: " + std::to_string(rc);
+            session_ = nullptr;
+            ok_ = false;
+        } else {
+            ok_ = true;
+        }
+    }
+
+    void OnOK() override {
+        Napi::HandleScope scope(Env());
+        if (!ok_ || session_ == nullptr) {
+            deferred_.Reject(make_rac_error(Env(), code_, err_).Value());
+            return;
+        }
+        int32_t hid;
+        {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            // Shutdown may have cleared maps + rac_shutdown() between Execute
+            // and OnOK — never register a session into a dead runtime.
+            if (!g_initialized.load()) {
+                rac_rag_session_destroy_proto(session_);
+                session_ = nullptr;
+                deferred_.Reject(make_rac_error(
+                                     Env(), RAC_ERROR_NOT_INITIALIZED,
+                                     "rag session create aborted: SDK shut down")
+                                     .Value());
+                return;
+            }
+            hid = g_next_handle_id++;
+            g_rag_handles[hid] = session_;
+            session_ = nullptr;  // ownership transferred to the map
+        }
+        deferred_.Resolve(Napi::Number::New(Env(), hid));
+    }
+
+    void OnError(const Napi::Error& e) override {
+        if (session_) {
+            rac_rag_session_destroy_proto(session_);
+            session_ = nullptr;
+        }
+        Napi::HandleScope scope(Env());
+        deferred_.Reject(e.Value());
+    }
+
+    ~RagCreateSessionWorker() override {
+        if (session_) rac_rag_session_destroy_proto(session_);
+    }
+
+ private:
+    Napi::Promise::Deferred deferred_;
+    std::vector<uint8_t> config_;
+    rac_handle_t session_ = nullptr;
+    std::string err_;
+    bool ok_ = false;
+    rac_result_t code_ = RAC_SUCCESS;
+};
 
 Napi::Value RagCreateSession(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
@@ -963,51 +1272,21 @@ Napi::Value RagCreateSession(const Napi::CallbackInfo& info) {
         return env.Undefined();
     }
     Napi::Uint8Array cfg = info[0].As<Napi::Uint8Array>();
-    rac_handle_t h = nullptr;
-    rac_result_t rc = rac_rag_session_create_proto(cfg.Data(), cfg.ByteLength(), &h);
-    if (rc != RAC_SUCCESS || h == nullptr) {
-        Napi::Error::New(env, "rag session create failed: " + std::to_string(rc)).ThrowAsJavaScriptException();
-        return env.Undefined();
-    }
-    int32_t hid;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        hid = g_next_handle_id++;
-        g_rag_handles[hid] = h;
-    }
-    return Napi::Number::New(env, hid);
+    std::vector<uint8_t> copy(cfg.Data(), cfg.Data() + cfg.ByteLength());
+    auto* worker = new RagCreateSessionWorker(env, std::move(copy));
+    Napi::Promise promise = worker->Promise();
+    worker->Queue();
+    return promise;
 }
 
+// Async (worker-thread) — a document's chunks are embedded, which can be slow.
 Napi::Value RagIngest(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
-        Napi::TypeError::New(env, "ragIngest(handleId, documentProtoBytes) bad args").ThrowAsJavaScriptException();
-        return env.Undefined();
-    }
-    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
-    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
-    Napi::Uint8Array doc = info[1].As<Napi::Uint8Array>();
-    rac_proto_buffer_t out;
-    rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_rag_ingest_proto(h, doc.Data(), doc.ByteLength(), &out);
-    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
-    return rag_out_to_js(env, &out, "rag ingest");
+    return rag_async_op(info, rac_rag_ingest_proto, "rag ingest");
 }
 
+// Async (worker-thread) — a query runs retrieval + a full LLM generation.
 Napi::Value RagQuery(const Napi::CallbackInfo& info) {
-    Napi::Env env = info.Env();
-    if (info.Length() < 2 || !info[0].IsNumber() || !info[1].IsTypedArray()) {
-        Napi::TypeError::New(env, "ragQuery(handleId, queryProtoBytes) bad args").ThrowAsJavaScriptException();
-        return env.Undefined();
-    }
-    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
-    if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
-    Napi::Uint8Array q = info[1].As<Napi::Uint8Array>();
-    rac_proto_buffer_t out;
-    rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_rag_query_proto(h, q.Data(), q.ByteLength(), &out);
-    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) out.status = rc;
-    return rag_out_to_js(env, &out, "rag query");
+    return rag_async_op(info, rac_rag_query_proto, "rag query");
 }
 
 Napi::Value RagClear(const Napi::CallbackInfo& info) {
@@ -1016,8 +1295,10 @@ Napi::Value RagClear(const Napi::CallbackInfo& info) {
         Napi::TypeError::New(env, "ragClear(handleId) bad args").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = begin_op(g_rag_handles, hid);
     if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    OpScope op(hid);
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_rag_clear_proto(h, &out);
@@ -1031,8 +1312,10 @@ Napi::Value RagStats(const Napi::CallbackInfo& info) {
         Napi::TypeError::New(env, "ragStats(handleId) bad args").ThrowAsJavaScriptException();
         return env.Undefined();
     }
-    rac_handle_t h = handle_for(g_rag_handles, info[0].As<Napi::Number>().Int32Value());
+    int32_t hid = info[0].As<Napi::Number>().Int32Value();
+    rac_handle_t h = begin_op(g_rag_handles, hid);
     if (!h) { Napi::Error::New(env, "invalid rag handle").ThrowAsJavaScriptException(); return env.Undefined(); }
+    OpScope op(hid);
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
     rac_result_t rc = rac_rag_stats_proto(h, &out);
@@ -1044,12 +1327,7 @@ Napi::Value RagDestroySession(const Napi::CallbackInfo& info) {
     Napi::Env env = info.Env();
     if (info.Length() < 1 || !info[0].IsNumber()) return env.Undefined();
     int32_t hid = info[0].As<Napi::Number>().Int32Value();
-    rac_handle_t h = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_handles_mutex);
-        auto it = g_rag_handles.find(hid);
-        if (it != g_rag_handles.end()) { h = it->second; g_rag_handles.erase(it); }
-    }
+    rac_handle_t h = take_handle_when_idle(g_rag_handles, hid);
     if (h) rac_rag_session_destroy_proto(h);
     return env.Undefined();
 }

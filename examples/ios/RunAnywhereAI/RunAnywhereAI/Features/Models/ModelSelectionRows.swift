@@ -2,8 +2,8 @@
 //  ModelSelectionRows.swift
 //  RunAnywhereAI
 //
-//  Shared overlay for the model selection sheet. Row rendering now uses the
-//  family-first components (ModelFamilyRow / ModelVariantRow).
+//  Shared overlay for the model selection sheet. Row rendering uses the
+//  organisation components (ModelOrgRow / ModelVariantRow).
 //
 
 import SwiftUI

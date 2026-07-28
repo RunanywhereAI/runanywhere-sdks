@@ -7,11 +7,11 @@ import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart'
     as sdk_events_enum;
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 
 /// Proto-backed model/component lifecycle bridge.
 ///
@@ -77,8 +77,8 @@ class DartBridgeModelLifecycle {
       }
       bindings.rac_proto_buffer_init(out);
       final code = fn(registry, requestPtr, bytes.length, out);
-      if (code != RacResultCode.success ||
-          out.ref.status != RacResultCode.success) {
+      if (code != RacResultCodes.success ||
+          out.ref.status != RacResultCodes.success) {
         _logger.debug(
           'rac_model_lifecycle_load_proto failed: '
           '${_protoBufferError(out, code)}',
@@ -159,8 +159,8 @@ class DartBridgeModelLifecycle {
     try {
       bindings.rac_proto_buffer_init(out);
       final code = fn(component.value, out);
-      if (code != RacResultCode.success ||
-          out.ref.status != RacResultCode.success) {
+      if (code != RacResultCodes.success ||
+          out.ref.status != RacResultCodes.success) {
         _logger.debug(
           'rac_component_lifecycle_snapshot_proto failed: '
           '${_protoBufferError(out, code)}',
@@ -206,8 +206,8 @@ class DartBridgeModelLifecycle {
       }
       bindings.rac_proto_buffer_init(out);
       final code = fn(requestPtr, bytes.length, out);
-      if (code != RacResultCode.success ||
-          out.ref.status != RacResultCode.success) {
+      if (code != RacResultCodes.success ||
+          out.ref.status != RacResultCodes.success) {
         if (logFailures) {
           _logger.debug('$symbol failed: ${_protoBufferError(out, code)}');
         }

@@ -27,6 +27,7 @@ package com.runanywhere.sdk.httptransport
 
 import android.os.Looper
 import android.util.Log
+import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import okhttp3.Call
 import okhttp3.Headers
@@ -64,16 +65,16 @@ import java.util.concurrent.atomic.AtomicReference
 object OkHttpHttpTransport {
     private const val TAG = "OkHttpHttpTransport"
 
-    /** Chunk size used for streaming body delivery (32 KB matches Okio's default). */
-    private const val STREAM_CHUNK_SIZE = 32 * 1024
+    /** Chunk size for streaming body delivery; see NetworkDefaults in idl/sdk_defaults.proto. */
+    private const val STREAM_CHUNK_SIZE = RADefaults.Network.STREAM_CHUNK_BYTES
 
     /** Default OkHttp client. Lazily built on first use. Mirrors Swift's `sharedSession`. */
     private val defaultClient: OkHttpClient by lazy {
         OkHttpClient
             .Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(RADefaults.Network.CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout(RADefaults.Network.REQUEST_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+            .writeTimeout(RADefaults.Network.REQUEST_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
@@ -83,16 +84,17 @@ object OkHttpHttpTransport {
      * Dedicated streaming OkHttp client. Mirrors the Swift adapter's per-call
      * streaming session built with `timeoutIntervalForResource = 24 * 60 * 60`.
      * A multi-GB GGUF download over a slow cellular link can legitimately run
-     * for hours, so the read timeout is bumped from the default 120s to 24h.
+     * for hours, so the read timeout uses the pool's streaming window, not the
+     * per-request one.
      */
     private val streamingClient: OkHttpClient
         get() {
             val base = clientRef.get() ?: defaultClient
             return base
                 .newBuilder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(Duration.ofHours(24))
-                .writeTimeout(60, TimeUnit.SECONDS)
+                .connectTimeout(RADefaults.Network.CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+                .readTimeout(Duration.ofMillis(RADefaults.Network.STREAMING_TIMEOUT_MS.toLong()))
+                .writeTimeout(RADefaults.Network.REQUEST_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
                 .build()
         }
 

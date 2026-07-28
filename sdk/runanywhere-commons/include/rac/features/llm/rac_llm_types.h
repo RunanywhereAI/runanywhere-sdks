@@ -24,6 +24,7 @@
 #define RAC_LLM_TYPES_H
 
 #include "rac/core/rac_types.h"
+#include "rac/rac_defaults_generated.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -152,29 +153,35 @@ typedef struct rac_llm_options {
 /**
  * @brief Default LLM generation options
  *
- * The sampling fields below the legacy struct members default to the proto's
- * documented "unset / disabled" sentinels (idl/llm_options.proto): top_k=0,
- * repetition_penalty=1.0, frequency/presence/min_p=0.0, seed=0, no grammar,
+ * The sampling values come from the `rac_default` annotations on
+ * runanywhere.v1.LLMGenerationOptions, via the generated
+ * rac_defaults_generated.h. Editing a number here would desynchronize C++ from
+ * the five platform SDKs, which generate their own defaults() from the same
+ * annotations — change idl/llm_options.proto instead.
+ *
+ * Fields with no annotation default to the proto's documented "unset /
+ * disabled" sentinels: frequency/presence/min_p=0.0, seed=0, no grammar,
  * n_threads=0. Engines apply each only when its non-disabled value is present.
  */
-static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {.max_tokens = 100,
-                                                          .temperature = 0.8f,
-                                                          .top_p = 1.0f,
-                                                          .stop_sequences = RAC_NULL,
-                                                          .num_stop_sequences = 0,
-                                                          .streaming_enabled = RAC_FALSE,
-                                                          .system_prompt = RAC_NULL,
-                                                          .top_k = 0,
-                                                          .repetition_penalty = 1.0f,
-                                                          .frequency_penalty = 0.0f,
-                                                          .presence_penalty = 0.0f,
-                                                          .min_p = 0.0f,
-                                                          .seed = 0,
-                                                          .grammar = RAC_NULL,
-                                                          .n_threads = 0,
-                                                          .disable_thinking = RAC_FALSE,
-                                                          .history = RAC_NULL,
-                                                          .n_history = 0};
+static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {
+    .max_tokens = RAC_DEFAULT_LLM_GENERATION_OPTIONS_MAX_TOKENS,
+    .temperature = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TEMPERATURE,
+    .top_p = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TOP_P,
+    .stop_sequences = RAC_NULL,
+    .num_stop_sequences = 0,
+    .streaming_enabled = RAC_FALSE,
+    .system_prompt = RAC_NULL,
+    .top_k = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TOP_K,
+    .repetition_penalty = RAC_DEFAULT_LLM_GENERATION_OPTIONS_REPETITION_PENALTY,
+    .frequency_penalty = 0.0f,
+    .presence_penalty = 0.0f,
+    .min_p = 0.0f,
+    .seed = 0,
+    .grammar = RAC_NULL,
+    .n_threads = 0,
+    .disable_thinking = RAC_FALSE,
+    .history = RAC_NULL,
+    .n_history = 0};
 
 // =============================================================================
 // RESULT - Mirrors Swift's LLMGenerationResult

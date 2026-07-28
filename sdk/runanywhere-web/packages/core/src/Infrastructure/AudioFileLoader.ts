@@ -1,3 +1,4 @@
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 /**
  * AudioFileLoader
  *
@@ -31,7 +32,7 @@ export class AudioFileLoader {
    */
   static async toFloat32Array(
     file: File,
-    targetSampleRate = 16000,
+    targetSampleRate = audioCaptureDefaults.micSampleRateHz,
   ): Promise<AudioFileLoaderResult> {
     const arrayBuffer = await file.arrayBuffer();
 

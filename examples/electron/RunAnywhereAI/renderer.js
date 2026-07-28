@@ -69,27 +69,12 @@ function md(text) {
   return s.replace(/(\d+)/g, (_m, i) => `<pre><code>${blocks[+i]}</code></pre>`);
 }
 
-// Split a reasoning model's <think>…</think> from its answer. Mirrors the SDK's
-// splitThinking (also on window.runanywhere.splitThinking) — inlined here for the
-// per-token streaming hot path so we don't cross the context bridge each token.
-function splitThink(text) {
-  if (!text) return { response: '', thinking: '' };
-  // indexOf scan (O(n)) — not a backreference regex, which backtracks on
-  // adversarial model output (ReDoS). Mirrors the SDK's splitThinking.
-  let idx = -1, tag = '';
-  for (const t of ['<think>', '<thinking>']) { const i = text.indexOf(t); if (i >= 0 && (idx < 0 || i < idx)) { idx = i; tag = t; } }
-  if (idx < 0) return { response: text.trim(), thinking: '' };
-  const afterOpen = idx + tag.length;
-  const closeTag = tag === '<think>' ? '</think>' : '</thinking>';
-  const close = text.indexOf(closeTag, afterOpen);
-  if (close < 0) return { response: text.slice(0, idx).trim(), thinking: text.slice(afterOpen).trim() };
-  return { thinking: text.slice(afterOpen, close).trim(), response: (text.slice(0, idx) + text.slice(close + closeTag.length)).trim() };
-}
 // Assistant bubble inner HTML: a collapsible "Reasoning" block (when present)
 // above the rendered answer. `streaming` keeps reasoning open + shows a
-// placeholder while the answer is still empty.
+// placeholder while the answer is still empty. Use the SDK's splitThinking so
+// the demo stays in lockstep with commons (newline join when both sides exist).
 function assistantHtml(raw, streaming) {
-  const { response, thinking } = splitThink(raw || '');
+  const { response, thinking } = ra.splitThinking(raw || '');
   let out = '';
   if (thinking) {
     const open = streaming && !response ? ' open' : '';
@@ -419,22 +404,26 @@ async function runEmbeddings(a, b) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
 }
 // ---- RAG (Knowledge tab) ----
-// rac model-registry enums: category EMBEDDING=7 / LANGUAGE=0, framework ONNX=0 / LLAMACPP=1.
-let ragSession = null; // native session handle, created lazily on first use.
+// Lazy singleton: memoize the in-flight promise so concurrent first-use (ingest
+// + ask) share one download/register/create instead of orphaning a handle.
+let ragSession = null;
+let ragSessionPromise = null;
 async function ragEnsureSession() {
   if (ragSession != null) return ragSession;
-  setStatus('preparing knowledge base…');
-  // Download (idempotent) to get on-disk paths, register them so commons' RAG can
-  // resolve the ids, then create the session over MiniLM (embed) + the chat LLM.
-  const em = await ra.downloadModel('minilm');
-  const lm = await ra.downloadModel(DEFAULT_LLM);
-  await ra.registerModel('minilm', em.primary, 7, 0);
-  await ra.registerModel(DEFAULT_LLM, lm.primary, 0, 1);
-  ragSession = await ra.ragCreateSession({
-    embeddingModelId: 'minilm', llmModelId: DEFAULT_LLM,
-    topK: 3, chunkSize: 512, chunkOverlap: 64, maxContextTokens: 1024,
+  if (ragSessionPromise) return ragSessionPromise;
+  ragSessionPromise = (async () => {
+    setStatus('preparing knowledge base…');
+    // Single SDK entry point — owns download + registry enums + session create.
+    ragSession = await ra.ragCreateSessionFromCatalog({
+      embeddingModelId: 'minilm', llmModelId: DEFAULT_LLM,
+      topK: 3, chunkSize: 512, chunkOverlap: 64, maxContextTokens: 1024,
+    });
+    return ragSession;
+  })().catch((e) => {
+    ragSessionPromise = null; // allow retry after failure
+    throw e;
   });
-  return ragSession;
+  return ragSessionPromise;
 }
 function ragStatsText(s) {
   if (!s) return '';
@@ -516,19 +505,27 @@ function wireUi() {
     if (ragSession == null) { $('ragstats').textContent = ''; return; }
     try { const s = await ra.ragClear(ragSession); $('ragstats').textContent = ragStatsText(s); $('ragout').textContent = ''; renderRagSources([]); } catch (e) { $('ragstats').textContent = 'error: ' + e.message; }
   });
+  let ragQuerying = false;
   const askRag = async () => {
+    if (ragQuerying) return; // one query at a time (Enter can re-fire past the disabled button)
     const q = $('ragq').value.trim();
     if (!q) return;
-    $('ragask').disabled = true; $('ragout').innerHTML = '…'; renderRagSources([]);
+    ragQuerying = true;
+    $('ragask').disabled = true; $('ragq').value = ''; $('ragout').innerHTML = '…'; renderRagSources([]);
     setStatus('retrieving + answering…');
     try {
       const h = await ragEnsureSession();
       const res = await ra.ragQuery(h, { question: q, maxTokens: settings.maxTokens, temperature: settings.temperature });
-      // Reuse the chat's thinking-aware renderer so <think> shows collapsibly.
-      $('ragout').innerHTML = assistantHtml(res.thinkingContent ? `<think>${res.thinkingContent}</think>${res.answer}` : res.answer);
+      // Render reasoning + answer SEPARATELY (commons already split thinkingContent
+      // out) — do NOT re-wrap in <think> tags, or a literal </think> in retrieved
+      // document text would mis-split the answer into the reasoning drawer.
+      const reason = res.thinkingContent
+        ? `<details class="reason"><summary>💭 Reasoning</summary><div class="reasonbody">${escapeHtml(res.thinkingContent)}</div></details>`
+        : '';
+      $('ragout').innerHTML = reason + md(res.answer || '');
       renderRagSources(res.retrievedChunks);
     } catch (e) { $('ragout').textContent = 'error: ' + e.message; }
-    finally { $('ragask').disabled = false; setStatus('ready'); }
+    finally { ragQuerying = false; $('ragask').disabled = false; setStatus('ready'); }
   };
   $('ragask').addEventListener('click', askRag);
   $('ragq').addEventListener('keydown', (e) => { if (e.key === 'Enter') askRag(); });

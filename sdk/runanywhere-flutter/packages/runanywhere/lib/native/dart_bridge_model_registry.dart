@@ -8,9 +8,9 @@ import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 
 // =============================================================================
 // Model Registry Bridge
@@ -190,10 +190,10 @@ class DartBridgeModelRegistry {
       }
 
       final result = fn(_registryHandle!, bytesPtr, bytes.length);
-      if (result != RacResultCode.success) {
+      if (result != RacResultCodes.success) {
         _logger.debug('$symbol failed for ${model.id}: result=$result');
       }
-      return result == RacResultCode.success;
+      return result == RacResultCodes.success;
     } catch (e) {
       _logger.debug('$symbol error: $e');
       return false;
@@ -220,8 +220,8 @@ class DartBridgeModelRegistry {
         outBytesPtr,
         outSizePtr,
       );
-      if (result != RacResultCode.success || outBytesPtr.value == nullptr) {
-        if (result != RacResultCode.errorNotFound) {
+      if (result != RacResultCodes.success || outBytesPtr.value == nullptr) {
+        if (result != RacResultCodes.errorNotFound) {
           _logger.debug(
             'rac_model_registry_get_proto failed for $modelId: result=$result',
           );
@@ -260,7 +260,7 @@ class DartBridgeModelRegistry {
 
     try {
       final result = listFn(_registryHandle!, outBytesPtr, outSizePtr);
-      if (result != RacResultCode.success || outBytesPtr.value == nullptr) {
+      if (result != RacResultCodes.success || outBytesPtr.value == nullptr) {
         _logger.debug('rac_model_registry_list_proto failed: result=$result');
         return null;
       }
@@ -307,7 +307,7 @@ class DartBridgeModelRegistry {
         outBytesPtr,
         outSizePtr,
       );
-      if (result != RacResultCode.success || outBytesPtr.value == nullptr) {
+      if (result != RacResultCodes.success || outBytesPtr.value == nullptr) {
         _logger.debug('rac_model_registry_query_proto failed: result=$result');
         return null;
       }
@@ -344,7 +344,7 @@ class DartBridgeModelRegistry {
 
     try {
       final result = listFn(_registryHandle!, outBytesPtr, outSizePtr);
-      if (result != RacResultCode.success || outBytesPtr.value == nullptr) {
+      if (result != RacResultCodes.success || outBytesPtr.value == nullptr) {
         _logger.debug(
           'rac_model_registry_list_downloaded_proto failed: result=$result',
         );
@@ -483,12 +483,12 @@ class DartBridgeModelRegistry {
     final modelIdPtr = modelId.toNativeUtf8();
     try {
       final result = removeProtoFn(_registryHandle!, modelIdPtr);
-      if (result != RacResultCode.success) {
+      if (result != RacResultCodes.success) {
         _logger.debug(
           'rac_model_registry_remove_proto failed for $modelId: result=$result',
         );
       }
-      return result == RacResultCode.success;
+      return result == RacResultCodes.success;
     } catch (e) {
       _logger.debug('rac_model_registry_remove_proto error: $e');
       return false;
@@ -512,7 +512,7 @@ class DartBridgeModelRegistry {
       final modelIdPtr = modelId.toNativeUtf8();
       try {
         final result = updateFn(_registryHandle!, modelIdPtr);
-        return result == RacResultCode.success;
+        return result == RacResultCodes.success;
       } finally {
         calloc.free(modelIdPtr);
       }

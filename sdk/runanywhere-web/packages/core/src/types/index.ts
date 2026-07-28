@@ -57,9 +57,9 @@ export type LLMStreamErrorCallback = (error: Error) => void;
  * options object.
  */
 export const LLM_GENERATION_DEFAULTS = Object.freeze({
-  maxTokens: 100,
-  temperature: 0.8,
-  topP: 1.0,
+  maxTokens: lLMGenerationOptionsDefaults().maxTokens,
+  temperature: lLMGenerationOptionsDefaults().temperature,
+  topP: lLMGenerationOptionsDefaults().topP,
   stopSequences: [] as readonly string[],
   streamingEnabled: false,
 }) as Readonly<{
@@ -183,6 +183,7 @@ export type {
 } from '@runanywhere/proto-ts/vad_options';
 export { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
 import type { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
+import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 
 export type SpeechActivityCallback = (activity: SpeechActivityKind) => void;
 

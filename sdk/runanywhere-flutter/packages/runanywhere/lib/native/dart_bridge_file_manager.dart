@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/native/types/tools_storage_types.dart';
@@ -13,9 +14,13 @@ import 'package:runanywhere/native/types/tools_storage_types.dart';
 // Exception Return Constants (must be compile-time constants for FFI)
 // =============================================================================
 
-const int _errorDirectoryCreationFailed = -189;
-const int _errorDeleteFailed = -187;
-const int _errorFileNotFound = -183;
+// A third hand-written copy of these numbers lived here; they come from
+// idl/errors.proto via generated/ra_result_codes.dart. Kept as file-local
+// aliases so the `exceptionalReturn:` arguments below stay compile-time const.
+const int _errorDirectoryCreationFailed =
+    RacResultCodes.errorDirectoryCreationFailed;
+const int _errorDeleteFailed = RacResultCodes.errorDeleteFailed;
+const int _errorFileNotFound = RacResultCodes.errorFileNotFound;
 const int _falseReturn = 0;
 const int _negativeReturn = -1;
 
@@ -86,7 +91,7 @@ class DartBridgeFileManager {
             Int32 Function(Pointer<RacFileCallbacksStruct>),
             int Function(Pointer<RacFileCallbacksStruct>)>(
         'rac_file_manager_create_directory_structure');
-    return fn(_callbacksPtr!) == RacResultCode.success;
+    return fn(_callbacksPtr!) == RacResultCodes.success;
   }
 
   /// Calculate directory size recursively.
@@ -136,7 +141,7 @@ class DartBridgeFileManager {
         Int32 Function(Pointer<RacFileCallbacksStruct>),
         int Function(
             Pointer<RacFileCallbacksStruct>)>('rac_file_manager_clear_cache');
-    return fn(_callbacksPtr!) == RacResultCode.success;
+    return fn(_callbacksPtr!) == RacResultCodes.success;
   }
 
   /// Clear temp directory.
@@ -147,7 +152,7 @@ class DartBridgeFileManager {
         Int32 Function(Pointer<RacFileCallbacksStruct>),
         int Function(
             Pointer<RacFileCallbacksStruct>)>('rac_file_manager_clear_temp');
-    return fn(_callbacksPtr!) == RacResultCode.success;
+    return fn(_callbacksPtr!) == RacResultCodes.success;
   }
 
   /// Get cache size.
@@ -184,7 +189,7 @@ class DartBridgeFileManager {
     try {
       final result =
           fn(_callbacksPtr!, modelIdPtr, framework, outPath, bufSize);
-      if (result != RacResultCode.success) return null;
+      if (result != RacResultCodes.success) return null;
       return outPath.toDartString();
     } finally {
       calloc.free(modelIdPtr);
@@ -263,7 +268,7 @@ class DartBridgeFileManager {
     final infoPtr = calloc<RacFileManagerStorageInfoStruct>();
     try {
       final result = fn(_callbacksPtr!, infoPtr);
-      if (result != RacResultCode.success) return null;
+      if (result != RacResultCodes.success) return null;
       return NativeStorageInfo(
         deviceTotal: infoPtr.ref.deviceTotal,
         deviceFree: infoPtr.ref.deviceFree,
@@ -293,7 +298,7 @@ class DartBridgeFileManager {
     final availPtr = calloc<RacStorageAvailabilityStruct>();
     try {
       final result = fn(_callbacksPtr!, requiredBytes, availPtr);
-      if (result != RacResultCode.success) return null;
+      if (result != RacResultCodes.success) return null;
       final rec = availPtr.ref.recommendation;
       return NativeStorageAvailability(
         isAvailable: availPtr.ref.isAvailable == RAC_TRUE,
@@ -326,7 +331,7 @@ class DartBridgeFileManager {
 
     final modelIdPtr = modelId.toNativeUtf8();
     try {
-      return fn(_callbacksPtr!, modelIdPtr, framework) == RacResultCode.success;
+      return fn(_callbacksPtr!, modelIdPtr, framework) == RacResultCodes.success;
     } finally {
       calloc.free(modelIdPtr);
     }
@@ -399,7 +404,7 @@ int _createDirectoryCallback(
     } else {
       dir.createSync();
     }
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
     return _errorDirectoryCreationFailed;
   }
@@ -410,14 +415,14 @@ int _deletePathCallback(
   try {
     final pathStr = path.toDartString();
     final type = FileSystemEntity.typeSync(pathStr);
-    if (type == FileSystemEntityType.notFound) return RacResultCode.success;
+    if (type == FileSystemEntityType.notFound) return RacResultCodes.success;
 
     if (type == FileSystemEntityType.directory) {
       Directory(pathStr).deleteSync(recursive: recursive != 0);
     } else {
       File(pathStr).deleteSync();
     }
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
     return _errorDeleteFailed;
   }
@@ -448,7 +453,7 @@ int _listDirectoryCallback(
 
     outEntries.value = entries;
     outCount.value = count;
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
     outEntries.value = nullptr;
     outCount.value = 0;

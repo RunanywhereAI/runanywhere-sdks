@@ -16,6 +16,7 @@ import type {
 import {
   clearModelOwnedByBackendWorker,
   markLlamaBackendWorkerDead,
+  markOnnxBackendWorkerDead,
 } from './BackendWorkerModelOwnership.js';
 import { setRuntimeDegradedReason } from '../Foundation/RuntimeConfig.js';
 
@@ -27,6 +28,7 @@ import {
   getRegisteredBackendWorkerDiagnostics,
   setBackendWorkerHost,
 } from './BackendWorkerHostRegistry.js';
+import { workerDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 export interface BackendWorkerLike {
   onmessage: ((event: MessageEvent<BackendWorkerResponse>) => void) | null;
@@ -75,7 +77,7 @@ interface StreamPending {
 
 type PendingRequest = UnaryPending | StreamPending;
 
-const defaultInitTimeoutMs = 10_000;
+const defaultInitTimeoutMs = workerDefaults.handshakeTimeoutMs;
 
 /** Current worker-runtime state for `RunAnywhere.runtime` diagnostics. */
 export function getBackendWorkerRuntimeDiagnostics(): BackendWorkerDiagnostics {
@@ -390,6 +392,8 @@ export class BackendWorkerHost {
     }
     if (this.backendId === 'llamacpp') {
       markLlamaBackendWorkerDead(message);
+    } else if (this.backendId === 'onnx') {
+      markOnnxBackendWorkerDead(message);
     }
     setRuntimeDegradedReason(
       `BackendWorker (${this.backendId}) crashed; reload the model. `

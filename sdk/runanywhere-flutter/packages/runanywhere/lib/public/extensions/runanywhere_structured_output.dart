@@ -18,6 +18,7 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart' show LLMStreamEvent;
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/structured_output.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart'
@@ -36,8 +37,8 @@ class RunAnywhereStructuredOutput {
   static Future<StructuredOutputResult> generate(
     String prompt, {
     required String jsonSchema,
-    int maxTokens = 512,
-    double temperature = 0.0,
+    int maxTokens = RADefaultsStructuredOutput.maxTokens,
+    double temperature = RADefaultsStructuredOutput.temperature,
   }) async {
     if (!DartBridge.isInitialized) throw SDKException.notInitialized();
     if (RunAnywhereLLM.shared.currentModelId == null) {

@@ -38,6 +38,8 @@
 #include "rac/features/rag/rac_rag.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_primitive.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "rag.pb.h"
@@ -600,15 +602,20 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // rerank_results enables LLM-pointwise reranking of fused candidates, run
-    // by rag_pipeline_graph using the session's LLM handle. reranker_model_id
-    // (a dedicated cross-encoder) is not yet supported — reject only that.
+    // rerank_results enables LLM-pointwise reranking of fused candidates, run by
+    // rag_pipeline_graph using the session's LLM handle — that path is fully
+    // wired. A dedicated cross-encoder (reranker_model_id → RAC_PRIMITIVE_RERANK)
+    // is NOT yet invoked at query time: RAGBackend/rag_pipeline_graph does not
+    // score fused candidates through the rerank primitive. Accepting the config
+    // and silently ignoring it would mislead callers into believing cross-encoder
+    // reranking is active, so reject it up front with an actionable error until
+    // the query-time wiring lands.
     if (proto.has_reranker_model_id() && !proto.reranker_model_id().empty()) {
         const char* msg =
-            "reranker_model_id (dedicated cross-encoder) is not yet supported; use rerank_results "
-            "to enable LLM-pointwise reranking with the session LLM";
-        publish_failure(RAC_ERROR_FEATURE_NOT_AVAILABLE, "rag.sessionCreate", msg);
-        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+            "reranker_model_id (dedicated cross-encoder reranking) is not yet supported by the "
+            "RAG query path; use rerank_results for LLM-pointwise reranking with the session LLM";
+        publish_failure(RAC_ERROR_NOT_IMPLEMENTED, "rag.sessionCreate", msg);
+        return RAC_ERROR_NOT_IMPLEMENTED;
     }
 
     std::string err_message;

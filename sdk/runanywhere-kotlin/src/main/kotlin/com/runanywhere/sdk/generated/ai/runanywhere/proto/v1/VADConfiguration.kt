@@ -124,6 +124,9 @@ public class VADConfiguration(
    * Calibration multiplier (threshold = ambient noise * multiplier).
    * Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
    */
+  @RacDefaultOption("2.0")
+  @RacMinFloatOption(1.5)
+  @RacMaxFloatOption(4.0)
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

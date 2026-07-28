@@ -5,8 +5,8 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 
 typedef _SecureStoreNative =
     Int32 Function(Pointer<Utf8> key, Pointer<Utf8> value);
@@ -140,7 +140,7 @@ final class DartBridgeSecureStorage {
   String? retrieveIfExists(String key) {
     final result = retrieve(key);
     if (result.status > 0) return result.value;
-    if (result.status == RacResultCode.errorFileNotFound) return null;
+    if (result.status == RacResultCodes.errorFileNotFound) return null;
     SDKException.throwIfError(result.status);
     throw StateError('Secure-storage read returned an invalid status');
   }

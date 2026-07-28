@@ -8,7 +8,7 @@ import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart' as download_pb;
-import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 
 /// Download bridge for the stable generated-proto download ABI.
 ///
@@ -68,7 +68,7 @@ class DartBridgeDownload {
         _onNativeProgress,
       );
       final code = setCallback(callable.nativeFunction, nullptr);
-      if (code != RacResultCode.success) {
+      if (code != RacResultCodes.success) {
         _logger.debug(
           'rac_download_set_progress_proto_callback returned $code',
         );
@@ -157,9 +157,9 @@ class DartBridgeDownload {
       }
       bindings.rac_proto_buffer_init(out);
       final code = poll(requestPtr, bytes.length, out);
-      if (code != RacResultCode.success ||
-          out.ref.status != RacResultCode.success) {
-        if (code == RacResultCode.errorNotFound) {
+      if (code != RacResultCodes.success ||
+          out.ref.status != RacResultCodes.success) {
+        if (code == RacResultCodes.errorNotFound) {
           // Task already purged in commons (e.g. cleanup_terminal_tasks ran)
           // — drop our tracking entry so we stop polling for it.
           _activeDownloads.remove(entry.key);
@@ -315,9 +315,9 @@ class DartBridgeDownload {
       }
       bindings.rac_proto_buffer_init(out);
       final code = fn(requestPtr, bytes.length, out);
-      if (code != RacResultCode.success ||
-          out.ref.status != RacResultCode.success) {
-        if (logNotFound || code != RacResultCode.errorNotFound) {
+      if (code != RacResultCodes.success ||
+          out.ref.status != RacResultCodes.success) {
+        if (logNotFound || code != RacResultCodes.errorNotFound) {
           final message = out.ref.errorMessage == nullptr
               ? 'code=$code status=${out.ref.status}'
               : out.ref.errorMessage.toDartString();

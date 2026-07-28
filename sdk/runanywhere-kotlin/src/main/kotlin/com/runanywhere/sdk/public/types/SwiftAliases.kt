@@ -58,6 +58,30 @@ public typealias RADiffusionGenerationRequest = ai.runanywhere.proto.v1.Diffusio
 public typealias RADiffusionResult = ai.runanywhere.proto.v1.DiffusionResult
 public typealias RADiffusionMode = ai.runanywhere.proto.v1.DiffusionMode
 
+// Semantic Segmentation
+public typealias RASegmentationPixelFormat = ai.runanywhere.proto.v1.SegmentationPixelFormat
+public typealias RASegmentationImage = ai.runanywhere.proto.v1.SegmentationImage
+public typealias RASegmentationOptions = ai.runanywhere.proto.v1.SegmentationOptions
+public typealias RASegmentationRequest = ai.runanywhere.proto.v1.SegmentationRequest
+public typealias RASegmentationClassSummary = ai.runanywhere.proto.v1.SegmentationClassSummary
+public typealias RASegmentationResult = ai.runanywhere.proto.v1.SegmentationResult
+
+// Speaker Diarization
+public typealias RADiarizationAudioEncoding = ai.runanywhere.proto.v1.DiarizationAudioEncoding
+public typealias RADiarizationOptions = ai.runanywhere.proto.v1.DiarizationOptions
+public typealias RADiarizationRequest = ai.runanywhere.proto.v1.DiarizationRequest
+public typealias RADiarizationSegment = ai.runanywhere.proto.v1.DiarizationSegment
+public typealias RADiarizationResult = ai.runanywhere.proto.v1.DiarizationResult
+public typealias RADiarizationStreamEvent = ai.runanywhere.proto.v1.DiarizationStreamEvent
+public typealias RADiarizationStreamEventKind = ai.runanywhere.proto.v1.DiarizationStreamEventKind
+
+// Cross-encoder Reranking
+public typealias RARerankCandidate = ai.runanywhere.proto.v1.RerankCandidate
+public typealias RARerankOptions = ai.runanywhere.proto.v1.RerankOptions
+public typealias RARerankRequest = ai.runanywhere.proto.v1.RerankRequest
+public typealias RARerankScoredItem = ai.runanywhere.proto.v1.RerankScoredItem
+public typealias RARerankResult = ai.runanywhere.proto.v1.RerankResult
+
 // ─── RAG ────────────────────────────────────────────────────────────────────
 
 public typealias RARAGConfiguration = ai.runanywhere.proto.v1.RAGConfiguration

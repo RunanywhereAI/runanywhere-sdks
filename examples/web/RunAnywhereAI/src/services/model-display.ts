@@ -168,65 +168,60 @@ function bytesToApproxParams(bytes: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// Model families — group catalog entries into consumer-facing product lines
-// (e.g. "Qwen3", "LFM2", "Whisper") so the picker can show one card per family
-// and reveal individual variants on tap. Pure, name/id-driven.
+// Model organisations — group catalog entries by publisher (NVIDIA, Meta, …)
+// so the picker shows one card per org and reveals every model on tap.
+// Matches Android ModelTaxonomy / iOS ModelOrgCatalog. Pure, name/id-driven.
 // ---------------------------------------------------------------------------
 
-export interface ModelFamily {
-  /** Stable key derived from the model id/name (e.g. "qwen3"). */
+export interface ModelOrg {
+  /** Stable key (e.g. "nvidia"). Declaration order = picker order. */
   key: string;
-  /** Consumer-facing display name (e.g. "Qwen3"). */
+  /** Consumer-facing display name (e.g. "NVIDIA"). */
   name: string;
-  /** Friendly one-liner describing what the family is good for. */
-  tagline: string;
 }
 
 /**
- * Ordered family matchers. Each tests the lowercased "id + name" haystack; the
- * first match wins. Order matters — more specific ids (qwen3, qwen2.5) precede
- * generic ones. A trailing catch-all guarantees every entry lands somewhere.
+ * Ordered org matchers. Each tests the lowercased "id + name" haystack; the
+ * first match wins. NVIDIA precedes llama so Nemotron stays NVIDIA; deepseek
+ * precedes qwen so R1 distills stay DeepSeek.
  */
-const FAMILY_MATCHERS: ReadonlyArray<{
+const ORG_MATCHERS: ReadonlyArray<{
   key: string;
   name: string;
-  tagline: string;
   test: RegExp;
 }> = [
-  // PrismML before Qwen*: Bonsai ids/names often mention qwen3_5 ancestry and
-  // must not land under the generic Qwen3 family card.
   {
-    key: 'prismml',
-    name: 'PrismML',
-    tagline: 'Sub-byte Bonsai reasoning models (1-bit GGUF).',
-    test: /bonsai|prismml|prism-?ml/,
+    key: 'nvidia',
+    name: 'NVIDIA',
+    test: /nemotron|nemoguard|cosmos|canary|parakeet|nv[_-]embed|nv_rerank|nvidia/,
   },
-  { key: 'qwen3', name: 'Qwen3', tagline: 'Latest Qwen chat models with a thinking mode.', test: /qwen3/ },
-  { key: 'qwen2.5', name: 'Qwen2.5', tagline: 'Compact, capable all-round chat models.', test: /qwen2\.?5/ },
-  { key: 'qwen2-vl', name: 'Qwen2-VL', tagline: 'Qwen models that can also see images.', test: /qwen2-?vl/ },
-  { key: 'llama', name: 'Llama', tagline: "Meta's versatile open chat models.", test: /llama/ },
-  { key: 'lfm2-vl', name: 'LFM2-VL', tagline: 'LiquidAI models that read images and text.', test: /lfm2-?vl/ },
-  { key: 'lfm2', name: 'LFM2', tagline: 'LiquidAI models tuned for fast on-device chat.', test: /lfm2/ },
-  { key: 'smolvlm', name: 'SmolVLM', tagline: 'Tiny vision-language models for quick demos.', test: /smolvlm/ },
-  { key: 'smollm', name: 'SmolLM', tagline: 'Very small, speedy instruction models.', test: /smollm/ },
-  { key: 'whisper', name: 'Whisper', tagline: 'Turns speech into text, on device.', test: /whisper/ },
-  { key: 'piper', name: 'Piper', tagline: 'Natural-sounding text-to-speech voices.', test: /piper|vits/ },
-  { key: 'silero', name: 'Silero', tagline: 'Detects when someone is speaking.', test: /silero|vad/ },
-  { key: 'minilm', name: 'MiniLM', tagline: 'Powers document search and memory.', test: /minilm|embedding/ },
+  { key: 'deepseek', name: 'DeepSeek', test: /deepseek/ },
+  { key: 'prism', name: 'Prism', test: /bonsai|prismml|prism-?ml/ },
+  { key: 'microsoft', name: 'Microsoft', test: /\bphi\b/ },
+  { key: 'google', name: 'Google', test: /gemma|embeddinggemma|siglip/ },
+  { key: 'meta', name: 'Meta', test: /llama/ },
+  { key: 'alibaba', name: 'Alibaba', test: /qwen/ },
+  { key: 'liquid', name: 'Liquid AI', test: /lfm2/ },
+  { key: 'mistral', name: 'Mistral AI', test: /mistral/ },
+  { key: 'hugging-face', name: 'Hugging Face', test: /smollm|smolvlm/ },
+  { key: 'openai', name: 'OpenAI', test: /whisper/ },
+  {
+    key: 'open-source',
+    name: 'Open source',
+    test: /internvl|lama_dilated|moonshine|melo|kokoro|kitten|piper|vits|silero|vad|minilm|soprano|pocket-tts|glm-asr/,
+  },
 ];
 
-const FALLBACK_FAMILY: ModelFamily = {
-  key: 'other',
-  name: 'Other models',
-  tagline: 'Additional on-device models.',
+const FALLBACK_ORG: ModelOrg = {
+  key: 'open-source',
+  name: 'Open source',
 };
 
-/** Derive the consumer-facing family for a catalog entry. Never throws. */
-export function modelFamily(entry: CatalogEntry): ModelFamily {
+/** Derive the publisher organisation for a catalog entry. Never throws. */
+export function modelOrg(entry: CatalogEntry): ModelOrg {
   const haystack = `${entry.id} ${entry.name}`.toLowerCase();
-  const match = FAMILY_MATCHERS.find((family) => family.test.test(haystack));
-  if (!match) return FALLBACK_FAMILY;
-  return { key: match.key, name: match.name, tagline: match.tagline };
+  const match = ORG_MATCHERS.find((org) => org.test.test(haystack));
+  return match ? { key: match.key, name: match.name } : FALLBACK_ORG;
 }
 
 /**

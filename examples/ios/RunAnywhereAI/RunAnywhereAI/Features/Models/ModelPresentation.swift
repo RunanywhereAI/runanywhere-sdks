@@ -365,6 +365,10 @@ extension RAModelCategory {
             return "Voice"
         case .voiceActivityDetection:
             return "Speech Detect"
+        case .speakerDiarization:
+            return "Diarization"
+        case .semanticSegmentation:
+            return "Segmentation"
         case .embedding:
             return "Documents"
         default:
@@ -388,6 +392,10 @@ extension RAModelCategory {
             return "speaker.wave.2"
         case .voiceActivityDetection:
             return "waveform.badge.mic"
+        case .speakerDiarization:
+            return "person.2.wave.2"
+        case .semanticSegmentation:
+            return "square.3.layers.3d.down.right"
         case .embedding:
             return "doc.text.magnifyingglass"
         default:
@@ -432,9 +440,9 @@ extension RAModelInfo {
         switch category {
         case .language:
             return .chatModels
-        case .speechRecognition, .speechSynthesis, .voiceActivityDetection, .audio:
+        case .speechRecognition, .speechSynthesis, .voiceActivityDetection, .speakerDiarization, .audio:
             return .voiceModels
-        case .multimodal, .vision:
+        case .multimodal, .vision, .semanticSegmentation:
             return .visionModels
         case .imageGeneration:
             return .imageGenerationModels

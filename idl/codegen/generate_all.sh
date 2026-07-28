@@ -98,6 +98,29 @@ fi
 echo "▶ C++ proto codegen"
 "${SCRIPT_DIR}/generate_cpp.sh"
 
+# C macros for every rac_default annotation. commons composes its default
+# structs (RAC_LLM_OPTIONS_DEFAULT and friends) from these, so the C layer that
+# actually runs inference reads the same annotations the SDKs generate against.
+# Unlike the four convenience post-processors this emits a plain header and
+# needs no language toolchain beyond protoc + the python protobuf runtime.
+echo "▶ C defaults header"
+if python3 -c 'import google.protobuf' >/dev/null 2>&1; then
+    python3 "${SCRIPT_DIR}/generate_cpp_defaults.py"
+else
+    echo "warning: python protobuf runtime not installed; skipping generate_cpp_defaults.py" >&2
+fi
+
+# Swift / Kotlin / Dart / TypeScript constants for the central default pool.
+# sdk_defaults.proto is excluded from the four message generators above, so its
+# values reach the SDKs as plain constants rather than as a generated message
+# type nobody puts on a wire.
+echo "▶ Default pool constants (Swift/Kotlin/Dart/TS)"
+if python3 -c 'import google.protobuf' >/dev/null 2>&1; then
+    python3 "${SCRIPT_DIR}/generate_defaults_pool.py"
+else
+    echo "warning: python protobuf runtime not installed; skipping generate_defaults_pool.py" >&2
+fi
+
 # AsyncIterable<T> stream wrappers for RN + Web. The
 # template-based renderer is intentionally separate from generate_ts.sh
 # (which uses ts-proto for messages) — different tools, different outputs.
@@ -109,5 +132,27 @@ echo "▶ C++ proto codegen"
 # other's output, masking unilateral edits.
 echo "▶ Shared TS AsyncIterable streams"
 "${SCRIPT_DIR}/generate_streams.sh"
+
+# Python protobuf for the RAG surface (optional — needs grpcio-tools). Soft-skip
+# when the package is missing so a non-Python developer environment still
+# completes the upstream codegen; CI installs grpcio-tools and fails on drift.
+echo "▶ Python proto codegen (RAG)"
+if python3 -c 'import grpc_tools.protoc' >/dev/null 2>&1; then
+    "${SCRIPT_DIR}/generate_python.sh"
+else
+    echo "warning: grpcio-tools not installed; skipping generate_python.sh" >&2
+fi
+
+# Python's ErrorCode / ErrorCategory. The Python SDK has no convenience
+# post-processor because it reaches the C ABI directly for everything but RAG,
+# so these 139 enum members were transcribed by hand under a "keep in sync"
+# docstring. Only protoc + the python protobuf runtime are needed here, not
+# grpcio-tools.
+echo "▶ Python error enums"
+if python3 -c 'import google.protobuf' >/dev/null 2>&1; then
+    python3 "${SCRIPT_DIR}/generate_python_errors.py"
+else
+    echo "warning: python protobuf runtime not installed; skipping generate_python_errors.py" >&2
+fi
 
 echo "✓ All proto codegen complete."

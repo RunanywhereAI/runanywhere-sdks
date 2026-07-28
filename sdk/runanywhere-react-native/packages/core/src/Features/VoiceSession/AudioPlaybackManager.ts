@@ -11,6 +11,7 @@
 
 import { AudioPlayback } from '../../Internal/Nitro/NitroAudioPlaybackSpec';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('AudioPlaybackManager');
 
@@ -24,7 +25,7 @@ export class AudioPlaybackManager {
    * sample rate. Encodes to an in-memory 16-bit WAV and hands the bytes to
    * the native player directly.
    */
-  async play(audioData: ArrayBuffer | string, sampleRate = 22050): Promise<void> {
+  async play(audioData: ArrayBuffer | string, sampleRate = audioCaptureDefaults.ttsSampleRateHz): Promise<void> {
     if (this.state === 'playing') {
       this.stop();
     }

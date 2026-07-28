@@ -9,6 +9,8 @@
 import { ModelCategory } from '@runanywhere/web';
 import { initChatTab } from './views/chat';
 import { initVisionTab } from './views/vision';
+import { initSegmentationTab } from './views/segmentation';
+import { initDiarizationTab } from './views/diarization';
 import { initVoiceTab } from './views/voice';
 import { initTranscribeTab } from './views/transcribe';
 import { initSpeakTab } from './views/speak';
@@ -51,10 +53,12 @@ type TabId =
   | 'settings'
   | 'voice'
   | 'vision'
+  | 'segmentation'
   | 'documents'
   | 'transcribe'
   | 'speak'
   | 'vad'
+  | 'diarization'
   | 'solutions'
   | 'benchmarks';
 
@@ -91,10 +95,12 @@ const TABS: TabDef[] = [
   { id: 'settings', label: 'Settings', initializer: (el) => { initSettingsTab(el); return undefined; } },
   { id: 'voice', label: 'Talk Mode', initializer: initVoiceTab },
   { id: 'vision', label: 'Image & Live', initializer: initVisionTab },
+  { id: 'segmentation', label: 'Segmentation', initializer: initSegmentationTab },
   { id: 'documents', label: 'Documents', initializer: initDocumentsTab },
   { id: 'transcribe', label: 'Transcribe', initializer: initTranscribeTab },
   { id: 'speak', label: 'Read Aloud', initializer: initSpeakTab },
   { id: 'vad', label: 'Voice Activity', initializer: initVadTab },
+  { id: 'diarization', label: 'Diarization', initializer: initDiarizationTab },
   { id: 'solutions', label: 'Solutions', initializer: initSolutionsTab },
   { id: 'benchmarks', label: 'Benchmarks', initializer: initBenchmarksTab },
 ];
@@ -542,10 +548,12 @@ function initAdvancedHub(el: HTMLElement): TabLifecycle {
     subtitle: string;
   }> = [
     { tab: 'voice', icon: ICONS.mic, title: 'Talk Mode', subtitle: 'Full STT + LLM + TTS voice assistant' },
+    { tab: 'segmentation', icon: ICONS.image, title: 'Segmentation', subtitle: 'Semantic image segmentation (SegFormer)' },
     { tab: 'documents', icon: ICONS.file, title: 'Documents & RAG', subtitle: 'Index local documents and ask grounded questions' },
     { tab: 'transcribe', icon: ICONS.waveform, title: 'Transcribe', subtitle: 'Speech-to-text utility' },
     { tab: 'speak', icon: ICONS.speaker, title: 'Read Aloud', subtitle: 'Text-to-speech utility' },
     { tab: 'vad', icon: ICONS.waveform, title: 'Voice Activity', subtitle: 'Speech and silence diagnostics' },
+    { tab: 'diarization', icon: ICONS.mic, title: 'Diarization', subtitle: 'Speaker diarization — who spoke when (Sortformer)' },
     { tab: 'storage', icon: ICONS.storage, title: 'Storage', subtitle: 'Models, cache, and browser files' },
     { tab: 'benchmarks', icon: ICONS.gauge, title: 'Benchmarks', subtitle: 'Measure local model performance' },
     { tab: 'solutions', icon: ICONS.stack, title: 'Solutions', subtitle: 'Run scripted SDK workflows' },
@@ -563,15 +571,15 @@ function initAdvancedHub(el: HTMLElement): TabLifecycle {
       </section>
       <section class="advanced-hub__section">
         <div class="consumer-section-title">Assistant Modes</div>
-        ${hubItems.slice(0, 2).map((item) => advancedRow(item)).join('')}
+        ${hubItems.slice(0, 3).map((item) => advancedRow(item)).join('')}
       </section>
       <section class="advanced-hub__section">
         <div class="consumer-section-title">Voice Utilities</div>
-        ${hubItems.slice(2, 5).map((item) => advancedRow(item)).join('')}
+        ${hubItems.slice(3, 7).map((item) => advancedRow(item)).join('')}
       </section>
       <section class="advanced-hub__section">
         <div class="consumer-section-title">Management</div>
-        ${hubItems.slice(5).map((item) => advancedRow(item)).join('')}
+        ${hubItems.slice(7).map((item) => advancedRow(item)).join('')}
       </section>
     </div>
   `;

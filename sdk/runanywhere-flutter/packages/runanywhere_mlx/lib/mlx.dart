@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere_mlx/src/native/mlx_bindings.dart';
 
 /// Apple MLX backend module.
@@ -37,8 +37,8 @@ abstract final class MLX {
     try {
       final bindings = _bindings ??= MLXBindings();
       final result = bindings.register(priority);
-      if (result != RacResultCode.success &&
-          result != RacResultCode.errorModuleAlreadyRegistered) {
+      if (result != RacResultCodes.success &&
+          result != RacResultCodes.errorModuleAlreadyRegistered) {
         _logger.warning('MLX backend registration returned: $result');
         return false;
       }
@@ -60,7 +60,7 @@ abstract final class MLX {
     if (bindings == null) return true;
 
     final result = bindings.unregister();
-    if (result != RacResultCode.success) {
+    if (result != RacResultCodes.success) {
       _logger.warning('MLX backend unregistration returned: $result');
       return false;
     }

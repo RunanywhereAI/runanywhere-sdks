@@ -1,8 +1,8 @@
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/native/types/core_function_types.dart';
 
 /// Minimal LlamaCPP backend FFI bindings.
@@ -130,7 +130,7 @@ class LlamaCppBindings {
   /// if already registered.
   int register() {
     if (_register == null) {
-      return RacResultCode.errorNotSupported;
+      return RacResultCodes.errorNotSupported;
     }
     return _register();
   }
@@ -138,7 +138,7 @@ class LlamaCppBindings {
   /// Unregister the LlamaCPP backend from C++ registry.
   int unregister() {
     if (_unregister == null) {
-      return RacResultCode.errorNotSupported;
+      return RacResultCodes.errorNotSupported;
     }
     return _unregister();
   }

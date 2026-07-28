@@ -15,11 +15,13 @@ import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RASTTOptions
 import com.runanywhere.sdk.public.types.RASTTOutput
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -108,7 +110,9 @@ fun RunAnywhere.transcribeStream(
                         trySend(RASTTPartialResult(is_final = true))
                     }
                     close()
-                } catch (e: Throwable) {
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
                     trySend(
                         RASTTPartialResult(
                             text = "STT stream failed: ${e.message ?: e::class.simpleName.orEmpty()}",
@@ -126,7 +130,7 @@ fun RunAnywhere.transcribeStream(
 // Private helper
 private fun estimateAudioLength(dataSize: Int): Double {
     val bytesPerSample = 2 // 16-bit
-    val sampleRate = 16000.0
+    val sampleRate = RADefaults.AudioCapture.MIC_SAMPLE_RATE_HZ.toDouble()
     val samples = dataSize.toDouble() / bytesPerSample.toDouble()
     return samples / sampleRate
 }

@@ -199,7 +199,7 @@ static rac_result_t sherpa_stt_vtable_transcribe_stream(void* impl, const void* 
                                                         rac_stt_stream_callback_t callback,
                                                         void* user_data) {
     rac_handle_t stream = nullptr;
-    rac_result_t result = rac_stt_sherpa_create_stream(impl, &stream);
+    rac_result_t result = rac_stt_sherpa_create_stream_with_options(impl, options, &stream);
     if (result != RAC_SUCCESS) {
         return result;
     }
@@ -224,14 +224,14 @@ static rac_result_t sherpa_stt_vtable_transcribe_stream(void* impl, const void* 
         (float_samples.size() % partial_interval_count != 0 ? 1 : 0);
     const size_t partial_stride = std::max(minimum_partial_stride, evenly_spaced_stride);
     std::string last_partial;
-    for (size_t partial_index = 1; partial_index <= kMaxSyntheticPartialDecodes;
-         ++partial_index) {
+    for (size_t partial_index = 1; partial_index <= kMaxSyntheticPartialDecodes; ++partial_index) {
         const size_t prefix = partial_stride * partial_index;
         if (prefix >= float_samples.size()) {
             break;
         }
         rac_handle_t partial_stream = nullptr;
-        if (rac_stt_sherpa_create_stream(impl, &partial_stream) != RAC_SUCCESS) {
+        if (rac_stt_sherpa_create_stream_with_options(impl, options, &partial_stream) !=
+            RAC_SUCCESS) {
             break;
         }
         const rac_result_t feed_result = rac_stt_sherpa_feed_audio(
@@ -321,23 +321,42 @@ static rac_result_t sherpa_stt_vtable_detect_language(void* impl, const void* au
     return rac_stt_sherpa_detect_language(impl, audio_data, audio_size, options, out_language);
 }
 
+static rac_result_t sherpa_stt_vtable_stream_create(void* impl, const rac_stt_options_t* options,
+                                                    rac_handle_t* out_stream_handle) {
+    if (rac_stt_sherpa_supports_persistent_streaming(impl) != RAC_TRUE) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    return rac_stt_sherpa_create_stream_with_options(impl, options, out_stream_handle);
+}
+
+static rac_result_t sherpa_stt_vtable_stream_feed_audio_chunk(void* impl,
+                                                              rac_handle_t stream_handle,
+                                                              const int16_t* samples, size_t count,
+                                                              rac_stt_stream_callback_t callback,
+                                                              void* user_data) {
+    return rac_stt_sherpa_feed_stream_audio_chunk(impl, stream_handle, samples, count, callback,
+                                                  user_data);
+}
+
+static rac_result_t sherpa_stt_vtable_stream_destroy(void* impl, rac_handle_t stream_handle) {
+    if (!stream_handle) {
+        return RAC_SUCCESS;
+    }
+    if (!impl) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    rac_stt_sherpa_destroy_stream(impl, stream_handle);
+    return RAC_SUCCESS;
+}
+
 }  // namespace
 
 // Keep external C linkage so rac_plugin_entry_sherpa.cpp can wire this ops
 // table in both static and shared builds.
 //
-// Persistent per-session stream slots are intentionally
-// NULL: the underlying Sherpa-ONNX integration here is backed by the
-// *offline* recognizer (engines/sherpa/sherpa_backend.cpp::SherpaSTT —
-// SherpaOnnxCreateOfflineStream + SherpaOnnxDecodeOfflineStream every
-// feed, no endpoint detection, no final emission). Wiring those slots
-// caused commons to take the persistent path
-// (rac_stt_stream.cpp:319-410), which then produced repeated offline
-// re-decodes as partials and never emitted a final/endpoint event,
-// violating the STT stream contract. Leaving the slots NULL forces
-// commons back onto the legacy transcribe_stream behavior — paying the
-// per-chunk decode cost but preserving correctness — until an online
-// recognizer implementation lands here.
+// Offline models return RAC_ERROR_NOT_SUPPORTED from stream_create, preserving
+// commons' one-shot fallback. Online transducers keep one Sherpa stream across
+// chunks, emit deduplicated partials, and emit/reset a final at each endpoint.
 extern "C" const rac_stt_service_ops_t g_sherpa_stt_ops = {
     .initialize = sherpa_stt_vtable_initialize,
     .transcribe = sherpa_stt_vtable_transcribe,
@@ -348,9 +367,9 @@ extern "C" const rac_stt_service_ops_t g_sherpa_stt_ops = {
     .create = sherpa_stt_create_impl,
     .get_languages = sherpa_stt_vtable_get_languages,
     .detect_language = sherpa_stt_vtable_detect_language,
-    .stream_create = nullptr,
-    .stream_feed_audio_chunk = nullptr,
-    .stream_destroy = nullptr,
+    .stream_create = sherpa_stt_vtable_stream_create,
+    .stream_feed_audio_chunk = sherpa_stt_vtable_stream_feed_audio_chunk,
+    .stream_destroy = sherpa_stt_vtable_stream_destroy,
 };
 
 namespace {  // reopen for the next batch of static helpers

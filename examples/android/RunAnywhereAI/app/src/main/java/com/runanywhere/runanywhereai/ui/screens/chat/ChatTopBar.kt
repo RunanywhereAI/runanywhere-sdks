@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.screens.models.brand
+import com.runanywhere.runanywhereai.ui.screens.models.displayTitle
 import com.runanywhere.runanywhereai.ui.screens.models.shortLabel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -176,7 +177,9 @@ private fun ModelCard(
 
             Column(modifier = Modifier.padding(end = dimens.spacingSm)) {
                 Text(
-                    text = model?.name ?: fallbackModelName ?: "Select Model",
+                    // The same cleaned title the picker shows, so the bar reads
+                    // "SmolLM2 360M" instead of clipping "SmolLM2 360M Q8_0".
+                    text = model?.displayTitle() ?: fallbackModelName ?: "Select Model",
                     overflow = TextOverflow.Ellipsis,
                     maxLines = 1,
                     style = MaterialTheme.typography.titleMedium,

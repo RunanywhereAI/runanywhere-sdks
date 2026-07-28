@@ -2,6 +2,9 @@
 // proto-byte bridge (window.runanywhere.rag*) so callers work with plain objects:
 // create a session over an embedding model (+ optional LLM), ingest documents,
 // then ask grounded questions. Proto encode/decode lives in the preload bridge.
+import * as path from 'path';
+
+import { SDKException } from './errors';
 
 /** Configuration for a RAG session. Only `embeddingModelId` is required. */
 export interface RagConfig {
@@ -11,15 +14,15 @@ export interface RagConfig {
   llmModelId?: string;
   /** Default number of chunks to retrieve per query. */
   topK?: number;
-  /** Chunking: characters per chunk. */
+  /** Chunking: tokens per chunk. */
   chunkSize?: number;
-  /** Chunking: overlap (characters) between adjacent chunks. */
+  /** Chunking: overlap (tokens) between adjacent chunks. Must be < chunkSize. */
   chunkOverlap?: number;
   /** Cap on retrieved context tokens fed to the LLM. */
   maxContextTokens?: number;
   /** Minimum cosine similarity for a chunk to be retrieved (0–1). */
   similarityThreshold?: number;
-  /** Prompt template override (uses "{context}" / "{question}" placeholders). */
+  /** Prompt template override (uses "{context}" / "{query}" placeholders). */
   promptTemplate?: string;
   /** Persist the vector index to disk (default in-memory). */
   persistIndex?: boolean;
@@ -92,17 +95,115 @@ export interface RagBridge {
 }
 
 /**
- * A live RAG session. Create with {@link RagSession.create}, ingest documents,
- * query, then {@link close} to release the native session.
+ * rac_model_category_t values used when registering models so commons' RAG can
+ * resolve embedding/LLM ids → on-disk paths. Kept SDK-internal (structured, not
+ * scattered magic ints in example apps).
+ */
+export const RagModelCategory = {
+  Language: 0,
+  Embedding: 7,
+} as const;
+export type RagModelCategory = (typeof RagModelCategory)[keyof typeof RagModelCategory];
+
+/** rac_inference_framework_t values for registry registration. */
+export const RagInferenceFramework = {
+  Onnx: 0,
+  LlamaCpp: 1,
+} as const;
+export type RagInferenceFramework = (typeof RagInferenceFramework)[keyof typeof RagInferenceFramework];
+
+/** Minimal download result needed to register a catalog model for RAG. */
+export interface RagResolvedModel {
+  id: string;
+  primary: string;
+}
+
+/**
+ * Bridge surface for {@link createRagSessionFromCatalog}: download + register +
+ * create. Hides registry category/framework enums from example apps.
+ */
+export interface RagCatalogBridge {
+  downloadModel(idOrPath: string): Promise<RagResolvedModel>;
+  registerModel(
+    id: string,
+    localPath: string,
+    category: RagModelCategory,
+    framework: RagInferenceFramework,
+  ): Promise<unknown> | unknown;
+  ragCreateSession(config: RagConfig): Promise<number>;
+}
+
+/** Pick the registry framework from a model file path (Python `create_session` parity). */
+export function frameworkForModelPath(filePath: string): RagInferenceFramework {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.onnx' || ext === '.ort') return RagInferenceFramework.Onnx;
+  return RagInferenceFramework.LlamaCpp;
+}
+
+/**
+ * Download (idempotent) the embedding (+ optional LLM) catalog models, register
+ * them in commons' global registry, and open a RAG session. Example apps should
+ * call this instead of hand-rolling download → register(enum ints) → create.
+ */
+export async function createRagSessionFromCatalog(
+  bridge: RagCatalogBridge,
+  config: RagConfig,
+): Promise<number> {
+  if (!config || !config.embeddingModelId) {
+    throw SDKException.validationFailed({
+      fieldPath: 'embeddingModelId',
+      message: 'createRagSessionFromCatalog: embeddingModelId is required',
+    });
+  }
+
+  const emb = await bridge.downloadModel(config.embeddingModelId);
+  await bridge.registerModel(
+    emb.id,
+    emb.primary,
+    RagModelCategory.Embedding,
+    RagInferenceFramework.Onnx,
+  );
+
+  const sessionConfig: RagConfig = { ...config, embeddingModelId: emb.id };
+
+  if (config.llmModelId) {
+    const llm = await bridge.downloadModel(config.llmModelId);
+    await bridge.registerModel(
+      llm.id,
+      llm.primary,
+      RagModelCategory.Language,
+      frameworkForModelPath(llm.primary),
+    );
+    sessionConfig.llmModelId = llm.id;
+  }
+
+  return bridge.ragCreateSession(sessionConfig);
+}
+
+/**
+ * A live RAG session. Create with {@link RagSession.create} (models already
+ * registered) or {@link RagSession.createFromCatalog} (download + register +
+ * create). Ingest documents, query, then {@link close} to release the native session.
  */
 export class RagSession {
   private closed = false;
   private constructor(private readonly bridge: RagBridge, readonly handle: number) {}
 
-  /** Create a session over the given embedding model (+ optional LLM). */
+  /** Create a session over already-registered embedding (+ optional LLM) model ids. */
   static async create(bridge: RagBridge, config: RagConfig): Promise<RagSession> {
-    if (!config || !config.embeddingModelId) throw new Error('RagSession.create: embeddingModelId is required');
+    if (!config || !config.embeddingModelId) {
+      throw SDKException.validationFailed({ fieldPath: 'embeddingModelId', message: 'RagSession.create: embeddingModelId is required' });
+    }
     const handle = await bridge.ragCreateSession(config);
+    return new RagSession(bridge, handle);
+  }
+
+  /**
+   * Download catalog models, register them (with correct category/framework), and
+   * open a session. Prefer this from apps over multi-step bootstrap.
+   */
+  static async createFromCatalog(bridge: RagCatalogBridge & RagBridge, config: RagConfig): Promise<RagSession> {
+    const handle = await createRagSessionFromCatalog(bridge, config);
     return new RagSession(bridge, handle);
   }
 
@@ -145,6 +246,6 @@ export class RagSession {
   }
 
   private assertOpen(): void {
-    if (this.closed) throw new Error('RagSession is closed');
+    if (this.closed) throw SDKException.invalidState('RagSession is closed');
   }
 }

@@ -254,42 +254,55 @@ private fun PickerBody(
         Spacer(Modifier.height(dimens.spacingXs))
     }
 
-    // Families to show. Apply the backend filter first, then (default view only) hide
+    // Orgs to show. Apply the backend filter first, then (default view only) hide
     // models already surfaced in the recommended section so the list stays short. Search
-    // matches friendly family/variant names + tags only.
+    // matches org name + model titles + tags only.
     val filteredModels = selectedBackend?.let { fw -> state.models.filter { it.framework == fw } }
         ?: state.models
     val hideSurfaced = !isSearching && selectedBackend == null
-    val families = filteredModels
+    val orgs = filteredModels
         .filter { !hideSurfaced || it.id !in surfacedIds }
-        .toFamilyGroups()
+        .toOrgGroups()
         .mapNotNull { group ->
             if (!isSearching) return@mapNotNull group
             val matches = group.matchesQuery(query)
             when {
-                group.family.matchesQuery(query) -> group
-                matches.isNotEmpty() -> group.copy(variants = matches)
+                group.org.matchesQuery(query) -> group
+                matches.isNotEmpty() -> group.copy(models = matches)
                 else -> null
             }
         }
 
-    if (families.isEmpty()) {
+    if (orgs.isEmpty()) {
         CenterNote(if (isSearching) "No models match your search" else "No additional models")
         return
     }
 
-    families.forEach { group ->
-        FamilyCard(
-            group = group,
-            viewModel = viewModel,
-            state = state,
-            onSelect = onSelect,
-            onDownload = onDownload,
-            onDelete = onDelete,
-            modifier = Modifier.padding(horizontal = dimens.spacingLg),
-            // Auto-expand single-family search results so variants are visible immediately.
-            initiallyExpanded = isSearching && families.size <= 2,
-        )
+    // Orgs with anything ready come first; everything else follows in org order.
+    val (installed, downloadable) = orgs.partition { it.hasReadyVariant }
+    val sections = buildList {
+        if (installed.isNotEmpty()) add("On this device" to installed)
+        if (downloadable.isNotEmpty()) {
+            add((if (installed.isEmpty()) "All organisations" else "More organisations") to downloadable)
+        }
+    }
+
+    sections.forEachIndexed { index, (label, groups) ->
+        if (index > 0) Spacer(modifier = Modifier.height(dimens.spacingSm))
+        SectionLabel(label)
+        groups.forEach { group ->
+            OrgCard(
+                group = group,
+                viewModel = viewModel,
+                state = state,
+                onSelect = onSelect,
+                onDownload = onDownload,
+                onDelete = onDelete,
+                modifier = Modifier.padding(horizontal = dimens.spacingLg),
+                // Auto-expand when search narrows to one or two orgs.
+                initiallyExpanded = isSearching && orgs.size <= 2,
+            )
+        }
     }
 }
 
@@ -460,20 +473,20 @@ private fun BackendFilterRow(
     }
 }
 
-// Friendly-only search: family title/tagline. No quant, backend, or ids.
-private fun ModelFamily.matchesQuery(query: String): Boolean {
+// Friendly-only search: organisation display name. No quant, backend, or ids.
+private fun ModelOrg.matchesQuery(query: String): Boolean {
     val q = query.trim().lowercase()
     if (q.isEmpty()) return true
-    return "$title $tagline".lowercase().contains(q)
+    return displayName.lowercase().contains(q)
 }
 
-// Variant-level friendly search: name + clean tags only.
-private fun FamilyGroup.matchesQuery(query: String): List<RAModelInfo> {
+// Model-level friendly search: name + clean tags only.
+private fun OrgGroup.matchesQuery(query: String): List<RAModelInfo> {
     val q = query.trim().lowercase()
-    if (q.isEmpty()) return variants
-    return variants.filter { variant ->
-        val tags = variant.consumerTags().joinToString(" ") { it.label }
-        "${variant.name} ${variant.variantFeelLabel()} $tags".lowercase().contains(q)
+    if (q.isEmpty()) return models
+    return models.filter { model ->
+        val tags = model.consumerTags().joinToString(" ") { it.label }
+        "${model.name} ${model.displayTitle()} ${model.variantFeelLabel()} $tags".lowercase().contains(q)
     }
 }
 

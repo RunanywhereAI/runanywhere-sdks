@@ -32,6 +32,7 @@
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/llm/tool_calling_generation_internal.h"
+#include "features/llm/tool_calling_internal.h"
 #include "features/llm/tool_calling_result_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
@@ -100,6 +101,10 @@ struct ToolCallingSession {
     bool require_json_arguments = false;
     bool keep_tools_available = false;
     bool validate_calls = true;
+    // Backend consumes rac_llm_options_t.grammar (QHexRT). Probed once at session
+    // create; when true the tool prompt is built AND parsed in the bare-Pythonic
+    // `[name(args)]` format the toolcall_opt grammar enforces (RUN-80).
+    bool grammar_backend = false;
 
     rac::llm::tool_calling::GenerationState generation;
     rac::llm::tool_calling::GenerationTelemetryAgg telemetry;
@@ -166,6 +171,17 @@ bool apply_explicit_tool_choice(ToolCallingSession* session, std::string* out_er
         session->tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE) {
         session->forced_tool_name.clear();
         return true;
+    }
+
+    // REQUIRED with no tools advertised can never be satisfied — reject up front rather
+    // than emit a "you must call a tool" prompt that fails downstream (mirrors run-loop).
+    if (session->has_tool_choice &&
+        session->tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_REQUIRED &&
+        session->tool_options.tools_size() == 0 && session->forced_tool_name.empty()) {
+        if (out_error) {
+            *out_error = "tool_choice=REQUIRED requires at least one tool";
+        }
+        return false;
     }
 
     if (!session->forced_tool_name.empty()) {
@@ -438,8 +454,14 @@ std::string build_initial_prompt(const ToolCallingSession& session) {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_call_format_prompt_proto(
-        req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(), &out);
+    // Grammar backends build in the bare-Pythonic format (RUN-80); see run-loop path.
+    rac_result_t rc = session.grammar_backend
+                          ? rac_tool_call_format_prompt_grammar_proto(
+                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
+                                &out)
+                          : rac_tool_call_format_prompt_proto(
+                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
+                                &out);
     if (rc != RAC_SUCCESS) {
         rac_proto_buffer_free(&out);
         return {};
@@ -471,8 +493,14 @@ std::string build_followup_prompt(const ToolCallingSession& session, bool keep_t
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_tool_call_format_prompt_proto(
-        req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(), &out);
+    // Grammar backends build in the bare-Pythonic format (RUN-80); see run-loop path.
+    rac_result_t rc = session.grammar_backend
+                          ? rac_tool_call_format_prompt_grammar_proto(
+                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
+                                &out)
+                          : rac_tool_call_format_prompt_proto(
+                                req_bytes.empty() ? nullptr : req_bytes.data(), req_bytes.size(),
+                                &out);
     if (rc != RAC_SUCCESS) {
         rac_proto_buffer_free(&out);
         return {};
@@ -493,6 +521,11 @@ bool parse_tool_call_from_output(const ToolCallingSession& session, const std::s
     request.set_text(llm_output);
     auto* options = request.mutable_options();
     *options = build_options_snapshot(session);
+    // Grammar backends emit bare `[name(args)]` (no format tag) — drop the format hint so
+    // the parser auto-detects it (bare call -> Pythonic parser; plain text -> no call).
+    if (session.grammar_backend) {
+        options->clear_format();
+    }
 
     const size_t req_size = request.ByteSizeLong();
     std::vector<uint8_t> req_bytes(req_size);
@@ -576,6 +609,30 @@ void run_generate_loop(ToolCallingSession& session) {
     auto step_generation = rac::llm::tool_calling::generation_for_tool_step(
         session.generation, session.iteration, session.has_tool_choice, session.tool_choice,
         session.format);
+    // Tools are "live" this turn when a call is still possible: not vetoed by
+    // tool_choice=NONE and not a pure post-call synthesis turn. Drives BOTH the QHexRT
+    // grammar gate and the tool-decision system hint below; the shared predicate keeps
+    // this in lockstep with the run-loop path.
+    const bool tools_live_this_turn = rac::llm::tool_calling::tool_grammar_constrained_this_turn(
+        session.has_tool_choice && session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE,
+        !session.all_tool_calls.empty(), session.keep_tools_available);
+    if (!tools_live_this_turn) {
+        step_generation.tool_names.clear();
+    } else if (session.has_tool_choice &&
+               session.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
+               !session.forced_tool_name.empty()) {
+        // tool_choice=SPECIFIC: narrow the QHexRT grammar spec to the ONE forced tool so the
+        // grammar can only emit `[<forced>(...)]` (or free text), rather than letting the
+        // model pick a tool the SPECIFIC policy then rejects (see the run-loop path). RUN-80.
+        step_generation.tool_names = {session.forced_tool_name};
+    }
+    // Stop over-calling (RUN-80): on the AUTO decision path add the device-proven
+    // "only call when genuinely needed" hint to the system prompt (see the run-loop path).
+    // Skipped when the caller forces a call (REQUIRED/SPECIFIC).
+    if (rac::llm::tool_calling::tool_decision_hint_this_turn(tools_live_this_turn,
+                                                             tool_choice_requires_call(session))) {
+        rac::llm::tool_calling::append_tool_decision_hint(&step_generation.system_prompt);
+    }
     rac::llm::tool_calling::GenerationCancelBinding cancel_binding{
         &session.active_ref_mu, &session.active_ref, &session.cancel_requested,
         &session.generation_started};
@@ -777,6 +834,10 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
     session->format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
                           ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON
                           : request.format();
+    // Probe grammar capability once (cheap acquire/release): grammar backends build +
+    // parse the tool prompt in the bare-Pythonic format the QHexRT grammar enforces.
+    // Non-grammar engines keep the declared format — a strict no-op for them (RUN-80).
+    session->grammar_backend = rac::llm::lifecycle_llm_supports_grammar();
     session->max_tool_calls =
         request.max_tool_calls() == 0 ? kDefaultMaxToolCalls : request.max_tool_calls();
     session->auto_execute = request.has_auto_execute() ? request.auto_execute() : true;
@@ -801,6 +862,8 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
 
     for (const auto& tool : request.tools()) {
         *session->tool_options.add_tools() = tool;
+        // Names drive the QHexRT grammar spec (RUN-80); ignored by non-grammar engines.
+        session->generation.tool_names.push_back(tool.name());
     }
 
     std::string tool_choice_error;

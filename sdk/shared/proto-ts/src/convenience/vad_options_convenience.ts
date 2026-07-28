@@ -23,7 +23,7 @@ export const vADConfigurationDefaults = (): VADConfiguration => ({
   frameLengthMs: 100,
   threshold: 0.015,
   enableAutoCalibration: false,
-  calibrationMultiplier: 0,
+  calibrationMultiplier: 2.0,
   windowSizeSamples: 0,
   maxSpeechDurationMs: 0,
 });
@@ -41,10 +41,16 @@ export const validateVADConfiguration = (m: VADConfiguration): void => {
       message: `frame_length_ms must be in 1...1000 (got ${m.frameLengthMs})`,
     });
   }
-  if (m.threshold < 0.0 || m.threshold > 1.0) {
+  if (!Number.isFinite(m.threshold) || m.threshold < 0.0 || m.threshold > 1.0) {
     throw new ValidationError({
       fieldPath: 'VADConfiguration.threshold',
       message: `threshold must be in 0.0...1.0 (got ${m.threshold})`,
+    });
+  }
+  if (!Number.isFinite(m.calibrationMultiplier) || m.calibrationMultiplier < 1.5 || m.calibrationMultiplier > 4.0) {
+    throw new ValidationError({
+      fieldPath: 'VADConfiguration.calibration_multiplier',
+      message: `calibration_multiplier must be in 1.5...4.0 (got ${m.calibrationMultiplier})`,
     });
   }
 };

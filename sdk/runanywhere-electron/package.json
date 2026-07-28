@@ -1,7 +1,7 @@
 {
   "name": "@runanywhere/electron",
   "version": "0.1.0",
-  "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (Windows-first, Hexagon-ready).",
+  "description": "RunAnywhere Electron SDK — on-device LLM/VLM/STT/TTS/embeddings for Electron & Node (Windows-first; QHexRT NPU seam open, not claimed).",
   "private": true,
   "license": "SEE LICENSE IN ../../LICENSE",
   "type": "commonjs",

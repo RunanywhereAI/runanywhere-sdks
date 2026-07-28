@@ -15,7 +15,7 @@ import {
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import { OffscreenRuntimeBridge } from '../runtime/OffscreenRuntimeBridge.js';
 import { getActiveBackendWorkerHost } from '../runtime/BackendWorkerHost.js';
-import { hasBackendWorkerOwnedModels } from '../runtime/BackendWorkerModelOwnership.js';
+import { mustUseOnnxBackendWorker } from '../runtime/BackendWorkerModelOwnership.js';
 import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { SDKException } from '../Foundation/SDKException.js';
 import {
@@ -29,15 +29,16 @@ import {
   streamCallback,
   type ModalityProtoModule,
 } from './ProtoAdapterTypes.js';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 function requireLiveOnnxWorkerOrMain(operation: string) {
   const host = getActiveBackendWorkerHost('onnx');
   if (host?.diagnostics.executionContext === 'worker') return host;
-  if (hasBackendWorkerOwnedModels('onnx')) {
+  if (mustUseOnnxBackendWorker()) {
     throw SDKException.backendNotAvailable(
       operation,
-      'ONNX BackendWorker owns loaded speech models; reload after recovering the worker. '
-        + 'Main-thread fallback is disabled for worker-owned models.',
+      'ONNX BackendWorker is required for speech (or owns loaded models); '
+        + 'reload after recovering the worker. Main-thread fallback is disabled.',
     );
   }
   return null;
@@ -230,7 +231,7 @@ function lifecycleRequest(
       audioData,
       encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM_S16LE,
-      sampleRate: options.sampleRate > 0 ? options.sampleRate : 16_000,
+      sampleRate: options.sampleRate > 0 ? options.sampleRate : audioCaptureDefaults.micSampleRateHz,
       channels: 1,
       bitsPerSample: 16,
     },

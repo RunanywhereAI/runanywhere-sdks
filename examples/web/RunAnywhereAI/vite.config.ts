@@ -62,13 +62,15 @@ const localSDKSourceAliases = [
  *   - `racommons.{js,wasm}` (commons core, owned by `@runanywhere/web`)
  *   - `racommons-llamacpp.{js,wasm}` (CPU LLM backend)
  *   - `racommons-llamacpp-webgpu.{js,wasm}` (WebGPU LLM backend)
- *   - `racommons-onnx-sherpa.{js,wasm}` (STT/TTS/VAD via Sherpa-ONNX)
+ *   - `racommons-onnx-sherpa.{js,wasm}` (STT/TTS/VAD via Sherpa-ONNX CPU)
+ *   - `racommons-onnx-sherpa-webgpu.{js,wasm}` (speech WebGPU EP path twin)
  */
 const wasmArtifacts = [
   { directory: coreWasmDir, baseName: 'racommons' },
   { directory: llamacppWasmDir, baseName: 'racommons-llamacpp' },
   { directory: llamacppWasmDir, baseName: 'racommons-llamacpp-webgpu' },
   { directory: onnxWasmDir, baseName: 'racommons-onnx-sherpa' },
+  { directory: onnxWasmDir, baseName: 'racommons-onnx-sherpa-webgpu' },
 ] as const;
 
 function copyWasmPlugin(requireCompleteArtifacts: boolean): Plugin {
@@ -134,7 +136,9 @@ export default defineConfig(({ command }) => {
       alias: useInstalledSDK ? [] : localSDKSourceAliases,
     },
     server: {
-      host: '127.0.0.1',
+      // Canonical URL is always http://localhost:3000 — do not advertise
+      // 127.0.0.1 (different browser origin / storage).
+      host: 'localhost',
       port: 3000,
       strictPort: true,
       headers: isolationHeaders,
@@ -146,7 +150,7 @@ export default defineConfig(({ command }) => {
       },
     },
     preview: {
-      host: '127.0.0.1',
+      host: 'localhost',
       port: 3000,
       strictPort: true,
       headers: isolationHeaders,

@@ -96,14 +96,16 @@ let homebrewPrefix = ProcessInfo.processInfo.environment["RUNANYWHERE_HOMEBREW_P
     ?? "/opt/homebrew"
 
 // mlx-audio-swift currently requires a Swift 6.2+ toolchain and has not cut a
-// tag compatible with mlx-swift-lm 3.x. Pin current main so MLX STT/TTS are
-// first-class in the Apple MLX runtime while upstream release tags catch up.
+// tag compatible with mlx-swift-lm 3.x. Pin current main so MLX STT/TTS and
+// speaker-diarization provider plumbing are available to the Apple MLX runtime
+// while upstream release tags catch up.
 let mlxAudioPackageDependencies: [Package.Dependency] = [
     .package(url: "https://github.com/Blaizzy/mlx-audio-swift.git", revision: "580e952adda0cd6bdc5c04f402822adbb61525c8"),
 ]
 let mlxAudioRuntimeDependencies: [Target.Dependency] = [
     .product(name: "MLXAudioSTT", package: "mlx-audio-swift"),
     .product(name: "MLXAudioTTS", package: "mlx-audio-swift"),
+    .product(name: "MLXAudioVAD", package: "mlx-audio-swift"),
 ]
 
 // PrismML's Bonsai 1-bit weights require kernels that are not yet available
@@ -187,7 +189,7 @@ let package = Package(
             revision: prismMLXSwiftRevision
         ),
         .package(url: "https://github.com/ml-explore/mlx-swift-lm", .upToNextMinor(from: "3.31.4")),
-        // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS.
+        // mlx-audio-swift requires Swift 6.2+ and enables MLX STT/TTS/VAD/diarization.
         .package(url: "https://github.com/huggingface/swift-transformers", .upToNextMinor(from: "1.3.0")),
         //
         // grpc-swift intentionally NOT wired. The *.grpc.swift files under
@@ -373,6 +375,7 @@ let package = Package(
                 .product(name: "MLXVLM", package: "mlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "MLX", package: "mlx-swift"),
+                .product(name: "MLXNN", package: "mlx-swift"),
                 .product(name: "MLXEmbedders", package: "mlx-swift-lm"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ] + mlxAudioRuntimeDependencies,
@@ -453,6 +456,8 @@ let package = Package(
                 "src/commands/cmd_vad.cpp",
                 "src/commands/cmd_voice.cpp",
                 "src/commands/cmd_image.cpp",
+                "src/commands/cmd_segment.cpp",
+                "src/commands/cmd_diarize.cpp",
                 "src/commands/cmd_rag.cpp",
                 "src/commands/cmd_bench.cpp",
                 "src/commands/cmd_auth.cpp",
@@ -617,22 +622,22 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "8c1129e2fb680a7d37b111d194191976055a6f276eda5562968f535ca02bee9f"
+                checksum: "59897310f994d8b5c8e73207205e829a910126d043f36adeeca6c255ae7d3e91"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "5c837259d302f66aecc2c6d52332af0ee4fb43beeedbd6a3f3fd762147b37765"
+                checksum: "5fb00064c441b5263f411ba6e2b238d70f776fc0f30db31622c16d12f11c7f36"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
-                checksum: "b50a9ebcf49a34f1cbefa6be445ced74cfa3ef47281fccfa7b1b272ba81aef79"
+                checksum: "0e548dcc59d8bb49446ff8d02c94b97130a1c6c7b18b6c768a9be4acc16edbf2"
             ),
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "75735609334d61180c623fbf2e09f8e74a2d990b84799b3ebde1334a5ac4f38c"
+                checksum: "9ad5132e604a0650573ced54e23b9192e511e5d6b4e88fafa58ba841beaef0e5"
             ),
             // Apple CoreML Stable-Diffusion engine. `ONNXRuntime` declares an
             // unconditional dependency on this, so the remote list must carry it.
@@ -642,12 +647,12 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendCoreMLBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendCoreML-ios-v\(sdkVersion).zip",
-                checksum: "93cb97b0a3e64dca8996214ebb85945202fa413e05907c260908fa6ab2b41e24"
+                checksum: "c3dee3f17fd86c2b6e15e4373894efbfd39ec4e87b09511fa88f478ce4db752a"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendMLX-ios-v\(sdkVersion).zip",
-                checksum: "b7532f4321d6f8726cd0e5b3cc2bd1c9fe031337217baf846e7e76fb98e6ba80"
+                checksum: "1db4d3458c4bbd7529d03e13b571d89fdef7e0ead78b150b862ab61a4bb816c6"
             ),
         ]
     }

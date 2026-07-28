@@ -322,6 +322,25 @@ describe('BrowserStorageAnalyzerAdapter', () => {
     vi.restoreAllMocks();
   });
 
+  it('scans diarization and segmentation lifecycle categories', async () => {
+    const scanned: ModelCategory[] = [];
+    vi.spyOn(ModelLifecycleAdapter, 'fromModule').mockReturnValue({
+      supportsProtoLifecycle: () => true,
+      currentModel: ({ category }: { category: ModelCategory }) => {
+        scanned.push(category);
+        return { found: false, modelId: '' };
+      },
+    } as unknown as ModelLifecycleAdapter);
+
+    const handle = createFakeModule(new MemoryFS());
+    const adapter = await BrowserStorageAnalyzerAdapter.install(handle.module);
+    adapter.refreshLoadedModelState();
+
+    expect(scanned).toContain(ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION);
+    expect(scanned).toContain(ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION);
+    adapter.cleanup();
+  });
+
   it('uses compiler offsets for recursive MEMFS sizes and cached quota', async () => {
     const fs = new MemoryFS();
     const modelPath = populateModelTree(fs, 'vad-layout');

@@ -4,26 +4,21 @@
 # Primary CI for the open-source contract: build rcli in this public repo and
 # keyless-blast all 12 modalities at the staging backend (PUBLIC org). No API
 # key. Staging origin comes from repo secrets/vars — not hardcoded hosts.
+#
+# Intentionally NOT on pull_request — each run writes real events into staging
+# and would dirty the DB under PR load. Daily + manual only.
 # =============================================================================
 
 name: OSS keyless telemetry
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/oss-keyless-telemetry.yml"
-      - "scripts/ci/oss_keyless_telemetry_blast.sh"
-      - "sdk/runanywhere-cli/**"
-      - "sdk/runanywhere-commons/src/infrastructure/network/**"
-      - "sdk/runanywhere-commons/src/lifecycle/**"
-      - "sdk/runanywhere-commons/src/core/sdk_state.cpp"
   schedule:
     # Daily 08:00 UTC — light cadence for Staging drift.
     - cron: "0 8 * * *"
   workflow_dispatch: {}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:

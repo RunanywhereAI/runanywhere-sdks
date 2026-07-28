@@ -19,6 +19,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
 
 /// SDK-owned microphone capture for speech-to-text.
 ///
@@ -56,8 +57,8 @@ class AudioCaptureManager {
   ///
   /// Returns null when microphone permission is missing or capture fails.
   Future<Stream<Uint8List>?> startRecording({
-    int sampleRate = 16000,
-    int numChannels = 1,
+    int sampleRate = RADefaultsAudioCapture.micSampleRateHz,
+    int numChannels = RADefaultsAudioCapture.micChannels,
   }) async {
     if (_isRecording) {
       await stopRecording();
@@ -86,8 +87,8 @@ class AudioCaptureManager {
   /// One-shot convenience: record to a temp WAV file until [stopRecording]
   /// is called. Returns the recording path, or null on failure.
   Future<String?> startRecordingToBuffer({
-    int sampleRate = 16000,
-    int numChannels = 1,
+    int sampleRate = RADefaultsAudioCapture.micSampleRateHz,
+    int numChannels = RADefaultsAudioCapture.micChannels,
   }) async {
     if (_isRecording) {
       await stopRecording();

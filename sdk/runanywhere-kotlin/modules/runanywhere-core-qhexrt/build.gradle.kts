@@ -76,6 +76,11 @@ val generateRunAnywhereLicenseResource by tasks.registering(Copy::class) {
     rename { "LICENSE.runanywhere-qhexrt.txt" }
 }
 
+val generateQairtNoticesResource by tasks.registering(Copy::class) {
+    from(project.file("src/main/resources/META-INF/THIRD-PARTY-NOTICES-QAIRT.txt"))
+    into(layout.buildDirectory.dir("generated/runanywhere-qairt-notices/META-INF"))
+}
+
 android {
     namespace = "com.runanywhere.sdk.npu.qhexrt"
     compileSdk = 37
@@ -92,6 +97,12 @@ android {
         getByName("main").resources.srcDir(
             layout.buildDirectory
                 .dir("generated/runanywhere-license")
+                .get()
+                .asFile,
+        )
+        getByName("main").resources.srcDir(
+            layout.buildDirectory
+                .dir("generated/runanywhere-qairt-notices")
                 .get()
                 .asFile,
         )
@@ -128,6 +139,7 @@ android {
 
 tasks.matching { it.name == "preBuild" }.configureEach {
     dependsOn(generateRunAnywhereLicenseResource)
+    dependsOn(generateQairtNoticesResource)
 }
 
 kotlin {
@@ -211,8 +223,8 @@ afterEvaluate {
                 pom {
                     name.set("RunAnywhere QHexRT Backend")
                     description.set(
-                        "QHexRT backend for RunAnywhere SDK - on-device LLM/VLM/STT/TTS inference " +
-                            "on Qualcomm Snapdragon Hexagon NPUs (V75/V79/V81).",
+                        "QHexRT backend for RunAnywhere SDK - on-device LLM/VLM/STT/TTS/" +
+                            "embeddings/diffusion inference on Qualcomm Snapdragon Hexagon NPUs (V75/V79/V81).",
                     )
                     url.set("https://runanywhere.ai")
                     inceptionYear.set("2024")

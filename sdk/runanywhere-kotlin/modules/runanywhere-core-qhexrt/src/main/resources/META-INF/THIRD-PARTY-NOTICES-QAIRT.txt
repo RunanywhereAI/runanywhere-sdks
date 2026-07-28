@@ -1,0 +1,32 @@
+THIRD-PARTY NOTICES — Qualcomm AI Runtime (QAIRT) redistributables
+==================================================================
+
+This AAR redistributes runtime shared libraries from the Qualcomm AI Runtime
+(QAIRT / Qualcomm AI Engine Direct) SDK. Those libraries are required to execute
+QNN graphs on Snapdragon Hexagon NPUs and are shipped under Qualcomm's SDK
+redistribution terms for application packaging.
+
+Bundled host libraries (jni/arm64-v8a/):
+  libQnnHtp.so
+  libQnnHtpNetRunExtensions.so
+  libQnnHtpPrepare.so
+  libQnnSystem.so
+  libQnnHtpV75CalculatorStub.so
+  libQnnHtpV75Stub.so
+  libQnnHtpV79CalculatorStub.so
+  libQnnHtpV79Stub.so
+  libQnnHtpV81CalculatorStub.so
+  libQnnHtpV81Stub.so
+
+Bundled DSP skel libraries (assets/runanywhere/qhexrt/skels/arm64-v8a/):
+  libQnnHtpV75Skel.so
+  libQnnHtpV79Skel.so
+  libQnnHtpV81Skel.so
+
+Copyright and license terms for the Qualcomm AI Runtime SDK remain with
+Qualcomm Technologies, Inc. Obtain the QAIRT SDK and review its license before
+redistributing modified builds of these libraries.
+
+The RunAnywhere QHexRT engine binaries in this AAR (librac_backend_qhexrt.so,
+librac_backend_qhexrt_jni.so) are covered by the RunAnywhere License shipped as
+META-INF/LICENSE.runanywhere-qhexrt.txt.

@@ -78,6 +78,21 @@ import { TTS as TTSCapability, sharedTTSPlayback } from './Extensions/RunAnywher
 import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD.js';
 import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader.js';
 import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage.js';
+import { segment as segmentImpl } from './Extensions/RunAnywhere+Segmentation.js';
+import type {
+  SegmentationRequest,
+  SegmentationResult,
+} from '@runanywhere/proto-ts/segmentation';
+import { diarize as diarizeImpl } from './Extensions/RunAnywhere+Diarization.js';
+import type {
+  DiarizationRequest,
+  DiarizationResult,
+} from '@runanywhere/proto-ts/diarization';
+import { rerank as rerankImpl } from './Extensions/RunAnywhere+Rerank.js';
+import type {
+  RerankRequest,
+  RerankResult,
+} from '@runanywhere/proto-ts/rerank';
 import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware.js';
 import { getStoredHfToken, setHfToken } from './Extensions/RunAnywhere+HuggingFace.js';
 import type {
@@ -121,6 +136,8 @@ import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
 import { OffscreenRuntimeBridge, setStreamWorkerInit } from '../runtime/OffscreenRuntimeBridge.js';
 import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry.js';
 import { setBackendWorkerFactory } from '../runtime/BackendWorkerFactoryRegistry.js';
+import { networkDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 /**
  * Persistent storage backend active for the current SDK session.
@@ -932,7 +949,7 @@ function throwDownloadFailure(feature: string, message: string, reason?: Downloa
 async function pollDownloadWithRetry(
   modelId: string,
   taskId: string,
-  maxRetries = 3,
+  maxRetries = networkDefaults.maxRetries,
 ): Promise<DownloadProgress | null> {
   let failure: unknown;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
@@ -941,7 +958,7 @@ async function pollDownloadWithRetry(
     } catch (error) {
       failure = error;
       if (attempt === maxRetries) break;
-      const backoffMs = 100 * (2 ** attempt);
+      const backoffMs = networkDefaults.retryBackoffBaseMs * (2 ** attempt);
       logger.warning(`Download poll failed; resuming '${modelId}' in ${backoffMs}ms (attempt ${attempt + 1}/${maxRetries})`);
       await delay(backoffMs);
       // Native download tasks retain their resume token and partial bytes.
@@ -1603,6 +1620,37 @@ export const RunAnywhere = {
 
   ...flatFacade,
 
+  /**
+   * Segment an image with the lifecycle-owned semantic-segmentation model.
+   * The caller must register and load the model through the generic model
+   * lifecycle first; this verb never downloads or silently swaps models.
+   */
+  async segment(request: SegmentationRequest): Promise<SegmentationResult> {
+    await RunAnywhere.ensureServicesReady();
+    return segmentImpl(request);
+  },
+
+  /**
+   * Diarize raw audio with the lifecycle-owned speaker-diarization model.
+   * The caller must register and load the model through the generic model
+   * lifecycle first; this verb never downloads or silently swaps models.
+   */
+  async diarize(request: DiarizationRequest): Promise<DiarizationResult> {
+    await RunAnywhere.ensureServicesReady();
+    return diarizeImpl(request);
+  },
+
+  /**
+   * Rerank candidates against a query with the lifecycle-owned cross-encoder
+   * rerank model. The caller must register and load the rerank model through
+   * the generic model lifecycle first; this verb never downloads or silently
+   * swaps models.
+   */
+  async rerank(request: RerankRequest): Promise<RerankResult> {
+    await RunAnywhere.ensureServicesReady();
+    return rerankImpl(request);
+  },
+
   async loadModel(
     request: Parameters<typeof ModelLifecycleCapability.loadModel>[0],
   ): Promise<Awaited<ReturnType<typeof ModelLifecycleCapability.loadModelAsync>>> {
@@ -2108,7 +2156,7 @@ export const RunAnywhere = {
           // singleton) so `stopSpeaking()` can stop in-flight speech.
           await sharedTTSPlayback().play(
             samples,
-            output.sampleRate > 0 ? output.sampleRate : 22050,
+            output.sampleRate > 0 ? output.sampleRate : audioCaptureDefaults.ttsSampleRateHz,
           );
         }
       } catch (err) {

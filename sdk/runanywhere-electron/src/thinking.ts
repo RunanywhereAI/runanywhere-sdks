@@ -43,7 +43,12 @@ export function splitThinking(text: string): ThinkingSplit {
     return { response: text.slice(0, open.index).trim(), thinking: text.slice(afterOpen).trim() };
   }
   const thinking = text.slice(afterOpen, close).trim();
-  const response = (text.slice(0, open.index) + text.slice(close + closeTag.length)).trim();
+  // Join the text before and after the block with a newline when BOTH are
+  // non-empty (parity with commons rac_llm_thinking); the common shape
+  // "<think>…</think>Answer" has no `before`, so this is a no-op there.
+  const before = text.slice(0, open.index).trim();
+  const after = text.slice(close + closeTag.length).trim();
+  const response = before && after ? `${before}\n${after}` : before + after;
   return { response, thinking };
 }
 
