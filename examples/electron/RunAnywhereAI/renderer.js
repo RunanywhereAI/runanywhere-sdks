@@ -55,7 +55,7 @@ const TOOLS = [
 ];
 
 // ---- settings + conversations + custom models (persisted via appStore) ----
-let settings = { systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7, maxTokens: 256, reasoning: false };
+let settings = { systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7, maxTokens: 512, reasoning: false };
 let conversations = [];
 let activeId = null;
 let nextConvId = 1;
@@ -260,9 +260,21 @@ function buildPrompt(priorMessages, userText) {
   // Reasoning mode: ask the model to think in <think></think> first. The SDK's
   // splitThinking (mirrored by assistantHtml) peels that back out for display.
   if (settings.reasoning) sys += '\n\nThink step by step inside <think></think> tags, then give your final answer after the closing tag.';
-  let p = sys + '\n\n';
-  for (const m of priorMessages) p += (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content + '\n';
-  return p + 'User: ' + userText + '\nAssistant:';
+  const turns = [{ role: 'system', content: sys }];
+  for (const m of priorMessages) turns.push({ role: m.role, content: m.content });
+  turns.push({ role: 'user', content: userText });
+  // formatChat renders the turn markup THIS model was trained on, and strips old
+  // <think> blocks so stale reasoning is never replayed as context.
+  return ra.formatChat(turns, activeChatTemplate(), { suppressThinking: !settings.reasoning });
+}
+
+// The turn markup the ACTIVE model expects. Getting this wrong is why a chat
+// appears to lose its memory: llama.cpp wraps an unrecognised prompt as a SINGLE
+// user message, so the whole transcript collapses into one turn and the model
+// answers as if every message were the first.
+function activeChatTemplate() {
+  const entry = catalogEntry(selectedModel('llm'));
+  return (entry && entry.chatTemplate) || 'chatml';
 }
 let generating = false;
 async function sendChat() {
@@ -970,7 +982,15 @@ function wireVoice() {
       const spokenStyle = settings.systemPrompt +
         ' You are answering out loud. Reply in one or two short spoken sentences, in plain words.' +
         ' Never use markdown, asterisks, bullet points, headings or mathematical notation.';
-      await withLlm((h) => ra.generate(h, `${spokenStyle}\n\nUser: ${heard}\nAssistant:`, {
+      // Same templating as chat — a raw "User:/Assistant:" string would be
+      // wrapped as one turn and answered generically.
+      // A spoken reply must never wait on visible deliberation.
+      const voicePrompt = ra.formatChat(
+        [{ role: 'system', content: spokenStyle }, { role: 'user', content: heard }],
+        activeChatTemplate(),
+        { suppressThinking: true }
+      );
+      await withLlm((h) => ra.generate(h, voicePrompt, {
         temperature: settings.temperature, maxTokens: settings.maxTokens,
       }, (t) => { reply += t; $('voicereply').textContent = ra.speakableText(ra.splitThinking(reply).response); }));
       // The prompt is a request, not a guarantee: a small model still emits

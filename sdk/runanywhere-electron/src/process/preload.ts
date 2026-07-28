@@ -10,6 +10,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { jsonSchemaToGrammar } from '../grammar';
 import { splitThinking } from '../thinking';
 import { speakableText } from '../speech';
+import { formatChat } from '../chat-template';
+import type { ChatTemplate, ChatTurn, FormatOptions } from '../chat-template';
 import { downsample, pcm16Bytes, rms } from '../audio';
 import {
   RAGConfiguration,
@@ -130,6 +132,9 @@ contextBridge.exposeInMainWorld('runanywhere', {
   splitThinking: (text: string) => splitThinking(text),
   // Markdown/symbols -> words a TTS voice can read (no "asterisk asterisk").
   speakableText: (text: string) => speakableText(text),
+  // Render a conversation in the markup the model was trained on. Without this a
+  // multi-turn chat collapses into a single user turn and the model "forgets".
+  formatChat: (turns: ChatTurn[], template?: ChatTemplate, opts?: FormatOptions) => formatChat(turns, template, opts),
 
   // ---- model catalog + storage ----
   catalog: () => CATALOG,
