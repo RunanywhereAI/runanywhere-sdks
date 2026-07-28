@@ -6,11 +6,11 @@
 
 ## Installation
 
-Add the Swift package and include the `RunAnywhereONNX` product (pin `0.20.11`):
+Add the Swift package and include the `RunAnywhereONNX` product (pin `0.20.12`):
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", exact: "0.20.11"),
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", exact: "0.20.12"),
 ],
 targets: [
     .target(
