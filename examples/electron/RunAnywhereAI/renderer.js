@@ -95,12 +95,40 @@ const DEFAULT_MODELS = { llm: DEFAULT_LLM, vlm: 'qwen3.5-0.8b-vl', embedder: 'mi
 const MODALITY_LABEL = { llm: 'Language model', vlm: 'Vision model', embedder: 'Embedding model', stt: 'Speech-to-text', tts: 'Text-to-speech' };
 const selectedModel = (m) => (settings.models && settings.models[m]) || DEFAULT_MODELS[m];
 
+// Unload a modality's model and forget its badges. Safe to call for a slot that
+// holds nothing.
+async function release(modality) {
+  const h = handles[modality];
+  delete handles[modality];
+  delete handles[`${modality}:id`];
+  if (h) {
+    try { await unloaders[modality](await h); } catch { /* already gone */ }
+  }
+  for (const k of Object.keys(loadedById)) if (loadedType[k] === modality) forgetLoaded(k);
+}
+
+/** Free every model the current screen does not need. */
+async function releaseUnneeded(acquiring) {
+  const loaded = Object.keys(loaders).filter((m) => handles[m]);
+  const drop = modalitiesToRelease(currentTab, acquiring, loaded);
+  for (const m of drop) {
+    setStatus(`releasing ${m}…`);
+    await release(m);
+  }
+  if (drop.length) renderModelChips();
+  return drop;
+}
+
 async function acquire(modality) {
   const id = selectedModel(modality);
   // Re-loading is only needed when the choice changed or nothing is loaded yet.
   if (handles[modality] && handles[`${modality}:id`] === id) return handles[modality];
   handles[`${modality}:id`] = id;
   const p = (async () => {
+    // Nothing evicts anything automatically — the backend keeps a slot per
+    // modality — so without this the app accumulates every model it has used
+    // (chat's LLM + a VLM + STT + TTS) until it exhausts memory.
+    await releaseUnneeded(modality);
     setStatus(`loading ${id}…`);
     try {
       const h = await loaders[modality](id);
@@ -119,10 +147,7 @@ async function acquire(modality) {
 async function selectModel(modality, id) {
   settings.models = { ...(settings.models || {}), [modality]: id };
   try { await store.saveSettings(settings); } catch { /* optional */ }
-  const prev = handles[modality];
-  delete handles[modality]; delete handles[`${modality}:id`];
-  if (prev) { try { await unloaders[modality](await prev); } catch { /* already gone */ } }
-  for (const k of Object.keys(loadedById)) if (loadedType[k] === modality) forgetLoaded(k);
+  await release(modality);
   renderModelChips();
   if (currentTab === 'models') renderModels();
 }
@@ -631,10 +656,7 @@ function showTab(name) {
 // ---- model chip + picker ------------------------------------------------------
 // Which modalities each tab lets you choose. Slots are per-modality, so a tab only
 // ever shows the models it actually uses.
-const TAB_MODALITIES = {
-  chat: ['llm'], vision: ['vlm'], embeddings: ['embedder'], voice: ['stt', 'llm', 'tts'],  // the spoken reply uses the LLM too
-  rag: ['embedder', 'llm'], structured: ['llm'], tools: ['llm'],
-};
+// TAB_MODALITIES + modalitiesToRelease come from model-policy.js (unit-tested).
 const CHIP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 7v10l8 4 8-4V7z"/><path d="m8 12 3 3 5-6"/></svg>';
 
 let openPicker = null;
