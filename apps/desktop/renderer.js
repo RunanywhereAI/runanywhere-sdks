@@ -199,10 +199,14 @@ function renderSidebar() {
 }
 function bubbleHtml(m) {
   const body = m.role === 'assistant' ? assistantHtml(m.content || '…') : escapeHtml(m.content);
-  const metrics = m.metrics ? `<div class="metrics">⚡ ${m.metrics.tokens} tokens · ${m.metrics.tps.toFixed(1)} tok/s · TTFT ${Math.round(m.metrics.ttft)}ms</div>` : '';
-  const av = m.role === 'assistant' ? '✦' : 'U';
+  // No emoji: ⚡ is rendered by Segoe UI Emoji in its OWN colours, so it was the
+  // one bitmap glyph in an all-SVG interface. The .metrics flex gap separates.
+  const metrics = m.metrics ? `<div class="metrics"><span>${m.metrics.tokens} tokens</span><span>${m.metrics.tps.toFixed(1)} tok/s</span><span>TTFT ${Math.round(m.metrics.ttft)}ms</span></div>` : '';
+  // The assistant reply is typeset as PROSE — the stylesheet drops the avatar and
+  // the bubble fill, leaving a small-caps label above plain text. Only the user's
+  // turn keeps a bubble. This is the single biggest difference from a chat toy.
   const who = m.role === 'assistant' ? 'RunAnywhere' : 'You';
-  return `<div class="msg ${m.role}"><div class="av">${av}</div><div class="col"><div class="who">${who}</div><div class="bubble">${body}</div>${metrics}</div></div>`;
+  return `<div class="msg ${m.role}"><div class="col"><div class="who">${who}</div><div class="bubble">${body}</div>${metrics}</div></div>`;
 }
 // Four openers, each with an icon, a title and the prompt it prefills. Clicking
 // one PREFILLS and focuses the composer (it does not fire a request) so the user
@@ -544,7 +548,8 @@ async function ragEnsureSession() {
   return ragSessionPromise;
 }
 function ragStatsText(s) {
-  if (!s) return '';
+  // Never render nothing — an empty slot beside the buttons reads as a failed load.
+  if (!s || !s.indexedDocuments) return 'No documents yet';
   return `${s.indexedDocuments} document${s.indexedDocuments === 1 ? '' : 's'} · ${s.indexedChunks} chunk${s.indexedChunks === 1 ? '' : 's'} indexed`;
 }
 function renderRagSources(chunks) {
@@ -581,7 +586,12 @@ function showTab(name) {
   document.querySelectorAll('.nav button').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
   document.querySelectorAll('.panel').forEach((x) => x.classList.toggle('active', x.id === name));
   const btn = document.querySelector(`.nav button[data-tab="${name}"]`);
-  if (btn) $('sectiontitle').textContent = btn.textContent.trim();
+  if (btn) {
+    $('sectiontitle').textContent = btn.textContent.trim();
+    // Selecting a workbench keeps the Developer group open so the active row is visible.
+    const grp = btn.closest('details');
+    if (grp) grp.open = true;
+  }
   closePicker();
   if (name !== 'voice' && voiceCleanup) voiceCleanup(); // release the mic on tab change
   renderModelChips();
@@ -695,7 +705,22 @@ async function togglePicker(anchor, modality) {
 document.querySelectorAll('.nav button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
 
 // ---- UI wiring ----
+// Default to the OS preference; an explicit choice is remembered in settings.
+function applyTheme(mode) {
+  const os = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  document.documentElement.dataset.theme = mode === 'light' || mode === 'dark' ? mode : os;
+}
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  settings.theme = next;
+  applyTheme(next);
+  Promise.resolve(store.saveSettings(settings)).catch(() => {});
+}
+
 function wireUi() {
+  applyTheme(settings.theme);
+  const tt = $('themetoggle');
+  if (tt) tt.addEventListener('click', toggleTheme);
   applySettingsToUi();
   applyDeviceUi();
   renderSidebar(); renderChat();
@@ -722,7 +747,20 @@ function wireUi() {
     return `${c.name}(${JSON.stringify(c.arguments)})
 → ${c.result}`;
   }));
-  $('embgo').addEventListener('click', out('embout', async () => 'cosine similarity: ' + (await runEmbeddings($('emba').value, $('embb').value)).toFixed(3)));
+  $('embgo').addEventListener('click', async () => {
+    const a = $('emba').value || $('emba').placeholder;
+    const b = $('embb').value || $('embb').placeholder;
+    const el = $('embout');
+    $('embgo').disabled = true; el.textContent = '…'; setStatus('working…');
+    try {
+      const score = await runEmbeddings(a, b);
+      const pct = Math.max(0, Math.min(1, score)) * 100;
+      el.innerHTML = `<div><div class="figure">${score.toFixed(3)}</div>` +
+        `<div class="figcap">Cosine similarity</div>` +
+        `<div class="meter"><i style="width:${pct.toFixed(1)}%"></i></div></div>`;
+    } catch (e) { el.textContent = 'error: ' + e.message; }
+    finally { $('embgo').disabled = false; setStatus('ready'); }
+  });
 
   $('ragadd').addEventListener('click', async () => {
     const text = $('ragdoc').value.trim();
