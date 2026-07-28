@@ -126,7 +126,7 @@ test('isRemoteSource is false for a Windows drive path', () => {
 });
 
 test('isRemoteSource is false for a bare id with no slash', () => {
-  assert.equal(download.isRemoteSource('smollm2-135m'), false);
+  assert.equal(download.isRemoteSource('qwen3.5-0.8b'), false);
   assert.equal(download.isRemoteSource('unknown-model'), false);
 });
 
@@ -283,17 +283,17 @@ test('resolveModel does NOT create the directory for a non-catalog path', async 
 test('resolveModel skips download when the catalog file already exists', async () => {
   const tempRoot = freshTempRoot();
   try {
-    const modelDir = path.join(tempRoot, 'smollm2-135m');
+    const modelDir = path.join(tempRoot, 'qwen3.5-0.8b');
     fs.mkdirSync(modelDir, { recursive: true });
     // Pre-create the expected primary file so the download loop is skipped.
     fs.writeFileSync(path.join(modelDir, 'model.gguf'), Buffer.from([0]));
 
-    const res = await download.resolveModel('smollm2-135m', { dir: tempRoot });
+    const res = await download.resolveModel('qwen3.5-0.8b', { dir: tempRoot });
 
-    assert.equal(res.id, 'smollm2-135m');
+    assert.equal(res.id, 'qwen3.5-0.8b');
     assert.equal(res.type, 'llm');
     assert.equal(res.dir, modelDir);
-    assert.equal(res.primary, path.join(tempRoot, 'smollm2-135m', 'model.gguf'));
+    assert.equal(res.primary, path.join(tempRoot, 'qwen3.5-0.8b', 'model.gguf'));
     assert.equal(res.mmproj, undefined);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -303,13 +303,13 @@ test('resolveModel skips download when the catalog file already exists', async (
 test('resolveModel does not overwrite the existing catalog file', async () => {
   const tempRoot = freshTempRoot();
   try {
-    const modelDir = path.join(tempRoot, 'smollm2-135m');
+    const modelDir = path.join(tempRoot, 'qwen3.5-0.8b');
     fs.mkdirSync(modelDir, { recursive: true });
     const primary = path.join(modelDir, 'model.gguf');
     const sentinel = Buffer.from('already-here');
     fs.writeFileSync(primary, sentinel);
 
-    await download.resolveModel('smollm2-135m', { dir: tempRoot });
+    await download.resolveModel('qwen3.5-0.8b', { dir: tempRoot });
 
     // Untouched: no network fetch replaced our sentinel bytes.
     assert.deepEqual(fs.readFileSync(primary), sentinel);
@@ -321,11 +321,11 @@ test('resolveModel does not overwrite the existing catalog file', async () => {
 test('resolveModel returns undefined mmproj for a non-VLM catalog entry', async () => {
   const tempRoot = freshTempRoot();
   try {
-    const modelDir = path.join(tempRoot, 'smollm2-135m');
+    const modelDir = path.join(tempRoot, 'qwen3.5-0.8b');
     fs.mkdirSync(modelDir, { recursive: true });
     fs.writeFileSync(path.join(modelDir, 'model.gguf'), Buffer.from([0]));
 
-    const res = await download.resolveModel('smollm2-135m', { dir: tempRoot });
+    const res = await download.resolveModel('qwen3.5-0.8b', { dir: tempRoot });
     assert.ok('mmproj' in res, 'ResolvedModel shape includes the mmproj key');
     assert.equal(res.mmproj, undefined);
   } finally {
@@ -340,11 +340,11 @@ test('resolveModel creates the per-model directory (dir side effect) when it is 
   // effect directly: after resolve, res.dir exists on disk.
   const tempRoot = freshTempRoot();
   try {
-    const modelDir = path.join(tempRoot, 'smollm2-135m');
+    const modelDir = path.join(tempRoot, 'qwen3.5-0.8b');
     fs.mkdirSync(modelDir, { recursive: true });
     fs.writeFileSync(path.join(modelDir, 'model.gguf'), Buffer.from([0]));
 
-    const res = await download.resolveModel('smollm2-135m', { dir: tempRoot });
+    const res = await download.resolveModel('qwen3.5-0.8b', { dir: tempRoot });
     assert.ok(fs.existsSync(res.dir), 'resolveModel should ensure the model dir exists');
     assert.equal(res.dir, modelDir);
   } finally {
@@ -357,15 +357,15 @@ test('resolveModel creates the per-model directory (dir side effect) when it is 
 test('resolveModel resolves a VLM entry with an mmproj path when files exist', async () => {
   const tempRoot = freshTempRoot();
   try {
-    const modelDir = path.join(tempRoot, 'smolvlm-256m');
+    const modelDir = path.join(tempRoot, 'qwen3.5-0.8b-vl');
     fs.mkdirSync(modelDir, { recursive: true });
-    // smolvlm-256m has two files: model.gguf (primary) and mmproj.gguf.
+    // qwen3.5-0.8b-vl has two files: model.gguf (primary) and mmproj.gguf.
     fs.writeFileSync(path.join(modelDir, 'model.gguf'), Buffer.from([0]));
     fs.writeFileSync(path.join(modelDir, 'mmproj.gguf'), Buffer.from([0]));
 
-    const res = await download.resolveModel('smolvlm-256m', { dir: tempRoot });
+    const res = await download.resolveModel('qwen3.5-0.8b-vl', { dir: tempRoot });
 
-    assert.equal(res.id, 'smolvlm-256m');
+    assert.equal(res.id, 'qwen3.5-0.8b-vl');
     assert.equal(res.type, 'vlm');
     assert.equal(res.dir, modelDir);
     assert.equal(res.primary, path.join(modelDir, 'model.gguf'));
@@ -468,13 +468,13 @@ test('resolveModel archive primary resolves under the model dir (piper tts entry
 test('resolveModel honors an explicit opts.dir root for the model directory', async () => {
   const tempRoot = freshTempRoot();
   try {
-    const modelDir = path.join(tempRoot, 'smollm2-135m');
+    const modelDir = path.join(tempRoot, 'qwen3.5-0.8b');
     fs.mkdirSync(modelDir, { recursive: true });
     fs.writeFileSync(path.join(modelDir, 'model.gguf'), Buffer.from([0]));
 
-    const res = await download.resolveModel('smollm2-135m', { dir: tempRoot });
+    const res = await download.resolveModel('qwen3.5-0.8b', { dir: tempRoot });
     // dir must be rooted at opts.dir, NOT at modelsRoot()/home.
-    assert.equal(res.dir, path.join(tempRoot, 'smollm2-135m'));
+    assert.equal(res.dir, path.join(tempRoot, 'qwen3.5-0.8b'));
     assert.ok(!res.dir.startsWith(download.modelsRoot()), 'opts.dir should override modelsRoot()');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
