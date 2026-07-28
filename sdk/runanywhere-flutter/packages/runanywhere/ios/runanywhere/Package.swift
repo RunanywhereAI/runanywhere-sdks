@@ -3,8 +3,7 @@
 import PackageDescription
 import Foundation
 
-// TEMP: pin to 0.20.11 until the v0.20.12 GitHub release assets are published.
-let sdkVersion = "0.20.11"
+let sdkVersion = "0.20.12"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
 func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
@@ -24,7 +23,7 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let raCommonsTarget = runAnywhereBinaryTarget(
     name: "RACommons",
-    checksum: "59897310f994d8b5c8e73207205e829a910126d043f36adeeca6c255ae7d3e91"
+    checksum: "e3163b5e2e167811b5d9f2f3407726d12778e6f4c1f96d078707b030a4acbc73"
 )
 
 let package = Package(

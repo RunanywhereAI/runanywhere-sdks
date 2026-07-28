@@ -3,8 +3,7 @@
 import PackageDescription
 import Foundation
 
-// TEMP: pin to 0.20.11 until the v0.20.12 GitHub release assets are published.
-let sdkVersion = "0.20.11"
+let sdkVersion = "0.20.12"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
 func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
