@@ -128,6 +128,7 @@ let package = Package(
         // =================================================================
         .library(
             name: "RunAnywhere",
+            type: .static,
             targets: ["RunAnywhere"]
         ),
 
@@ -136,6 +137,7 @@ let package = Package(
         // =================================================================
         .library(
             name: "RunAnywhereONNX",
+            type: .static,
             targets: ["ONNXRuntime"]
         ),
 
@@ -144,6 +146,7 @@ let package = Package(
         // =================================================================
         .library(
             name: "RunAnywhereLlamaCPP",
+            type: .static,
             targets: ["LlamaCPPRuntime"]
         ),
 
@@ -152,6 +155,7 @@ let package = Package(
         // =================================================================
         .library(
             name: "RunAnywhereMLX",
+            type: .static,
             targets: ["MLXRuntime"]
         ),
 
