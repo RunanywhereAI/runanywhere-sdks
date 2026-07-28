@@ -9,6 +9,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import { jsonSchemaToGrammar } from '../grammar';
 import { splitThinking } from '../thinking';
+import { speakableText } from '../speech';
+import { downsample, pcm16Bytes, rms } from '../audio';
 import {
   RAGConfiguration,
   RAGDocument,
@@ -116,9 +118,18 @@ contextBridge.exposeInMainWorld('runanywhere', {
   // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
   onEvent: (listener: EventListener) => bus.on(listener),
 
+  // ---- audio helpers (pure DSP; renderer-side, no RPC) ----
+  // Anti-aliased rate conversion + PCM16 packing for the mic -> STT path. Doing
+  // this by hand in an app folds >8kHz energy into the band Whisper reads.
+  downsample: (samples: Float32Array, inRate: number, outRate: number) => downsample(samples, inRate, outRate),
+  pcm16Bytes: (samples: Float32Array) => pcm16Bytes(samples),
+  rms: (samples: Float32Array) => rms(samples),
+
   // ---- reasoning ----
   // Split a reasoning model's <think>…</think> from its answer (pure, in-page).
   splitThinking: (text: string) => splitThinking(text),
+  // Markdown/symbols -> words a TTS voice can read (no "asterisk asterisk").
+  speakableText: (text: string) => speakableText(text),
 
   // ---- model catalog + storage ----
   catalog: () => CATALOG,

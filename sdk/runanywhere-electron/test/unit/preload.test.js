@@ -317,8 +317,8 @@ test('catalog() returns the built-in model catalog', { skip: SKIP }, () => {
   const { exposed } = freshPreload();
   const cat = exposed.runanywhere.catalog();
   assert.equal(typeof cat, 'object');
-  assert.ok(cat['qwen2.5-0.5b'], 'includes a known catalog id');
-  assert.equal(cat['qwen2.5-0.5b'].type, 'llm');
+  assert.ok(cat['qwen3.5-0.8b'], 'includes a known catalog id');
+  assert.equal(cat['qwen3.5-0.8b'].type, 'llm');
 });
 
 test('onEvent subscribes to lifecycle events and returns an unsubscribe', { skip: SKIP }, async () => {

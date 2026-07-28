@@ -38,6 +38,7 @@ export { jsonSchemaToGrammar } from './grammar';
 export type { JsonSchema } from './grammar';
 export { objectGrammar, toolCallSchema, toolCallPrompt } from './structured';
 export { splitThinking, stripThinking, isThinking } from './thinking';
+export { speakableText } from './speech';
 export type { ThinkingSplit } from './thinking';
 export { streamWithMetrics } from './stream';
 export {
