@@ -6,9 +6,9 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart' as event_pb;
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
 
 /// Native bridge for the stable SDKEvent proto-byte stream.
@@ -119,7 +119,7 @@ class DartBridgeEvents {
     final publish = RacNative.bindings.rac_sdk_event_publish_proto;
     if (publish == null) return false;
     return _withProtoBytes(event, (bytes, size) {
-      return publish(bytes, size) == RacResultCode.success;
+      return publish(bytes, size) == RacResultCodes.success;
     });
   }
 
@@ -132,7 +132,7 @@ class DartBridgeEvents {
     try {
       bindings.rac_proto_buffer_init(out);
       final code = poll(out);
-      if (code != RacResultCode.success || out.ref.data == nullptr) {
+      if (code != RacResultCodes.success || out.ref.data == nullptr) {
         return null;
       }
       final bytes = out.ref.data
@@ -187,7 +187,7 @@ class DartBridgeEvents {
             operationPtr,
             recoverable ? 1 : 0,
           ) ==
-          RacResultCode.success;
+          RacResultCodes.success;
     } finally {
       calloc.free(messagePtr);
       calloc.free(componentPtr);
@@ -257,7 +257,7 @@ void _sdkEventCallback(
     try {
       bindings.rac_proto_buffer_init(out);
       final code = pollFn(out);
-      if (code != RacResultCode.success || out.ref.data == nullptr) {
+      if (code != RacResultCodes.success || out.ref.data == nullptr) {
         return;
       }
       try {

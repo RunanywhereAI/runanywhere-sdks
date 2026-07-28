@@ -1,4 +1,29 @@
-"""Curated built-in model catalog so callers can load models by id instead of files."""
+"""Curated built-in model catalog so callers can load models by id instead of files.
+
+This catalog is local on purpose, and it is the one place in the repo where model
+ids and download URLs are written out by hand. Every other SDK fetches its
+catalog from the control plane during phase-2 initialization.
+
+The reason is that the Python package has no control-plane dependency: it
+initializes offline, `complete_services_initialization` is a local-only
+lifecycle seam with no network auth, and the package's whole premise is that
+inference needs no network beyond fetching weights. Requiring a backend round
+trip just to resolve ``smollm2-360m`` to a URL would put a server in the path of
+an otherwise offline SDK.
+
+So this is a decision, not drift. Two things follow from it:
+
+  - These strings are catalog data, not defaults. They do not belong in
+    idl/sdk_defaults.proto, and scripts/validation/gates/check_no_hardcoded_defaults.sh
+    does not scan for them.
+  - Nothing here may be read as a capability signal. Resolve a model id to files
+    and then inspect the artifact; never branch on the id to decide what a model
+    can do. Vendors ship reasoning and non-reasoning checkpoints under one name
+    prefix, so the id predicts nothing.
+
+If the Python SDK ever grows a control-plane client, this should move behind it
+and the local table become a fallback.
+"""
 
 from __future__ import annotations
 

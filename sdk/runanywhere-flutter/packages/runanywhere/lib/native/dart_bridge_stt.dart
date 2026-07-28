@@ -12,6 +12,7 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart'
     show
         STTAudioSource_Source,
@@ -66,7 +67,7 @@ class DartBridgeSTT {
 
         if (result != RAC_SUCCESS) {
           throw StateError(
-            'Failed to create STT component: ${RacResultCode.getMessage(result)}',
+            'Failed to create STT component: ${RacResultCodes.message(result)}',
           );
         }
 
@@ -248,7 +249,7 @@ class DartBridgeSTT {
       if (code != RAC_SUCCESS) {
         throw StateError(
           'rac_stt_component_load_model failed: '
-          '${RacResultCode.getMessage(code)}',
+          '${RacResultCodes.message(code)}',
         );
       }
       _loadedModelId = id;

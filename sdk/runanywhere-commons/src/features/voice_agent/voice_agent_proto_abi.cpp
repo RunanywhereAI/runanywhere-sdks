@@ -54,8 +54,9 @@ namespace {
 #if defined(RAC_HAVE_PROTOBUF)
 
 // Catalogued default Silero VAD model id, seeded by every example app's
-// catalog. Mirrors Swift `RunAnywhere.defaultVADModelID`.
-constexpr const char* kDefaultVADModelID = "silero-vad";
+// catalog. Declared in idl/sdk_defaults.proto and exposed to the SDKs as
+// rac_voice_agent_default_vad_model_id().
+constexpr const char* kDefaultVADModelID = RAC_DEFAULT_VOICE_AGENT_DEFAULT_VAD_MODEL_ID;
 
 // Ensure a VAD model is loaded in the canonical lifecycle before the voice
 // agent session starts. When no `.voiceActivityDetection` model is current,

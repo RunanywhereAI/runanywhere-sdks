@@ -19,6 +19,7 @@ import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart'
     show LLMGenerateRequest, LLMStreamEvent;
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/native_functions.dart';
@@ -62,7 +63,7 @@ class DartBridgeLLM {
 
         if (result != RAC_SUCCESS) {
           throw StateError(
-            'Failed to create LLM component: ${RacResultCode.getMessage(result)}',
+            'Failed to create LLM component: ${RacResultCodes.message(result)}',
           );
         }
 
@@ -232,7 +233,7 @@ class DartBridgeLLM {
           controller.addError(
             StateError(
               'rac_llm_generate_stream_proto failed: '
-              '${RacResultCode.getMessage(message)}',
+              '${RacResultCodes.message(message)}',
             ),
           );
         }

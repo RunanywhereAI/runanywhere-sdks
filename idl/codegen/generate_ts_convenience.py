@@ -51,6 +51,10 @@ from typing import Iterable
 
 from google.protobuf import descriptor_pb2
 
+# Imported rather than restated: a second copy of this list is exactly the drift
+# the annotations exist to prevent.
+from _convenience_common import DECLARATION_ONLY_FILES
+
 # --- RunAnywhere proto-annotation field numbers (mirror idl/rac_options.proto).
 RAC_DEFAULT_FIELD_NUM       = 50001
 RAC_REQUIRED_FIELD_NUM      = 50002
@@ -607,7 +611,7 @@ def _collect_message_symbols_per_file(
     enum_consts: dict[str, set[str]] = {}
 
     for file_desc in fds.file:
-        if file_desc.package != "runanywhere.v1":
+        if file_desc.package != "runanywhere.v1" or file_desc.name in DECLARATION_ONLY_FILES:
             continue
         base = _file_basename(file_desc)
         for enum_desc in file_desc.enum_type:
@@ -812,7 +816,7 @@ def main() -> int:
     total_validate = 0
 
     for file_desc in fds.file:
-        if file_desc.package != "runanywhere.v1":
+        if file_desc.package != "runanywhere.v1" or file_desc.name in DECLARATION_ONLY_FILES:
             continue
         generated = _process_file(file_desc, enum_owner_file, enum_const_names)
         if generated is None:

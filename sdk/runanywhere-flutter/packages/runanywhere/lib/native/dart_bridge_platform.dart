@@ -9,6 +9,7 @@ import 'dart:isolate';
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/dart_bridge_secure_storage.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
@@ -235,7 +236,7 @@ class DartBridgePlatform {
           >('rac_set_platform_adapter');
 
       final result = setAdapter(adapter);
-      if (result != RacResultCode.success) {
+      if (result != RacResultCodes.success) {
         _logger.error(
           'Failed to register platform adapter',
           metadata: {'error_code': result},
@@ -310,7 +311,7 @@ class DartBridgePlatform {
           );
 
       final result = registerCallback(_servicesAvailabilityCallback!);
-      if (result != RacResultCode.success) {
+      if (result != RacResultCodes.success) {
         _logger.warning(
           'Failed to register platform services availability callback',
           metadata: {'error_code': result},
@@ -473,7 +474,7 @@ int _platformFileReadCallback(
   Pointer<Void> userData,
 ) {
   if (path == nullptr || outData == nullptr || outSize == nullptr) {
-    return RacResultCode.errorInvalidParameter;
+    return RacResultCodes.errorInvalidParameter;
   }
 
   try {
@@ -481,7 +482,7 @@ int _platformFileReadCallback(
     final file = File(pathString);
 
     if (!file.existsSync()) {
-      return RacResultCode.errorFileNotFound;
+      return RacResultCodes.errorFileNotFound;
     }
 
     final data = file.readAsBytesSync();
@@ -495,9 +496,9 @@ int _platformFileReadCallback(
     outData.value = buffer.cast<Void>();
     outSize.value = data.length;
 
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
-    return RacResultCode.errorFileReadFailed;
+    return RacResultCodes.errorFileReadFailed;
   }
 }
 
@@ -509,7 +510,7 @@ int _platformFileWriteCallback(
   Pointer<Void> userData,
 ) {
   if (path == nullptr || data == nullptr) {
-    return RacResultCode.errorInvalidParameter;
+    return RacResultCodes.errorInvalidParameter;
   }
 
   try {
@@ -519,16 +520,16 @@ int _platformFileWriteCallback(
     final file = File(pathString);
     file.writeAsBytesSync(bytes);
 
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
-    return RacResultCode.errorFileWriteFailed;
+    return RacResultCodes.errorFileWriteFailed;
   }
 }
 
 /// File delete callback
 int _platformFileDeleteCallback(Pointer<Utf8> path, Pointer<Void> userData) {
   if (path == nullptr) {
-    return RacResultCode.errorInvalidParameter;
+    return RacResultCodes.errorInvalidParameter;
   }
 
   try {
@@ -539,9 +540,9 @@ int _platformFileDeleteCallback(Pointer<Utf8> path, Pointer<Void> userData) {
       file.deleteSync();
     }
 
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
-    return RacResultCode.errorDeleteFailed;
+    return RacResultCodes.errorDeleteFailed;
   }
 }
 
@@ -552,7 +553,7 @@ int _platformSecureGetCallback(
   Pointer<Void> userData,
 ) {
   if (key == nullptr || outValue == nullptr) {
-    return RacResultCode.errorInvalidParameter;
+    return RacResultCodes.errorInvalidParameter;
   }
 
   try {
@@ -560,16 +561,16 @@ int _platformSecureGetCallback(
     final result = DartBridgeSecureStorage.instance.retrieve(keyString);
     if (result.status <= 0) return result.status;
     final value = result.value;
-    if (value == null || value.isEmpty) return RacResultCode.errorFileNotFound;
+    if (value == null || value.isEmpty) return RacResultCodes.errorFileNotFound;
 
     // Allocate and copy string
     final cString = value.toNativeUtf8();
     outValue.value = cString;
 
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
     // Contract: real failures MUST NOT collide with the not-found code.
-    return RacResultCode.errorSecureStorageFailed;
+    return RacResultCodes.errorSecureStorageFailed;
   }
 }
 
@@ -580,26 +581,26 @@ int _platformSecureSetCallback(
   Pointer<Void> userData,
 ) {
   if (key == nullptr || value == nullptr) {
-    return RacResultCode.errorInvalidParameter;
+    return RacResultCodes.errorInvalidParameter;
   }
 
   try {
     return DartBridgeSecureStorage.instance.storePointers(key, value);
   } catch (_) {
-    return RacResultCode.errorSecureStorageFailed;
+    return RacResultCodes.errorSecureStorageFailed;
   }
 }
 
 /// Secure delete callback
 int _platformSecureDeleteCallback(Pointer<Utf8> key, Pointer<Void> userData) {
   if (key == nullptr) {
-    return RacResultCode.errorInvalidParameter;
+    return RacResultCodes.errorInvalidParameter;
   }
 
   try {
     return DartBridgeSecureStorage.instance.deletePointer(key);
   } catch (_) {
-    return RacResultCode.errorSecureStorageFailed;
+    return RacResultCodes.errorSecureStorageFailed;
   }
 }
 
@@ -705,7 +706,7 @@ int _platformGetMemoryInfoCallback(
   Pointer<Void> userData,
 ) {
   if (outInfo == nullptr) {
-    return RacResultCode.errorInvalidParameter;
+    return RacResultCodes.errorInvalidParameter;
   }
 
   final usedBytes = ProcessInfo.currentRss;
@@ -717,7 +718,7 @@ int _platformGetMemoryInfoCallback(
   memoryInfo.availableBytes = availableBytes;
   memoryInfo.usedBytes = usedBytes;
 
-  return RacResultCode.success;
+  return RacResultCodes.success;
 }
 
 // =============================================================================
@@ -741,14 +742,14 @@ int _platformFileListDirectoryCallback(
   Pointer<Void> userData,
 ) {
   if (dirPath == nullptr || inOutCount == nullptr) {
-    return RacResultCode.errorInvalidParameter;
+    return RacResultCodes.errorInvalidParameter;
   }
 
   try {
     final pathString = dirPath.toDartString();
     final dir = Directory(pathString);
     if (!dir.existsSync()) {
-      return RacResultCode.errorFileNotFound;
+      return RacResultCodes.errorFileNotFound;
     }
 
     // Collect entries up front so capacity and fill calls observe the same
@@ -789,7 +790,7 @@ int _platformFileListDirectoryCallback(
     if (outEntries == nullptr) {
       // Capacity query: write total entry count, do not touch entries array.
       inOutCount.value = retained.length;
-      return RacResultCode.success;
+      return RacResultCodes.success;
     }
 
     final capacity = inOutCount.value;
@@ -809,10 +810,10 @@ int _platformFileListDirectoryCallback(
       slot.sizeBytes = entry.sizeBytes;
     }
     inOutCount.value = count;
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
     SDKLogger('PlatformAdapter').warning('file_list_directory failed');
-    return RacResultCode.errorFileReadFailed;
+    return RacResultCodes.errorFileReadFailed;
   }
 }
 
@@ -868,13 +869,13 @@ int _platformHttpDownloadCallback(
 ) {
   try {
     if (url == nullptr || destinationPath == nullptr || outTaskId == nullptr) {
-      return RacResultCode.errorInvalidParameter;
+      return RacResultCodes.errorInvalidParameter;
     }
 
     final urlString = url.toDartString();
     final destinationString = destinationPath.toDartString();
     if (urlString.isEmpty || destinationString.isEmpty) {
-      return RacResultCode.errorInvalidParameter;
+      return RacResultCodes.errorInvalidParameter;
     }
 
     final taskId = 'http_${_httpDownloadCounter++}';
@@ -897,9 +898,9 @@ int _platformHttpDownloadCallback(
         userDataAddress,
       ]),
     );
-    return RacResultCode.success;
+    return RacResultCodes.success;
   } catch (_) {
-    return RacResultCode.errorDownloadFailed;
+    return RacResultCodes.errorDownloadFailed;
   }
 }
 
@@ -908,7 +909,7 @@ int _platformHttpDownloadCancelCallback(
   Pointer<Utf8> taskId,
   Pointer<Void> userData,
 ) {
-  return RacResultCode.errorNotSupported;
+  return RacResultCodes.errorNotSupported;
 }
 
 Future<void> _performHttpDownloadIsolate(
@@ -918,7 +919,7 @@ Future<void> _performHttpDownloadIsolate(
   void Function(int, Pointer<Utf8>, Pointer<Void>)? completeCallback,
   Pointer<Void> callbackUserData,
 ) async {
-  var result = RacResultCode.errorDownloadFailed;
+  var result = RacResultCodes.errorDownloadFailed;
   String? finalPath;
   File? tempFile;
   HttpClient? client;
@@ -926,7 +927,7 @@ Future<void> _performHttpDownloadIsolate(
   try {
     final uri = Uri.tryParse(url);
     if (uri == null) {
-      result = RacResultCode.errorInvalidParameter;
+      result = RacResultCodes.errorInvalidParameter;
       return;
     }
 
@@ -936,7 +937,7 @@ Future<void> _performHttpDownloadIsolate(
     final response = await request.close();
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      result = RacResultCode.errorDownloadFailed;
+      result = RacResultCodes.errorDownloadFailed;
       return;
     }
 
@@ -986,13 +987,13 @@ Future<void> _performHttpDownloadIsolate(
     }
 
     finalPath = destFile.path;
-    result = RacResultCode.success;
+    result = RacResultCodes.success;
   } catch (_) {
-    result = RacResultCode.errorDownloadFailed;
+    result = RacResultCodes.errorDownloadFailed;
   } finally {
     client?.close(force: true);
 
-    if (result != RacResultCode.success && tempFile != null) {
+    if (result != RacResultCodes.success && tempFile != null) {
       try {
         if (await tempFile.exists()) {
           await tempFile.delete();

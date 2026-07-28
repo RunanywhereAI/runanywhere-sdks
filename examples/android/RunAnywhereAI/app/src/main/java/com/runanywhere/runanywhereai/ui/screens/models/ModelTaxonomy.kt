@@ -40,7 +40,19 @@ private fun org(org: ModelOrg, vararg tokens: String) = OrgSpec(org, tokens.toLi
 
 private val orgSpecs: List<OrgSpec> = listOf(
     // NVIDIA first among Llama-derived names so Nemotron / Canary / Parakeet stay NVIDIA.
-    org(ModelOrg.NVIDIA, "nemotron", "nemoguard", "cosmos", "canary", "parakeet", "nv_embed", "nv-embed", "nv_rerank", "nvidia"),
+    org(
+        ModelOrg.NVIDIA,
+        "nemotron",
+        "nemoguard",
+        "cosmos",
+        "canary",
+        "parakeet",
+        "nv_embed",
+        "nv-embed",
+        "nv_rerank",
+        "nvidia",
+        "magpie",
+    ),
     org(ModelOrg.DEEPSEEK, "deepseek"),
     org(ModelOrg.PRISM, "bonsai"),
     org(ModelOrg.MICROSOFT, "phi"),
@@ -51,7 +63,19 @@ private val orgSpecs: List<OrgSpec> = listOf(
     org(ModelOrg.MISTRAL, "mistral"),
     org(ModelOrg.HUGGING_FACE, "smollm", "smolvlm"),
     org(ModelOrg.OPENAI, "whisper"),
-    org(ModelOrg.OPEN_SOURCE, "internvl", "lama_dilated", "moonshine", "melo", "kokoro", "kitten", "piper", "silero", "minilm"),
+    org(
+        ModelOrg.OPEN_SOURCE,
+        "internvl",
+        "lama_dilated",
+        "moonshine",
+        "melo",
+        "kokoro",
+        "kitten",
+        "piper",
+        "silero",
+        "minilm",
+        "segformer",
+    ),
 )
 
 fun RAModelInfo.org(): ModelOrg {

@@ -15,6 +15,7 @@ import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.VLMStreamEventKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions

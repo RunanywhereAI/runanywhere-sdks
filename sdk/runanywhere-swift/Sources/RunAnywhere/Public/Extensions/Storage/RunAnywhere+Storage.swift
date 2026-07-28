@@ -52,7 +52,7 @@ public extension RunAnywhere {
             request.downloadSizeBytes = memoryRequirement
         }
         if modality.requiresContextLength {
-            request.contextLength = 2048
+            request.contextLength = Int32(RADefaults.Storage.contextLength)
         }
         if supportsThinking {
             request.supportsThinking = true
@@ -168,7 +168,7 @@ public extension RunAnywhere {
         if let contextLength {
             request.contextLength = Int32(contextLength)
         } else if modality.requiresContextLength {
-            request.contextLength = 2048
+            request.contextLength = Int32(RADefaults.Storage.contextLength)
         }
         if supportsThinking {
             request.supportsThinking = true

@@ -566,11 +566,18 @@ for ABI in "${ABIS[@]}"; do
 
     # Sherpa / ORT prebuilt runtime — only has arm64-v8a/armeabi-v7a/x86_64
     # sub-folders. Staged into Kotlin, RN, and Flutter ONNX plugins.
+    # Copy the public allowlist only (build-android.sh ONNX_LIBS). The upstream
+    # jniLibs tree also ships libsherpa-onnx-cxx-api.so, which is not part of
+    # the public RACommons Android archive and must not land in jniLibs.
     if [ -d "${SHERPA_ANDROID_JNI_SRC}/${ABI}" ]; then
-        find "${SHERPA_ANDROID_JNI_SRC}/${ABI}" -maxdepth 1 -name "*.so" \
-            -exec cp -v {} "${KOTLIN_ONNX_DEST}/" \; \
-            -exec cp -v {} "${RN_ONNX_DEST}/" \; \
-            -exec cp -v {} "${FLUTTER_ONNX_DEST}/" \;
+        for sherpa_lib in libonnxruntime.so libsherpa-onnx-c-api.so libsherpa-onnx-jni.so; do
+            src="${SHERPA_ANDROID_JNI_SRC}/${ABI}/${sherpa_lib}"
+            if [ -f "${src}" ]; then
+                cp -v "${src}" "${KOTLIN_ONNX_DEST}/"
+                cp -v "${src}" "${RN_ONNX_DEST}/"
+                cp -v "${src}" "${FLUTTER_ONNX_DEST}/"
+            fi
+        done
     fi
 
     # libc++_shared.so is required at runtime for every package that loads

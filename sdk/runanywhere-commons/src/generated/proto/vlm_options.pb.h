@@ -36,6 +36,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "model_types.pb.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -2622,7 +2623,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   ::runanywhere::v1::VLMChatTemplate* PROTOBUF_NONNULL _internal_mutable_custom_chat_template();
 
   public:
-  // int32 max_tokens = 2;
+  // int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
   void clear_max_tokens() ;
   [[nodiscard]] ::int32_t max_tokens() const;
   void set_max_tokens(::int32_t value);
@@ -2632,7 +2633,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   void _internal_set_max_tokens(::int32_t value);
 
   public:
-  // float temperature = 3;
+  // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
   void clear_temperature() ;
   [[nodiscard]] float temperature() const;
   void set_temperature(float value);
@@ -2642,7 +2643,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   void _internal_set_temperature(float value);
 
   public:
-  // float top_p = 4;
+  // float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   void clear_top_p() ;
   [[nodiscard]] float top_p() const;
   void set_top_p(float value);
@@ -2652,7 +2653,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   void _internal_set_top_p(float value);
 
   public:
-  // int32 top_k = 5;
+  // int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
   void clear_top_k() ;
   [[nodiscard]] ::int32_t top_k() const;
   void set_top_k(::int32_t value);
@@ -2692,7 +2693,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   void _internal_set_model_family(::runanywhere::v1::VLMModelFamily value);
 
   public:
-  // bool streaming_enabled = 7;
+  // bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
   void clear_streaming_enabled() ;
   [[nodiscard]] bool streaming_enabled() const;
   void set_streaming_enabled(bool value);
@@ -2702,7 +2703,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   void _internal_set_streaming_enabled(bool value);
 
   public:
-  // bool use_gpu = 11;
+  // bool use_gpu = 11 [(.runanywhere.v1.rac_default) = "true"];
   void clear_use_gpu() ;
   [[nodiscard]] bool use_gpu() const;
   void set_use_gpu(bool value);
@@ -2732,7 +2733,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   void _internal_set_seed(::int64_t value);
 
   public:
-  // float repetition_penalty = 16;
+  // float repetition_penalty = 16 [(.runanywhere.v1.rac_default) = "1.1", (.runanywhere.v1.rac_min_float) = 0];
   void clear_repetition_penalty() ;
   [[nodiscard]] float repetition_penalty() const;
   void set_repetition_penalty(float value);
@@ -4255,7 +4256,7 @@ inline void VLMGenerationOptions::set_allocated_prompt(::std::string* PROTOBUF_N
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VLMGenerationOptions.prompt)
 }
 
-// int32 max_tokens = 2;
+// int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
 inline void VLMGenerationOptions::clear_max_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_tokens_ = 0;
@@ -4279,7 +4280,7 @@ inline void VLMGenerationOptions::_internal_set_max_tokens(::int32_t value) {
   _impl_.max_tokens_ = value;
 }
 
-// float temperature = 3;
+// float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
 inline void VLMGenerationOptions::clear_temperature() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.temperature_ = 0;
@@ -4303,7 +4304,7 @@ inline void VLMGenerationOptions::_internal_set_temperature(float value) {
   _impl_.temperature_ = value;
 }
 
-// float top_p = 4;
+// float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline void VLMGenerationOptions::clear_top_p() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_p_ = 0;
@@ -4327,7 +4328,7 @@ inline void VLMGenerationOptions::_internal_set_top_p(float value) {
   _impl_.top_p_ = value;
 }
 
-// int32 top_k = 5;
+// int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
 inline void VLMGenerationOptions::clear_top_k() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_k_ = 0;
@@ -4423,7 +4424,7 @@ VLMGenerationOptions::_internal_mutable_stop_sequences() {
   return &_impl_.stop_sequences_;
 }
 
-// bool streaming_enabled = 7;
+// bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
 inline void VLMGenerationOptions::clear_streaming_enabled() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.streaming_enabled_ = false;
@@ -4563,7 +4564,7 @@ inline void VLMGenerationOptions::_internal_set_n_threads(::int32_t value) {
   _impl_.n_threads_ = value;
 }
 
-// bool use_gpu = 11;
+// bool use_gpu = 11 [(.runanywhere.v1.rac_default) = "true"];
 inline void VLMGenerationOptions::clear_use_gpu() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.use_gpu_ = false;
@@ -4801,7 +4802,7 @@ inline void VLMGenerationOptions::_internal_set_seed(::int64_t value) {
   _impl_.seed_ = value;
 }
 
-// float repetition_penalty = 16;
+// float repetition_penalty = 16 [(.runanywhere.v1.rac_default) = "1.1", (.runanywhere.v1.rac_min_float) = 0];
 inline void VLMGenerationOptions::clear_repetition_penalty() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.repetition_penalty_ = 0;

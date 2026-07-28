@@ -10,6 +10,7 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/plugin_loader.pb.dart' show PluginInfo;
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
 
@@ -60,7 +61,7 @@ class DartBridgePluginLoader {
       final rc = fn(outNamesPtr, outCountPtr);
       if (rc != RAC_SUCCESS) {
         _logger.warning(
-          'rac_registry_registered_names failed: ${RacResultCode.getMessage(rc)}',
+          'rac_registry_registered_names failed: ${RacResultCodes.message(rc)}',
         );
         return const <String>[];
       }

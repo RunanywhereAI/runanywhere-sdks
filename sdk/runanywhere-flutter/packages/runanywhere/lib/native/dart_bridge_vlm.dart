@@ -14,12 +14,12 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart'
     show RacNative, RacProtoBuffer;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart' show SDKEvent;
 import 'package:runanywhere/generated/vlm_options.pb.dart'
     show VLMGenerationRequest, VLMResult, VLMStreamEvent;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 
 typedef _RacVlmGenerateProtoNative =
     ffi.Int32 Function(
@@ -93,12 +93,12 @@ class DartBridgeVLM {
         // rc sentinel — always the LAST message on this port (FIFO after every
         // event). Early-return rcs (parse / no-model errors) produce no
         // terminal event, so surface them.
-        if (message != RacResultCode.success &&
+        if (message != RacResultCodes.success &&
             !sawTerminalEvent &&
             !controller.isClosed) {
           controller.addError(
             StateError(
-              'rac_vlm_stream_proto failed: ${RacResultCode.getMessage(message)}',
+              'rac_vlm_stream_proto failed: ${RacResultCodes.message(message)}',
             ),
           );
         }
@@ -122,7 +122,7 @@ class DartBridgeVLM {
           unawaited(controller.close());
         }
         teardown();
-        return RacResultCode.success;
+        return RacResultCodes.success;
       }),
     );
 

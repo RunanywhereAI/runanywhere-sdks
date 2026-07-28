@@ -17,7 +17,6 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.ExecutionTarget
 import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.ThinkingTagPattern
 import com.runanywhere.sdk.public.types.RAExecutionTarget
 import com.runanywhere.sdk.public.types.RALLMGenerateRequest
@@ -26,19 +25,6 @@ import com.runanywhere.sdk.public.types.RALLMGenerationResult
 import com.runanywhere.sdk.public.types.RAThinkingTagPattern
 
 // MARK: - RALLMGenerationOptions: C-bridge + convenience
-
-/**
- * Default LLM generation options matching Swift `RALLMGenerationOptions.defaults()`:
- * maxTokens=100, temperature=0.8, topP=1.0, topK=0, repetitionPenalty=1.0.
- */
-fun LLMGenerationOptions.Companion.defaults(): RALLMGenerationOptions =
-    RALLMGenerationOptions(
-        max_tokens = 100,
-        temperature = 0.8f,
-        top_p = 1.0f,
-        top_k = 0,
-        repetition_penalty = 1.0f,
-    )
 
 /**
  * Build a `RALLMGenerateRequest` from these options + a prompt.

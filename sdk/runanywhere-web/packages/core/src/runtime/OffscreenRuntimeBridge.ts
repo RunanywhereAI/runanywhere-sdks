@@ -66,6 +66,7 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from './StreamWorker.js';
+import { workerDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('OffscreenRuntimeBridge');
 
@@ -477,7 +478,7 @@ let _warnedNoInit = false;
  * so the timer only fires on genuine breakage (404 worker bundle,
  * malformed wasm, throw-before-onmessage). See pass2-syn-092.
  */
-const HANDSHAKE_TIMEOUT_MS = 10_000;
+const HANDSHAKE_TIMEOUT_MS = workerDefaults.handshakeTimeoutMs;
 
 function toRequestKind(req: BridgeStreamRequest): StreamRequestKind {
   return req.kind;

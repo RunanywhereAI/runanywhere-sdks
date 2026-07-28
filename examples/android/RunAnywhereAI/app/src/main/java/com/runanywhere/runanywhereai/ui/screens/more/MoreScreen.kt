@@ -27,6 +27,7 @@ import com.runanywhere.runanywhereai.ui.navigation.CloudProviders
 import com.runanywhere.runanywhereai.ui.navigation.Diarization
 import com.runanywhere.runanywhereai.ui.navigation.Diffusion
 import com.runanywhere.runanywhereai.ui.navigation.Documents
+import com.runanywhere.runanywhereai.ui.navigation.Ocr
 import com.runanywhere.runanywhereai.ui.navigation.Segmentation
 import com.runanywhere.runanywhereai.ui.navigation.Settings
 import com.runanywhere.runanywhereai.ui.navigation.Solutions
@@ -59,6 +60,7 @@ fun MoreScreen(onNavigate: (Any) -> Unit) {
         AdvancedEntry("Settings", "Personalization, privacy, and account controls", RACIcons.Outline.Settings, AdvancedGroup.ASSISTANT, Settings),
         AdvancedEntry("Document workbench", "Inspect document Q&A setup and sources", RACIcons.Outline.FileText, AdvancedGroup.ASSISTANT, Documents),
         AdvancedEntry("Vision workbench", "Photo prompts, camera mode, and VLM metrics", RACIcons.Outline.Eye, AdvancedGroup.ASSISTANT, Vision()),
+        AdvancedEntry("Document OCR", "Extract text from invoices and scans (Nemotron OCR)", RACIcons.Outline.FileText, AdvancedGroup.ASSISTANT, Ocr),
         AdvancedEntry("Segmentation", "Semantic image segmentation (SegFormer)", RACIcons.Outline.Stack, AdvancedGroup.ASSISTANT, Segmentation),
         AdvancedEntry("Diarization", "Who spoke when (NVIDIA Sortformer)", RACIcons.Outline.Microphone, AdvancedGroup.SPEECH, Diarization),
         AdvancedEntry("Image generation", "Text-to-image on the NPU (Cosmos3-Edge diffusion)", RACIcons.Outline.Eye, AdvancedGroup.ASSISTANT, Diffusion),

@@ -329,21 +329,21 @@ object PlatformAdapter {
 The SDK uses a modular architecture where AI backends are optional:
 
 ### Core SDK (Required)
-- `com.runanywhere.sdk:runanywhere-kotlin`
+- `io.github.sanchitmonga22:runanywhere-sdk`
 - Contains: Public API, JNI bridge, model management
 - Native: `librac_commons.so`, `librunanywhere_jni.so`
 
 ### LlamaCPP Module (Optional)
-- `com.runanywhere.sdk:runanywhere-core-llamacpp`
+- `io.github.sanchitmonga22:runanywhere-llamacpp`
 - Provides: LLM text generation
 - Native: `librunanywhere_llamacpp.so` (~34MB)
-- Framework: `InferenceFramework.LLAMA_CPP`
+- Framework: `InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP`
 
 ### ONNX Module (Optional)
-- `com.runanywhere.sdk:runanywhere-core-onnx`
+- `io.github.sanchitmonga22:runanywhere-onnx`
 - Provides: STT, TTS, VAD
 - Native: `libonnxruntime.so`, `libsherpa-onnx-*.so` (~25MB)
-- Framework: `InferenceFramework.ONNX`
+- Framework: `InferenceFramework.INFERENCE_FRAMEWORK_ONNX`
 
 ### Module Detection
 
@@ -667,6 +667,6 @@ fun testRealInference() = runTest {
 
 ## References
 
-- [RunAnywhere Swift SDK](../runanywhere-swift/) - iOS implementation
-- [runanywhere-commons](../runanywhere-commons/) - C++ core library
-- [Sample App](../../examples/android/RunAnywhereAI/) - Reference implementation
+- [RunAnywhere Swift SDK](../../runanywhere-swift/) - iOS implementation
+- [runanywhere-commons](../../runanywhere-commons/) - C++ core library
+- [Sample App](../../../examples/android/RunAnywhereAI/) - Reference implementation

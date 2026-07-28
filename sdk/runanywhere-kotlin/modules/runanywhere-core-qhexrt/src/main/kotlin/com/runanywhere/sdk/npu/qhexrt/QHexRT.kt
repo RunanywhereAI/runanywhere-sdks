@@ -16,12 +16,12 @@ private val RAC_ERROR_BACKEND_UNAVAILABLE = -ErrorCode.ERROR_CODE_BACKEND_UNAVAI
 private val RAC_ERROR_CAPABILITY_UNSUPPORTED = -ErrorCode.ERROR_CODE_CAPABILITY_UNSUPPORTED.value
 
 /**
- * QHexRT module — RunAnywhere's private Qualcomm Hexagon NPU backend.
+ * QHexRT module — RunAnywhere's Qualcomm Hexagon NPU backend.
  *
  * Runs prebuilt QNN context binaries on Snapdragon V75/V79/V81 NPUs, serving
- * LLM, VLM, STT and TTS through the standard SDK APIs once registered. A thin
- * wrapper over C++ backend registration; all inference lives in the C++
- * commons layer.
+ * LLM, VLM, STT, TTS, embeddings, and diffusion through the standard SDK APIs
+ * once registered. A thin wrapper over C++ backend registration; all inference
+ * lives in the C++ commons layer.
  *
  * ## Pre-flight
  * ```kotlin
@@ -156,7 +156,7 @@ object QHexRT {
             RunAnywhereBridge.RAC_ERROR_MODULE_ALREADY_REGISTERED,
             -> {
                 isRegistered = true
-                logger.info("QHexRT backend registered successfully (LLM/VLM/STT/TTS)")
+                logger.info("QHexRT backend registered successfully (LLM/VLM/STT/TTS/embed/diffusion)")
             }
             RAC_ERROR_BACKEND_UNAVAILABLE,
             RAC_ERROR_CAPABILITY_UNSUPPORTED,

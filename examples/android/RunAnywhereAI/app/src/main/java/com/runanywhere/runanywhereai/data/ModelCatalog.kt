@@ -80,9 +80,12 @@ internal object ModelCatalog {
         // separate generation repo.
         // supportsThinking=false: the text manifest bakes a closed empty-think block for concise,
         // self-terminating replies, so the app shows the answer rather than an always-empty reasoning section.
-        SingleFileModel("cosmos3_edge_text", "Cosmos3-Edge Text (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_HNPU/v81/cosmos3-edge-text.manifest.json", QHEXRT, LANGUAGE, 2513105364L, contextLength = 2_048, supportsThinking = false),
-        SingleFileModel("cosmos3_edge_vlm", "Cosmos3-Edge Vision (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_HNPU/v81/cosmos3-edge-vlm.json", QHEXRT, MULTIMODAL, 3505000000L, contextLength = 2_048),
-        SingleFileModel("cosmos3_edge_diffusion", "Cosmos3-Edge Image (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_image_HNPU/v81/cosmos3-edge-diffusion.json", QHEXRT, IMAGE_GENERATION, 4_450_000_000L),
+        // The arch segment is intentionally OMITTED: native commons resolves the device's own
+        // child dir (v79/ or v81/) from the manifest leaf, so one row serves both chips. Both
+        // repos now ship v79/ alongside v81/ (v79 device-validated on SM8750).
+        SingleFileModel("cosmos3_edge_text", "Cosmos3-Edge Text (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_HNPU/cosmos3-edge-text.manifest.json", QHEXRT, LANGUAGE, 2513105364L, contextLength = 2_048, supportsThinking = false),
+        SingleFileModel("cosmos3_edge_vlm", "Cosmos3-Edge Vision (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_HNPU/cosmos3-edge-vlm.json", QHEXRT, MULTIMODAL, 3505000000L, contextLength = 2_048),
+        SingleFileModel("cosmos3_edge_diffusion", "Cosmos3-Edge Image (HNPU)", "https://huggingface.co/runanywhere/cosmos3_edge_image_HNPU/cosmos3-edge-diffusion.json", QHEXRT, IMAGE_GENERATION, 4_450_000_000L),
         SingleFileModel("nemoguard_content_8b", "NemoGuard 8B Content Safety (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_content_safety_HNPU/nemoguard-content-8b.json", QHEXRT, LANGUAGE, 8_610_354_023L),
         SingleFileModel("nemoguard_topic_8b", "NemoGuard 8B Topic Control (HNPU)", "https://huggingface.co/runanywhere/nemoguard_8b_topic_control_HNPU/nemoguard-topic-8b.json", QHEXRT, LANGUAGE, 8_609_694_527L),
         SingleFileModel("qwen3_vl_2b_text", "Qwen3-VL 2B Text (HNPU)", "https://huggingface.co/runanywhere/qwen3_vl_HNPU/qwen3vl-2b-text-512.json", QHEXRT, LANGUAGE, 2_364_667_194L, contextLength = 512),
@@ -121,6 +124,9 @@ internal object ModelCatalog {
         SingleFileModel("kitten_nano_0_8", "Kitten-nano-0.8-fp32 (HNPU)", "https://huggingface.co/runanywhere/kitten_nano_0_8_HNPU/kitten_nano08_v81.json", QHEXRT, TTS, 44_135_896L),
         SingleFileModel("kitten_mini_0_8", "Kitten-mini-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_mini_0_8_HNPU/kitten_mini08_v81.json", QHEXRT, TTS, 184_334_815L),
         SingleFileModel("kitten_micro_0_8", "Kitten-micro-0.8 (HNPU)", "https://huggingface.co/runanywhere/kitten_micro_0_8_HNPU/kitten_micro08_v81.json", QHEXRT, TTS, 103_930_338L),
+        // Repo-root URL: C++ pin_hf_ref_to_arch inserts v75/v81. Do not hardcode
+        // magpie-357m-v81.json — that filename is missing under the v75/ tree.
+        SingleFileModel("magpie_tts_357m", "Magpie-TTS Multilingual 357M (HNPU)", "https://huggingface.co/runanywhere/magpie_tts_357m_HNPU", QHEXRT, TTS, 749_093_186L),
     )
 
     // The Play build intentionally ships no refusal-removal or safety-bypass adapters.
@@ -655,6 +661,37 @@ internal object ModelCatalog {
             // doubles as download_size_bytes, which feeds the post-download size guard —
             // an over-stated 5 MB tripped the guard on a valid ~2.3 MB download.
             2_327_524
+        ),
+        // Semantic segmentation (SegFormer B0 ADE20K) — mirrors iOS ModelCatalogBootstrap.
+        // Provider expects model.onnx + config.json + preprocessor_config.json at the
+        // model root (engines/onnx/onnx_segmentation_provider.cpp).
+        MultiFileModel(
+            "segformer-b0-ade20k",
+            "SegFormer B0 ADE20K (ONNX)",
+            ONNX,
+            ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
+            memoryBytes = 15_342_776,
+            downloadBytes = 15_342_776,
+            files = listOf(
+                ModelFile(
+                    "https://huggingface.co/Xenova/segformer-b0-finetuned-ade-512-512/resolve/" +
+                        "d3e5499fa8701ff0453ca940a8dfeae39b2f1504/onnx/model.onnx",
+                    "model.onnx",
+                    15_335_446,
+                ),
+                ModelFile(
+                    "https://huggingface.co/Xenova/segformer-b0-finetuned-ade-512-512/resolve/" +
+                        "d3e5499fa8701ff0453ca940a8dfeae39b2f1504/config.json",
+                    "config.json",
+                    6_957,
+                ),
+                ModelFile(
+                    "https://huggingface.co/Xenova/segformer-b0-finetuned-ade-512-512/resolve/" +
+                        "d3e5499fa8701ff0453ca940a8dfeae39b2f1504/preprocessor_config.json",
+                    "preprocessor_config.json",
+                    373,
+                ),
+            ),
         ),
         MultiFileModel(
             "all-minilm-l6-v2",

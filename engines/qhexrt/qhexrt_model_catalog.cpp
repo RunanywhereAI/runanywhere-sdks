@@ -65,8 +65,11 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"llama3_2_1b", kV79V81, false},
     {"ternary_bonsai_1_7b", kV75V81, false},
     {"bonsai_1_7b_1bit", kV81, false},
-    {"bonsai_4b_1bit", kV75V81, false},
-    {"bonsai_8b_1bit", kV75V81, false},
+    // HF currently ships only v81 context binaries for these 1-bit Bonsai
+    // bundles (no v75/). Keep policy aligned with the published tree so v75
+    // devices filter them before registration instead of failing with -423.
+    {"bonsai_4b_1bit", kV81, false},
+    {"bonsai_8b_1bit", kV81, false},
     {"bonsai_27b_1bit", kV81, false},
     {"phi_tiny_moe", kV79V81, false},
     {"embeddinggemma_300m", kAllSupportedArches, false},
@@ -86,9 +89,9 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"nemoguard_topic_8b", kV81, false},
     {"qwen3_vl_2b_text", kV81, false},
     {"qwen3_vl", kV75V79, false},
-    {"cosmos3_edge_text", kV81, false},   // Cosmos3-Edge reasoning/text AR path (sharded fp16 decode, split_generate); v81 device-validated greedy-exact
-    {"cosmos3_edge_vlm", kV81, false},    // Cosmos3-Edge image-understanding path (SigLIP vision + W8 decode via cosmos3vl_generate); v81 device-validated
-    {"cosmos3_edge_diffusion", kV81, false},  // Cosmos3-Edge text->image (4-shard W8 DiT + UniPC denoise + tiled VAE via cosmos3_diffusion_generate); v81
+    {"cosmos3_edge_text", kV79V81, false},   // Cosmos3-Edge reasoning/text AR path (split_generate); v81 greedy-exact, v79 W8-mono decode + fp16 lm-head
+    {"cosmos3_edge_vlm", kV79V81, false},    // Cosmos3-Edge image-understanding path (SigLIP vision + W8 decode via cosmos3vl_generate); v79 + v81
+    {"cosmos3_edge_diffusion", kV79V81, false},  // Cosmos3-Edge text->image (4-shard W8 DiT + UniPC denoise + tiled VAE via cosmos3_diffusion_generate); v79 + v81
     {"internvl3_5_1b", kAllSupportedArches, false},
     {"gemma4_e2b_vlm", kV79V81, false},
     {"gemma4_e4b_vlm", kV81, false},
@@ -116,6 +119,8 @@ constexpr ModelPolicy kModelPolicies[] = {
     {"kitten_nano_0_8", kV75V81, false},
     {"kitten_mini_0_8", kV81, false},
     {"kitten_micro_0_8", kV81, false},
+    // Magpie-TTS: published with v75/ + v81/ child dirs only (no v79 build).
+    {"magpie_tts_357m", kV75V81, false},
 };
 
 const ModelPolicy* find_model_policy(std::string_view model_id) {

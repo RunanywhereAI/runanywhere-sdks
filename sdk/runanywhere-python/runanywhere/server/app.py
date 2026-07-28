@@ -35,8 +35,9 @@ from ..structured import ToolCall, ToolSpec
 from .errors import http_status_for, install_error_handlers, openai_error_body
 from .manager import ModelManager
 from .schemas import ChatMessage, ChatRequest, CompletionRequest, EmbeddingsRequest, SpeechRequest
+from runanywhere._generated_defaults import AudioCaptureDefaults
 
-STT_SAMPLE_RATE = 16000
+STT_SAMPLE_RATE = AudioCaptureDefaults.MIC_SAMPLE_RATE_HZ
 _DONE = "data: [DONE]\n\n"
 MAX_IMAGE_BYTES = 20 * 1024 * 1024  # cap decoded/fetched image bytes (DoS guard)
 _MAX_DATA_URI_CHARS = (MAX_IMAGE_BYTES // 3 + 1) * 4 + 64  # base64 input cap (pre-decode)

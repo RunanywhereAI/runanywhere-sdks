@@ -103,6 +103,23 @@ private val textToImageModelIds = setOf("cosmos3_edge_diffusion")
 fun RAModelInfo.servesTextToImage(): Boolean =
     category == ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION && id in textToImageModelIds
 
+// Nemotron OCR / Parse are cataloged as MULTIMODAL (same VLM lifecycle as InternVL)
+// but they are detector+recognizer document pipelines, not caption VLMs. Keep them
+// out of the Vision picker and route them through the Document OCR surface.
+private val documentOcrModelIds = setOf(
+    "nemotron_ocr",
+    "nemotron_ocr_v1",
+    "nemotron_parse",
+)
+
+fun RAModelInfo.isDocumentOcrModel(): Boolean =
+    id in documentOcrModelIds ||
+        (category == ModelCategory.MODEL_CATEGORY_MULTIMODAL &&
+            (id.contains("_ocr", ignoreCase = true) ||
+                id.endsWith("_parse", ignoreCase = true) ||
+                (name.contains("OCR", ignoreCase = true) &&
+                    name.contains("Nemotron", ignoreCase = true))))
+
 fun RAModelInfo.requiresHfAuth(): Boolean {
     val tags = metadata?.tags.orEmpty().map { it.lowercase() }
     return (framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
@@ -188,7 +205,9 @@ private fun RAModelInfo.notableTag(): ConsumerTag? {
     val modality = when (category) {
         ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         ModelCategory.MODEL_CATEGORY_VISION,
-        -> "Vision"
+        -> if (isDocumentOcrModel()) "OCR" else "Vision"
+        ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION -> "Segmentation"
+        ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION -> "Image gen"
         ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         ModelCategory.MODEL_CATEGORY_AUDIO,

@@ -230,6 +230,9 @@ class ModelSelectionViewModel(
         }
         state = state.copy(busyModelId = model.id, progressPercent = 0, error = null)
         return try {
+            // Same as ModelDownloadService: free resident weights so the RAM
+            // preflight can pass when another STT/LLM is still loaded.
+            RuntimeModelSelection.unloadAllForDownload()
             RunAnywhere.downloadModelStream(model).collect { p ->
                 val pct = if (p.total_bytes > 0) {
                     (p.bytes_downloaded * 100 / p.total_bytes).toInt()
@@ -238,7 +241,7 @@ class ModelSelectionViewModel(
                 }
                 state = state.copy(progressPercent = pct)
             }
-            state = state.copy(busyModelId = null, progressPercent = null)
+            state = state.copy(busyModelId = null, progressPercent = null, currentModelId = null)
             reload()
             true
         } catch (e: CancellationException) {
@@ -257,6 +260,11 @@ class ModelSelectionViewModel(
         val onDisk = state.models.firstOrNull { it.id == model.id } ?: model
         return select(onDisk)
     }
+
+    // Download-only staging step. Multi-component flows (Voice AI) fetch every
+    // missing model first because each download unloads resident models for RAM
+    // headroom — loading between downloads would be undone by the next one.
+    suspend fun ensureDownloaded(model: RAModelInfo): Boolean = awaitDownload(model)
 
     // Downloads via the foreground service (survives screen-off / Doze) and suspends
     // until this model reaches a terminal state, falling back to the in-VM stream when

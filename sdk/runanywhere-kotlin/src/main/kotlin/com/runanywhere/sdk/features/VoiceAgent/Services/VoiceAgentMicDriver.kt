@@ -21,6 +21,7 @@ import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.features.STT.Services.AudioCaptureManager
 import com.runanywhere.sdk.features.TTS.Services.AudioPlaybackManager
+import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.coroutines.channels.BufferOverflow
@@ -124,7 +125,7 @@ internal class VoiceAgentMicDriver(
     }
 
     private companion object {
-        const val SAMPLE_RATE_HZ = 16_000
+        const val SAMPLE_RATE_HZ = RADefaults.AudioCapture.MIC_SAMPLE_RATE_HZ
 
         /**
          * Bounded mic ingress buffer. The capture callback trySends while the
@@ -132,6 +133,6 @@ internal class VoiceAgentMicDriver(
          * could grow without limit on long turns. DROP_OLDEST bounds memory;
          * frames captured mid-turn are discarded anyway (no barge-in).
          */
-        const val MIC_CHANNEL_CAPACITY = 128
+        const val MIC_CHANNEL_CAPACITY = RADefaults.AudioCapture.MIC_CHANNEL_CAPACITY
     }
 }

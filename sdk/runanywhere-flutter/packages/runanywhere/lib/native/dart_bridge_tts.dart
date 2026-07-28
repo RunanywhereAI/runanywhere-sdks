@@ -12,6 +12,7 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/tts_options.pb.dart'
     show
         TTSOptions,
@@ -97,7 +98,7 @@ class DartBridgeTTS {
 
         if (result != RAC_SUCCESS) {
           throw StateError(
-            'Failed to create TTS component: ${RacResultCode.getMessage(result)}',
+            'Failed to create TTS component: ${RacResultCodes.message(result)}',
           );
         }
 
@@ -280,7 +281,7 @@ class DartBridgeTTS {
           controller.addError(
             StateError(
               'rac_tts_synthesize_stream_lifecycle_proto failed: '
-              '${RacResultCode.getMessage(message)}',
+              '${RacResultCodes.message(message)}',
             ),
           );
         }
@@ -359,7 +360,7 @@ class DartBridgeTTS {
           controller.addError(
             StateError(
               'rac_tts_synthesize_stream_lifecycle_proto (test fake) failed: '
-              '${RacResultCode.getMessage(rc)}',
+              '${RacResultCodes.message(rc)}',
             ),
           );
         }
@@ -438,7 +439,7 @@ class DartBridgeTTS {
       if (rc != RAC_SUCCESS) {
         throw StateError(
           'rac_tts_component_list_voices_proto failed: '
-          '${RacResultCode.getMessage(rc)}',
+          '${RacResultCodes.message(rc)}',
         );
       }
       return voices;
@@ -549,7 +550,7 @@ class DartBridgeTTS {
           controller.addError(
             StateError(
               'rac_tts_component_synthesize_stream_proto failed: '
-              '${RacResultCode.getMessage(rc)}',
+              '${RacResultCodes.message(rc)}',
             ),
           );
         }

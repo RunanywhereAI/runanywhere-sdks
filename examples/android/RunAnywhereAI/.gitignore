@@ -19,3 +19,6 @@ local.properties
 reports/
 # synced from QHexRT2 device_suites/ by the android_npu_e2e flow; never committed here (sdks commits stay code-only)
 app/src/androidTest/assets/npu_suites/
+
+# Native libs come from staged SDK AARs (QHexRT/LlamaCPP/ONNX). Do not vendor QAIRT here.
+app/src/main/jniLibs/

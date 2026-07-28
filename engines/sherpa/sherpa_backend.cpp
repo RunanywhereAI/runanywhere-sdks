@@ -839,7 +839,12 @@ STTResult SherpaSTT::transcribe(const STTRequest& request, SherpaSttStatus* out_
         if (stream_language.empty()) {
             stream_language = "auto";
         }
+#if defined(SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION) && \
+    SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION
         SherpaOnnxOnlineStreamSetOption(stream, "language", stream_language.c_str());
+#else
+        (void)stream_language;  // recognizer already pinned language_ at load time
+#endif
         if (uses_language_prompt_) {
             accept_online_silence(stream, request.sample_rate,
                                   kPromptedOnlineLeftPaddingSeconds);
@@ -1141,7 +1146,10 @@ std::string SherpaSTT::create_stream(const nlohmann::json& config) {
             RAC_LOG_ERROR("Sherpa.STT", "Failed to create online stream");
             return "";
         }
+#if defined(SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION) && \
+    SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION
         SherpaOnnxOnlineStreamSetOption(state.online, "language", state.language.c_str());
+#endif
         if (uses_language_prompt_) {
             accept_online_silence(state.online, state.sample_rate,
                                   kPromptedOnlineLeftPaddingSeconds);
@@ -1249,7 +1257,10 @@ bool SherpaSTT::feed_audio_and_decode(const std::string& stream_id,
             updates->push_back({.text = text, .is_final = true});
         }
         SherpaOnnxOnlineStreamReset(sherpa_online_recognizer_, it->second.online);
+#if defined(SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION) && \
+    SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION
         SherpaOnnxOnlineStreamSetOption(it->second.online, "language", it->second.language.c_str());
+#endif
         if (uses_language_prompt_) {
             accept_online_silence(it->second.online, it->second.sample_rate,
                                   kPromptedOnlineLeftPaddingSeconds);
@@ -1377,7 +1388,10 @@ void SherpaSTT::reset_stream(const std::string& stream_id) {
     }
     if (it->second.online && sherpa_online_recognizer_) {
         SherpaOnnxOnlineStreamReset(sherpa_online_recognizer_, it->second.online);
+#if defined(SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION) && \
+    SHERPA_HEADER_HAS_ONLINE_STREAM_SET_OPTION
         SherpaOnnxOnlineStreamSetOption(it->second.online, "language", it->second.language.c_str());
+#endif
         if (uses_language_prompt_) {
             accept_online_silence(it->second.online, it->second.sample_rate,
                                   kPromptedOnlineLeftPaddingSeconds);
@@ -2153,23 +2167,23 @@ TTSResult SherpaTTS::synthesize(const TTSRequest& request) {
 
     const SherpaOnnxGeneratedAudio* audio = nullptr;
     try {
-        // iOS ships sherpa-onnx 1.13.2 XCFramework headers without
-        // SherpaOnnxGenerationConfig / GenerateWithConfig. Android/macOS
-        // third_party headers expose the newer API — prefer it when present.
-#if defined(__APPLE__) && (TARGET_OS_IPHONE || TARGET_OS_SIMULATOR)
-        audio = SherpaOnnxOfflineTtsGenerateWithProgressCallbackWithArg(
-            tts_ptr, request.text.c_str(), speaker_id, speed,
+        // Prefer GenerationConfig when the vendor header exposes it (newer
+        // macOS/WASM trees). Pinned Android/iOS 1.13.2 headers fall back to
+        // OfflineTtsGenerateWithProgressCallbackWithArg.
+#if defined(SHERPA_HEADER_HAS_GENERATION_CONFIG) && SHERPA_HEADER_HAS_GENERATION_CONFIG
+        SherpaOnnxGenerationConfig generation_config{};
+        generation_config.sid = speaker_id;
+        generation_config.speed = speed;
+        audio = SherpaOnnxOfflineTtsGenerateWithConfig(
+            tts_ptr, request.text.c_str(), &generation_config,
             [](const float*, int32_t, float, void* user_data) -> int32_t {
                 const auto* cancelled = static_cast<const std::atomic<bool>*>(user_data);
                 return cancelled->load(std::memory_order_acquire) ? 0 : 1;
             },
             &cancel_requested_);
 #else
-        SherpaOnnxGenerationConfig generation_config{};
-        generation_config.sid = speaker_id;
-        generation_config.speed = speed;
-        audio = SherpaOnnxOfflineTtsGenerateWithConfig(
-            tts_ptr, request.text.c_str(), &generation_config,
+        audio = SherpaOnnxOfflineTtsGenerateWithProgressCallbackWithArg(
+            tts_ptr, request.text.c_str(), speaker_id, speed,
             [](const float*, int32_t, float, void* user_data) -> int32_t {
                 const auto* cancelled = static_cast<const std::atomic<bool>*>(user_data);
                 return cancelled->load(std::memory_order_acquire) ? 0 : 1;

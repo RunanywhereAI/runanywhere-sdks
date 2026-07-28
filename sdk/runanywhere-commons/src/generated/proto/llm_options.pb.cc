@@ -1479,23 +1479,23 @@ constexpr LLMGenerationOptions::ParseTableT_ LLMGenerationOptions::InternalGener
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // int32 max_tokens = 1;
+      // int32 max_tokens = 1 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 0];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMGenerationOptions, _impl_.max_tokens_), 8>(),
        {8, 8, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.max_tokens_)}},
-      // float temperature = 2;
+      // float temperature = 2 [(.runanywhere.v1.rac_default) = "0.8", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
       {::_pbi::TcParser::FastF32S1,
        {21, 9, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.temperature_)}},
-      // float top_p = 3;
+      // float top_p = 3 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
        {29, 10, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.top_p_)}},
-      // int32 top_k = 4;
+      // int32 top_k = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMGenerationOptions, _impl_.top_k_), 11>(),
        {32, 11, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.top_k_)}},
-      // float repetition_penalty = 5;
+      // float repetition_penalty = 5 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0];
       {::_pbi::TcParser::FastF32S1,
        {45, 12, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.repetition_penalty_)}},
@@ -1588,15 +1588,15 @@ constexpr LLMGenerationOptions::ParseTableT_ LLMGenerationOptions::InternalGener
     }}, {{
       65535, 65535
     }}, {{
-      // int32 max_tokens = 1;
+      // int32 max_tokens = 1 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 0];
       {PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.max_tokens_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // float temperature = 2;
+      // float temperature = 2 [(.runanywhere.v1.rac_default) = "0.8", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
       {PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.temperature_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // float top_p = 3;
+      // float top_p = 3 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.top_p_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int32 top_k = 4;
+      // int32 top_k = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
       {PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.top_k_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // float repetition_penalty = 5;
+      // float repetition_penalty = 5 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0];
       {PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.repetition_penalty_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // repeated string stop_sequences = 6;
       {PROTOBUF_FIELD_OFFSET(LLMGenerationOptions, _impl_.stop_sequences_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
@@ -2251,106 +2251,111 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_llm_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\021llm_options.proto\022\016runanywhere.v1\032\021mod"
-    "el_types.proto\032\027structured_output.proto\032"
-    "\032thinking_tag_pattern.proto\032\022tool_callin"
-    "g.proto\"\303\007\n\024LLMGenerationOptions\022\022\n\nmax_"
-    "tokens\030\001 \001(\005\022\023\n\013temperature\030\002 \001(\002\022\r\n\005top"
-    "_p\030\003 \001(\002\022\r\n\005top_k\030\004 \001(\005\022\032\n\022repetition_pe"
-    "nalty\030\005 \001(\002\022\026\n\016stop_sequences\030\006 \003(\t\022\031\n\021s"
-    "treaming_enabled\030\007 \001(\010\022\?\n\023preferred_fram"
-    "ework\030\010 \001(\0162\".runanywhere.v1.InferenceFr"
-    "amework\022\032\n\rsystem_prompt\030\t \001(\tH\000\210\001\001\022\030\n\013j"
-    "son_schema\030\n \001(\tH\001\210\001\001\022A\n\020thinking_patter"
-    "n\030\013 \001(\0132\".runanywhere.v1.ThinkingTagPatt"
-    "ernH\002\210\001\001\022>\n\020execution_target\030\014 \001(\0162\037.run"
-    "anywhere.v1.ExecutionTargetH\003\210\001\001\022G\n\021stru"
-    "ctured_output\030\r \001(\0132\'.runanywhere.v1.Str"
-    "ucturedOutputOptionsH\004\210\001\001\022!\n\031enable_real"
-    "_time_tracking\030\016 \001(\010\022\014\n\004seed\030\017 \001(\003\022\031\n\021fr"
-    "equency_penalty\030\020 \001(\002\022\030\n\020presence_penalt"
-    "y\030\021 \001(\002\022\025\n\rrepeat_last_n\030\022 \001(\005\022\r\n\005min_p\030"
-    "\023 \001(\002\022\024\n\007grammar\030\024 \001(\tH\005\210\001\001\022\034\n\017response_"
-    "format\030\025 \001(\tH\006\210\001\001\022\023\n\013echo_prompt\030\026 \001(\010\022\021"
-    "\n\tn_threads\030\027 \001(\005\022=\n\014tool_calling\030\030 \001(\0132"
-    "\".runanywhere.v1.ToolCallingOptionsH\007\210\001\001"
-    "\022\030\n\020disable_thinking\030\031 \001(\010B\020\n\016_system_pr"
-    "omptB\016\n\014_json_schemaB\023\n\021_thinking_patter"
-    "nB\023\n\021_execution_targetB\024\n\022_structured_ou"
-    "tputB\n\n\010_grammarB\022\n\020_response_formatB\017\n\r"
-    "_tool_calling\"\251\007\n\023LLMGenerationResult\022\014\n"
-    "\004text\030\001 \001(\t\022\035\n\020thinking_content\030\002 \001(\tH\000\210"
-    "\001\001\022\024\n\014input_tokens\030\003 \001(\005\022\030\n\020tokens_gener"
-    "ated\030\004 \001(\005\022\022\n\nmodel_used\030\005 \001(\t\022\032\n\022genera"
-    "tion_time_ms\030\006 \001(\001\022\024\n\007ttft_ms\030\007 \001(\001H\001\210\001\001"
-    "\022\031\n\021tokens_per_second\030\010 \001(\001\022\026\n\tframework"
-    "\030\t \001(\tH\002\210\001\001\022\025\n\rfinish_reason\030\n \001(\t\022\027\n\017th"
-    "inking_tokens\030\013 \001(\005\022\027\n\017response_tokens\030\014"
-    " \001(\005\022\030\n\013json_output\030\r \001(\tH\003\210\001\001\022<\n\013perfor"
-    "mance\030\016 \001(\0132\".runanywhere.v1.Performance"
-    "MetricsH\004\210\001\001\0229\n\013executed_on\030\017 \001(\0162\037.runa"
-    "nywhere.v1.ExecutionTargetH\005\210\001\001\022U\n\034struc"
-    "tured_output_validation\030\020 \001(\0132*.runanywh"
-    "ere.v1.StructuredOutputValidationH\006\210\001\001\022\024"
-    "\n\014total_tokens\030\021 \001(\005\022\032\n\rerror_message\030\022 "
-    "\001(\tH\007\210\001\001\022\022\n\nerror_code\030\023 \001(\005\022\034\n\024cached_p"
-    "rompt_tokens\030\024 \001(\005\022\033\n\023prompt_eval_time_m"
-    "s\030\025 \001(\003\022\026\n\016decode_time_ms\030\026 \001(\003\022,\n\ntool_"
-    "calls\030\027 \003(\0132\030.runanywhere.v1.ToolCall\0220\n"
-    "\014tool_results\030\030 \003(\0132\032.runanywhere.v1.Too"
-    "lResultB\023\n\021_thinking_contentB\n\n\010_ttft_ms"
-    "B\014\n\n_frameworkB\016\n\014_json_outputB\016\n\014_perfo"
-    "rmanceB\016\n\014_executed_onB\037\n\035_structured_ou"
-    "tput_validationB\020\n\016_error_message\"\325\002\n\024LL"
-    "MGenerationRequest\022\022\n\nrequest_id\030\001 \001(\t\022\020"
-    "\n\010model_id\030\002 \001(\t\022\016\n\006prompt\030\003 \001(\t\022:\n\007opti"
-    "ons\030\004 \001(\0132$.runanywhere.v1.LLMGeneration"
-    "OptionsH\000\210\001\001\022\026\n\016context_chunks\030\005 \003(\t\022D\n\010"
-    "metadata\030\006 \003(\01322.runanywhere.v1.LLMGener"
-    "ationRequest.MetadataEntry\022\034\n\017conversati"
-    "on_id\030\007 \001(\tH\001\210\001\001\032/\n\rMetadataEntry\022\013\n\003key"
-    "\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\n\n\010_optionsB\022\n"
-    "\020_conversation_id\"\254\002\n\023LLMGenerationStatu"
-    "s\022\022\n\nrequest_id\030\001 \001(\t\0221\n\005state\030\002 \001(\0162\".r"
-    "unanywhere.v1.LLMGenerationState\022\037\n\027prom"
-    "pt_tokens_processed\030\003 \001(\005\022#\n\033completion_"
-    "tokens_generated\030\004 \001(\005\022\020\n\010progress\030\005 \001(\002"
-    "\022\022\n\nelapsed_ms\030\006 \001(\003\022\024\n\007message\030\007 \001(\tH\000\210"
-    "\001\001\022\032\n\rerror_message\030\010 \001(\tH\001\210\001\001\022\022\n\nerror_"
-    "code\030\t \001(\005B\n\n\010_messageB\020\n\016_error_message"
-    "\"\226\002\n\020LLMConfiguration\022\026\n\016context_length\030"
-    "\001 \001(\005\022\023\n\013temperature\030\002 \001(\002\022\022\n\nmax_tokens"
-    "\030\003 \001(\005\022\032\n\rsystem_prompt\030\004 \001(\tH\000\210\001\001\022\021\n\tst"
-    "reaming\030\005 \001(\010\022\025\n\010model_id\030\006 \001(\tH\001\210\001\001\022D\n\023"
-    "preferred_framework\030\007 \001(\0162\".runanywhere."
-    "v1.InferenceFrameworkH\002\210\001\001B\020\n\016_system_pr"
-    "omptB\013\n\t_model_idB\026\n\024_preferred_framewor"
-    "k\"d\n\017GenerationHints\022\023\n\013temperature\030\001 \001("
-    "\002\022\022\n\nmax_tokens\030\002 \001(\005\022\030\n\013system_role\030\003 \001"
-    "(\tH\000\210\001\001B\016\n\014_system_role\"@\n\013StreamToken\022\014"
-    "\n\004text\030\001 \001(\t\022\024\n\014timestamp_ms\030\002 \001(\003\022\r\n\005in"
-    "dex\030\003 \001(\005\"\223\001\n\022PerformanceMetrics\022\022\n\nlate"
-    "ncy_ms\030\001 \001(\003\022\024\n\014memory_bytes\030\002 \001(\003\022!\n\031th"
-    "roughput_tokens_per_sec\030\003 \001(\002\022\025\n\rprompt_"
-    "tokens\030\004 \001(\005\022\031\n\021completion_tokens\030\005 \001(\005*"
-    "\263\002\n\022LLMGenerationState\022$\n LLM_GENERATION"
-    "_STATE_UNSPECIFIED\020\000\022\037\n\033LLM_GENERATION_S"
-    "TATE_QUEUED\020\001\022#\n\037LLM_GENERATION_STATE_PR"
-    "EFILLING\020\002\022!\n\035LLM_GENERATION_STATE_DECOD"
-    "ING\020\003\022%\n!LLM_GENERATION_STATE_TOOL_CALLI"
-    "NG\020\004\022\"\n\036LLM_GENERATION_STATE_COMPLETED\020\005"
-    "\022\"\n\036LLM_GENERATION_STATE_CANCELLED\020\006\022\037\n\033"
-    "LLM_GENERATION_STATE_FAILED\020\007*\212\001\n\017Execut"
-    "ionTarget\022 \n\034EXECUTION_TARGET_UNSPECIFIE"
-    "D\020\000\022\036\n\032EXECUTION_TARGET_ON_DEVICE\020\001\022\032\n\026E"
-    "XECUTION_TARGET_CLOUD\020\002\022\031\n\025EXECUTION_TAR"
-    "GET_AUTO\020\003B\212\001\n\027ai.runanywhere.proto.v1B\017"
-    "LLMOptionsProtoP\001Z<github.com/runanywher"
-    "e/runanywhere-sdks/idl/v1;runanywherev1\370"
-    "\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "el_types.proto\032\021rac_options.proto\032\027struc"
+    "tured_output.proto\032\032thinking_tag_pattern"
+    ".proto\032\022tool_calling.proto\"\255\010\n\024LLMGenera"
+    "tionOptions\022\037\n\nmax_tokens\030\001 \001(\005B\013\212\265\030\003100"
+    "\240\265\030\000\0222\n\013temperature\030\002 \001(\002B\035\212\265\030\0030.8\261\265\030\000\000\000"
+    "\000\000\000\000\000\271\265\030\000\000\000\000\000\000\000@\022,\n\005top_p\030\003 \001(\002B\035\212\265\030\0031.0"
+    "\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\030\n\005top_k\030\004 \001(\005B\t\212"
+    "\265\030\0010\240\265\030\000\022.\n\022repetition_penalty\030\005 \001(\002B\022\212\265"
+    "\030\0031.0\261\265\030\000\000\000\000\000\000\000\000\022\026\n\016stop_sequences\030\006 \003(\t"
+    "\022\031\n\021streaming_enabled\030\007 \001(\010\022\?\n\023preferred"
+    "_framework\030\010 \001(\0162\".runanywhere.v1.Infere"
+    "nceFramework\022\032\n\rsystem_prompt\030\t \001(\tH\000\210\001\001"
+    "\022\030\n\013json_schema\030\n \001(\tH\001\210\001\001\022A\n\020thinking_p"
+    "attern\030\013 \001(\0132\".runanywhere.v1.ThinkingTa"
+    "gPatternH\002\210\001\001\022>\n\020execution_target\030\014 \001(\0162"
+    "\037.runanywhere.v1.ExecutionTargetH\003\210\001\001\022G\n"
+    "\021structured_output\030\r \001(\0132\'.runanywhere.v"
+    "1.StructuredOutputOptionsH\004\210\001\001\022!\n\031enable"
+    "_real_time_tracking\030\016 \001(\010\022\014\n\004seed\030\017 \001(\003\022"
+    "\031\n\021frequency_penalty\030\020 \001(\002\022\030\n\020presence_p"
+    "enalty\030\021 \001(\002\022\025\n\rrepeat_last_n\030\022 \001(\005\022\r\n\005m"
+    "in_p\030\023 \001(\002\022\024\n\007grammar\030\024 \001(\tH\005\210\001\001\022\034\n\017resp"
+    "onse_format\030\025 \001(\tH\006\210\001\001\022\023\n\013echo_prompt\030\026 "
+    "\001(\010\022\021\n\tn_threads\030\027 \001(\005\022=\n\014tool_calling\030\030"
+    " \001(\0132\".runanywhere.v1.ToolCallingOptions"
+    "H\007\210\001\001\022\030\n\020disable_thinking\030\031 \001(\010B\020\n\016_syst"
+    "em_promptB\016\n\014_json_schemaB\023\n\021_thinking_p"
+    "atternB\023\n\021_execution_targetB\024\n\022_structur"
+    "ed_outputB\n\n\010_grammarB\022\n\020_response_forma"
+    "tB\017\n\r_tool_calling\"\251\007\n\023LLMGenerationResu"
+    "lt\022\014\n\004text\030\001 \001(\t\022\035\n\020thinking_content\030\002 \001"
+    "(\tH\000\210\001\001\022\024\n\014input_tokens\030\003 \001(\005\022\030\n\020tokens_"
+    "generated\030\004 \001(\005\022\022\n\nmodel_used\030\005 \001(\t\022\032\n\022g"
+    "eneration_time_ms\030\006 \001(\001\022\024\n\007ttft_ms\030\007 \001(\001"
+    "H\001\210\001\001\022\031\n\021tokens_per_second\030\010 \001(\001\022\026\n\tfram"
+    "ework\030\t \001(\tH\002\210\001\001\022\025\n\rfinish_reason\030\n \001(\t\022"
+    "\027\n\017thinking_tokens\030\013 \001(\005\022\027\n\017response_tok"
+    "ens\030\014 \001(\005\022\030\n\013json_output\030\r \001(\tH\003\210\001\001\022<\n\013p"
+    "erformance\030\016 \001(\0132\".runanywhere.v1.Perfor"
+    "manceMetricsH\004\210\001\001\0229\n\013executed_on\030\017 \001(\0162\037"
+    ".runanywhere.v1.ExecutionTargetH\005\210\001\001\022U\n\034"
+    "structured_output_validation\030\020 \001(\0132*.run"
+    "anywhere.v1.StructuredOutputValidationH\006"
+    "\210\001\001\022\024\n\014total_tokens\030\021 \001(\005\022\032\n\rerror_messa"
+    "ge\030\022 \001(\tH\007\210\001\001\022\022\n\nerror_code\030\023 \001(\005\022\034\n\024cac"
+    "hed_prompt_tokens\030\024 \001(\005\022\033\n\023prompt_eval_t"
+    "ime_ms\030\025 \001(\003\022\026\n\016decode_time_ms\030\026 \001(\003\022,\n\n"
+    "tool_calls\030\027 \003(\0132\030.runanywhere.v1.ToolCa"
+    "ll\0220\n\014tool_results\030\030 \003(\0132\032.runanywhere.v"
+    "1.ToolResultB\023\n\021_thinking_contentB\n\n\010_tt"
+    "ft_msB\014\n\n_frameworkB\016\n\014_json_outputB\016\n\014_"
+    "performanceB\016\n\014_executed_onB\037\n\035_structur"
+    "ed_output_validationB\020\n\016_error_message\"\325"
+    "\002\n\024LLMGenerationRequest\022\022\n\nrequest_id\030\001 "
+    "\001(\t\022\020\n\010model_id\030\002 \001(\t\022\016\n\006prompt\030\003 \001(\t\022:\n"
+    "\007options\030\004 \001(\0132$.runanywhere.v1.LLMGener"
+    "ationOptionsH\000\210\001\001\022\026\n\016context_chunks\030\005 \003("
+    "\t\022D\n\010metadata\030\006 \003(\01322.runanywhere.v1.LLM"
+    "GenerationRequest.MetadataEntry\022\034\n\017conve"
+    "rsation_id\030\007 \001(\tH\001\210\001\001\032/\n\rMetadataEntry\022\013"
+    "\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\n\n\010_optio"
+    "nsB\022\n\020_conversation_id\"\254\002\n\023LLMGeneration"
+    "Status\022\022\n\nrequest_id\030\001 \001(\t\0221\n\005state\030\002 \001("
+    "\0162\".runanywhere.v1.LLMGenerationState\022\037\n"
+    "\027prompt_tokens_processed\030\003 \001(\005\022#\n\033comple"
+    "tion_tokens_generated\030\004 \001(\005\022\020\n\010progress\030"
+    "\005 \001(\002\022\022\n\nelapsed_ms\030\006 \001(\003\022\024\n\007message\030\007 \001"
+    "(\tH\000\210\001\001\022\032\n\rerror_message\030\010 \001(\tH\001\210\001\001\022\022\n\ne"
+    "rror_code\030\t \001(\005B\n\n\010_messageB\020\n\016_error_me"
+    "ssage\"\226\002\n\020LLMConfiguration\022\026\n\016context_le"
+    "ngth\030\001 \001(\005\022\023\n\013temperature\030\002 \001(\002\022\022\n\nmax_t"
+    "okens\030\003 \001(\005\022\032\n\rsystem_prompt\030\004 \001(\tH\000\210\001\001\022"
+    "\021\n\tstreaming\030\005 \001(\010\022\025\n\010model_id\030\006 \001(\tH\001\210\001"
+    "\001\022D\n\023preferred_framework\030\007 \001(\0162\".runanyw"
+    "here.v1.InferenceFrameworkH\002\210\001\001B\020\n\016_syst"
+    "em_promptB\013\n\t_model_idB\026\n\024_preferred_fra"
+    "mework\"d\n\017GenerationHints\022\023\n\013temperature"
+    "\030\001 \001(\002\022\022\n\nmax_tokens\030\002 \001(\005\022\030\n\013system_rol"
+    "e\030\003 \001(\tH\000\210\001\001B\016\n\014_system_role\"@\n\013StreamTo"
+    "ken\022\014\n\004text\030\001 \001(\t\022\024\n\014timestamp_ms\030\002 \001(\003\022"
+    "\r\n\005index\030\003 \001(\005\"\223\001\n\022PerformanceMetrics\022\022\n"
+    "\nlatency_ms\030\001 \001(\003\022\024\n\014memory_bytes\030\002 \001(\003\022"
+    "!\n\031throughput_tokens_per_sec\030\003 \001(\002\022\025\n\rpr"
+    "ompt_tokens\030\004 \001(\005\022\031\n\021completion_tokens\030\005"
+    " \001(\005*\263\002\n\022LLMGenerationState\022$\n LLM_GENER"
+    "ATION_STATE_UNSPECIFIED\020\000\022\037\n\033LLM_GENERAT"
+    "ION_STATE_QUEUED\020\001\022#\n\037LLM_GENERATION_STA"
+    "TE_PREFILLING\020\002\022!\n\035LLM_GENERATION_STATE_"
+    "DECODING\020\003\022%\n!LLM_GENERATION_STATE_TOOL_"
+    "CALLING\020\004\022\"\n\036LLM_GENERATION_STATE_COMPLE"
+    "TED\020\005\022\"\n\036LLM_GENERATION_STATE_CANCELLED\020"
+    "\006\022\037\n\033LLM_GENERATION_STATE_FAILED\020\007*\212\001\n\017E"
+    "xecutionTarget\022 \n\034EXECUTION_TARGET_UNSPE"
+    "CIFIED\020\000\022\036\n\032EXECUTION_TARGET_ON_DEVICE\020\001"
+    "\022\032\n\026EXECUTION_TARGET_CLOUD\020\002\022\031\n\025EXECUTIO"
+    "N_TARGET_AUTO\020\003B\212\001\n\027ai.runanywhere.proto"
+    ".v1B\017LLMOptionsProtoP\001Z<github.com/runan"
+    "ywhere/runanywhere-sdks/idl/v1;runanywhe"
+    "rev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pr"
+    "oto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_llm_5foptions_2eproto_deps[4] = {
+    descriptor_table_llm_5foptions_2eproto_deps[5] = {
         &::descriptor_table_model_5ftypes_2eproto,
+        &::descriptor_table_rac_5foptions_2eproto,
         &::descriptor_table_structured_5foutput_2eproto,
         &::descriptor_table_thinking_5ftag_5fpattern_2eproto,
         &::descriptor_table_tool_5fcalling_2eproto,
@@ -2359,12 +2364,12 @@ static ::absl::once_flag descriptor_table_llm_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_llm_5foptions_2eproto = {
     false,
     false,
-    3879,
+    4004,
     descriptor_table_protodef_llm_5foptions_2eproto,
     "llm_options.proto",
     &descriptor_table_llm_5foptions_2eproto_once,
     descriptor_table_llm_5foptions_2eproto_deps,
-    4,
+    5,
     9,
     schemas,
     file_message_globals,
@@ -2607,7 +2612,7 @@ PROTOBUF_NOINLINE void LLMGenerationOptions::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // int32 max_tokens = 1;
+  // int32 max_tokens = 1 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 0];
   if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (this_._internal_max_tokens() != 0) {
       target =
@@ -2616,7 +2621,7 @@ PROTOBUF_NOINLINE void LLMGenerationOptions::Clear() {
     }
   }
 
-  // float temperature = 2;
+  // float temperature = 2 [(.runanywhere.v1.rac_default) = "0.8", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
   if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
       target = stream->EnsureSpace(target);
@@ -2625,7 +2630,7 @@ PROTOBUF_NOINLINE void LLMGenerationOptions::Clear() {
     }
   }
 
-  // float top_p = 3;
+  // float top_p = 3 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   if (CheckHasBit(cached_has_bits, 0x00000400U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_top_p()) != 0) {
       target = stream->EnsureSpace(target);
@@ -2634,7 +2639,7 @@ PROTOBUF_NOINLINE void LLMGenerationOptions::Clear() {
     }
   }
 
-  // int32 top_k = 4;
+  // int32 top_k = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
   if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     if (this_._internal_top_k() != 0) {
       target =
@@ -2643,7 +2648,7 @@ PROTOBUF_NOINLINE void LLMGenerationOptions::Clear() {
     }
   }
 
-  // float repetition_penalty = 5;
+  // float repetition_penalty = 5 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0];
   if (CheckHasBit(cached_has_bits, 0x00001000U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_repetition_penalty()) != 0) {
       target = stream->EnsureSpace(target);
@@ -2893,33 +2898,33 @@ PROTOBUF_NOINLINE void LLMGenerationOptions::Clear() {
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    // int32 max_tokens = 1;
+    // int32 max_tokens = 1 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 0];
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_max_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_max_tokens());
       }
     }
-    // float temperature = 2;
+    // float temperature = 2 [(.runanywhere.v1.rac_default) = "0.8", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
     if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
         total_size += 5;
       }
     }
-    // float top_p = 3;
+    // float top_p = 3 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
     if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_top_p()) != 0) {
         total_size += 5;
       }
     }
-    // int32 top_k = 4;
+    // int32 top_k = 4 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
     if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (this_._internal_top_k() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_top_k());
       }
     }
-    // float repetition_penalty = 5;
+    // float repetition_penalty = 5 [(.runanywhere.v1.rac_default) = "1.0", (.runanywhere.v1.rac_min_float) = 0];
     if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_repetition_penalty()) != 0) {
         total_size += 5;

@@ -32,6 +32,7 @@ import {
   type ModalityProtoModule,
   type ProtoEventHandler,
 } from './ProtoAdapterTypes.js';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 function requireLiveOnnxWorkerOrMain(operation: string) {
   const host = getActiveBackendWorkerHost('onnx');
@@ -110,7 +111,7 @@ export class VADProtoAdapter {
   async processLifecycle(
     samples: Float32Array,
     options: ProtoVADOptions,
-    sampleRate = 16_000,
+    sampleRate = audioCaptureDefaults.micSampleRateHz,
   ): Promise<ProtoVADResult | null> {
     const request = VADProcessRequest.create({
       requestId: lifecycleRequestId(),

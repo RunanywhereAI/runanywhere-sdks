@@ -67,9 +67,9 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "whisper_small",        "moonshine_tiny",      "moonshine_base",  "parakeet_tdt_0_6b_v2",
         "parakeet_tdt_0_6b_v3", "parakeet_rnnt_1_1b",  "canary_1b_flash", "nemotron_asr_streaming",
         "melotts_en",           "kokoro_en",           "kitten_nano_0_8", "embeddinggemma_300m",
-        "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",    "bonsai_4b_1bit",
-        "bonsai_8b_1bit",       "nemotron_nano_8b",    "canary_180m_flash",
-        "parakeet_ctc_1_1b",    "nemotron_3_embed_1b",
+        "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",
+        "nemotron_nano_8b",     "canary_180m_flash",
+        "parakeet_ctc_1_1b",    "nemotron_3_embed_1b", "magpie_tts_357m",
     };
     const std::unordered_set<std::string> v79 = {
         "lfm2_5_230m",    "lfm2_5_350m",   "llama3_2_1b",
@@ -126,6 +126,7 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "kitten_nano_0_8",
         "kitten_mini_0_8",
         "kitten_micro_0_8",
+        "magpie_tts_357m",
         "embeddinggemma_300m",
         "nv_embedqa_1b",
         "nv_rerankqa_1b",

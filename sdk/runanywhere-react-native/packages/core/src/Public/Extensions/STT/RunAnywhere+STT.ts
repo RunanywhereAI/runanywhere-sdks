@@ -42,6 +42,7 @@ import {
 import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { currentModel } from '../Models/RunAnywhere+ModelLifecycle';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('RunAnywhere.STT');
 let requestCounter = 0;
@@ -62,7 +63,7 @@ function defaultSTTOptions(): STTOptions {
     beamSize: 0,
     detectLanguage: true,
     audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: 16000,
+    sampleRate: audioCaptureDefaults.micSampleRateHz,
     maxAlternatives: 0,
   });
 }

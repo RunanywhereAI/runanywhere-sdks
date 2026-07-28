@@ -25,8 +25,9 @@ import { requireNativeModule } from '../../native';
 import { arrayBufferToBytes } from '../../services/ProtoBytes';
 import { VoiceAgentResult as VoiceAgentResultMessage } from '@runanywhere/proto-ts/voice_agent_service';
 import { AudioEncoding } from '@runanywhere/proto-ts/voice_events';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
-const SAMPLE_RATE_HZ = 16_000;
+const SAMPLE_RATE_HZ = audioCaptureDefaults.micSampleRateHz;
 const CHANNELS = 1;
 /** Bounded backlog so a slow turn cannot grow the queue without limit. */
 const CHANNEL_CAPACITY = 128;

@@ -18,6 +18,7 @@ import android.graphics.Bitmap
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import okio.ByteString.Companion.toByteString
+import com.runanywhere.sdk.generated.convenience.defaults as generatedDefaults
 
 // MARK: - VLMConfiguration
 
@@ -38,16 +39,15 @@ fun VLMConfiguration.Companion.defaults(modelId: String = ""): VLMConfiguration 
 // MARK: - VLMGenerationOptions
 
 /**
- * Default VLM generation options mirroring Swift `RAVLMGenerationOptions.defaults`.
+ * [VLMGenerationOptions.defaults] with a prompt filled in.
+ *
+ * Sampling values come from generated/convenience/RAConvenience.kt, emitted from
+ * the rac_default annotations in idl/vlm_options.proto. The table this replaced
+ * capped max_tokens at 256 against the C layer's 2048 and set top_k=40 where the
+ * C layer disables it.
  */
 fun VLMGenerationOptions.Companion.defaults(prompt: String = ""): RAVLMGenerationOptions =
-    RAVLMGenerationOptions(
-        prompt = prompt,
-        max_tokens = 256,
-        temperature = 0.7f,
-        top_p = 0.9f,
-        top_k = 40,
-    )
+    generatedDefaults().copy(prompt = prompt)
 
 // MARK: - VLMImage factories (platform-agnostic)
 

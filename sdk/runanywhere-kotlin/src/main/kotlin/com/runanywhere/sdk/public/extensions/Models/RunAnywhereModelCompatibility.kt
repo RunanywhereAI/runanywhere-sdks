@@ -11,6 +11,7 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelCompatibilityRequest
 import ai.runanywhere.proto.v1.ModelCompatibilityResult
+import ai.runanywhere.proto.v1.ModelUnloadRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelCompatibility
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -19,6 +20,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAModelLoadResult
 import java.util.Locale
+import kotlin.coroutines.cancellation.CancellationException
 
 /** The resource dimensions required before an SDK operation may start. */
 internal enum class ModelCompatibilityOperation {
@@ -78,14 +80,25 @@ suspend fun RunAnywhere.checkModelCompatibility(
  * Run [action] only after commons approves the resources relevant to
  * [operation]. A load intentionally ignores `can_fit`: an already-downloaded
  * model should not become unloadable merely because disk space later fell.
+ *
+ * When available RAM is short, one unload-all reclaim is attempted before the
+ * hard failure: downloaded STT/LLM weights often remain resident and would
+ * otherwise block downloading the next model on mid-range phones.
  */
 internal suspend fun <T> withModelCompatibilityPreflight(
     operation: ModelCompatibilityOperation,
     resultProvider: suspend () -> ModelCompatibilityResult,
+    reclaimMemory: (suspend () -> Unit)? = { reclaimLoadedModelMemory() },
     action: suspend () -> T,
 ): T {
-    val result = resultProvider()
-    compatibilityFailure(operation, result)?.let { throw it }
+    var result = resultProvider()
+    var failure = compatibilityFailure(operation, result)
+    if (failure?.code == ErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY && reclaimMemory != null) {
+        reclaimMemory()
+        result = resultProvider()
+        failure = compatibilityFailure(operation, result)
+    }
+    failure?.let { throw it }
     return action()
 }
 
@@ -97,11 +110,21 @@ internal suspend fun <T> withModelCompatibilityPreflight(
 internal suspend fun withModelLoadCompatibilityPreflight(
     request: RAModelLoadRequest,
     resultProvider: suspend () -> ModelCompatibilityResult,
+    reclaimMemory: (suspend () -> Unit)? = { reclaimLoadedModelMemory() },
     action: suspend () -> RAModelLoadResult,
 ): RAModelLoadResult {
     val failure =
         try {
-            compatibilityFailure(ModelCompatibilityOperation.LOAD, resultProvider())
+            var result = resultProvider()
+            var compatFailure = compatibilityFailure(ModelCompatibilityOperation.LOAD, result)
+            if (compatFailure?.code == ErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY &&
+                reclaimMemory != null
+            ) {
+                reclaimMemory()
+                result = resultProvider()
+                compatFailure = compatibilityFailure(ModelCompatibilityOperation.LOAD, result)
+            }
+            compatFailure
         } catch (error: SDKException) {
             error
         }
@@ -119,6 +142,21 @@ internal suspend fun withModelLoadCompatibilityPreflight(
     return action()
 }
 
+/**
+ * Drop every lifecycle-resident model so download/load preflight can re-probe
+ * MemAvailable. Best-effort: unit tests and hosts without a live lifecycle
+ * simply no-op.
+ */
+internal suspend fun reclaimLoadedModelMemory() {
+    try {
+        RunAnywhere.unloadModel(ModelUnloadRequest(unload_all = true))
+    } catch (error: CancellationException) {
+        throw error
+    } catch (_: Throwable) {
+        // Best-effort reclaim: ordinary unload failures must not block the retry path.
+    }
+}
+
 private fun compatibilityFailure(
     operation: ModelCompatibilityOperation,
     result: ModelCompatibilityResult,
@@ -130,7 +168,7 @@ private fun compatibilityFailure(
                 "${displayModelId(result.model_id)} needs at least " +
                     "${formatGiB(result.required_memory_bytes)} of available memory; " +
                     "${formatGiB(result.available_memory_bytes)} is available. " +
-                    "Close other apps or use a device with more RAM.",
+                    "Unload the current model, close other apps, or use a device with more RAM.",
         )
     }
     if (operation == ModelCompatibilityOperation.DOWNLOAD && !result.can_fit) {

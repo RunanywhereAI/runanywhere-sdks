@@ -18,6 +18,7 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/voice_agent_service.pb.dart'
     as voice_agent_proto;
 import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
@@ -59,7 +60,7 @@ class RunAnywhereVoice {
   /// Default Silero VAD model id seeded by every example app's catalog.
   /// Exposed so callers do not hard-code the string when invoking
   /// [ensureDefaultVAD]. Mirrors Swift `RunAnywhere.defaultVADModelID`.
-  String get defaultVADModelID => 'silero-vad';
+  String get defaultVADModelID => RADefaultsVoiceAgent.defaultVadModelId;
 
   /// Ensure a VAD model is loaded in the canonical lifecycle before a voice
   /// agent session starts. When no VAD model is currently registered for

@@ -7,10 +7,10 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/dart_bridge_secure_storage.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 // =============================================================================
@@ -94,8 +94,8 @@ class DartBridgeAuth {
         'rac_auth_load_stored_tokens',
       );
       final loadResult = loadFn();
-      if (loadResult != RacResultCode.success &&
-          loadResult != RacResultCode.errorFileNotFound) {
+      if (loadResult != RacResultCodes.success &&
+          loadResult != RacResultCodes.errorFileNotFound) {
         SDKException.throwIfError(loadResult);
       }
 
@@ -322,13 +322,13 @@ int _secureStoreCallback(
   Pointer<Void> context,
 ) {
   if (key == nullptr || value == nullptr) {
-    return RacResultCode.errorInvalidArgument;
+    return RacResultCodes.errorInvalidArgument;
   }
 
   try {
     return DartBridgeSecureStorage.instance.storePointers(key, value);
   } catch (_) {
-    return RacResultCode.errorSecureStorageFailed;
+    return RacResultCodes.errorSecureStorageFailed;
   }
 }
 
@@ -340,7 +340,7 @@ int _secureRetrieveCallback(
   Pointer<Void> context,
 ) {
   if (key == nullptr || outValue == nullptr || bufferSize <= 0) {
-    return RacResultCode.errorInvalidArgument;
+    return RacResultCodes.errorInvalidArgument;
   }
 
   try {
@@ -350,18 +350,18 @@ int _secureRetrieveCallback(
       bufferSize,
     );
   } catch (_) {
-    return RacResultCode.errorSecureStorageFailed;
+    return RacResultCodes.errorSecureStorageFailed;
   }
 }
 
 /// Delete callback
 int _secureDeleteCallback(Pointer<Utf8> key, Pointer<Void> context) {
-  if (key == nullptr) return RacResultCode.errorInvalidArgument;
+  if (key == nullptr) return RacResultCodes.errorInvalidArgument;
 
   try {
     return DartBridgeSecureStorage.instance.deletePointer(key);
   } catch (_) {
-    return RacResultCode.errorSecureStorageFailed;
+    return RacResultCodes.errorSecureStorageFailed;
   }
 }
 

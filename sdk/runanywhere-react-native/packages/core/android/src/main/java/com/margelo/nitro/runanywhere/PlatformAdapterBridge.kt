@@ -21,6 +21,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import com.margelo.nitro.NitroModules
+import com.runanywhere.sdk.generated.RADefaults
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -170,8 +171,8 @@ object PlatformAdapterBridge {
             val connection = URL(task.url).openConnection() as HttpURLConnection
             task.connection = connection
             connection.instanceFollowRedirects = true
-            connection.connectTimeout = 30_000
-            connection.readTimeout = 60_000
+            connection.connectTimeout = RADefaults.Network.CONNECT_TIMEOUT_MS
+            connection.readTimeout = RADefaults.Network.REQUEST_TIMEOUT_MS
             connection.requestMethod = "GET"
             connection.connect()
 
