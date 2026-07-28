@@ -1127,7 +1127,12 @@ const IS_SELFTEST = new URLSearchParams(location.search).get('selftest') === '1'
   if (!IS_SELFTEST) {
     // Accept ANY persisted object — gating on systemPrompt discarded saved
     // settings whose prompt was cleared, and would drop the model choices too.
-    try { const s = await store.loadSettings(); if (s && typeof s === 'object') settings = { ...settings, ...s }; } catch { /* ignore */ }
+    try {
+      const s = await store.loadSettings();
+      // migrateSettings upgrades a persisted copy of a SUPERSEDED default while
+      // leaving anything the user actually customised alone.
+      if (s && typeof s === 'object') settings = store.migrateSettings(s, settings);
+    } catch { /* ignore */ }
     try { const c = await store.loadConversations(); if (c && Array.isArray(c.conversations)) { conversations = c.conversations; nextConvId = c.nextConvId || conversations.length + 1; activeId = conversations[0] ? conversations[0].id : null; } } catch { /* ignore */ }
     try { const cm = await store.loadCustomModels(); if (Array.isArray(cm)) customModels = cm; } catch { /* ignore */ }
   }

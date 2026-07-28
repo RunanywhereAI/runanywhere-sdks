@@ -85,3 +85,34 @@ test('capConversations leaves a short list untouched and tolerates junk', () => 
   assert.deepEqual(capConversations(null), []);
   assert.deepEqual(capConversations(undefined), []);
 });
+
+// --- settings migration ------------------------------------------------------
+
+const { migrateSettings } = require('../../store');
+const DEFAULTS = { systemPrompt: 'NEW PROMPT', temperature: 0.3, maxTokens: 512, reasoning: false };
+
+test('a superseded default prompt is upgraded, and its paired temperature with it', () => {
+  const out = migrateSettings({ systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7 }, DEFAULTS);
+  assert.equal(out.systemPrompt, 'NEW PROMPT');
+  assert.equal(out.temperature, 0.3);
+});
+
+test('a prompt the user actually customised is NEVER overwritten', () => {
+  const mine = 'Always answer in haiku.';
+  const out = migrateSettings({ systemPrompt: mine, temperature: 0.9 }, DEFAULTS);
+  assert.equal(out.systemPrompt, mine);
+  assert.equal(out.temperature, 0.9, 'their temperature is theirs too');
+});
+
+test('a custom temperature survives even when the prompt is upgraded', () => {
+  const out = migrateSettings({ systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.15 }, DEFAULTS);
+  assert.equal(out.systemPrompt, 'NEW PROMPT');
+  assert.equal(out.temperature, 0.15, 'only the paired 0.7 is migrated');
+});
+
+test('unknown keys are preserved and missing settings fall back to defaults', () => {
+  const out = migrateSettings({ models: { llm: 'x' } }, DEFAULTS);
+  assert.deepEqual(out.models, { llm: 'x' });
+  assert.equal(out.maxTokens, 512);
+  assert.deepEqual(migrateSettings(null, DEFAULTS), DEFAULTS);
+});

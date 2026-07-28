@@ -3,11 +3,15 @@
 // and custom models, persisted as JSON in userData by the main process.
 require('../../../sdk/runanywhere-electron/dist/process/preload');
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
+const { migrateSettings } = require('./store');
 
 contextBridge.exposeInMainWorld('appStore', {
   loadConversations: () => ipcRenderer.invoke('store:conversations:load'),
   saveConversations: (data) => ipcRenderer.invoke('store:conversations:save', data),
   loadSettings: () => ipcRenderer.invoke('store:settings:load'),
+  // Upgrade settings a previous build persisted (see store.js). Without this a
+  // saved copy of a superseded default silently overrides the current one.
+  migrateSettings: (saved, defaults) => migrateSettings(saved, defaults),
   saveSettings: (data) => ipcRenderer.invoke('store:settings:save', data),
   loadCustomModels: () => ipcRenderer.invoke('store:models:load'),
   saveCustomModels: (data) => ipcRenderer.invoke('store:models:save', data),

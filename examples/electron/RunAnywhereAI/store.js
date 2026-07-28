@@ -67,4 +67,27 @@ function capConversations(conversations, max = 200) {
   return conversations.length > max ? conversations.slice(0, max) : conversations;
 }
 
-module.exports = { createStore, capConversations };
+// System prompts shipped by earlier builds. A user who pressed "Save settings"
+// on one of those has it persisted, and persisted values override the defaults —
+// so they would keep the old behaviour (a model answering "my name is Qwen" when
+// asked "what is my name") forever, with no way to know why. Upgrade them.
+const SUPERSEDED_SYSTEM_PROMPTS = [
+  'You are a concise, helpful assistant.',
+];
+
+/**
+ * Migrate persisted settings to current defaults where the stored value is a
+ * known-superseded default the user never actually customised.
+ */
+function migrateSettings(saved, defaults) {
+  if (!saved || typeof saved !== 'object') return { ...defaults };
+  const out = { ...defaults, ...saved };
+  if (SUPERSEDED_SYSTEM_PROMPTS.includes((saved.systemPrompt || '').trim())) {
+    out.systemPrompt = defaults.systemPrompt;
+    // That prompt shipped alongside a temperature tuned for it.
+    if (saved.temperature === 0.7) out.temperature = defaults.temperature;
+  }
+  return out;
+}
+
+module.exports = { createStore, capConversations, migrateSettings, SUPERSEDED_SYSTEM_PROMPTS };
