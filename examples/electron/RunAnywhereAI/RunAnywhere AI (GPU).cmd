@@ -7,7 +7,7 @@ rem ELECTRON_RUN_AS_NODE makes electron.exe behave as plain Node (no window).
 set "ELECTRON_RUN_AS_NODE="
 
 set "APP=%~dp0"
-set "REPO=%~dp0..\.."
+set "REPO=%~dp0..\..\.."
 set "ELECTRON=%REPO%\sdk\runanywhere-electron\node_modules\electron\dist\electron.exe"
 
 if not exist "%ELECTRON%" (

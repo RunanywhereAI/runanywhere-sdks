@@ -7,7 +7,7 @@ rem clear it, or the app silently never opens.
 set "ELECTRON_RUN_AS_NODE="
 
 set "APP=%~dp0"
-set "REPO=%~dp0..\.."
+set "REPO=%~dp0..\..\.."
 set "ELECTRON=%REPO%\sdk\runanywhere-electron\node_modules\electron\dist\electron.exe"
 
 rem Pass --gpu through to use the CUDA prebuild (needs an NVIDIA driver stack).

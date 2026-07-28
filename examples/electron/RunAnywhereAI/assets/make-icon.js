@@ -11,7 +11,7 @@ const path = require('path');
 
 const SIZES = [256, 128, 64, 48, 32, 16];
 const OUT_DIR = __dirname;
-const LOGO = path.join(__dirname, '..', '..', '..', 'examples', 'logo.svg');
+const LOGO = path.join(__dirname, '..', '..', '..', 'logo.svg');
 
 // ---- ICO container (PNG-compressed entries; Vista+) -------------------------
 function encodeIco(entries) {

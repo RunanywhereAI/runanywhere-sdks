@@ -87,6 +87,38 @@ export function modelStatus(root: string = modelsRoot()): Record<string, { downl
   return out;
 }
 
+/** SHA-256 of a file on disk, lowercase hex. */
+export function sha256File(file: string): string {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+/**
+ * Throw before starting a multi-GB download that cannot possibly fit. `dir` need
+ * not exist yet — we walk up to the nearest existing parent. A filesystem that
+ * cannot report capacity is treated as "enough" rather than blocking the user.
+ */
+export function assertEnoughSpace(bytesNeeded: number, dir: string): void {
+  if (!Number.isFinite(bytesNeeded) || bytesNeeded <= 0) return;
+  let probe = dir;
+  for (let i = 0; i < 8 && !fs.existsSync(probe); i++) probe = path.dirname(probe);
+  let free: number;
+  try {
+    const statfs = (fs as unknown as { statfsSync?: (p: string) => { bavail: number; bsize: number } }).statfsSync;
+    if (!statfs) return;
+    const st = statfs(probe);
+    free = st.bavail * st.bsize;
+  } catch {
+    return; // capacity unknown: let the download try rather than block the user
+  }
+  const MARGIN = 256 * 1024 * 1024; // never fill the volume completely
+  if (free < bytesNeeded + MARGIN) {
+    const gb = (v: number): string => (v / 1e9).toFixed(1) + ' GB';
+    throw new Error(
+      `not enough disk space: need ${gb(bytesNeeded)} (plus headroom) but only ${gb(free)} is free on ${probe}`
+    );
+  }
+}
+
 /**
  * Stream a URL to `dest` (following redirects), reporting byte progress. Downloads
  * to `dest + '.part'` and renames on success. If a `.part` from an interrupted
@@ -98,12 +130,28 @@ export function modelStatus(root: string = modelsRoot()): Record<string, { downl
 export function downloadFile(
   url: string,
   dest: string,
-  onProgress?: (p: DownloadProgress) => void
+  onProgress?: (p: DownloadProgress) => void,
+  opts: { sha256?: string } = {}
 ): Promise<void> {
   const tmp = dest + '.part';
   let startAt = 0;
   try { startAt = fs.statSync(tmp).size; } catch { startAt = 0; }
   const finalize = (resolve: () => void, reject: (e: Error) => void): void => {
+    // Integrity gate. The bytes arrive from a CDN while the digest comes from the
+    // origin API, so this catches silent corruption AND a tampered mirror. A file
+    // that fails is DELETED — never left behind for a later run to "resume".
+    if (opts.sha256) {
+      let got: string;
+      try { got = sha256File(tmp); }
+      catch (e) { reject(e as Error); return; }
+      if (got.toLowerCase() !== opts.sha256.toLowerCase()) {
+        try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+        reject(new Error(
+          `checksum mismatch for ${path.basename(dest)}: expected ${opts.sha256}, got ${got}`
+        ));
+        return;
+      }
+    }
     // renameSync runs outside the Promise executor's synchronous scope, so a throw
     // (Windows EPERM/EBUSY from AV/indexer, or EXDEV across volumes) would not be
     // caught — settle explicitly instead of hanging/crashing. KEEP the completed
@@ -161,6 +209,14 @@ export function downloadFile(
         const resuming = code === 206 && startAt > 0;
         const len = parseInt((res.headers['content-length'] as string) || '0', 10);
         const total = resuming ? startAt + len : len;
+        // Fail fast and legibly instead of filling the volume and dying on ENOSPC.
+        try {
+          assertEnoughSpace(total - startAt, path.dirname(dest));
+        } catch (e) {
+          res.resume();
+          reject(e as Error);
+          return;
+        }
         let received = resuming ? startAt : 0;
         const out = fs.createWriteStream(tmp, { flags: resuming ? 'a' : 'w' });
         // res.pipe(out) does NOT forward source errors to the destination, so a
@@ -213,15 +269,45 @@ function extractTarBz2(archive: string, destDir: string): void {
   if (r.status !== 0) throw new Error('tar extraction failed for ' + archive + ' (need bsdtar/tar on PATH)');
 }
 
+/**
+ * The SHA-256 HuggingFace records for a file, or '' when it cannot be determined
+ * (small non-LFS files, an offline/ratelimited API, a non-HF host).
+ *
+ * This is worth doing even though the digest comes from the same vendor: the API
+ * response is served by huggingface.co while the bytes are served by a separate
+ * CDN host after a redirect, so comparing them detects silent corruption and a
+ * tampered/poisoned CDN object. It is not a defence against HuggingFace itself.
+ */
+async function hfSha256(repo: string, file: string, revision = 'main'): Promise<string> {
+  try {
+    const rev = encodeURIComponent(revision || 'main');
+    const dir = file.includes('/') ? '/' + file.slice(0, file.lastIndexOf('/')) : '';
+    const url = `https://huggingface.co/api/models/${repo}/tree/${rev}${dir}`;
+    const { body } = await httpText(url);
+    const tree = JSON.parse(body) as Array<{ path?: string; lfs?: { oid?: string; sha256?: string } }>;
+    if (!Array.isArray(tree)) return '';
+    const hit = tree.find((e) => e && e.path === file);
+    const oid = hit && hit.lfs ? hit.lfs.sha256 || hit.lfs.oid : '';
+    return typeof oid === 'string' && /^[a-f0-9]{64}$/i.test(oid) ? oid : '';
+  } catch {
+    return ''; // never let integrity lookup failure block a download
+  }
+}
+
 // Dedup concurrent downloads to the SAME destination. Two resolveModel calls for
 // one source (e.g. a UI double-click, or an auto-load racing an explicit
 // download) would otherwise open two write streams on the same `.part` file and
 // corrupt it / race the rename. Callers share the first in-flight promise.
 const inFlight = new Map<string, Promise<void>>();
-function downloadOnce(url: string, dest: string, onProgress?: (p: DownloadProgress) => void): Promise<void> {
+function downloadOnce(
+  url: string,
+  dest: string,
+  onProgress?: (p: DownloadProgress) => void,
+  opts: { sha256?: string } = {}
+): Promise<void> {
   const existing = inFlight.get(dest);
   if (existing) return existing;
-  const p = downloadFile(url, dest, onProgress).finally(() => inFlight.delete(dest));
+  const p = downloadFile(url, dest, onProgress, opts).finally(() => inFlight.delete(dest));
   inFlight.set(dest, p);
   return p;
 }
@@ -452,7 +538,8 @@ export async function resolveModel(
       for (const g of shards) {
         const d = path.join(dir, path.basename(g));
         if (!fs.existsSync(d)) {
-          await downloadOnce(`https://huggingface.co/${repo}/resolve/${revSeg}/${g}`, d, opts.onProgress);
+          const sha = await hfSha256(repo, g, revision);
+          await downloadOnce(`https://huggingface.co/${repo}/resolve/${revSeg}/${g}`, d, opts.onProgress, { sha256: sha });
         }
       }
       let mmprojPath: string | undefined;
@@ -464,10 +551,12 @@ export async function resolveModel(
         const mmName = path.basename(mmproj);
         mmprojPath = path.join(dir, shardNames.has(mmName) ? 'mmproj-' + mmName : mmName);
         if (!fs.existsSync(mmprojPath)) {
+          const sha = await hfSha256(repo, mmproj, revision);
           await downloadOnce(
             `https://huggingface.co/${repo}/resolve/${revSeg}/${mmproj}`,
             mmprojPath,
-            opts.onProgress
+            opts.onProgress,
+            { sha256: sha }
           );
         }
       }
