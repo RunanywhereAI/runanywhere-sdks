@@ -34,6 +34,7 @@ test('module exports exactly the public surface', () => {
   assert.equal(typeof download.pickGguf, 'undefined');
   const own = Object.keys(download).filter((k) => typeof download[k] === 'function');
   assert.deepEqual(own.sort(), [
+    'assertEnoughSpace',
     'assertRemoteSupported',
     'downloadFile',
     'isRemoteSource',
@@ -42,6 +43,7 @@ test('module exports exactly the public surface', () => {
     'parseHfUrl',
     'pathExists',
     'resolveModel',
+    'sha256File',
   ]);
 });
 

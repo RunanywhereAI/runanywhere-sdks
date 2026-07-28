@@ -398,6 +398,12 @@ async function renderModels() {
       else if (entry.sizeMB) bits.push('~' + fmtMB(entry.sizeMB));
       let sub = bits.join(' · ');
       if (entry.heavy) sub += ' <span class="badge heavy">heavy · CPU</span>';
+      // Non-Apache weights (Gemma, Llama, NVIDIA) restrict use; link the terms.
+      if (entry.license) {
+        sub += entry.licenseUrl
+          ? ` · <a href="${escapeHtml(entry.licenseUrl)}" title="Model licence">${escapeHtml(entry.license)}</a>`
+          : ` · ${escapeHtml(entry.license)}`;
+      }
       el.appendChild(buildCard({ key: id, type: entry.type, label: entry.label || id, sub, source: id, downloaded: st.downloaded, custom: false }));
     }
   }
@@ -670,7 +676,7 @@ async function togglePicker(anchor, modality) {
     const isActive = id === active;
     const stateCls = isActive ? 'active' : st.downloaded ? 'ready' : 'get';
     const stateTxt = isActive ? 'Active' : st.downloaded ? 'Ready' : 'Download';
-    const bits = [entry.params, st.downloaded ? fmtSize(st.sizeBytes) : entry.sizeMB ? '~' + fmtMB(entry.sizeMB) : ''].filter(Boolean);
+    const bits = [entry.params, st.downloaded ? fmtSize(st.sizeBytes) : entry.sizeMB ? '~' + fmtMB(entry.sizeMB) : '', entry.license].filter(Boolean);
     const row = document.createElement('button');
     row.className = 'row';
     row.innerHTML =
@@ -706,6 +712,15 @@ document.querySelectorAll('.nav button').forEach((b) => b.addEventListener('clic
 
 // ---- UI wiring ----
 // Default to the OS preference; an explicit choice is remembered in settings.
+// Nothing in a UI should fail silently. Every handler catches its own errors;
+// this is the net that catches whatever a future one forgets.
+window.addEventListener('unhandledrejection', (e) => {
+  const msg = (e.reason && e.reason.message) || String(e.reason || 'unknown error');
+  console.error('unhandled rejection:', e.reason);
+  try { flashToast('Something went wrong: ' + msg); } catch { /* toast is best-effort */ }
+});
+window.addEventListener('error', (e) => { console.error('renderer error:', e.error || e.message); });
+
 function applyTheme(mode) {
   const os = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   document.documentElement.dataset.theme = mode === 'light' || mode === 'dark' ? mode : os;

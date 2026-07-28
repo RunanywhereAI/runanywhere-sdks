@@ -41,3 +41,56 @@ jobs:
         run: npm run build
       - name: Unit tests
         run: npm test
+
+  # The demo app has its own hermetic unit tests (the JSON store: atomic writes,
+  # corrupt-file recovery, conversation capping). They need no Electron runtime.
+  demo-app-unit:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: examples/electron/RunAnywhereAI
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unit tests (no Electron, no models)
+        run: npm test
+
+  # The native addon is NOT built by the job above, so a change that breaks the
+  # C++ bindings (a bad signature, a missing symbol, a renamed rac_* call) used to
+  # ship undetected — the .node is built by hand and is gitignored. This job
+  # compiles it on every PR that touches the addon or commons. It does not run
+  # inference: linking is the signal we are missing today.
+  native-addon-build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Fetch node headers + import lib (for the N-API link)
+        shell: pwsh
+        working-directory: sdk/runanywhere-electron
+        run: |
+          npm install
+          npx node-gyp install
+      - name: Configure (Release, static plugins)
+        shell: pwsh
+        run: |
+          cmake --preset windows-release `
+            -DRAC_BUILD_BACKENDS=ON -DRAC_BACKEND_LLAMACPP=ON `
+            -DRAC_BACKEND_ONNX=ON -DRAC_RUNTIME_ONNXRT=ON -DRAC_BACKEND_SHERPA=OFF `
+            -DRAC_STATIC_PLUGINS=ON -DRAC_BUILD_ELECTRON_ADDON=ON
+      - name: Build the addon
+        run: cmake --build build/windows-release --target runanywhere_native --config Release
+      - name: Assert the addon was produced
+        shell: pwsh
+        run: |
+          $node = "build/windows-release/sdk/runanywhere-electron/native/Release/runanywhere_native.node"
+          if (!(Test-Path $node)) { throw "the native addon was not produced" }
+          Write-Host "addon built: $((Get-Item $node).Length) bytes"
