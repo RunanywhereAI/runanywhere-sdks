@@ -9,6 +9,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import { jsonSchemaToGrammar } from '../grammar';
 import { splitThinking } from '../thinking';
+import { speakableText } from '../speech';
 import { downsample, pcm16Bytes, rms } from '../audio';
 import {
   RAGConfiguration,
@@ -127,6 +128,8 @@ contextBridge.exposeInMainWorld('runanywhere', {
   // ---- reasoning ----
   // Split a reasoning model's <think>…</think> from its answer (pure, in-page).
   splitThinking: (text: string) => splitThinking(text),
+  // Markdown/symbols -> words a TTS voice can read (no "asterisk asterisk").
+  speakableText: (text: string) => speakableText(text),
 
   // ---- model catalog + storage ----
   catalog: () => CATALOG,
