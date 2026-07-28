@@ -950,10 +950,19 @@ function wireVoice() {
       $('voiceheard').textContent = heard;
       $('voicereply').textContent = '';
       let reply = '';
-      await withLlm((h) => ra.generate(h, buildPrompt([], heard), {
+      // Ask for speech, not a document — a spoken answer should have no markdown
+      // in it at all.
+      const spokenStyle = settings.systemPrompt +
+        ' You are answering out loud. Reply in one or two short spoken sentences, in plain words.' +
+        ' Never use markdown, asterisks, bullet points, headings or mathematical notation.';
+      await withLlm((h) => ra.generate(h, `${spokenStyle}\n\nUser: ${heard}\nAssistant:`, {
         temperature: settings.temperature, maxTokens: settings.maxTokens,
-      }, (t) => { reply += t; $('voicereply').textContent = reply; }));
-      reply = ra.splitThinking(reply).response.trim();
+      }, (t) => { reply += t; $('voicereply').textContent = ra.speakableText(ra.splitThinking(reply).response); }));
+      // The prompt is a request, not a guarantee: a small model still emits
+      // "**Paris**", and the TTS voice pronounces that as "asterisk asterisk
+      // Paris". speakableText is what actually makes the audio clean — it also
+      // says "20 degrees Celsius" and "5 times 3" instead of spelling symbols.
+      reply = ra.speakableText(ra.splitThinking(reply).response);
       $('voicereply').textContent = reply;
       if (!reply) { setVoiceState('idle'); return; }
 
