@@ -880,7 +880,25 @@ function captureController() {
       cap = { stream, ctx, node, chunks, onframe };
     },
     onFrame(cb) { cap && cap.onframe.push(cb); },
-    stop() { if (!cap) return null; const { stream, ctx, node, chunks } = cap; node.disconnect(); stream.getTracks().forEach((t) => t.stop()); ctx.close(); cap = null; let n = 0; for (const c of chunks) n += c.length; const m = new Float32Array(n); let o = 0; for (const c of chunks) { m.set(c, o); o += c.length; } return { samples: m, rate: ctx.sampleRate }; },
+    // Tearing down the graph must NEVER throw: a throw here used to escape
+    // finishTurn's try block and leave the turn flagged busy forever, which
+    // presents as a mic button that silently stops responding. Claim `cap`
+    // first so a re-entrant stop() is a no-op rather than a double-close.
+    stop() {
+      if (!cap) return null;
+      const { stream, ctx, node, chunks } = cap;
+      cap = null;
+      const rate = ctx.sampleRate; // read before close(); the context is unusable after
+      try { node.disconnect(); } catch { /* already detached */ }
+      try { stream.getTracks().forEach((t) => t.stop()); } catch { /* already stopped */ }
+      try { ctx.close(); } catch { /* already closed */ }
+      let n = 0;
+      for (const c of chunks) n += c.length;
+      const m = new Float32Array(n);
+      let o = 0;
+      for (const c of chunks) { m.set(c, o); o += c.length; }
+      return { samples: m, rate };
+    },
   };
 }
 // Mic float samples -> 16 kHz PCM16 bytes for STT. Uses the SDK's block-averaging
@@ -908,8 +926,20 @@ function wireVoice() {
   let playing = null;
   let state = 'idle';
   let busy = false;          // a turn is in flight; ignore re-entrant taps
+  let abandoned = false;     // the user gave up on the in-flight turn
   let levelRaf = 0;
   let level = 0;             // smoothed mic RMS, 0..1
+
+  let watchdog = 0;
+  // Replace the hint line with what the turn is actually doing, and start a
+  // watchdog so an unusually long step offers a way out instead of just sitting.
+  function phase(text) {
+    hintEl.textContent = text;
+    clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      hintEl.textContent = text + ' (taking longer than usual — tap the orb to cancel)';
+    }, 20000);
+  }
 
   const COPY = {
     idle: ['Tap to talk', 'Speech, reasoning and speech-synthesis all run on this device.'],
@@ -978,17 +1008,23 @@ function wireVoice() {
   async function finishTurn() {
     if (busy) return;
     busy = true;
-    const rec = cc.stop();
-    level = 0;
-    if (!rec || !rec.samples.length) { setVoiceState('idle'); busy = false; return; }
-    setVoiceState('thinking');
+    abandoned = false;
+    // EVERYTHING from here on is inside try/finally: a throw before the guarded
+    // region used to leave busy=true forever, and the mic button simply stopped
+    // responding with no error anywhere.
     try {
+      const rec = cc.stop();
+      level = 0;
+      if (!rec || !rec.samples.length) { setVoiceState('idle'); return; }
+      setVoiceState('thinking');
+      phase('Transcribing what you said…');
       const heard = (await ra.transcribe(await stt(), toPcm16At16k(rec.samples, rec.rate)) || '').trim();
       if (!heard) { showError('I did not catch that — try again a little closer to the mic.'); setVoiceState('idle'); return; }
       transcript.hidden = false;
       $('voiceheard').textContent = heard;
       $('voicereply').textContent = '';
       let reply = '';
+      phase('Composing a reply…');
       // Ask for speech, not a document — a spoken answer should have no markdown
       // in it at all.
       const spokenStyle = settings.systemPrompt +
@@ -1013,6 +1049,8 @@ function wireVoice() {
       $('voicereply').textContent = reply;
       if (!reply) { setVoiceState('idle'); return; }
 
+      if (abandoned) return;
+      phase('Generating speech…');
       const audio = await ra.synthesize(await tts(), reply);
       if (!audio || !audio.samples || !audio.samples.length) { setVoiceState('idle'); return; } // createBuffer(0) throws
       setVoiceState('speaking');
@@ -1028,17 +1066,34 @@ function wireVoice() {
     } catch (e) {
       showError(e.message || String(e));
     } finally {
+      clearTimeout(watchdog);
       busy = false;
       if (state !== 'listening') setVoiceState('idle');
     }
   }
 
   // One tap does the right thing for the current state.
+  // The orb must ALWAYS do something. Any state that cannot proceed is reset and
+  // a fresh turn starts, so a stale flag can never leave a dead button — the
+  // failure mode was a mic that silently stopped responding until app restart.
   orb.addEventListener('click', () => {
-    if (busy && state === 'thinking') return;         // can't interrupt generation (no cancel API)
-    if (state === 'idle') beginListening();
-    else if (state === 'listening') finishTurn();
-    else if (state === 'speaking') { stopPlayback(); setVoiceState('idle'); } // barge-in
+    if (state === 'listening') { finishTurn(); return; }
+    if (state === 'speaking') { stopPlayback(); setVoiceState('idle'); return; } // barge-in
+    if (state === 'thinking') {
+      // There is no cancel in the inference stack, so the work keeps running —
+      // but the user is never trapped. Abandon the turn; the result is discarded
+      // when it lands.
+      abandoned = true;
+      busy = false;
+      clearTimeout(watchdog);
+      showError('Turn cancelled.');
+      setVoiceState('idle');
+      return;
+    }
+    // idle, or any state we did not anticipate: self-heal and listen.
+    if (busy) { busy = false; abandoned = true; }
+    stopPlayback();
+    beginListening();
   });
   orb.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); orb.click(); } });
 
