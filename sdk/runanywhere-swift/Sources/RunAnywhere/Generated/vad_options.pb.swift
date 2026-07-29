@@ -229,9 +229,9 @@ public nonisolated struct RAVADConfiguration: Sendable {
   /// 0.1 seconds; we canonicalize to ms on the wire).
   public var frameLengthMs: Int32 = 0
 
-  /// Energy threshold in [0.0, 1.0] for voice detection.
-  /// Recommended range 0.01–0.05; default 0.015 across SDKs.
-  public var threshold: Float = 0
+  /// Activation (energy) threshold in [0.0, 1.0] for voice detection.
+  /// Recommended range 0.01–0.05.
+  public var activationThreshold: Float = 0
 
   /// When true, the VAD performs ambient-noise calibration and uses the
   /// result as a multiplier on the threshold (see calibration_multiplier
@@ -296,28 +296,30 @@ public nonisolated struct RAVADConfiguration: Sendable {
 ///   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
 /// Surfacing them as fields lets callers tune debouncing without a rebuild.
 /// ---------------------------------------------------------------------------
+/// Field vocabulary follows the industry VAD naming (LiveKit/Silero):
+/// activation_threshold + min/max duration knobs + prefix padding.
 public nonisolated struct RAVADOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Per-call energy threshold override. Use 0 (default) to keep the
-  /// configured threshold. Mirrors rac_vad_input_t::energy_threshold_override
-  /// (which uses -1 as the sentinel; on the wire we use 0 for proto3
-  /// default semantics — generators emit -1 when this is unset).
-  public var threshold: Float = 0
+  /// Per-call activation threshold override in [0.0, 1.0]. Unset/0 = keep
+  /// the configured threshold.
+  public var activationThreshold: Float = 0
 
   /// Minimum continuous speech duration (ms) before SPEECH_STARTED fires.
-  /// Default 100 (RAC_VAD_MIN_SPEECH_DURATION_MS).
   public var minSpeechDurationMs: Int32 = 0
 
   /// Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
-  /// Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
   public var minSilenceDurationMs: Int32 = 0
 
   /// Maximum continuous speech duration (ms) before forcing a segment split.
   /// 0 = backend/default.
   public var maxSpeechDurationMs: Int32 = 0
+
+  /// Audio retained before SPEECH_STARTED so segments don't clip the first
+  /// syllable. 0 = backend/default.
+  public var prefixPaddingMs: Int32 = 0
 
   /// Whether to include VADStatistics in stream events when available.
   public var includeStatistics: Bool = false
@@ -752,7 +754,7 @@ nonisolated extension RAVADStreamEventKind: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}sample_rate\0\u{3}frame_length_ms\0\u{1}threshold\0\u{3}enable_auto_calibration\0\u{3}calibration_multiplier\0\u{3}preferred_framework\0\u{3}model_path\0\u{3}window_size_samples\0\u{3}max_speech_duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}sample_rate\0\u{3}frame_length_ms\0\u{3}activation_threshold\0\u{3}enable_auto_calibration\0\u{3}calibration_multiplier\0\u{3}preferred_framework\0\u{3}model_path\0\u{3}window_size_samples\0\u{3}max_speech_duration_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -763,7 +765,7 @@ nonisolated extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
       case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.frameLengthMs) }()
-      case 4: try { try decoder.decodeSingularFloatField(value: &self.threshold) }()
+      case 4: try { try decoder.decodeSingularFloatField(value: &self.activationThreshold) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.enableAutoCalibration) }()
       case 6: try { try decoder.decodeSingularFloatField(value: &self.calibrationMultiplier) }()
       case 7: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
@@ -789,8 +791,8 @@ nonisolated extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
     if self.frameLengthMs != 0 {
       try visitor.visitSingularInt32Field(value: self.frameLengthMs, fieldNumber: 3)
     }
-    if self.threshold.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.threshold, fieldNumber: 4)
+    if self.activationThreshold.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.activationThreshold, fieldNumber: 4)
     }
     if self.enableAutoCalibration != false {
       try visitor.visitSingularBoolField(value: self.enableAutoCalibration, fieldNumber: 5)
@@ -817,7 +819,7 @@ nonisolated extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs.modelID != rhs.modelID {return false}
     if lhs.sampleRate != rhs.sampleRate {return false}
     if lhs.frameLengthMs != rhs.frameLengthMs {return false}
-    if lhs.threshold != rhs.threshold {return false}
+    if lhs.activationThreshold != rhs.activationThreshold {return false}
     if lhs.enableAutoCalibration != rhs.enableAutoCalibration {return false}
     if lhs.calibrationMultiplier != rhs.calibrationMultiplier {return false}
     if lhs._preferredFramework != rhs._preferredFramework {return false}
@@ -831,7 +833,7 @@ nonisolated extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}threshold\0\u{3}min_speech_duration_ms\0\u{3}min_silence_duration_ms\0\u{3}max_speech_duration_ms\0\u{3}include_statistics\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}min_speech_duration_ms\0\u{3}min_silence_duration_ms\0\u{3}max_speech_duration_ms\0\u{3}include_statistics\0\u{3}activation_threshold\0\u{3}prefix_padding_ms\0\u{c}\u{1}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -839,20 +841,18 @@ nonisolated extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularFloatField(value: &self.threshold) }()
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.minSpeechDurationMs) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.minSilenceDurationMs) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxSpeechDurationMs) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.includeStatistics) }()
+      case 6: try { try decoder.decodeSingularFloatField(value: &self.activationThreshold) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self.prefixPaddingMs) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.threshold.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.threshold, fieldNumber: 1)
-    }
     if self.minSpeechDurationMs != 0 {
       try visitor.visitSingularInt32Field(value: self.minSpeechDurationMs, fieldNumber: 2)
     }
@@ -865,14 +865,21 @@ nonisolated extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if self.includeStatistics != false {
       try visitor.visitSingularBoolField(value: self.includeStatistics, fieldNumber: 5)
     }
+    if self.activationThreshold.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.activationThreshold, fieldNumber: 6)
+    }
+    if self.prefixPaddingMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.prefixPaddingMs, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAVADOptions, rhs: RAVADOptions) -> Bool {
-    if lhs.threshold != rhs.threshold {return false}
+    if lhs.activationThreshold != rhs.activationThreshold {return false}
     if lhs.minSpeechDurationMs != rhs.minSpeechDurationMs {return false}
     if lhs.minSilenceDurationMs != rhs.minSilenceDurationMs {return false}
     if lhs.maxSpeechDurationMs != rhs.maxSpeechDurationMs {return false}
+    if lhs.prefixPaddingMs != rhs.prefixPaddingMs {return false}
     if lhs.includeStatistics != rhs.includeStatistics {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

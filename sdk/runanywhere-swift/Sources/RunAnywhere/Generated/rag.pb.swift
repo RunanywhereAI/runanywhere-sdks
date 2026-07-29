@@ -346,27 +346,18 @@ public nonisolated struct RARAGQueryOptions: Sendable {
   /// The user question to answer. Required (empty = no-op).
   public var question: String = String()
 
-  /// Optional system prompt override. Unset uses the pipeline default.
-  public var systemPrompt: String {
-    get {_systemPrompt ?? String()}
-    set {_systemPrompt = newValue}
+  /// Answer-generation knobs (sampling, system prompt, reasoning). Unset =
+  /// pipeline defaults. RAG-appropriate defaults (e.g. max_output_tokens
+  /// 512, temperature 0.7) are applied by the pipeline when unset, not
+  /// re-declared here.
+  public var generation: RALLMGenerationOptions {
+    get {_generation ?? RALLMGenerationOptions()}
+    set {_generation = newValue}
   }
-  /// Returns true if `systemPrompt` has been explicitly set.
-  public var hasSystemPrompt: Bool {self._systemPrompt != nil}
-  /// Clears the value of `systemPrompt`. Subsequent reads from it will return its default value.
-  public mutating func clearSystemPrompt() {self._systemPrompt = nil}
-
-  /// Maximum tokens to generate in the answer.
-  public var maxTokens: Int32 = 0
-
-  /// Sampling temperature. 0.0 = greedy, higher = more random.
-  public var temperature: Float = 0
-
-  /// Nucleus (top-p) sampling parameter. 1.0 = disabled.
-  public var topP: Float = 0
-
-  /// Top-k sampling parameter. 0 = disabled.
-  public var topK: Int32 = 0
+  /// Returns true if `generation` has been explicitly set.
+  public var hasGeneration: Bool {self._generation != nil}
+  /// Clears the value of `generation`. Subsequent reads from it will return its default value.
+  public mutating func clearGeneration() {self._generation = nil}
 
   /// Retrieval overrides. 0/unset = use RAGConfiguration defaults.
   public var retrievalTopK: Int32 = 0
@@ -384,11 +375,6 @@ public nonisolated struct RARAGQueryOptions: Sendable {
   public mutating func clearSimilarityThreshold() {self._similarityThreshold = nil}
 
   public var stream: Bool = false
-
-  /// When true, suppress the answer model's thinking phase (maps to
-  /// LLMGenerationOptions.disable_thinking so commons prepends the no-think
-  /// directive instead of the app injecting "/no_think"). Default false.
-  public var disableThinking: Bool = false
 
   /// Multi-query expansion: when true, the answer LLM rewrites the question
   /// into `multi_query_count` variants; retrieval runs for the original plus
@@ -421,7 +407,7 @@ public nonisolated struct RARAGQueryOptions: Sendable {
 
   public init() {}
 
-  fileprivate var _systemPrompt: String? = nil
+  fileprivate var _generation: RALLMGenerationOptions? = nil
   fileprivate var _similarityThreshold: Float? = nil
   fileprivate var _multiQueryCount: Int32? = nil
   fileprivate var _scopePrefix: String? = nil
@@ -1027,7 +1013,7 @@ nonisolated extension RARAGIngestRequest: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGQueryOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}question\0\u{3}system_prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}retrieval_top_k\0\u{3}similarity_threshold\0\u{1}stream\0\u{3}disable_thinking\0\u{3}enable_multi_query\0\u{3}multi_query_count\0\u{3}scope_prefix\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}question\0\u{4}\u{6}retrieval_top_k\0\u{3}similarity_threshold\0\u{1}stream\0\u{4}\u{2}enable_multi_query\0\u{3}multi_query_count\0\u{3}scope_prefix\0\u{1}generation\0\u{c}\u{2}\u{5}\u{c}\u{a}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1036,18 +1022,13 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.question) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._systemPrompt) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
-      case 4: try { try decoder.decodeSingularFloatField(value: &self.temperature) }()
-      case 5: try { try decoder.decodeSingularFloatField(value: &self.topP) }()
-      case 6: try { try decoder.decodeSingularInt32Field(value: &self.topK) }()
       case 7: try { try decoder.decodeSingularInt32Field(value: &self.retrievalTopK) }()
       case 8: try { try decoder.decodeSingularFloatField(value: &self._similarityThreshold) }()
       case 9: try { try decoder.decodeSingularBoolField(value: &self.stream) }()
-      case 10: try { try decoder.decodeSingularBoolField(value: &self.disableThinking) }()
       case 11: try { try decoder.decodeSingularBoolField(value: &self.enableMultiQuery) }()
       case 12: try { try decoder.decodeSingularInt32Field(value: &self._multiQueryCount) }()
       case 13: try { try decoder.decodeSingularStringField(value: &self._scopePrefix) }()
+      case 14: try { try decoder.decodeSingularMessageField(value: &self._generation) }()
       default: break
       }
     }
@@ -1061,21 +1042,6 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
     if !self.question.isEmpty {
       try visitor.visitSingularStringField(value: self.question, fieldNumber: 1)
     }
-    try { if let v = self._systemPrompt {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    if self.maxTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 3)
-    }
-    if self.temperature.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.temperature, fieldNumber: 4)
-    }
-    if self.topP.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.topP, fieldNumber: 5)
-    }
-    if self.topK != 0 {
-      try visitor.visitSingularInt32Field(value: self.topK, fieldNumber: 6)
-    }
     if self.retrievalTopK != 0 {
       try visitor.visitSingularInt32Field(value: self.retrievalTopK, fieldNumber: 7)
     }
@@ -1084,9 +1050,6 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
     } }()
     if self.stream != false {
       try visitor.visitSingularBoolField(value: self.stream, fieldNumber: 9)
-    }
-    if self.disableThinking != false {
-      try visitor.visitSingularBoolField(value: self.disableThinking, fieldNumber: 10)
     }
     if self.enableMultiQuery != false {
       try visitor.visitSingularBoolField(value: self.enableMultiQuery, fieldNumber: 11)
@@ -1097,20 +1060,18 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
     try { if let v = self._scopePrefix {
       try visitor.visitSingularStringField(value: v, fieldNumber: 13)
     } }()
+    try { if let v = self._generation {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RARAGQueryOptions, rhs: RARAGQueryOptions) -> Bool {
     if lhs.question != rhs.question {return false}
-    if lhs._systemPrompt != rhs._systemPrompt {return false}
-    if lhs.maxTokens != rhs.maxTokens {return false}
-    if lhs.temperature != rhs.temperature {return false}
-    if lhs.topP != rhs.topP {return false}
-    if lhs.topK != rhs.topK {return false}
+    if lhs._generation != rhs._generation {return false}
     if lhs.retrievalTopK != rhs.retrievalTopK {return false}
     if lhs._similarityThreshold != rhs._similarityThreshold {return false}
     if lhs.stream != rhs.stream {return false}
-    if lhs.disableThinking != rhs.disableThinking {return false}
     if lhs.enableMultiQuery != rhs.enableMultiQuery {return false}
     if lhs._multiQueryCount != rhs._multiQueryCount {return false}
     if lhs._scopePrefix != rhs._scopePrefix {return false}

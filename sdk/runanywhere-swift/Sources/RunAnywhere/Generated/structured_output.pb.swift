@@ -573,20 +573,14 @@ public nonisolated struct RAJSONSchema: @unchecked Sendable {
 ///   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
 ///   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
 /// ---------------------------------------------------------------------------
+/// The ONE output-constraint surface. The retired loose fields on
+/// LLMGenerationOptions (json_schema, grammar, response_format) all fold in
+/// here: schema-shaped output via `schema_source`, low-level constrained
+/// decoding via `grammar`/`regex_pattern`.
 public nonisolated struct RAStructuredOutputOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
-
-  /// Schema describing the desired output shape.
-  public var schema: RAJSONSchema {
-    get {_schema ?? RAJSONSchema()}
-    set {_schema = newValue}
-  }
-  /// Returns true if `schema` has been explicitly set.
-  public var hasSchema: Bool {self._schema != nil}
-  /// Clears the value of `schema`. Subsequent reads from it will return its default value.
-  public mutating func clearSchema() {self._schema = nil}
 
   /// Whether to embed the schema text in the LLM prompt.
   public var includeSchemaInPrompt: Bool = false
@@ -601,27 +595,28 @@ public nonisolated struct RAStructuredOutputOptions: Sendable {
   /// Clears the value of `strictMode`. Subsequent reads from it will return its default value.
   public mutating func clearStrictMode() {self._strictMode = nil}
 
-  /// Raw JSON Schema string for C ABI and SDKs that already carry schema as
-  /// serialized JSON instead of the typed JSONSchema tree.
+  /// The schema, exactly one representation: the typed tree OR the raw
+  /// JSON Schema string. Previously both fields coexisted with undefined
+  /// precedence.
+  public var schemaSource: RAStructuredOutputOptions.OneOf_SchemaSource? = nil
+
+  public var schema: RAJSONSchema {
+    get {
+      if case .schema(let v)? = schemaSource {return v}
+      return RAJSONSchema()
+    }
+    set {schemaSource = .schema(newValue)}
+  }
+
   public var jsonSchema: String {
-    get {_jsonSchema ?? String()}
-    set {_jsonSchema = newValue}
+    get {
+      if case .jsonSchema(let v)? = schemaSource {return v}
+      return String()
+    }
+    set {schemaSource = .jsonSchema(newValue)}
   }
-  /// Returns true if `jsonSchema` has been explicitly set.
-  public var hasJsonSchema: Bool {self._jsonSchema != nil}
-  /// Clears the value of `jsonSchema`. Subsequent reads from it will return its default value.
-  public mutating func clearJsonSchema() {self._jsonSchema = nil}
 
-  /// Optional generated type/name hints used by Swift/Kotlin/Dart wrappers.
-  public var typeName: String {
-    get {_typeName ?? String()}
-    set {_typeName = newValue}
-  }
-  /// Returns true if `typeName` has been explicitly set.
-  public var hasTypeName: Bool {self._typeName != nil}
-  /// Clears the value of `typeName`. Subsequent reads from it will return its default value.
-  public mutating func clearTypeName() {self._typeName = nil}
-
+  /// Name for the schema/output type (OpenAI json_schema.name).
   public var name: String {
     get {_name ?? String()}
     set {_name = newValue}
@@ -657,12 +652,18 @@ public nonisolated struct RAStructuredOutputOptions: Sendable {
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
+  /// The schema, exactly one representation: the typed tree OR the raw
+  /// JSON Schema string. Previously both fields coexisted with undefined
+  /// precedence.
+  public nonisolated enum OneOf_SchemaSource: Equatable, Sendable {
+    case schema(RAJSONSchema)
+    case jsonSchema(String)
+
+  }
+
   public init() {}
 
-  fileprivate var _schema: RAJSONSchema? = nil
   fileprivate var _strictMode: Bool? = nil
-  fileprivate var _jsonSchema: String? = nil
-  fileprivate var _typeName: String? = nil
   fileprivate var _name: String? = nil
   fileprivate var _regexPattern: String? = nil
   fileprivate var _grammar: String? = nil
@@ -1533,7 +1534,7 @@ nonisolated extension RAJSONSchema: SwiftProtobuf.Message, SwiftProtobuf._Messag
 
 nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StructuredOutputOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}schema\0\u{3}include_schema_in_prompt\0\u{3}strict_mode\0\u{3}json_schema\0\u{3}type_name\0\u{1}name\0\u{1}mode\0\u{3}regex_pattern\0\u{1}grammar\0\u{3}repair_json\0\u{3}max_retries\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}schema\0\u{3}include_schema_in_prompt\0\u{3}strict_mode\0\u{3}json_schema\0\u{2}\u{2}name\0\u{1}mode\0\u{3}regex_pattern\0\u{1}grammar\0\u{3}repair_json\0\u{3}max_retries\0\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1541,11 +1542,29 @@ nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftPro
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._schema) }()
+      case 1: try {
+        var v: RAJSONSchema?
+        var hadOneofValue = false
+        if let current = self.schemaSource {
+          hadOneofValue = true
+          if case .schema(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.schemaSource = .schema(v)
+        }
+      }()
       case 2: try { try decoder.decodeSingularBoolField(value: &self.includeSchemaInPrompt) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self._strictMode) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._jsonSchema) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._typeName) }()
+      case 4: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.schemaSource != nil {try decoder.handleConflictingOneOf()}
+          self.schemaSource = .jsonSchema(v)
+        }
+      }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._name) }()
       case 7: try { try decoder.decodeSingularEnumField(value: &self.mode) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self._regexPattern) }()
@@ -1562,7 +1581,7 @@ nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftPro
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._schema {
+    try { if case .schema(let v)? = self.schemaSource {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
     if self.includeSchemaInPrompt != false {
@@ -1571,11 +1590,8 @@ nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftPro
     try { if let v = self._strictMode {
       try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
     } }()
-    try { if let v = self._jsonSchema {
+    try { if case .jsonSchema(let v)? = self.schemaSource {
       try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._typeName {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
     } }()
     try { if let v = self._name {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
@@ -1599,11 +1615,9 @@ nonisolated extension RAStructuredOutputOptions: SwiftProtobuf.Message, SwiftPro
   }
 
   public static func ==(lhs: RAStructuredOutputOptions, rhs: RAStructuredOutputOptions) -> Bool {
-    if lhs._schema != rhs._schema {return false}
     if lhs.includeSchemaInPrompt != rhs.includeSchemaInPrompt {return false}
     if lhs._strictMode != rhs._strictMode {return false}
-    if lhs._jsonSchema != rhs._jsonSchema {return false}
-    if lhs._typeName != rhs._typeName {return false}
+    if lhs.schemaSource != rhs.schemaSource {return false}
     if lhs._name != rhs._name {return false}
     if lhs.mode != rhs.mode {return false}
     if lhs._regexPattern != rhs._regexPattern {return false}

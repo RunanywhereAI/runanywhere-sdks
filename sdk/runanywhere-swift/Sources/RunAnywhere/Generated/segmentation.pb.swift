@@ -84,6 +84,11 @@ public nonisolated struct RASegmentationImage: Sendable {
 
   public var pixelFormat: RASegmentationPixelFormat = .unspecified
 
+  /// Bytes per row. 0 = tightly packed (width * bytes-per-pixel). Was a
+  /// C-struct-only field (rac_segmentation_image_t.stride_bytes) with no
+  /// wire counterpart.
+  public var strideBytes: UInt32 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -197,7 +202,7 @@ nonisolated extension RASegmentationPixelFormat: SwiftProtobuf._ProtoNameProvidi
 
 nonisolated extension RASegmentationImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SegmentationImage"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}data\0\u{1}width\0\u{1}height\0\u{3}pixel_format\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}data\0\u{1}width\0\u{1}height\0\u{3}pixel_format\0\u{3}stride_bytes\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -209,6 +214,7 @@ nonisolated extension RASegmentationImage: SwiftProtobuf.Message, SwiftProtobuf.
       case 2: try { try decoder.decodeSingularUInt32Field(value: &self.width) }()
       case 3: try { try decoder.decodeSingularUInt32Field(value: &self.height) }()
       case 4: try { try decoder.decodeSingularEnumField(value: &self.pixelFormat) }()
+      case 5: try { try decoder.decodeSingularUInt32Field(value: &self.strideBytes) }()
       default: break
       }
     }
@@ -227,6 +233,9 @@ nonisolated extension RASegmentationImage: SwiftProtobuf.Message, SwiftProtobuf.
     if self.pixelFormat != .unspecified {
       try visitor.visitSingularEnumField(value: self.pixelFormat, fieldNumber: 4)
     }
+    if self.strideBytes != 0 {
+      try visitor.visitSingularUInt32Field(value: self.strideBytes, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -235,6 +244,7 @@ nonisolated extension RASegmentationImage: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs.width != rhs.width {return false}
     if lhs.height != rhs.height {return false}
     if lhs.pixelFormat != rhs.pixelFormat {return false}
+    if lhs.strideBytes != rhs.strideBytes {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

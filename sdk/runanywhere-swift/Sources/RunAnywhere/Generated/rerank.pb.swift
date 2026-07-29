@@ -51,6 +51,7 @@ public nonisolated struct RARerankOptions: Sendable {
 
   /// When > 0, only the top_n highest-scoring candidates are returned (every
   /// candidate is still scored). 0 = return all candidates, ranked.
+  /// Industry name (Cohere rerank `top_n`).
   public var topN: UInt32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -91,12 +92,14 @@ public nonisolated struct RARerankScoredItem: Sendable {
   /// Echo of RerankCandidate.id for correlation.
   public var id: String = String()
 
-  /// Raw relevance score from the reranker (higher = more relevant). Not
+  /// Relevance score from the reranker (higher = more relevant). Not
   /// normalized to a fixed range; comparable only within one result set.
-  public var score: Float = 0
+  /// Industry name (Cohere/Voyage `relevance_score`).
+  public var relevanceScore: Float = 0
 
   /// Index of this candidate in the original RerankRequest.candidates list.
-  public var originalIndex: UInt32 = 0
+  /// Industry name (`index`).
+  public var index: UInt32 = 0
 
   /// 0-based position after sorting by score descending (0 = most relevant).
   public var rank: UInt32 = 0
@@ -239,7 +242,7 @@ nonisolated extension RARerankRequest: SwiftProtobuf.Message, SwiftProtobuf._Mes
 
 nonisolated extension RARerankScoredItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RerankScoredItem"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}score\0\u{3}original_index\0\u{1}rank\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}relevance_score\0\u{1}index\0\u{1}rank\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -248,8 +251,8 @@ nonisolated extension RARerankScoredItem: SwiftProtobuf.Message, SwiftProtobuf._
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
-      case 2: try { try decoder.decodeSingularFloatField(value: &self.score) }()
-      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.originalIndex) }()
+      case 2: try { try decoder.decodeSingularFloatField(value: &self.relevanceScore) }()
+      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.index) }()
       case 4: try { try decoder.decodeSingularUInt32Field(value: &self.rank) }()
       default: break
       }
@@ -260,11 +263,11 @@ nonisolated extension RARerankScoredItem: SwiftProtobuf.Message, SwiftProtobuf._
     if !self.id.isEmpty {
       try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
     }
-    if self.score.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.score, fieldNumber: 2)
+    if self.relevanceScore.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.relevanceScore, fieldNumber: 2)
     }
-    if self.originalIndex != 0 {
-      try visitor.visitSingularUInt32Field(value: self.originalIndex, fieldNumber: 3)
+    if self.index != 0 {
+      try visitor.visitSingularUInt32Field(value: self.index, fieldNumber: 3)
     }
     if self.rank != 0 {
       try visitor.visitSingularUInt32Field(value: self.rank, fieldNumber: 4)
@@ -274,8 +277,8 @@ nonisolated extension RARerankScoredItem: SwiftProtobuf.Message, SwiftProtobuf._
 
   public static func ==(lhs: RARerankScoredItem, rhs: RARerankScoredItem) -> Bool {
     if lhs.id != rhs.id {return false}
-    if lhs.score != rhs.score {return false}
-    if lhs.originalIndex != rhs.originalIndex {return false}
+    if lhs.relevanceScore != rhs.relevanceScore {return false}
+    if lhs.index != rhs.index {return false}
     if lhs.rank != rhs.rank {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

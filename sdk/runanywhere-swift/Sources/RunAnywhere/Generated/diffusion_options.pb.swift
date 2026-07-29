@@ -586,15 +586,16 @@ public nonisolated struct RADiffusionGenerationOptions: @unchecked Sendable {
     set {_uniqueStorage()._height = newValue}
   }
 
-  /// Number of denoising steps. Range 1–50 (variant-dependent: SDXS=1,
-  /// SDXL_Turbo / LCM=4, SD*=20–28). 0 = use variant default.
-  public var numInferenceSteps: Int32 {
-    get {_storage._numInferenceSteps}
-    set {_uniqueStorage()._numInferenceSteps = newValue}
+  /// Number of denoising steps (industry short name `steps`). Range 1–50
+  /// (variant-dependent: SDXS=1, SDXL_Turbo / LCM=4, SD*=20–28). 0 = use
+  /// variant default. Was `num_inference_steps`.
+  public var steps: Int32 {
+    get {_storage._steps}
+    set {_uniqueStorage()._steps = newValue}
   }
 
   /// Classifier-free guidance scale. 0.0 = no CFG (required for SDXS /
-  /// SDXL_Turbo). Typical SD range 1.0–20.0; default 7.5.
+  /// SDXL_Turbo). Typical SD range 1.0–20.0.
   public var guidanceScale: Float {
     get {_storage._guidanceScale}
     set {_uniqueStorage()._guidanceScale = newValue}
@@ -1263,14 +1264,14 @@ nonisolated extension RADiffusionConfig: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionGenerationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}negative_prompt\0\u{1}width\0\u{1}height\0\u{3}num_inference_steps\0\u{3}guidance_scale\0\u{1}seed\0\u{1}scheduler\0\u{1}mode\0\u{3}input_image\0\u{3}mask_image\0\u{3}denoise_strength\0\u{3}report_intermediate_images\0\u{3}progress_stride\0\u{3}input_image_width\0\u{3}input_image_height\0\u{3}input_image_media_type\0\u{3}mask_image_media_type\0\u{3}batch_size\0\u{3}return_latents\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}negative_prompt\0\u{1}width\0\u{1}height\0\u{1}steps\0\u{3}guidance_scale\0\u{1}seed\0\u{1}scheduler\0\u{1}mode\0\u{3}input_image\0\u{3}mask_image\0\u{3}denoise_strength\0\u{3}report_intermediate_images\0\u{3}progress_stride\0\u{3}input_image_width\0\u{3}input_image_height\0\u{3}input_image_media_type\0\u{3}mask_image_media_type\0\u{3}batch_size\0\u{3}return_latents\0")
 
   fileprivate class _StorageClass {
     var _prompt: String = String()
     var _negativePrompt: String = String()
     var _width: Int32 = 0
     var _height: Int32 = 0
-    var _numInferenceSteps: Int32 = 0
+    var _steps: Int32 = 0
     var _guidanceScale: Float = 0
     var _seed: Int64 = 0
     var _scheduler: RADiffusionScheduler = .unspecified
@@ -1300,7 +1301,7 @@ nonisolated extension RADiffusionGenerationOptions: SwiftProtobuf.Message, Swift
       _negativePrompt = source._negativePrompt
       _width = source._width
       _height = source._height
-      _numInferenceSteps = source._numInferenceSteps
+      _steps = source._steps
       _guidanceScale = source._guidanceScale
       _seed = source._seed
       _scheduler = source._scheduler
@@ -1338,7 +1339,7 @@ nonisolated extension RADiffusionGenerationOptions: SwiftProtobuf.Message, Swift
         case 2: try { try decoder.decodeSingularStringField(value: &_storage._negativePrompt) }()
         case 3: try { try decoder.decodeSingularInt32Field(value: &_storage._width) }()
         case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._height) }()
-        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._numInferenceSteps) }()
+        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._steps) }()
         case 6: try { try decoder.decodeSingularFloatField(value: &_storage._guidanceScale) }()
         case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._seed) }()
         case 8: try { try decoder.decodeSingularEnumField(value: &_storage._scheduler) }()
@@ -1378,8 +1379,8 @@ nonisolated extension RADiffusionGenerationOptions: SwiftProtobuf.Message, Swift
       if _storage._height != 0 {
         try visitor.visitSingularInt32Field(value: _storage._height, fieldNumber: 4)
       }
-      if _storage._numInferenceSteps != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._numInferenceSteps, fieldNumber: 5)
+      if _storage._steps != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._steps, fieldNumber: 5)
       }
       if _storage._guidanceScale.bitPattern != 0 {
         try visitor.visitSingularFloatField(value: _storage._guidanceScale, fieldNumber: 6)
@@ -1439,7 +1440,7 @@ nonisolated extension RADiffusionGenerationOptions: SwiftProtobuf.Message, Swift
         if _storage._negativePrompt != rhs_storage._negativePrompt {return false}
         if _storage._width != rhs_storage._width {return false}
         if _storage._height != rhs_storage._height {return false}
-        if _storage._numInferenceSteps != rhs_storage._numInferenceSteps {return false}
+        if _storage._steps != rhs_storage._steps {return false}
         if _storage._guidanceScale != rhs_storage._guidanceScale {return false}
         if _storage._seed != rhs_storage._seed {return false}
         if _storage._scheduler != rhs_storage._scheduler {return false}

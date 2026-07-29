@@ -546,9 +546,9 @@ public nonisolated struct RAVLMGenerationOptions: @unchecked Sendable {
     set {_uniqueStorage()._prompt = newValue}
   }
 
-  public var maxTokens: Int32 {
-    get {_storage._maxTokens}
-    set {_uniqueStorage()._maxTokens = newValue}
+  public var maxOutputTokens: Int32 {
+    get {_storage._maxOutputTokens}
+    set {_uniqueStorage()._maxOutputTokens = newValue}
   }
 
   public var temperature: Float {
@@ -570,11 +570,6 @@ public nonisolated struct RAVLMGenerationOptions: @unchecked Sendable {
   public var stopSequences: [String] {
     get {_storage._stopSequences}
     set {_uniqueStorage()._stopSequences = newValue}
-  }
-
-  public var streamingEnabled: Bool {
-    get {_storage._streamingEnabled}
-    set {_uniqueStorage()._streamingEnabled = newValue}
   }
 
   public var systemPrompt: String {
@@ -644,6 +639,16 @@ public nonisolated struct RAVLMGenerationOptions: @unchecked Sendable {
     get {_storage._emitImageEmbeddings}
     set {_uniqueStorage()._emitImageEmbeddings = newValue}
   }
+
+  /// Reasoning/thinking control — same message as LLMGenerationOptions.
+  public var reasoning: RAReasoningOptions {
+    get {_storage._reasoning ?? RAReasoningOptions()}
+    set {_uniqueStorage()._reasoning = newValue}
+  }
+  /// Returns true if `reasoning` has been explicitly set.
+  public var hasReasoning: Bool {_storage._reasoning != nil}
+  /// Clears the value of `reasoning`. Subsequent reads from it will return its default value.
+  public mutating func clearReasoning() {_uniqueStorage()._reasoning = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -723,9 +728,9 @@ public nonisolated struct RAVLMResult: Sendable {
 
   public var text: String = String()
 
-  public var promptTokens: Int32 = 0
+  public var inputTokens: Int32 = 0
 
-  public var completionTokens: Int32 = 0
+  public var outputTokens: Int32 = 0
 
   public var totalTokens: Int64 = 0
 
@@ -1147,16 +1152,15 @@ nonisolated extension RAVLMConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMGenerationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}system_prompt\0\u{3}max_image_size\0\u{3}n_threads\0\u{3}use_gpu\0\u{3}model_family\0\u{3}custom_chat_template\0\u{3}image_marker_override\0\u{1}seed\0\u{3}repetition_penalty\0\u{3}min_p\0\u{3}emit_image_embeddings\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_output_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}stop_sequences\0\u{4}\u{2}system_prompt\0\u{3}max_image_size\0\u{3}n_threads\0\u{3}use_gpu\0\u{3}model_family\0\u{3}custom_chat_template\0\u{3}image_marker_override\0\u{1}seed\0\u{3}repetition_penalty\0\u{3}min_p\0\u{3}emit_image_embeddings\0\u{1}reasoning\0\u{c}\u{7}\u{1}")
 
   fileprivate class _StorageClass {
     var _prompt: String = String()
-    var _maxTokens: Int32 = 0
+    var _maxOutputTokens: Int32 = 0
     var _temperature: Float = 0
     var _topP: Float = 0
     var _topK: Int32 = 0
     var _stopSequences: [String] = []
-    var _streamingEnabled: Bool = false
     var _systemPrompt: String? = nil
     var _maxImageSize: Int32 = 0
     var _nThreads: Int32 = 0
@@ -1168,6 +1172,7 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
     var _repetitionPenalty: Float = 0
     var _minP: Float = 0
     var _emitImageEmbeddings: Bool = false
+    var _reasoning: RAReasoningOptions? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1179,12 +1184,11 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
 
     init(copying source: _StorageClass) {
       _prompt = source._prompt
-      _maxTokens = source._maxTokens
+      _maxOutputTokens = source._maxOutputTokens
       _temperature = source._temperature
       _topP = source._topP
       _topK = source._topK
       _stopSequences = source._stopSequences
-      _streamingEnabled = source._streamingEnabled
       _systemPrompt = source._systemPrompt
       _maxImageSize = source._maxImageSize
       _nThreads = source._nThreads
@@ -1196,6 +1200,7 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
       _repetitionPenalty = source._repetitionPenalty
       _minP = source._minP
       _emitImageEmbeddings = source._emitImageEmbeddings
+      _reasoning = source._reasoning
     }
   }
 
@@ -1215,12 +1220,11 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularStringField(value: &_storage._prompt) }()
-        case 2: try { try decoder.decodeSingularInt32Field(value: &_storage._maxTokens) }()
+        case 2: try { try decoder.decodeSingularInt32Field(value: &_storage._maxOutputTokens) }()
         case 3: try { try decoder.decodeSingularFloatField(value: &_storage._temperature) }()
         case 4: try { try decoder.decodeSingularFloatField(value: &_storage._topP) }()
         case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._topK) }()
         case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._stopSequences) }()
-        case 7: try { try decoder.decodeSingularBoolField(value: &_storage._streamingEnabled) }()
         case 8: try { try decoder.decodeSingularStringField(value: &_storage._systemPrompt) }()
         case 9: try { try decoder.decodeSingularInt32Field(value: &_storage._maxImageSize) }()
         case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._nThreads) }()
@@ -1232,6 +1236,7 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
         case 16: try { try decoder.decodeSingularFloatField(value: &_storage._repetitionPenalty) }()
         case 17: try { try decoder.decodeSingularFloatField(value: &_storage._minP) }()
         case 18: try { try decoder.decodeSingularBoolField(value: &_storage._emitImageEmbeddings) }()
+        case 19: try { try decoder.decodeSingularMessageField(value: &_storage._reasoning) }()
         default: break
         }
       }
@@ -1247,8 +1252,8 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
       if !_storage._prompt.isEmpty {
         try visitor.visitSingularStringField(value: _storage._prompt, fieldNumber: 1)
       }
-      if _storage._maxTokens != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._maxTokens, fieldNumber: 2)
+      if _storage._maxOutputTokens != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._maxOutputTokens, fieldNumber: 2)
       }
       if _storage._temperature.bitPattern != 0 {
         try visitor.visitSingularFloatField(value: _storage._temperature, fieldNumber: 3)
@@ -1261,9 +1266,6 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
       }
       if !_storage._stopSequences.isEmpty {
         try visitor.visitRepeatedStringField(value: _storage._stopSequences, fieldNumber: 6)
-      }
-      if _storage._streamingEnabled != false {
-        try visitor.visitSingularBoolField(value: _storage._streamingEnabled, fieldNumber: 7)
       }
       try { if let v = _storage._systemPrompt {
         try visitor.visitSingularStringField(value: v, fieldNumber: 8)
@@ -1298,6 +1300,9 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
       if _storage._emitImageEmbeddings != false {
         try visitor.visitSingularBoolField(value: _storage._emitImageEmbeddings, fieldNumber: 18)
       }
+      try { if let v = _storage._reasoning {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 19)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1308,12 +1313,11 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
         let _storage = _args.0
         let rhs_storage = _args.1
         if _storage._prompt != rhs_storage._prompt {return false}
-        if _storage._maxTokens != rhs_storage._maxTokens {return false}
+        if _storage._maxOutputTokens != rhs_storage._maxOutputTokens {return false}
         if _storage._temperature != rhs_storage._temperature {return false}
         if _storage._topP != rhs_storage._topP {return false}
         if _storage._topK != rhs_storage._topK {return false}
         if _storage._stopSequences != rhs_storage._stopSequences {return false}
-        if _storage._streamingEnabled != rhs_storage._streamingEnabled {return false}
         if _storage._systemPrompt != rhs_storage._systemPrompt {return false}
         if _storage._maxImageSize != rhs_storage._maxImageSize {return false}
         if _storage._nThreads != rhs_storage._nThreads {return false}
@@ -1325,6 +1329,7 @@ nonisolated extension RAVLMGenerationOptions: SwiftProtobuf.Message, SwiftProtob
         if _storage._repetitionPenalty != rhs_storage._repetitionPenalty {return false}
         if _storage._minP != rhs_storage._minP {return false}
         if _storage._emitImageEmbeddings != rhs_storage._emitImageEmbeddings {return false}
+        if _storage._reasoning != rhs_storage._reasoning {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1390,7 +1395,7 @@ nonisolated extension RAVLMGenerationRequest: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VLMResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}processing_time_ms\0\u{3}tokens_per_second\0\u{3}image_tokens\0\u{3}time_to_first_token_ms\0\u{3}image_encode_time_ms\0\u{3}hardware_used\0\u{3}error_message\0\u{3}error_code\0\u{3}finish_reason\0\u{3}images_processed\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}input_tokens\0\u{3}output_tokens\0\u{3}total_tokens\0\u{3}processing_time_ms\0\u{3}tokens_per_second\0\u{3}image_tokens\0\u{3}time_to_first_token_ms\0\u{3}image_encode_time_ms\0\u{3}hardware_used\0\u{3}error_message\0\u{3}error_code\0\u{3}finish_reason\0\u{3}images_processed\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1399,8 +1404,8 @@ nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._Message
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.promptTokens) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.completionTokens) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.inputTokens) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.outputTokens) }()
       case 4: try { try decoder.decodeSingularInt64Field(value: &self.totalTokens) }()
       case 5: try { try decoder.decodeSingularInt64Field(value: &self.processingTimeMs) }()
       case 6: try { try decoder.decodeSingularFloatField(value: &self.tokensPerSecond) }()
@@ -1425,11 +1430,11 @@ nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._Message
     if !self.text.isEmpty {
       try visitor.visitSingularStringField(value: self.text, fieldNumber: 1)
     }
-    if self.promptTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.promptTokens, fieldNumber: 2)
+    if self.inputTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.inputTokens, fieldNumber: 2)
     }
-    if self.completionTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.completionTokens, fieldNumber: 3)
+    if self.outputTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.outputTokens, fieldNumber: 3)
     }
     if self.totalTokens != 0 {
       try visitor.visitSingularInt64Field(value: self.totalTokens, fieldNumber: 4)
@@ -1469,8 +1474,8 @@ nonisolated extension RAVLMResult: SwiftProtobuf.Message, SwiftProtobuf._Message
 
   public static func ==(lhs: RAVLMResult, rhs: RAVLMResult) -> Bool {
     if lhs.text != rhs.text {return false}
-    if lhs.promptTokens != rhs.promptTokens {return false}
-    if lhs.completionTokens != rhs.completionTokens {return false}
+    if lhs.inputTokens != rhs.inputTokens {return false}
+    if lhs.outputTokens != rhs.outputTokens {return false}
     if lhs.totalTokens != rhs.totalTokens {return false}
     if lhs.processingTimeMs != rhs.processingTimeMs {return false}
     if lhs.tokensPerSecond != rhs.tokensPerSecond {return false}

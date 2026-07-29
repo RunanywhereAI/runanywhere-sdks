@@ -112,7 +112,6 @@ public nonisolated struct RALoRAAdapterConfig: Sendable {
   /// path on disk to the GGUF file
   public var adapterPath: String = String()
 
-  /// default 1.0 (set by codegen layer)
   public var scale: Float = 0
 
   /// optional link to catalog entry id

@@ -98,106 +98,6 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// STT language hint. Sources pre-IDL:
-///   Swift  STTConfiguration default = "en-US", STTOptions default = "en"
-///   Kotlin STTConfiguration default = "en-US", STTOptions default = "en"
-///   Dart   STTOptions language nullable; auto-detect when null
-///   RN     STTOptions.language?: string (free-form)
-///   Web    STTTranscribeOptions.language?: string (free-form)
-///   C ABI  RAC_STT_DEFAULT_LANGUAGE = "en"
-/// Free-form BCP-47 strings are collapsed to base language codes here.
-/// AUTO is the explicit "detect from audio" sentinel; UNSPECIFIED falls
-/// back to the backend default (typically "en").
-/// ---------------------------------------------------------------------------
-/// `rac_wire_string` annotations expose the BCP-47 base code for each value via
-/// the codegen-generated `wireString` accessor (see idl/rac_options.proto and
-/// idl/codegen/generate_swift_convenience.py). Swift SDK `bcp47Code` is sourced
-/// from this annotation; the unspecified case falls back to "" by default.
-public nonisolated enum RASTTLanguage: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-
-  /// Auto-detect from audio
-  case auto // = 1
-  case en // = 2
-  case es // = 3
-  case fr // = 4
-  case de // = 5
-  case zh // = 6
-  case ja // = 7
-  case ko // = 8
-  case it // = 9
-  case pt // = 10
-  case ar // = 11
-  case ru // = 12
-  case hi // = 13
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .auto
-    case 2: self = .en
-    case 3: self = .es
-    case 4: self = .fr
-    case 5: self = .de
-    case 6: self = .zh
-    case 7: self = .ja
-    case 8: self = .ko
-    case 9: self = .it
-    case 10: self = .pt
-    case 11: self = .ar
-    case 12: self = .ru
-    case 13: self = .hi
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .auto: return 1
-    case .en: return 2
-    case .es: return 3
-    case .fr: return 4
-    case .de: return 5
-    case .zh: return 6
-    case .ja: return 7
-    case .ko: return 8
-    case .it: return 9
-    case .pt: return 10
-    case .ar: return 11
-    case .ru: return 12
-    case .hi: return 13
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RASTTLanguage] = [
-    .unspecified,
-    .auto,
-    .en,
-    .es,
-    .fr,
-    .de,
-    .zh,
-    .ja,
-    .ko,
-    .it,
-    .pt,
-    .ar,
-    .ru,
-    .hi,
-  ]
-
-}
-
 public nonisolated enum RASTTAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -314,7 +214,15 @@ public nonisolated struct RASTTConfiguration: Sendable {
 
   public var modelID: String = String()
 
-  public var language: RASTTLanguage = .unspecified
+  /// Default input language, BCP-47 / ISO-639-1. Unset/empty = auto-detect.
+  public var language: String {
+    get {_language ?? String()}
+    set {_language = newValue}
+  }
+  /// Returns true if `language` has been explicitly set.
+  public var hasLanguage: Bool {self._language != nil}
+  /// Clears the value of `language`. Subsequent reads from it will return its default value.
+  public mutating func clearLanguage() {self._language = nil}
 
   public var sampleRate: Int32 = 0
 
@@ -345,23 +253,12 @@ public nonisolated struct RASTTConfiguration: Sendable {
   /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
   public mutating func clearPreferredFramework() {self._preferredFramework = nil}
 
-  /// Free-form BCP-47 language tag ("en-US", "pt-BR", etc.) for callers
-  /// that cannot be represented by STTLanguage's base-code enum.
-  public var languageCode: String {
-    get {_languageCode ?? String()}
-    set {_languageCode = newValue}
-  }
-  /// Returns true if `languageCode` has been explicitly set.
-  public var hasLanguageCode: Bool {self._languageCode != nil}
-  /// Clears the value of `languageCode`. Subsequent reads from it will return its default value.
-  public mutating func clearLanguageCode() {self._languageCode = nil}
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
+  fileprivate var _language: String? = nil
   fileprivate var _preferredFramework: RAInferenceFramework? = nil
-  fileprivate var _languageCode: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -385,13 +282,22 @@ public nonisolated struct RASTTOptions: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var language: RASTTLanguage = .unspecified
+  /// Input language as a BCP-47 / ISO-639-1 tag ("en", "en-US", "hi").
+  /// Unset or empty = auto-detect. Matches the industry `language` param.
+  public var language: String {
+    get {_language ?? String()}
+    set {_language = newValue}
+  }
+  /// Returns true if `language` has been explicitly set.
+  public var hasLanguage: Bool {self._language != nil}
+  /// Clears the value of `language`. Subsequent reads from it will return its default value.
+  public mutating func clearLanguage() {self._language = nil}
 
   public var enablePunctuation: Bool = false
 
   public var enableDiarization: Bool = false
 
-  /// 0 = auto / unset
+  /// 0 = auto
   public var maxSpeakers: Int32 = 0
 
   /// Custom vocabulary bias
@@ -401,26 +307,6 @@ public nonisolated struct RASTTOptions: Sendable {
 
   /// 0 = backend default
   public var beamSize: Int32 = 0
-
-  /// Free-form BCP-47 language tag. When set, consumers should prefer this
-  /// over the base-language enum above.
-  public var languageCode: String {
-    get {_languageCode ?? String()}
-    set {_languageCode = newValue}
-  }
-  /// Returns true if `languageCode` has been explicitly set.
-  public var hasLanguageCode: Bool {self._languageCode != nil}
-  /// Clears the value of `languageCode`. Subsequent reads from it will return its default value.
-  public mutating func clearLanguageCode() {self._languageCode = nil}
-
-  /// Explicit language auto-detection flag for C ABI parity. Equivalent to
-  /// language == STT_LANGUAGE_AUTO for generated-only consumers.
-  public var detectLanguage: Bool = false
-
-  /// Per-call input audio hints mirrored from rac_stt_options_t.
-  public var audioFormat: RAAudioFormat = .unspecified
-
-  public var sampleRate: Int32 = 0
 
   /// Maximum number of alternatives to return. 0 = backend/default.
   public var maxAlternatives: Int32 = 0
@@ -438,7 +324,7 @@ public nonisolated struct RASTTOptions: Sendable {
 
   public init() {}
 
-  fileprivate var _languageCode: String? = nil
+  fileprivate var _language: String? = nil
 }
 
 public nonisolated struct RASTTAudioSource: Sendable {
@@ -657,9 +543,17 @@ public nonisolated struct RASTTOutput: Sendable {
 
   public var text: String = String()
 
-  public var language: RASTTLanguage = .unspecified
-
   public var confidence: Float = 0
+
+  /// Detected language, BCP-47 (preserves regional variants). Empty = unknown.
+  public var language: String {
+    get {_language ?? String()}
+    set {_language = newValue}
+  }
+  /// Returns true if `language` has been explicitly set.
+  public var hasLanguage: Bool {self._language != nil}
+  /// Clears the value of `language`. Subsequent reads from it will return its default value.
+  public mutating func clearLanguage() {self._language = nil}
 
   public var words: [RAWordTimestamp] = []
 
@@ -673,16 +567,6 @@ public nonisolated struct RASTTOutput: Sendable {
   public var hasMetadata: Bool {self._metadata != nil}
   /// Clears the value of `metadata`. Subsequent reads from it will return its default value.
   public mutating func clearMetadata() {self._metadata = nil}
-
-  /// Free-form detected language tag, preserving regional variants.
-  public var languageCode: String {
-    get {_languageCode ?? String()}
-    set {_languageCode = newValue}
-  }
-  /// Returns true if `languageCode` has been explicitly set.
-  public var hasLanguageCode: Bool {self._languageCode != nil}
-  /// Clears the value of `languageCode`. Subsequent reads from it will return its default value.
-  public mutating func clearLanguageCode() {self._languageCode = nil}
 
   /// Wall-clock output timestamp in milliseconds since Unix epoch.
   public var timestampMs: Int64 = 0
@@ -713,8 +597,8 @@ public nonisolated struct RASTTOutput: Sendable {
 
   public init() {}
 
+  fileprivate var _language: String? = nil
   fileprivate var _metadata: RATranscriptionMetadata? = nil
-  fileprivate var _languageCode: String? = nil
   fileprivate var _errorMessage: String? = nil
 }
 
@@ -757,10 +641,14 @@ public nonisolated struct RASTTPartialResult: @unchecked Sendable {
     set {_uniqueStorage()._confidence = newValue}
   }
 
-  public var language: RASTTLanguage {
-    get {_storage._language}
+  public var language: String {
+    get {_storage._language ?? String()}
     set {_uniqueStorage()._language = newValue}
   }
+  /// Returns true if `language` has been explicitly set.
+  public var hasLanguage: Bool {_storage._language != nil}
+  /// Clears the value of `language`. Subsequent reads from it will return its default value.
+  public mutating func clearLanguage() {_uniqueStorage()._language = nil}
 
   public var timestampMs: Int64 {
     get {_storage._timestampMs}
@@ -771,15 +659,6 @@ public nonisolated struct RASTTPartialResult: @unchecked Sendable {
     get {_storage._alternatives}
     set {_uniqueStorage()._alternatives = newValue}
   }
-
-  public var languageCode: String {
-    get {_storage._languageCode ?? String()}
-    set {_uniqueStorage()._languageCode = newValue}
-  }
-  /// Returns true if `languageCode` has been explicitly set.
-  public var hasLanguageCode: Bool {_storage._languageCode != nil}
-  /// Clears the value of `languageCode`. Subsequent reads from it will return its default value.
-  public mutating func clearLanguageCode() {_uniqueStorage()._languageCode = nil}
 
   /// Streaming correlation and endpointing metadata.
   public var requestID: String {
@@ -926,16 +805,8 @@ public nonisolated struct RASTTLanguageDetectionResult: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var language: RASTTLanguage = .unspecified
-
-  public var languageCode: String {
-    get {_languageCode ?? String()}
-    set {_languageCode = newValue}
-  }
-  /// Returns true if `languageCode` has been explicitly set.
-  public var hasLanguageCode: Bool {self._languageCode != nil}
-  /// Clears the value of `languageCode`. Subsequent reads from it will return its default value.
-  public mutating func clearLanguageCode() {self._languageCode = nil}
+  /// Detected language, BCP-47.
+  public var language: String = String()
 
   public var confidence: Float = 0
 
@@ -944,17 +815,11 @@ public nonisolated struct RASTTLanguageDetectionResult: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
-
-  fileprivate var _languageCode: String? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
-
-nonisolated extension RASTTLanguage: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STT_LANGUAGE_UNSPECIFIED\0\u{1}STT_LANGUAGE_AUTO\0\u{1}STT_LANGUAGE_EN\0\u{1}STT_LANGUAGE_ES\0\u{1}STT_LANGUAGE_FR\0\u{1}STT_LANGUAGE_DE\0\u{1}STT_LANGUAGE_ZH\0\u{1}STT_LANGUAGE_JA\0\u{1}STT_LANGUAGE_KO\0\u{1}STT_LANGUAGE_IT\0\u{1}STT_LANGUAGE_PT\0\u{1}STT_LANGUAGE_AR\0\u{1}STT_LANGUAGE_RU\0\u{1}STT_LANGUAGE_HI\0")
-}
 
 nonisolated extension RASTTAudioEncoding: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STT_AUDIO_ENCODING_UNSPECIFIED\0\u{1}STT_AUDIO_ENCODING_PCM_S16_LE\0\u{1}STT_AUDIO_ENCODING_PCM_F32_LE\0\u{1}STT_AUDIO_ENCODING_CONTAINER\0")
@@ -966,7 +831,7 @@ nonisolated extension RASTTStreamEventKind: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}language\0\u{3}sample_rate\0\u{3}enable_vad\0\u{3}audio_format\0\u{3}enable_punctuation\0\u{3}enable_diarization\0\u{3}vocabulary_list\0\u{3}max_alternatives\0\u{3}enable_word_timestamps\0\u{3}preferred_framework\0\u{3}language_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{4}\u{2}sample_rate\0\u{3}enable_vad\0\u{3}audio_format\0\u{3}enable_punctuation\0\u{3}enable_diarization\0\u{3}vocabulary_list\0\u{3}max_alternatives\0\u{3}enable_word_timestamps\0\u{3}preferred_framework\0\u{2}\u{2}language\0\u{c}\u{2}\u{1}\u{c}\u{c}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -975,7 +840,6 @@ nonisolated extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.language) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.enableVad) }()
       case 5: try { try decoder.decodeSingularEnumField(value: &self.audioFormat) }()
@@ -985,7 +849,7 @@ nonisolated extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
       case 9: try { try decoder.decodeSingularInt32Field(value: &self.maxAlternatives) }()
       case 10: try { try decoder.decodeSingularBoolField(value: &self.enableWordTimestamps) }()
       case 11: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
-      case 12: try { try decoder.decodeSingularStringField(value: &self._languageCode) }()
+      case 13: try { try decoder.decodeSingularStringField(value: &self._language) }()
       default: break
       }
     }
@@ -998,9 +862,6 @@ nonisolated extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
     // https://github.com/apple/swift-protobuf/issues/1182
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
-    }
-    if self.language != .unspecified {
-      try visitor.visitSingularEnumField(value: self.language, fieldNumber: 2)
     }
     if self.sampleRate != 0 {
       try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 3)
@@ -1029,15 +890,15 @@ nonisolated extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
     try { if let v = self._preferredFramework {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 11)
     } }()
-    try { if let v = self._languageCode {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 12)
+    try { if let v = self._language {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 13)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RASTTConfiguration, rhs: RASTTConfiguration) -> Bool {
     if lhs.modelID != rhs.modelID {return false}
-    if lhs.language != rhs.language {return false}
+    if lhs._language != rhs._language {return false}
     if lhs.sampleRate != rhs.sampleRate {return false}
     if lhs.enableVad != rhs.enableVad {return false}
     if lhs.audioFormat != rhs.audioFormat {return false}
@@ -1047,7 +908,6 @@ nonisolated extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs.maxAlternatives != rhs.maxAlternatives {return false}
     if lhs.enableWordTimestamps != rhs.enableWordTimestamps {return false}
     if lhs._preferredFramework != rhs._preferredFramework {return false}
-    if lhs._languageCode != rhs._languageCode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1055,7 +915,7 @@ nonisolated extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}language\0\u{3}enable_punctuation\0\u{3}enable_diarization\0\u{3}max_speakers\0\u{3}vocabulary_list\0\u{3}enable_word_timestamps\0\u{3}beam_size\0\u{3}language_code\0\u{3}detect_language\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}max_alternatives\0\u{3}chunk_duration_ms\0\u{3}endpoint_silence_ms\0\u{3}suppress_blank\0\u{3}translate_to_english\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}enable_punctuation\0\u{3}enable_diarization\0\u{3}max_speakers\0\u{3}vocabulary_list\0\u{3}enable_word_timestamps\0\u{3}beam_size\0\u{4}\u{5}max_alternatives\0\u{3}chunk_duration_ms\0\u{3}endpoint_silence_ms\0\u{3}suppress_blank\0\u{3}translate_to_english\0\u{1}language\0\u{c}\u{1}\u{1}\u{c}\u{8}\u{1}\u{c}\u{9}\u{1}\u{c}\u{a}\u{1}\u{c}\u{b}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1063,22 +923,18 @@ nonisolated extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self.language) }()
       case 2: try { try decoder.decodeSingularBoolField(value: &self.enablePunctuation) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.enableDiarization) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxSpeakers) }()
       case 5: try { try decoder.decodeRepeatedStringField(value: &self.vocabularyList) }()
       case 6: try { try decoder.decodeSingularBoolField(value: &self.enableWordTimestamps) }()
       case 7: try { try decoder.decodeSingularInt32Field(value: &self.beamSize) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._languageCode) }()
-      case 9: try { try decoder.decodeSingularBoolField(value: &self.detectLanguage) }()
-      case 10: try { try decoder.decodeSingularEnumField(value: &self.audioFormat) }()
-      case 11: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
       case 12: try { try decoder.decodeSingularInt32Field(value: &self.maxAlternatives) }()
       case 13: try { try decoder.decodeSingularInt32Field(value: &self.chunkDurationMs) }()
       case 14: try { try decoder.decodeSingularInt32Field(value: &self.endpointSilenceMs) }()
       case 15: try { try decoder.decodeSingularBoolField(value: &self.suppressBlank) }()
       case 16: try { try decoder.decodeSingularBoolField(value: &self.translateToEnglish) }()
+      case 17: try { try decoder.decodeSingularStringField(value: &self._language) }()
       default: break
       }
     }
@@ -1089,9 +945,6 @@ nonisolated extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if self.language != .unspecified {
-      try visitor.visitSingularEnumField(value: self.language, fieldNumber: 1)
-    }
     if self.enablePunctuation != false {
       try visitor.visitSingularBoolField(value: self.enablePunctuation, fieldNumber: 2)
     }
@@ -1110,18 +963,6 @@ nonisolated extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if self.beamSize != 0 {
       try visitor.visitSingularInt32Field(value: self.beamSize, fieldNumber: 7)
     }
-    try { if let v = self._languageCode {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-    } }()
-    if self.detectLanguage != false {
-      try visitor.visitSingularBoolField(value: self.detectLanguage, fieldNumber: 9)
-    }
-    if self.audioFormat != .unspecified {
-      try visitor.visitSingularEnumField(value: self.audioFormat, fieldNumber: 10)
-    }
-    if self.sampleRate != 0 {
-      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 11)
-    }
     if self.maxAlternatives != 0 {
       try visitor.visitSingularInt32Field(value: self.maxAlternatives, fieldNumber: 12)
     }
@@ -1137,21 +978,20 @@ nonisolated extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if self.translateToEnglish != false {
       try visitor.visitSingularBoolField(value: self.translateToEnglish, fieldNumber: 16)
     }
+    try { if let v = self._language {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 17)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RASTTOptions, rhs: RASTTOptions) -> Bool {
-    if lhs.language != rhs.language {return false}
+    if lhs._language != rhs._language {return false}
     if lhs.enablePunctuation != rhs.enablePunctuation {return false}
     if lhs.enableDiarization != rhs.enableDiarization {return false}
     if lhs.maxSpeakers != rhs.maxSpeakers {return false}
     if lhs.vocabularyList != rhs.vocabularyList {return false}
     if lhs.enableWordTimestamps != rhs.enableWordTimestamps {return false}
     if lhs.beamSize != rhs.beamSize {return false}
-    if lhs._languageCode != rhs._languageCode {return false}
-    if lhs.detectLanguage != rhs.detectLanguage {return false}
-    if lhs.audioFormat != rhs.audioFormat {return false}
-    if lhs.sampleRate != rhs.sampleRate {return false}
     if lhs.maxAlternatives != rhs.maxAlternatives {return false}
     if lhs.chunkDurationMs != rhs.chunkDurationMs {return false}
     if lhs.endpointSilenceMs != rhs.endpointSilenceMs {return false}
@@ -1493,7 +1333,7 @@ nonisolated extension RATranscriptionMetadata: SwiftProtobuf.Message, SwiftProto
 
 nonisolated extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTOutput"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{1}language\0\u{1}confidence\0\u{1}words\0\u{1}alternatives\0\u{1}metadata\0\u{3}language_code\0\u{3}timestamp_ms\0\u{3}duration_ms\0\u{3}speaker_ids\0\u{3}error_message\0\u{3}error_code\0\u{3}segment_index\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{2}\u{2}confidence\0\u{1}words\0\u{1}alternatives\0\u{1}metadata\0\u{4}\u{2}timestamp_ms\0\u{3}duration_ms\0\u{3}speaker_ids\0\u{3}error_message\0\u{3}error_code\0\u{3}segment_index\0\u{1}language\0\u{c}\u{2}\u{1}\u{c}\u{7}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1502,18 +1342,17 @@ nonisolated extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._Message
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.language) }()
       case 3: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
       case 4: try { try decoder.decodeRepeatedMessageField(value: &self.words) }()
       case 5: try { try decoder.decodeRepeatedMessageField(value: &self.alternatives) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._metadata) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self._languageCode) }()
       case 8: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
       case 9: try { try decoder.decodeSingularInt64Field(value: &self.durationMs) }()
       case 10: try { try decoder.decodeRepeatedStringField(value: &self.speakerIds) }()
       case 11: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
       case 12: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
       case 13: try { try decoder.decodeSingularInt32Field(value: &self.segmentIndex) }()
+      case 14: try { try decoder.decodeSingularStringField(value: &self._language) }()
       default: break
       }
     }
@@ -1527,9 +1366,6 @@ nonisolated extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._Message
     if !self.text.isEmpty {
       try visitor.visitSingularStringField(value: self.text, fieldNumber: 1)
     }
-    if self.language != .unspecified {
-      try visitor.visitSingularEnumField(value: self.language, fieldNumber: 2)
-    }
     if self.confidence.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 3)
     }
@@ -1541,9 +1377,6 @@ nonisolated extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._Message
     }
     try { if let v = self._metadata {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._languageCode {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
     } }()
     if self.timestampMs != 0 {
       try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 8)
@@ -1563,17 +1396,19 @@ nonisolated extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._Message
     if self.segmentIndex != 0 {
       try visitor.visitSingularInt32Field(value: self.segmentIndex, fieldNumber: 13)
     }
+    try { if let v = self._language {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 14)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RASTTOutput, rhs: RASTTOutput) -> Bool {
     if lhs.text != rhs.text {return false}
-    if lhs.language != rhs.language {return false}
     if lhs.confidence != rhs.confidence {return false}
+    if lhs._language != rhs._language {return false}
     if lhs.words != rhs.words {return false}
     if lhs.alternatives != rhs.alternatives {return false}
     if lhs._metadata != rhs._metadata {return false}
-    if lhs._languageCode != rhs._languageCode {return false}
     if lhs.timestampMs != rhs.timestampMs {return false}
     if lhs.durationMs != rhs.durationMs {return false}
     if lhs.speakerIds != rhs.speakerIds {return false}
@@ -1587,17 +1422,16 @@ nonisolated extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._Message
 
 nonisolated extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTPartialResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}is_final\0\u{1}stability\0\u{1}confidence\0\u{1}language\0\u{3}timestamp_ms\0\u{1}alternatives\0\u{3}language_code\0\u{3}request_id\0\u{3}segment_index\0\u{3}audio_start_ms\0\u{3}audio_end_ms\0\u{3}final_output\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}is_final\0\u{1}stability\0\u{1}confidence\0\u{4}\u{2}timestamp_ms\0\u{1}alternatives\0\u{4}\u{2}request_id\0\u{3}segment_index\0\u{3}audio_start_ms\0\u{3}audio_end_ms\0\u{3}final_output\0\u{1}language\0\u{c}\u{5}\u{1}\u{c}\u{8}\u{1}")
 
   fileprivate class _StorageClass {
     var _text: String = String()
     var _isFinal: Bool = false
     var _stability: Float = 0
     var _confidence: Float = 0
-    var _language: RASTTLanguage = .unspecified
+    var _language: String? = nil
     var _timestampMs: Int64 = 0
     var _alternatives: [RATranscriptionAlternative] = []
-    var _languageCode: String? = nil
     var _requestID: String = String()
     var _segmentIndex: Int32 = 0
     var _audioStartMs: Int64 = 0
@@ -1620,7 +1454,6 @@ nonisolated extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._
       _language = source._language
       _timestampMs = source._timestampMs
       _alternatives = source._alternatives
-      _languageCode = source._languageCode
       _requestID = source._requestID
       _segmentIndex = source._segmentIndex
       _audioStartMs = source._audioStartMs
@@ -1648,15 +1481,14 @@ nonisolated extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._
         case 2: try { try decoder.decodeSingularBoolField(value: &_storage._isFinal) }()
         case 3: try { try decoder.decodeSingularFloatField(value: &_storage._stability) }()
         case 4: try { try decoder.decodeSingularFloatField(value: &_storage._confidence) }()
-        case 5: try { try decoder.decodeSingularEnumField(value: &_storage._language) }()
         case 6: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampMs) }()
         case 7: try { try decoder.decodeRepeatedMessageField(value: &_storage._alternatives) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._languageCode) }()
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
         case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._segmentIndex) }()
         case 11: try { try decoder.decodeSingularInt64Field(value: &_storage._audioStartMs) }()
         case 12: try { try decoder.decodeSingularInt64Field(value: &_storage._audioEndMs) }()
         case 13: try { try decoder.decodeSingularMessageField(value: &_storage._finalOutput) }()
+        case 14: try { try decoder.decodeSingularStringField(value: &_storage._language) }()
         default: break
         }
       }
@@ -1681,18 +1513,12 @@ nonisolated extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._
       if _storage._confidence.bitPattern != 0 {
         try visitor.visitSingularFloatField(value: _storage._confidence, fieldNumber: 4)
       }
-      if _storage._language != .unspecified {
-        try visitor.visitSingularEnumField(value: _storage._language, fieldNumber: 5)
-      }
       if _storage._timestampMs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._timestampMs, fieldNumber: 6)
       }
       if !_storage._alternatives.isEmpty {
         try visitor.visitRepeatedMessageField(value: _storage._alternatives, fieldNumber: 7)
       }
-      try { if let v = _storage._languageCode {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-      } }()
       if !_storage._requestID.isEmpty {
         try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 9)
       }
@@ -1707,6 +1533,9 @@ nonisolated extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._
       }
       try { if let v = _storage._finalOutput {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+      } }()
+      try { if let v = _storage._language {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 14)
       } }()
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -1724,7 +1553,6 @@ nonisolated extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._
         if _storage._language != rhs_storage._language {return false}
         if _storage._timestampMs != rhs_storage._timestampMs {return false}
         if _storage._alternatives != rhs_storage._alternatives {return false}
-        if _storage._languageCode != rhs_storage._languageCode {return false}
         if _storage._requestID != rhs_storage._requestID {return false}
         if _storage._segmentIndex != rhs_storage._segmentIndex {return false}
         if _storage._audioStartMs != rhs_storage._audioStartMs {return false}
@@ -1919,7 +1747,7 @@ nonisolated extension RASTTServiceState: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RASTTLanguageDetectionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTLanguageDetectionResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}language\0\u{3}language_code\0\u{1}confidence\0\u{1}alternatives\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{3}confidence\0\u{1}alternatives\0\u{1}language\0\u{c}\u{1}\u{1}\u{c}\u{2}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1927,38 +1755,29 @@ nonisolated extension RASTTLanguageDetectionResult: SwiftProtobuf.Message, Swift
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self.language) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._languageCode) }()
       case 3: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
       case 4: try { try decoder.decodeRepeatedStringField(value: &self.alternatives) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.language) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.language != .unspecified {
-      try visitor.visitSingularEnumField(value: self.language, fieldNumber: 1)
-    }
-    try { if let v = self._languageCode {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
     if self.confidence.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 3)
     }
     if !self.alternatives.isEmpty {
       try visitor.visitRepeatedStringField(value: self.alternatives, fieldNumber: 4)
     }
+    if !self.language.isEmpty {
+      try visitor.visitSingularStringField(value: self.language, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RASTTLanguageDetectionResult, rhs: RASTTLanguageDetectionResult) -> Bool {
     if lhs.language != rhs.language {return false}
-    if lhs._languageCode != rhs._languageCode {return false}
     if lhs.confidence != rhs.confidence {return false}
     if lhs.alternatives != rhs.alternatives {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

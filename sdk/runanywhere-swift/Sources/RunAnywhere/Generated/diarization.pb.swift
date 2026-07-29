@@ -124,23 +124,23 @@ public nonisolated struct RADiarizationOptions: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var sampleRateHz: Int32 {
-    get {_sampleRateHz ?? 0}
-    set {_sampleRateHz = newValue}
+  public var sampleRate: Int32 {
+    get {_sampleRate ?? 0}
+    set {_sampleRate = newValue}
   }
-  /// Returns true if `sampleRateHz` has been explicitly set.
-  public var hasSampleRateHz: Bool {self._sampleRateHz != nil}
-  /// Clears the value of `sampleRateHz`. Subsequent reads from it will return its default value.
-  public mutating func clearSampleRateHz() {self._sampleRateHz = nil}
+  /// Returns true if `sampleRate` has been explicitly set.
+  public var hasSampleRate: Bool {self._sampleRate != nil}
+  /// Clears the value of `sampleRate`. Subsequent reads from it will return its default value.
+  public mutating func clearSampleRate() {self._sampleRate = nil}
 
-  public var channelCount: Int32 {
-    get {_channelCount ?? 0}
-    set {_channelCount = newValue}
+  public var channels: Int32 {
+    get {_channels ?? 0}
+    set {_channels = newValue}
   }
-  /// Returns true if `channelCount` has been explicitly set.
-  public var hasChannelCount: Bool {self._channelCount != nil}
-  /// Clears the value of `channelCount`. Subsequent reads from it will return its default value.
-  public mutating func clearChannelCount() {self._channelCount = nil}
+  /// Returns true if `channels` has been explicitly set.
+  public var hasChannels: Bool {self._channels != nil}
+  /// Clears the value of `channels`. Subsequent reads from it will return its default value.
+  public mutating func clearChannels() {self._channels = nil}
 
   public var encoding: RADiarizationAudioEncoding {
     get {_encoding ?? .unspecified}
@@ -168,8 +168,8 @@ public nonisolated struct RADiarizationOptions: Sendable {
 
   public init() {}
 
-  fileprivate var _sampleRateHz: Int32? = nil
-  fileprivate var _channelCount: Int32? = nil
+  fileprivate var _sampleRate: Int32? = nil
+  fileprivate var _channels: Int32? = nil
   fileprivate var _encoding: RADiarizationAudioEncoding? = nil
   fileprivate var _threshold: Float? = nil
 }
@@ -302,7 +302,7 @@ nonisolated extension RADiarizationStreamEventKind: SwiftProtobuf._ProtoNameProv
 
 nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiarizationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}sample_rate_hz\0\u{3}channel_count\0\u{1}encoding\0\u{1}threshold\0\u{3}minimum_duration_ms\0\u{3}merge_gap_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}sample_rate\0\u{1}channels\0\u{1}encoding\0\u{1}threshold\0\u{3}minimum_duration_ms\0\u{3}merge_gap_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -310,8 +310,8 @@ nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt32Field(value: &self._sampleRateHz) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self._channelCount) }()
+      case 1: try { try decoder.decodeSingularInt32Field(value: &self._sampleRate) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self._channels) }()
       case 3: try { try decoder.decodeSingularEnumField(value: &self._encoding) }()
       case 4: try { try decoder.decodeSingularFloatField(value: &self._threshold) }()
       case 5: try { try decoder.decodeSingularInt64Field(value: &self.minimumDurationMs) }()
@@ -326,10 +326,10 @@ nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._sampleRateHz {
+    try { if let v = self._sampleRate {
       try visitor.visitSingularInt32Field(value: v, fieldNumber: 1)
     } }()
-    try { if let v = self._channelCount {
+    try { if let v = self._channels {
       try visitor.visitSingularInt32Field(value: v, fieldNumber: 2)
     } }()
     try { if let v = self._encoding {
@@ -348,8 +348,8 @@ nonisolated extension RADiarizationOptions: SwiftProtobuf.Message, SwiftProtobuf
   }
 
   public static func ==(lhs: RADiarizationOptions, rhs: RADiarizationOptions) -> Bool {
-    if lhs._sampleRateHz != rhs._sampleRateHz {return false}
-    if lhs._channelCount != rhs._channelCount {return false}
+    if lhs._sampleRate != rhs._sampleRate {return false}
+    if lhs._channels != rhs._channels {return false}
     if lhs._encoding != rhs._encoding {return false}
     if lhs._threshold != rhs._threshold {return false}
     if lhs.minimumDurationMs != rhs.minimumDurationMs {return false}

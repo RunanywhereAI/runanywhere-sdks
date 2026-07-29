@@ -439,25 +439,25 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   /// Clears the value of `ttsVoiceName`. Subsequent reads from it will return its default value.
   public mutating func clearTtsVoiceName() {_uniqueStorage()._ttsVoiceName = nil}
 
-  /// -------------------------------------------------------------------
-  /// VAD sub-config (mirrors rac_voice_agent_vad_config_t).
-  /// -------------------------------------------------------------------
-  public var vadSampleRate: Int32 {
-    get {_storage._vadSampleRate}
-    set {_uniqueStorage()._vadSampleRate = newValue}
+  public var vadConfig: RAVADConfiguration {
+    get {_storage._vadConfig ?? RAVADConfiguration()}
+    set {_uniqueStorage()._vadConfig = newValue}
   }
+  /// Returns true if `vadConfig` has been explicitly set.
+  public var hasVadConfig: Bool {_storage._vadConfig != nil}
+  /// Clears the value of `vadConfig`. Subsequent reads from it will return its default value.
+  public mutating func clearVadConfig() {_uniqueStorage()._vadConfig = nil}
 
-  /// default 0.1
-  public var vadFrameLength: Float {
-    get {_storage._vadFrameLength}
-    set {_uniqueStorage()._vadFrameLength = newValue}
+  /// LLM generation knobs for the response model (sampling, system prompt,
+  /// reasoning). Unset = voice-agent defaults from the generated pool.
+  public var llmGeneration: RALLMGenerationOptions {
+    get {_storage._llmGeneration ?? RALLMGenerationOptions()}
+    set {_uniqueStorage()._llmGeneration = newValue}
   }
-
-  /// default 0.005
-  public var vadEnergyThreshold: Float {
-    get {_storage._vadEnergyThreshold}
-    set {_uniqueStorage()._vadEnergyThreshold = newValue}
-  }
+  /// Returns true if `llmGeneration` has been explicitly set.
+  public var hasLlmGeneration: Bool {_storage._llmGeneration != nil}
+  /// Clears the value of `llmGeneration`. Subsequent reads from it will return its default value.
+  public mutating func clearLlmGeneration() {_uniqueStorage()._llmGeneration = nil}
 
   /// -------------------------------------------------------------------
   /// Session-behavior sub-config. Optional so the C ABI can be invoked
@@ -983,7 +983,7 @@ nonisolated extension RAAudioPipelineConfig: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentComposeConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{3}vad_sample_rate\0\u{3}vad_frame_length\0\u{3}vad_energy_threshold\0\u{4}\u{8}session_config\0\u{3}audio_pipeline_config\0\u{3}session_id\0\u{3}default_language_code\0\u{b}wakeword_enabled\0\u{b}wakeword_model_path\0\u{b}wakeword_model_id\0\u{b}wakeword_phrase\0\u{b}wakeword_threshold\0\u{b}wakeword_embedding_model_path\0\u{b}wakeword_vad_model_path\0\u{c}\u{d}\u{7}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{4}\u{b}session_config\0\u{3}audio_pipeline_config\0\u{3}session_id\0\u{3}default_language_code\0\u{3}vad_config\0\u{3}llm_generation\0\u{b}wakeword_enabled\0\u{b}wakeword_model_path\0\u{b}wakeword_model_id\0\u{b}wakeword_phrase\0\u{b}wakeword_threshold\0\u{b}wakeword_embedding_model_path\0\u{b}wakeword_vad_model_path\0\u{c}\u{a}\u{3}\u{c}\u{d}\u{7}")
 
   fileprivate class _StorageClass {
     var _sttModelPath: String? = nil
@@ -995,9 +995,8 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
     var _ttsVoicePath: String? = nil
     var _ttsVoiceID: String? = nil
     var _ttsVoiceName: String? = nil
-    var _vadSampleRate: Int32 = 0
-    var _vadFrameLength: Float = 0
-    var _vadEnergyThreshold: Float = 0
+    var _vadConfig: RAVADConfiguration? = nil
+    var _llmGeneration: RALLMGenerationOptions? = nil
     var _sessionConfig: RAVoiceSessionConfig? = nil
     var _audioPipelineConfig: RAAudioPipelineConfig? = nil
     var _sessionID: String? = nil
@@ -1021,9 +1020,8 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
       _ttsVoicePath = source._ttsVoicePath
       _ttsVoiceID = source._ttsVoiceID
       _ttsVoiceName = source._ttsVoiceName
-      _vadSampleRate = source._vadSampleRate
-      _vadFrameLength = source._vadFrameLength
-      _vadEnergyThreshold = source._vadEnergyThreshold
+      _vadConfig = source._vadConfig
+      _llmGeneration = source._llmGeneration
       _sessionConfig = source._sessionConfig
       _audioPipelineConfig = source._audioPipelineConfig
       _sessionID = source._sessionID
@@ -1055,13 +1053,12 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
         case 7: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoicePath) }()
         case 8: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoiceID) }()
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._ttsVoiceName) }()
-        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._vadSampleRate) }()
-        case 11: try { try decoder.decodeSingularFloatField(value: &_storage._vadFrameLength) }()
-        case 12: try { try decoder.decodeSingularFloatField(value: &_storage._vadEnergyThreshold) }()
         case 20: try { try decoder.decodeSingularMessageField(value: &_storage._sessionConfig) }()
         case 21: try { try decoder.decodeSingularMessageField(value: &_storage._audioPipelineConfig) }()
         case 22: try { try decoder.decodeSingularStringField(value: &_storage._sessionID) }()
         case 23: try { try decoder.decodeSingularStringField(value: &_storage._defaultLanguageCode) }()
+        case 24: try { try decoder.decodeSingularMessageField(value: &_storage._vadConfig) }()
+        case 25: try { try decoder.decodeSingularMessageField(value: &_storage._llmGeneration) }()
         default: break
         }
       }
@@ -1101,15 +1098,6 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
       try { if let v = _storage._ttsVoiceName {
         try visitor.visitSingularStringField(value: v, fieldNumber: 9)
       } }()
-      if _storage._vadSampleRate != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._vadSampleRate, fieldNumber: 10)
-      }
-      if _storage._vadFrameLength.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._vadFrameLength, fieldNumber: 11)
-      }
-      if _storage._vadEnergyThreshold.bitPattern != 0 {
-        try visitor.visitSingularFloatField(value: _storage._vadEnergyThreshold, fieldNumber: 12)
-      }
       try { if let v = _storage._sessionConfig {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
       } }()
@@ -1121,6 +1109,12 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
       } }()
       try { if let v = _storage._defaultLanguageCode {
         try visitor.visitSingularStringField(value: v, fieldNumber: 23)
+      } }()
+      try { if let v = _storage._vadConfig {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
+      } }()
+      try { if let v = _storage._llmGeneration {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 25)
       } }()
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -1140,9 +1134,8 @@ nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftPro
         if _storage._ttsVoicePath != rhs_storage._ttsVoicePath {return false}
         if _storage._ttsVoiceID != rhs_storage._ttsVoiceID {return false}
         if _storage._ttsVoiceName != rhs_storage._ttsVoiceName {return false}
-        if _storage._vadSampleRate != rhs_storage._vadSampleRate {return false}
-        if _storage._vadFrameLength != rhs_storage._vadFrameLength {return false}
-        if _storage._vadEnergyThreshold != rhs_storage._vadEnergyThreshold {return false}
+        if _storage._vadConfig != rhs_storage._vadConfig {return false}
+        if _storage._llmGeneration != rhs_storage._llmGeneration {return false}
         if _storage._sessionConfig != rhs_storage._sessionConfig {return false}
         if _storage._audioPipelineConfig != rhs_storage._audioPipelineConfig {return false}
         if _storage._sessionID != rhs_storage._sessionID {return false}

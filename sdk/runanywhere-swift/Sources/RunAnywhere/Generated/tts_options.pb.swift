@@ -191,7 +191,7 @@ public nonisolated enum RATTSStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
 /// Defaults (for documentation; proto3 zero-values apply on the wire):
 ///   voice              = "default"  (Kotlin) / "com.apple.ttsbundle..." (Swift)
 ///   language_code      = "en-US"
-///   speaking_rate      = 1.0   (range 0.5 – 2.0)
+///   speed              = 1.0   (range 0.5 – 2.0)
 ///   pitch              = 1.0   (range 0.5 – 2.0)
 ///   volume             = 1.0   (range 0.0 – 1.0)
 ///   audio_format       = AUDIO_FORMAT_PCM
@@ -209,37 +209,10 @@ public nonisolated struct RATTSConfiguration: Sendable {
   /// require a model file.
   public var modelID: String = String()
 
-  /// Voice identifier to use for synthesis. For platform engines this is the
-  /// engine-specific voice id (e.g. "com.apple.ttsbundle.siri_female_en-US_compact").
-  public var voice: String = String()
-
-  /// Language for synthesis (BCP-47, e.g. "en-US").
-  public var languageCode: String = String()
-
-  /// Speaking rate (0.5 – 2.0; 1.0 is normal).
-  public var speakingRate: Float = 0
-
-  /// Speech pitch (0.5 – 2.0; 1.0 is normal).
-  public var pitch: Float = 0
-
-  /// Speech volume (0.0 – 1.0).
-  public var volume: Float = 0
-
-  /// Output audio format.
-  public var audioFormat: RAAudioFormat = .unspecified
-
-  /// Sample rate for output audio in Hz. 0 = engine default
-  /// (RAC_TTS_DEFAULT_SAMPLE_RATE = 22050).
-  public var sampleRate: Int32 = 0
-
   /// Whether to use neural / premium voice if available.
   public var enableNeuralVoice: Bool = false
 
-  /// Whether to enable SSML markup support.
-  public var enableSsml: Bool = false
-
-  /// Preferred framework for the component. Absent = auto. Mirrors the C
-  /// ABI rac_tts_config_t preferred_framework field.
+  /// Preferred framework for the component. Absent = auto.
   public var preferredFramework: RAInferenceFramework {
     get {_preferredFramework ?? .unspecified}
     set {_preferredFramework = newValue}
@@ -249,11 +222,23 @@ public nonisolated struct RATTSConfiguration: Sendable {
   /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
   public mutating func clearPreferredFramework() {self._preferredFramework = nil}
 
+  /// Component-level defaults applied when a per-call TTSOptions is absent
+  /// or leaves a field unset.
+  public var defaultOptions: RATTSOptions {
+    get {_defaultOptions ?? RATTSOptions()}
+    set {_defaultOptions = newValue}
+  }
+  /// Returns true if `defaultOptions` has been explicitly set.
+  public var hasDefaultOptions: Bool {self._defaultOptions != nil}
+  /// Clears the value of `defaultOptions`. Subsequent reads from it will return its default value.
+  public mutating func clearDefaultOptions() {self._defaultOptions = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _preferredFramework: RAInferenceFramework? = nil
+  fileprivate var _defaultOptions: RATTSOptions? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -277,11 +262,10 @@ public nonisolated struct RATTSOptions: Sendable {
   /// Language override (BCP-47). Empty = use component default.
   public var languageCode: String = String()
 
-  /// Speech rate (0.0 – 2.0; 1.0 is normal). Note Swift/Kotlin use the name
-  /// `rate`, Dart uses `rate`, RN uses `rate`. C ABI field is `rate`. We
-  /// canonicalize on `speaking_rate` to match TTSConfiguration; bindings
-  /// alias to `rate` where appropriate.
-  public var speakingRate: Float = 0
+  /// Speech speed multiplier (1.0 = normal). Industry name (OpenAI
+  /// /audio/speech `speed`); replaces the rate/speaking_rate/speakingRate
+  /// split across the C ABI and SDKs.
+  public var speed: Float = 0
 
   /// Speech pitch (0.5 – 2.0; 1.0 is normal).
   public var pitch: Float = 0
@@ -794,7 +778,7 @@ nonisolated extension RATTSStreamEventKind: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}voice\0\u{3}language_code\0\u{3}speaking_rate\0\u{1}pitch\0\u{1}volume\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}enable_neural_voice\0\u{3}enable_ssml\0\u{3}preferred_framework\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{4}\u{8}enable_neural_voice\0\u{4}\u{2}preferred_framework\0\u{3}default_options\0\u{c}\u{2}\u{7}\u{c}\u{a}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -803,16 +787,9 @@ nonisolated extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.voice) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.languageCode) }()
-      case 4: try { try decoder.decodeSingularFloatField(value: &self.speakingRate) }()
-      case 5: try { try decoder.decodeSingularFloatField(value: &self.pitch) }()
-      case 6: try { try decoder.decodeSingularFloatField(value: &self.volume) }()
-      case 7: try { try decoder.decodeSingularEnumField(value: &self.audioFormat) }()
-      case 8: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
       case 9: try { try decoder.decodeSingularBoolField(value: &self.enableNeuralVoice) }()
-      case 10: try { try decoder.decodeSingularBoolField(value: &self.enableSsml) }()
       case 11: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
+      case 12: try { try decoder.decodeSingularMessageField(value: &self._defaultOptions) }()
       default: break
       }
     }
@@ -826,51 +803,23 @@ nonisolated extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
     if !self.modelID.isEmpty {
       try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
     }
-    if !self.voice.isEmpty {
-      try visitor.visitSingularStringField(value: self.voice, fieldNumber: 2)
-    }
-    if !self.languageCode.isEmpty {
-      try visitor.visitSingularStringField(value: self.languageCode, fieldNumber: 3)
-    }
-    if self.speakingRate.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.speakingRate, fieldNumber: 4)
-    }
-    if self.pitch.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.pitch, fieldNumber: 5)
-    }
-    if self.volume.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.volume, fieldNumber: 6)
-    }
-    if self.audioFormat != .unspecified {
-      try visitor.visitSingularEnumField(value: self.audioFormat, fieldNumber: 7)
-    }
-    if self.sampleRate != 0 {
-      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 8)
-    }
     if self.enableNeuralVoice != false {
       try visitor.visitSingularBoolField(value: self.enableNeuralVoice, fieldNumber: 9)
     }
-    if self.enableSsml != false {
-      try visitor.visitSingularBoolField(value: self.enableSsml, fieldNumber: 10)
-    }
     try { if let v = self._preferredFramework {
       try visitor.visitSingularEnumField(value: v, fieldNumber: 11)
+    } }()
+    try { if let v = self._defaultOptions {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RATTSConfiguration, rhs: RATTSConfiguration) -> Bool {
     if lhs.modelID != rhs.modelID {return false}
-    if lhs.voice != rhs.voice {return false}
-    if lhs.languageCode != rhs.languageCode {return false}
-    if lhs.speakingRate != rhs.speakingRate {return false}
-    if lhs.pitch != rhs.pitch {return false}
-    if lhs.volume != rhs.volume {return false}
-    if lhs.audioFormat != rhs.audioFormat {return false}
-    if lhs.sampleRate != rhs.sampleRate {return false}
     if lhs.enableNeuralVoice != rhs.enableNeuralVoice {return false}
-    if lhs.enableSsml != rhs.enableSsml {return false}
     if lhs._preferredFramework != rhs._preferredFramework {return false}
+    if lhs._defaultOptions != rhs._defaultOptions {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -878,7 +827,7 @@ nonisolated extension RATTSConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TTSOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}voice\0\u{3}language_code\0\u{3}speaking_rate\0\u{1}pitch\0\u{1}volume\0\u{3}enable_ssml\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}speaker_id\0\u{2}\u{2}style\0\u{c}\u{a}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}voice\0\u{3}language_code\0\u{1}speed\0\u{1}pitch\0\u{1}volume\0\u{3}enable_ssml\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}speaker_id\0\u{2}\u{2}style\0\u{c}\u{a}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -888,7 +837,7 @@ nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.voice) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.languageCode) }()
-      case 3: try { try decoder.decodeSingularFloatField(value: &self.speakingRate) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.speed) }()
       case 4: try { try decoder.decodeSingularFloatField(value: &self.pitch) }()
       case 5: try { try decoder.decodeSingularFloatField(value: &self.volume) }()
       case 6: try { try decoder.decodeSingularBoolField(value: &self.enableSsml) }()
@@ -912,8 +861,8 @@ nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if !self.languageCode.isEmpty {
       try visitor.visitSingularStringField(value: self.languageCode, fieldNumber: 2)
     }
-    if self.speakingRate.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.speakingRate, fieldNumber: 3)
+    if self.speed.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.speed, fieldNumber: 3)
     }
     if self.pitch.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.pitch, fieldNumber: 4)
@@ -942,7 +891,7 @@ nonisolated extension RATTSOptions: SwiftProtobuf.Message, SwiftProtobuf._Messag
   public static func ==(lhs: RATTSOptions, rhs: RATTSOptions) -> Bool {
     if lhs.voice != rhs.voice {return false}
     if lhs.languageCode != rhs.languageCode {return false}
-    if lhs.speakingRate != rhs.speakingRate {return false}
+    if lhs.speed != rhs.speed {return false}
     if lhs.pitch != rhs.pitch {return false}
     if lhs.volume != rhs.volume {return false}
     if lhs.enableSsml != rhs.enableSsml {return false}
