@@ -33,7 +33,7 @@ const CASE_TIMEOUT = 120000;
 const withTimeout = (opts) => ({ timeout: CASE_TIMEOUT, ...opts });
 
 // Model + generation knobs kept small/deterministic.
-const MODEL_ID = 'qwen2.5-0.5b';
+const MODEL_ID = 'qwen3.5-0.8b';
 const GEN = { maxTokens: 128, temperature: 0 };
 
 // --------------------------------------------------------------------------

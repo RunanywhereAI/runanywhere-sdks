@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 // ---------------------------------------------------------------------------
 // Integration test: multi-turn chat memory against the REAL native addon +
-// a REAL model (qwen2.5-0.5b). This exercises the full stack:
+// a REAL model (qwen3.5-0.8b). This exercises the full stack:
 //   dist/index -> RunAnywhere.createChat -> Chat.sendText ->
 //   LLMModel.generate -> native addon.generate (llama.cpp) -> streamed tokens.
 //
@@ -30,7 +30,7 @@ try {
 // separate `test:integration` script, so no extra flag is required.
 const ADDON_OK = RunAnywhere != null && typeof RunAnywhere.initialize === 'function';
 const ENABLED = ADDON_OK;
-const MODEL = process.env.RUNANYWHERE_LLM || 'qwen2.5-0.5b';
+const MODEL = process.env.RUNANYWHERE_LLM || 'qwen3.5-0.8b';
 
 // A shared, lazily-loaded model across the file's tests (loading is expensive).
 let llm = null;

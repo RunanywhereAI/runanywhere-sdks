@@ -50,7 +50,7 @@ const ENABLED =
   REQUIRED.every((name) => typeof addon[name] === 'function');
 
 const EMBED = process.env.RUNANYWHERE_EMBED || 'minilm';
-const LLM = process.env.RUNANYWHERE_LLM || 'qwen2.5-0.5b';
+const LLM = process.env.RUNANYWHERE_LLM || 'qwen3.5-0.8b';
 
 // rac model-registry enums: category EMBEDDING=7 / LANGUAGE=0, framework ONNX=0 / LLAMACPP=1.
 const DOC =
