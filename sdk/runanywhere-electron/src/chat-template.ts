@@ -13,16 +13,13 @@
 // message — which is exactly how a multi-turn transcript collapses into one turn.
 // So the correct prompt has to be built here.
 
+import { stripAllThinking } from './thinking';
+
 export type ChatTemplate = 'chatml' | 'llama3' | 'gemma' | 'mistral';
 
 export interface ChatTurn {
   role: 'system' | 'user' | 'assistant';
   content: string;
-}
-
-/** Drop a reasoning block so old <think> text is never replayed as context. */
-function withoutThinking(text: string): string {
-  return text.replace(/<(think|thinking)>[\s\S]*?<\/\1>/gi, '').replace(/<(think|thinking)>[\s\S]*$/i, '').trim();
 }
 
 /**
@@ -51,7 +48,7 @@ export function formatChat(
   opts: FormatOptions = {}
 ): string {
   const clean = turns
-    .map((t) => ({ role: t.role, content: t.role === 'assistant' ? withoutThinking(t.content) : (t.content || '').trim() }))
+    .map((t) => ({ role: t.role, content: t.role === 'assistant' ? stripAllThinking(t.content) : (t.content || '').trim() }))
     .filter((t) => t.content.length > 0);
 
   const system = clean.find((t) => t.role === 'system');
@@ -75,6 +72,9 @@ export function formatChat(
         if (role === 'user') pending = '';
         s += `<start_of_turn>${role}\n${content}<end_of_turn>\n`;
       }
+      // A system-only conversation still has to carry its instruction: with no
+      // user turn to ride on, emit it as the opening user turn.
+      if (pending) s += `<start_of_turn>user\n${pending}<end_of_turn>\n`;
       return s + '<start_of_turn>model\n';
     }
     case 'mistral': {
@@ -90,6 +90,7 @@ export function formatChat(
           s += ` ${t.content}</s>`;
         }
       }
+      if (pending) s += `[INST] ${pending} [/INST]`;
       return s;
     }
     case 'chatml':
@@ -110,8 +111,10 @@ export function formatChat(
  * True when `prompt` already carries turn markup the llama.cpp backend
  * recognises and will therefore pass through without re-wrapping.
  *
- * NOTE: the backend does NOT currently detect Gemma's `<start_of_turn>`, so a
- * Gemma-formatted prompt is re-wrapped unless the engine is updated to match.
+ * These four markers must stay in step with `build_prompt` in
+ * engines/llamacpp/llamacpp_backend.cpp. If a marker is listed here but not
+ * there, the backend re-wraps the whole formatted conversation as a single user
+ * message and the model loses its history.
  */
 export function hasTurnMarkup(prompt: string): boolean {
   return (
