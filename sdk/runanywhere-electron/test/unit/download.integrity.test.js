@@ -41,10 +41,10 @@ after(async () => {
 
 // --- sha256File --------------------------------------------------------------
 
-test('sha256File hashes file contents', () => {
+test('sha256File hashes file contents', async () => {
   const f = path.join(tmpDir, 'h.bin');
   fs.writeFileSync(f, BODY);
-  assert.equal(sha256File(f), GOOD_SHA);
+  assert.equal(await sha256File(f), GOOD_SHA);
 });
 
 // --- downloadFile integrity gate --------------------------------------------
@@ -53,7 +53,7 @@ test('a download whose digest matches is published', async () => {
   const dest = path.join(tmpDir, 'ok.gguf');
   await downloadFile(`${baseUrl}/model.gguf`, dest, undefined, { sha256: GOOD_SHA });
   assert.equal(fs.existsSync(dest), true);
-  assert.equal(sha256File(dest), GOOD_SHA);
+  assert.equal(await sha256File(dest), GOOD_SHA);
 });
 
 test('a digest mismatch REJECTS and never publishes the file', async () => {
@@ -71,7 +71,7 @@ test('a failed digest also deletes the .part, so a retry cannot "resume" bad byt
   assert.equal(fs.existsSync(dest + '.part'), false, 'the .part must be removed');
   // …and the same URL downloads cleanly once the expected digest is right.
   await downloadFile(`${baseUrl}/model.gguf`, dest, undefined, { sha256: GOOD_SHA });
-  assert.equal(sha256File(dest), GOOD_SHA);
+  assert.equal(await sha256File(dest), GOOD_SHA);
 });
 
 test('no digest supplied means no integrity gate (back-compat)', async () => {
@@ -130,4 +130,23 @@ test('a download refuses to start when the volume cannot hold it', async () => {
     big.closeAllConnections();
     await new Promise((r) => big.close(r));
   }
+});
+
+test('sha256File streams rather than buffering the whole file', async () => {
+  // Catalog entries reach ~7GB; readFileSync would block the loop for the whole
+  // read and can exceed the max Buffer length. Prove the loop stays responsive.
+  const big = path.join(tmpDir, 'big.bin');
+  const chunk = Buffer.alloc(4 * 1024 * 1024, 0x61);
+  const fd = fs.openSync(big, 'w');
+  for (let i = 0; i < 24; i++) fs.writeSync(fd, chunk); // ~96MB
+  fs.closeSync(fd);
+
+  let ticks = 0;
+  const timer = setInterval(() => { ticks++; }, 5);
+  const digest = await sha256File(big);
+  clearInterval(timer);
+
+  assert.match(digest, /^[0-9a-f]{64}$/);
+  assert.ok(ticks > 0, 'the event loop must keep turning while hashing');
+  fs.rmSync(big, { force: true });
 });
