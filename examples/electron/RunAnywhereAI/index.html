@@ -44,6 +44,7 @@
         --tint: rgba(255,105,0,.10);   /* active nav, icon wells    */
         --tint-2: rgba(255,105,0,.28); /* focus borders             */
         --green: #45c97f; --red: #dc2626; --yellow: #f7ae2a; --blue: #60a5fa;
+        --red-fg: #ffb4b4;   /* error TEXT on a dark surface - 9.8:1 */
         --shadow-1: 0 1px 2px rgba(0,0,0,.28);
         --shadow-2: 0 6px 20px rgba(0,0,0,.30);
         --shadow-3: 0 18px 50px rgba(0,0,0,.42);
@@ -62,6 +63,7 @@
         --tint: rgba(255,105,0,.09);
         --tint-2: rgba(255,105,0,.32);
         --green: #269b57; --red: #ef4444; --yellow: #f59e0b; --blue: #3b82f6;
+        --red-fg: #b3261e;   /* error TEXT on a light surface - 5.5:1 */
         --shadow-1: 0 1px 2px rgba(29,27,25,.06);
         --shadow-2: 0 4px 16px rgba(29,27,25,.08);
         --shadow-3: 0 12px 40px rgba(29,27,25,.14);
@@ -384,7 +386,7 @@
                               color: var(--fg-3); font-weight: 650; margin-bottom: 4px; }
       .voicetranscript .turn div { font-size: 14.5px; line-height: 1.6; color: var(--fg); min-height: 1.6em; }
       .voiceerror { width: 100%; max-width: 560px; background: rgba(220,38,38,.10); border: 1px solid rgba(220,38,38,.35);
-                    color: var(--red); border-radius: 11px; padding: 10px 13px; font-size: 13px; }
+                    color: var(--red-fg); border-radius: 11px; padding: 10px 13px; font-size: 13px; }
       .voicetoggle { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--fg-2); cursor: pointer; }
       .reasontoggle { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: var(--fg-3); line-height: 1.5; cursor: pointer; }
       .reasontoggle input { margin-top: 2px; flex: 0 0 auto; }
