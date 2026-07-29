@@ -33,6 +33,7 @@ import {
   VADProcessRequest,
   VADResult as VADResultMessage,
 } from '@runanywhere/proto-ts/vad_options';
+import { vADOptionsDefaults } from '@runanywhere/proto-ts/convenience/vad_options_convenience';
 import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 
@@ -64,10 +65,8 @@ function audioToArrayBuffer(audio: Uint8Array | Float32Array | string | ArrayBuf
 
 function buildVADOptions(options?: Partial<VADOptions>): VADOptions {
   return VADOptionsMessage.create({
-    threshold: options?.threshold ?? 0,
-    minSpeechDurationMs: options?.minSpeechDurationMs ?? 100,
-    minSilenceDurationMs: options?.minSilenceDurationMs ?? 300,
-    maxSpeechDurationMs: options?.maxSpeechDurationMs ?? 0,
+    ...vADOptionsDefaults(),
+    ...options,
   });
 }
 

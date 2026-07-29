@@ -35,38 +35,27 @@ import {
   type LLMStreamEvent as LLMStreamEventType,
 } from '@runanywhere/proto-ts/llm_service';
 import { inferenceFrameworkToJSON, ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import { modelInfoForCategory } from '../Models/RunAnywhere+ModelLifecycle';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 
 function buildLLMGenerateRequest(
   prompt: string,
-  options?: LLMGenerationOptions,
-  streamingEnabled: boolean = false
+  options?: LLMGenerationOptions
 ): LLMGenerateRequest {
-  const canonicalOptions = generationOptionsForRequest(options, streamingEnabled);
-
   return LLMGenerateRequest.fromPartial({
     prompt,
-    emitThoughts: !!options?.thinkingPattern,
-    options: canonicalOptions,
+    options: generationOptionsForRequest(options),
   });
 }
 
 function generationOptionsForRequest(
-  options: LLMGenerationOptions | undefined,
-  streamingEnabled: boolean
+  options: LLMGenerationOptions | undefined
 ): LLMGenerationOptions {
   return LLMGenerationOptionsMessage.fromPartial({
-    maxTokens: options?.maxTokens ?? 100,
-    temperature: options?.temperature ?? 0.8,
-    topP: options?.topP ?? 1.0,
-    topK: options?.topK ?? 0,
-    repetitionPenalty: options?.repetitionPenalty ?? 1.0,
+    ...lLMGenerationOptionsDefaults(),
     ...options,
-    streamingEnabled,
-    jsonSchema: options?.jsonSchema ?? options?.structuredOutput?.jsonSchema,
-    grammar: options?.grammar ?? options?.structuredOutput?.grammar,
   });
 }
 
@@ -84,15 +73,14 @@ function decodeLLMGenerationResult(buffer: ArrayBuffer): LLMGenerationResult {
 
 function normalizeLLMGenerateRequest(
   requestOrPrompt: LLMGenerateRequest | string,
-  options: LLMGenerationOptions | undefined,
-  streamingEnabled: boolean
+  options: LLMGenerationOptions | undefined
 ): LLMGenerateRequest {
   if (typeof requestOrPrompt === 'string') {
-    return buildLLMGenerateRequest(requestOrPrompt, options, streamingEnabled);
+    return buildLLMGenerateRequest(requestOrPrompt, options);
   }
   return LLMGenerateRequest.fromPartial({
     ...requestOrPrompt,
-    options: generationOptionsForRequest(requestOrPrompt.options, streamingEnabled),
+    options: generationOptionsForRequest(requestOrPrompt.options),
   });
 }
 
@@ -119,7 +107,7 @@ export async function generate(
   await ensureServicesReady();
   const native = requireNativeModule();
   const requestBytes = encodeLLMGenerateRequest(
-    normalizeLLMGenerateRequest(requestOrPrompt, options, false)
+    normalizeLLMGenerateRequest(requestOrPrompt, options)
   );
   const resultBytes = await native.llmGenerateProto(requestBytes);
   return decodeLLMGenerationResult(resultBytes);
@@ -158,7 +146,7 @@ export function generateStream(
   }
 
   const native = requireNativeModule();
-  const llmRequest = normalizeLLMGenerateRequest(requestOrPrompt, options, true);
+  const llmRequest = normalizeLLMGenerateRequest(requestOrPrompt, options);
   const requestBytes = encodeLLMGenerateRequest(llmRequest);
 
   // Stream via the dedicated callback method `llmGenerateStreamProto(bytes, cb)`
@@ -352,8 +340,8 @@ export async function aggregateStream(
   // concatenated text / wall-clock metrics for backends that omit it.
   const final = finalEvent?.result;
   const inputTokens =
-    final?.promptTokens ?? Math.max(1, Math.floor(prompt.length / 4));
-  const tokensGenerated = final?.completionTokens ?? tokenCount;
+    final?.inputTokens ?? Math.max(1, Math.floor(prompt.length / 4));
+  const outputTokens = final?.outputTokens ?? tokenCount;
   return LLMGenerationResultMessage.fromPartial({
     text: final?.text ?? fullResponse,
     // Swift parity (RunAnywhere+TextGeneration.swift:176-178): propagate the
@@ -362,10 +350,10 @@ export async function aggregateStream(
       ? { thinkingContent: final.thinkingContent }
       : {}),
     inputTokens,
-    tokensGenerated,
-    responseTokens: tokensGenerated,
+    outputTokens,
+    responseTokens: outputTokens,
     // Swift parity (line 182): totalTokens falls back to input + generated.
-    totalTokens: final?.totalTokens ?? inputTokens + tokensGenerated,
+    totalTokens: final?.totalTokens ?? inputTokens + outputTokens,
     modelUsed: modelId,
     generationTimeMs: final?.totalTimeMs ?? totalLatencyMs,
     framework,

@@ -172,7 +172,7 @@ export async function ragAddDocumentsBatch(
  *
  * Matches Swift: `RunAnywhere.ragQuery(_:options:)` — the options message is
  * forwarded verbatim (including `retrievalTopK`, `similarityThreshold`,
- * `stream`, and `disableThinking`). Unset numeric fields encode as proto3
+ * `stream`, and `generation`). Unset numeric fields encode as proto3
  * zeros, which commons maps to the canonical `rac_default` values.
  */
 export async function ragQuery(
@@ -198,12 +198,9 @@ export async function ragQuery(
     typeof questionOrOptions === 'string'
       ? RAGQueryOptionsMessage.fromPartial({
           ...options,
-          // Defaults mirror Swift RARAGQueryOptions.defaults(question:)
-          // (generated from IDL rac_default annotations): maxTokens 512,
-          // temperature 0.7, topP 1.0. Caller-provided options override.
-          maxTokens: options?.maxTokens ?? 512,
-          temperature: options?.temperature ?? 0.7,
-          topP: options?.topP ?? 1.0,
+          // Answer-generation knobs travel in `options.generation`; RAG
+          // defaults (max_output_tokens 512, temperature 0.7) are applied by
+          // the pipeline when unset, not re-declared here.
           question: questionOrOptions,
         })
       : questionOrOptions;
@@ -241,9 +238,6 @@ export function ragQueryStream(
     typeof questionOrOptions === 'string'
       ? RAGQueryOptionsMessage.fromPartial({
           ...options,
-          maxTokens: options?.maxTokens ?? 512,
-          temperature: options?.temperature ?? 0.7,
-          topP: options?.topP ?? 1.0,
           question: questionOrOptions,
         })
       : questionOrOptions;

@@ -19,23 +19,24 @@ import { ensureServicesReady } from '../../../Foundation/Initialization/Services
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
-  STTLanguage,
   STTAudioEncoding,
   type STTOptions,
   type STTOutput,
   type STTPartialResult,
+  type STTServiceState,
 } from '@runanywhere/proto-ts/stt_options';
 import {
   STTAudioSource,
   STTOptions as STTOptionsCtor,
   STTOutput as STTOutputMessage,
   STTPartialResult as STTPartialResultMessage,
+  STTServiceState as STTServiceStateMessage,
   STTStreamEvent,
   STTStreamEventKind,
   STTTranscriptionRequest,
 } from '@runanywhere/proto-ts/stt_options';
+import { sTTOptionsDefaults } from '@runanywhere/proto-ts/convenience/stt_options_convenience';
 import {
-  AudioFormat,
   CurrentModelRequest,
   ModelCategory,
 } from '@runanywhere/proto-ts/model_types';
@@ -48,38 +49,14 @@ const logger = new SDKLogger('RunAnywhere.STT');
 let requestCounter = 0;
 
 /**
- * Build a default proto `STTOptions` for callers that pass no options.
- * Defaults mirror Swift `RASTTOptions.defaults()` (Generated/RAConvenience.swift):
- * language EN, punctuation + word timestamps enabled.
+ * Merge caller options over the generated `sTTOptionsDefaults()` pool.
+ * `language` stays unset (BCP-47 tag) unless the caller provides one —
+ * unset means auto-detect.
  */
-function defaultSTTOptions(): STTOptions {
-  return STTOptionsCtor.create({
-    language: STTLanguage.STT_LANGUAGE_EN,
-    enablePunctuation: true,
-    enableDiarization: false,
-    maxSpeakers: 0,
-    vocabularyList: [],
-    enableWordTimestamps: true,
-    beamSize: 0,
-    detectLanguage: true,
-    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: audioCaptureDefaults.micSampleRateHz,
-    maxAlternatives: 0,
-  });
-}
-
 function buildSTTOptions(options?: Partial<STTOptions>): STTOptions {
   return STTOptionsCtor.create({
-    ...defaultSTTOptions(),
+    ...sTTOptionsDefaults(),
     ...options,
-    language: options?.language ?? STTLanguage.STT_LANGUAGE_EN,
-    detectLanguage:
-      options?.detectLanguage ??
-      (options?.language === undefined ||
-        options.language === STTLanguage.STT_LANGUAGE_AUTO),
-    audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: options?.sampleRate ?? 16000,
-    maxAlternatives: options?.maxAlternatives ?? 0,
   });
 }
 
@@ -105,8 +82,7 @@ function buildSTTRequestBytes(
     audio: STTAudioSource.fromPartial({
       audioData: audio,
       encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
-      audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
-      sampleRate: options?.sampleRate ?? 16000,
+      sampleRate: audioCaptureDefaults.micSampleRateHz,
       channels: 1,
       bitsPerSample: 16,
     }),
@@ -114,6 +90,24 @@ function buildSTTRequestBytes(
     metadata: {},
   });
   return encodeProtoMessage(request, STTTranscriptionRequest);
+}
+
+/**
+ * Report the lifecycle-loaded STT service's state (readiness, current model,
+ * streaming support, supported languages). Succeeds with `isReady = false`
+ * when no STT model is loaded.
+ */
+export async function sttState(): Promise<STTServiceState> {
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  await ensureServicesReady();
+  const native = requireNativeModule();
+  const bytes = arrayBufferToBytes(await native.sttStateProto());
+  if (bytes.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('sttStateProto');
+  }
+  return STTServiceStateMessage.decode(bytes);
 }
 
 /**

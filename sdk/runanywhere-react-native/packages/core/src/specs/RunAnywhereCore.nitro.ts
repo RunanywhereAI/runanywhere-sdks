@@ -524,6 +524,14 @@ export interface RunAnywhereCore extends HybridObject<{
     onEventBytes: (eventBytes: ArrayBuffer) => void
   ): Promise<void>;
 
+  /**
+   * Report the lifecycle-loaded STT service's state
+   * (`rac_stt_state_lifecycle_proto`) as serialized
+   * `runanywhere.v1.STTServiceState` bytes. Succeeds with `isReady=false`
+   * when no STT model is loaded.
+   */
+  sttStateProto(): Promise<ArrayBuffer>;
+
   // ============================================================================
   // STT Streaming Session (live partials)
   // Mirrors Swift CppBridge+STT.swift `transcribeSessionStream`:
@@ -816,6 +824,14 @@ export interface RunAnywhereCore extends HybridObject<{
   ): Promise<void>;
   ttsStopProto(): Promise<ArrayBuffer>;
 
+  /**
+   * Report the lifecycle-loaded TTS service's state
+   * (`rac_tts_state_lifecycle_proto`) as serialized
+   * `runanywhere.v1.TTSServiceState` bytes. Succeeds with `isReady=false`
+   * when no voice is loaded.
+   */
+  ttsStateProto(): Promise<ArrayBuffer>;
+
   // ============================================================================
   // VAD Capability (Backend-Agnostic)
   // Matches Swift: CppBridge+VAD.swift - calls lifecycle proto APIs.
@@ -970,21 +986,16 @@ export interface RunAnywhereCore extends HybridObject<{
 
   /**
    * Stream raw mic frames into the in-core voice agent via the commons
-   * `rac_voice_agent_feed_audio_proto` ABI. The core performs energy-based
-   * utterance segmentation and runs the STT -> LLM -> TTS turn pipeline itself;
-   * there is NO SDK-side VAD. Each call returns a serialized
-   * `runanywhere.v1.VoiceAgentResult`: empty (zero-length) while the utterance
-   * is still open, non-empty (with `synthesizedAudio`) on the call that closes a
-   * turn. `isFinal` flushes the in-progress utterance. Mirrors the iOS Swift /
-   * Kotlin drivers' feed loop.
+   * `rac_voice_agent_feed_audio_proto` ABI. `frameBytes` is a serialized
+   * `runanywhere.v1.VoiceAgentAudioFrame` (audioData, sampleRate, channels,
+   * encoding, isFinal). The core performs energy-based utterance segmentation
+   * and runs the STT -> LLM -> TTS turn pipeline itself; there is NO SDK-side
+   * VAD. Each call returns a serialized `runanywhere.v1.VoiceAgentResult`:
+   * empty (zero-length) while the utterance is still open, non-empty (with
+   * `synthesizedAudio`) on the call that closes a turn. `isFinal` flushes the
+   * in-progress utterance. Mirrors the iOS Swift / Kotlin drivers' feed loop.
    */
-  voiceAgentFeedAudioProto(
-    audioBytes: ArrayBuffer,
-    sampleRateHz: number,
-    channels: number,
-    encoding: number,
-    isFinal: boolean
-  ): Promise<ArrayBuffer>;
+  voiceAgentFeedAudioProto(frameBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   // ============================================================================
   // Tool Calling Capability

@@ -211,7 +211,6 @@ export async function generateWithStructuredOutput(
   let generationOptions: LLMGenerationOptions = LLMGenerationOptionsMessage.fromPartial({
     ...options,
     structuredOutput,
-    jsonSchema: options?.jsonSchema ?? structuredOutput.jsonSchema ?? '',
   });
 
   if (structuredOutput.includeSchemaInPrompt) {
@@ -225,10 +224,13 @@ export async function generateWithStructuredOutput(
         systemPrompt: prepared.systemPrompt,
       });
     }
-    if (prepared.jsonSchema && !generationOptions.jsonSchema) {
+    if (prepared.jsonSchema && !generationOptions.structuredOutput?.jsonSchema) {
       generationOptions = LLMGenerationOptionsMessage.fromPartial({
         ...generationOptions,
-        jsonSchema: prepared.jsonSchema,
+        structuredOutput: {
+          ...structuredOutput,
+          jsonSchema: prepared.jsonSchema,
+        },
       });
     }
   }

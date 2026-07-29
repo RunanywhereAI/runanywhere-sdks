@@ -252,6 +252,7 @@ public:
       const std::shared_ptr<ArrayBuffer> &requestBytes,
       const std::function<void(const std::shared_ptr<ArrayBuffer> &)>
           &onEventBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttStateProto() override;
 
   // STT Streaming Session (rac_stt_stream.h) — mirrors Swift
   // CppBridge+STT.swift `transcribeSessionStream`. Single concurrent
@@ -347,6 +348,7 @@ public:
           &onEventBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
   ttsStopProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsStateProto() override;
 
   // ============================================================================
   // VAD Capability (Backend-Agnostic)
@@ -429,9 +431,8 @@ public:
   voiceAgentProcessTurnProto(
       const std::shared_ptr<ArrayBuffer> &audioBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
-  voiceAgentFeedAudioProto(const std::shared_ptr<ArrayBuffer> &audioBytes,
-                           double sampleRateHz, double channels, double encoding,
-                           bool isFinal) override;
+  voiceAgentFeedAudioProto(
+      const std::shared_ptr<ArrayBuffer> &frameBytes) override;
 
   // ============================================================================
   // Tool Calling - delegates generated proto bytes to commons C ABI.

@@ -23,7 +23,11 @@ import { AudioPlaybackManager } from '../VoiceSession/AudioPlaybackManager';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { requireNativeModule } from '../../native';
 import { arrayBufferToBytes } from '../../services/ProtoBytes';
-import { VoiceAgentResult as VoiceAgentResultMessage } from '@runanywhere/proto-ts/voice_agent_service';
+import { encodeProtoMessage } from '../../services/ProtoWire';
+import {
+  VoiceAgentAudioFrame,
+  VoiceAgentResult as VoiceAgentResultMessage,
+} from '@runanywhere/proto-ts/voice_agent_service';
 import { AudioEncoding } from '@runanywhere/proto-ts/voice_events';
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
@@ -122,11 +126,16 @@ export class VoiceAgentMicDriver {
         if (this.stopped) return;
         try {
           const resultBytes = await native.voiceAgentFeedAudioProto(
-            VoiceAgentMicDriver.toArrayBuffer(chunk),
-            SAMPLE_RATE_HZ,
-            CHANNELS,
-            AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
-            false
+            encodeProtoMessage(
+              VoiceAgentAudioFrame.fromPartial({
+                audioData: chunk,
+                sampleRate: SAMPLE_RATE_HZ,
+                channels: CHANNELS,
+                encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
+                isFinal: false,
+              }),
+              VoiceAgentAudioFrame
+            )
           );
           if (this.stopped) return;
           const bytes = arrayBufferToBytes(resultBytes);

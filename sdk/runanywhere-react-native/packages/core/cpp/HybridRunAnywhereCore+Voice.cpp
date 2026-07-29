@@ -568,6 +568,21 @@ HybridRunAnywhereCore::sttTranscribeProto(
     });
 }
 
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::sttStateProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        rac_result_t rc = rac_stt_state_lifecycle_proto(&out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("sttStateProto: rc=%d", rc);
+            rac_proto_buffer_free(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "sttStateProto");
+    });
+}
+
 std::shared_ptr<Promise<void>>
 HybridRunAnywhereCore::sttTranscribeStreamProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes,
@@ -877,6 +892,21 @@ HybridRunAnywhereCore::ttsStopProto() {
             return emptyVoiceProtoBuffer();
         }
         return copyVoiceProtoBuffer(out, "ttsStopProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::ttsStateProto() {
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
+        rac_proto_buffer_t out;
+        rac_proto_buffer_init(&out);
+        rac_result_t rc = rac_tts_state_lifecycle_proto(&out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("ttsStateProto: rc=%d", rc);
+            rac_proto_buffer_free(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "ttsStateProto");
     });
 }
 
@@ -1344,11 +1374,10 @@ HybridRunAnywhereCore::voiceAgentProcessTurnProto(
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::voiceAgentFeedAudioProto(
-    const std::shared_ptr<ArrayBuffer>& audioBytes, double sampleRateHz,
-    double channels, double encoding, bool isFinal) {
-    auto audio = copyVoiceArrayBufferBytes(audioBytes);
+    const std::shared_ptr<ArrayBuffer>& frameBytes) {
+    auto frame = copyVoiceArrayBufferBytes(frameBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async(
-        [audio = std::move(audio), sampleRateHz, channels, encoding, isFinal]() {
+        [frame = std::move(frame)]() {
             rac_voice_agent_handle_t handle = getGlobalVoiceAgentHandle();
             if (!handle) {
                 LOGE("voiceAgentFeedAudioProto: handle unavailable");
@@ -1356,13 +1385,9 @@ HybridRunAnywhereCore::voiceAgentFeedAudioProto(
             }
             rac_proto_buffer_t out;
             rac_proto_buffer_init(&out);
-            const void* data = audio.empty() ? nullptr : audio.data();
+            const uint8_t* data = frame.empty() ? nullptr : frame.data();
             rac_result_t rc = rac_voice_agent_feed_audio_proto(
-                handle, data, audio.size(),
-                static_cast<int32_t>(sampleRateHz),
-                static_cast<int32_t>(channels),
-                static_cast<int32_t>(encoding),
-                isFinal ? RAC_TRUE : RAC_FALSE, &out);
+                handle, data, frame.size(), &out);
             if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
                 LOGE("voiceAgentFeedAudioProto: rc=%d", rc);
                 rac_proto_buffer_free(&out);

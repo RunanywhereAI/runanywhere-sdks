@@ -17,7 +17,6 @@ import {
   ToolResult,
   ToolCallingResult,
   ToolCallingOptions,
-  ToolCallingSessionCreateRequest,
   ToolCallFormatName,
   type ToolDefinition,
   type ToolParameter,
@@ -25,7 +24,11 @@ import {
   type ToolValueArray,
   type ToolValueObject,
 } from '@runanywhere/proto-ts/tool_calling';
+import { ToolCallingSessionCreateRequest } from '@runanywhere/proto-ts/llm_service';
+import { ChatMessage, MessageRole } from '@runanywhere/proto-ts/chat';
 import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+import { LLMGenerationOptions as LLMGenerationOptionsMessage } from '@runanywhere/proto-ts/llm_options';
+import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
@@ -255,16 +258,14 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
 export interface GenerateWithToolsOptions {
   signal?: AbortSignal;
   /**
-   * LLM generation options channel — Swift parity
-   * (`generateWithTools(prompt:options:toolOptions:...)`): tool options that
-   * are unset fall back to these, and `topP` comes from here exclusively.
-   * Defaults mirror Swift `RALLMGenerationOptions.defaults()`
-   * (maxTokens 100, temperature 0.8, topP 1.0).
+   * LLM generation options channel — sampling, reasoning, and system prompt
+   * for the run loop. Merged over the canonical
+   * `lLMGenerationOptionsDefaults()` into the request's `generation` message.
    */
   llmOptions?: Partial<
     Pick<
       LLMGenerationOptions,
-      'maxTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'disableThinking'
+      'maxOutputTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'reasoning'
     >
   >;
   /**
@@ -322,43 +323,43 @@ export async function generateWithTools(
   const tools = options?.tools ?? (await getRegisteredTools());
   const format =
     options?.format ?? ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
-  // Field fallbacks mirror Swift makeRunLoopRequest
-  // (RunAnywhere+ToolCalling.swift:491-536): tool options take precedence,
-  // unset values fall back to the LLM options channel, whose defaults are
-  // Swift's RALLMGenerationOptions.defaults().
+  // Sampling/reasoning/system prompt travel in `generation`
+  // (lLMGenerationOptionsDefaults + the caller's llmOptions channel); pure
+  // tool configuration travels in `generation.toolCalling`.
   const llm = extra?.llmOptions;
-  const toolMaxTokens = options?.maxTokens;
+  const generation = LLMGenerationOptionsMessage.fromPartial({
+    ...lLMGenerationOptionsDefaults(),
+    ...llm,
+    toolCalling: ToolCallingOptions.fromPartial({
+      tools,
+      format,
+      maxToolCalls: options?.maxToolCalls,
+      keepToolsAvailable: options?.keepToolsAvailable ?? false,
+      toolChoice: options?.toolChoice,
+      forcedToolName: options?.forcedToolName,
+      autoExecute: options?.autoExecute ?? true,
+      replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
+      requireJsonArguments: options?.requireJsonArguments ?? false,
+    }),
+  });
   const request = ToolCallingSessionCreateRequest.fromPartial({
     prompt,
-    maxTokens:
-      toolMaxTokens !== undefined && toolMaxTokens > 0
-        ? toolMaxTokens
-        : (llm?.maxTokens ?? 100),
-    temperature: options?.temperature ?? llm?.temperature ?? 0.8,
-    topP: llm?.topP ?? 1.0,
-    systemPrompt: options?.systemPrompt || llm?.systemPrompt || '',
-    tools,
-    format,
-    maxToolCalls: options?.maxToolCalls ?? 5,
-    keepToolsAvailable: options?.keepToolsAvailable ?? false,
+    generation,
     // Leave unset unless the caller chose — commons defaults to true.
     validateCalls: extra?.validateCalls,
-    // Thread the OpenAI-style tool_choice /
-    // forced_tool_name knobs into the canonical request envelope (idl
-    // fields 7/8). Commons build_options_snapshot copies them onto every
-    // synthesized ToolCallingOptions before format/validate proto calls.
-    toolChoice: options?.toolChoice,
-    forcedToolName: options?.forcedToolName,
-    // Suppress thinking when requested (commons prepends the no-think directive).
-    disableThinking:
-      (options?.disableThinking ?? false) || (llm?.disableThinking ?? false),
-    autoExecute: options?.autoExecute ?? true,
-    replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
-    requireJsonArguments: options?.requireJsonArguments ?? false,
-    // Prior turns as a flat alternating [user0, asst0, ...] list (excluding the
-    // current turn, which is `prompt`); commons threads these into every
-    // generate in the loop so multi-turn tool use keeps context.
-    history: extra?.history ?? [],
+    // Prior turns as a flat alternating [user0, asst0, ...] list (excluding
+    // the current turn, which is `prompt`) mapped onto ChatMessage roles;
+    // commons threads these into every generate in the loop so multi-turn
+    // tool use keeps context.
+    history: (extra?.history ?? []).map((content, index) =>
+      ChatMessage.fromPartial({
+        role:
+          index % 2 === 0
+            ? MessageRole.MESSAGE_ROLE_USER
+            : MessageRole.MESSAGE_ROLE_ASSISTANT,
+        content,
+      })
+    ),
   });
 
   logger.debug(

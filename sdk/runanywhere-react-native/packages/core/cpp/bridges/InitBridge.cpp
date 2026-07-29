@@ -82,8 +82,6 @@ extern jmethodID g_getAppVersionMethod;
 extern jmethodID g_getAppBuildMethod;
 extern jmethodID g_getLocaleIdentifierMethod;
 extern jmethodID g_getTimezoneIdentifierMethod;
-extern jmethodID g_httpDownloadMethod;
-extern jmethodID g_httpDownloadCancelMethod;
 // Directory enumeration slots populated by Kotlin PlatformAdapterBridge so
 // the C++ model-registry refresh path (rescan_local) and
 // rac_model_info_make_proto's is_downloaded probe for multi-file artifacts
@@ -537,62 +535,6 @@ namespace AndroidBridge {
         return callStaticString(g_getTimezoneIdentifierMethod, "getTimezoneIdentifier");
     }
 
-    rac_result_t httpDownload(const char* url, const char* destinationPath, const char* taskId) {
-        JNIEnv* env = getJNIEnv();
-        if (!env) return RAC_ERROR_NOT_SUPPORTED;
-
-        if (!g_platformAdapterBridgeClass || !g_httpDownloadMethod) {
-            LOGE("PlatformAdapterBridge class or httpDownload method not cached");
-            return RAC_ERROR_NOT_SUPPORTED;
-        }
-
-        jstring jUrl = env->NewStringUTF(url ? url : "");
-        jstring jDest = env->NewStringUTF(destinationPath ? destinationPath : "");
-        jstring jTaskId = env->NewStringUTF(taskId ? taskId : "");
-
-        jint result = env->CallStaticIntMethod(g_platformAdapterBridgeClass,
-                                               g_httpDownloadMethod,
-                                               jUrl,
-                                               jDest,
-                                               jTaskId);
-
-        env->DeleteLocalRef(jUrl);
-        env->DeleteLocalRef(jDest);
-        env->DeleteLocalRef(jTaskId);
-
-        if (env->ExceptionCheck()) {
-            env->ExceptionClear();
-            LOGE("Exception in httpDownload");
-            return RAC_ERROR_DOWNLOAD_FAILED;
-        }
-
-        return static_cast<rac_result_t>(result);
-    }
-
-    bool httpDownloadCancel(const char* taskId) {
-        JNIEnv* env = getJNIEnv();
-        if (!env) return false;
-
-        if (!g_platformAdapterBridgeClass || !g_httpDownloadCancelMethod) {
-            LOGE("PlatformAdapterBridge class or httpDownloadCancel method not cached");
-            return false;
-        }
-
-        jstring jTaskId = env->NewStringUTF(taskId ? taskId : "");
-        jboolean result = env->CallStaticBooleanMethod(g_platformAdapterBridgeClass,
-                                                       g_httpDownloadCancelMethod,
-                                                       jTaskId);
-        env->DeleteLocalRef(jTaskId);
-
-        if (env->ExceptionCheck()) {
-            env->ExceptionClear();
-            LOGE("Exception in httpDownloadCancel");
-            return false;
-        }
-
-        return result == JNI_TRUE;
-    }
-
     // Directory enumeration via
     // java.io.File.listFiles(). Two-call semantics matching
     // rac_file_list_directory_fn. Truncation contract: skip oversized
@@ -735,16 +677,6 @@ extern "C" {
     bool PlatformAdapter_getLocaleIdentifier(char** outValue);
     bool PlatformAdapter_getTimezoneIdentifier(char** outValue);
 
-    // Platform HTTP download fallback used by the RACommons platform adapter.
-    // Public RN downloads enter commons through the rac_download_*_proto ABI.
-    int PlatformAdapter_httpDownload(
-        const char* url,
-        const char* destinationPath,
-        const char* taskId
-    );
-
-    bool PlatformAdapter_httpDownloadCancel(const char* taskId);
-
     // Directory enumeration + Apple vendor-id.
     // Mirrors `PlatformDirectoryEntry` in PlatformAdapterBridge.h field-for-field
     // with `rac_directory_entry_t` so we can memcpy entries straight across.
@@ -817,20 +749,6 @@ int neuralEngineCoresForChip(const std::string& chipName) {
 #endif
 
 } // anonymous namespace
-
-// =============================================================================
-// HTTP download callback state (platform adapter)
-// =============================================================================
-
-struct http_download_context {
-    rac_http_progress_callback_fn progress_callback;
-    rac_http_complete_callback_fn complete_callback;
-    void* user_data;
-};
-
-static std::mutex g_http_download_mutex;
-static std::unordered_map<std::string, http_download_context> g_http_downloads;
-static std::atomic<uint64_t> g_http_download_counter{0};
 
 static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     const std::string& url,
@@ -1615,134 +1533,6 @@ static rac_result_t platformGetVendorIdCallback(char* out_buffer,
 #endif
 
 // =============================================================================
-// HTTP Download Callbacks (Platform Adapter)
-// =============================================================================
-
-static int reportHttpDownloadProgressInternal(const char* task_id,
-                                              int64_t downloaded_bytes,
-                                              int64_t total_bytes) {
-    if (!task_id) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    std::lock_guard<std::mutex> lock(g_http_download_mutex);
-    auto it = g_http_downloads.find(task_id);
-    if (it == g_http_downloads.end()) {
-        return RAC_ERROR_NOT_FOUND;
-    }
-
-    if (it->second.progress_callback) {
-        it->second.progress_callback(downloaded_bytes, total_bytes, it->second.user_data);
-    }
-
-    return RAC_SUCCESS;
-}
-
-static int reportHttpDownloadCompleteInternal(const char* task_id,
-                                              int result,
-                                              const char* downloaded_path) {
-    if (!task_id) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    http_download_context ctx{};
-    {
-        std::lock_guard<std::mutex> lock(g_http_download_mutex);
-        auto it = g_http_downloads.find(task_id);
-        if (it == g_http_downloads.end()) {
-            return RAC_ERROR_NOT_FOUND;
-        }
-        ctx = it->second;
-        g_http_downloads.erase(it);
-    }
-
-    if (ctx.complete_callback) {
-        ctx.complete_callback(static_cast<rac_result_t>(result), downloaded_path, ctx.user_data);
-    }
-
-    return RAC_SUCCESS;
-}
-
-static rac_result_t platformHttpDownloadCallback(const char* url,
-                                                 const char* destination_path,
-                                                 rac_http_progress_callback_fn progress_callback,
-                                                 rac_http_complete_callback_fn complete_callback,
-                                                 void* callback_user_data,
-                                                 char** out_task_id,
-                                                 void* user_data) {
-    (void)user_data;
-
-    if (!url || !destination_path || !out_task_id) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    std::string task_id =
-        "http_" + std::to_string(g_http_download_counter.fetch_add(1, std::memory_order_relaxed));
-
-    *out_task_id = strdup(task_id.c_str());
-    if (!*out_task_id) {
-        return RAC_ERROR_OUT_OF_MEMORY;
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(g_http_download_mutex);
-        g_http_downloads[task_id] = {progress_callback, complete_callback, callback_user_data};
-    }
-
-    rac_result_t start_result = RAC_ERROR_NOT_SUPPORTED;
-
-#if defined(ANDROID) || defined(__ANDROID__)
-    start_result = AndroidBridge::httpDownload(url, destination_path, task_id.c_str());
-#elif defined(__APPLE__)
-    start_result = static_cast<rac_result_t>(
-        PlatformAdapter_httpDownload(url, destination_path, task_id.c_str()));
-#endif
-
-    if (start_result != RAC_SUCCESS) {
-        http_download_context ctx{};
-        {
-            std::lock_guard<std::mutex> lock(g_http_download_mutex);
-            auto it = g_http_downloads.find(task_id);
-            if (it != g_http_downloads.end()) {
-                ctx = it->second;
-                g_http_downloads.erase(it);
-            }
-        }
-
-        if (ctx.complete_callback) {
-            ctx.complete_callback(start_result, nullptr, ctx.user_data);
-        }
-    }
-
-    return start_result;
-}
-
-static rac_result_t platformHttpDownloadCancelCallback(const char* task_id, void* user_data) {
-    (void)user_data;
-
-    if (!task_id) {
-        return RAC_ERROR_INVALID_ARGUMENT;
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(g_http_download_mutex);
-        if (g_http_downloads.find(task_id) == g_http_downloads.end()) {
-            return RAC_ERROR_NOT_FOUND;
-        }
-    }
-
-    bool cancelled = false;
-
-#if defined(ANDROID) || defined(__ANDROID__)
-    cancelled = AndroidBridge::httpDownloadCancel(task_id);
-#elif defined(__APPLE__)
-    cancelled = PlatformAdapter_httpDownloadCancel(task_id);
-#endif
-
-    return cancelled ? RAC_SUCCESS : RAC_ERROR_CANCELLED;
-}
-
-// =============================================================================
 // InitBridge Implementation
 // =============================================================================
 
@@ -1784,10 +1574,10 @@ rac_result_t InitBridge::registerPlatformAdapter() {
   // Memory info
   adapter_.get_memory_info = platformGetMemoryInfoCallback;
 
-  // HTTP download fallback for RACommons platform-adapter callers.
-  // Public RN model downloads use the rac_download_*_proto ABI.
-  adapter_.http_download = platformHttpDownloadCallback;
-  adapter_.http_download_cancel = platformHttpDownloadCancelCallback;
+  // http_download / http_download_cancel stay NULL per the seam contract in
+  // rac_platform_adapter.h: that slot exists only for WASM, where the main
+  // thread cannot block. Native SDKs route downloads through the registered
+  // rac_http_transport_ops_t vtable via the blocking runner.
 
   // Archive extraction (handled by JS layer)
   adapter_.extract_archive = nullptr;
@@ -2529,21 +2319,29 @@ std::tuple<bool, int, std::string, std::string> InitBridge::httpPostSync(
 // =============================================================================
 // Global C API for platform download reporting
 // =============================================================================
+//
+// Inert stubs kept for link compatibility with the iOS/Android platform
+// delegates that still reference them. The platform_adapter.http_download
+// driver they used to report into was removed — the slot is WASM-only per
+// the seam contract in rac_platform_adapter.h; native downloads flow through
+// the registered HTTP transport vtable instead.
 
 extern "C" int RunAnywhereHttpDownloadReportProgress(const char* task_id,
                                                      int64_t downloaded_bytes,
                                                      int64_t total_bytes) {
-    return runanywhere::bridges::reportHttpDownloadProgressInternal(task_id,
-                                                                    downloaded_bytes,
-                                                                    total_bytes);
+    (void)task_id;
+    (void)downloaded_bytes;
+    (void)total_bytes;
+    return RAC_ERROR_NOT_FOUND;
 }
 
 extern "C" int RunAnywhereHttpDownloadReportComplete(const char* task_id,
                                                      int result,
                                                      const char* downloaded_path) {
-    return runanywhere::bridges::reportHttpDownloadCompleteInternal(task_id,
-                                                                    result,
-                                                                    downloaded_path);
+    (void)task_id;
+    (void)result;
+    (void)downloaded_path;
+    return RAC_ERROR_NOT_FOUND;
 }
 
 // M5: The `SyncHttpDownload` helper that used to live here — the B-RN-3-001 /

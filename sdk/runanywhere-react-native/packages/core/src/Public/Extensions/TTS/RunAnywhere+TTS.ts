@@ -27,16 +27,18 @@ import {
   type TTSOptions,
   type TTSOutput,
   type TTSSpeakResult,
+  type TTSServiceState,
 } from '@runanywhere/proto-ts/tts_options';
 import {
   TTSOptions as TTSOptionsMessage,
   TTSOutput as TTSOutputMessage,
   TTSSpeakResult as TTSSpeakResultMessage,
+  TTSServiceState as TTSServiceStateMessage,
   TTSSynthesisRequest,
   TTSStreamEvent,
   TTSStreamEventKind,
 } from '@runanywhere/proto-ts/tts_options';
-import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import { tTSOptionsDefaults } from '@runanywhere/proto-ts/convenience/tts_options_convenience';
 import { arrayBufferToBytes } from '../../../services/ProtoBytes';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 
@@ -65,14 +67,8 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 function buildTTSOptions(options?: Partial<TTSOptions>): TTSOptions {
   return TTSOptionsMessage.create({
-    voice: options?.voice ?? '',
-    languageCode: options?.languageCode ?? '',
-    speakingRate: options?.speakingRate ?? 1.0,
-    pitch: options?.pitch ?? 1.0,
-    volume: options?.volume ?? 1.0,
-    enableSsml: options?.enableSsml ?? false,
-    audioFormat: options?.audioFormat ?? AudioFormat.AUDIO_FORMAT_PCM,
-    sampleRate: options?.sampleRate ?? 0,
+    ...tTSOptionsDefaults(),
+    ...options,
   });
 }
 
@@ -100,6 +96,24 @@ function decodeTTSOutput(buffer: ArrayBuffer): TTSOutput {
     throw SDKException.protoDecodeFailed('ttsSynthesizeProto');
   }
   return TTSOutputMessage.decode(bytes);
+}
+
+/**
+ * Report the lifecycle-loaded TTS service's state (readiness, current voice,
+ * available voices, supported languages). Succeeds with `isReady = false`
+ * when no voice is loaded.
+ */
+export async function ttsState(): Promise<TTSServiceState> {
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  await ensureServicesReady();
+  const native = requireNativeModule();
+  const bytes = arrayBufferToBytes(await native.ttsStateProto());
+  if (bytes.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('ttsStateProto');
+  }
+  return TTSServiceStateMessage.decode(bytes);
 }
 
 /**

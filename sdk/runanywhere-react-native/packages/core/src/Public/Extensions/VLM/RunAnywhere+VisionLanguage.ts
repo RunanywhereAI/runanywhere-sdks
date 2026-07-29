@@ -28,6 +28,7 @@ import {
   VLMStreamEvent as VLMStreamEventMessage,
   VLMStreamEventKind,
 } from '@runanywhere/proto-ts/vlm_options';
+import { vLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/vlm_options_convenience';
 import type {
   VLMGenerationOptions,
   VLMImage,
@@ -46,32 +47,11 @@ function ensureNative() {
 }
 
 function buildVLMOptions(
-  options: Partial<VLMGenerationOptions> | undefined,
-  streamingEnabled: boolean
+  options: Partial<VLMGenerationOptions> | undefined
 ): VLMGenerationOptions {
   return VLMGenerationOptionsMessage.fromPartial({
+    ...vLMGenerationOptionsDefaults(),
     ...options,
-    prompt: options?.prompt ?? '',
-    // Defaults mirror Swift RAVLMGenerationOptions.defaults()
-    // (RAVLMImage+Helpers.swift): maxTokens 256, temperature 0.7,
-    // topP 0.9, topK 40; no useGpu override (proto default).
-    maxTokens: options?.maxTokens ?? 256,
-    temperature: options?.temperature ?? 0.7,
-    topP: options?.topP ?? 0.9,
-    topK: options?.topK ?? 40,
-    stopSequences: options?.stopSequences ?? [],
-    streamingEnabled,
-    systemPrompt: options?.systemPrompt,
-    maxImageSize: options?.maxImageSize ?? 0,
-    nThreads: options?.nThreads ?? 0,
-    useGpu: options?.useGpu ?? false,
-    modelFamily: options?.modelFamily ?? 0,
-    customChatTemplate: options?.customChatTemplate,
-    imageMarkerOverride: options?.imageMarkerOverride,
-    seed: options?.seed ?? 0,
-    repetitionPenalty: options?.repetitionPenalty ?? 0,
-    minP: options?.minP ?? 0,
-    emitImageEmbeddings: options?.emitImageEmbeddings ?? false,
   });
 }
 
@@ -82,13 +62,12 @@ function nextVLMRequestId(): string {
 
 function encodeVLMRequest(
   image: VLMImage,
-  options: Partial<VLMGenerationOptions> | undefined,
-  streamingEnabled: boolean
+  options: Partial<VLMGenerationOptions> | undefined
 ): ArrayBuffer {
   const request = VLMGenerationRequest.fromPartial({
     requestId: nextVLMRequestId(),
     images: [VLMImageMessage.fromPartial(image)],
-    options: buildVLMOptions(options, streamingEnabled),
+    options: buildVLMOptions(options),
     metadata: {},
   });
   return encodeProtoMessage(request, VLMGenerationRequest);
@@ -118,7 +97,7 @@ export async function processImage(
   // Swift parity: RunAnywhere+VisionLanguage.swift:31 gates on ensureServicesReady.
   await ensureServicesReady();
   const resultBytes = await native.vlmProcessProto(
-    encodeVLMRequest(image, options, false)
+    encodeVLMRequest(image, options)
   );
   return decodeVLMResult(resultBytes, 'vlmProcessProto');
 }
@@ -154,7 +133,7 @@ export async function processImageStream(
   const native = ensureNative();
   // Swift parity: RunAnywhere+VisionLanguage.swift:59 gates on ensureServicesReady.
   await ensureServicesReady();
-  const requestBytes = encodeVLMRequest(image, options, true);
+  const requestBytes = encodeVLMRequest(image, options);
 
   return {
     [Symbol.asyncIterator](): AsyncIterator<VLMStreamEvent> {

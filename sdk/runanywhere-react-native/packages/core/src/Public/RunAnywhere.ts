@@ -677,6 +677,7 @@ export const RunAnywhere = {
 
   transcribe: STT.transcribe,
   transcribeStream: STT.transcribeStream,
+  sttState: STT.sttState,
 
   // ============================================================================
   // Text-to-Speech (Swift-shaped public extension)
@@ -686,6 +687,7 @@ export const RunAnywhere = {
   synthesizeStream: TTS.synthesizeStream,
   stopSynthesis: TTS.stopSynthesis,
   speak: TTS.speak,
+  ttsState: TTS.ttsState,
   stopSpeaking: TTS.stopSpeaking,
 
   // ============================================================================
