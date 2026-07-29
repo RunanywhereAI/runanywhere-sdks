@@ -46,7 +46,7 @@ extension LLMViewModel {
                 try ensureVisionModelLoaded()
 
                 var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-                options.maxTokens = 500
+                options.maxOutputTokens = 500
 
                 let stream = try await RunAnywhere.processImageStream(attachment.image, options: options)
                 let response = try await consumeVisionStream(

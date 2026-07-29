@@ -56,8 +56,12 @@ extension LLMViewModel {
 
                 var options = RARAGQueryOptions.defaults(question: prompt)
                 let settings = SettingsViewModel.shared
-                options.disableThinking =
-                    answerModel.supportsThinking && !settings.thinkingModeEnabled
+                var reasoning = RAReasoningOptions()
+                if answerModel.supportsThinking && !settings.thinkingModeEnabled {
+                    reasoning.mode = .off
+                }
+                reasoning.includeInOutput = settings.thinkingModeEnabled
+                options.generation.reasoning = reasoning
 
                 let result = try await RunAnywhere.ragQuery(options)
                 if isCurrentGeneration(generationID) {

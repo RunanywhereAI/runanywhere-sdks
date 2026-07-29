@@ -47,7 +47,7 @@ extension LLMViewModel {
         let completionStatus: MessageAnalytics.CompletionStatus = wasInterrupted ? .interrupted : .complete
         let generationParameters = MessageAnalytics.GenerationParameters(
             temperature: Double(options.temperature),
-            maxTokens: Int(options.maxTokens),
+            maxTokens: Int(options.maxOutputTokens),
             topP: nil,
             topK: nil
         )
@@ -77,7 +77,7 @@ extension LLMViewModel {
             wasInterrupted: wasInterrupted,
             retryCount: 0,
             completionStatus: completionStatus,
-            generationMode: options.streamingEnabled ? .streaming : .nonStreaming,
+            generationMode: useStreaming ? .streaming : .nonStreaming,
             generationParameters: generationParameters
         )
     }

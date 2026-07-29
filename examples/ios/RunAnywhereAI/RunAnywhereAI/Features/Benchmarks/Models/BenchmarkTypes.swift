@@ -132,10 +132,6 @@ struct BenchmarkMetrics: Codable, Sendable {
     var audioDurationSeconds: Double?
     var charactersProcessed: Int?
 
-    // VLM-specific
-    var promptTokens: Int?
-    var completionTokens: Int?
-
     // Generation duration (LLM / VLM generate paths)
     var generationTimeMs: Double?
 
@@ -203,8 +199,6 @@ extension BenchmarkMetrics {
         m.realTimeFactor = median { $0.realTimeFactor }
         m.audioDurationSeconds = median { $0.audioDurationSeconds }
         m.charactersProcessed = medianInt { $0.charactersProcessed }
-        m.promptTokens = medianInt { $0.promptTokens }
-        m.completionTokens = medianInt { $0.completionTokens }
         m.generationTimeMs = median { $0.generationTimeMs }
 
         let variance = BenchmarkVariance(

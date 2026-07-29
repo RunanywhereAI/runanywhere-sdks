@@ -702,23 +702,28 @@ final class LLMViewModel {
         )
 
         var options = RALLMGenerationOptions.defaults()
-        options.maxTokens = Int32(effectiveSettings.maxTokens)
+        options.maxOutputTokens = Int32(effectiveSettings.maxTokens)
         options.temperature = Float(effectiveSettings.temperature)
         if let effectiveSystemPrompt {
             options.systemPrompt = effectiveSystemPrompt
         }
-        options.streamingEnabled = useStreaming
-        // Structured flag — commons applies the model's no-think directive;
-        // the app never injects control tokens into prompts. Chat document
-        // attachments use the same gate before calling the SDK RAG pipeline.
-        options.disableThinking = loadedModelSupportsThinking && !thinkingModeEnabled
+        // Structured reasoning control — commons applies the model's no-think
+        // directive; the app never injects control tokens into prompts. Chat
+        // document attachments use the same gate before calling the SDK RAG
+        // pipeline. Thought tokens only reach the UI when includeInOutput is set.
+        var reasoning = RAReasoningOptions()
+        if loadedModelSupportsThinking && !thinkingModeEnabled {
+            reasoning.mode = .off
+        }
+        reasoning.includeInOutput = thinkingModeEnabled
         if let currentModel = ModelListViewModel.shared.currentModel, currentModel.supportsThinking {
-            options.thinkingPattern = currentModel.hasThinkingPattern
+            reasoning.pattern = currentModel.hasThinkingPattern
                 ? currentModel.thinkingPattern
                 : .defaultPattern
         } else if loadedModelSupportsThinking {
-            options.thinkingPattern = .defaultPattern
+            reasoning.pattern = .defaultPattern
         }
+        options.reasoning = reasoning
         return options
     }
 

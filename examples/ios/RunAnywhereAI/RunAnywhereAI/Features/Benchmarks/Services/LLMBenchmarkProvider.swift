@@ -54,9 +54,8 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
             // tokens/sec from the event sequence directly.
             let warmupStart = Date()
             var warmupOptions = RALLMGenerationOptions.defaults()
-            warmupOptions.maxTokens = 5
+            warmupOptions.maxOutputTokens = 5
             warmupOptions.temperature = 0.0
-            warmupOptions.streamingEnabled = true
             let warmupRequest = warmupOptions.toRALLMGenerateRequest(prompt: "Hello")
             let warmupEvents = try await RunAnywhere.generateStream(warmupRequest)
             for await event in warmupEvents where event.isFinal { break }
@@ -72,10 +71,9 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
                 + "loss functions, convolutional layers, recurrent layers, transformers, attention "
                 + "mechanisms, and training procedures. Be as thorough as possible."
             var benchOptions = RALLMGenerationOptions.defaults()
-            benchOptions.maxTokens = Int32(maxTokens)
+            benchOptions.maxOutputTokens = Int32(maxTokens)
             benchOptions.temperature = 0.0
             benchOptions.systemPrompt = systemPrompt
-            benchOptions.streamingEnabled = true
             let benchRequest = benchOptions.toRALLMGenerateRequest(prompt: prompt)
             let benchEvents = try await RunAnywhere.generateStream(benchRequest)
 
@@ -94,11 +92,11 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
             metrics.ttftMs = result.ttftMs > 0 ? result.ttftMs : nil
             metrics.tokensPerSecond = result.tokensPerSecond > 0 ? result.tokensPerSecond : nil
             metrics.inputTokens = result.inputTokens > 0 ? Int(result.inputTokens) : nil
-            metrics.outputTokens = result.tokensGenerated > 0 ? Int(result.tokensGenerated) : nil
+            metrics.outputTokens = result.outputTokens > 0 ? Int(result.outputTokens) : nil
 
-            if result.decodeTimeMs > 0, result.tokensGenerated > 0 {
+            if result.decodeTimeMs > 0, result.outputTokens > 0 {
                 metrics.decodeTokensPerSecond =
-                    Double(result.tokensGenerated) / (Double(result.decodeTimeMs) / 1000.0)
+                    Double(result.outputTokens) / (Double(result.decodeTimeMs) / 1000.0)
             }
             if result.promptEvalTimeMs > 0, result.inputTokens > 0 {
                 metrics.prefillTokensPerSecond =

@@ -68,7 +68,7 @@ class TTSViewModel: VoiceComponentViewModelBase {
 
         do {
             var options = RATTSOptions.defaults()
-            options.speakingRate = Float(speechRate)
+            options.speed = Float(speechRate)
             options.pitch = Float(pitch)
 
             // SDK handles everything - synthesis AND playback

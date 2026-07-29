@@ -71,7 +71,7 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
             let warmupStart = Date()
             var warmupOptions = RAVLMGenerationOptions()
             warmupOptions.prompt = "Hi"
-            warmupOptions.maxTokens = 1
+            warmupOptions.maxOutputTokens = 1
             warmupOptions.temperature = 0.0
             _ = try await RunAnywhere.processImage(vlmImage, options: warmupOptions)
             metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
@@ -82,13 +82,13 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
             // Benchmark
             var benchOptions = RAVLMGenerationOptions()
             benchOptions.prompt = "Describe this image in detail."
-            benchOptions.maxTokens = 128
+            benchOptions.maxOutputTokens = 128
             benchOptions.temperature = 0.0
             let result = try await RunAnywhere.processImage(vlmImage, options: benchOptions)
             metrics.endToEndLatencyMs = Double(result.processingTimeMs)
             metrics.tokensPerSecond = Double(result.tokensPerSecond)
-            metrics.promptTokens = Int(result.promptTokens)
-            metrics.completionTokens = Int(result.completionTokens)
+            metrics.inputTokens = Int(result.inputTokens)
+            metrics.outputTokens = Int(result.outputTokens)
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter

@@ -174,7 +174,7 @@ final class VLMViewModel: NSObject {
                 if !event.token.isEmpty { onToken(event.token) }
             case .completed:
                 let result = event.result
-                logger.info("VLM streaming completed: \(result.completionTokens) tokens, \(result.tokensPerSecond) tok/s")
+                logger.info("VLM streaming completed: \(result.outputTokens) tokens, \(result.tokensPerSecond) tok/s")
             case .error:
                 throw NSError(
                     domain: "com.runanywhere.RunAnywhereAI",
@@ -200,7 +200,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe what you see briefly."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = Self.liveFrameMaxTokens
+            options.maxOutputTokens = Self.liveFrameMaxTokens
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) { currentDescription += $0 }
@@ -224,7 +224,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe this image in detail."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = Self.selectedImageMaxTokens
+            options.maxOutputTokens = Self.selectedImageMaxTokens
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) { currentDescription += $0 }
@@ -248,7 +248,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe this image in detail."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = Self.selectedImageMaxTokens
+            options.maxOutputTokens = Self.selectedImageMaxTokens
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) { currentDescription += $0 }
@@ -297,7 +297,7 @@ final class VLMViewModel: NSObject {
             }
             let prompt = "Describe what you see in one sentence."
             var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-            options.maxTokens = Self.autoStreamMaxTokens
+            options.maxOutputTokens = Self.autoStreamMaxTokens
             let stream = try await RunAnywhere.processImageStream(image, options: options)
 
             try await consumeVLMStream(stream) {

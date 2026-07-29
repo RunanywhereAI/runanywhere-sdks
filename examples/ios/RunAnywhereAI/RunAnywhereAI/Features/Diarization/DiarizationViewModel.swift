@@ -142,8 +142,8 @@ final class DiarizationViewModel {
 
         do {
             var options = RADiarizationOptions()
-            options.sampleRateHz = Int32(Self.sampleRate)
-            options.channelCount = 1
+            options.sampleRate = Int32(Self.sampleRate)
+            options.channels = 1
             options.encoding = .pcmS16Le
 
             let result = try await RunAnywhere.diarize(audioData: audio, options: options)
