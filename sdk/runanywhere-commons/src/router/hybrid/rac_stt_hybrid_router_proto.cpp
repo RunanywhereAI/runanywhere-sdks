@@ -384,10 +384,10 @@ rac_result_t rac_stt_hybrid_router_transcribe_proto(rac_handle_t handle,
     const auto& opt = req.options();
     language_storage = opt.language();
     // Do NOT inherit RAC_STT_OPTIONS_DEFAULT.language ("en") when the caller
-    // didn't pin a language — the cloud provider (sarvam) rejects bare "en";
+    // didn't pin a language — the legacy cloud provider (Sarvam) rejected bare "en";
     // only BCP-47 region forms like "en-IN" or the "unknown" sentinel are
     // accepted. NULL here lets each engine fall back to its own default
-    // (cloud/sarvam: "unknown", sherpa: whatever the model header declares).
+    // (cloud: "unknown", sherpa: whatever the model header declares).
     options.language = language_storage.empty() ? nullptr : language_storage.c_str();
     if (opt.sample_rate() > 0) {
         options.sample_rate = opt.sample_rate();

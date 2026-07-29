@@ -9,7 +9,7 @@
  * engine plugin so it becomes routable via
  * `rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, "cloud")` — exactly the
  * same registry path as the in-tree sherpa STT plugin. Callers pick the provider
- * via the create config (`{"provider":"sarvam"}`).
+ * via the create config (`{"provider":"runanywhere"}`).
  *
  * Like onnx / llamacpp / sherpa, the engine registers via the explicit-register
  * + static-shim pattern: dynamic-linkage hosts call `rac_backend_cloud_register()`

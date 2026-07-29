@@ -10,7 +10,7 @@
  * vtable + RAC_PLUGIN_ENTRY_DEF) so the engine is routable through the plugin
  * registry via `rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, "cloud")`. The
  * concrete provider is selected per-service from the create config
- * (`{"provider":"sarvam"}`), not at the manifest level.
+ * (`{"provider":"runanywhere"}`), not at the manifest level.
  *
  * Cloud-specific manifest shape:
  *   - runtimes = NULL, runtimes_count = 0 — no local compute substrate. The

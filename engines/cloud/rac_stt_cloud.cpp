@@ -2,9 +2,9 @@
  * @file rac_stt_cloud.cpp
  * @brief Generic cloud STT backend — shared HTTP/multipart core.
  *
- * cloud_stt is ONE engine; the PROVIDER (Sarvam, and future HTTP STT providers)
+ * cloud_stt is ONE engine; the PROVIDER (the RunAnywhere backend proxy)
  * is selected at create() via config_json["provider"]. This TU owns the
- * provider-agnostic plumbing — ~85% of the original Sarvam code:
+ * provider-agnostic plumbing:
  *   - the CloudSttImpl state + its vtable (create/transcribe/get_info/destroy)
  *   - the shared HTTP issue path (URL assembly, auth + content-type + accept
  *     headers, timeout, the rac_http_client_* round-trip, mutex)
@@ -13,8 +13,8 @@
  *   - the NaN "no-signal" confidence helper
  *
  * The genuinely provider-specific bits (endpoint path, auth header, body shape,
- * response keys) live behind the CloudSttProvider adapter; Sarvam's adapter is
- * in providers/sarvam.cpp.
+ * response keys) live behind the CloudSttProvider adapter; the RunAnywhere
+ * backend-proxy adapter is in providers/runanywhere.cpp.
  */
 
 #include "rac/backends/rac_stt_cloud.h"
@@ -42,11 +42,12 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/core/rac_sdk_state.h"
 #include "rac/core/rac_types.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/stt/rac_stt_types.h"
 #include "rac/infrastructure/http/rac_http_client.h"
-#include "rac/cloud/rac_cloud_stt_provider.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
 
 #include "cloud_stt_provider.h"
 
@@ -154,9 +155,23 @@ std::string expand_auth_value(const char* templ, const std::string& key) {
 rac_result_t issue_blocking(CloudSttImpl&            impl,
                             const HttpRequestParts&  parts,
                             rac_http_response_t&     resp) {
-    const std::string url        = impl.base_url + impl.path;
+    const std::string url = impl.base_url + impl.path;
+
+    // Session-auth providers read the device access token at request time so
+    // rotation (5h expiry + refresh) is picked up without recreating the
+    // service. A missing session fails here, before any audio leaves the
+    // device.
+    std::string credential = impl.api_key;
+    if (impl.provider->auth_from_sdk_session && credential.empty()) {
+        const char* token = rac_auth_get_access_token();
+        if (token == nullptr || token[0] == '\0') {
+            RAC_LOG_ERROR("cloud_stt", "no SDK access token; authenticate first");
+            return RAC_ERROR_UNAUTHORIZED;
+        }
+        credential = token;
+    }
     const std::string auth_value =
-        expand_auth_value(impl.provider->auth_value_template, impl.api_key);
+        expand_auth_value(impl.provider->auth_value_template, credential);
 
     const rac_http_header_kv_t headers[] = {
         {impl.provider->auth_header_name, auth_value.c_str()},
@@ -192,116 +207,63 @@ rac_result_t issue_blocking(CloudSttImpl&            impl,
 
 // ---- config parsing ---------------------------------------------------------
 
-// Selects the provider, then fills the impl. Provider defaults seed base_url /
-// path before config overrides. api_key + model stay required (as today).
+// Fills the impl from config_json. The provider table is LOCKED to the static
+// adapters in providers/ (runanywhere only): audio captured by this engine is
+// never routable to an arbitrary host, so there is no developer-registered
+// provider branch and no way to point the engine at a third-party endpoint
+// beyond the test-only base_url override.
+rac_result_t cloud_stt_finalize_impl(CloudSttImpl& out);
+
 rac_result_t parse_config(const std::string& config_json, CloudSttImpl& out) {
-    std::string provider_name = "sarvam";  // default for current single-provider callers
+    std::string provider_name = "runanywhere";
     try {
         const auto json = nlohmann::json::parse(config_json);
-        provider_name     = json.value("provider", std::string{"sarvam"});
+        provider_name     = json.value("provider", std::string{"runanywhere"});
         out.api_key       = json.value("api_key", std::string{});
         out.model         = json.value("model", std::string{});
         out.language_code = json.value("language_code", std::string{kDefaultLanguage});
         out.timeout_ms    = json.value("timeout_ms", kDefaultTimeoutMs);
         out.provider_name = provider_name;
-        out.config_json   = config_json;
 
         const CloudSttProvider* provider = find_cloud_stt_provider(provider_name);
-        if (provider != nullptr) {
-            out.use_host_callback = false;
-            out.provider = provider;
-            // Provider defaults first, then optional per-request overrides.
-            out.base_url = json.value("base_url", std::string{provider->default_base_url});
-            out.path     = json.value("path", std::string{provider->default_path});
-        } else if (rac_cloud_has_stt_provider(provider_name.c_str()) == RAC_TRUE) {
-            // Developer-registered host-callback provider: the host owns the wire
-            // format end to end, so there's no static adapter and no engine-side
-            // base_url/path defaults — the host reads whatever it needs from the
-            // forwarded config_json.
-            out.use_host_callback = true;
-            out.provider = nullptr;
-            out.base_url = json.value("base_url", std::string{});
-            out.path     = json.value("path", std::string{});
-        } else {
-            CLOUD_STT_LOG_E("parse_config: unknown provider '%s'", provider_name.c_str());
-            RAC_LOG_ERROR("cloud_stt", "unknown provider '%s'", provider_name.c_str());
+        if (provider == nullptr) {
+            CLOUD_STT_LOG_E("parse_config: unsupported provider '%s'", provider_name.c_str());
+            RAC_LOG_ERROR("cloud_stt", "unsupported provider '%s'", provider_name.c_str());
             return RAC_ERROR_INVALID_CONFIGURATION;
         }
+        out.provider = provider;
+        // Provider defaults first, then optional per-request overrides.
+        out.base_url = json.value("base_url", std::string{provider->default_base_url});
+        out.path     = json.value("path", std::string{provider->default_path});
     } catch (const std::exception&) {
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
-    if (out.api_key.empty() || out.model.empty()) {
+    return cloud_stt_finalize_impl(out);
+}
+
+// Shared tail of both create paths: resolve an empty base_url from the SDK's
+// configured backend, then validate what this provider actually requires.
+// Session-auth providers need neither api_key (the device token is read per
+// request) nor model (the backend chooses the served model).
+rac_result_t cloud_stt_finalize_impl(CloudSttImpl& out) {
+    if (out.provider == nullptr) {
+        return RAC_ERROR_INVALID_CONFIGURATION;
+    }
+    if (out.base_url.empty()) {
+        const char* backend = rac_state_get_base_url();
+        if (backend != nullptr) {
+            out.base_url = backend;
+        }
+    }
+    if (out.base_url.empty()) {
+        RAC_LOG_ERROR("cloud_stt", "no base_url: SDK not initialized with a backend URL");
+        return RAC_ERROR_INVALID_CONFIGURATION;
+    }
+    if (!out.provider->auth_from_sdk_session &&
+        (out.api_key.empty() || out.model.empty())) {
         return RAC_ERROR_INVALID_CONFIGURATION;
     }
     return RAC_SUCCESS;
-}
-
-// ---- host-callback (developer-defined) provider path ------------------------
-
-// Decode the host callback's result JSON into out_result. Shape:
-//   {"text": "...", "language_code": "...", "confidence": <number|omitted>,
-//    "error_code": 0, "error_message": "..."}
-// A non-zero error_code is surfaced as an HTTP error; confidence defaults to the
-// cloud "no-signal" NaN when the host omits it.
-rac_result_t parse_host_result_json(const char*       result_json,
-                                    rac_stt_result_t* out_result,
-                                    int64_t           elapsed_ms) {
-    if (result_json == nullptr || out_result == nullptr) {
-        return RAC_ERROR_INVALID_RESPONSE;
-    }
-    try {
-        const auto json = nlohmann::json::parse(result_json);
-        const int error_code = json.value("error_code", 0);
-        if (error_code != 0) {
-            const auto msg = json.value("error_message", std::string{});
-            CLOUD_STT_LOG_E("host provider error %d: %s", error_code, msg.c_str());
-            RAC_LOG_ERROR("cloud_stt", "host provider error %d: %s", error_code, msg.c_str());
-            return RAC_ERROR_HTTP_ERROR;
-        }
-        out_result->text = cloud_stt_dup_cstr(json.value("text", std::string{}));
-        if (out_result->text == nullptr) {
-            return RAC_ERROR_OUT_OF_MEMORY;
-        }
-        const auto language = json.value("language_code", std::string{});
-        if (!language.empty()) {
-            out_result->detected_language = cloud_stt_dup_cstr(language);
-        }
-        out_result->confidence =
-            (json.contains("confidence") && json["confidence"].is_number())
-                ? json["confidence"].get<float>()
-                : cloud_stt_no_confidence();
-        out_result->processing_time_ms = elapsed_ms;
-        return RAC_SUCCESS;
-    } catch (const std::exception&) {
-        return RAC_ERROR_INVALID_RESPONSE;
-    }
-}
-
-// Delegate the whole transcribe to the host-registered provider callback. The
-// host builds the request, performs the HTTP, and parses the response; we just
-// hand over the audio + forwarded config and decode the result JSON it returns.
-rac_result_t transcribe_via_host(CloudSttImpl&            impl,
-                                 const void*              audio,
-                                 size_t                   audio_size,
-                                 const rac_stt_options_t* options,
-                                 rac_stt_result_t*        out_result) {
-    const int32_t fmt = (options != nullptr) ? static_cast<int32_t>(options->audio_format)
-                                             : static_cast<int32_t>(RAC_AUDIO_FORMAT_WAV);
-    char* result_json = nullptr;
-    const auto start = std::chrono::steady_clock::now();
-    rac_result_t rc = rac_cloud_invoke_stt_provider(
-        impl.provider_name.c_str(), impl.config_json.c_str(),
-        static_cast<const uint8_t*>(audio), audio_size, fmt, &result_json);
-    const auto elapsed_ms =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - start).count();
-    if (rc != RAC_SUCCESS) {
-        rac_cloud_stt_result_free(result_json);
-        return rc;
-    }
-    rc = parse_host_result_json(result_json, out_result, static_cast<int64_t>(elapsed_ms));
-    rac_cloud_stt_result_free(result_json);
-    return rc;
 }
 
 // =============================================================================
@@ -322,24 +284,23 @@ rac_result_t ops_create(const char* model_id, const char* config_json, void** ou
             return rc;
         }
     } else {
-        // No config at all: still need a provider to be a usable service. Default
-        // to sarvam so existing single-provider callers keep working; api_key /
-        // model remain required and fail the check below.
-        impl->provider = find_cloud_stt_provider("sarvam");
+        // No config at all: default to the runanywhere backend proxy, which
+        // needs no per-caller configuration (base_url and auth come from the
+        // SDK session).
+        impl->provider = find_cloud_stt_provider("runanywhere");
         if (impl->provider == nullptr) {
             return RAC_ERROR_INVALID_CONFIGURATION;
         }
-        impl->base_url = impl->provider->default_base_url;
-        impl->path     = impl->provider->default_path;
+        impl->provider_name = impl->provider->name;
+        impl->base_url      = impl->provider->default_base_url;
+        impl->path          = impl->provider->default_path;
+        const rac_result_t rc = cloud_stt_finalize_impl(*impl);
+        if (rc != RAC_SUCCESS) {
+            return rc;
+        }
     }
     if (model_id != nullptr && model_id[0] != '\0') {
         impl->model = model_id;
-    }
-    // A usable service needs either a static provider adapter or a host-callback
-    // provider; api_key + model stay required for both.
-    if ((impl->provider == nullptr && !impl->use_host_callback) ||
-        impl->api_key.empty() || impl->model.empty()) {
-        return RAC_ERROR_INVALID_CONFIGURATION;
     }
     *out_impl = impl.release();
     return RAC_SUCCESS;
@@ -360,11 +321,6 @@ rac_result_t ops_transcribe(void* impl_v, const void* audio_data, size_t audio_s
     }
     impl->cancelled.store(false);
     std::memset(out_result, 0, sizeof(*out_result));
-
-    // Developer-defined provider: the host performs the whole request.
-    if (impl->use_host_callback) {
-        return transcribe_via_host(*impl, audio_data, audio_size, options, out_result);
-    }
 
     if (impl->provider == nullptr || impl->provider->build_request == nullptr ||
         impl->provider->parse_response == nullptr) {
@@ -475,7 +431,31 @@ rac_result_t cloud_stt_parse_flat_json(const rac_http_response_t* resp,
                       resp->status,
                       (int)std::min<size_t>(resp->body_len, 512),
                       reinterpret_cast<const char*>(resp->body_bytes));
-        return RAC_ERROR_HTTP_ERROR;
+        // Backend error envelope ({"error":{"code": ...}}) beats the bare HTTP
+        // status: it distinguishes "key not entitled" from a generic 403 so
+        // apps can point at the Console toggle instead of a mystery failure.
+        if (resp->body_bytes != nullptr && resp->body_len > 0) {
+            try {
+                const auto json =
+                    nlohmann::json::parse(resp->body_bytes, resp->body_bytes + resp->body_len);
+                const auto code =
+                    json.value("error", nlohmann::json::object()).value("code", std::string{});
+                if (code == "feature_not_enabled") {
+                    return RAC_ERROR_FEATURE_NOT_ENABLED;
+                }
+                if (code == "quota_exceeded") {
+                    return RAC_ERROR_QUOTA_EXCEEDED;
+                }
+            } catch (const std::exception&) {
+                // Not our envelope; fall through to the status mapping.
+            }
+        }
+        switch (resp->status) {
+            case 401: return RAC_ERROR_UNAUTHORIZED;
+            case 403: return RAC_ERROR_FORBIDDEN;
+            case 429: return RAC_ERROR_QUOTA_EXCEEDED;
+            default:  return RAC_ERROR_HTTP_ERROR;
+        }
     }
     if (resp->body_bytes == nullptr || resp->body_len == 0) {
         return RAC_ERROR_INVALID_RESPONSE;
@@ -533,7 +513,7 @@ rac_result_t rac_stt_cloud_create(const char* api_key, const char* model,
         return RAC_ERROR_INVALID_PARAMETER;
     }
     *out_service = nullptr;
-    // No "provider" key -> defaults to sarvam inside ops_create, preserving the
+    // No "provider" key -> defaults to runanywhere inside ops_create, preserving the
     // legacy single-provider create() contract byte-for-byte.
     nlohmann::json cfg = {{"api_key", api_key}, {"model", model}};
     const std::string cfg_str = cfg.dump();

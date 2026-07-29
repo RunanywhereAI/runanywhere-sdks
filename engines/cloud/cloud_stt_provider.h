@@ -15,8 +15,11 @@
  *   - build_request:  fills the HTTP body + content-type for one transcribe call
  *   - parse_response: decodes the provider's JSON into a rac_stt_result_t
  *
- * Sarvam is the first adapter (providers/sarvam.cpp). New providers add a data
- * struct + (often) a one-line call to the shared default helpers below.
+ * The RunAnywhere backend proxy (providers/runanywhere.cpp) is the ONLY
+ * provider: the table is deliberately closed so audio captured by this engine
+ * cannot be routed to arbitrary third-party hosts, and the developer
+ * host-callback path was removed for the same reason. Provider credentials
+ * live on the backend; the device authenticates with its own session token.
  *
  * This header is engine-internal (lives under engines/cloud_stt/, not in the
  * public include/ tree): only the engine TUs and its provider adapters include
@@ -67,19 +70,13 @@ struct CloudSttProvider;  // fwd-decl; full definition below.
 struct CloudSttImpl {
     const CloudSttProvider* provider = nullptr;  // borrowed; static table entry
 
-    std::string api_key;
+    std::string api_key;  // empty for session-auth providers (device token used)
     std::string model;
     std::string language_code;
-    std::string base_url;  // resolved: provider default unless config overrides
+    std::string base_url;  // provider default, else the SDK's configured backend
     std::string path;      // resolved: provider default unless config overrides
 
-    // Host-callback (developer-defined) provider path. When true, transcribe is
-    // delegated to the host via rac_cloud_invoke_stt_provider(provider_name, …)
-    // — the host owns build + HTTP + parse — and `provider` stays null. Set when
-    // config_json["provider"] has no static adapter but a registered callback.
-    bool        use_host_callback = false;
-    std::string provider_name;  // config_json["provider"]; selects the host callback
-    std::string config_json;    // raw config forwarded verbatim to the host callback
+    std::string provider_name;  // config_json["provider"]; logging/telemetry only
 
     int32_t           timeout_ms = kDefaultTimeoutMs;
     std::atomic<bool> cancelled{false};
@@ -121,11 +118,17 @@ struct HttpRequestParts {
  * shared plumbing the callbacks reuse.
  */
 struct CloudSttProvider {
-    const char* name;                 // e.g. "sarvam"
-    const char* default_base_url;     // e.g. "https://api.sarvam.ai"
-    const char* default_path;         // e.g. "/speech-to-text"
-    const char* auth_header_name;     // e.g. "api-subscription-key"
-    const char* auth_value_template;  // e.g. "{key}" (Sarvam); "Bearer {key}", "Token {key}"
+    const char* name;                 // e.g. "runanywhere"
+    const char* default_base_url;     // "" = resolve from rac_state_get_base_url()
+    const char* default_path;         // e.g. "/api/v1/sdk/stt/transcribe"
+    const char* auth_header_name;     // e.g. "Authorization"
+    const char* auth_value_template;  // e.g. "Bearer {key}", "Token {key}", raw "{key}"
+
+    // When true the provider authenticates with the SDK's own session: {key} is
+    // expanded from rac_auth_get_access_token() at REQUEST time (tokens rotate),
+    // config_json["api_key"] is not required, and a missing/expired session
+    // surfaces as RAC_ERROR_UNAUTHORIZED before any bytes leave the device.
+    bool auth_from_sdk_session;
 
     /**
      * Build the request body + content-type for one transcribe call. The

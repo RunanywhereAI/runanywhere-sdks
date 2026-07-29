@@ -10,7 +10,7 @@
  *
  * The router does NOT own the underlying services — callers create them
  * through the plugin registry (engine_hint="sherpa" for the on-device side,
- * "cloud" with provider=sarvam for the cloud side) and pass them in. Caller must
+ * "cloud" with provider=runanywhere for the cloud side) and pass them in. Caller must
  * call set_*_service(handle, NULL) BEFORE destroying either underlying
  * service to avoid use-after-free on the next route.
  *
@@ -131,7 +131,7 @@ RAC_API rac_result_t rac_stt_hybrid_router_cancel(rac_handle_t handle);
  * @param config_json       Passed verbatim as the create op's `config_json`
  *                          argument (the cloud {provider,api_key,model,…} JSON,
  *                          or NULL). The caller is responsible for threading the
- *                          provider in (e.g. {"provider":"sarvam"}).
+ *                          provider in (e.g. {"provider":"runanywhere"}).
  * @return A heap-allocated rac_stt_service_t* the caller owns (release with
  *         rac_stt_hybrid_router_destroy_service), or NULL on routing/create
  *         failure or OOM.

@@ -18,7 +18,7 @@
  *      otherwise the primary's result/error stands.
  *
  * Confidence only flows from the offline (sherpa) side — the cloud engine
- * (cloud, provider=sarvam) does not surface a transcript-quality signal,
+ * (cloud, provider=runanywhere) does not surface a transcript-quality signal,
  * so its confidence is NaN and never triggers a cascade.
  */
 

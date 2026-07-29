@@ -16,7 +16,7 @@
  * racSttServiceCreate (model-registry path resolution for in-tree backends
  * like sherpa-onnx), the online side from racSttHybridRouterCreateService
  * (explicit engine hint + config JSON; the cloud provider, default
- * "sarvam", travels in that config JSON). The router path no longer depends on
+ * "runanywhere", travels in that config JSON). The router path no longer depends on
  * any bespoke per-engine factory; racSttHybridRouterDestroyService releases
  * either handle through rac_stt_destroy.
  */
@@ -124,13 +124,13 @@ const char* framework_to_plugin_hint(rac_inference_framework_t fw) {
 
 // Engine hint for the generic cloud backend (engines/cloud), a modality-agnostic
 // engine that today serves STT. The concrete HTTP provider is chosen per-service
-// from config_json["provider"] (default "sarvam"), NOT from the hint.
+// from config_json["provider"] (default "runanywhere"), NOT from the hint.
 constexpr char kCloudSttEngineHint[] = "cloud";
-constexpr char kDefaultCloudProvider[] = "sarvam";
+constexpr char kDefaultCloudProvider[] = "runanywhere";
 
 // Ensures config_json carries a "provider" so the cloud engine selects a
 // concrete adapter. When the hint targets cloud and the incoming JSON has
-// no "provider" key, inject the default ("sarvam"). Returns the (possibly
+// no "provider" key, inject the default ("runanywhere"). Returns the (possibly
 // rewritten) config string; passes non-cloud hints and already-tagged configs
 // through unchanged. Malformed JSON is left untouched — the engine surfaces the
 // parse error itself.
@@ -151,7 +151,7 @@ std::string ensure_cloud_provider(const std::string& engine_hint, const std::str
 }
 
 // Unified "create an STT service by engine hint + config" path. BOTH the
-// offline (sherpa) and online (cloud, provider=sarvam) sides of the hybrid
+// offline (sherpa) and online (cloud, provider=runanywhere) sides of the hybrid
 // router go through this single function so service creation always resolves the
 // engine through the plugin registry (rac_plugin_find_for_engine → vt->stt_ops->create) —
 // there is no bespoke per-engine factory on the router path.
@@ -250,7 +250,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttServiceCreate(JNI
 // (e.g. "cloud") is pinned as preferred_engine_name, `modelIdOrPath` and
 // `configJson` are forwarded to the routed engine's stt_ops->create. For the
 // cloud hint the provider is threaded into config_json (defaulting to
-// "sarvam") so the engine selects the right adapter. This replaces the bespoke
+// "runanywhere") so the engine selects the right adapter. This replaces the bespoke
 // SarvamBridge.racSttSarvamCreate* factory on the router path; the returned
 // jlong is the same opaque rac_stt_service_t* the router setters accept.
 JNIEXPORT jlong JNICALL

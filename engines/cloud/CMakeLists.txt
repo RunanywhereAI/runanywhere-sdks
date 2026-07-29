@@ -7,7 +7,7 @@
 # modalities (TTS / LLM / embeddings) attach by filling more vtable op-tables.
 # Routable via `rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, "cloud")`.
 # The concrete provider is chosen per-service from the create config
-# (`{"provider":"sarvam"}`). Cloud engine: no local runtime / model file — the
+# (`{"provider":"runanywhere"}`). Cloud engine: no local runtime / model file — the
 # manifest declares zero runtimes + zero formats (see rac_plugin_entry_cloud.cpp),
 # so the router treats it as always-eligible.
 #
@@ -43,12 +43,12 @@ get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../s
 # SHARED shim, exactly like sherpa. Listing it here too would double-expand
 # RAC_STATIC_REGISTER_BACKEND(cloud) and collide the registrar symbols.
 #
-# rac_stt_cloud.cpp + providers/sarvam.cpp keep their `stt` naming: they are the
+# rac_stt_cloud.cpp + providers/runanywhere.cpp keep their `stt` naming: they are the
 # cloud engine's STT MODALITY (its op-table + provider adapter), not the engine
 # identity.
 set(CLOUD_BACKEND_SOURCES
     rac_stt_cloud.cpp
-    providers/sarvam.cpp
+    providers/runanywhere.cpp
     rac_plugin_entry_cloud.cpp
     rac_backend_cloud_register.cpp
 )
@@ -149,5 +149,5 @@ else()
 endif()
 
 message(STATUS "Cloud Backend Configuration:")
-message(STATUS "  Engine: cloud (HTTP; STT/TRANSCRIBE today; providers: sarvam)")
+message(STATUS "  Engine: cloud (HTTP; STT/TRANSCRIBE today; providers: runanywhere)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")

@@ -16,7 +16,7 @@
  *      *CreateFromJson / *Destroy): Kotlin obtains an opaque `rac_stt_service_t*`
  *      (passed across JNI as a `jlong`) which it hands to whatever STT facade
  *      consumes the engine. The provider is selected through the JSON config
- *      (`{"provider":"sarvam"}`); the bare create() defaults to sarvam. These
+ *      (`{"provider":"runanywhere"}`); the bare create() defaults to runanywhere. These
  *      `racSttCloud*` thunks keep their STT naming — they are the cloud engine's
  *      STT modality, not the engine identity.
  */

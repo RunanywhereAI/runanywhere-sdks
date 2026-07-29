@@ -4,7 +4,7 @@
  *
  * cloud_stt is ONE engine fronting multiple HTTP STT providers behind a shared
  * multipart/JSON core. The provider is selected at create() via the config
- * JSON's "provider" field (default "sarvam"); each provider supplies only its
+ * JSON's "provider" field (default "runanywhere"); each provider supplies only its
  * endpoint path, auth header, request body shape, and response keys.
  *
  * Sarvam (the first provider) wire shape (POST {base_url}/speech-to-text):
@@ -37,7 +37,7 @@ extern const rac_stt_service_ops_t g_cloud_stt_ops;
  * @brief Create a fully-wrapped cloud STT service using the default provider.
  *
  * Convenience factory: allocates impl + rac_stt_service_t and wires the vtable.
- * With no provider specified the engine defaults to "sarvam", so this preserves
+ * With no provider specified the engine defaults to "runanywhere", so this preserves
  * the original single-provider create() contract. The returned service is owned
  * by the caller and must be released via rac_stt_cloud_destroy().
  *
@@ -56,11 +56,11 @@ RAC_API rac_result_t rac_stt_cloud_create(const char*         api_key,
  *
  * Config JSON schema:
  *   {
- *     "provider":      "sarvam",                        // optional, default "sarvam"
+ *     "provider":      "runanywhere",                   // optional, default "runanywhere"
  *     "api_key":       "...",                           // required
  *     "model":         "saarika:v2.5",                  // required
  *     "language_code": "en-IN",                         // optional, default "unknown" (auto-detect)
- *     "base_url":      "https://api.sarvam.ai",         // optional (provider default)
+ *     "base_url":      "https://api.example.test",      // optional (default: SDK backend)
  *     "path":          "/speech-to-text",               // optional (provider default)
  *     "timeout_ms":    30000                            // optional
  *   }
