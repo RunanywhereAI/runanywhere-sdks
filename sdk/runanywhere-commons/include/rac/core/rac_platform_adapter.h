@@ -302,8 +302,16 @@ typedef struct rac_platform_adapter {
     // -------------------------------------------------------------------------
 
     /**
-     * Start an HTTP download.
-     * Can be NULL - download orchestration in C++ will call back to Swift/Kotlin.
+     * Start an HTTP download (asynchronous).
+     *
+     * Seam contract: the registered rac_http_transport_ops_t vtable is the
+     * canonical HTTP surface; the download orchestrator drives it through the
+     * blocking rac_http_download_execute runner. This slot exists for ONE
+     * consumer: WASM, where the main thread cannot block, so the Web SDK
+     * supplies an async fetch-based driver here and the orchestrator uses it
+     * INSTEAD of the blocking runner. Native SDKs (Swift/Kotlin/Flutter/RN)
+     * MUST leave this NULL — populating it on a platform with a working
+     * blocking transport adds a second download path for no benefit.
      *
      * @param url URL to download from
      * @param destination_path Where to save the downloaded file
@@ -532,32 +540,6 @@ RAC_API void rac_log(rac_log_level_t level, const char* category, const char* me
  * @return Current time in milliseconds since epoch
  */
 RAC_API int64_t rac_get_current_time_ms(void);
-
-/**
- * Start an HTTP download using the platform adapter.
- * Returns RAC_ERROR_NOT_SUPPORTED if http_download callback is NULL.
- *
- * @param url URL to download
- * @param destination_path Where to save
- * @param progress_callback Progress callback (can be NULL)
- * @param complete_callback Completion callback
- * @param callback_user_data User data for callbacks
- * @param out_task_id Output: Task ID (owned, must be freed)
- * @return RAC_SUCCESS if started, error code otherwise
- */
-RAC_API rac_result_t rac_http_download(const char* url, const char* destination_path,
-                                       rac_http_progress_callback_fn progress_callback,
-                                       rac_http_complete_callback_fn complete_callback,
-                                       void* callback_user_data, char** out_task_id);
-
-/**
- * Cancel an HTTP download.
- * Returns RAC_ERROR_NOT_SUPPORTED if http_download_cancel callback is NULL.
- *
- * @param task_id Task ID to cancel
- * @return RAC_SUCCESS if cancelled, error code otherwise
- */
-RAC_API rac_result_t rac_http_download_cancel(const char* task_id);
 
 #ifdef __cplusplus
 }
