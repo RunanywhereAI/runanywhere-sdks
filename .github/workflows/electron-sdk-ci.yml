@@ -87,19 +87,30 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Fetch the node headers + import lib the N-API link needs
+      # node-addon-api + node-api-headers live in native/, not the SDK root.
+      - name: Install the addon's node deps
         shell: pwsh
-        working-directory: sdk/runanywhere-electron
+        working-directory: sdk/runanywhere-electron/native
+        run: npm install
+      # node-gyp caches headers + node.lib under the RUNNER's Node version, which
+      # is not the version CMake defaults to — resolve it and pass it explicitly.
+      - name: Fetch the node headers + import lib the N-API link needs
+        id: nodedev
+        shell: pwsh
         run: |
-          npm install
-          npx node-gyp install
+          npx --yes node-gyp install
+          $ver = (node -p "process.versions.node")
+          $dir = "$env:LOCALAPPDATA/node-gyp/Cache/$ver"
+          if (!(Test-Path "$dir/x64/node.lib")) { throw "node.lib missing under $dir" }
+          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Configure
         shell: pwsh
         run: |
           cmake --preset windows-release `
             -DRAC_BUILD_BACKENDS=ON -DRAC_BACKEND_LLAMACPP=ON `
             -DRAC_BACKEND_ONNX=ON -DRAC_RUNTIME_ONNXRT=ON -DRAC_BACKEND_SHERPA=OFF `
-            -DRAC_STATIC_PLUGINS=ON -DRAC_BUILD_ELECTRON_ADDON=ON
+            -DRAC_STATIC_PLUGINS=ON -DRAC_BUILD_ELECTRON_ADDON=ON `
+            "-DRAC_NODE_DEV_DIR=${{ steps.nodedev.outputs.dir }}"
       - name: Build the addon
         shell: pwsh
         run: cmake --build build/windows-release --target runanywhere_native --config Release
