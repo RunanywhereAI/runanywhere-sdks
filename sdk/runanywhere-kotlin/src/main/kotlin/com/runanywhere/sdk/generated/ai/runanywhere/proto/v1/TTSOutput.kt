@@ -255,11 +255,11 @@ public class TTSOutput(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TTSOutput> = object : ProtoAdapter<TTSOutput>(
-      FieldEncoding.LENGTH_DELIMITED,
-      TTSOutput::class,
-      "type.googleapis.com/runanywhere.v1.TTSOutput",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      TTSOutput::class, 
+      "type.googleapis.com/runanywhere.v1.TTSOutput", 
+      PROTO_3, 
+      null, 
       "tts_options.proto"
     ) {
       override fun encodedSize(`value`: TTSOutput): Int {

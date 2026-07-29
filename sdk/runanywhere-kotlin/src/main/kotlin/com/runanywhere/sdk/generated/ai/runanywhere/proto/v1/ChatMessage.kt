@@ -262,11 +262,11 @@ public class ChatMessage(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ChatMessage> = object : ProtoAdapter<ChatMessage>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ChatMessage::class,
-      "type.googleapis.com/runanywhere.v1.ChatMessage",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ChatMessage::class, 
+      "type.googleapis.com/runanywhere.v1.ChatMessage", 
+      PROTO_3, 
+      null, 
       "chat.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

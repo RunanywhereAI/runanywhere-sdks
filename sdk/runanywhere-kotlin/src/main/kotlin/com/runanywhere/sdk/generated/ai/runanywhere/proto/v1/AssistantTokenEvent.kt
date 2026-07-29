@@ -141,11 +141,11 @@ public class AssistantTokenEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<AssistantTokenEvent> =
         object : ProtoAdapter<AssistantTokenEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      AssistantTokenEvent::class,
-      "type.googleapis.com/runanywhere.v1.AssistantTokenEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      AssistantTokenEvent::class, 
+      "type.googleapis.com/runanywhere.v1.AssistantTokenEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: AssistantTokenEvent): Int {

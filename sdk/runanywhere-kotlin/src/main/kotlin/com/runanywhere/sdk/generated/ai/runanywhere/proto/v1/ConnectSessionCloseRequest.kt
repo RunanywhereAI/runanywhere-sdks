@@ -76,11 +76,11 @@ public class ConnectSessionCloseRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectSessionCloseRequest> =
         object : ProtoAdapter<ConnectSessionCloseRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectSessionCloseRequest::class,
-      "type.googleapis.com/runanywhere.v1.ConnectSessionCloseRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectSessionCloseRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectSessionCloseRequest", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectSessionCloseRequest): Int {

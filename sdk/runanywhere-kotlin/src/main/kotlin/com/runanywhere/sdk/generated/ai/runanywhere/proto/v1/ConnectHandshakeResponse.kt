@@ -128,11 +128,11 @@ public class ConnectHandshakeResponse(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectHandshakeResponse> =
         object : ProtoAdapter<ConnectHandshakeResponse>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectHandshakeResponse::class,
-      "type.googleapis.com/runanywhere.v1.ConnectHandshakeResponse",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectHandshakeResponse::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectHandshakeResponse", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectHandshakeResponse): Int {

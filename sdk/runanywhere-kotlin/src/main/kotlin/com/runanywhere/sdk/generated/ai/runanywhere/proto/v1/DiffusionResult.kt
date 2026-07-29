@@ -260,11 +260,11 @@ public class DiffusionResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionResult> = object : ProtoAdapter<DiffusionResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DiffusionResult::class,
-      "type.googleapis.com/runanywhere.v1.DiffusionResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DiffusionResult::class, 
+      "type.googleapis.com/runanywhere.v1.DiffusionResult", 
+      PROTO_3, 
+      null, 
       "diffusion_options.proto"
     ) {
       override fun encodedSize(`value`: DiffusionResult): Int {

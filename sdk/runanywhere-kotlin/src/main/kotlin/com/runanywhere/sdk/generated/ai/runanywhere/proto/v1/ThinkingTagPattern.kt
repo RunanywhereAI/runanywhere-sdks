@@ -105,11 +105,11 @@ public class ThinkingTagPattern(
     @JvmField
     public val ADAPTER: ProtoAdapter<ThinkingTagPattern> =
         object : ProtoAdapter<ThinkingTagPattern>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ThinkingTagPattern::class,
-      "type.googleapis.com/runanywhere.v1.ThinkingTagPattern",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ThinkingTagPattern::class, 
+      "type.googleapis.com/runanywhere.v1.ThinkingTagPattern", 
+      PROTO_3, 
+      null, 
       "thinking_tag_pattern.proto"
     ) {
       override fun encodedSize(`value`: ThinkingTagPattern): Int {

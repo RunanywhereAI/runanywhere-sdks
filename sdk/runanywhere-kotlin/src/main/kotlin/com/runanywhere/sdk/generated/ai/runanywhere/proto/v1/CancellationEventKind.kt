@@ -30,8 +30,8 @@ public enum class CancellationEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<CancellationEventKind> =
         object : EnumAdapter<CancellationEventKind>(
-      CancellationEventKind::class,
-      PROTO_3,
+      CancellationEventKind::class, 
+      PROTO_3, 
       CancellationEventKind.CANCELLATION_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): CancellationEventKind? = CancellationEventKind.fromValue(`value`)

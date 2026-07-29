@@ -32,8 +32,8 @@ public enum class ModelQuerySortField(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelQuerySortField> =
         object : EnumAdapter<ModelQuerySortField>(
-      ModelQuerySortField::class,
-      PROTO_3,
+      ModelQuerySortField::class, 
+      PROTO_3, 
       ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ModelQuerySortField? = ModelQuerySortField.fromValue(`value`)

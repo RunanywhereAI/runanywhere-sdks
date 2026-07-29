@@ -335,11 +335,11 @@ public class DownloadProgress(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadProgress> = object : ProtoAdapter<DownloadProgress>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DownloadProgress::class,
-      "type.googleapis.com/runanywhere.v1.DownloadProgress",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DownloadProgress::class, 
+      "type.googleapis.com/runanywhere.v1.DownloadProgress", 
+      PROTO_3, 
+      null, 
       "download_service.proto"
     ) {
       override fun encodedSize(`value`: DownloadProgress): Int {

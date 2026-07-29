@@ -218,11 +218,11 @@ public class RegisterMultiFileModelRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<RegisterMultiFileModelRequest> =
         object : ProtoAdapter<RegisterMultiFileModelRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      RegisterMultiFileModelRequest::class,
-      "type.googleapis.com/runanywhere.v1.RegisterMultiFileModelRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      RegisterMultiFileModelRequest::class, 
+      "type.googleapis.com/runanywhere.v1.RegisterMultiFileModelRequest", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: RegisterMultiFileModelRequest): Int {

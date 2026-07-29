@@ -203,11 +203,11 @@ public class TTSVoiceInfo(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TTSVoiceInfo> = object : ProtoAdapter<TTSVoiceInfo>(
-      FieldEncoding.LENGTH_DELIMITED,
-      TTSVoiceInfo::class,
-      "type.googleapis.com/runanywhere.v1.TTSVoiceInfo",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      TTSVoiceInfo::class, 
+      "type.googleapis.com/runanywhere.v1.TTSVoiceInfo", 
+      PROTO_3, 
+      null, 
       "tts_options.proto"
     ) {
       override fun encodedSize(`value`: TTSVoiceInfo): Int {

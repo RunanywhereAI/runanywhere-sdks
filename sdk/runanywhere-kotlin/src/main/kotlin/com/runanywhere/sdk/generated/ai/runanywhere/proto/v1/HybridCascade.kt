@@ -87,11 +87,11 @@ public class HybridCascade(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<HybridCascade> = object : ProtoAdapter<HybridCascade>(
-      FieldEncoding.LENGTH_DELIMITED,
-      HybridCascade::class,
-      "type.googleapis.com/runanywhere.v1.HybridCascade",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      HybridCascade::class, 
+      "type.googleapis.com/runanywhere.v1.HybridCascade", 
+      PROTO_3, 
+      null, 
       "hybrid_router.proto"
     ) {
       override fun encodedSize(`value`: HybridCascade): Int {

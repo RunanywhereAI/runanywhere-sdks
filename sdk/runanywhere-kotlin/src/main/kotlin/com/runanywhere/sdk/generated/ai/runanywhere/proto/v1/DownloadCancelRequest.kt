@@ -103,11 +103,11 @@ public class DownloadCancelRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadCancelRequest> =
         object : ProtoAdapter<DownloadCancelRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DownloadCancelRequest::class,
-      "type.googleapis.com/runanywhere.v1.DownloadCancelRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DownloadCancelRequest::class, 
+      "type.googleapis.com/runanywhere.v1.DownloadCancelRequest", 
+      PROTO_3, 
+      null, 
       "download_service.proto"
     ) {
       override fun encodedSize(`value`: DownloadCancelRequest): Int {

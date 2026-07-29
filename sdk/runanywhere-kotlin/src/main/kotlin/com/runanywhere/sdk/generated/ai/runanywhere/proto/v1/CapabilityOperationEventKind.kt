@@ -44,8 +44,8 @@ public enum class CapabilityOperationEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<CapabilityOperationEventKind> =
         object : EnumAdapter<CapabilityOperationEventKind>(
-      CapabilityOperationEventKind::class,
-      PROTO_3,
+      CapabilityOperationEventKind::class, 
+      PROTO_3, 
       CapabilityOperationEventKind.CAPABILITY_OPERATION_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): CapabilityOperationEventKind? = CapabilityOperationEventKind.fromValue(`value`)

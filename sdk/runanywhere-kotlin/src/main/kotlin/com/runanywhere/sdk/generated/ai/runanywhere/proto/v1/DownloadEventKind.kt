@@ -38,8 +38,8 @@ public enum class DownloadEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadEventKind> = object : EnumAdapter<DownloadEventKind>(
-      DownloadEventKind::class,
-      PROTO_3,
+      DownloadEventKind::class, 
+      PROTO_3, 
       DownloadEventKind.DOWNLOAD_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DownloadEventKind? = DownloadEventKind.fromValue(`value`)

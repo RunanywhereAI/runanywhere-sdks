@@ -143,11 +143,11 @@ public class VADAudioSource(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VADAudioSource> = object : ProtoAdapter<VADAudioSource>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VADAudioSource::class,
-      "type.googleapis.com/runanywhere.v1.VADAudioSource",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VADAudioSource::class, 
+      "type.googleapis.com/runanywhere.v1.VADAudioSource", 
+      PROTO_3, 
+      null, 
       "vad_options.proto"
     ) {
       override fun encodedSize(`value`: VADAudioSource): Int {

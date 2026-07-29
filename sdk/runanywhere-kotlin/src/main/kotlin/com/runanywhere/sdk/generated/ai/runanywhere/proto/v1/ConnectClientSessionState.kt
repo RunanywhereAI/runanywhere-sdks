@@ -128,11 +128,11 @@ public class ConnectClientSessionState(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectClientSessionState> =
         object : ProtoAdapter<ConnectClientSessionState>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectClientSessionState::class,
-      "type.googleapis.com/runanywhere.v1.ConnectClientSessionState",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectClientSessionState::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectClientSessionState", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectClientSessionState): Int {

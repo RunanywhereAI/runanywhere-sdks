@@ -44,8 +44,8 @@ public enum class SpeechActivityKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SpeechActivityKind> = object : EnumAdapter<SpeechActivityKind>(
-      SpeechActivityKind::class,
-      PROTO_3,
+      SpeechActivityKind::class, 
+      PROTO_3, 
       SpeechActivityKind.SPEECH_ACTIVITY_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): SpeechActivityKind? = SpeechActivityKind.fromValue(`value`)

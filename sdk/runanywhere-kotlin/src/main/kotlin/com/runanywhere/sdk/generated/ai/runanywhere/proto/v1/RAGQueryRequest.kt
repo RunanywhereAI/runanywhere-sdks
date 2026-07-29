@@ -104,11 +104,11 @@ public class RAGQueryRequest(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<RAGQueryRequest> = object : ProtoAdapter<RAGQueryRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      RAGQueryRequest::class,
-      "type.googleapis.com/runanywhere.v1.RAGQueryRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      RAGQueryRequest::class, 
+      "type.googleapis.com/runanywhere.v1.RAGQueryRequest", 
+      PROTO_3, 
+      null, 
       "rag.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

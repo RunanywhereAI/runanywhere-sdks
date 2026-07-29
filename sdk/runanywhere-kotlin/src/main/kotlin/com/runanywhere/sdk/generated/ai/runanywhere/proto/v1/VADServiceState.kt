@@ -161,11 +161,11 @@ public class VADServiceState(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VADServiceState> = object : ProtoAdapter<VADServiceState>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VADServiceState::class,
-      "type.googleapis.com/runanywhere.v1.VADServiceState",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VADServiceState::class, 
+      "type.googleapis.com/runanywhere.v1.VADServiceState", 
+      PROTO_3, 
+      null, 
       "vad_options.proto"
     ) {
       override fun encodedSize(`value`: VADServiceState): Int {

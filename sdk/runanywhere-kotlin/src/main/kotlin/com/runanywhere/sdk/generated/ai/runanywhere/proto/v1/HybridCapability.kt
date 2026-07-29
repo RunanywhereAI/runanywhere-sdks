@@ -35,8 +35,8 @@ public enum class HybridCapability(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<HybridCapability> = object : EnumAdapter<HybridCapability>(
-      HybridCapability::class,
-      PROTO_3,
+      HybridCapability::class, 
+      PROTO_3, 
       HybridCapability.HYBRID_CAPABILITY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): HybridCapability? = HybridCapability.fromValue(`value`)

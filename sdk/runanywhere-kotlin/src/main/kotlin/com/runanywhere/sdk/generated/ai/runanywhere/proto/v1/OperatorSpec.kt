@@ -164,11 +164,11 @@ public class OperatorSpec(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<OperatorSpec> = object : ProtoAdapter<OperatorSpec>(
-      FieldEncoding.LENGTH_DELIMITED,
-      OperatorSpec::class,
-      "type.googleapis.com/runanywhere.v1.OperatorSpec",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      OperatorSpec::class, 
+      "type.googleapis.com/runanywhere.v1.OperatorSpec", 
+      PROTO_3, 
+      null, 
       "pipeline.proto"
     ) {
       private val paramsAdapter: ProtoAdapter<Map<String, String>> by

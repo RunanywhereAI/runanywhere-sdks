@@ -189,11 +189,11 @@ public class FrameworkEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<FrameworkEvent> = object : ProtoAdapter<FrameworkEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      FrameworkEvent::class,
-      "type.googleapis.com/runanywhere.v1.FrameworkEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      FrameworkEvent::class, 
+      "type.googleapis.com/runanywhere.v1.FrameworkEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: FrameworkEvent): Int {

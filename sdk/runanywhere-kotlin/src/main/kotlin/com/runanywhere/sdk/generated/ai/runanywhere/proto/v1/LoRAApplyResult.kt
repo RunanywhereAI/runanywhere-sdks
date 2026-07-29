@@ -128,11 +128,11 @@ public class LoRAApplyResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<LoRAApplyResult> = object : ProtoAdapter<LoRAApplyResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      LoRAApplyResult::class,
-      "type.googleapis.com/runanywhere.v1.LoRAApplyResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      LoRAApplyResult::class, 
+      "type.googleapis.com/runanywhere.v1.LoRAApplyResult", 
+      PROTO_3, 
+      null, 
       "lora_options.proto"
     ) {
       override fun encodedSize(`value`: LoRAApplyResult): Int {

@@ -158,11 +158,11 @@ public class LLMGenerationRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<LLMGenerationRequest> =
         object : ProtoAdapter<LLMGenerationRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      LLMGenerationRequest::class,
-      "type.googleapis.com/runanywhere.v1.LLMGenerationRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      LLMGenerationRequest::class, 
+      "type.googleapis.com/runanywhere.v1.LLMGenerationRequest", 
+      PROTO_3, 
+      null, 
       "llm_options.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

@@ -116,11 +116,11 @@ public class StructuredOutputParseRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<StructuredOutputParseRequest> =
         object : ProtoAdapter<StructuredOutputParseRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StructuredOutputParseRequest::class,
-      "type.googleapis.com/runanywhere.v1.StructuredOutputParseRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StructuredOutputParseRequest::class, 
+      "type.googleapis.com/runanywhere.v1.StructuredOutputParseRequest", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

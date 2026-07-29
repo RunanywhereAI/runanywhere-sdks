@@ -72,8 +72,8 @@ public enum class STTLanguage(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<STTLanguage> = object : EnumAdapter<STTLanguage>(
-      STTLanguage::class,
-      PROTO_3,
+      STTLanguage::class, 
+      PROTO_3, 
       STTLanguage.STT_LANGUAGE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): STTLanguage? = STTLanguage.fromValue(`value`)

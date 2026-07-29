@@ -130,11 +130,11 @@ public class DiarizationResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DiarizationResult> = object : ProtoAdapter<DiarizationResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DiarizationResult::class,
-      "type.googleapis.com/runanywhere.v1.DiarizationResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DiarizationResult::class, 
+      "type.googleapis.com/runanywhere.v1.DiarizationResult", 
+      PROTO_3, 
+      null, 
       "diarization.proto"
     ) {
       override fun encodedSize(`value`: DiarizationResult): Int {

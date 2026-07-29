@@ -118,11 +118,11 @@ public class GenerationHints(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<GenerationHints> = object : ProtoAdapter<GenerationHints>(
-      FieldEncoding.LENGTH_DELIMITED,
-      GenerationHints::class,
-      "type.googleapis.com/runanywhere.v1.GenerationHints",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      GenerationHints::class, 
+      "type.googleapis.com/runanywhere.v1.GenerationHints", 
+      PROTO_3, 
+      null, 
       "llm_options.proto"
     ) {
       override fun encodedSize(`value`: GenerationHints): Int {

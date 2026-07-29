@@ -124,11 +124,11 @@ public class CancellationEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<CancellationEvent> = object : ProtoAdapter<CancellationEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      CancellationEvent::class,
-      "type.googleapis.com/runanywhere.v1.CancellationEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      CancellationEvent::class, 
+      "type.googleapis.com/runanywhere.v1.CancellationEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: CancellationEvent): Int {

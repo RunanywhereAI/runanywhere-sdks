@@ -145,11 +145,11 @@ public class StructuredOutputPromptResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<StructuredOutputPromptResult> =
         object : ProtoAdapter<StructuredOutputPromptResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StructuredOutputPromptResult::class,
-      "type.googleapis.com/runanywhere.v1.StructuredOutputPromptResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StructuredOutputPromptResult::class, 
+      "type.googleapis.com/runanywhere.v1.StructuredOutputPromptResult", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       override fun encodedSize(`value`: StructuredOutputPromptResult): Int {

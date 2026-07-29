@@ -46,8 +46,8 @@ public enum class ModelSource(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelSource> = object : EnumAdapter<ModelSource>(
-      ModelSource::class,
-      PROTO_3,
+      ModelSource::class, 
+      PROTO_3, 
       ModelSource.MODEL_SOURCE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ModelSource? = ModelSource.fromValue(`value`)

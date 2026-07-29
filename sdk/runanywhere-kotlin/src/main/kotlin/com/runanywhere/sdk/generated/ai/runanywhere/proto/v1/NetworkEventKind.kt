@@ -30,8 +30,8 @@ public enum class NetworkEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<NetworkEventKind> = object : EnumAdapter<NetworkEventKind>(
-      NetworkEventKind::class,
-      PROTO_3,
+      NetworkEventKind::class, 
+      PROTO_3, 
       NetworkEventKind.NETWORK_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): NetworkEventKind? = NetworkEventKind.fromValue(`value`)

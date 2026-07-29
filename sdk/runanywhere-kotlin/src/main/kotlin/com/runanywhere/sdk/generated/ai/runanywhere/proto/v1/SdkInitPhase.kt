@@ -44,8 +44,8 @@ public enum class SdkInitPhase(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SdkInitPhase> = object : EnumAdapter<SdkInitPhase>(
-      SdkInitPhase::class,
-      PROTO_3,
+      SdkInitPhase::class, 
+      PROTO_3, 
       SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): SdkInitPhase? = SdkInitPhase.fromValue(`value`)

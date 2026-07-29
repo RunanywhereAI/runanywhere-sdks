@@ -30,8 +30,8 @@ public enum class ChatMessageStatus(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ChatMessageStatus> = object : EnumAdapter<ChatMessageStatus>(
-      ChatMessageStatus::class,
-      PROTO_3,
+      ChatMessageStatus::class, 
+      PROTO_3, 
       ChatMessageStatus.CHAT_MESSAGE_STATUS_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ChatMessageStatus? = ChatMessageStatus.fromValue(`value`)

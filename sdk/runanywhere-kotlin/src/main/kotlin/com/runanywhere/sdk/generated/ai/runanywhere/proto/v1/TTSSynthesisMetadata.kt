@@ -171,11 +171,11 @@ public class TTSSynthesisMetadata(
     @JvmField
     public val ADAPTER: ProtoAdapter<TTSSynthesisMetadata> =
         object : ProtoAdapter<TTSSynthesisMetadata>(
-      FieldEncoding.LENGTH_DELIMITED,
-      TTSSynthesisMetadata::class,
-      "type.googleapis.com/runanywhere.v1.TTSSynthesisMetadata",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      TTSSynthesisMetadata::class, 
+      "type.googleapis.com/runanywhere.v1.TTSSynthesisMetadata", 
+      PROTO_3, 
+      null, 
       "tts_options.proto"
     ) {
       override fun encodedSize(`value`: TTSSynthesisMetadata): Int {

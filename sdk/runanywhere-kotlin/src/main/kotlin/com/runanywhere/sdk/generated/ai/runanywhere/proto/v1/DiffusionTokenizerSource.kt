@@ -117,11 +117,11 @@ public class DiffusionTokenizerSource(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionTokenizerSource> =
         object : ProtoAdapter<DiffusionTokenizerSource>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DiffusionTokenizerSource::class,
-      "type.googleapis.com/runanywhere.v1.DiffusionTokenizerSource",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DiffusionTokenizerSource::class, 
+      "type.googleapis.com/runanywhere.v1.DiffusionTokenizerSource", 
+      PROTO_3, 
+      null, 
       "diffusion_options.proto"
     ) {
       override fun encodedSize(`value`: DiffusionTokenizerSource): Int {

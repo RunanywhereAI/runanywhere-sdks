@@ -152,11 +152,11 @@ public class AgentLoopConfig(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<AgentLoopConfig> = object : ProtoAdapter<AgentLoopConfig>(
-      FieldEncoding.LENGTH_DELIMITED,
-      AgentLoopConfig::class,
-      "type.googleapis.com/runanywhere.v1.AgentLoopConfig",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      AgentLoopConfig::class, 
+      "type.googleapis.com/runanywhere.v1.AgentLoopConfig", 
+      PROTO_3, 
+      null, 
       "solutions.proto"
     ) {
       override fun encodedSize(`value`: AgentLoopConfig): Int {

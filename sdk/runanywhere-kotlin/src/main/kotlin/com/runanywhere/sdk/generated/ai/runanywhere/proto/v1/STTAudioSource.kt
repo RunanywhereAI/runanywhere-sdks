@@ -179,11 +179,11 @@ public class STTAudioSource(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<STTAudioSource> = object : ProtoAdapter<STTAudioSource>(
-      FieldEncoding.LENGTH_DELIMITED,
-      STTAudioSource::class,
-      "type.googleapis.com/runanywhere.v1.STTAudioSource",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      STTAudioSource::class, 
+      "type.googleapis.com/runanywhere.v1.STTAudioSource", 
+      PROTO_3, 
+      null, 
       "stt_options.proto"
     ) {
       override fun encodedSize(`value`: STTAudioSource): Int {

@@ -140,11 +140,11 @@ public class HybridFilter(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<HybridFilter> = object : ProtoAdapter<HybridFilter>(
-      FieldEncoding.LENGTH_DELIMITED,
-      HybridFilter::class,
-      "type.googleapis.com/runanywhere.v1.HybridFilter",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      HybridFilter::class, 
+      "type.googleapis.com/runanywhere.v1.HybridFilter", 
+      PROTO_3, 
+      null, 
       "hybrid_router.proto"
     ) {
       override fun encodedSize(`value`: HybridFilter): Int {

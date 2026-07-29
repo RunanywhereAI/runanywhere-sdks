@@ -110,11 +110,11 @@ public class RerankResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<RerankResult> = object : ProtoAdapter<RerankResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      RerankResult::class,
-      "type.googleapis.com/runanywhere.v1.RerankResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      RerankResult::class, 
+      "type.googleapis.com/runanywhere.v1.RerankResult", 
+      PROTO_3, 
+      null, 
       "rerank.proto"
     ) {
       override fun encodedSize(`value`: RerankResult): Int {

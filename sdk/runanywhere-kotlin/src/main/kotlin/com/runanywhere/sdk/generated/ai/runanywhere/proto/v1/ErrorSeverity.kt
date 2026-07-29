@@ -30,8 +30,8 @@ public enum class ErrorSeverity(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ErrorSeverity> = object : EnumAdapter<ErrorSeverity>(
-      ErrorSeverity::class,
-      PROTO_3,
+      ErrorSeverity::class, 
+      PROTO_3, 
       ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ErrorSeverity? = ErrorSeverity.fromValue(`value`)

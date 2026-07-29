@@ -30,8 +30,8 @@ public enum class ConnectSessionState(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectSessionState> =
         object : EnumAdapter<ConnectSessionState>(
-      ConnectSessionState::class,
-      PROTO_3,
+      ConnectSessionState::class, 
+      PROTO_3, 
       ConnectSessionState.CONNECT_SESSION_STATE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ConnectSessionState? = ConnectSessionState.fromValue(`value`)

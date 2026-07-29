@@ -43,8 +43,8 @@ public enum class DeviceEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DeviceEventKind> = object : EnumAdapter<DeviceEventKind>(
-      DeviceEventKind::class,
-      PROTO_3,
+      DeviceEventKind::class, 
+      PROTO_3, 
       DeviceEventKind.DEVICE_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DeviceEventKind? = DeviceEventKind.fromValue(`value`)

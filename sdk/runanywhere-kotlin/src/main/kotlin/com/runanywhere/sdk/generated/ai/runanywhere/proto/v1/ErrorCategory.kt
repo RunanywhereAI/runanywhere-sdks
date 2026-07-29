@@ -86,8 +86,8 @@ public enum class ErrorCategory(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ErrorCategory> = object : EnumAdapter<ErrorCategory>(
-      ErrorCategory::class,
-      PROTO_3,
+      ErrorCategory::class, 
+      PROTO_3, 
       ErrorCategory.ERROR_CATEGORY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ErrorCategory? = ErrorCategory.fromValue(`value`)

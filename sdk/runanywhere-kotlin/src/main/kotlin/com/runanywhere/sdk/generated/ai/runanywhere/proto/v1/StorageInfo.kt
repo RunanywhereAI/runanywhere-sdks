@@ -136,11 +136,11 @@ public class StorageInfo(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<StorageInfo> = object : ProtoAdapter<StorageInfo>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StorageInfo::class,
-      "type.googleapis.com/runanywhere.v1.StorageInfo",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StorageInfo::class, 
+      "type.googleapis.com/runanywhere.v1.StorageInfo", 
+      PROTO_3, 
+      null, 
       "storage_types.proto"
     ) {
       override fun encodedSize(`value`: StorageInfo): Int {

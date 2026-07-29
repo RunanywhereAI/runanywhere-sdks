@@ -157,11 +157,11 @@ public class DiffusionStreamEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionStreamEvent> =
         object : ProtoAdapter<DiffusionStreamEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DiffusionStreamEvent::class,
-      "type.googleapis.com/runanywhere.v1.DiffusionStreamEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DiffusionStreamEvent::class, 
+      "type.googleapis.com/runanywhere.v1.DiffusionStreamEvent", 
+      PROTO_3, 
+      null, 
       "diffusion_options.proto"
     ) {
       override fun encodedSize(`value`: DiffusionStreamEvent): Int {

@@ -30,8 +30,8 @@ public enum class StructuredOutputMode(
     @JvmField
     public val ADAPTER: ProtoAdapter<StructuredOutputMode> =
         object : EnumAdapter<StructuredOutputMode>(
-      StructuredOutputMode::class,
-      PROTO_3,
+      StructuredOutputMode::class, 
+      PROTO_3, 
       StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): StructuredOutputMode? = StructuredOutputMode.fromValue(`value`)

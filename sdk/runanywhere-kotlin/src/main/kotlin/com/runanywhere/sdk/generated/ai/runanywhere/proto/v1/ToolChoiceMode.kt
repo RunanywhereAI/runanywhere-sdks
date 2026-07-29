@@ -29,8 +29,8 @@ public enum class ToolChoiceMode(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolChoiceMode> = object : EnumAdapter<ToolChoiceMode>(
-      ToolChoiceMode::class,
-      PROTO_3,
+      ToolChoiceMode::class, 
+      PROTO_3, 
       ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ToolChoiceMode? = ToolChoiceMode.fromValue(`value`)

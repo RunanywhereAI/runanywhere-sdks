@@ -123,11 +123,11 @@ public class HybridModelDescriptor(
     @JvmField
     public val ADAPTER: ProtoAdapter<HybridModelDescriptor> =
         object : ProtoAdapter<HybridModelDescriptor>(
-      FieldEncoding.LENGTH_DELIMITED,
-      HybridModelDescriptor::class,
-      "type.googleapis.com/runanywhere.v1.HybridModelDescriptor",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      HybridModelDescriptor::class, 
+      "type.googleapis.com/runanywhere.v1.HybridModelDescriptor", 
+      PROTO_3, 
+      null, 
       "hybrid_router.proto"
     ) {
       override fun encodedSize(`value`: HybridModelDescriptor): Int {

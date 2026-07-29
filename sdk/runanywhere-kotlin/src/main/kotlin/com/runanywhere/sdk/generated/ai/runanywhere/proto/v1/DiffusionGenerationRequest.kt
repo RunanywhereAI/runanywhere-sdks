@@ -116,11 +116,11 @@ public class DiffusionGenerationRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiffusionGenerationRequest> =
         object : ProtoAdapter<DiffusionGenerationRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DiffusionGenerationRequest::class,
-      "type.googleapis.com/runanywhere.v1.DiffusionGenerationRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DiffusionGenerationRequest::class, 
+      "type.googleapis.com/runanywhere.v1.DiffusionGenerationRequest", 
+      PROTO_3, 
+      null, 
       "diffusion_options.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

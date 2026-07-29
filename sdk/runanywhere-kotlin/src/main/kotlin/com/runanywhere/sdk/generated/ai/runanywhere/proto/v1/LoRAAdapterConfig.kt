@@ -152,11 +152,11 @@ public class LoRAAdapterConfig(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<LoRAAdapterConfig> = object : ProtoAdapter<LoRAAdapterConfig>(
-      FieldEncoding.LENGTH_DELIMITED,
-      LoRAAdapterConfig::class,
-      "type.googleapis.com/runanywhere.v1.LoRAAdapterConfig",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      LoRAAdapterConfig::class, 
+      "type.googleapis.com/runanywhere.v1.LoRAAdapterConfig", 
+      PROTO_3, 
+      null, 
       "lora_options.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

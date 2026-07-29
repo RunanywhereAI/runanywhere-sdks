@@ -74,11 +74,11 @@ public class BatteryFilter(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<BatteryFilter> = object : ProtoAdapter<BatteryFilter>(
-      FieldEncoding.LENGTH_DELIMITED,
-      BatteryFilter::class,
-      "type.googleapis.com/runanywhere.v1.BatteryFilter",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      BatteryFilter::class, 
+      "type.googleapis.com/runanywhere.v1.BatteryFilter", 
+      PROTO_3, 
+      null, 
       "hybrid_router.proto"
     ) {
       override fun encodedSize(`value`: BatteryFilter): Int {

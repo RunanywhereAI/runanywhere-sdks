@@ -247,11 +247,11 @@ public class ComponentLifecycleEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<ComponentLifecycleEvent> =
         object : ProtoAdapter<ComponentLifecycleEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ComponentLifecycleEvent::class,
-      "type.googleapis.com/runanywhere.v1.ComponentLifecycleEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ComponentLifecycleEvent::class, 
+      "type.googleapis.com/runanywhere.v1.ComponentLifecycleEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: ComponentLifecycleEvent): Int {

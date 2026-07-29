@@ -76,11 +76,11 @@ public class AgentResponseStartedEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<AgentResponseStartedEvent> =
         object : ProtoAdapter<AgentResponseStartedEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      AgentResponseStartedEvent::class,
-      "type.googleapis.com/runanywhere.v1.AgentResponseStartedEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      AgentResponseStartedEvent::class, 
+      "type.googleapis.com/runanywhere.v1.AgentResponseStartedEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: AgentResponseStartedEvent): Int {

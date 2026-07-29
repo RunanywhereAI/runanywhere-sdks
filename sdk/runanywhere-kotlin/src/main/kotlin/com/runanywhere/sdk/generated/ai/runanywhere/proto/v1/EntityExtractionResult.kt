@@ -89,11 +89,11 @@ public class EntityExtractionResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<EntityExtractionResult> =
         object : ProtoAdapter<EntityExtractionResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      EntityExtractionResult::class,
-      "type.googleapis.com/runanywhere.v1.EntityExtractionResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      EntityExtractionResult::class, 
+      "type.googleapis.com/runanywhere.v1.EntityExtractionResult", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       override fun encodedSize(`value`: EntityExtractionResult): Int {

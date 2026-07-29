@@ -36,8 +36,8 @@ public enum class VLMModelFamily(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VLMModelFamily> = object : EnumAdapter<VLMModelFamily>(
-      VLMModelFamily::class,
-      PROTO_3,
+      VLMModelFamily::class, 
+      PROTO_3, 
       VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): VLMModelFamily? = VLMModelFamily.fromValue(`value`)

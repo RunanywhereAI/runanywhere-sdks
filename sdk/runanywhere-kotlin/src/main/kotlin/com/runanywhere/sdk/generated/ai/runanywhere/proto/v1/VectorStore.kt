@@ -33,8 +33,8 @@ public enum class VectorStore(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VectorStore> = object : EnumAdapter<VectorStore>(
-      VectorStore::class,
-      PROTO_3,
+      VectorStore::class, 
+      PROTO_3, 
       VectorStore.VECTOR_STORE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): VectorStore? = VectorStore.fromValue(`value`)

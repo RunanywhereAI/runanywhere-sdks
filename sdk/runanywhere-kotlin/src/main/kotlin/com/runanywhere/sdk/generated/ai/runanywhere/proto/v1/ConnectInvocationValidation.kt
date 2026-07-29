@@ -94,11 +94,11 @@ public class ConnectInvocationValidation(
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectInvocationValidation> =
         object : ProtoAdapter<ConnectInvocationValidation>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ConnectInvocationValidation::class,
-      "type.googleapis.com/runanywhere.v1.ConnectInvocationValidation",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ConnectInvocationValidation::class, 
+      "type.googleapis.com/runanywhere.v1.ConnectInvocationValidation", 
+      PROTO_3, 
+      null, 
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectInvocationValidation): Int {

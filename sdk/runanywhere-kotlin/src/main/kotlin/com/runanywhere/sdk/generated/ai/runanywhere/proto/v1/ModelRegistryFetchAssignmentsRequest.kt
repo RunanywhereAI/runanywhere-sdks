@@ -122,11 +122,11 @@ public class ModelRegistryFetchAssignmentsRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelRegistryFetchAssignmentsRequest> =
         object : ProtoAdapter<ModelRegistryFetchAssignmentsRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelRegistryFetchAssignmentsRequest::class,
-      "type.googleapis.com/runanywhere.v1.ModelRegistryFetchAssignmentsRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelRegistryFetchAssignmentsRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ModelRegistryFetchAssignmentsRequest", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelRegistryFetchAssignmentsRequest): Int {

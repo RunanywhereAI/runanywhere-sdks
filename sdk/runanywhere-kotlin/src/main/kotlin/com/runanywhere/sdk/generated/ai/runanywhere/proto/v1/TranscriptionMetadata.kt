@@ -130,11 +130,11 @@ public class TranscriptionMetadata(
     @JvmField
     public val ADAPTER: ProtoAdapter<TranscriptionMetadata> =
         object : ProtoAdapter<TranscriptionMetadata>(
-      FieldEncoding.LENGTH_DELIMITED,
-      TranscriptionMetadata::class,
-      "type.googleapis.com/runanywhere.v1.TranscriptionMetadata",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      TranscriptionMetadata::class, 
+      "type.googleapis.com/runanywhere.v1.TranscriptionMetadata", 
+      PROTO_3, 
+      null, 
       "stt_options.proto"
     ) {
       override fun encodedSize(`value`: TranscriptionMetadata): Int {

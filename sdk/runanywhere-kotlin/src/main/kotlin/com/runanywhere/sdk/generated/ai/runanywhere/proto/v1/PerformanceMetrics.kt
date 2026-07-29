@@ -149,11 +149,11 @@ public class PerformanceMetrics(
     @JvmField
     public val ADAPTER: ProtoAdapter<PerformanceMetrics> =
         object : ProtoAdapter<PerformanceMetrics>(
-      FieldEncoding.LENGTH_DELIMITED,
-      PerformanceMetrics::class,
-      "type.googleapis.com/runanywhere.v1.PerformanceMetrics",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      PerformanceMetrics::class, 
+      "type.googleapis.com/runanywhere.v1.PerformanceMetrics", 
+      PROTO_3, 
+      null, 
       "llm_options.proto"
     ) {
       override fun encodedSize(`value`: PerformanceMetrics): Int {

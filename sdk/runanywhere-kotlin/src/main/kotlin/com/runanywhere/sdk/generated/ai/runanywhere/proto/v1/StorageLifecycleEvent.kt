@@ -180,11 +180,11 @@ public class StorageLifecycleEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<StorageLifecycleEvent> =
         object : ProtoAdapter<StorageLifecycleEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StorageLifecycleEvent::class,
-      "type.googleapis.com/runanywhere.v1.StorageLifecycleEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StorageLifecycleEvent::class, 
+      "type.googleapis.com/runanywhere.v1.StorageLifecycleEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: StorageLifecycleEvent): Int {

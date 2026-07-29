@@ -70,8 +70,8 @@ public enum class ModelFormat(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelFormat> = object : EnumAdapter<ModelFormat>(
-      ModelFormat::class,
-      PROTO_3,
+      ModelFormat::class, 
+      PROTO_3, 
       ModelFormat.MODEL_FORMAT_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ModelFormat? = ModelFormat.fromValue(`value`)

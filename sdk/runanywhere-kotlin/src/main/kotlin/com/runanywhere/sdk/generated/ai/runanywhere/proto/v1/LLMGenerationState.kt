@@ -32,8 +32,8 @@ public enum class LLMGenerationState(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<LLMGenerationState> = object : EnumAdapter<LLMGenerationState>(
-      LLMGenerationState::class,
-      PROTO_3,
+      LLMGenerationState::class, 
+      PROTO_3, 
       LLMGenerationState.LLM_GENERATION_STATE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): LLMGenerationState? = LLMGenerationState.fromValue(`value`)

@@ -43,8 +43,8 @@ public enum class JSONSchemaType(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<JSONSchemaType> = object : EnumAdapter<JSONSchemaType>(
-      JSONSchemaType::class,
-      PROTO_3,
+      JSONSchemaType::class, 
+      PROTO_3, 
       JSONSchemaType.JSON_SCHEMA_TYPE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): JSONSchemaType? = JSONSchemaType.fromValue(`value`)

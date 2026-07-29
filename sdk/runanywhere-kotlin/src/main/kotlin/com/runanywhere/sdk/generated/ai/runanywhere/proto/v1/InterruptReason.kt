@@ -29,8 +29,8 @@ public enum class InterruptReason(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<InterruptReason> = object : EnumAdapter<InterruptReason>(
-      InterruptReason::class,
-      PROTO_3,
+      InterruptReason::class, 
+      PROTO_3, 
       InterruptReason.INTERRUPT_REASON_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): InterruptReason? = InterruptReason.fromValue(`value`)

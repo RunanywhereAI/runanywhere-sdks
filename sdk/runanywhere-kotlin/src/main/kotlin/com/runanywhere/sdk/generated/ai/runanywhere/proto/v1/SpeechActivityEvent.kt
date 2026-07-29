@@ -166,11 +166,11 @@ public class SpeechActivityEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<SpeechActivityEvent> =
         object : ProtoAdapter<SpeechActivityEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SpeechActivityEvent::class,
-      "type.googleapis.com/runanywhere.v1.SpeechActivityEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SpeechActivityEvent::class, 
+      "type.googleapis.com/runanywhere.v1.SpeechActivityEvent", 
+      PROTO_3, 
+      null, 
       "vad_options.proto"
     ) {
       override fun encodedSize(`value`: SpeechActivityEvent): Int {

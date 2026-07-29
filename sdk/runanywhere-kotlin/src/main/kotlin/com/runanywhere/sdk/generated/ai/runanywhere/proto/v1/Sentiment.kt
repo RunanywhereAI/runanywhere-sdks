@@ -38,8 +38,8 @@ public enum class Sentiment(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<Sentiment> = object : EnumAdapter<Sentiment>(
-      Sentiment::class,
-      PROTO_3,
+      Sentiment::class, 
+      PROTO_3, 
       Sentiment.SENTIMENT_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): Sentiment? = Sentiment.fromValue(`value`)

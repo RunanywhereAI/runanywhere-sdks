@@ -39,8 +39,8 @@ public enum class StorageLifecycleEventKind(
     @JvmField
     public val ADAPTER: ProtoAdapter<StorageLifecycleEventKind> =
         object : EnumAdapter<StorageLifecycleEventKind>(
-      StorageLifecycleEventKind::class,
-      PROTO_3,
+      StorageLifecycleEventKind::class, 
+      PROTO_3, 
       StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): StorageLifecycleEventKind? = StorageLifecycleEventKind.fromValue(`value`)

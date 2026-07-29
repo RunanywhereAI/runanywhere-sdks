@@ -37,8 +37,8 @@ public enum class AudioSource(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<AudioSource> = object : EnumAdapter<AudioSource>(
-      AudioSource::class,
-      PROTO_3,
+      AudioSource::class, 
+      PROTO_3, 
       AudioSource.AUDIO_SOURCE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): AudioSource? = AudioSource.fromValue(`value`)

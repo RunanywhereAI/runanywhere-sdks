@@ -156,11 +156,11 @@ public class PerformanceEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<PerformanceEvent> = object : ProtoAdapter<PerformanceEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      PerformanceEvent::class,
-      "type.googleapis.com/runanywhere.v1.PerformanceEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      PerformanceEvent::class, 
+      "type.googleapis.com/runanywhere.v1.PerformanceEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: PerformanceEvent): Int {

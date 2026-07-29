@@ -156,11 +156,11 @@ public class STTStreamEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<STTStreamEvent> = object : ProtoAdapter<STTStreamEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      STTStreamEvent::class,
-      "type.googleapis.com/runanywhere.v1.STTStreamEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      STTStreamEvent::class, 
+      "type.googleapis.com/runanywhere.v1.STTStreamEvent", 
+      PROTO_3, 
+      null, 
       "stt_options.proto"
     ) {
       override fun encodedSize(`value`: STTStreamEvent): Int {

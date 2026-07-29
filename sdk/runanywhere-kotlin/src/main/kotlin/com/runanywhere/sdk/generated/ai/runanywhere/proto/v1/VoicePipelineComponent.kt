@@ -35,8 +35,8 @@ public enum class VoicePipelineComponent(
     @JvmField
     public val ADAPTER: ProtoAdapter<VoicePipelineComponent> =
         object : EnumAdapter<VoicePipelineComponent>(
-      VoicePipelineComponent::class,
-      PROTO_3,
+      VoicePipelineComponent::class, 
+      PROTO_3, 
       VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): VoicePipelineComponent? = VoicePipelineComponent.fromValue(`value`)

@@ -92,11 +92,11 @@ public class InterruptedEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<InterruptedEvent> = object : ProtoAdapter<InterruptedEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      InterruptedEvent::class,
-      "type.googleapis.com/runanywhere.v1.InterruptedEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      InterruptedEvent::class, 
+      "type.googleapis.com/runanywhere.v1.InterruptedEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: InterruptedEvent): Int {

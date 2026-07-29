@@ -178,11 +178,11 @@ public class DownloadEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadEvent> = object : ProtoAdapter<DownloadEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DownloadEvent::class,
-      "type.googleapis.com/runanywhere.v1.DownloadEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DownloadEvent::class, 
+      "type.googleapis.com/runanywhere.v1.DownloadEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: DownloadEvent): Int {

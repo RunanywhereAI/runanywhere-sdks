@@ -88,11 +88,11 @@ public class NERResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<NERResult> = object : ProtoAdapter<NERResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      NERResult::class,
-      "type.googleapis.com/runanywhere.v1.NERResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      NERResult::class, 
+      "type.googleapis.com/runanywhere.v1.NERResult", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       override fun encodedSize(`value`: NERResult): Int {

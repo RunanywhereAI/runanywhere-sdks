@@ -157,11 +157,11 @@ public class HardwareRoutingEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<HardwareRoutingEvent> =
         object : ProtoAdapter<HardwareRoutingEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      HardwareRoutingEvent::class,
-      "type.googleapis.com/runanywhere.v1.HardwareRoutingEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      HardwareRoutingEvent::class, 
+      "type.googleapis.com/runanywhere.v1.HardwareRoutingEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: HardwareRoutingEvent): Int {

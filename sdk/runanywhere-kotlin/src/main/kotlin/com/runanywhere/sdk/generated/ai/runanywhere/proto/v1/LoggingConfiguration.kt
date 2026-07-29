@@ -148,11 +148,11 @@ public class LoggingConfiguration(
     @JvmField
     public val ADAPTER: ProtoAdapter<LoggingConfiguration> =
         object : ProtoAdapter<LoggingConfiguration>(
-      FieldEncoding.LENGTH_DELIMITED,
-      LoggingConfiguration::class,
-      "type.googleapis.com/runanywhere.v1.LoggingConfiguration",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      LoggingConfiguration::class, 
+      "type.googleapis.com/runanywhere.v1.LoggingConfiguration", 
+      PROTO_3, 
+      null, 
       "logging.proto"
     ) {
       override fun encodedSize(`value`: LoggingConfiguration): Int {

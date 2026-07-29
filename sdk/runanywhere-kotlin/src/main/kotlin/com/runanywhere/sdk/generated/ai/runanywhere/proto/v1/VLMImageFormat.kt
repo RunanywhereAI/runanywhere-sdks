@@ -81,8 +81,8 @@ public enum class VLMImageFormat(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VLMImageFormat> = object : EnumAdapter<VLMImageFormat>(
-      VLMImageFormat::class,
-      PROTO_3,
+      VLMImageFormat::class, 
+      PROTO_3, 
       VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): VLMImageFormat? = VLMImageFormat.fromValue(`value`)

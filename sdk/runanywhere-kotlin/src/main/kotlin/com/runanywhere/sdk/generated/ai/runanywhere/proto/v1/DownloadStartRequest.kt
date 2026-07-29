@@ -125,11 +125,11 @@ public class DownloadStartRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadStartRequest> =
         object : ProtoAdapter<DownloadStartRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DownloadStartRequest::class,
-      "type.googleapis.com/runanywhere.v1.DownloadStartRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DownloadStartRequest::class, 
+      "type.googleapis.com/runanywhere.v1.DownloadStartRequest", 
+      PROTO_3, 
+      null, 
       "download_service.proto"
     ) {
       override fun encodedSize(`value`: DownloadStartRequest): Int {

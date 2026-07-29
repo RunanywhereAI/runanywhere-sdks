@@ -27,8 +27,8 @@ public enum class VADAudioEncoding(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VADAudioEncoding> = object : EnumAdapter<VADAudioEncoding>(
-      VADAudioEncoding::class,
-      PROTO_3,
+      VADAudioEncoding::class, 
+      PROTO_3, 
       VADAudioEncoding.VAD_AUDIO_ENCODING_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): VADAudioEncoding? = VADAudioEncoding.fromValue(`value`)

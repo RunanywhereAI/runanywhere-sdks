@@ -86,11 +86,11 @@ public class SessionStartedEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<SessionStartedEvent> =
         object : ProtoAdapter<SessionStartedEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SessionStartedEvent::class,
-      "type.googleapis.com/runanywhere.v1.SessionStartedEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SessionStartedEvent::class, 
+      "type.googleapis.com/runanywhere.v1.SessionStartedEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: SessionStartedEvent): Int {

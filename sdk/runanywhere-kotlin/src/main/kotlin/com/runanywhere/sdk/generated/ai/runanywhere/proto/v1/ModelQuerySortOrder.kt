@@ -28,8 +28,8 @@ public enum class ModelQuerySortOrder(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelQuerySortOrder> =
         object : EnumAdapter<ModelQuerySortOrder>(
-      ModelQuerySortOrder::class,
-      PROTO_3,
+      ModelQuerySortOrder::class, 
+      PROTO_3, 
       ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): ModelQuerySortOrder? = ModelQuerySortOrder.fromValue(`value`)

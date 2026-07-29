@@ -104,11 +104,11 @@ public class ArtifactInferFromUrlRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ArtifactInferFromUrlRequest> =
         object : ProtoAdapter<ArtifactInferFromUrlRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ArtifactInferFromUrlRequest::class,
-      "type.googleapis.com/runanywhere.v1.ArtifactInferFromUrlRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ArtifactInferFromUrlRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ArtifactInferFromUrlRequest", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ArtifactInferFromUrlRequest): Int {

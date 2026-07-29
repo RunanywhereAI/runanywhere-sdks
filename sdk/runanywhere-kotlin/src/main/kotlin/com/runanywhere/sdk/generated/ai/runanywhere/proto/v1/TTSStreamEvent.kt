@@ -230,11 +230,11 @@ public class TTSStreamEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TTSStreamEvent> = object : ProtoAdapter<TTSStreamEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      TTSStreamEvent::class,
-      "type.googleapis.com/runanywhere.v1.TTSStreamEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      TTSStreamEvent::class, 
+      "type.googleapis.com/runanywhere.v1.TTSStreamEvent", 
+      PROTO_3, 
+      null, 
       "tts_options.proto"
     ) {
       override fun encodedSize(`value`: TTSStreamEvent): Int {

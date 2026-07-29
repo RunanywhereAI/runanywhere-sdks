@@ -150,11 +150,11 @@ public class DownloadFilePlan(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadFilePlan> = object : ProtoAdapter<DownloadFilePlan>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DownloadFilePlan::class,
-      "type.googleapis.com/runanywhere.v1.DownloadFilePlan",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DownloadFilePlan::class, 
+      "type.googleapis.com/runanywhere.v1.DownloadFilePlan", 
+      PROTO_3, 
+      null, 
       "download_service.proto"
     ) {
       override fun encodedSize(`value`: DownloadFilePlan): Int {

@@ -82,11 +82,11 @@ public class FrameworksForCapabilityRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<FrameworksForCapabilityRequest> =
         object : ProtoAdapter<FrameworksForCapabilityRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      FrameworksForCapabilityRequest::class,
-      "type.googleapis.com/runanywhere.v1.FrameworksForCapabilityRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      FrameworksForCapabilityRequest::class, 
+      "type.googleapis.com/runanywhere.v1.FrameworksForCapabilityRequest", 
+      PROTO_3, 
+      null, 
       "router.proto"
     ) {
       override fun encodedSize(`value`: FrameworksForCapabilityRequest): Int {

@@ -32,8 +32,8 @@ public enum class LLMStreamEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<LLMStreamEventKind> = object : EnumAdapter<LLMStreamEventKind>(
-      LLMStreamEventKind::class,
-      PROTO_3,
+      LLMStreamEventKind::class, 
+      PROTO_3, 
       LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): LLMStreamEventKind? = LLMStreamEventKind.fromValue(`value`)

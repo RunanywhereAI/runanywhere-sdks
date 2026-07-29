@@ -37,8 +37,8 @@ public enum class EdgePolicy(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<EdgePolicy> = object : EnumAdapter<EdgePolicy>(
-      EdgePolicy::class,
-      PROTO_3,
+      EdgePolicy::class, 
+      PROTO_3, 
       EdgePolicy.EDGE_POLICY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): EdgePolicy? = EdgePolicy.fromValue(`value`)

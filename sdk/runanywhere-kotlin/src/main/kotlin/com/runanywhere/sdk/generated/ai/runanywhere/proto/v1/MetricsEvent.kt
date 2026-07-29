@@ -226,11 +226,11 @@ public class MetricsEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<MetricsEvent> = object : ProtoAdapter<MetricsEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      MetricsEvent::class,
-      "type.googleapis.com/runanywhere.v1.MetricsEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      MetricsEvent::class, 
+      "type.googleapis.com/runanywhere.v1.MetricsEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: MetricsEvent): Int {

@@ -35,8 +35,8 @@ public enum class InitializationStage(
     @JvmField
     public val ADAPTER: ProtoAdapter<InitializationStage> =
         object : EnumAdapter<InitializationStage>(
-      InitializationStage::class,
-      PROTO_3,
+      InitializationStage::class, 
+      PROTO_3, 
       InitializationStage.INITIALIZATION_STAGE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): InitializationStage? = InitializationStage.fromValue(`value`)

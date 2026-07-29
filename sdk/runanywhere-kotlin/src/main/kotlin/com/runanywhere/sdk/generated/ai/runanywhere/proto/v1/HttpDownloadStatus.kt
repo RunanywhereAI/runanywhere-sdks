@@ -47,8 +47,8 @@ public enum class HttpDownloadStatus(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<HttpDownloadStatus> = object : EnumAdapter<HttpDownloadStatus>(
-      HttpDownloadStatus::class,
-      PROTO_3,
+      HttpDownloadStatus::class, 
+      PROTO_3, 
       HttpDownloadStatus.HTTP_DOWNLOAD_STATUS_OK
     ) {
       override fun fromValue(`value`: Int): HttpDownloadStatus? = HttpDownloadStatus.fromValue(`value`)

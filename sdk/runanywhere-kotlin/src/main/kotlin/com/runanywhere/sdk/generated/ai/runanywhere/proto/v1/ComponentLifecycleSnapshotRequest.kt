@@ -89,11 +89,11 @@ public class ComponentLifecycleSnapshotRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ComponentLifecycleSnapshotRequest> =
         object : ProtoAdapter<ComponentLifecycleSnapshotRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ComponentLifecycleSnapshotRequest::class,
-      "type.googleapis.com/runanywhere.v1.ComponentLifecycleSnapshotRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ComponentLifecycleSnapshotRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ComponentLifecycleSnapshotRequest", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: ComponentLifecycleSnapshotRequest): Int {

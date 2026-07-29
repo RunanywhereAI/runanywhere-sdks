@@ -130,11 +130,11 @@ public class LoRAState(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<LoRAState> = object : ProtoAdapter<LoRAState>(
-      FieldEncoding.LENGTH_DELIMITED,
-      LoRAState::class,
-      "type.googleapis.com/runanywhere.v1.LoRAState",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      LoRAState::class, 
+      "type.googleapis.com/runanywhere.v1.LoRAState", 
+      PROTO_3, 
+      null, 
       "lora_options.proto"
     ) {
       override fun encodedSize(`value`: LoRAState): Int {

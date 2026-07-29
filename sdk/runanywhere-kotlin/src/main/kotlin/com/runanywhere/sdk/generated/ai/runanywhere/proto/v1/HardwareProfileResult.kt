@@ -93,11 +93,11 @@ public class HardwareProfileResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<HardwareProfileResult> =
         object : ProtoAdapter<HardwareProfileResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      HardwareProfileResult::class,
-      "type.googleapis.com/runanywhere.v1.HardwareProfileResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      HardwareProfileResult::class, 
+      "type.googleapis.com/runanywhere.v1.HardwareProfileResult", 
+      PROTO_3, 
+      null, 
       "hardware_profile.proto"
     ) {
       override fun encodedSize(`value`: HardwareProfileResult): Int {

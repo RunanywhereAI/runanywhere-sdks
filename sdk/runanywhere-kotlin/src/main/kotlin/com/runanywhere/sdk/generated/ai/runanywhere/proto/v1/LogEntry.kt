@@ -218,11 +218,11 @@ public class LogEntry(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<LogEntry> = object : ProtoAdapter<LogEntry>(
-      FieldEncoding.LENGTH_DELIMITED,
-      LogEntry::class,
-      "type.googleapis.com/runanywhere.v1.LogEntry",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      LogEntry::class, 
+      "type.googleapis.com/runanywhere.v1.LogEntry", 
+      PROTO_3, 
+      null, 
       "logging.proto"
     ) {
       private val metadataAdapter: ProtoAdapter<Map<String, String>> by

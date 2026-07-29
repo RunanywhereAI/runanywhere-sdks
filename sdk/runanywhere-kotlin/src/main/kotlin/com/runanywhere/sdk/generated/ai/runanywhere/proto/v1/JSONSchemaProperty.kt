@@ -262,11 +262,11 @@ public class JSONSchemaProperty(
     @JvmField
     public val ADAPTER: ProtoAdapter<JSONSchemaProperty> =
         object : ProtoAdapter<JSONSchemaProperty>(
-      FieldEncoding.LENGTH_DELIMITED,
-      JSONSchemaProperty::class,
-      "type.googleapis.com/runanywhere.v1.JSONSchemaProperty",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      JSONSchemaProperty::class, 
+      "type.googleapis.com/runanywhere.v1.JSONSchemaProperty", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       override fun encodedSize(`value`: JSONSchemaProperty): Int {

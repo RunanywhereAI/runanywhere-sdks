@@ -240,11 +240,11 @@ public class ModelRegistryEvent(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelRegistryEvent> =
         object : ProtoAdapter<ModelRegistryEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelRegistryEvent::class,
-      "type.googleapis.com/runanywhere.v1.ModelRegistryEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelRegistryEvent::class, 
+      "type.googleapis.com/runanywhere.v1.ModelRegistryEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: ModelRegistryEvent): Int {

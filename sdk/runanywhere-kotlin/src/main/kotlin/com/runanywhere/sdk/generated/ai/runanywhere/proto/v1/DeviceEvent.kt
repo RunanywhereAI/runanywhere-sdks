@@ -261,11 +261,11 @@ public class DeviceEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DeviceEvent> = object : ProtoAdapter<DeviceEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DeviceEvent::class,
-      "type.googleapis.com/runanywhere.v1.DeviceEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DeviceEvent::class, 
+      "type.googleapis.com/runanywhere.v1.DeviceEvent", 
+      PROTO_3, 
+      null, 
       "sdk_events.proto"
     ) {
       override fun encodedSize(`value`: DeviceEvent): Int {

@@ -33,8 +33,8 @@ public enum class EmbeddingsNormalizeMode(
     @JvmField
     public val ADAPTER: ProtoAdapter<EmbeddingsNormalizeMode> =
         object : EnumAdapter<EmbeddingsNormalizeMode>(
-      EmbeddingsNormalizeMode::class,
-      PROTO_3,
+      EmbeddingsNormalizeMode::class, 
+      PROTO_3, 
       EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): EmbeddingsNormalizeMode? = EmbeddingsNormalizeMode.fromValue(`value`)

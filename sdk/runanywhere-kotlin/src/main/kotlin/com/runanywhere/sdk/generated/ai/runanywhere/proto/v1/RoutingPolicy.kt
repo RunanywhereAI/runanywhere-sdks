@@ -49,8 +49,8 @@ public enum class RoutingPolicy(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<RoutingPolicy> = object : EnumAdapter<RoutingPolicy>(
-      RoutingPolicy::class,
-      PROTO_3,
+      RoutingPolicy::class, 
+      PROTO_3, 
       RoutingPolicy.ROUTING_POLICY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): RoutingPolicy? = RoutingPolicy.fromValue(`value`)

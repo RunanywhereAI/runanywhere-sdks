@@ -139,11 +139,11 @@ public class VoiceSessionError(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VoiceSessionError> = object : ProtoAdapter<VoiceSessionError>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VoiceSessionError::class,
-      "type.googleapis.com/runanywhere.v1.VoiceSessionError",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VoiceSessionError::class, 
+      "type.googleapis.com/runanywhere.v1.VoiceSessionError", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: VoiceSessionError): Int {

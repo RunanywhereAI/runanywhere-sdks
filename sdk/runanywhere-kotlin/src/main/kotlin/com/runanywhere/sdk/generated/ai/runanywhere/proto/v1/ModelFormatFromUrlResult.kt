@@ -100,11 +100,11 @@ public class ModelFormatFromUrlResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelFormatFromUrlResult> =
         object : ProtoAdapter<ModelFormatFromUrlResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelFormatFromUrlResult::class,
-      "type.googleapis.com/runanywhere.v1.ModelFormatFromUrlResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelFormatFromUrlResult::class, 
+      "type.googleapis.com/runanywhere.v1.ModelFormatFromUrlResult", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelFormatFromUrlResult): Int {

@@ -116,11 +116,11 @@ public class STTLanguageDetectionResult(
     @JvmField
     public val ADAPTER: ProtoAdapter<STTLanguageDetectionResult> =
         object : ProtoAdapter<STTLanguageDetectionResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      STTLanguageDetectionResult::class,
-      "type.googleapis.com/runanywhere.v1.STTLanguageDetectionResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      STTLanguageDetectionResult::class, 
+      "type.googleapis.com/runanywhere.v1.STTLanguageDetectionResult", 
+      PROTO_3, 
+      null, 
       "stt_options.proto"
     ) {
       override fun encodedSize(`value`: STTLanguageDetectionResult): Int {

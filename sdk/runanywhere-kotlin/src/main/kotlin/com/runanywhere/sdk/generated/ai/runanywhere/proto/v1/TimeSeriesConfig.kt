@@ -148,11 +148,11 @@ public class TimeSeriesConfig(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TimeSeriesConfig> = object : ProtoAdapter<TimeSeriesConfig>(
-      FieldEncoding.LENGTH_DELIMITED,
-      TimeSeriesConfig::class,
-      "type.googleapis.com/runanywhere.v1.TimeSeriesConfig",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      TimeSeriesConfig::class, 
+      "type.googleapis.com/runanywhere.v1.TimeSeriesConfig", 
+      PROTO_3, 
+      null, 
       "solutions.proto"
     ) {
       override fun encodedSize(`value`: TimeSeriesConfig): Int {

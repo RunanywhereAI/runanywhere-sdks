@@ -39,8 +39,8 @@ public enum class MessageRole(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<MessageRole> = object : EnumAdapter<MessageRole>(
-      MessageRole::class,
-      PROTO_3,
+      MessageRole::class, 
+      PROTO_3, 
       MessageRole.MESSAGE_ROLE_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): MessageRole? = MessageRole.fromValue(`value`)

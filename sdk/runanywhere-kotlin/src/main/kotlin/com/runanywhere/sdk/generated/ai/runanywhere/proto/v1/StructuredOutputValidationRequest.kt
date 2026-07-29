@@ -88,11 +88,11 @@ public class StructuredOutputValidationRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<StructuredOutputValidationRequest> =
         object : ProtoAdapter<StructuredOutputValidationRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StructuredOutputValidationRequest::class,
-      "type.googleapis.com/runanywhere.v1.StructuredOutputValidationRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StructuredOutputValidationRequest::class, 
+      "type.googleapis.com/runanywhere.v1.StructuredOutputValidationRequest", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       override fun encodedSize(`value`: StructuredOutputValidationRequest): Int {

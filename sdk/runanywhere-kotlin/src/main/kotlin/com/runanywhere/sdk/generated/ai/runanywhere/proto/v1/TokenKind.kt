@@ -37,8 +37,8 @@ public enum class TokenKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TokenKind> = object : EnumAdapter<TokenKind>(
-      TokenKind::class,
-      PROTO_3,
+      TokenKind::class, 
+      PROTO_3, 
       TokenKind.TOKEN_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): TokenKind? = TokenKind.fromValue(`value`)

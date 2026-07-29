@@ -159,11 +159,11 @@ public class VLMServiceState(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<VLMServiceState> = object : ProtoAdapter<VLMServiceState>(
-      FieldEncoding.LENGTH_DELIMITED,
-      VLMServiceState::class,
-      "type.googleapis.com/runanywhere.v1.VLMServiceState",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      VLMServiceState::class, 
+      "type.googleapis.com/runanywhere.v1.VLMServiceState", 
+      PROTO_3, 
+      null, 
       "vlm_options.proto"
     ) {
       override fun encodedSize(`value`: VLMServiceState): Int {

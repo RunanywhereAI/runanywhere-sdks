@@ -262,11 +262,11 @@ public class SDKError(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<SDKError> = object : ProtoAdapter<SDKError>(
-      FieldEncoding.LENGTH_DELIMITED,
-      SDKError::class,
-      "type.googleapis.com/runanywhere.v1.SDKError",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      SDKError::class, 
+      "type.googleapis.com/runanywhere.v1.SDKError", 
+      PROTO_3, 
+      null, 
       "errors.proto"
     ) {
       override fun encodedSize(`value`: SDKError): Int {

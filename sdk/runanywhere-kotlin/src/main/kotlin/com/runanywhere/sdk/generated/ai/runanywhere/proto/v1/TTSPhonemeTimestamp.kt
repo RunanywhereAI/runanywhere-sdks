@@ -120,11 +120,11 @@ public class TTSPhonemeTimestamp(
     @JvmField
     public val ADAPTER: ProtoAdapter<TTSPhonemeTimestamp> =
         object : ProtoAdapter<TTSPhonemeTimestamp>(
-      FieldEncoding.LENGTH_DELIMITED,
-      TTSPhonemeTimestamp::class,
-      "type.googleapis.com/runanywhere.v1.TTSPhonemeTimestamp",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      TTSPhonemeTimestamp::class, 
+      "type.googleapis.com/runanywhere.v1.TTSPhonemeTimestamp", 
+      PROTO_3, 
+      null, 
       "tts_options.proto"
     ) {
       override fun encodedSize(`value`: TTSPhonemeTimestamp): Int {

@@ -112,11 +112,11 @@ public class AudioLevelEvent(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<AudioLevelEvent> = object : ProtoAdapter<AudioLevelEvent>(
-      FieldEncoding.LENGTH_DELIMITED,
-      AudioLevelEvent::class,
-      "type.googleapis.com/runanywhere.v1.AudioLevelEvent",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      AudioLevelEvent::class, 
+      "type.googleapis.com/runanywhere.v1.AudioLevelEvent", 
+      PROTO_3, 
+      null, 
       "voice_events.proto"
     ) {
       override fun encodedSize(`value`: AudioLevelEvent): Int {

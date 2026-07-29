@@ -122,11 +122,11 @@ public class StreamToken(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<StreamToken> = object : ProtoAdapter<StreamToken>(
-      FieldEncoding.LENGTH_DELIMITED,
-      StreamToken::class,
-      "type.googleapis.com/runanywhere.v1.StreamToken",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      StreamToken::class, 
+      "type.googleapis.com/runanywhere.v1.StreamToken", 
+      PROTO_3, 
+      null, 
       "llm_options.proto"
     ) {
       override fun encodedSize(`value`: StreamToken): Int {

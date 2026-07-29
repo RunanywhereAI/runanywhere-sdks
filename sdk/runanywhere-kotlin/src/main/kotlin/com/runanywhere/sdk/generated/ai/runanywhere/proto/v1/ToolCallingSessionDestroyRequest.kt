@@ -75,11 +75,11 @@ public class ToolCallingSessionDestroyRequest(
     @JvmField
     public val ADAPTER: ProtoAdapter<ToolCallingSessionDestroyRequest> =
         object : ProtoAdapter<ToolCallingSessionDestroyRequest>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ToolCallingSessionDestroyRequest::class,
-      "type.googleapis.com/runanywhere.v1.ToolCallingSessionDestroyRequest",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ToolCallingSessionDestroyRequest::class, 
+      "type.googleapis.com/runanywhere.v1.ToolCallingSessionDestroyRequest", 
+      PROTO_3, 
+      null, 
       "tool_calling.proto"
     ) {
       override fun encodedSize(`value`: ToolCallingSessionDestroyRequest): Int {

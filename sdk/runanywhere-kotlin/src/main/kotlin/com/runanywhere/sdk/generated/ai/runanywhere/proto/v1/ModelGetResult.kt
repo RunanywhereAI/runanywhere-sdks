@@ -100,11 +100,11 @@ public class ModelGetResult(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ModelGetResult> = object : ProtoAdapter<ModelGetResult>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ModelGetResult::class,
-      "type.googleapis.com/runanywhere.v1.ModelGetResult",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ModelGetResult::class, 
+      "type.googleapis.com/runanywhere.v1.ModelGetResult", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ModelGetResult): Int {

@@ -97,11 +97,11 @@ public class ClassificationCandidate(
     @JvmField
     public val ADAPTER: ProtoAdapter<ClassificationCandidate> =
         object : ProtoAdapter<ClassificationCandidate>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ClassificationCandidate::class,
-      "type.googleapis.com/runanywhere.v1.ClassificationCandidate",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ClassificationCandidate::class, 
+      "type.googleapis.com/runanywhere.v1.ClassificationCandidate", 
+      PROTO_3, 
+      null, 
       "structured_output.proto"
     ) {
       override fun encodedSize(`value`: ClassificationCandidate): Int {

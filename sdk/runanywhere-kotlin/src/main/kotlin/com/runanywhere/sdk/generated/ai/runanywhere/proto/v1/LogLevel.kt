@@ -50,8 +50,8 @@ public enum class LogLevel(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<LogLevel> = object : EnumAdapter<LogLevel>(
-      LogLevel::class,
-      PROTO_3,
+      LogLevel::class, 
+      PROTO_3, 
       LogLevel.LOG_LEVEL_TRACE
     ) {
       override fun fromValue(`value`: Int): LogLevel? = LogLevel.fromValue(`value`)

@@ -115,11 +115,11 @@ public class DiarizationSegment(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiarizationSegment> =
         object : ProtoAdapter<DiarizationSegment>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DiarizationSegment::class,
-      "type.googleapis.com/runanywhere.v1.DiarizationSegment",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DiarizationSegment::class, 
+      "type.googleapis.com/runanywhere.v1.DiarizationSegment", 
+      PROTO_3, 
+      null, 
       "diarization.proto"
     ) {
       override fun encodedSize(`value`: DiarizationSegment): Int {

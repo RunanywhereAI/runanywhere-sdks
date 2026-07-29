@@ -136,11 +136,11 @@ public class ArchiveArtifact(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ArchiveArtifact> = object : ProtoAdapter<ArchiveArtifact>(
-      FieldEncoding.LENGTH_DELIMITED,
-      ArchiveArtifact::class,
-      "type.googleapis.com/runanywhere.v1.ArchiveArtifact",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      ArchiveArtifact::class, 
+      "type.googleapis.com/runanywhere.v1.ArchiveArtifact", 
+      PROTO_3, 
+      null, 
       "model_types.proto"
     ) {
       override fun encodedSize(`value`: ArchiveArtifact): Int {

@@ -343,11 +343,11 @@ public class DeviceInfo(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<DeviceInfo> = object : ProtoAdapter<DeviceInfo>(
-      FieldEncoding.LENGTH_DELIMITED,
-      DeviceInfo::class,
-      "type.googleapis.com/runanywhere.v1.DeviceInfo",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      DeviceInfo::class, 
+      "type.googleapis.com/runanywhere.v1.DeviceInfo", 
+      PROTO_3, 
+      null, 
       "device_info.proto"
     ) {
       private val platform_extrasAdapter: ProtoAdapter<Map<String, String>> by

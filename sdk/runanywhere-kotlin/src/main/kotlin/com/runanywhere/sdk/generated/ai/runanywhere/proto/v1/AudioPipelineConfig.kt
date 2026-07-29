@@ -110,11 +110,11 @@ public class AudioPipelineConfig(
     @JvmField
     public val ADAPTER: ProtoAdapter<AudioPipelineConfig> =
         object : ProtoAdapter<AudioPipelineConfig>(
-      FieldEncoding.LENGTH_DELIMITED,
-      AudioPipelineConfig::class,
-      "type.googleapis.com/runanywhere.v1.AudioPipelineConfig",
-      PROTO_3,
-      null,
+      FieldEncoding.LENGTH_DELIMITED, 
+      AudioPipelineConfig::class, 
+      "type.googleapis.com/runanywhere.v1.AudioPipelineConfig", 
+      PROTO_3, 
+      null, 
       "voice_agent_service.proto"
     ) {
       override fun encodedSize(`value`: AudioPipelineConfig): Int {

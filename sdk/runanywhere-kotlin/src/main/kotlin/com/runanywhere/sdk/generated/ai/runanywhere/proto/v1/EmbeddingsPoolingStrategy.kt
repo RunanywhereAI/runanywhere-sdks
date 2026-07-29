@@ -34,8 +34,8 @@ public enum class EmbeddingsPoolingStrategy(
     @JvmField
     public val ADAPTER: ProtoAdapter<EmbeddingsPoolingStrategy> =
         object : EnumAdapter<EmbeddingsPoolingStrategy>(
-      EmbeddingsPoolingStrategy::class,
-      PROTO_3,
+      EmbeddingsPoolingStrategy::class, 
+      PROTO_3, 
       EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): EmbeddingsPoolingStrategy? = EmbeddingsPoolingStrategy.fromValue(`value`)

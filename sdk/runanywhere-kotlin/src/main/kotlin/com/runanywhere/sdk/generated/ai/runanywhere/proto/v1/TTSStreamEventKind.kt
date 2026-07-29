@@ -31,8 +31,8 @@ public enum class TTSStreamEventKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<TTSStreamEventKind> = object : EnumAdapter<TTSStreamEventKind>(
-      TTSStreamEventKind::class,
-      PROTO_3,
+      TTSStreamEventKind::class, 
+      PROTO_3, 
       TTSStreamEventKind.TTS_STREAM_EVENT_KIND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): TTSStreamEventKind? = TTSStreamEventKind.fromValue(`value`)
