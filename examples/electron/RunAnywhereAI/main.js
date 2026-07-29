@@ -4,14 +4,14 @@
 // native addon, and the renderer talks to it over an isolated MessagePort. No
 // prompt, document, or audio ever leaves the machine.
 //
-// Launch (dev):   npm start        (from apps/desktop)
+// Launch (dev):   npm start        (from examples/electron/RunAnywhereAI)
 // Launch (GPU):   npm run start:gpu
 // Headless self-test (runs the real code paths, exits 0/1):
-//   RA_SELFTEST=1 npx electron apps/desktop
+//   RA_SELFTEST=1 npx electron examples/electron/RunAnywhereAI
 const path = require('path');
 const { createStore, capConversations } = require('./store');
 const fs = require('fs');
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 
 // Identity must be set before `app.getPath('userData')` is read so settings and
 // conversations land in %APPDATA%\RunAnywhere AI (not Electron's default).
@@ -31,15 +31,26 @@ const SELFTEST = process.env.RA_SELFTEST === '1';
 function resolveNativePath() {
   if (process.env.RUNANYWHERE_NATIVE_PATH) return process.env.RUNANYWHERE_NATIVE_PATH;
   const wantGpu = process.env.RA_GPU === '1' || process.argv.includes('--gpu');
-  const variant = wantGpu ? 'win32-x64-cuda' : 'win32-x64';
-  const candidate = path.join(PREBUILDS, variant, 'runanywhere_native.node');
-  if (fs.existsSync(candidate)) return candidate;
-  // Fall back to CPU if a GPU build was asked for but isn't bundled.
-  const cpu = path.join(PREBUILDS, 'win32-x64', 'runanywhere_native.node');
-  return fs.existsSync(cpu) ? cpu : undefined;
+  const base = `${process.platform}-${process.arch}`;
+  const candidates = wantGpu ? [`${base}-cuda`, base] : [base];
+  for (const variant of candidates) {
+    const candidate = path.join(PREBUILDS, variant, 'runanywhere_native.node');
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  // Say so HERE rather than letting `undefined` travel into the utility host and
+  // fail there with a message that points at the wrong layer.
+  throw new Error(
+    `no native addon for ${base}. This build ships prebuilds for: ` +
+    `${(fs.existsSync(PREBUILDS) ? fs.readdirSync(PREBUILDS) : []).join(', ') || '(none)'}. ` +
+    'Set RUNANYWHERE_NATIVE_PATH to a runanywhere_native.node built for this platform.'
+  );
 }
 
-const NATIVE_PATH = resolveNativePath();
+// Resolve at startup, but keep the failure readable: an uncaught throw here would
+// close the app with no window and no message.
+let NATIVE_PATH = null;
+let NATIVE_ERROR = null;
+try { NATIVE_PATH = resolveNativePath(); } catch (e) { NATIVE_ERROR = e; }
 const DEVICE = /cuda|gpu/i.test(NATIVE_PATH || '') ? 'gpu' : 'cpu';
 
 // Self-test output also goes to a file — Electron is a GUI-subsystem binary, so
@@ -74,6 +85,15 @@ if (!SELFTEST && !app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.whenReady().then(() => {
+    // Nothing below can work without the addon; say which platform is missing a
+    // prebuild rather than failing later inside the utility host.
+    if (NATIVE_ERROR) {
+      console.error('[main]', NATIVE_ERROR.message);
+      record('[main] ' + NATIVE_ERROR.message + '\n');
+      if (!SELFTEST) dialog.showErrorBox('RunAnywhere AI cannot start', NATIVE_ERROR.message);
+      finish(1, 'no native addon');
+      return;
+    }
     ipcMain.handle('store:conversations:load', () => readJson('conversations.json', []));
     ipcMain.handle('store:conversations:save', (_e, data) => writeJson('conversations.json',
       data && Array.isArray(data.conversations)
@@ -148,8 +168,15 @@ if (!SELFTEST && !app.requestSingleInstanceLock()) {
     });
     win.webContents.on('unresponsive', () => console.error('[main] renderer unresponsive'));
 
-    win.webContents.on('console-message', (_e, level, message) => {
-      if (level >= 2) console.log('[renderer]', message); // surface warnings/errors
+    // Electron >=34 passes a single details object with a string `level`
+    // ('info' | 'warning' | 'error' | 'debug'). The old positional form silently
+    // compared a string with `>= 2`, so renderer warnings and errors — the ones
+    // worth seeing — were never printed.
+    win.webContents.on('console-message', (_e, details) => {
+      const level = details && details.level;
+      if (level === 'warning' || level === 'error') {
+        console.log('[renderer]', level + ':', details.message);
+      }
     });
     // Self-test plumbing ONLY. runanywhere-test-done calls app.exit(), so it must
     // never be reachable in a shipped build.
