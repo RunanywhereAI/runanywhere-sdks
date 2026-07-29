@@ -22,6 +22,7 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.STTAudioSource
 import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.STTPartialResult
+import ai.runanywhere.proto.v1.STTServiceState
 import ai.runanywhere.proto.v1.STTStreamEvent
 import ai.runanywhere.proto.v1.STTStreamEventKind
 import ai.runanywhere.proto.v1.STTTranscriptionRequest
@@ -147,6 +148,17 @@ object CppBridgeSTT {
         if (handle == 0L) return
         RunAnywhereBridge.racSttComponentCancel(handle)
     }
+
+    /**
+     * Snapshot the lifecycle STT service state. Mirrors iOS Swift's
+     * `rac_stt_state_lifecycle_proto` call site — no handle is threaded.
+     */
+    suspend fun state(): STTServiceState =
+        decodeOrThrow(
+            STTServiceState.ADAPTER,
+            RunAnywhereBridge.racSttStateLifecycleProto(),
+            "racSttStateLifecycleProto",
+        )
 
     /**
      * One-shot transcription via lifecycle-loaded STT model.

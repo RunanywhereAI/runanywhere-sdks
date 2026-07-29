@@ -18,6 +18,7 @@
 package com.runanywhere.sdk.features.VoiceAgent.Services
 
 import ai.runanywhere.proto.v1.AudioEncoding
+import ai.runanywhere.proto.v1.VoiceAgentAudioFrame
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.features.STT.Services.AudioCaptureManager
 import com.runanywhere.sdk.features.TTS.Services.AudioPlaybackManager
@@ -28,6 +29,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
+import okio.ByteString.Companion.toByteString
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -73,11 +75,15 @@ internal class VoiceAgentMicDriver(
                 try {
                     RunAnywhereBridge.racVoiceAgentFeedAudioProto(
                         handle,
-                        chunk,
-                        SAMPLE_RATE_HZ,
-                        1,
-                        AudioEncoding.AUDIO_ENCODING_PCM_S16_LE.value,
-                        false,
+                        VoiceAgentAudioFrame.ADAPTER.encode(
+                            VoiceAgentAudioFrame(
+                                audio_data = chunk.toByteString(),
+                                sample_rate = SAMPLE_RATE_HZ,
+                                channels = 1,
+                                encoding = AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
+                                is_final = false,
+                            ),
+                        ),
                     )
                 } catch (e: CancellationException) {
                     throw e

@@ -20,6 +20,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.TTSOutput
+import ai.runanywhere.proto.v1.TTSServiceState
 import ai.runanywhere.proto.v1.TTSSynthesisRequest
 import ai.runanywhere.proto.v1.TTSVoiceInfo
 import ai.runanywhere.proto.v1.TTSVoiceList
@@ -126,6 +127,17 @@ object CppBridgeTTS {
                 ?: throw SDKException.operation("racTtsListVoicesLifecycleProto returned null")
         return TTSVoiceList.ADAPTER.decode(bytes).voices
     }
+
+    /**
+     * Snapshot the lifecycle TTS service state. Mirrors iOS Swift's
+     * `rac_tts_state_lifecycle_proto` call site — no handle is threaded.
+     */
+    suspend fun state(): TTSServiceState =
+        decodeOrThrow(
+            TTSServiceState.ADAPTER,
+            RunAnywhereBridge.racTtsStateLifecycleProto(),
+            "racTtsStateLifecycleProto",
+        )
 
     /**
      * One-shot synthesis via lifecycle-loaded TTS model.

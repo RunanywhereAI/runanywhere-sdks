@@ -34,12 +34,12 @@ val TTSConfiguration.modelIdOrNull: String?
 // MARK: - RATTSOptions: aliases
 
 /**
- * Alias for `speaking_rate` — Swift's `RATTSOptions.rate`.
+ * Alias for `speed` — Swift's `RATTSOptions.rate`.
  * Provided as a read-only computed property since Wire-generated types are
- * immutable; use `.copy(speaking_rate = ...)` to modify.
+ * immutable; use `.copy(speed = ...)` to modify.
  */
 val RATTSOptions.rate: Float
-    get() = speaking_rate
+    get() = speed
 
 /**
  * Alias for `language_code` — Swift's `RATTSOptions.language`.

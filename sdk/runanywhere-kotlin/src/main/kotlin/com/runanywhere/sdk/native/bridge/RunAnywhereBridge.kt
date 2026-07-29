@@ -243,6 +243,10 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racSttTranscribeLifecycleProto(requestProto: ByteArray): ByteArray?
 
+    /** Snapshot the lifecycle STT service state as serialized STTServiceState bytes. */
+    @JvmStatic
+    external fun racSttStateLifecycleProto(): ByteArray?
+
     @JvmStatic
     external fun racSttTranscribeStreamLifecycleProto(
         requestProto: ByteArray,
@@ -398,6 +402,10 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racTtsListVoicesLifecycleProto(): ByteArray?
 
+    /** Snapshot the lifecycle TTS service state as serialized TTSServiceState bytes. */
+    @JvmStatic
+    external fun racTtsStateLifecycleProto(): ByteArray?
+
     /**
      * Stop an in-flight lifecycle-owned TTS synthesis. Mirrors iOS Swift's
      * `rac_tts_stop_lifecycle_proto` path — the v2 lifecycle TTS stack does
@@ -434,11 +442,15 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racVadComponentConfigureProto(handle: Long, configProto: ByteArray): Int
 
+    /**
+     * Run VAD over one serialized VADProcessRequest (audio bytes + encoding +
+     * options bundled in the request). Returns serialized VADProcessResult
+     * bytes, or null on failure.
+     */
     @JvmStatic
     external fun racVadComponentProcessProto(
         handle: Long,
-        samples: FloatArray,
-        optionsProto: ByteArray?,
+        requestProto: ByteArray,
     ): ByteArray?
 
     @JvmStatic
@@ -1182,24 +1194,21 @@ object RunAnywhereBridge {
     ): Int
 
     /**
-     * Feed raw mic frames (16 kHz mono PCM16) into the in-core segmenter. The
-     * core accumulates frames, performs energy-based utterance endpointing, and
-     * on each completed utterance runs the full VAD→STT→LLM→TTS turn pipeline.
-     * Returns serialized VoiceAgentResult bytes — carrying the synthesized
-     * reply (WAV) when a turn completed this call, or an empty result
-     * otherwise. Per-stage VoiceEvents fan out to the handle callback (so
-     * streamVoiceAgent() collectors observe them). Throws a native-proto
-     * failure on error. Pass [isFinal] = true to flush an in-progress
-     * utterance.
+     * Feed raw mic frames into the in-core segmenter as one serialized
+     * VoiceAgentAudioFrame (audio_data, sample_rate, channels, encoding,
+     * is_final). The core accumulates frames, performs energy-based utterance
+     * endpointing, and on each completed utterance runs the full
+     * VAD→STT→LLM→TTS turn pipeline. Returns serialized VoiceAgentResult
+     * bytes — carrying the synthesized reply (WAV) when a turn completed this
+     * call, or an empty result otherwise. Per-stage VoiceEvents fan out to
+     * the handle callback (so streamVoiceAgent() collectors observe them).
+     * Throws a native-proto failure on error. Set `is_final` on the frame to
+     * flush an in-progress utterance.
      */
     @JvmStatic
     external fun racVoiceAgentFeedAudioProto(
         handle: Long,
-        audioData: ByteArray,
-        sampleRateHz: Int,
-        channels: Int,
-        encoding: Int,
-        isFinal: Boolean,
+        frameProto: ByteArray,
     ): ByteArray?
 
     // TOOL-CALLING SESSION (rac_tool_calling.h)

@@ -22,6 +22,7 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ToolChoiceMode
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
 import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingResult
@@ -30,7 +31,6 @@ import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOrchestrator
 import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
 import com.runanywhere.sdk.public.extensions.LLM.ToolExecutor
 import com.runanywhere.sdk.public.extensions.LLM.ToolResult
-import com.runanywhere.sdk.public.extensions.LLM.defaults
 import com.runanywhere.sdk.public.extensions.LLM.toToolCallingOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 

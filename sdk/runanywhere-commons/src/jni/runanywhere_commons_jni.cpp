@@ -4834,6 +4834,16 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttTranscribeLifecyc
     return makeProtoCallResult(env, rc, &result, "racSttTranscribeLifecycleProto");
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttStateLifecycleProto(JNIEnv* env,
+                                                                                   jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_stt_state_lifecycle_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racSttStateLifecycleProto");
+}
+
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttTranscribeStreamLifecycleProto(
     JNIEnv* env, jclass clazz, jbyteArray requestProto, jobject listener) {
@@ -5243,6 +5253,16 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsListVoicesLifecyc
     rac_proto_buffer_init(&result);
     rac_result_t rc = rac_tts_list_voices_lifecycle_proto(&result);
     return makeProtoCallResult(env, rc, &result, "racTtsListVoicesLifecycleProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsStateLifecycleProto(JNIEnv* env,
+                                                                                   jclass clazz) {
+    (void)clazz;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_tts_state_lifecycle_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racTtsStateLifecycleProto");
 }
 
 // Swift-aligned: exposes rac_tts_stop_lifecycle_proto so Kotlin can stop an

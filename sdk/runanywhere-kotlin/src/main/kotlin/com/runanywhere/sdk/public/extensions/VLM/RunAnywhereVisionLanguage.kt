@@ -84,7 +84,7 @@ suspend fun RunAnywhere.processImage(
         )
 
     vlmLogger.info(
-        "VLM processing complete: ${result.completion_tokens} tokens in ${result.processing_time_ms}ms " +
+        "VLM processing complete: ${result.output_tokens} tokens in ${result.processing_time_ms}ms " +
             "(${String.format(java.util.Locale.ROOT, "%.1f", result.tokens_per_second)} tok/s)",
     )
 
@@ -129,7 +129,7 @@ fun RunAnywhere.processImageStream(
                     VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED -> {
                         val result = event.result
                         vlmLogger.info(
-                            "VLM processing complete: ${result?.completion_tokens ?: 0} tokens " +
+                            "VLM processing complete: ${result?.output_tokens ?: 0} tokens " +
                                 "(${String.format(java.util.Locale.ROOT, "%.1f", result?.tokens_per_second ?: 0f)} tok/s)",
                         )
                         true

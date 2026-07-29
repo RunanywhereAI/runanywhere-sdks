@@ -11,63 +11,19 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.STTLanguage
 import ai.runanywhere.proto.v1.TranscriptionAlternative
 import ai.runanywhere.proto.v1.TranscriptionMetadata
 import ai.runanywhere.proto.v1.WordTimestamp
 import com.runanywhere.sdk.public.types.RASTTOutput
 
-// MARK: - STTLanguage
-
-/**
- * Map a BCP-47 language string (e.g. "en-US", "zh-Hans") to the canonical enum.
- */
-fun STTLanguage.Companion.fromBcp47(raw: String): STTLanguage {
-    val base = raw.split('-').firstOrNull()?.lowercase() ?: raw.lowercase()
-    return when (base) {
-        "auto" -> STTLanguage.STT_LANGUAGE_AUTO
-        "en" -> STTLanguage.STT_LANGUAGE_EN
-        "es" -> STTLanguage.STT_LANGUAGE_ES
-        "fr" -> STTLanguage.STT_LANGUAGE_FR
-        "de" -> STTLanguage.STT_LANGUAGE_DE
-        "zh" -> STTLanguage.STT_LANGUAGE_ZH
-        "ja" -> STTLanguage.STT_LANGUAGE_JA
-        "ko" -> STTLanguage.STT_LANGUAGE_KO
-        "it" -> STTLanguage.STT_LANGUAGE_IT
-        "pt" -> STTLanguage.STT_LANGUAGE_PT
-        "ar" -> STTLanguage.STT_LANGUAGE_AR
-        "ru" -> STTLanguage.STT_LANGUAGE_RU
-        "hi" -> STTLanguage.STT_LANGUAGE_HI
-        else -> STTLanguage.STT_LANGUAGE_UNSPECIFIED
-    }
-}
-
-val STTLanguage.bcp47Code: String
-    get() =
-        when (this) {
-            STTLanguage.STT_LANGUAGE_UNSPECIFIED -> ""
-            STTLanguage.STT_LANGUAGE_AUTO -> "auto"
-            STTLanguage.STT_LANGUAGE_EN -> "en"
-            STTLanguage.STT_LANGUAGE_ES -> "es"
-            STTLanguage.STT_LANGUAGE_FR -> "fr"
-            STTLanguage.STT_LANGUAGE_DE -> "de"
-            STTLanguage.STT_LANGUAGE_ZH -> "zh"
-            STTLanguage.STT_LANGUAGE_JA -> "ja"
-            STTLanguage.STT_LANGUAGE_KO -> "ko"
-            STTLanguage.STT_LANGUAGE_IT -> "it"
-            STTLanguage.STT_LANGUAGE_PT -> "pt"
-            STTLanguage.STT_LANGUAGE_AR -> "ar"
-            STTLanguage.STT_LANGUAGE_RU -> "ru"
-            STTLanguage.STT_LANGUAGE_HI -> "hi"
-        }
-
 // MARK: - STTOutput
 
 /**
- * Convenience alias for the detected language enum on the output.
- * Mirrors Swift `RASTTOutput.detectedLanguageCode`.
+ * Convenience alias for the detected BCP-47 language code on the output
+ * (`null` when the engine did not report one). Mirrors Swift
+ * `RASTTOutput.detectedLanguageCode`.
  */
-val RASTTOutput.detectedLanguageCode: STTLanguage
+val RASTTOutput.detectedLanguageCode: String?
     get() = language
 
 // MARK: - WordTimestamp

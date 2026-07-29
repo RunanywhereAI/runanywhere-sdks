@@ -18,8 +18,9 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.SpeechActivityEvent
+import ai.runanywhere.proto.v1.VADAudioEncoding
+import ai.runanywhere.proto.v1.VADAudioSource
 import ai.runanywhere.proto.v1.VADConfiguration
-import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADProcessRequest
 import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADServiceState
@@ -34,6 +35,9 @@ import com.runanywhere.sdk.public.types.RAVADOptions
 import com.runanywhere.sdk.public.types.RAVADResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
+import okio.ByteString.Companion.toByteString
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 private fun <M : Message<M, *>> decodeOrThrow(
     adapter: ProtoAdapter<M>,
@@ -190,12 +194,26 @@ object CppBridgeVAD {
     /** Handle-based path; prefer [processLifecycle] after lifecycle model load. */
     suspend fun process(samples: FloatArray, options: RAVADOptions = RAVADOptions()): RAVADResult {
         val handle = actor.getHandle()
+        val audioBytes =
+            ByteBuffer
+                .allocate(samples.size * Float.SIZE_BYTES)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .apply { asFloatBuffer().put(samples) }
+                .array()
+        val request =
+            VADProcessRequest(
+                audio =
+                    VADAudioSource(
+                        audio_data = audioBytes.toByteString(),
+                        encoding = VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE,
+                    ),
+                options = options,
+            )
         return decodeOrThrow(
             VADResult.ADAPTER,
             RunAnywhereBridge.racVadComponentProcessProto(
                 handle,
-                samples,
-                VADOptions.ADAPTER.encode(options),
+                VADProcessRequest.ADAPTER.encode(request),
             ),
             "racVadComponentProcessProto",
         )

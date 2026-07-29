@@ -12,6 +12,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.TTSServiceState
 import ai.runanywhere.proto.v1.TTSSpeakResult
 import ai.runanywhere.proto.v1.TTSVoiceInfo
 import com.runanywhere.sdk.features.TTS.Services.TtsAudioPlayback
@@ -53,6 +54,18 @@ private val ttsAudioPlayback = TtsAudioPlayback
  */
 internal suspend fun RunAnywhere.availableTTSVoicesInternal(): List<TTSVoiceInfo> {
     return CppBridgeTTS.voices()
+}
+
+/**
+ * Snapshot the lifecycle TTS service state (readiness, current voice,
+ * available voices). Mirrors Swift `RunAnywhere.ttsState()`.
+ */
+suspend fun RunAnywhere.ttsState(): TTSServiceState {
+    if (!isInitialized) {
+        throw SDKException.notInitialized("SDK not initialized")
+    }
+    ensureServicesReady()
+    return CppBridgeTTS.state()
 }
 
 suspend fun RunAnywhere.synthesize(
@@ -177,7 +190,7 @@ suspend fun RunAnywhere.speak(
         when {
             output.sample_rate > 0 -> output.sample_rate
             options.sample_rate > 0 -> options.sample_rate
-            else -> 22_050
+            else -> RATTSOptions.defaults().sample_rate
         }
     val wavData = convertPcmToWav(output.audio_data.toByteArray(), sampleRate)
 

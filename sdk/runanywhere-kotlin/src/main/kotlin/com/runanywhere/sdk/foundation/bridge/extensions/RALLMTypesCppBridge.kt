@@ -18,6 +18,7 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.ExecutionTarget
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ThinkingTagPattern
+import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.types.RAExecutionTarget
 import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
@@ -33,19 +34,19 @@ import com.runanywhere.sdk.public.types.RAThinkingTagPattern
  * request itself carries only prompt, identity, metadata, and history.
  */
 fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerateRequest {
+    val defaults = RALLMGenerationOptions.defaults()
     val requestOptions =
         copy(
-            max_tokens = max_tokens.takeIf { it > 0 } ?: 100,
+            max_output_tokens = max_output_tokens.takeIf { it > 0 } ?: defaults.max_output_tokens,
             // This extension is invoked on an explicit options value. Zero is
             // the documented greedy-decoding sentinel, not an absent value;
             // callers that want the sampled default use defaults().
             temperature = temperature.coerceIn(0.0f, 2.0f),
-            top_p = top_p.takeIf { it > 0.0f } ?: 1.0f,
-            repetition_penalty = repetition_penalty.takeIf { it > 0.0f } ?: 1.0f,
+            top_p = top_p.takeIf { it > 0.0f } ?: defaults.top_p,
+            repetition_penalty = repetition_penalty.takeIf { it > 0.0f } ?: defaults.repetition_penalty,
         )
     return RALLMGenerateRequest(
         prompt = prompt,
-        emit_thoughts = requestOptions.thinking_pattern != null && !requestOptions.disable_thinking,
         options = requestOptions,
     )
 }
@@ -53,10 +54,10 @@ fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerate
 // MARK: - RALLMGenerationResult: proto-convenience accessors
 
 /**
- * Alias for `tokens_generated` matching Swift `RALLMGenerationResult.tokensUsed`.
+ * Alias for `output_tokens` matching Swift `RALLMGenerationResult.tokensUsed`.
  */
 val RALLMGenerationResult.tokensUsed: Int
-    get() = tokens_generated
+    get() = output_tokens
 
 /**
  * Alias for `generation_time_ms` matching Swift `RALLMGenerationResult.latencyMs`.

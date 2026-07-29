@@ -54,7 +54,7 @@ suspend fun RunAnywhere.generate(
     ensureServicesReady()
 
     val opts = options ?: RALLMGenerationOptions.defaults()
-    llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
+    llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_output_tokens}")
     return CppBridgeLLM.generate(prompt, options)
 }
 
@@ -76,8 +76,7 @@ suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGeneration
     llmLogger.info(
         "[PARAMS] generate: temperature=${requestOptions?.temperature ?: "default"}, " +
             "topP=${requestOptions?.top_p ?: "default"}, " +
-            "maxTokens=${requestOptions?.max_tokens ?: "default"}, systemPrompt=$systemPromptDesc, " +
-            "streaming=${requestOptions?.streaming_enabled ?: false}",
+            "maxTokens=${requestOptions?.max_output_tokens ?: "default"}, systemPrompt=$systemPromptDesc",
     )
     return CppBridgeLLM.generate(request)
 }
@@ -91,7 +90,7 @@ fun RunAnywhere.generateStream(
     }
 
     val opts = options ?: RALLMGenerationOptions.defaults()
-    llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
+    llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_output_tokens}")
 
     return losslessLLMStreamFlow(
         prepare = { ensureServicesReady() },
@@ -116,8 +115,7 @@ fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamE
     llmLogger.info(
         "[PARAMS] generateStream: temperature=${requestOptions?.temperature ?: "default"}, " +
             "topP=${requestOptions?.top_p ?: "default"}, " +
-            "maxTokens=${requestOptions?.max_tokens ?: "default"}, systemPrompt=$systemPromptDesc, " +
-            "streaming=${requestOptions?.streaming_enabled ?: false}",
+            "maxTokens=${requestOptions?.max_output_tokens ?: "default"}, systemPrompt=$systemPromptDesc",
     )
 
     return losslessLLMStreamFlow(
@@ -284,13 +282,13 @@ internal suspend fun aggregateLLMStream(
     // final event carries one, matching the Web SDK; otherwise fall back to the
     // locally concatenated text / wall-clock metrics.
     val final = finalEvent?.result
-    val inputTokens = final?.prompt_tokens ?: maxOf(1, prompt.length / 4)
-    val tokensGenerated = final?.completion_tokens ?: tokenCount
+    val inputTokens = final?.input_tokens ?: maxOf(1, prompt.length / 4)
+    val tokensGenerated = final?.output_tokens ?: tokenCount
     return RALLMGenerationResult(
         text = final?.text ?: answerResponse.toString(),
         thinking_content = final?.thinking_content ?: thinkingResponse.toString().takeIf { it.isNotEmpty() },
         input_tokens = inputTokens,
-        tokens_generated = tokensGenerated,
+        output_tokens = tokensGenerated,
         response_tokens = tokensGenerated,
         total_tokens = final?.total_tokens ?: (inputTokens + tokensGenerated),
         model_used = modelIdentity.modelID,

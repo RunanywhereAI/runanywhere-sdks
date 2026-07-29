@@ -182,7 +182,7 @@ object CppBridgeVLM {
         val request =
             VLMGenerationRequest(
                 images = listOf(image),
-                options = options.copy(streaming_enabled = true),
+                options = options,
             )
         val requestBytes = VLMGenerationRequest.ADAPTER.encode(request)
         val listener =

@@ -25,6 +25,7 @@ package com.runanywhere.sdk.public.extensions.LLM
 import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.ToolValueJSON
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 // PROTO TYPEALIASES (RA-prefixed, mirroring Swift)
@@ -70,45 +71,19 @@ internal data class RegisteredTool(
     val executor: ToolExecutor,
 )
 
-// RAToolCallingOptions.defaults() — Swift parity
-
-internal const val DEFAULT_MAX_TOOL_CALLS = 5
-
-/**
- * Default tool-calling options mirroring Swift's
- * `RAToolCallingOptions.defaults()`:
- * `maxToolCalls=5, autoExecute=true, format=.json`.
- */
-fun ai.runanywhere.proto.v1.ToolCallingOptions.Companion.defaults(): RAToolCallingOptions =
-    RAToolCallingOptions(
-        max_tool_calls = DEFAULT_MAX_TOOL_CALLS,
-        auto_execute = true,
-        format = ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
-    )
-
 // LLMGenerationOptions -> ToolCallingOptions normalization
+//
+// Defaults come from generated/convenience/RAConvenience.kt
+// (`ToolCallingOptions.Companion.defaults()`), emitted from the rac_default
+// annotations in idl/tool_calling.proto. Sampling and system_prompt no longer
+// live on ToolCallingOptions — they stay on the LLMGenerationOptions envelope.
 
-internal fun LLMGenerationOptions?.toToolCallingOptions(): ToolCallingOptions {
-    val generationOptions = this
-    val providedToolOptions = generationOptions?.tool_calling
-    val base = providedToolOptions ?: ToolCallingOptions()
-    return base.copy(
-        max_tool_calls =
-            base.max_tool_calls?.takeIf { it > 0 }
-                ?: if (providedToolOptions == null) DEFAULT_MAX_TOOL_CALLS else null,
-        auto_execute = if (providedToolOptions == null) true else base.auto_execute,
-        temperature =
-            base.temperature
-                ?: generationOptions?.temperature?.takeUnless { it == 0f },
-        max_tokens =
-            base.max_tokens
-                ?: generationOptions?.max_tokens?.takeIf { it > 0 },
-        system_prompt = base.system_prompt ?: generationOptions?.system_prompt,
-    )
-}
+internal fun LLMGenerationOptions?.toToolCallingOptions(): ToolCallingOptions =
+    this?.tool_calling ?: ToolCallingOptions.defaults()
 
 internal fun ToolCallingOptions.effectiveMaxToolCalls(): Int =
-    max_tool_calls?.takeIf { it > 0 } ?: DEFAULT_MAX_TOOL_CALLS
+    max_tool_calls?.takeIf { it > 0 }
+        ?: checkNotNull(ToolCallingOptions.defaults().max_tool_calls)
 
 // RAToolValue ergonomic helpers (mirror Swift `RAToolValue` extension)
 

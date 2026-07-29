@@ -20,6 +20,8 @@
 
 package com.runanywhere.sdk.public.extensions.LLM
 
+import ai.runanywhere.proto.v1.ChatMessage
+import ai.runanywhere.proto.v1.MessageRole
 import ai.runanywhere.proto.v1.ToolCallingSessionCreateRequest
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
@@ -155,40 +157,35 @@ internal fun makeToolCallingRunLoopRequest(
     validateCalls: Boolean?,
     // Prior conversation turns as a flat alternating list [user0, asst0, ...],
     // EXCLUDING the current turn (which is `prompt`). commons threads these into
-    // every generate in the loop so multi-turn tool use keeps context. Same
-    // contract as the standard path's ChatMessage history, as strings.
+    // every generate in the loop so multi-turn tool use keeps context.
     history: List<String> = emptyList(),
 ): ToolCallingSessionCreateRequest =
     ToolCallingSessionCreateRequest(
         prompt = prompt,
-        max_tokens = options.max_tokens?.takeIf { it > 0 } ?: llmOptions.max_tokens,
-        // Zero is a real greedy temperature. Do not use takeIf/non-zero
-        // fallback here; the native tool loop now honors this value exactly.
-        temperature = options.temperature ?: llmOptions.temperature,
-        top_p = llmOptions.top_p,
-        system_prompt =
-            options.system_prompt?.takeIf { it.isNotEmpty() }
-                ?: llmOptions.system_prompt?.takeIf { it.isNotEmpty() }
-                ?: "",
-        format =
-            options.format
-                ?: ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED,
-        max_tool_calls = options.effectiveMaxToolCalls(),
-        keep_tools_available = options.keep_tools_available,
-        // Suppress thinking when either options surface asks for it (commons
-        // prepends the no-think directive).
-        disable_thinking = (options.disable_thinking ?: false) || llmOptions.disable_thinking,
+        // Sampling, system_prompt, and reasoning ride on the generation
+        // envelope; tool routing lives in generation.tool_calling. Zero is a
+        // real greedy temperature — commons honors the value exactly.
+        generation =
+            llmOptions.copy(
+                tool_calling =
+                    options.copy(
+                        max_tool_calls = options.effectiveMaxToolCalls(),
+                        tools = tools,
+                    ),
+            ),
         validate_calls = validateCalls,
-        tools = tools,
-        tool_choice =
-            options.tool_choice.takeIf {
-                it != ai.runanywhere.proto.v1.ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED
+        history =
+            history.mapIndexed { index, content ->
+                ChatMessage(
+                    role =
+                        if (index % 2 == 0) {
+                            MessageRole.MESSAGE_ROLE_USER
+                        } else {
+                            MessageRole.MESSAGE_ROLE_ASSISTANT
+                        },
+                    content = content,
+                )
             },
-        forced_tool_name = options.forced_tool_name?.takeIf { it.isNotEmpty() },
-        auto_execute = options.auto_execute,
-        replace_system_prompt = options.replace_system_prompt,
-        require_json_arguments = options.require_json_arguments,
-        history = history,
     )
 
 /**
