@@ -30,6 +30,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "model_types.proto";
+import "rac_options.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -224,28 +225,37 @@ message DiffusionConfig {
 // ---------------------------------------------------------------------------
 message DiffusionGenerationOptions {
     // Text prompt describing the desired image. Required.
-    string             prompt              = 1;
+    string             prompt              = 1 [(runanywhere.v1.rac_required) = true];
 
     // Things to avoid in the image. Empty = no negative prompt.
     string             negative_prompt     = 2;
 
     // Output image width  in pixels.  0 = use variant default
     // (512 for SD 1.5 / SDXS / LCM, 768 for SD 2.1, 1024 for SDXL / Turbo).
-    int32              width               = 3;
+    int32              width               = 3 [(runanywhere.v1.rac_default) = "0"];
 
     // Output image height in pixels.  0 = use variant default.
-    int32              height              = 4;
+    int32              height              = 4 [(runanywhere.v1.rac_default) = "0"];
 
-    // Number of denoising steps. Range 1–50 (variant-dependent: SDXS=1,
-    // SDXL_Turbo / LCM=4, SD*=20–28). 0 = use variant default.
-    int32              num_inference_steps = 5;
+    // Number of denoising steps (industry short name `steps`). Range 1–50
+    // (variant-dependent: SDXS=1, SDXL_Turbo / LCM=4, SD*=20–28). 0 = use
+    // variant default. Was `num_inference_steps`.
+    int32              steps               = 5 [
+        (runanywhere.v1.rac_default) = "0",
+        (runanywhere.v1.rac_min) = 0,
+        (runanywhere.v1.rac_max) = 50
+    ];
 
     // Classifier-free guidance scale. 0.0 = no CFG (required for SDXS /
-    // SDXL_Turbo). Typical SD range 1.0–20.0; default 7.5.
-    float              guidance_scale      = 6;
+    // SDXL_Turbo). Typical SD range 1.0–20.0.
+    float              guidance_scale      = 6 [
+        (runanywhere.v1.rac_default) = "0.0",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 20.0
+    ];
 
     // RNG seed for reproducibility. -1 = pick a random seed.
-    int64              seed                = 7;
+    int64              seed                = 7 [(runanywhere.v1.rac_default) = "-1"];
 
     // Sampler algorithm. UNSPECIFIED = backend picks (recommended:
     // DPMPP_2M_KARRAS).
@@ -258,7 +268,11 @@ message DiffusionGenerationOptions {
     // Image-to-image / inpainting payloads from rac_diffusion_options_t.
     optional bytes     input_image         = 10;
     optional bytes     mask_image          = 11;
-    float              denoise_strength    = 12;
+    float              denoise_strength    = 12 [
+        (runanywhere.v1.rac_default) = "0.75",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
 
     // Progress reporting controls.
     bool               report_intermediate_images = 13;

@@ -31,12 +31,12 @@ enum DiarizationAudioEncoding {
 }
 
 message DiarizationOptions {
-    optional int32 sample_rate_hz = 1 [
+    optional int32 sample_rate = 1 [
         (runanywhere.v1.rac_default) = "16000",
         (runanywhere.v1.rac_min) = 8000,
         (runanywhere.v1.rac_max) = 48000
     ];
-    optional int32 channel_count = 2 [
+    optional int32 channels = 2 [
         (runanywhere.v1.rac_default) = "1",
         (runanywhere.v1.rac_min) = 1,
         (runanywhere.v1.rac_max) = 1

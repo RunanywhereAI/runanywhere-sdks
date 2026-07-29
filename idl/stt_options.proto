@@ -87,38 +87,8 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// ---------------------------------------------------------------------------
-// STT language hint. Sources pre-IDL:
-//   Swift  STTConfiguration default = "en-US", STTOptions default = "en"
-//   Kotlin STTConfiguration default = "en-US", STTOptions default = "en"
-//   Dart   STTOptions language nullable; auto-detect when null
-//   RN     STTOptions.language?: string (free-form)
-//   Web    STTTranscribeOptions.language?: string (free-form)
-//   C ABI  RAC_STT_DEFAULT_LANGUAGE = "en"
-// Free-form BCP-47 strings are collapsed to base language codes here.
-// AUTO is the explicit "detect from audio" sentinel; UNSPECIFIED falls
-// back to the backend default (typically "en").
-// ---------------------------------------------------------------------------
-// `rac_wire_string` annotations expose the BCP-47 base code for each value via
-// the codegen-generated `wireString` accessor (see idl/rac_options.proto and
-// idl/codegen/generate_swift_convenience.py). Swift SDK `bcp47Code` is sourced
-// from this annotation; the unspecified case falls back to "" by default.
-enum STTLanguage {
-    STT_LANGUAGE_UNSPECIFIED = 0;
-    STT_LANGUAGE_AUTO        = 1 [(runanywhere.v1.rac_wire_string) = "auto"];   // Auto-detect from audio
-    STT_LANGUAGE_EN          = 2 [(runanywhere.v1.rac_wire_string) = "en"];
-    STT_LANGUAGE_ES          = 3 [(runanywhere.v1.rac_wire_string) = "es"];
-    STT_LANGUAGE_FR          = 4 [(runanywhere.v1.rac_wire_string) = "fr"];
-    STT_LANGUAGE_DE          = 5 [(runanywhere.v1.rac_wire_string) = "de"];
-    STT_LANGUAGE_ZH          = 6 [(runanywhere.v1.rac_wire_string) = "zh"];
-    STT_LANGUAGE_JA          = 7 [(runanywhere.v1.rac_wire_string) = "ja"];
-    STT_LANGUAGE_KO          = 8 [(runanywhere.v1.rac_wire_string) = "ko"];
-    STT_LANGUAGE_IT          = 9 [(runanywhere.v1.rac_wire_string) = "it"];
-    STT_LANGUAGE_PT          = 10 [(runanywhere.v1.rac_wire_string) = "pt"];
-    STT_LANGUAGE_AR          = 11 [(runanywhere.v1.rac_wire_string) = "ar"];
-    STT_LANGUAGE_RU          = 12 [(runanywhere.v1.rac_wire_string) = "ru"];
-    STT_LANGUAGE_HI          = 13 [(runanywhere.v1.rac_wire_string) = "hi"];
-}
+// STTLanguage enum deleted: language is a single BCP-47 / ISO-639-1 string
+// everywhere (options, configuration, outputs). Unset = auto-detect.
 
 enum STTAudioEncoding {
     STT_AUDIO_ENCODING_UNSPECIFIED = 0;
@@ -143,8 +113,14 @@ enum STTAudioEncoding {
 // STTOptions when constructing requests.
 // ---------------------------------------------------------------------------
 message STTConfiguration {
+    // 2 was the STTLanguage enum, 12 was language_code — collapsed into the
+    // single `language` string (13).
+    reserved 2, 12;
+
     string      model_id     = 1;
-    STTLanguage language     = 2 [(runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
+
+    // Default input language, BCP-47 / ISO-639-1. Unset/empty = auto-detect.
+    optional string language = 13;
     int32       sample_rate  = 3 [
         (runanywhere.v1.rac_default) = "16000",
         (runanywhere.v1.rac_min) = 8000,
@@ -164,9 +140,6 @@ message STTConfiguration {
     // Preferred framework for the component. Absent = auto.
     optional InferenceFramework preferred_framework = 11;
 
-    // Free-form BCP-47 language tag ("en-US", "pt-BR", etc.) for callers
-    // that cannot be represented by STTLanguage's base-code enum.
-    optional string language_code       = 12;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,28 +159,27 @@ message STTConfiguration {
 // STT_LANGUAGE_AUTO.
 // ---------------------------------------------------------------------------
 message STTOptions {
-    STTLanguage     language               = 1 [(runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
+    // Retired fields — never reuse:
+    //  1 language (STTLanguage enum) + 8 language_code + 9 detect_language —
+    //    collapsed into the single `language` string below (three fields
+    //    said one thing).
+    // 10 audio_format + 11 sample_rate — audio properties describe the
+    //    audio, so they live on STTAudioSource only.
+    reserved 1, 8, 9, 10, 11;
+
+    // Input language as a BCP-47 / ISO-639-1 tag ("en", "en-US", "hi").
+    // Unset or empty = auto-detect. Matches the industry `language` param.
+    optional string language               = 17;
+
     bool            enable_punctuation     = 2 [(runanywhere.v1.rac_default) = "true"];
     bool            enable_diarization     = 3;
-    int32           max_speakers           = 4;   // 0 = auto / unset
+    int32           max_speakers           = 4 [(runanywhere.v1.rac_default) = "0"];   // 0 = auto
     repeated string vocabulary_list        = 5;   // Custom vocabulary bias
     bool            enable_word_timestamps = 6 [(runanywhere.v1.rac_default) = "true"];
-    int32           beam_size              = 7;   // 0 = backend default
-
-    // Free-form BCP-47 language tag. When set, consumers should prefer this
-    // over the base-language enum above.
-    optional string language_code          = 8;
-
-    // Explicit language auto-detection flag for C ABI parity. Equivalent to
-    // language == STT_LANGUAGE_AUTO for generated-only consumers.
-    bool            detect_language        = 9;
-
-    // Per-call input audio hints mirrored from rac_stt_options_t.
-    AudioFormat     audio_format           = 10;
-    int32           sample_rate            = 11;
+    int32           beam_size              = 7 [(runanywhere.v1.rac_default) = "0"];   // 0 = backend default
 
     // Maximum number of alternatives to return. 0 = backend/default.
-    int32           max_alternatives       = 12;
+    int32           max_alternatives       = 12 [(runanywhere.v1.rac_default) = "0"];
 
     // Streaming/endpointer controls. 0 = backend/default.
     int32           chunk_duration_ms      = 13;
@@ -311,15 +283,18 @@ message TranscriptionMetadata {
 //   - durationMs (Dart) / processingTimeMs (Web) → captured in metadata.
 // ---------------------------------------------------------------------------
 message STTOutput {
+    // 2 was the STTLanguage enum, 7 was language_code — collapsed into the
+    // single detected `language` string (14).
+    reserved 2, 7;
+
     string                            text          = 1;
-    STTLanguage                       language      = 2;
     float                             confidence    = 3;
+
+    // Detected language, BCP-47 (preserves regional variants). Empty = unknown.
+    optional string                   language      = 14;
     repeated WordTimestamp            words         = 4;
     repeated TranscriptionAlternative alternatives  = 5;
     TranscriptionMetadata             metadata      = 6;
-
-    // Free-form detected language tag, preserving regional variants.
-    optional string                   language_code = 7;
 
     // Wall-clock output timestamp in milliseconds since Unix epoch.
     int64                             timestamp_ms  = 8;
@@ -359,10 +334,11 @@ message STTPartialResult {
 
     // Additional partial-hypothesis fields carried by Dart/RN live streams.
     float  confidence = 4;
-    STTLanguage language = 5;
+    // 5 was the STTLanguage enum, 8 was language_code — one string now (14).
+    reserved 5, 8;
+    optional string language = 14;
     int64  timestamp_ms = 6;
     repeated TranscriptionAlternative alternatives = 7;
-    optional string language_code = 8;
 
     // Streaming correlation and endpointing metadata.
     string request_id = 9;
@@ -402,8 +378,10 @@ message STTServiceState {
 }
 
 message STTLanguageDetectionResult {
-    STTLanguage language = 1;
-    optional string language_code = 2;
+    // 1 was the STTLanguage enum, 2 was language_code.
+    reserved 1, 2;
+    // Detected language, BCP-47.
+    string language = 5;
     float confidence = 3;
     repeated string alternatives = 4;
 }

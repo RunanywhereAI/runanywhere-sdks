@@ -90,6 +90,7 @@ package runanywhere.v1;
 
 import "model_types.proto";
 import "rac_options.proto";
+import "thinking_tag_pattern.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -258,9 +259,12 @@ message VLMConfiguration {
 // llama.cpp backend already supports top_k internally.
 // ---------------------------------------------------------------------------
 message VLMGenerationOptions {
+    // 7 was streaming_enabled — the verb decides streaming, not an option.
+    reserved 7;
+
     string prompt      = 1;
 
-    int32  max_tokens  = 2 [
+    int32  max_output_tokens = 2 [
         (runanywhere.v1.rac_default) = "2048",
         (runanywhere.v1.rac_min) = 0
     ];
@@ -284,7 +288,6 @@ message VLMGenerationOptions {
 
     // Full rac_vlm_options_t coverage.
     repeated string stop_sequences = 6;
-    bool   streaming_enabled = 7 [(runanywhere.v1.rac_default) = "true"];
     optional string system_prompt = 8;
     int32  max_image_size = 9;
     int32  n_threads = 10;
@@ -301,8 +304,11 @@ message VLMGenerationOptions {
         (runanywhere.v1.rac_min_float) = 0.0
     ];
 
-    float min_p = 17;
+    float min_p = 17 [(runanywhere.v1.rac_default) = "0.0"];
     bool emit_image_embeddings = 18;
+
+    // Reasoning/thinking control — same message as LLMGenerationOptions.
+    optional ReasoningOptions reasoning = 19;
 }
 
 message VLMGenerationRequest {
@@ -342,8 +348,8 @@ message VLMGenerationRequest {
 // ---------------------------------------------------------------------------
 message VLMResult {
     string text                = 1;
-    int32  prompt_tokens       = 2;
-    int32  completion_tokens   = 3;
+    int32  input_tokens        = 2;
+    int32  output_tokens       = 3;
     int64  total_tokens        = 4;
     int64  processing_time_ms  = 5;   // Kotlin/C ABI total_time_ms;
                                       // Swift VLMResult totalTimeMs (Double ms).

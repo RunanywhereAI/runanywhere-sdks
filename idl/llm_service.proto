@@ -34,9 +34,8 @@ option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;r
 // prevent unsafe wire reuse.
 message LLMGenerateRequest {
     string prompt           = 1;
-    reserved 2 to 6;
-    bool   emit_thoughts    = 7;   // chain-of-thought tokens emit as TokenKind.THOUGHT
-    reserved 8 to 13;
+    // 7 was emit_thoughts — folded into options.reasoning.include_in_output.
+    reserved 2 to 13;
     string request_id = 14;
     string model_id = 15;
     string conversation_id = 16;
@@ -62,8 +61,8 @@ message LLMGenerateRequest {
 message LLMStreamFinalResult {
     string text = 1;
     optional string thinking_content = 2;
-    int32 prompt_tokens = 3;
-    int32 completion_tokens = 4;
+    int32 input_tokens = 3;
+    int32 output_tokens = 4;
     int32 total_tokens = 5;
     int64 total_time_ms = 6;
     int64 time_to_first_token_ms = 7;
@@ -158,13 +157,64 @@ message LLMStreamEvent {
     optional ToolCall tool_call = 18;
 }
 
+// ---------------------------------------------------------------------------
+// Tool-calling session / run-loop envelopes. They live here (not in
+// tool_calling.proto) because they carry an LLMGenerationOptions and
+// llm_options.proto already imports tool_calling.proto — the reverse import
+// would be a cycle. Moving them ended the inline re-declaration of sampling
+// knobs the old ToolCallingSessionCreateRequest carried.
+// ---------------------------------------------------------------------------
+message ToolCallingSessionCreateRequest {
+    // The live user turn.
+    string prompt = 1;
+
+    // Sampling, reasoning, system prompt — the same canonical knobs as any
+    // other generation. tools/tool_choice policy travels in
+    // generation.tool_calling.
+    optional LLMGenerationOptions generation = 2;
+
+    // proto3 `optional` enables presence detection. When unset, commons
+    // defaults to validate_calls=true so unknown tool calls short-circuit
+    // before host execution. Callers that delegate validation to their
+    // executor must explicitly set false.
+    optional bool validate_calls = 3;
+
+    // Prior conversation turns (excluding `prompt`), same contract as
+    // LLMGenerateRequest.history.
+    repeated ChatMessage history = 4;
+}
+
+message ToolCallingSessionCreateResult {
+    uint64 session_handle = 1;
+}
+
+message ToolCallingSessionEvent {
+    oneof kind {
+        bytes llm_stream_event_bytes = 1;  // serialized LLMStreamEvent proto
+        ToolCall tool_call = 2;
+        ToolCallingResult final_result = 3;
+        bytes error_bytes = 4;  // serialized SDKError proto
+    }
+    uint64 seq = 5;
+}
+
+message ToolCallingSessionStepWithResultRequest {
+    uint64 session_handle = 1;
+    string tool_call_id = 2;
+    string result_json = 3;
+    optional string error = 4;
+}
+
+message ToolCallingSessionDestroyRequest {
+    uint64 session_handle = 1;
+}
+
 service LLM {
     // Server-streaming: emits one LLMStreamEvent per generated token
     // until is_final=true. Cancellation aborts the underlying generation
     // via the existing rac_llm_cancel() C ABI.
     //
     // Tool-driven streaming is not supported on this entry point even when
-    // options.tool_calling is populated. Use the non-streaming tool-session
-    // generation path for tool calling.
+    // options.tool_calling is populated. Use the tool-calling session path.
     rpc Generate(LLMGenerateRequest) returns (stream LLMStreamEvent);
 }

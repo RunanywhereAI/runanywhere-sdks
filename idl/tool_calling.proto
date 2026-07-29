@@ -22,6 +22,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "rac_options.proto";
+
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -182,24 +184,18 @@ message ToolResult {
 // ---------------------------------------------------------------------------
 // Options for tool-enabled generation.
 // ---------------------------------------------------------------------------
+// Pure tool configuration. Sampling, system prompt, and reasoning control
+// come from the enclosing LLMGenerationOptions — this message deliberately
+// carries none of its own (fields 4-6 and 17 are retired duplicates).
 message ToolCallingOptions {
     // Available tools for this generation. If empty, the SDK falls back to
     // its registered tools (per-SDK convention).
     repeated ToolDefinition tools    = 1;
 
-    reserved 2, 9, 11, 15;
+    reserved 2, 4, 5, 6, 9, 11, 15, 17;
 
     // Whether to auto-execute tools or hand them back to the caller.
     bool   auto_execute              = 3;
-
-    // Sampling temperature override (Swift: optional Float).
-    optional float temperature       = 4;
-
-    // Maximum tokens override.
-    optional int32 max_tokens        = 5;
-
-    // System prompt to use during tool-enabled generation.
-    optional string system_prompt    = 6;
 
     // If true, replaces the system prompt entirely (no auto-injected
     // tool instructions).
@@ -212,19 +208,16 @@ message ToolCallingOptions {
     // Typed tool-call format. Unset lets commons select the model default.
     optional ToolCallFormatName format = 10;
 
-    // Maximum tool calls in one conversation turn. Unset/0 = SDK default
-    // (typically 5).
-    optional int32 max_tool_calls = 12;
+    // Maximum tool calls in one conversation turn. Unset = default (5) —
+    // the single declaration; SDKs must not hardcode their own copy.
+    optional int32 max_tool_calls = 12 [
+        (runanywhere.v1.rac_default) = "5",
+        (runanywhere.v1.rac_min) = 1
+    ];
 
     ToolChoiceMode tool_choice = 13;
     optional string forced_tool_name = 14;
     bool require_json_arguments = 16;
-
-    // When true, suppress the model's thinking/reasoning phase during
-    // tool-enabled generation (commons prepends the model no-think directive
-    // at the prompt level — same contract as
-    // LLMGenerationOptions.disable_thinking). Default false.
-    optional bool disable_thinking = 17;
 }
 
 // ---------------------------------------------------------------------------
@@ -348,80 +341,6 @@ service ToolCalling {
 // Tool-calling session state machine.
 // ---------------------------------------------------------------------------
 
-message ToolCallingSessionCreateRequest {
-    // Prompt + LLM generation options inline (avoids cross-proto import cycle).
-    string prompt = 1;
-    int32 max_tokens = 11;
-    float temperature = 12;
-    float top_p = 13;
-    string system_prompt = 14;
-    repeated ToolDefinition tools = 2;
-    ToolCallFormatName format = 3;
-    uint32 max_tool_calls = 4;
-    bool keep_tools_available = 5;
-    // proto3 `optional` enables presence detection (has_validate_calls()).
-    // When unset, commons defaults to validate_calls=true so unknown tool
-    // calls short-circuit before host execution.
-    // Callers that delegate validation/authorization to their executor or
-    // use dynamic tool registries must explicitly set validate_calls=false.
-    optional bool validate_calls = 6;
-
-    // OpenAI-style tool_choice override surfaced through the high-level
-    // run-loop / session APIs. The same fields exist on ToolCallingOptions
-    // (fields 13/14); we re-publish them here so the canonical request
-    // envelope can carry the policy without forcing callers to pass an
-    // inline ToolCallingOptions. commons honors these on every
-    // format/validate primitive via build_options_snapshot.
-    optional ToolChoiceMode tool_choice = 7;
-    optional string forced_tool_name = 8;
-
-    // 9-10 reserved: remaining gap between session-control fields and
-    // inline LLM generation params (11-14). Explicitly reserving prevents
-    // two concurrent patches from racing to claim a number here with
-    // conflicting semantics — a wire-compat hazard that would silently
-    // mis-decode data once both patches land.
-    reserved 9 to 10;
-
-    // When true, suppress the model's thinking phase for every generate in
-    // the loop/session (maps from ToolCallingOptions.disable_thinking; same
-    // contract as LLMGenerationOptions.disable_thinking). Default false.
-    bool disable_thinking = 15;
-
-    // Default true when absent. False returns the parsed ToolCall without
-    // invoking the host executor.
-    optional bool auto_execute = 16;
-    bool replace_system_prompt = 17;
-    bool require_json_arguments = 18;
-
-    // Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
-    // EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
-    // in the loop so multi-turn tool use keeps context. Same contract as the standard path's
-    // ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
-    // cross-proto import cycle.
-    repeated string history = 19;
-}
-
-message ToolCallingSessionCreateResult {
-    uint64 session_handle = 1;
-}
-
-message ToolCallingSessionEvent {
-    oneof kind {
-        bytes llm_stream_event_bytes = 1;  // serialized LLMStreamEvent proto
-        ToolCall tool_call = 2;
-        ToolCallingResult final_result = 3;
-        bytes error_bytes = 4;  // serialized SDKError proto
-    }
-    uint64 seq = 5;
-}
-
-message ToolCallingSessionStepWithResultRequest {
-    uint64 session_handle = 1;
-    string tool_call_id = 2;
-    string result_json = 3;
-    optional string error = 4;
-}
-
-message ToolCallingSessionDestroyRequest {
-    uint64 session_handle = 1;
-}
+// The tool-calling session/run-loop envelopes (ToolCallingSessionCreateRequest and friends) moved to llm_service.proto:
+// they carry an LLMGenerationOptions, and importing llm_options.proto from
+// here would be a cycle. The old inline sampling fields are gone with them.

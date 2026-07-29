@@ -29,6 +29,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "rac_options.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -175,9 +177,13 @@ message JSONSchema {
 //   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
 //   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
 // ---------------------------------------------------------------------------
+// The ONE output-constraint surface. The retired loose fields on
+// LLMGenerationOptions (json_schema, grammar, response_format) all fold in
+// here: schema-shaped output via `schema_source`, low-level constrained
+// decoding via `grammar`/`regex_pattern`.
 message StructuredOutputOptions {
-    // Schema describing the desired output shape.
-    JSONSchema     schema                   = 1;
+    // 5 was type_name — merged into `name` (matches OpenAI json_schema.name).
+    reserved 5;
 
     // Whether to embed the schema text in the LLM prompt.
     bool           include_schema_in_prompt = 2;
@@ -185,19 +191,25 @@ message StructuredOutputOptions {
     // Strict schema adherence — rejects outputs that don't fully validate.
     optional bool  strict_mode              = 3;
 
-    // Raw JSON Schema string for C ABI and SDKs that already carry schema as
-    // serialized JSON instead of the typed JSONSchema tree.
-    optional string json_schema             = 4;
+    // The schema, exactly one representation: the typed tree OR the raw
+    // JSON Schema string. Previously both fields coexisted with undefined
+    // precedence.
+    oneof schema_source {
+        JSONSchema schema      = 1;
+        string     json_schema = 4;
+    }
 
-    // Optional generated type/name hints used by Swift/Kotlin/Dart wrappers.
-    optional string type_name               = 5;
+    // Name for the schema/output type (OpenAI json_schema.name).
     optional string name                    = 6;
 
     StructuredOutputMode mode               = 7;
     optional string regex_pattern           = 8;
     optional string grammar                 = 9;
     bool repair_json                        = 10;
-    int32 max_retries                       = 11;
+    int32 max_retries                       = 11 [
+        (runanywhere.v1.rac_default) = "0",
+        (runanywhere.v1.rac_min) = 0
+    ];
 }
 
 // ---------------------------------------------------------------------------

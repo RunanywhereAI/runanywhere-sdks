@@ -19,6 +19,8 @@ import "errors.proto";
 import "voice_events.proto";
 import "tts_options.proto";
 import "stt_options.proto";
+import "vad_options.proto";
+import "llm_options.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -213,11 +215,17 @@ message VoiceAgentComposeConfig {
     optional string tts_voice_name = 9;
 
     // -------------------------------------------------------------------
-    // VAD sub-config (mirrors rac_voice_agent_vad_config_t).
+    // VAD sub-config: the canonical VADConfiguration, not a third copy.
+    // Retired: 10 vad_sample_rate, 11 vad_frame_length (float seconds!),
+    // 12 vad_energy_threshold (whose 0.005 default silently disagreed with
+    // VADConfiguration's 0.015).
     // -------------------------------------------------------------------
-    int32  vad_sample_rate     = 10;   // default 16000
-    float  vad_frame_length    = 11;   // default 0.1
-    float  vad_energy_threshold = 12;  // default 0.005
+    reserved 10 to 12;
+    optional VADConfiguration vad_config = 24;
+
+    // LLM generation knobs for the response model (sampling, system prompt,
+    // reasoning). Unset = voice-agent defaults from the generated pool.
+    optional LLMGenerationOptions llm_generation = 25;
 
     // Removed: the voice-agent runtime never implemented wake-word composition.
     // Keep the wire identifiers unavailable for accidental reuse.

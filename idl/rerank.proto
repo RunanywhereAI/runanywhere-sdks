@@ -9,6 +9,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "rac_options.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -29,11 +31,12 @@ message RerankCandidate {
 message RerankOptions {
     // When > 0, only the top_n highest-scoring candidates are returned (every
     // candidate is still scored). 0 = return all candidates, ranked.
-    uint32 top_n = 1;
+    // Industry name (Cohere rerank `top_n`).
+    uint32 top_n = 1 [(runanywhere.v1.rac_default) = "0"];
 }
 
 message RerankRequest {
-    string query = 1;
+    string query = 1 [(runanywhere.v1.rac_required) = true];
     repeated RerankCandidate candidates = 2;
     optional RerankOptions options = 3;
 }
@@ -41,11 +44,13 @@ message RerankRequest {
 message RerankScoredItem {
     // Echo of RerankCandidate.id for correlation.
     string id = 1;
-    // Raw relevance score from the reranker (higher = more relevant). Not
+    // Relevance score from the reranker (higher = more relevant). Not
     // normalized to a fixed range; comparable only within one result set.
-    float score = 2;
+    // Industry name (Cohere/Voyage `relevance_score`).
+    float relevance_score = 2;
     // Index of this candidate in the original RerankRequest.candidates list.
-    uint32 original_index = 3;
+    // Industry name (`index`).
+    uint32 index = 3;
     // 0-based position after sorting by score descending (0 = most relevant).
     uint32 rank = 4;
 }

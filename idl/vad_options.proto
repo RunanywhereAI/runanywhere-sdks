@@ -90,9 +90,9 @@ message VADConfiguration {
         (runanywhere.v1.rac_max) = 1000
     ];
 
-    // Energy threshold in [0.0, 1.0] for voice detection.
-    // Recommended range 0.01–0.05; default 0.015 across SDKs.
-    float  threshold             = 4 [
+    // Activation (energy) threshold in [0.0, 1.0] for voice detection.
+    // Recommended range 0.01–0.05.
+    float  activation_threshold  = 4 [
         (runanywhere.v1.rac_default) = "0.015",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
@@ -144,24 +144,32 @@ message VADConfiguration {
 //   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
 // Surfacing them as fields lets callers tune debouncing without a rebuild.
 // ---------------------------------------------------------------------------
+// Field vocabulary follows the industry VAD naming (LiveKit/Silero):
+// activation_threshold + min/max duration knobs + prefix padding.
 message VADOptions {
-    // Per-call energy threshold override. Use 0 (default) to keep the
-    // configured threshold. Mirrors rac_vad_input_t::energy_threshold_override
-    // (which uses -1 as the sentinel; on the wire we use 0 for proto3
-    // default semantics — generators emit -1 when this is unset).
-    float threshold                = 1;
+    // 1 was `threshold` — renamed to activation_threshold (6).
+    reserved 1;
+
+    // Per-call activation threshold override in [0.0, 1.0]. Unset/0 = keep
+    // the configured threshold.
+    float activation_threshold     = 6 [
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
 
     // Minimum continuous speech duration (ms) before SPEECH_STARTED fires.
-    // Default 100 (RAC_VAD_MIN_SPEECH_DURATION_MS).
-    int32 min_speech_duration_ms   = 2;
+    int32 min_speech_duration_ms   = 2 [(runanywhere.v1.rac_default) = "100"];
 
     // Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
-    // Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
-    int32 min_silence_duration_ms  = 3;
+    int32 min_silence_duration_ms  = 3 [(runanywhere.v1.rac_default) = "300"];
 
     // Maximum continuous speech duration (ms) before forcing a segment split.
     // 0 = backend/default.
-    int32 max_speech_duration_ms    = 4;
+    int32 max_speech_duration_ms    = 4 [(runanywhere.v1.rac_default) = "0"];
+
+    // Audio retained before SPEECH_STARTED so segments don't clip the first
+    // syllable. 0 = backend/default.
+    int32 prefix_padding_ms          = 7 [(runanywhere.v1.rac_default) = "0"];
 
     // Whether to include VADStatistics in stream events when available.
     bool include_statistics          = 5;

@@ -91,7 +91,7 @@ enum TTSVoiceGender {
 // Defaults (for documentation; proto3 zero-values apply on the wire):
 //   voice              = "default"  (Kotlin) / "com.apple.ttsbundle..." (Swift)
 //   language_code      = "en-US"
-//   speaking_rate      = 1.0   (range 0.5 – 2.0)
+//   speed              = 1.0   (range 0.5 – 2.0)
 //   pitch              = 1.0   (range 0.5 – 2.0)
 //   volume             = 1.0   (range 0.0 – 1.0)
 //   audio_format       = AUDIO_FORMAT_PCM
@@ -100,43 +100,26 @@ enum TTSVoiceGender {
 //   enable_ssml        = false
 // ---------------------------------------------------------------------------
 message TTSConfiguration {
+    // Retired duplicates of TTSOptions fields (2 voice, 3 language_code,
+    // 4 speaking_rate, 5 pitch, 6 volume, 7 audio_format, 8 sample_rate,
+    // 10 enable_ssml) — per-call knobs have exactly one declaration in
+    // TTSOptions; component-level defaults live in default_options.
+    reserved 2 to 8, 10;
+
     // Model identifier (voice model file id, e.g. piper voice). Optional —
     // platform TTS engines (Apple System TTS, Android TextToSpeech) don't
     // require a model file.
     string             model_id            = 1;
 
-    // Voice identifier to use for synthesis. For platform engines this is the
-    // engine-specific voice id (e.g. "com.apple.ttsbundle.siri_female_en-US_compact").
-    string             voice               = 2 [(runanywhere.v1.rac_default) = "default"];
-
-    // Language for synthesis (BCP-47, e.g. "en-US").
-    string             language_code       = 3 [(runanywhere.v1.rac_default) = "en-US"];
-
-    // Speaking rate (0.5 – 2.0; 1.0 is normal).
-    float              speaking_rate       = 4 [(runanywhere.v1.rac_default) = "1.0"];
-
-    // Speech pitch (0.5 – 2.0; 1.0 is normal).
-    float              pitch               = 5 [(runanywhere.v1.rac_default) = "1.0"];
-
-    // Speech volume (0.0 – 1.0).
-    float              volume              = 6 [(runanywhere.v1.rac_default) = "1.0"];
-
-    // Output audio format.
-    runanywhere.v1.AudioFormat audio_format = 7;
-
-    // Sample rate for output audio in Hz. 0 = engine default
-    // (RAC_TTS_DEFAULT_SAMPLE_RATE = 22050).
-    int32              sample_rate         = 8 [(runanywhere.v1.rac_default) = "22050"];
-
     // Whether to use neural / premium voice if available.
     bool               enable_neural_voice = 9 [(runanywhere.v1.rac_default) = "true"];
 
-    // Whether to enable SSML markup support.
-    bool               enable_ssml         = 10;
-
-    // Preferred framework for the component. Absent = auto. Mirrors the C
-    // ABI rac_tts_config_t preferred_framework field.
+    // Preferred framework for the component. Absent = auto.
     optional InferenceFramework preferred_framework = 11;
+
+    // Component-level defaults applied when a per-call TTSOptions is absent
+    // or leaves a field unset.
+    optional TTSOptions default_options    = 12;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,11 +139,14 @@ message TTSOptions {
     // Language override (BCP-47). Empty = use component default.
     string             language_code       = 2 [(runanywhere.v1.rac_default) = "en-US"];
 
-    // Speech rate (0.0 – 2.0; 1.0 is normal). Note Swift/Kotlin use the name
-    // `rate`, Dart uses `rate`, RN uses `rate`. C ABI field is `rate`. We
-    // canonicalize on `speaking_rate` to match TTSConfiguration; bindings
-    // alias to `rate` where appropriate.
-    float              speaking_rate       = 3 [(runanywhere.v1.rac_default) = "1.0"];
+    // Speech speed multiplier (1.0 = normal). Industry name (OpenAI
+    // /audio/speech `speed`); replaces the rate/speaking_rate/speakingRate
+    // split across the C ABI and SDKs.
+    float              speed               = 3 [
+        (runanywhere.v1.rac_default) = "1.0",
+        (runanywhere.v1.rac_min_float) = 0.5,
+        (runanywhere.v1.rac_max_float) = 2.0
+    ];
 
     // Speech pitch (0.5 – 2.0; 1.0 is normal).
     float              pitch               = 4 [(runanywhere.v1.rac_default) = "1.0"];

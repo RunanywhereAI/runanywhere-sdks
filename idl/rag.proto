@@ -17,6 +17,9 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "rac_options.proto";
+// RAGQueryOptions embeds the canonical LLM generation knobs instead of
+// re-declaring them (llm_options.proto does not import rag.proto — no cycle).
+import "llm_options.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -146,23 +149,20 @@ message RAGIngestRequest {
 // RAGQueryOptions — per-query sampling and prompt overrides.
 // ---------------------------------------------------------------------------
 message RAGQueryOptions {
+    // Retired duplicate LLM knobs — 2 system_prompt, 3 max_tokens,
+    // 4 temperature, 5 top_p, 6 top_k, 10 disable_thinking. All of that now
+    // travels in `generation` (system prompt included), so answer-generation
+    // defaults have exactly one declaration.
+    reserved 2 to 6, 10;
+
     // The user question to answer. Required (empty = no-op).
-    string question              = 1;
+    string question              = 1 [(runanywhere.v1.rac_required) = true];
 
-    // Optional system prompt override. Unset uses the pipeline default.
-    optional string system_prompt = 2;
-
-    // Maximum tokens to generate in the answer.
-    int32  max_tokens            = 3 [(runanywhere.v1.rac_default) = "512"];
-
-    // Sampling temperature. 0.0 = greedy, higher = more random.
-    float  temperature           = 4 [(runanywhere.v1.rac_default) = "0.7"];
-
-    // Nucleus (top-p) sampling parameter. 1.0 = disabled.
-    float  top_p                 = 5 [(runanywhere.v1.rac_default) = "1.0"];
-
-    // Top-k sampling parameter. 0 = disabled.
-    int32  top_k                 = 6;
+    // Answer-generation knobs (sampling, system prompt, reasoning). Unset =
+    // pipeline defaults. RAG-appropriate defaults (e.g. max_output_tokens
+    // 512, temperature 0.7) are applied by the pipeline when unset, not
+    // re-declared here.
+    optional LLMGenerationOptions generation = 14;
 
     // Retrieval overrides. 0/unset = use RAGConfiguration defaults.
     int32 retrieval_top_k        = 7;
@@ -171,11 +171,6 @@ message RAGQueryOptions {
     // session-level default; unset falls back to RAGConfiguration.
     optional float similarity_threshold = 8;
     bool  stream                 = 9;
-
-    // When true, suppress the answer model's thinking phase (maps to
-    // LLMGenerationOptions.disable_thinking so commons prepends the no-think
-    // directive instead of the app injecting "/no_think"). Default false.
-    bool  disable_thinking       = 10;
 
     // Multi-query expansion: when true, the answer LLM rewrites the question
     // into `multi_query_count` variants; retrieval runs for the original plus

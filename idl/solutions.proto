@@ -9,6 +9,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "llm_options.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -102,16 +104,15 @@ message VoiceAgentConfig {
     optional bool enable_barge_in = 8;  // default true when unset
     int32  barge_in_threshold_ms = 9;  // default 200
 
-    // LLM behavior.
-    string system_prompt = 10;
+    // LLM behavior — canonical generation knobs (system prompt, sampling,
+    // reasoning). Retired duplicates: 10 system_prompt, 12 temperature,
+    // 14 emit_thoughts (now generation.reasoning.include_in_output).
+    reserved 10, 12, 14;
+    optional LLMGenerationOptions generation = 18;
     int32  max_context_tokens = 11;
-    float  temperature = 12;
 
     // Emit partial transcripts as UserSaidEvent{is_final=false}.
     bool   emit_partials = 13;
-
-    // Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens.
-    bool   emit_thoughts = 14;
 
     // Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
     // oneof arm; provided so callers that pass this message standalone (or

@@ -4,6 +4,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "rac_options.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -23,10 +25,15 @@ enum SegmentationPixelFormat {
 }
 
 message SegmentationImage {
-    bytes data = 1;
-    uint32 width = 2;
-    uint32 height = 3;
-    SegmentationPixelFormat pixel_format = 4;
+    bytes data = 1 [(runanywhere.v1.rac_required) = true];
+    uint32 width = 2 [(runanywhere.v1.rac_required) = true];
+    uint32 height = 3 [(runanywhere.v1.rac_required) = true];
+    SegmentationPixelFormat pixel_format = 4 [(runanywhere.v1.rac_required) = true];
+
+    // Bytes per row. 0 = tightly packed (width * bytes-per-pixel). Was a
+    // C-struct-only field (rac_segmentation_image_t.stride_bytes) with no
+    // wire counterpart.
+    uint32 stride_bytes = 5 [(runanywhere.v1.rac_default) = "0"];
 }
 
 message SegmentationOptions {

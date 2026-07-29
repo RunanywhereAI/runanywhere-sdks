@@ -77,6 +77,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "rac_options.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -96,8 +98,8 @@ option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/
 // helper APIs should preserve it; raw path-only adapters may omit it.
 // ---------------------------------------------------------------------------
 message LoRAAdapterConfig {
-    string          adapter_path = 1;   // path on disk to the GGUF file
-    float           scale        = 2;   // default 1.0 (set by codegen layer)
+    string          adapter_path = 1 [(runanywhere.v1.rac_required) = true];   // path on disk to the GGUF file
+    float           scale        = 2 [(runanywhere.v1.rac_default) = "1.0"];
     optional string adapter_id   = 3;   // optional link to catalog entry id
     map<string, string> metadata = 4;
     repeated string target_modules = 5;
@@ -138,7 +140,7 @@ message LoraAdapterCatalogEntry {
     repeated string compatible_models = 6;   // explicit base model IDs
     int64           size_bytes        = 7;   // file size, 0 if unknown
     optional string author            = 8;   // optional adapter author
-    float           default_scale     = 9;   // recommended adapter scale
+    float           default_scale     = 9 [(runanywhere.v1.rac_default) = "1.0"];   // recommended adapter scale
     optional string checksum_sha256   = 10;  // lowercase hex SHA-256
     optional string license           = 11;
     repeated string tags              = 12;
