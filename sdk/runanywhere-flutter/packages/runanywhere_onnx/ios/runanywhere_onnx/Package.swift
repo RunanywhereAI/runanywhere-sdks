@@ -27,7 +27,7 @@ let onnxTarget = runAnywhereBinaryTarget(
 )
 let sherpaTarget = runAnywhereBinaryTarget(
     name: "RABackendSherpa",
-    checksum: "9ad5132e604a0650573ced54e23b9192e511e5d6b4e88fafa58ba841beaef0e5"
+    checksum: "36a0965157111f6f0b9b16a6c6d622b9ee537f1df2ecfa3558553233cff27a64"
 )
 // Apple CoreML Stable-Diffusion engine. RACommons references
 // _rac_plugin_entry_coreml (0.20.10 enabled the CoreML backend in commons),

@@ -626,12 +626,12 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RACommonsBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RACommons-ios-v\(sdkVersion).zip",
-                checksum: "e3163b5e2e167811b5d9f2f3407726d12778e6f4c1f96d078707b030a4acbc73"
+                checksum: "595e034e5ceb9425c0d2ae1ddb3797a2891a5df62083a866c6df7a843fc7f8d2"
             ),
             .binaryTarget(
                 name: "RABackendLlamaCPPBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendLLAMACPP-ios-v\(sdkVersion).zip",
-                checksum: "5fb00064c441b5263f411ba6e2b238d70f776fc0f30db31622c16d12f11c7f36"
+                checksum: "38edbe3f56be8f05a012e0132f59db0667bf33ad8b5e019aa011c9a2293d0d95"
             ),
             .binaryTarget(
                 name: "RABackendONNXBinary",
@@ -641,7 +641,7 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendSherpaBinary",
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendSherpa-ios-v\(sdkVersion).zip",
-                checksum: "9ad5132e604a0650573ced54e23b9192e511e5d6b4e88fafa58ba841beaef0e5"
+                checksum: "36a0965157111f6f0b9b16a6c6d622b9ee537f1df2ecfa3558553233cff27a64"
             ),
             // Apple CoreML Stable-Diffusion engine. `ONNXRuntime` declares an
             // unconditional dependency on this, so the remote list must carry it.
