@@ -2,7 +2,7 @@
 
 **Optional Qualcomm Hexagon NPU backend for the RunAnywhere Kotlin SDK** — on-device LLM, VLM, STT, TTS, embeddings, and diffusion routed to Snapdragon Hexagon V75/V79/V81 NPUs. Android `arm64-v8a` only.
 
-The AAR is binary-only: it bundles the QHexRT engine, JNI bridge, redistributable Qualcomm QAIRT/QNN host libraries, and Hexagon DSP skels. Model conversion / CoreML / forge tooling is not included — download models at runtime through the SDK catalog.
+The AAR is binary-only: it bundles the QHexRT engine, JNI bridge, redistributable Qualcomm QAIRT/QNN host libraries, and Hexagon DSP skels. Model conversion / CoreML / forge tooling is not included. Register the dedicated model URL supplied by the model publisher through the core SDK.
 
 ---
 
@@ -26,6 +26,8 @@ Probe capability, register once at startup, then use standard RunAnywhere APIs �
 ```kotlin
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.registerModel
+import ai.runanywhere.proto.v1.InferenceFramework
 
 val npu = QHexRT.probeNpu() // safe on any device
 if (npu.qhexrt_supported) {
@@ -33,7 +35,13 @@ if (npu.qhexrt_supported) {
 }
 
 RunAnywhere.initialize(context = this, /* ... */)
-// Register, download, load, and infer via core APIs
+RunAnywhere.registerModel(
+    id = "my-qhexrt-model",
+    name = "My QHexRT Model",
+    url = "https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json",
+    framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+)
+// Download, load, and infer via core APIs.
 ```
 
 See the [Kotlin SDK README](../../README.md) for full setup.
@@ -51,7 +59,7 @@ See the [Kotlin SDK README](../../README.md) for full setup.
 | Embeddings | Nemotron Embed, EmbeddingGemma |
 | Diffusion | Cosmos3-Edge / LaMa inpaint |
 
-Exact catalog rows and Hexagon arch support are returned by the runtime model catalog after `QHexRT.register()`.
+QHexRT does not seed or select models. Register the exact model URL intended for the target device. Use `QHexRT.probeNpu()` as an optional preflight when your UI needs to report device support before registration.
 
 ---
 

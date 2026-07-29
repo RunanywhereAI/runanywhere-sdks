@@ -7,7 +7,6 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/hardware_profile.pb.dart';
-import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere_qhexrt/native/qhexrt_bindings.dart';
 
@@ -58,33 +57,6 @@ class QHexRT {
   static bool isArchitectureSupported(HexagonArch arch) {
     if (!isAvailable) return false;
     return (_bindings ??= QhexrtBindings()).isArchitectureSupported(arch);
-  }
-
-  /// Match QHexRT's native product policy for [modelId] against [arch].
-  static bool modelSupportsArchitecture(String modelId, HexagonArch arch) {
-    if (!isAvailable) return false;
-    return (_bindings ??= QhexrtBindings()).modelSupportsArchitecture(
-      modelId,
-      arch,
-    );
-  }
-
-  /// Whether QHexRT's native product policy marks [modelId] HF-authenticated.
-  static bool modelRequiresHfAuth(String modelId) {
-    if (!isAvailable) return false;
-    return (_bindings ??= QhexrtBindings()).modelRequiresHfAuth(modelId);
-  }
-
-  /// Register [request] only when native product policy allows it on this
-  /// device. URLs and presentation metadata stay in the app; QHexRT owns
-  /// probing/selection and composes commons' shared model
-  /// registration and download pipeline. A null value is a normal ineligible
-  /// model/device outcome.
-  static Future<ModelInfo?> registerModelForDevice({
-    required RegisterModelFromUrlRequest request,
-  }) async {
-    if (!isAvailable) return null;
-    return (_bindings ??= QhexrtBindings()).registerModelForDevice(request);
   }
 
   /// Register the QHexRT backend with the C++ plugin registry. Safe to call
