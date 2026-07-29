@@ -151,3 +151,39 @@ test('suppressThinking does not disturb the non-ChatML templates', () => {
     assert.doesNotMatch(p, /<think>/, `${t} must not gain a ChatML think block`);
   }
 });
+
+test('a system-only conversation is never dropped (gemma)', () => {
+  // Bots caught this: `pending` was only flushed when a user turn existed, so
+  // formatChat([system]) silently lost the instruction.
+  const out = formatChat([{ role: 'system', content: 'Be terse.' }], 'gemma');
+  assert.match(out, /<start_of_turn>user\nBe terse\.<end_of_turn>/);
+  assert.ok(out.endsWith('<start_of_turn>model\n'));
+});
+
+test('a system-only conversation is never dropped (mistral)', () => {
+  const out = formatChat([{ role: 'system', content: 'Be terse.' }], 'mistral');
+  assert.equal(out, '<s>[INST] Be terse. [/INST]');
+});
+
+test('hasTurnMarkup covers exactly the markers the backend passes through', () => {
+  // Must stay in step with build_prompt in engines/llamacpp/llamacpp_backend.cpp.
+  for (const t of ['chatml', 'llama3', 'gemma', 'mistral']) {
+    const prompt = formatChat(
+      [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'hello' }, { role: 'user', content: 'again' }],
+      t
+    );
+    assert.ok(hasTurnMarkup(prompt), `${t} output must be recognised as pre-formatted`);
+  }
+  assert.equal(hasTurnMarkup('User: hi\nAssistant:'), false);
+});
+
+test('stale reasoning is stripped from every replayed assistant turn', () => {
+  const out = formatChat([
+    { role: 'user', content: 'a' },
+    { role: 'assistant', content: '<think>one</think>A1<think>two</think>A2' },
+    { role: 'user', content: 'b' },
+  ]);
+  assert.ok(!out.includes('<think>one'));
+  assert.ok(!out.includes('<think>two'));
+  assert.ok(out.includes('A1A2'));
+});
