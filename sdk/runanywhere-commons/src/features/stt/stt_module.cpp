@@ -1297,19 +1297,17 @@ extern "C" rac_result_t rac_stt_component_detect_language(rac_handle_t handle,
 // GENERATED-PROTO C ABI
 // =============================================================================
 
-extern "C" rac_result_t
-rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data, size_t audio_size,
-                                   const uint8_t* options_proto_bytes, size_t options_proto_size,
-                                   rac_proto_buffer_t* out_result) {
+extern "C" rac_result_t rac_stt_component_transcribe_proto(rac_handle_t handle,
+                                                           const uint8_t* request_proto_bytes,
+                                                           size_t request_proto_size,
+                                                           rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
-    (void)audio_data;
-    (void)audio_size;
-    (void)options_proto_bytes;
-    (void)options_proto_size;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
     return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
@@ -1318,21 +1316,25 @@ rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data, 
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_HANDLE,
                                           "STT component handle is invalid");
     }
-    if (!audio_data || audio_size == 0) {
-        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
-                                          "STT transcribe proto requires handle and audio bytes");
-    }
-    if (!proto_bytes_valid(options_proto_bytes, options_proto_size)) {
+    if (!proto_bytes_valid(request_proto_bytes, request_proto_size)) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "STTOptions bytes are invalid");
+                                          "STTTranscriptionRequest bytes are invalid");
     }
 
-    runanywhere::v1::STTOptions proto_options;
-    if (!proto_options.ParseFromArray(proto_parse_data(options_proto_bytes, options_proto_size),
-                                      static_cast<int>(options_proto_size))) {
+    runanywhere::v1::STTTranscriptionRequest request;
+    if (!request.ParseFromArray(proto_parse_data(request_proto_bytes, request_proto_size),
+                                static_cast<int>(request_proto_size))) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to parse STTOptions");
+                                          "failed to parse STTTranscriptionRequest");
     }
+    const std::string& audio_bytes = request.audio().audio_data();
+    const void* audio_data = audio_bytes.data();
+    const size_t audio_size = audio_bytes.size();
+    if (audio_size == 0) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "STTTranscriptionRequest requires inline audio bytes");
+    }
+    const runanywhere::v1::STTOptions& proto_options = request.options();
 
     const char* model_id = rac_stt_component_get_model_id(handle);
     if (!model_id) {
@@ -1371,15 +1373,12 @@ rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data, 
 }
 
 extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
-    rac_handle_t handle, const void* audio_data, size_t audio_size,
-    const uint8_t* options_proto_bytes, size_t options_proto_size,
+    rac_handle_t handle, const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_stt_proto_stream_event_callback_fn callback, void* user_data) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
-    (void)audio_data;
-    (void)audio_size;
-    (void)options_proto_bytes;
-    (void)options_proto_size;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
     (void)callback;
     (void)user_data;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
@@ -1388,20 +1387,28 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
     if (!component_lease) {
         return RAC_ERROR_INVALID_HANDLE;
     }
-    if (!audio_data || audio_size == 0 || !callback) {
+    if (!callback) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    if (!proto_bytes_valid(options_proto_bytes, options_proto_size)) {
+    if (!proto_bytes_valid(request_proto_bytes, request_proto_size)) {
         return RAC_ERROR_DECODING_ERROR;
     }
 
-    runanywhere::v1::STTOptions proto_options;
-    if (!proto_options.ParseFromArray(proto_parse_data(options_proto_bytes, options_proto_size),
-                                      static_cast<int>(options_proto_size))) {
+    runanywhere::v1::STTTranscriptionRequest request;
+    if (!request.ParseFromArray(proto_parse_data(request_proto_bytes, request_proto_size),
+                                static_cast<int>(request_proto_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
+    const std::string& audio_bytes = request.audio().audio_data();
+    const void* audio_data = audio_bytes.data();
+    const size_t audio_size = audio_bytes.size();
+    if (audio_size == 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    const runanywhere::v1::STTOptions& proto_options = request.options();
 
-    const std::string request_id = generate_unique_id();
+    const std::string request_id =
+        request.request_id().empty() ? generate_unique_id() : request.request_id();
     if (!rac_stt_component_get_model_id(handle)) {
         const rac_result_t rc = RAC_ERROR_NOT_INITIALIZED;
         publish_stt_voice_event(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED, nullptr, 0.0f, rc);

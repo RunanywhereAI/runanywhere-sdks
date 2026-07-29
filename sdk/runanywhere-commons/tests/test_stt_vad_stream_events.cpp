@@ -148,8 +148,13 @@ int test_stt_stream_events() {
 
     runanywhere::v1::STTOptions options;
     options.set_language("en");
-    std::vector<uint8_t> options_bytes;
-    CHECK(serialize(options, &options_bytes), "STTOptions serializes");
+
+    const int16_t audio[] = {0, 1, 2, 3};
+    runanywhere::v1::STTTranscriptionRequest stream_request;
+    *stream_request.mutable_options() = options;
+    stream_request.mutable_audio()->set_audio_data(audio, sizeof(audio));
+    std::vector<uint8_t> request_bytes;
+    CHECK(serialize(stream_request, &request_bytes), "STTTranscriptionRequest serializes");
 
     std::vector<runanywhere::v1::STTStreamEvent> events;
     auto callback = [](const uint8_t* data, size_t size, void* user_data) {
@@ -160,9 +165,8 @@ int test_stt_stream_events() {
         }
     };
 
-    const int16_t audio[] = {0, 1, 2, 3};
     const rac_result_t rc = rac_stt_component_transcribe_stream_proto(
-        stt, audio, sizeof(audio), options_bytes.data(), options_bytes.size(), callback, &events);
+        stt, request_bytes.data(), request_bytes.size(), callback, &events);
     CHECK(rc == RAC_SUCCESS, "STT stream proto returns success");
     CHECK(events.size() == 3, "STT stream emits started, partial, final events");
     if (events.size() == 3) {
@@ -199,9 +203,10 @@ int test_stt_stream_events() {
             rac_stt_component_destroy(context->component);
         }
     };
-    CHECK(rac_stt_component_transcribe_stream_proto(
-              stt, audio, sizeof(audio), options_bytes.data(), options_bytes.size(),
-              reentrant_destroy_callback, &reentrant_destroy) == RAC_SUCCESS,
+    CHECK(rac_stt_component_transcribe_stream_proto(stt, request_bytes.data(),
+                                                    request_bytes.size(),
+                                                    reentrant_destroy_callback,
+                                                    &reentrant_destroy) == RAC_SUCCESS,
           "reentrant component destroy is refused without deadlocking its active operation");
     CHECK(reentrant_destroy.attempted.load(std::memory_order_acquire) &&
               rac_stt_component_is_loaded(stt) == RAC_TRUE,

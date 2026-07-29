@@ -386,9 +386,8 @@ RAC_API rac_result_t rac_voice_agent_generate_response(rac_voice_agent_handle_t 
  *      C core will not transcribe anything until the SDK pushes a buffer.
  *
  *   2. Streaming raw-frame ingress (in-core segmentation):
- *        rac_voice_agent_feed_audio_proto(handle, pcm, n, sample_rate,
- *                                         channels, encoding, is_final,
- *                                         &result).
+ *        rac_voice_agent_feed_audio_proto(handle, frame_bytes, n, &result)
+ *      with serialized runanywhere.v1.VoiceAgentAudioFrame bytes.
  *      The SDK pushes raw mic frames continuously (16 kHz mono PCM16); the
  *      C core performs energy-based utterance segmentation internally and,
  *      once an utterance closes, runs the same VAD -> STT -> LLM -> TTS
@@ -504,20 +503,15 @@ RAC_API rac_result_t rac_voice_agent_cancel_turn_proto(rac_voice_agent_handle_t 
  * not call it from a real-time audio callback — feed from a dedicated
  * consumer loop. @p out_result must be released with rac_proto_buffer_free().
  *
- * @param handle        Voice agent handle.
- * @param audio_data    Raw PCM frame bytes (may be NULL only when size == 0).
- * @param audio_size    Size of @p audio_data in bytes.
- * @param sample_rate_hz Sample rate hint (16000 expected).
- * @param channels      Channel count hint (1 expected).
- * @param encoding      AudioEncoding value (0/UNSPECIFIED or PCM_S16_LE).
- * @param is_final      RAC_TRUE to flush the in-progress utterance.
- * @param out_result    Output: serialized VoiceAgentResult (owned).
+ * @param handle             Voice agent handle.
+ * @param frame_proto_bytes  Serialized runanywhere.v1.VoiceAgentAudioFrame.
+ * @param frame_proto_size   Size of @p frame_proto_bytes.
+ * @param out_result         Output: serialized VoiceAgentResult (owned).
  * @return RAC_SUCCESS or error code.
  */
 RAC_API rac_result_t rac_voice_agent_feed_audio_proto(rac_voice_agent_handle_t handle,
-                                                      const void* audio_data, size_t audio_size,
-                                                      int32_t sample_rate_hz, int32_t channels,
-                                                      int32_t encoding, rac_bool_t is_final,
+                                                      const uint8_t* frame_proto_bytes,
+                                                      size_t frame_proto_size,
                                                       rac_proto_buffer_t* out_result);
 
 RAC_API rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_t handle,

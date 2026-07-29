@@ -176,20 +176,15 @@ bool feed_segment(rac_voice_agent_feed_state& s, const void* data, size_t size, 
 #endif  // RAC_HAVE_PROTOBUF
 
 extern "C" rac_result_t rac_voice_agent_feed_audio_proto(rac_voice_agent_handle_t handle,
-                                                         const void* audio_data, size_t audio_size,
-                                                         int32_t sample_rate_hz, int32_t channels,
-                                                         int32_t encoding, rac_bool_t is_final,
+                                                         const uint8_t* frame_proto_bytes,
+                                                         size_t frame_proto_size,
                                                          rac_proto_buffer_t* out_result) {
     if (!out_result)
         return RAC_ERROR_INVALID_ARGUMENT;
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
-    (void)audio_data;
-    (void)audio_size;
-    (void)sample_rate_hz;
-    (void)channels;
-    (void)encoding;
-    (void)is_final;
+    (void)frame_proto_bytes;
+    (void)frame_proto_size;
     return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
@@ -198,12 +193,19 @@ extern "C" rac_result_t rac_voice_agent_feed_audio_proto(rac_voice_agent_handle_
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_HANDLE,
                                           "voice-agent handle is required");
     }
+    runanywhere::v1::VoiceAgentAudioFrame frame;
+    if (!frame_proto_bytes || frame_proto_size == 0 ||
+        !frame.ParseFromArray(frame_proto_bytes, static_cast<int>(frame_proto_size))) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse VoiceAgentAudioFrame");
+    }
+    const void* audio_data = frame.audio_data().data();
+    const size_t audio_size = frame.audio_data().size();
+    const rac_bool_t is_final = frame.is_final() ? RAC_TRUE : RAC_FALSE;
     // The in-core segmenter operates on 16 kHz mono PCM16 — the format every
     // SDK's AudioCaptureManager already produces. Treat UNSPECIFIED as PCM16.
-    (void)sample_rate_hz;
-    (void)channels;
-    if (encoding != 0 &&
-        encoding != static_cast<int32_t>(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE)) {
+    if (frame.encoding() != runanywhere::v1::AUDIO_ENCODING_UNSPECIFIED &&
+        frame.encoding() != runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
                                           "feed_audio expects PCM_S16_LE mono @ 16 kHz");
     }

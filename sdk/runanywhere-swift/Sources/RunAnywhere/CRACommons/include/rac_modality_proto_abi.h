@@ -41,20 +41,18 @@ RAC_API rac_result_t rac_llm_generate_stream_proto(
     void* user_data);
 RAC_API rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event);
 
-// STT component proto ABI.
+// STT component proto ABI. Takes serialized
+// runanywhere.v1.STTTranscriptionRequest bytes (inline audio in
+// request.audio.audio_data).
 RAC_API rac_result_t rac_stt_component_transcribe_proto(
     rac_handle_t handle,
-    const void* audio_data,
-    size_t audio_size,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
     rac_proto_buffer_t* out_result);
 RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
     rac_handle_t handle,
-    const void* audio_data,
-    size_t audio_size,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
     rac_modality_proto_callback_fn callback,
     void* user_data);
 
@@ -82,12 +80,12 @@ RAC_API rac_result_t rac_vad_component_configure_proto(
     rac_handle_t handle,
     const uint8_t* config_proto_bytes,
     size_t config_proto_size);
+// Takes serialized runanywhere.v1.VADProcessRequest bytes (inline audio in
+// request.audio).
 RAC_API rac_result_t rac_vad_component_process_proto(
     rac_handle_t handle,
-    const float* samples,
-    size_t num_samples,
-    const uint8_t* options_proto_bytes,
-    size_t options_proto_size,
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
     rac_proto_buffer_t* out_result);
 RAC_API rac_result_t rac_vad_component_get_statistics_proto(
     rac_handle_t handle,

@@ -1214,38 +1214,53 @@ extern "C" rac_result_t rac_vad_component_configure_proto(rac_handle_t handle,
 #endif
 }
 
-extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, const float* samples,
-                                                        size_t num_samples,
-                                                        const uint8_t* options_proto_bytes,
-                                                        size_t options_proto_size,
+namespace {
+rac_result_t decode_vad_samples(const runanywhere::v1::VADAudioSource& audio,
+                                std::vector<float>* out, rac_proto_buffer_t* out_error);
+}
+
+extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle,
+                                                        const uint8_t* request_proto_bytes,
+                                                        size_t request_proto_size,
                                                         rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
-    (void)samples;
-    (void)num_samples;
-    (void)options_proto_bytes;
-    (void)options_proto_size;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
     return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
                                       "protobuf support is not available");
 #else
-    if (!handle || !samples || num_samples == 0) {
+    if (!handle) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
-                                          "VAD process proto requires handle and samples");
+                                          "VAD process proto requires a handle");
     }
-    if (!proto_bytes_valid(options_proto_bytes, options_proto_size)) {
+    if (!proto_bytes_valid(request_proto_bytes, request_proto_size)) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "VADOptions bytes are invalid");
+                                          "VADProcessRequest bytes are invalid");
     }
 
-    runanywhere::v1::VADOptions options;
-    if (!options.ParseFromArray(proto_parse_data(options_proto_bytes, options_proto_size),
-                                static_cast<int>(options_proto_size))) {
+    runanywhere::v1::VADProcessRequest request;
+    if (!request.ParseFromArray(proto_parse_data(request_proto_bytes, request_proto_size),
+                                static_cast<int>(request_proto_size))) {
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
-                                          "failed to parse VADOptions");
+                                          "failed to parse VADProcessRequest");
     }
+    const runanywhere::v1::VADOptions& options = request.options();
+
+    std::vector<float> decoded;
+    rac_result_t decode_rc = decode_vad_samples(request.audio(), &decoded, out_result);
+    if (decode_rc != RAC_SUCCESS) {
+        return decode_rc;
+    }
+    if (decoded.empty()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "VADProcessRequest decoded no samples");
+    }
+    const float* samples = decoded.data();
+    const size_t num_samples = decoded.size();
 
     int32_t sample_rate = RAC_VAD_DEFAULT_SAMPLE_RATE;
     float threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD;

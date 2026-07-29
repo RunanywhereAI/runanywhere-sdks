@@ -5373,28 +5373,18 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentConfigur
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentProcessProto(
-    JNIEnv* env, jclass clazz, jlong handle, jfloatArray samplesArray, jbyteArray optionsProto) {
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray requestProto) {
     (void)clazz;
-    if (handle == 0L || samplesArray == nullptr)
+    if (handle == 0L)
         return nullptr;
-    const jsize numSamples = env->GetArrayLength(samplesArray);
-    jfloat* samples = numSamples > 0 ? env->GetFloatArrayElements(samplesArray, nullptr) : nullptr;
-    if (numSamples > 0 && samples == nullptr)
+    JByteArrayView request(env, requestProto, false);
+    if (!request.ok)
         return nullptr;
-    JByteArrayView options(env, optionsProto, true);
-    if (!options.ok) {
-        if (samples != nullptr)
-            env->ReleaseFloatArrayElements(samplesArray, samples, JNI_ABORT);
-        return nullptr;
-    }
 
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
-    rac_result_t rc = rac_vad_component_process_proto(
-        handleFromJLong(handle), reinterpret_cast<const float*>(samples),
-        static_cast<size_t>(numSamples), options.u8(), options.size(), &result);
-    if (samples != nullptr)
-        env->ReleaseFloatArrayElements(samplesArray, samples, JNI_ABORT);
+    rac_result_t rc = rac_vad_component_process_proto(handleFromJLong(handle), request.u8(),
+                                                      request.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racVadComponentProcessProto");
 }
 
@@ -6334,18 +6324,15 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentProcessTur
 // listener).
 JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentFeedAudioProto(
-    JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData, jint sampleRateHz, jint channels,
-    jint encoding, jboolean isFinal) {
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray frameProto) {
     (void)clazz;
-    JByteArrayView audio(env, audioData);
-    if (handle == 0L || !audio.ok)
+    JByteArrayView frame(env, frameProto);
+    if (handle == 0L || !frame.ok)
         return nullptr;
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
     rac_result_t rc = rac_voice_agent_feed_audio_proto(
-        reinterpret_cast<rac_voice_agent_handle_t>(handle), audio.data(), audio.size(),
-        static_cast<int32_t>(sampleRateHz), static_cast<int32_t>(channels),
-        static_cast<int32_t>(encoding), isFinal == JNI_TRUE ? RAC_TRUE : RAC_FALSE, &result);
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), frame.u8(), frame.size(), &result);
     return makeProtoCallResult(env, rc, &result, "racVoiceAgentFeedAudioProto");
 }
 

@@ -586,18 +586,17 @@ int test_parse_failure_and_missing_component() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_stt_component_transcribe_proto(stt, audio, sizeof(audio), bad, sizeof(bad), &out);
+    rac_result_t rc = rac_stt_component_transcribe_proto(stt, bad, sizeof(bad), &out);
     CHECK(rc == RAC_ERROR_DECODING_ERROR, "STT proto parse failure returns decoding error");
     CHECK(out.status == RAC_ERROR_DECODING_ERROR, "parse failure marks output error");
     rac_proto_buffer_free(&out);
 
-    runanywhere::v1::STTOptions options;
+    runanywhere::v1::STTTranscriptionRequest request;
+    request.mutable_audio()->set_audio_data(audio, sizeof(audio));
     std::vector<uint8_t> bytes;
-    CHECK(serialize(options, &bytes), "empty STTOptions serializes");
+    CHECK(serialize(request, &bytes), "STTTranscriptionRequest serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_stt_component_transcribe_proto(
-        stt, audio, sizeof(audio), bytes.empty() ? nullptr : bytes.data(), bytes.size(), &out);
+    rc = rac_stt_component_transcribe_proto(stt, bytes.data(), bytes.size(), &out);
     CHECK(rc == RAC_ERROR_NOT_INITIALIZED, "missing STT lifecycle component fails");
     CHECK(out.status == RAC_ERROR_NOT_INITIALIZED, "missing STT marks output error");
     CHECK(poll_sdk_until_failure(), "missing STT publishes failure SDKEvent");
@@ -613,15 +612,15 @@ int test_mocked_stt() {
           "mock STT model loads");
 
     const int16_t audio[] = {0, 1, 2, 3};
-    runanywhere::v1::STTOptions options;
-    options.set_language("en");
+    runanywhere::v1::STTTranscriptionRequest request;
+    request.mutable_options()->set_language("en");
+    request.mutable_audio()->set_audio_data(audio, sizeof(audio));
     std::vector<uint8_t> bytes;
-    CHECK(serialize(options, &bytes), "STTOptions serializes");
+    CHECK(serialize(request, &bytes), "STTTranscriptionRequest serializes");
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc = rac_stt_component_transcribe_proto(stt, audio, sizeof(audio), bytes.data(),
-                                                         bytes.size(), &out);
+    rac_result_t rc = rac_stt_component_transcribe_proto(stt, bytes.data(), bytes.size(), &out);
     runanywhere::v1::STTOutput result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "STTOutput parses");
     CHECK(result.text() == "hello mock", "STTOutput text matches mock");
@@ -648,8 +647,8 @@ int test_mocked_stt() {
                                  event.has_partial() && event.partial().is_final());
         }
     };
-    rc = rac_stt_component_transcribe_stream_proto(stt, audio, sizeof(audio), bytes.data(),
-                                                   bytes.size(), stream_cb, &events);
+    rc = rac_stt_component_transcribe_stream_proto(stt, bytes.data(), bytes.size(), stream_cb,
+                                                   &events);
     CHECK(rc == RAC_SUCCESS && events.count == 3 && events.saw_started && events.saw_final &&
               events.valid_envelope,
           "STT stream emits generated STTStreamEvent envelopes");
@@ -722,15 +721,16 @@ int test_mocked_vad_and_activity() {
     CHECK(rac_vad_component_start(vad) == RAC_SUCCESS && g_last_mock_vad->active,
           "VAD start routes to the model backend");
 
-    runanywhere::v1::VADOptions options;
-    options.set_activation_threshold(0.1f);
-    std::vector<uint8_t> bytes;
-    CHECK(serialize(options, &bytes), "VADOptions serializes");
     const float speech[] = {0.3f, 0.4f, 0.5f, 0.6f};
+    runanywhere::v1::VADProcessRequest vad_request;
+    vad_request.mutable_options()->set_activation_threshold(0.1f);
+    vad_request.mutable_audio()->set_audio_data(speech, sizeof(speech));
+    vad_request.mutable_audio()->set_encoding(runanywhere::v1::VAD_AUDIO_ENCODING_PCM_F32_LE);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(vad_request, &bytes), "VADProcessRequest serializes");
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
-    rac_result_t rc =
-        rac_vad_component_process_proto(vad, speech, 4, bytes.data(), bytes.size(), &out);
+    rac_result_t rc = rac_vad_component_process_proto(vad, bytes.data(), bytes.size(), &out);
     runanywhere::v1::VADResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "VADResult parses");
     CHECK(result.is_speech(), "mock VAD detects speech");
