@@ -296,26 +296,26 @@ rac_result_t perform_authentication(SdkInitResult* result) {
         }
     }
 
+    // Single gate, shared with phase-2 step 2 (register/assignments): if a JWT
+    // is expected for this env+key combination, authenticate here. A split
+    // predicate previously let "skip auth" (env says development) coexist with
+    // "register with a bearer token" (key present), wedging every JWT-gated
+    // request behind an API-key bearer.
     const rac_environment_t env = rac_state_get_environment();
-    if (!environment_requires_external_config(env)) {
-        result->set_http_configured(rac_http_transport_is_registered() == RAC_TRUE);
-        result->set_has_completed_http_setup(true);
-        return RAC_SUCCESS;
-    }
-
     const char* api_key = rac_state_get_api_key();
-    const char* base_url = rac_state_get_base_url();
-    if (!has_nonempty_string(base_url)) {
-        result->set_http_configured(false);
-        result->set_has_completed_http_setup(false);
-        return RAC_ERROR_INVALID_CONFIGURATION;
-    }
     if (!rac_env_auth_expected(env, api_key)) {
         // Keyless development: requests go out unauthenticated (PUBLIC org),
         // there is no token to fetch.
         result->set_http_configured(rac_http_transport_is_registered() == RAC_TRUE);
         result->set_has_completed_http_setup(true);
         return RAC_SUCCESS;
+    }
+
+    const char* base_url = rac_state_get_base_url();
+    if (!has_nonempty_string(base_url)) {
+        result->set_http_configured(false);
+        result->set_has_completed_http_setup(false);
+        return RAC_ERROR_INVALID_CONFIGURATION;
     }
     if (!has_nonempty_string(api_key)) {
         result->set_http_configured(false);
