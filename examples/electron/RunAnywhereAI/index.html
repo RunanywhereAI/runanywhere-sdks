@@ -384,7 +384,7 @@
                               color: var(--fg-3); font-weight: 650; margin-bottom: 4px; }
       .voicetranscript .turn div { font-size: 14.5px; line-height: 1.6; color: var(--fg); min-height: 1.6em; }
       .voiceerror { width: 100%; max-width: 560px; background: rgba(220,38,38,.10); border: 1px solid rgba(220,38,38,.35);
-                    color: #ffb4b4; border-radius: 11px; padding: 10px 13px; font-size: 13px; }
+                    color: var(--red); border-radius: 11px; padding: 10px 13px; font-size: 13px; }
       .voicetoggle { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: var(--fg-2); cursor: pointer; }
       .reasontoggle { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: var(--fg-3); line-height: 1.5; cursor: pointer; }
       .reasontoggle input { margin-top: 2px; flex: 0 0 auto; }
@@ -515,7 +515,7 @@
             </div>
             <div class="card">
               <div class="label" style="margin-top:0">Compute device</div>
-              <p class="muted" style="margin:2px 0 0" id="devicenote">Inference runs on the <b style="color:var(--fg)">CPU</b> in this build. A CUDA (NVIDIA GPU) build is available — launch with <code>run-demo-gpu.cmd</code>.</p>
+              <p class="muted" style="margin:2px 0 0" id="devicenote">Inference runs on the <b style="color:var(--fg)">CPU</b> in this build. A CUDA (NVIDIA GPU) build is available — launch with <code>RunAnywhere AI (GPU).cmd</code>.</p>
             </div>
           </div></section>
 
@@ -609,7 +609,6 @@
             <div class="label">Threshold · <span id="vadthval">0.015</span></div>
             <input id="vadth" type="range" min="0.005" max="0.2" step="0.005" value="0.015" style="max-width:340px" />
             <div style="margin-top:14px"><button class="btn" id="vadbtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-7 4 16 3-11 2 5 3-3h3"/></svg> Hold + speak</button></div>
-            <div class="label">Detection</div>
             <div class="label">Result</div>
             <div id="vadout" class="out" data-empty="Hold the button and speak — detected speech segments appear here."></div>
           </div></section>
@@ -617,6 +616,7 @@
       </main>
     </div>
     <script src="model-policy.js"></script>
+    <script src="turn-guard.js"></script>
     <script src="renderer.js"></script>
   </body>
 </html>
