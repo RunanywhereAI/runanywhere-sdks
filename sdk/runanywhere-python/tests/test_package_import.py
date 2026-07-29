@@ -57,12 +57,12 @@ def test_import_runanywhere_without_native() -> None:
 
 def test_version_string() -> None:
     import runanywhere
-    from pathlib import Path
+    from importlib.metadata import version
 
-    # Track the monorepo VERSION train — do not hardcode a release string here.
-    version_file = Path(__file__).resolve().parents[2] / "runanywhere-commons" / "VERSION"
-    expected = version_file.read_text(encoding="utf-8").strip()
-    assert runanywhere.__version__ == expected
+    # Hermetic CI copies only tests/ into a temp dir, so do not read the monorepo
+    # VERSION file here. Match the installed wheel metadata instead (that metadata
+    # is already gated against VERSION in the validate_public_packages step).
+    assert runanywhere.__version__ == version("runanywhere")
 
 
 # The full public surface promised by __all__ / the Electron index.ts.
