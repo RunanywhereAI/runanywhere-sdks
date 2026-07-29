@@ -121,6 +121,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> unloadSTTModel() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttTranscribeProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<void>> sttTranscribeStreamProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttStateProto() = 0;
       virtual std::shared_ptr<Promise<bool>> sttStreamLoadModel(const std::string& modelPath, const std::string& modelId, const std::string& modelName) = 0;
       virtual std::shared_ptr<Promise<double>> sttStreamStart(const std::shared_ptr<ArrayBuffer>& optionsBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
       virtual std::shared_ptr<Promise<void>> sttStreamFeed(double sessionId, const std::shared_ptr<ArrayBuffer>& audioBytes) = 0;
@@ -150,6 +151,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsSynthesizeProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<void>> ttsSynthesizeStreamProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsStopProto() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsStateProto() = 0;
       virtual std::shared_ptr<Promise<bool>> isVADModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadVADModel() = 0;
       virtual std::shared_ptr<Promise<void>> resetVAD() = 0;
@@ -173,7 +175,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentInitializeProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentComponentStatesProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentProcessTurnProto(const std::shared_ptr<ArrayBuffer>& audioBytes) = 0;
-      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentFeedAudioProto(const std::shared_ptr<ArrayBuffer>& audioBytes, double sampleRateHz, double channels, double encoding, bool isFinal) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentFeedAudioProto(const std::shared_ptr<ArrayBuffer>& frameBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolParseProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolFormatPromptProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolValidateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;

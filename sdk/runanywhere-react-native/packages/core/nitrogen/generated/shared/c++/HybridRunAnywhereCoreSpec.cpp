@@ -84,6 +84,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("unloadSTTModel", &HybridRunAnywhereCoreSpec::unloadSTTModel);
       prototype.registerHybridMethod("sttTranscribeProto", &HybridRunAnywhereCoreSpec::sttTranscribeProto);
       prototype.registerHybridMethod("sttTranscribeStreamProto", &HybridRunAnywhereCoreSpec::sttTranscribeStreamProto);
+      prototype.registerHybridMethod("sttStateProto", &HybridRunAnywhereCoreSpec::sttStateProto);
       prototype.registerHybridMethod("sttStreamLoadModel", &HybridRunAnywhereCoreSpec::sttStreamLoadModel);
       prototype.registerHybridMethod("sttStreamStart", &HybridRunAnywhereCoreSpec::sttStreamStart);
       prototype.registerHybridMethod("sttStreamFeed", &HybridRunAnywhereCoreSpec::sttStreamFeed);
@@ -113,6 +114,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("ttsSynthesizeProto", &HybridRunAnywhereCoreSpec::ttsSynthesizeProto);
       prototype.registerHybridMethod("ttsSynthesizeStreamProto", &HybridRunAnywhereCoreSpec::ttsSynthesizeStreamProto);
       prototype.registerHybridMethod("ttsStopProto", &HybridRunAnywhereCoreSpec::ttsStopProto);
+      prototype.registerHybridMethod("ttsStateProto", &HybridRunAnywhereCoreSpec::ttsStateProto);
       prototype.registerHybridMethod("isVADModelLoaded", &HybridRunAnywhereCoreSpec::isVADModelLoaded);
       prototype.registerHybridMethod("unloadVADModel", &HybridRunAnywhereCoreSpec::unloadVADModel);
       prototype.registerHybridMethod("resetVAD", &HybridRunAnywhereCoreSpec::resetVAD);
