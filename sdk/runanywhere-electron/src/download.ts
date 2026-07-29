@@ -12,6 +12,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { CATALOG, isCatalogId, ModelType } from './catalog';
+import { ErrorCode, SDKException } from './errors';
 
 export interface DownloadProgress {
   file: string;
@@ -87,9 +88,21 @@ export function modelStatus(root: string = modelsRoot()): Record<string, { downl
   return out;
 }
 
-/** SHA-256 of a file on disk, lowercase hex. */
-export function sha256File(file: string): string {
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+/**
+ * SHA-256 of a file on disk, lowercase hex.
+ *
+ * Streamed, not `readFileSync`: catalog entries reach ~7GB, and reading one into
+ * a single Buffer would block the event loop for the whole read and can exceed
+ * the maximum Buffer length outright.
+ */
+export function sha256File(file: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const rs = fs.createReadStream(file, { highWaterMark: 8 * 1024 * 1024 });
+    rs.on('error', reject);
+    rs.on('data', (chunk) => hash.update(chunk));
+    rs.on('end', () => resolve(hash.digest('hex')));
+  });
 }
 
 /**
@@ -113,7 +126,8 @@ export function assertEnoughSpace(bytesNeeded: number, dir: string): void {
   const MARGIN = 256 * 1024 * 1024; // never fill the volume completely
   if (free < bytesNeeded + MARGIN) {
     const gb = (v: number): string => (v / 1e9).toFixed(1) + ' GB';
-    throw new Error(
+    throw SDKException.of(
+      ErrorCode.STORAGE_ERROR,
       `not enough disk space: need ${gb(bytesNeeded)} (plus headroom) but only ${gb(free)} is free on ${probe}`
     );
   }
@@ -140,24 +154,30 @@ export function downloadFile(
     // Integrity gate. The bytes arrive from a CDN while the digest comes from the
     // origin API, so this catches silent corruption AND a tampered mirror. A file
     // that fails is DELETED — never left behind for a later run to "resume".
-    if (opts.sha256) {
-      let got: string;
-      try { got = sha256File(tmp); }
-      catch (e) { reject(e as Error); return; }
-      if (got.toLowerCase() !== opts.sha256.toLowerCase()) {
-        try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
-        reject(new Error(
-          `checksum mismatch for ${path.basename(dest)}: expected ${opts.sha256}, got ${got}`
-        ));
-        return;
-      }
-    }
-    // renameSync runs outside the Promise executor's synchronous scope, so a throw
-    // (Windows EPERM/EBUSY from AV/indexer, or EXDEV across volumes) would not be
-    // caught — settle explicitly instead of hanging/crashing. KEEP the completed
-    // .part on failure so a retry finalizes it (via 416) rather than refetching.
-    try { fs.renameSync(tmp, dest); resolve(); }
-    catch (e) { reject(e as Error); }
+    // Hashing is async (streamed), so the rename has to run in its continuation.
+    const rename = (): void => {
+      // renameSync runs outside the Promise executor's synchronous scope, so a throw
+      // (Windows EPERM/EBUSY from AV/indexer, or EXDEV across volumes) would not be
+      // caught — settle explicitly instead of hanging/crashing. KEEP the completed
+      // .part on failure so a retry finalizes it (via 416) rather than refetching.
+      try { fs.renameSync(tmp, dest); resolve(); }
+      catch (e) { reject(e as Error); }
+    };
+    if (!opts.sha256) { rename(); return; }
+    sha256File(tmp).then(
+      (got) => {
+        if (got.toLowerCase() !== (opts.sha256 as string).toLowerCase()) {
+          try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ }
+          reject(SDKException.of(
+            ErrorCode.STORAGE_ERROR,
+            `checksum mismatch for ${path.basename(dest)}: expected ${opts.sha256}, got ${got}`
+          ));
+          return;
+        }
+        rename();
+      },
+      (e) => reject(e as Error)
+    );
   };
   return new Promise((resolve, reject) => {
     const get = (u: string, redirects = 0): void => {
