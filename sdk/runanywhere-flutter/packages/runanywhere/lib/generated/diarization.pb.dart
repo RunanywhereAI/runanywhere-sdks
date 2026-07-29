@@ -25,16 +25,16 @@ export 'diarization.pbenum.dart';
 
 class DiarizationOptions extends $pb.GeneratedMessage {
   factory DiarizationOptions({
-    $core.int? sampleRateHz,
-    $core.int? channelCount,
+    $core.int? sampleRate,
+    $core.int? channels,
     DiarizationAudioEncoding? encoding,
     $core.double? threshold,
     $fixnum.Int64? minimumDurationMs,
     $fixnum.Int64? mergeGapMs,
   }) {
     final result = create();
-    if (sampleRateHz != null) result.sampleRateHz = sampleRateHz;
-    if (channelCount != null) result.channelCount = channelCount;
+    if (sampleRate != null) result.sampleRate = sampleRate;
+    if (channels != null) result.channels = channels;
     if (encoding != null) result.encoding = encoding;
     if (threshold != null) result.threshold = threshold;
     if (minimumDurationMs != null) result.minimumDurationMs = minimumDurationMs;
@@ -55,8 +55,8 @@ class DiarizationOptions extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'DiarizationOptions',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'sampleRateHz')
-    ..aI(2, _omitFieldNames ? '' : 'channelCount')
+    ..aI(1, _omitFieldNames ? '' : 'sampleRate')
+    ..aI(2, _omitFieldNames ? '' : 'channels')
     ..aE<DiarizationAudioEncoding>(3, _omitFieldNames ? '' : 'encoding',
         enumValues: DiarizationAudioEncoding.values)
     ..aD(4, _omitFieldNames ? '' : 'threshold', fieldType: $pb.PbFieldType.OF)
@@ -84,22 +84,22 @@ class DiarizationOptions extends $pb.GeneratedMessage {
   static DiarizationOptions? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.int get sampleRateHz => $_getIZ(0);
+  $core.int get sampleRate => $_getIZ(0);
   @$pb.TagNumber(1)
-  set sampleRateHz($core.int value) => $_setSignedInt32(0, value);
+  set sampleRate($core.int value) => $_setSignedInt32(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasSampleRateHz() => $_has(0);
+  $core.bool hasSampleRate() => $_has(0);
   @$pb.TagNumber(1)
-  void clearSampleRateHz() => $_clearField(1);
+  void clearSampleRate() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get channelCount => $_getIZ(1);
+  $core.int get channels => $_getIZ(1);
   @$pb.TagNumber(2)
-  set channelCount($core.int value) => $_setSignedInt32(1, value);
+  set channels($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasChannelCount() => $_has(1);
+  $core.bool hasChannels() => $_has(1);
   @$pb.TagNumber(2)
-  void clearChannelCount() => $_clearField(2);
+  void clearChannels() => $_clearField(2);
 
   @$pb.TagNumber(3)
   DiarizationAudioEncoding get encoding => $_getN(2);

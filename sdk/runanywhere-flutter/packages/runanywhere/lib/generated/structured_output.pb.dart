@@ -493,6 +493,8 @@ class JSONSchema extends $pb.GeneratedMessage {
   void clearRawJson() => $_clearField(16);
 }
 
+enum StructuredOutputOptions_SchemaSource { schema, jsonSchema, notSet }
+
 /// ---------------------------------------------------------------------------
 /// Structured output options — request-side configuration for a structured
 /// generation call. Wraps a JSONSchema plus generation flags.
@@ -502,13 +504,16 @@ class JSONSchema extends $pb.GeneratedMessage {
 ///   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
 ///   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
 /// ---------------------------------------------------------------------------
+/// The ONE output-constraint surface. The retired loose fields on
+/// LLMGenerationOptions (json_schema, grammar, response_format) all fold in
+/// here: schema-shaped output via `schema_source`, low-level constrained
+/// decoding via `grammar`/`regex_pattern`.
 class StructuredOutputOptions extends $pb.GeneratedMessage {
   factory StructuredOutputOptions({
     JSONSchema? schema,
     $core.bool? includeSchemaInPrompt,
     $core.bool? strictMode,
     $core.String? jsonSchema,
-    $core.String? typeName,
     $core.String? name,
     StructuredOutputMode? mode,
     $core.String? regexPattern,
@@ -522,7 +527,6 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
       result.includeSchemaInPrompt = includeSchemaInPrompt;
     if (strictMode != null) result.strictMode = strictMode;
     if (jsonSchema != null) result.jsonSchema = jsonSchema;
-    if (typeName != null) result.typeName = typeName;
     if (name != null) result.name = name;
     if (mode != null) result.mode = mode;
     if (regexPattern != null) result.regexPattern = regexPattern;
@@ -541,16 +545,22 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
           [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
       create()..mergeFromJson(json, registry);
 
+  static const $core.Map<$core.int, StructuredOutputOptions_SchemaSource>
+      _StructuredOutputOptions_SchemaSourceByTag = {
+    1: StructuredOutputOptions_SchemaSource.schema,
+    4: StructuredOutputOptions_SchemaSource.jsonSchema,
+    0: StructuredOutputOptions_SchemaSource.notSet
+  };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'StructuredOutputOptions',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
+    ..oo(0, [1, 4])
     ..aOM<JSONSchema>(1, _omitFieldNames ? '' : 'schema',
         subBuilder: JSONSchema.create)
     ..aOB(2, _omitFieldNames ? '' : 'includeSchemaInPrompt')
     ..aOB(3, _omitFieldNames ? '' : 'strictMode')
     ..aOS(4, _omitFieldNames ? '' : 'jsonSchema')
-    ..aOS(5, _omitFieldNames ? '' : 'typeName')
     ..aOS(6, _omitFieldNames ? '' : 'name')
     ..aE<StructuredOutputMode>(7, _omitFieldNames ? '' : 'mode',
         enumValues: StructuredOutputMode.values)
@@ -580,7 +590,14 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<StructuredOutputOptions>(create);
   static StructuredOutputOptions? _defaultInstance;
 
-  /// Schema describing the desired output shape.
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(4)
+  StructuredOutputOptions_SchemaSource whichSchemaSource() =>
+      _StructuredOutputOptions_SchemaSourceByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(4)
+  void clearSchemaSource() => $_clearField($_whichOneof(0));
+
   @$pb.TagNumber(1)
   JSONSchema get schema => $_getN(0);
   @$pb.TagNumber(1)
@@ -612,8 +629,6 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearStrictMode() => $_clearField(3);
 
-  /// Raw JSON Schema string for C ABI and SDKs that already carry schema as
-  /// serialized JSON instead of the typed JSONSchema tree.
   @$pb.TagNumber(4)
   $core.String get jsonSchema => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -623,67 +638,58 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearJsonSchema() => $_clearField(4);
 
-  /// Optional generated type/name hints used by Swift/Kotlin/Dart wrappers.
-  @$pb.TagNumber(5)
-  $core.String get typeName => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set typeName($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasTypeName() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearTypeName() => $_clearField(5);
-
+  /// Name for the schema/output type (OpenAI json_schema.name).
   @$pb.TagNumber(6)
-  $core.String get name => $_getSZ(5);
+  $core.String get name => $_getSZ(4);
   @$pb.TagNumber(6)
-  set name($core.String value) => $_setString(5, value);
+  set name($core.String value) => $_setString(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasName() => $_has(5);
+  $core.bool hasName() => $_has(4);
   @$pb.TagNumber(6)
   void clearName() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  StructuredOutputMode get mode => $_getN(6);
+  StructuredOutputMode get mode => $_getN(5);
   @$pb.TagNumber(7)
   set mode(StructuredOutputMode value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasMode() => $_has(6);
+  $core.bool hasMode() => $_has(5);
   @$pb.TagNumber(7)
   void clearMode() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.String get regexPattern => $_getSZ(7);
+  $core.String get regexPattern => $_getSZ(6);
   @$pb.TagNumber(8)
-  set regexPattern($core.String value) => $_setString(7, value);
+  set regexPattern($core.String value) => $_setString(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasRegexPattern() => $_has(7);
+  $core.bool hasRegexPattern() => $_has(6);
   @$pb.TagNumber(8)
   void clearRegexPattern() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.String get grammar => $_getSZ(8);
+  $core.String get grammar => $_getSZ(7);
   @$pb.TagNumber(9)
-  set grammar($core.String value) => $_setString(8, value);
+  set grammar($core.String value) => $_setString(7, value);
   @$pb.TagNumber(9)
-  $core.bool hasGrammar() => $_has(8);
+  $core.bool hasGrammar() => $_has(7);
   @$pb.TagNumber(9)
   void clearGrammar() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  $core.bool get repairJson => $_getBF(9);
+  $core.bool get repairJson => $_getBF(8);
   @$pb.TagNumber(10)
-  set repairJson($core.bool value) => $_setBool(9, value);
+  set repairJson($core.bool value) => $_setBool(8, value);
   @$pb.TagNumber(10)
-  $core.bool hasRepairJson() => $_has(9);
+  $core.bool hasRepairJson() => $_has(8);
   @$pb.TagNumber(10)
   void clearRepairJson() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.int get maxRetries => $_getIZ(10);
+  $core.int get maxRetries => $_getIZ(9);
   @$pb.TagNumber(11)
-  set maxRetries($core.int value) => $_setSignedInt32(10, value);
+  set maxRetries($core.int value) => $_setSignedInt32(9, value);
   @$pb.TagNumber(11)
-  $core.bool hasMaxRetries() => $_has(10);
+  $core.bool hasMaxRetries() => $_has(9);
   @$pb.TagNumber(11)
   void clearMaxRetries() => $_clearField(11);
 }

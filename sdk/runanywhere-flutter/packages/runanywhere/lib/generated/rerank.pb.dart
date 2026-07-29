@@ -133,6 +133,7 @@ class RerankOptions extends $pb.GeneratedMessage {
 
   /// When > 0, only the top_n highest-scoring candidates are returned (every
   /// candidate is still scored). 0 = return all candidates, ranked.
+  /// Industry name (Cohere rerank `top_n`).
   @$pb.TagNumber(1)
   $core.int get topN => $_getIZ(0);
   @$pb.TagNumber(1)
@@ -222,14 +223,14 @@ class RerankRequest extends $pb.GeneratedMessage {
 class RerankScoredItem extends $pb.GeneratedMessage {
   factory RerankScoredItem({
     $core.String? id,
-    $core.double? score,
-    $core.int? originalIndex,
+    $core.double? relevanceScore,
+    $core.int? index,
     $core.int? rank,
   }) {
     final result = create();
     if (id != null) result.id = id;
-    if (score != null) result.score = score;
-    if (originalIndex != null) result.originalIndex = originalIndex;
+    if (relevanceScore != null) result.relevanceScore = relevanceScore;
+    if (index != null) result.index = index;
     if (rank != null) result.rank = rank;
     return result;
   }
@@ -248,9 +249,9 @@ class RerankScoredItem extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'id')
-    ..aD(2, _omitFieldNames ? '' : 'score', fieldType: $pb.PbFieldType.OF)
-    ..aI(3, _omitFieldNames ? '' : 'originalIndex',
-        fieldType: $pb.PbFieldType.OU3)
+    ..aD(2, _omitFieldNames ? '' : 'relevanceScore',
+        fieldType: $pb.PbFieldType.OF)
+    ..aI(3, _omitFieldNames ? '' : 'index', fieldType: $pb.PbFieldType.OU3)
     ..aI(4, _omitFieldNames ? '' : 'rank', fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
@@ -283,26 +284,28 @@ class RerankScoredItem extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearId() => $_clearField(1);
 
-  /// Raw relevance score from the reranker (higher = more relevant). Not
+  /// Relevance score from the reranker (higher = more relevant). Not
   /// normalized to a fixed range; comparable only within one result set.
+  /// Industry name (Cohere/Voyage `relevance_score`).
   @$pb.TagNumber(2)
-  $core.double get score => $_getN(1);
+  $core.double get relevanceScore => $_getN(1);
   @$pb.TagNumber(2)
-  set score($core.double value) => $_setFloat(1, value);
+  set relevanceScore($core.double value) => $_setFloat(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasScore() => $_has(1);
+  $core.bool hasRelevanceScore() => $_has(1);
   @$pb.TagNumber(2)
-  void clearScore() => $_clearField(2);
+  void clearRelevanceScore() => $_clearField(2);
 
   /// Index of this candidate in the original RerankRequest.candidates list.
+  /// Industry name (`index`).
   @$pb.TagNumber(3)
-  $core.int get originalIndex => $_getIZ(2);
+  $core.int get index => $_getIZ(2);
   @$pb.TagNumber(3)
-  set originalIndex($core.int value) => $_setUnsignedInt32(2, value);
+  set index($core.int value) => $_setUnsignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasOriginalIndex() => $_has(2);
+  $core.bool hasIndex() => $_has(2);
   @$pb.TagNumber(3)
-  void clearOriginalIndex() => $_clearField(3);
+  void clearIndex() => $_clearField(3);
 
   /// 0-based position after sorting by score descending (0 = most relevant).
   @$pb.TagNumber(4)

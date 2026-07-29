@@ -16,10 +16,12 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'component_types.pbenum.dart' as $3;
-import 'errors.pbenum.dart' as $4;
-import 'stt_options.pb.dart' as $2;
-import 'tts_options.pb.dart' as $1;
+import 'component_types.pbenum.dart' as $5;
+import 'errors.pbenum.dart' as $6;
+import 'llm_options.pb.dart' as $2;
+import 'stt_options.pb.dart' as $4;
+import 'tts_options.pb.dart' as $3;
+import 'vad_options.pb.dart' as $1;
 import 'voice_events.pb.dart' as $0;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -31,8 +33,8 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   factory VoiceAgentRequest({
     $core.String? eventFilter,
     $core.String? sessionId,
-    $core.Iterable<$3.EventCategory>? categories,
-    $4.ErrorSeverity? minSeverity,
+    $core.Iterable<$5.EventCategory>? categories,
+    $6.ErrorSeverity? minSeverity,
     $fixnum.Int64? replayFromSeq,
     $core.bool? includeAudio,
   }) {
@@ -61,13 +63,13 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'eventFilter')
     ..aOS(2, _omitFieldNames ? '' : 'sessionId')
-    ..pc<$3.EventCategory>(
+    ..pc<$5.EventCategory>(
         3, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE,
-        valueOf: $3.EventCategory.valueOf,
-        enumValues: $3.EventCategory.values,
-        defaultEnumValue: $3.EventCategory.EVENT_CATEGORY_UNSPECIFIED)
-    ..aE<$4.ErrorSeverity>(4, _omitFieldNames ? '' : 'minSeverity',
-        enumValues: $4.ErrorSeverity.values)
+        valueOf: $5.EventCategory.valueOf,
+        enumValues: $5.EventCategory.values,
+        defaultEnumValue: $5.EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+    ..aE<$6.ErrorSeverity>(4, _omitFieldNames ? '' : 'minSeverity',
+        enumValues: $6.ErrorSeverity.values)
     ..a<$fixnum.Int64>(
         5, _omitFieldNames ? '' : 'replayFromSeq', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
@@ -114,12 +116,12 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   void clearSessionId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $pb.PbList<$3.EventCategory> get categories => $_getList(2);
+  $pb.PbList<$5.EventCategory> get categories => $_getList(2);
 
   @$pb.TagNumber(4)
-  $4.ErrorSeverity get minSeverity => $_getN(3);
+  $6.ErrorSeverity get minSeverity => $_getN(3);
   @$pb.TagNumber(4)
-  set minSeverity($4.ErrorSeverity value) => $_setField(4, value);
+  set minSeverity($6.ErrorSeverity value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasMinSeverity() => $_has(3);
   @$pb.TagNumber(4)
@@ -847,13 +849,12 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
     $core.String? ttsVoicePath,
     $core.String? ttsVoiceId,
     $core.String? ttsVoiceName,
-    $core.int? vadSampleRate,
-    $core.double? vadFrameLength,
-    $core.double? vadEnergyThreshold,
     VoiceSessionConfig? sessionConfig,
     AudioPipelineConfig? audioPipelineConfig,
     $core.String? sessionId,
     $core.String? defaultLanguageCode,
+    $1.VADConfiguration? vadConfig,
+    $2.LLMGenerationOptions? llmGeneration,
   }) {
     final result = create();
     if (sttModelPath != null) result.sttModelPath = sttModelPath;
@@ -865,16 +866,14 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
     if (ttsVoicePath != null) result.ttsVoicePath = ttsVoicePath;
     if (ttsVoiceId != null) result.ttsVoiceId = ttsVoiceId;
     if (ttsVoiceName != null) result.ttsVoiceName = ttsVoiceName;
-    if (vadSampleRate != null) result.vadSampleRate = vadSampleRate;
-    if (vadFrameLength != null) result.vadFrameLength = vadFrameLength;
-    if (vadEnergyThreshold != null)
-      result.vadEnergyThreshold = vadEnergyThreshold;
     if (sessionConfig != null) result.sessionConfig = sessionConfig;
     if (audioPipelineConfig != null)
       result.audioPipelineConfig = audioPipelineConfig;
     if (sessionId != null) result.sessionId = sessionId;
     if (defaultLanguageCode != null)
       result.defaultLanguageCode = defaultLanguageCode;
+    if (vadConfig != null) result.vadConfig = vadConfig;
+    if (llmGeneration != null) result.llmGeneration = llmGeneration;
     return result;
   }
 
@@ -900,17 +899,16 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
     ..aOS(7, _omitFieldNames ? '' : 'ttsVoicePath')
     ..aOS(8, _omitFieldNames ? '' : 'ttsVoiceId')
     ..aOS(9, _omitFieldNames ? '' : 'ttsVoiceName')
-    ..aI(10, _omitFieldNames ? '' : 'vadSampleRate')
-    ..aD(11, _omitFieldNames ? '' : 'vadFrameLength',
-        fieldType: $pb.PbFieldType.OF)
-    ..aD(12, _omitFieldNames ? '' : 'vadEnergyThreshold',
-        fieldType: $pb.PbFieldType.OF)
     ..aOM<VoiceSessionConfig>(20, _omitFieldNames ? '' : 'sessionConfig',
         subBuilder: VoiceSessionConfig.create)
     ..aOM<AudioPipelineConfig>(21, _omitFieldNames ? '' : 'audioPipelineConfig',
         subBuilder: AudioPipelineConfig.create)
     ..aOS(22, _omitFieldNames ? '' : 'sessionId')
     ..aOS(23, _omitFieldNames ? '' : 'defaultLanguageCode')
+    ..aOM<$1.VADConfiguration>(24, _omitFieldNames ? '' : 'vadConfig',
+        subBuilder: $1.VADConfiguration.create)
+    ..aOM<$2.LLMGenerationOptions>(25, _omitFieldNames ? '' : 'llmGeneration',
+        subBuilder: $2.LLMGenerationOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1024,81 +1022,75 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   void clearTtsVoiceName() => $_clearField(9);
 
   /// -------------------------------------------------------------------
-  /// VAD sub-config (mirrors rac_voice_agent_vad_config_t).
-  /// -------------------------------------------------------------------
-  @$pb.TagNumber(10)
-  $core.int get vadSampleRate => $_getIZ(9);
-  @$pb.TagNumber(10)
-  set vadSampleRate($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasVadSampleRate() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearVadSampleRate() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.double get vadFrameLength => $_getN(10);
-  @$pb.TagNumber(11)
-  set vadFrameLength($core.double value) => $_setFloat(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasVadFrameLength() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearVadFrameLength() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.double get vadEnergyThreshold => $_getN(11);
-  @$pb.TagNumber(12)
-  set vadEnergyThreshold($core.double value) => $_setFloat(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasVadEnergyThreshold() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearVadEnergyThreshold() => $_clearField(12);
-
-  /// -------------------------------------------------------------------
   /// Session-behavior sub-config. Optional so the C ABI can be invoked
   /// without runtime-behavior overrides (engine defaults applied).
   /// -------------------------------------------------------------------
   @$pb.TagNumber(20)
-  VoiceSessionConfig get sessionConfig => $_getN(12);
+  VoiceSessionConfig get sessionConfig => $_getN(9);
   @$pb.TagNumber(20)
   set sessionConfig(VoiceSessionConfig value) => $_setField(20, value);
   @$pb.TagNumber(20)
-  $core.bool hasSessionConfig() => $_has(12);
+  $core.bool hasSessionConfig() => $_has(9);
   @$pb.TagNumber(20)
   void clearSessionConfig() => $_clearField(20);
   @$pb.TagNumber(20)
-  VoiceSessionConfig ensureSessionConfig() => $_ensure(12);
+  VoiceSessionConfig ensureSessionConfig() => $_ensure(9);
 
   /// Audio state-machine behavior. Optional so defaults can be applied by
   /// the native voice-agent implementation.
   @$pb.TagNumber(21)
-  AudioPipelineConfig get audioPipelineConfig => $_getN(13);
+  AudioPipelineConfig get audioPipelineConfig => $_getN(10);
   @$pb.TagNumber(21)
   set audioPipelineConfig(AudioPipelineConfig value) => $_setField(21, value);
   @$pb.TagNumber(21)
-  $core.bool hasAudioPipelineConfig() => $_has(13);
+  $core.bool hasAudioPipelineConfig() => $_has(10);
   @$pb.TagNumber(21)
   void clearAudioPipelineConfig() => $_clearField(21);
   @$pb.TagNumber(21)
-  AudioPipelineConfig ensureAudioPipelineConfig() => $_ensure(13);
+  AudioPipelineConfig ensureAudioPipelineConfig() => $_ensure(10);
 
   /// Correlation and defaults for event streams and one-shot turn APIs.
   @$pb.TagNumber(22)
-  $core.String get sessionId => $_getSZ(14);
+  $core.String get sessionId => $_getSZ(11);
   @$pb.TagNumber(22)
-  set sessionId($core.String value) => $_setString(14, value);
+  set sessionId($core.String value) => $_setString(11, value);
   @$pb.TagNumber(22)
-  $core.bool hasSessionId() => $_has(14);
+  $core.bool hasSessionId() => $_has(11);
   @$pb.TagNumber(22)
   void clearSessionId() => $_clearField(22);
 
   @$pb.TagNumber(23)
-  $core.String get defaultLanguageCode => $_getSZ(15);
+  $core.String get defaultLanguageCode => $_getSZ(12);
   @$pb.TagNumber(23)
-  set defaultLanguageCode($core.String value) => $_setString(15, value);
+  set defaultLanguageCode($core.String value) => $_setString(12, value);
   @$pb.TagNumber(23)
-  $core.bool hasDefaultLanguageCode() => $_has(15);
+  $core.bool hasDefaultLanguageCode() => $_has(12);
   @$pb.TagNumber(23)
   void clearDefaultLanguageCode() => $_clearField(23);
+
+  @$pb.TagNumber(24)
+  $1.VADConfiguration get vadConfig => $_getN(13);
+  @$pb.TagNumber(24)
+  set vadConfig($1.VADConfiguration value) => $_setField(24, value);
+  @$pb.TagNumber(24)
+  $core.bool hasVadConfig() => $_has(13);
+  @$pb.TagNumber(24)
+  void clearVadConfig() => $_clearField(24);
+  @$pb.TagNumber(24)
+  $1.VADConfiguration ensureVadConfig() => $_ensure(13);
+
+  /// LLM generation knobs for the response model (sampling, system prompt,
+  /// reasoning). Unset = voice-agent defaults from the generated pool.
+  @$pb.TagNumber(25)
+  $2.LLMGenerationOptions get llmGeneration => $_getN(14);
+  @$pb.TagNumber(25)
+  set llmGeneration($2.LLMGenerationOptions value) => $_setField(25, value);
+  @$pb.TagNumber(25)
+  $core.bool hasLlmGeneration() => $_has(14);
+  @$pb.TagNumber(25)
+  void clearLlmGeneration() => $_clearField(25);
+  @$pb.TagNumber(25)
+  $2.LLMGenerationOptions ensureLlmGeneration() => $_ensure(14);
 }
 
 /// Helper-level proto requests for voice-agent sub-components.
@@ -1227,7 +1219,7 @@ class VoiceAgentSynthesizeSpeechProtoRequest extends $pb.GeneratedMessage {
   factory VoiceAgentSynthesizeSpeechProtoRequest({
     $core.String? text,
     $core.String? sessionId,
-    $1.TTSOptions? options,
+    $3.TTSOptions? options,
   }) {
     final result = create();
     if (text != null) result.text = text;
@@ -1252,8 +1244,8 @@ class VoiceAgentSynthesizeSpeechProtoRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'text')
     ..aOS(2, _omitFieldNames ? '' : 'sessionId')
-    ..aOM<$1.TTSOptions>(3, _omitFieldNames ? '' : 'options',
-        subBuilder: $1.TTSOptions.create)
+    ..aOM<$3.TTSOptions>(3, _omitFieldNames ? '' : 'options',
+        subBuilder: $3.TTSOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1298,15 +1290,15 @@ class VoiceAgentSynthesizeSpeechProtoRequest extends $pb.GeneratedMessage {
   void clearSessionId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $1.TTSOptions get options => $_getN(2);
+  $3.TTSOptions get options => $_getN(2);
   @$pb.TagNumber(3)
-  set options($1.TTSOptions value) => $_setField(3, value);
+  set options($3.TTSOptions value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasOptions() => $_has(2);
   @$pb.TagNumber(3)
   void clearOptions() => $_clearField(3);
   @$pb.TagNumber(3)
-  $1.TTSOptions ensureOptions() => $_ensure(2);
+  $3.TTSOptions ensureOptions() => $_ensure(2);
 }
 
 class VoiceAgentApi {
@@ -1329,16 +1321,16 @@ class VoiceAgentApi {
           ctx, 'VoiceAgent', 'ProcessTurn', request, VoiceAgentResult());
 
   /// Helper-level STT transcribe path used by voice-agent sub-components.
-  $async.Future<$2.STTOutput> transcribe(
+  $async.Future<$4.STTOutput> transcribe(
           $pb.ClientContext? ctx, VoiceAgentTranscribeProtoRequest request) =>
-      _client.invoke<$2.STTOutput>(
-          ctx, 'VoiceAgent', 'Transcribe', request, $2.STTOutput());
+      _client.invoke<$4.STTOutput>(
+          ctx, 'VoiceAgent', 'Transcribe', request, $4.STTOutput());
 
   /// Helper-level TTS synthesize-speech path used by voice-agent sub-components.
-  $async.Future<$1.TTSOutput> synthesizeSpeech($pb.ClientContext? ctx,
+  $async.Future<$3.TTSOutput> synthesizeSpeech($pb.ClientContext? ctx,
           VoiceAgentSynthesizeSpeechProtoRequest request) =>
-      _client.invoke<$1.TTSOutput>(
-          ctx, 'VoiceAgent', 'SynthesizeSpeech', request, $1.TTSOutput());
+      _client.invoke<$3.TTSOutput>(
+          ctx, 'VoiceAgent', 'SynthesizeSpeech', request, $3.TTSOutput());
 
   /// Configure / initialize the executable voice-agent sub-components
   /// (STT/LLM/TTS/VAD). Returns an initial VoiceAgentResult capturing

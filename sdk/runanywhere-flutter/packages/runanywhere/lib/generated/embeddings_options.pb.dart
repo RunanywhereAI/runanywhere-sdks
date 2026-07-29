@@ -33,9 +33,7 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
     $core.String? modelId,
     $core.int? embeddingDimension,
     $core.int? maxSequenceLength,
-    $core.bool? normalize,
     $0.InferenceFramework? preferredFramework,
-    $core.int? maxTokens,
     EmbeddingsNormalizeMode? normalizeMode,
     EmbeddingsPoolingStrategy? pooling,
     $core.String? configJson,
@@ -45,10 +43,8 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
     if (embeddingDimension != null)
       result.embeddingDimension = embeddingDimension;
     if (maxSequenceLength != null) result.maxSequenceLength = maxSequenceLength;
-    if (normalize != null) result.normalize = normalize;
     if (preferredFramework != null)
       result.preferredFramework = preferredFramework;
-    if (maxTokens != null) result.maxTokens = maxTokens;
     if (normalizeMode != null) result.normalizeMode = normalizeMode;
     if (pooling != null) result.pooling = pooling;
     if (configJson != null) result.configJson = configJson;
@@ -71,10 +67,8 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
     ..aI(2, _omitFieldNames ? '' : 'embeddingDimension')
     ..aI(3, _omitFieldNames ? '' : 'maxSequenceLength')
-    ..aOB(4, _omitFieldNames ? '' : 'normalize')
     ..aE<$0.InferenceFramework>(5, _omitFieldNames ? '' : 'preferredFramework',
         enumValues: $0.InferenceFramework.values)
-    ..aI(6, _omitFieldNames ? '' : 'maxTokens')
     ..aE<EmbeddingsNormalizeMode>(7, _omitFieldNames ? '' : 'normalizeMode',
         enumValues: EmbeddingsNormalizeMode.values)
     ..aE<EmbeddingsPoolingStrategy>(8, _omitFieldNames ? '' : 'pooling',
@@ -134,65 +128,43 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearMaxSequenceLength() => $_clearField(3);
 
-  /// Default L2 normalization for produced vectors. When unset the backend
-  /// applies its default (RAC_EMBEDDINGS_NORMALIZE_L2 in the C ABI).
-  @$pb.TagNumber(4)
-  $core.bool get normalize => $_getBF(3);
-  @$pb.TagNumber(4)
-  set normalize($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasNormalize() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearNormalize() => $_clearField(4);
-
   /// Preferred framework for the component. Absent = auto.
   @$pb.TagNumber(5)
-  $0.InferenceFramework get preferredFramework => $_getN(4);
+  $0.InferenceFramework get preferredFramework => $_getN(3);
   @$pb.TagNumber(5)
   set preferredFramework($0.InferenceFramework value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasPreferredFramework() => $_has(4);
+  $core.bool hasPreferredFramework() => $_has(3);
   @$pb.TagNumber(5)
   void clearPreferredFramework() => $_clearField(5);
 
-  /// C ABI name for max_sequence_length. 0 = use max_sequence_length or
-  /// backend default.
-  @$pb.TagNumber(6)
-  $core.int get maxTokens => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set maxTokens($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasMaxTokens() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearMaxTokens() => $_clearField(6);
-
-  /// Exact C ABI normalization/pooling modes for backends that need more
-  /// than the bool normalize flag.
+  /// Vector normalization mode for the component. UNSPECIFIED = L2
+  /// (the C ABI default).
   @$pb.TagNumber(7)
-  EmbeddingsNormalizeMode get normalizeMode => $_getN(6);
+  EmbeddingsNormalizeMode get normalizeMode => $_getN(4);
   @$pb.TagNumber(7)
   set normalizeMode(EmbeddingsNormalizeMode value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasNormalizeMode() => $_has(6);
+  $core.bool hasNormalizeMode() => $_has(4);
   @$pb.TagNumber(7)
   void clearNormalizeMode() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  EmbeddingsPoolingStrategy get pooling => $_getN(7);
+  EmbeddingsPoolingStrategy get pooling => $_getN(5);
   @$pb.TagNumber(8)
   set pooling(EmbeddingsPoolingStrategy value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasPooling() => $_has(7);
+  $core.bool hasPooling() => $_has(5);
   @$pb.TagNumber(8)
   void clearPooling() => $_clearField(8);
 
   /// Backend-specific JSON config (e.g. tokenizer/vocab companion paths).
   @$pb.TagNumber(9)
-  $core.String get configJson => $_getSZ(8);
+  $core.String get configJson => $_getSZ(6);
   @$pb.TagNumber(9)
-  set configJson($core.String value) => $_setString(8, value);
+  set configJson($core.String value) => $_setString(6, value);
   @$pb.TagNumber(9)
-  $core.bool hasConfigJson() => $_has(8);
+  $core.bool hasConfigJson() => $_has(6);
   @$pb.TagNumber(9)
   void clearConfigJson() => $_clearField(9);
 }
@@ -203,7 +175,6 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
 /// ---------------------------------------------------------------------------
 class EmbeddingsOptions extends $pb.GeneratedMessage {
   factory EmbeddingsOptions({
-    $core.bool? normalize,
     $core.bool? truncate,
     $core.int? batchSize,
     EmbeddingsNormalizeMode? normalizeMode,
@@ -211,7 +182,6 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
     $core.int? nThreads,
   }) {
     final result = create();
-    if (normalize != null) result.normalize = normalize;
     if (truncate != null) result.truncate = truncate;
     if (batchSize != null) result.batchSize = batchSize;
     if (normalizeMode != null) result.normalizeMode = normalizeMode;
@@ -233,7 +203,6 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'EmbeddingsOptions',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'normalize')
     ..aOB(2, _omitFieldNames ? '' : 'truncate')
     ..aI(3, _omitFieldNames ? '' : 'batchSize')
     ..aE<EmbeddingsNormalizeMode>(4, _omitFieldNames ? '' : 'normalizeMode',
@@ -262,66 +231,55 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<EmbeddingsOptions>(create);
   static EmbeddingsOptions? _defaultInstance;
 
-  /// Apply L2 normalization to the produced vectors. Required so the wire
-  /// form is unambiguous on the most common knob; backends may still defer
-  /// to model defaults at load time.
-  @$pb.TagNumber(1)
-  $core.bool get normalize => $_getBF(0);
-  @$pb.TagNumber(1)
-  set normalize($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasNormalize() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearNormalize() => $_clearField(1);
-
   /// Truncate inputs longer than max_sequence_length instead of erroring.
   /// Unset = backend default (currently truncate-on-overflow for ONNX,
   /// sliding-window for llama.cpp).
   @$pb.TagNumber(2)
-  $core.bool get truncate => $_getBF(1);
+  $core.bool get truncate => $_getBF(0);
   @$pb.TagNumber(2)
-  set truncate($core.bool value) => $_setBool(1, value);
+  set truncate($core.bool value) => $_setBool(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasTruncate() => $_has(1);
+  $core.bool hasTruncate() => $_has(0);
   @$pb.TagNumber(2)
   void clearTruncate() => $_clearField(2);
 
   /// Override batch size for embed_batch. Unset = backend chooses
   /// (RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE = 512, capped at 8192).
   @$pb.TagNumber(3)
-  $core.int get batchSize => $_getIZ(2);
+  $core.int get batchSize => $_getIZ(1);
   @$pb.TagNumber(3)
-  set batchSize($core.int value) => $_setSignedInt32(2, value);
+  set batchSize($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasBatchSize() => $_has(2);
+  $core.bool hasBatchSize() => $_has(1);
   @$pb.TagNumber(3)
   void clearBatchSize() => $_clearField(3);
 
-  /// Exact C ABI per-call overrides. UNSPECIFIED = use component config.
+  /// Vector normalization mode. UNSPECIFIED = use component config
+  /// (default L2).
   @$pb.TagNumber(4)
-  EmbeddingsNormalizeMode get normalizeMode => $_getN(3);
+  EmbeddingsNormalizeMode get normalizeMode => $_getN(2);
   @$pb.TagNumber(4)
   set normalizeMode(EmbeddingsNormalizeMode value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasNormalizeMode() => $_has(3);
+  $core.bool hasNormalizeMode() => $_has(2);
   @$pb.TagNumber(4)
   void clearNormalizeMode() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  EmbeddingsPoolingStrategy get pooling => $_getN(4);
+  EmbeddingsPoolingStrategy get pooling => $_getN(3);
   @$pb.TagNumber(5)
   set pooling(EmbeddingsPoolingStrategy value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasPooling() => $_has(4);
+  $core.bool hasPooling() => $_has(3);
   @$pb.TagNumber(5)
   void clearPooling() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get nThreads => $_getIZ(5);
+  $core.int get nThreads => $_getIZ(4);
   @$pb.TagNumber(6)
-  set nThreads($core.int value) => $_setSignedInt32(5, value);
+  set nThreads($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasNThreads() => $_has(5);
+  $core.bool hasNThreads() => $_has(4);
   @$pb.TagNumber(6)
   void clearNThreads() => $_clearField(6);
 }

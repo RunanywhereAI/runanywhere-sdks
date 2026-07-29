@@ -47,7 +47,7 @@ class VADConfiguration extends $pb.GeneratedMessage {
     $core.String? modelId,
     $core.int? sampleRate,
     $core.int? frameLengthMs,
-    $core.double? threshold,
+    $core.double? activationThreshold,
     $core.bool? enableAutoCalibration,
     $core.double? calibrationMultiplier,
     $0.InferenceFramework? preferredFramework,
@@ -59,7 +59,8 @@ class VADConfiguration extends $pb.GeneratedMessage {
     if (modelId != null) result.modelId = modelId;
     if (sampleRate != null) result.sampleRate = sampleRate;
     if (frameLengthMs != null) result.frameLengthMs = frameLengthMs;
-    if (threshold != null) result.threshold = threshold;
+    if (activationThreshold != null)
+      result.activationThreshold = activationThreshold;
     if (enableAutoCalibration != null)
       result.enableAutoCalibration = enableAutoCalibration;
     if (calibrationMultiplier != null)
@@ -89,7 +90,8 @@ class VADConfiguration extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
     ..aI(2, _omitFieldNames ? '' : 'sampleRate')
     ..aI(3, _omitFieldNames ? '' : 'frameLengthMs')
-    ..aD(4, _omitFieldNames ? '' : 'threshold', fieldType: $pb.PbFieldType.OF)
+    ..aD(4, _omitFieldNames ? '' : 'activationThreshold',
+        fieldType: $pb.PbFieldType.OF)
     ..aOB(5, _omitFieldNames ? '' : 'enableAutoCalibration')
     ..aD(6, _omitFieldNames ? '' : 'calibrationMultiplier',
         fieldType: $pb.PbFieldType.OF)
@@ -151,16 +153,16 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearFrameLengthMs() => $_clearField(3);
 
-  /// Energy threshold in [0.0, 1.0] for voice detection.
-  /// Recommended range 0.01–0.05; default 0.015 across SDKs.
+  /// Activation (energy) threshold in [0.0, 1.0] for voice detection.
+  /// Recommended range 0.01–0.05.
   @$pb.TagNumber(4)
-  $core.double get threshold => $_getN(3);
+  $core.double get activationThreshold => $_getN(3);
   @$pb.TagNumber(4)
-  set threshold($core.double value) => $_setFloat(3, value);
+  set activationThreshold($core.double value) => $_setFloat(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasThreshold() => $_has(3);
+  $core.bool hasActivationThreshold() => $_has(3);
   @$pb.TagNumber(4)
-  void clearThreshold() => $_clearField(4);
+  void clearActivationThreshold() => $_clearField(4);
 
   /// When true, the VAD performs ambient-noise calibration and uses the
   /// result as a multiplier on the threshold (see calibration_multiplier
@@ -246,16 +248,18 @@ class VADConfiguration extends $pb.GeneratedMessage {
 ///   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
 /// Surfacing them as fields lets callers tune debouncing without a rebuild.
 /// ---------------------------------------------------------------------------
+/// Field vocabulary follows the industry VAD naming (LiveKit/Silero):
+/// activation_threshold + min/max duration knobs + prefix padding.
 class VADOptions extends $pb.GeneratedMessage {
   factory VADOptions({
-    $core.double? threshold,
     $core.int? minSpeechDurationMs,
     $core.int? minSilenceDurationMs,
     $core.int? maxSpeechDurationMs,
     $core.bool? includeStatistics,
+    $core.double? activationThreshold,
+    $core.int? prefixPaddingMs,
   }) {
     final result = create();
-    if (threshold != null) result.threshold = threshold;
     if (minSpeechDurationMs != null)
       result.minSpeechDurationMs = minSpeechDurationMs;
     if (minSilenceDurationMs != null)
@@ -263,6 +267,9 @@ class VADOptions extends $pb.GeneratedMessage {
     if (maxSpeechDurationMs != null)
       result.maxSpeechDurationMs = maxSpeechDurationMs;
     if (includeStatistics != null) result.includeStatistics = includeStatistics;
+    if (activationThreshold != null)
+      result.activationThreshold = activationThreshold;
+    if (prefixPaddingMs != null) result.prefixPaddingMs = prefixPaddingMs;
     return result;
   }
 
@@ -279,11 +286,13 @@ class VADOptions extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'VADOptions',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aD(1, _omitFieldNames ? '' : 'threshold', fieldType: $pb.PbFieldType.OF)
     ..aI(2, _omitFieldNames ? '' : 'minSpeechDurationMs')
     ..aI(3, _omitFieldNames ? '' : 'minSilenceDurationMs')
     ..aI(4, _omitFieldNames ? '' : 'maxSpeechDurationMs')
     ..aOB(5, _omitFieldNames ? '' : 'includeStatistics')
+    ..aD(6, _omitFieldNames ? '' : 'activationThreshold',
+        fieldType: $pb.PbFieldType.OF)
+    ..aI(7, _omitFieldNames ? '' : 'prefixPaddingMs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -304,61 +313,68 @@ class VADOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<VADOptions>(create);
   static VADOptions? _defaultInstance;
 
-  /// Per-call energy threshold override. Use 0 (default) to keep the
-  /// configured threshold. Mirrors rac_vad_input_t::energy_threshold_override
-  /// (which uses -1 as the sentinel; on the wire we use 0 for proto3
-  /// default semantics — generators emit -1 when this is unset).
-  @$pb.TagNumber(1)
-  $core.double get threshold => $_getN(0);
-  @$pb.TagNumber(1)
-  set threshold($core.double value) => $_setFloat(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasThreshold() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearThreshold() => $_clearField(1);
-
   /// Minimum continuous speech duration (ms) before SPEECH_STARTED fires.
-  /// Default 100 (RAC_VAD_MIN_SPEECH_DURATION_MS).
   @$pb.TagNumber(2)
-  $core.int get minSpeechDurationMs => $_getIZ(1);
+  $core.int get minSpeechDurationMs => $_getIZ(0);
   @$pb.TagNumber(2)
-  set minSpeechDurationMs($core.int value) => $_setSignedInt32(1, value);
+  set minSpeechDurationMs($core.int value) => $_setSignedInt32(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasMinSpeechDurationMs() => $_has(1);
+  $core.bool hasMinSpeechDurationMs() => $_has(0);
   @$pb.TagNumber(2)
   void clearMinSpeechDurationMs() => $_clearField(2);
 
   /// Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
-  /// Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
   @$pb.TagNumber(3)
-  $core.int get minSilenceDurationMs => $_getIZ(2);
+  $core.int get minSilenceDurationMs => $_getIZ(1);
   @$pb.TagNumber(3)
-  set minSilenceDurationMs($core.int value) => $_setSignedInt32(2, value);
+  set minSilenceDurationMs($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasMinSilenceDurationMs() => $_has(2);
+  $core.bool hasMinSilenceDurationMs() => $_has(1);
   @$pb.TagNumber(3)
   void clearMinSilenceDurationMs() => $_clearField(3);
 
   /// Maximum continuous speech duration (ms) before forcing a segment split.
   /// 0 = backend/default.
   @$pb.TagNumber(4)
-  $core.int get maxSpeechDurationMs => $_getIZ(3);
+  $core.int get maxSpeechDurationMs => $_getIZ(2);
   @$pb.TagNumber(4)
-  set maxSpeechDurationMs($core.int value) => $_setSignedInt32(3, value);
+  set maxSpeechDurationMs($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasMaxSpeechDurationMs() => $_has(3);
+  $core.bool hasMaxSpeechDurationMs() => $_has(2);
   @$pb.TagNumber(4)
   void clearMaxSpeechDurationMs() => $_clearField(4);
 
   /// Whether to include VADStatistics in stream events when available.
   @$pb.TagNumber(5)
-  $core.bool get includeStatistics => $_getBF(4);
+  $core.bool get includeStatistics => $_getBF(3);
   @$pb.TagNumber(5)
-  set includeStatistics($core.bool value) => $_setBool(4, value);
+  set includeStatistics($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasIncludeStatistics() => $_has(4);
+  $core.bool hasIncludeStatistics() => $_has(3);
   @$pb.TagNumber(5)
   void clearIncludeStatistics() => $_clearField(5);
+
+  /// Per-call activation threshold override in [0.0, 1.0]. Unset/0 = keep
+  /// the configured threshold.
+  @$pb.TagNumber(6)
+  $core.double get activationThreshold => $_getN(4);
+  @$pb.TagNumber(6)
+  set activationThreshold($core.double value) => $_setFloat(4, value);
+  @$pb.TagNumber(6)
+  $core.bool hasActivationThreshold() => $_has(4);
+  @$pb.TagNumber(6)
+  void clearActivationThreshold() => $_clearField(6);
+
+  /// Audio retained before SPEECH_STARTED so segments don't clip the first
+  /// syllable. 0 = backend/default.
+  @$pb.TagNumber(7)
+  $core.int get prefixPaddingMs => $_getIZ(5);
+  @$pb.TagNumber(7)
+  set prefixPaddingMs($core.int value) => $_setSignedInt32(5, value);
+  @$pb.TagNumber(7)
+  $core.bool hasPrefixPaddingMs() => $_has(5);
+  @$pb.TagNumber(7)
+  void clearPrefixPaddingMs() => $_clearField(7);
 }
 
 enum VADAudioSource_Source { audioData, adapterHandle, notSet }

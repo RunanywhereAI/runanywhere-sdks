@@ -16,6 +16,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'llm_options.pb.dart' as $0;
 import 'solutions.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -270,14 +271,12 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
     AudioSource? audioSource,
     $core.bool? enableBargeIn,
     $core.int? bargeInThresholdMs,
-    $core.String? systemPrompt,
     $core.int? maxContextTokens,
-    $core.double? temperature,
     $core.bool? emitPartials,
-    $core.bool? emitThoughts,
     $core.String? audioFilePath,
     SolutionType? typeKind,
     $core.String? ttsVoiceId,
+    $0.LLMGenerationOptions? generation,
   }) {
     final result = create();
     if (llmModelId != null) result.llmModelId = llmModelId;
@@ -290,14 +289,12 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
     if (enableBargeIn != null) result.enableBargeIn = enableBargeIn;
     if (bargeInThresholdMs != null)
       result.bargeInThresholdMs = bargeInThresholdMs;
-    if (systemPrompt != null) result.systemPrompt = systemPrompt;
     if (maxContextTokens != null) result.maxContextTokens = maxContextTokens;
-    if (temperature != null) result.temperature = temperature;
     if (emitPartials != null) result.emitPartials = emitPartials;
-    if (emitThoughts != null) result.emitThoughts = emitThoughts;
     if (audioFilePath != null) result.audioFilePath = audioFilePath;
     if (typeKind != null) result.typeKind = typeKind;
     if (ttsVoiceId != null) result.ttsVoiceId = ttsVoiceId;
+    if (generation != null) result.generation = generation;
     return result;
   }
 
@@ -324,16 +321,14 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
         enumValues: AudioSource.values)
     ..aOB(8, _omitFieldNames ? '' : 'enableBargeIn')
     ..aI(9, _omitFieldNames ? '' : 'bargeInThresholdMs')
-    ..aOS(10, _omitFieldNames ? '' : 'systemPrompt')
     ..aI(11, _omitFieldNames ? '' : 'maxContextTokens')
-    ..aD(12, _omitFieldNames ? '' : 'temperature',
-        fieldType: $pb.PbFieldType.OF)
     ..aOB(13, _omitFieldNames ? '' : 'emitPartials')
-    ..aOB(14, _omitFieldNames ? '' : 'emitThoughts')
     ..aOS(15, _omitFieldNames ? '' : 'audioFilePath')
     ..aE<SolutionType>(16, _omitFieldNames ? '' : 'typeKind',
         enumValues: SolutionType.values)
     ..aOS(17, _omitFieldNames ? '' : 'ttsVoiceId')
+    ..aOM<$0.LLMGenerationOptions>(18, _omitFieldNames ? '' : 'generation',
+        subBuilder: $0.LLMGenerationOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -439,62 +434,33 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearBargeInThresholdMs() => $_clearField(9);
 
-  /// LLM behavior.
-  @$pb.TagNumber(10)
-  $core.String get systemPrompt => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set systemPrompt($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasSystemPrompt() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearSystemPrompt() => $_clearField(10);
-
   @$pb.TagNumber(11)
-  $core.int get maxContextTokens => $_getIZ(10);
+  $core.int get maxContextTokens => $_getIZ(9);
   @$pb.TagNumber(11)
-  set maxContextTokens($core.int value) => $_setSignedInt32(10, value);
+  set maxContextTokens($core.int value) => $_setSignedInt32(9, value);
   @$pb.TagNumber(11)
-  $core.bool hasMaxContextTokens() => $_has(10);
+  $core.bool hasMaxContextTokens() => $_has(9);
   @$pb.TagNumber(11)
   void clearMaxContextTokens() => $_clearField(11);
 
-  @$pb.TagNumber(12)
-  $core.double get temperature => $_getN(11);
-  @$pb.TagNumber(12)
-  set temperature($core.double value) => $_setFloat(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasTemperature() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearTemperature() => $_clearField(12);
-
   /// Emit partial transcripts as UserSaidEvent{is_final=false}.
   @$pb.TagNumber(13)
-  $core.bool get emitPartials => $_getBF(12);
+  $core.bool get emitPartials => $_getBF(10);
   @$pb.TagNumber(13)
-  set emitPartials($core.bool value) => $_setBool(12, value);
+  set emitPartials($core.bool value) => $_setBool(10, value);
   @$pb.TagNumber(13)
-  $core.bool hasEmitPartials() => $_has(12);
+  $core.bool hasEmitPartials() => $_has(10);
   @$pb.TagNumber(13)
   void clearEmitPartials() => $_clearField(13);
-
-  /// Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens.
-  @$pb.TagNumber(14)
-  $core.bool get emitThoughts => $_getBF(13);
-  @$pb.TagNumber(14)
-  set emitThoughts($core.bool value) => $_setBool(13, value);
-  @$pb.TagNumber(14)
-  $core.bool hasEmitThoughts() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearEmitThoughts() => $_clearField(14);
 
   /// Absolute path to an audio file. Required when `audio_source` is
   /// `AUDIO_SOURCE_FILE`; ignored for MICROPHONE / CALLBACK sources.
   @$pb.TagNumber(15)
-  $core.String get audioFilePath => $_getSZ(14);
+  $core.String get audioFilePath => $_getSZ(11);
   @$pb.TagNumber(15)
-  set audioFilePath($core.String value) => $_setString(14, value);
+  set audioFilePath($core.String value) => $_setString(11, value);
   @$pb.TagNumber(15)
-  $core.bool hasAudioFilePath() => $_has(14);
+  $core.bool hasAudioFilePath() => $_has(11);
   @$pb.TagNumber(15)
   void clearAudioFilePath() => $_clearField(15);
 
@@ -502,11 +468,11 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   /// oneof arm; provided so callers that pass this message standalone (or
   /// log it) can read a single discriminator. Defaults to UNSPECIFIED.
   @$pb.TagNumber(16)
-  SolutionType get typeKind => $_getN(15);
+  SolutionType get typeKind => $_getN(12);
   @$pb.TagNumber(16)
   set typeKind(SolutionType value) => $_setField(16, value);
   @$pb.TagNumber(16)
-  $core.bool hasTypeKind() => $_has(15);
+  $core.bool hasTypeKind() => $_has(12);
   @$pb.TagNumber(16)
   void clearTypeKind() => $_clearField(16);
 
@@ -517,13 +483,24 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   /// VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
   /// (voice_agent_service.proto:214) which already exposes tts_voice_id.
   @$pb.TagNumber(17)
-  $core.String get ttsVoiceId => $_getSZ(16);
+  $core.String get ttsVoiceId => $_getSZ(13);
   @$pb.TagNumber(17)
-  set ttsVoiceId($core.String value) => $_setString(16, value);
+  set ttsVoiceId($core.String value) => $_setString(13, value);
   @$pb.TagNumber(17)
-  $core.bool hasTtsVoiceId() => $_has(16);
+  $core.bool hasTtsVoiceId() => $_has(13);
   @$pb.TagNumber(17)
   void clearTtsVoiceId() => $_clearField(17);
+
+  @$pb.TagNumber(18)
+  $0.LLMGenerationOptions get generation => $_getN(14);
+  @$pb.TagNumber(18)
+  set generation($0.LLMGenerationOptions value) => $_setField(18, value);
+  @$pb.TagNumber(18)
+  $core.bool hasGeneration() => $_has(14);
+  @$pb.TagNumber(18)
+  void clearGeneration() => $_clearField(18);
+  @$pb.TagNumber(18)
+  $0.LLMGenerationOptions ensureGeneration() => $_ensure(14);
 }
 
 /// ---------------------------------------------------------------------------

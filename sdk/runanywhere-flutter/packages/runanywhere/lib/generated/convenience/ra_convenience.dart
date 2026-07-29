@@ -16,15 +16,41 @@
 import 'package:fixnum/fixnum.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/diarization.pb.dart';
+import 'package:runanywhere/generated/diffusion_options.pb.dart';
 import 'package:runanywhere/generated/embeddings_options.pb.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart';
 import 'package:runanywhere/generated/logging.pb.dart';
+import 'package:runanywhere/generated/lora_options.pb.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart';
 import 'package:runanywhere/generated/rag.pb.dart';
+import 'package:runanywhere/generated/rerank.pb.dart';
+import 'package:runanywhere/generated/segmentation.pb.dart';
+import 'package:runanywhere/generated/structured_output.pb.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart';
+import 'package:runanywhere/generated/tool_calling.pb.dart';
 import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/generated/vad_options.pb.dart';
 import 'package:runanywhere/generated/vlm_options.pb.dart';
+
+extension ToolCallingOptionsConvenience on ToolCallingOptions {
+  static ToolCallingOptions defaults() {
+    final r = ToolCallingOptions();
+    r.maxToolCalls = 5;
+    return r;
+  }
+}
+
+extension ToolCallingOptionsValidate on ToolCallingOptions {
+  void validate() {
+    final effectiveMaxToolCalls = hasMaxToolCalls() ? maxToolCalls : 5;
+    if (effectiveMaxToolCalls < 1) {
+      throw SDKException.validationFailed(
+        'max_tool_calls must be >= 1 (got $effectiveMaxToolCalls)',
+        fieldPath: 'ToolCallingOptions.max_tool_calls',
+      );
+    }
+  }
+}
 
 extension AudioFormatWireString on AudioFormat {
   String get wireString {
@@ -232,24 +258,49 @@ ArchiveStructure? archiveStructureFromWireString(String value) {
   return null;
 }
 
+extension StructuredOutputOptionsConvenience on StructuredOutputOptions {
+  static StructuredOutputOptions defaults() {
+    final r = StructuredOutputOptions();
+    r.maxRetries = 0;
+    return r;
+  }
+}
+
+extension StructuredOutputOptionsValidate on StructuredOutputOptions {
+  void validate() {
+    if (maxRetries < 0) {
+      throw SDKException.validationFailed(
+        'max_retries must be >= 0 (got $maxRetries)',
+        fieldPath: 'StructuredOutputOptions.max_retries',
+      );
+    }
+  }
+}
+
 extension LLMGenerationOptionsConvenience on LLMGenerationOptions {
   static LLMGenerationOptions defaults() {
     final r = LLMGenerationOptions();
-    r.maxTokens = 100;
+    r.maxOutputTokens = 100;
     r.temperature = 0.8;
     r.topP = 1.0;
     r.topK = 0;
     r.repetitionPenalty = 1.0;
+    r.seed = Int64(0);
+    r.frequencyPenalty = 0.0;
+    r.presencePenalty = 0.0;
+    r.repeatLastN = 0;
+    r.minP = 0.0;
+    r.nThreads = 0;
     return r;
   }
 }
 
 extension LLMGenerationOptionsValidate on LLMGenerationOptions {
   void validate() {
-    if (maxTokens < 0) {
+    if (maxOutputTokens < 0) {
       throw SDKException.validationFailed(
-        'max_tokens must be >= 0 (got $maxTokens)',
-        fieldPath: 'LLMGenerationOptions.max_tokens',
+        'max_output_tokens must be >= 0 (got $maxOutputTokens)',
+        fieldPath: 'LLMGenerationOptions.max_output_tokens',
       );
     }
     if (!temperature.isFinite || temperature < 0.0 || temperature > 2.0) {
@@ -279,11 +330,19 @@ extension LLMGenerationOptionsValidate on LLMGenerationOptions {
   }
 }
 
+extension LLMConfigurationConvenience on LLMConfiguration {
+  static LLMConfiguration defaults() {
+    final r = LLMConfiguration();
+    r.contextLength = 2048;
+    return r;
+  }
+}
+
 extension DiarizationOptionsConvenience on DiarizationOptions {
   static DiarizationOptions defaults() {
     final r = DiarizationOptions();
-    r.sampleRateHz = 16000;
-    r.channelCount = 1;
+    r.sampleRate = 16000;
+    r.channels = 1;
     r.encoding = DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
     r.threshold = 0.5;
     return r;
@@ -292,18 +351,18 @@ extension DiarizationOptionsConvenience on DiarizationOptions {
 
 extension DiarizationOptionsValidate on DiarizationOptions {
   void validate() {
-    final effectiveSampleRateHz = hasSampleRateHz() ? sampleRateHz : 16000;
-    if (effectiveSampleRateHz < 8000 || effectiveSampleRateHz > 48000) {
+    final effectiveSampleRate = hasSampleRate() ? sampleRate : 16000;
+    if (effectiveSampleRate < 8000 || effectiveSampleRate > 48000) {
       throw SDKException.validationFailed(
-        'sample_rate_hz must be in 8000...48000 (got $effectiveSampleRateHz)',
-        fieldPath: 'DiarizationOptions.sample_rate_hz',
+        'sample_rate must be in 8000...48000 (got $effectiveSampleRate)',
+        fieldPath: 'DiarizationOptions.sample_rate',
       );
     }
-    final effectiveChannelCount = hasChannelCount() ? channelCount : 1;
-    if (effectiveChannelCount < 1 || effectiveChannelCount > 1) {
+    final effectiveChannels = hasChannels() ? channels : 1;
+    if (effectiveChannels < 1 || effectiveChannels > 1) {
       throw SDKException.validationFailed(
-        'channel_count must be in 1...1 (got $effectiveChannelCount)',
-        fieldPath: 'DiarizationOptions.channel_count',
+        'channels must be in 1...1 (got $effectiveChannels)',
+        fieldPath: 'DiarizationOptions.channels',
       );
     }
     final effectiveThreshold = hasThreshold() ? threshold : 0.5;
@@ -328,12 +387,55 @@ extension DiarizationOptionsValidate on DiarizationOptions {
   }
 }
 
+extension DiffusionGenerationOptionsConvenience on DiffusionGenerationOptions {
+  static DiffusionGenerationOptions defaults() {
+    final r = DiffusionGenerationOptions();
+    r.width = 0;
+    r.height = 0;
+    r.steps = 0;
+    r.guidanceScale = 0.0;
+    r.seed = Int64(-1);
+    r.denoiseStrength = 0.75;
+    return r;
+  }
+}
+
+extension DiffusionGenerationOptionsValidate on DiffusionGenerationOptions {
+  void validate() {
+    if (prompt.isEmpty) {
+      throw SDKException.validationFailed(
+        'prompt is required',
+        fieldPath: 'DiffusionGenerationOptions.prompt',
+      );
+    }
+    if (steps < 0 || steps > 50) {
+      throw SDKException.validationFailed(
+        'steps must be in 0...50 (got $steps)',
+        fieldPath: 'DiffusionGenerationOptions.steps',
+      );
+    }
+    if (!guidanceScale.isFinite || guidanceScale < 0.0 || guidanceScale > 20.0) {
+      throw SDKException.validationFailed(
+        'guidance_scale must be in 0.0...20.0 (got $guidanceScale)',
+        fieldPath: 'DiffusionGenerationOptions.guidance_scale',
+      );
+    }
+    if (!denoiseStrength.isFinite || denoiseStrength < 0.0 || denoiseStrength > 1.0) {
+      throw SDKException.validationFailed(
+        'denoise_strength must be in 0.0...1.0 (got $denoiseStrength)',
+        fieldPath: 'DiffusionGenerationOptions.denoise_strength',
+      );
+    }
+  }
+}
+
 extension EmbeddingsConfigurationConvenience on EmbeddingsConfiguration {
   static EmbeddingsConfiguration defaults() {
     final r = EmbeddingsConfiguration();
     r.embeddingDimension = 384;
     r.maxSequenceLength = 512;
-    r.normalize = true;
+    r.normalizeMode = EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2;
+    r.pooling = EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN;
     return r;
   }
 }
@@ -364,8 +466,20 @@ extension EmbeddingsConfigurationValidate on EmbeddingsConfiguration {
 extension EmbeddingsOptionsConvenience on EmbeddingsOptions {
   static EmbeddingsOptions defaults() {
     final r = EmbeddingsOptions();
-    r.normalize = true;
+    r.normalizeMode = EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED;
+    r.nThreads = 0;
     return r;
+  }
+}
+
+extension EmbeddingsOptionsValidate on EmbeddingsOptions {
+  void validate() {
+    if (hasBatchSize() && (batchSize < 1 || batchSize > 8192)) {
+      throw SDKException.validationFailed(
+        'batch_size must be in 1...8192 (got $batchSize)',
+        fieldPath: 'EmbeddingsOptions.batch_size',
+      );
+    }
   }
 }
 
@@ -374,7 +488,7 @@ extension VADConfigurationConvenience on VADConfiguration {
     final r = VADConfiguration();
     r.sampleRate = 16000;
     r.frameLengthMs = 100;
-    r.threshold = 0.015;
+    r.activationThreshold = 0.015;
     r.calibrationMultiplier = 2.0;
     return r;
   }
@@ -394,16 +508,38 @@ extension VADConfigurationValidate on VADConfiguration {
         fieldPath: 'VADConfiguration.frame_length_ms',
       );
     }
-    if (!threshold.isFinite || threshold < 0.0 || threshold > 1.0) {
+    if (!activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0) {
       throw SDKException.validationFailed(
-        'threshold must be in 0.0...1.0 (got $threshold)',
-        fieldPath: 'VADConfiguration.threshold',
+        'activation_threshold must be in 0.0...1.0 (got $activationThreshold)',
+        fieldPath: 'VADConfiguration.activation_threshold',
       );
     }
     if (!calibrationMultiplier.isFinite || calibrationMultiplier < 1.5 || calibrationMultiplier > 4.0) {
       throw SDKException.validationFailed(
         'calibration_multiplier must be in 1.5...4.0 (got $calibrationMultiplier)',
         fieldPath: 'VADConfiguration.calibration_multiplier',
+      );
+    }
+  }
+}
+
+extension VADOptionsConvenience on VADOptions {
+  static VADOptions defaults() {
+    final r = VADOptions();
+    r.minSpeechDurationMs = 100;
+    r.minSilenceDurationMs = 300;
+    r.maxSpeechDurationMs = 0;
+    r.prefixPaddingMs = 0;
+    return r;
+  }
+}
+
+extension VADOptionsValidate on VADOptions {
+  void validate() {
+    if (!activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0) {
+      throw SDKException.validationFailed(
+        'activation_threshold must be in 0.0...1.0 (got $activationThreshold)',
+        fieldPath: 'VADOptions.activation_threshold',
       );
     }
   }
@@ -475,6 +611,33 @@ extension LoggingConfigurationConvenience on LoggingConfiguration {
   }
 }
 
+extension LoRAAdapterConfigConvenience on LoRAAdapterConfig {
+  static LoRAAdapterConfig defaults() {
+    final r = LoRAAdapterConfig();
+    r.scale = 1.0;
+    return r;
+  }
+}
+
+extension LoRAAdapterConfigValidate on LoRAAdapterConfig {
+  void validate() {
+    if (adapterPath.isEmpty) {
+      throw SDKException.validationFailed(
+        'adapter_path is required',
+        fieldPath: 'LoRAAdapterConfig.adapter_path',
+      );
+    }
+  }
+}
+
+extension LoraAdapterCatalogEntryConvenience on LoraAdapterCatalogEntry {
+  static LoraAdapterCatalogEntry defaults() {
+    final r = LoraAdapterCatalogEntry();
+    r.defaultScale = 1.0;
+    return r;
+  }
+}
+
 extension RAGConfigurationConvenience on RAGConfiguration {
   static RAGConfiguration defaults() {
     final r = RAGConfiguration();
@@ -522,9 +685,6 @@ extension RAGConfigurationValidate on RAGConfiguration {
 extension RAGQueryOptionsConvenience on RAGQueryOptions {
   static RAGQueryOptions defaults() {
     final r = RAGQueryOptions();
-    r.maxTokens = 512;
-    r.temperature = 0.7;
-    r.topP = 1.0;
     r.multiQueryCount = 3;
     return r;
   }
@@ -532,6 +692,12 @@ extension RAGQueryOptionsConvenience on RAGQueryOptions {
 
 extension RAGQueryOptionsValidate on RAGQueryOptions {
   void validate() {
+    if (question.isEmpty) {
+      throw SDKException.validationFailed(
+        'question is required',
+        fieldPath: 'RAGQueryOptions.question',
+      );
+    }
     final effectiveMultiQueryCount = hasMultiQueryCount() ? multiQueryCount : 3;
     if (effectiveMultiQueryCount < 1 || effectiveMultiQueryCount > 8) {
       throw SDKException.validationFailed(
@@ -542,78 +708,59 @@ extension RAGQueryOptionsValidate on RAGQueryOptions {
   }
 }
 
-extension STTLanguageWireString on STTLanguage {
-  String get wireString {
-    switch (this) {
-      case STTLanguage.STT_LANGUAGE_UNSPECIFIED:
-        return '';
-      case STTLanguage.STT_LANGUAGE_AUTO:
-        return 'auto';
-      case STTLanguage.STT_LANGUAGE_EN:
-        return 'en';
-      case STTLanguage.STT_LANGUAGE_ES:
-        return 'es';
-      case STTLanguage.STT_LANGUAGE_FR:
-        return 'fr';
-      case STTLanguage.STT_LANGUAGE_DE:
-        return 'de';
-      case STTLanguage.STT_LANGUAGE_ZH:
-        return 'zh';
-      case STTLanguage.STT_LANGUAGE_JA:
-        return 'ja';
-      case STTLanguage.STT_LANGUAGE_KO:
-        return 'ko';
-      case STTLanguage.STT_LANGUAGE_IT:
-        return 'it';
-      case STTLanguage.STT_LANGUAGE_PT:
-        return 'pt';
-      case STTLanguage.STT_LANGUAGE_AR:
-        return 'ar';
-      case STTLanguage.STT_LANGUAGE_RU:
-        return 'ru';
-      case STTLanguage.STT_LANGUAGE_HI:
-        return 'hi';
-    }
-    return '';
+extension RerankOptionsConvenience on RerankOptions {
+  static RerankOptions defaults() {
+    final r = RerankOptions();
+    r.topN = 0;
+    return r;
   }
 }
 
-STTLanguage? sttLanguageFromWireString(String value) {
-  switch (value.toLowerCase()) {
-    case 'auto':
-      return STTLanguage.STT_LANGUAGE_AUTO;
-    case 'en':
-      return STTLanguage.STT_LANGUAGE_EN;
-    case 'es':
-      return STTLanguage.STT_LANGUAGE_ES;
-    case 'fr':
-      return STTLanguage.STT_LANGUAGE_FR;
-    case 'de':
-      return STTLanguage.STT_LANGUAGE_DE;
-    case 'zh':
-      return STTLanguage.STT_LANGUAGE_ZH;
-    case 'ja':
-      return STTLanguage.STT_LANGUAGE_JA;
-    case 'ko':
-      return STTLanguage.STT_LANGUAGE_KO;
-    case 'it':
-      return STTLanguage.STT_LANGUAGE_IT;
-    case 'pt':
-      return STTLanguage.STT_LANGUAGE_PT;
-    case 'ar':
-      return STTLanguage.STT_LANGUAGE_AR;
-    case 'ru':
-      return STTLanguage.STT_LANGUAGE_RU;
-    case 'hi':
-      return STTLanguage.STT_LANGUAGE_HI;
+extension RerankRequestValidate on RerankRequest {
+  void validate() {
+    if (query.isEmpty) {
+      throw SDKException.validationFailed(
+        'query is required',
+        fieldPath: 'RerankRequest.query',
+      );
+    }
   }
-  return null;
+}
+
+extension SegmentationImageConvenience on SegmentationImage {
+  static SegmentationImage defaults() {
+    final r = SegmentationImage();
+    r.strideBytes = 0;
+    return r;
+  }
+}
+
+extension SegmentationImageValidate on SegmentationImage {
+  void validate() {
+    if (width == 0) {
+      throw SDKException.validationFailed(
+        'width is required',
+        fieldPath: 'SegmentationImage.width',
+      );
+    }
+    if (height == 0) {
+      throw SDKException.validationFailed(
+        'height is required',
+        fieldPath: 'SegmentationImage.height',
+      );
+    }
+    if (pixelFormat.value == 0) {
+      throw SDKException.validationFailed(
+        'pixel_format is required',
+        fieldPath: 'SegmentationImage.pixel_format',
+      );
+    }
+  }
 }
 
 extension STTConfigurationConvenience on STTConfiguration {
   static STTConfiguration defaults() {
     final r = STTConfiguration();
-    r.language = STTLanguage.STT_LANGUAGE_EN;
     r.sampleRate = 16000;
     r.enablePunctuation = true;
     r.enableWordTimestamps = true;
@@ -635,9 +782,11 @@ extension STTConfigurationValidate on STTConfiguration {
 extension STTOptionsConvenience on STTOptions {
   static STTOptions defaults() {
     final r = STTOptions();
-    r.language = STTLanguage.STT_LANGUAGE_EN;
     r.enablePunctuation = true;
+    r.maxSpeakers = 0;
     r.enableWordTimestamps = true;
+    r.beamSize = 0;
+    r.maxAlternatives = 0;
     return r;
   }
 }
@@ -645,12 +794,6 @@ extension STTOptionsConvenience on STTOptions {
 extension TTSConfigurationConvenience on TTSConfiguration {
   static TTSConfiguration defaults() {
     final r = TTSConfiguration();
-    r.voice = 'default';
-    r.languageCode = 'en-US';
-    r.speakingRate = 1.0;
-    r.pitch = 1.0;
-    r.volume = 1.0;
-    r.sampleRate = 22050;
     r.enableNeuralVoice = true;
     return r;
   }
@@ -660,7 +803,7 @@ extension TTSOptionsConvenience on TTSOptions {
   static TTSOptions defaults() {
     final r = TTSOptions();
     r.languageCode = 'en-US';
-    r.speakingRate = 1.0;
+    r.speed = 1.0;
     r.pitch = 1.0;
     r.volume = 1.0;
     r.audioFormat = AudioFormat.AUDIO_FORMAT_PCM;
@@ -669,26 +812,37 @@ extension TTSOptionsConvenience on TTSOptions {
   }
 }
 
+extension TTSOptionsValidate on TTSOptions {
+  void validate() {
+    if (!speed.isFinite || speed < 0.5 || speed > 2.0) {
+      throw SDKException.validationFailed(
+        'speed must be in 0.5...2.0 (got $speed)',
+        fieldPath: 'TTSOptions.speed',
+      );
+    }
+  }
+}
+
 extension VLMGenerationOptionsConvenience on VLMGenerationOptions {
   static VLMGenerationOptions defaults() {
     final r = VLMGenerationOptions();
-    r.maxTokens = 2048;
+    r.maxOutputTokens = 2048;
     r.temperature = 0.7;
     r.topP = 0.9;
     r.topK = 0;
-    r.streamingEnabled = true;
     r.useGpu = true;
     r.repetitionPenalty = 1.1;
+    r.minP = 0.0;
     return r;
   }
 }
 
 extension VLMGenerationOptionsValidate on VLMGenerationOptions {
   void validate() {
-    if (maxTokens < 0) {
+    if (maxOutputTokens < 0) {
       throw SDKException.validationFailed(
-        'max_tokens must be >= 0 (got $maxTokens)',
-        fieldPath: 'VLMGenerationOptions.max_tokens',
+        'max_output_tokens must be >= 0 (got $maxOutputTokens)',
+        fieldPath: 'VLMGenerationOptions.max_output_tokens',
       );
     }
     if (!temperature.isFinite || temperature < 0.0 || temperature > 2.0) {

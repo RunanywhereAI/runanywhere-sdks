@@ -33,7 +33,7 @@ export 'tts_options.pbenum.dart';
 /// Defaults (for documentation; proto3 zero-values apply on the wire):
 ///   voice              = "default"  (Kotlin) / "com.apple.ttsbundle..." (Swift)
 ///   language_code      = "en-US"
-///   speaking_rate      = 1.0   (range 0.5 – 2.0)
+///   speed              = 1.0   (range 0.5 – 2.0)
 ///   pitch              = 1.0   (range 0.5 – 2.0)
 ///   volume             = 1.0   (range 0.0 – 1.0)
 ///   audio_format       = AUDIO_FORMAT_PCM
@@ -44,30 +44,16 @@ export 'tts_options.pbenum.dart';
 class TTSConfiguration extends $pb.GeneratedMessage {
   factory TTSConfiguration({
     $core.String? modelId,
-    $core.String? voice,
-    $core.String? languageCode,
-    $core.double? speakingRate,
-    $core.double? pitch,
-    $core.double? volume,
-    $0.AudioFormat? audioFormat,
-    $core.int? sampleRate,
     $core.bool? enableNeuralVoice,
-    $core.bool? enableSsml,
     $0.InferenceFramework? preferredFramework,
+    TTSOptions? defaultOptions,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
-    if (voice != null) result.voice = voice;
-    if (languageCode != null) result.languageCode = languageCode;
-    if (speakingRate != null) result.speakingRate = speakingRate;
-    if (pitch != null) result.pitch = pitch;
-    if (volume != null) result.volume = volume;
-    if (audioFormat != null) result.audioFormat = audioFormat;
-    if (sampleRate != null) result.sampleRate = sampleRate;
     if (enableNeuralVoice != null) result.enableNeuralVoice = enableNeuralVoice;
-    if (enableSsml != null) result.enableSsml = enableSsml;
     if (preferredFramework != null)
       result.preferredFramework = preferredFramework;
+    if (defaultOptions != null) result.defaultOptions = defaultOptions;
     return result;
   }
 
@@ -85,19 +71,11 @@ class TTSConfiguration extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOS(2, _omitFieldNames ? '' : 'voice')
-    ..aOS(3, _omitFieldNames ? '' : 'languageCode')
-    ..aD(4, _omitFieldNames ? '' : 'speakingRate',
-        fieldType: $pb.PbFieldType.OF)
-    ..aD(5, _omitFieldNames ? '' : 'pitch', fieldType: $pb.PbFieldType.OF)
-    ..aD(6, _omitFieldNames ? '' : 'volume', fieldType: $pb.PbFieldType.OF)
-    ..aE<$0.AudioFormat>(7, _omitFieldNames ? '' : 'audioFormat',
-        enumValues: $0.AudioFormat.values)
-    ..aI(8, _omitFieldNames ? '' : 'sampleRate')
     ..aOB(9, _omitFieldNames ? '' : 'enableNeuralVoice')
-    ..aOB(10, _omitFieldNames ? '' : 'enableSsml')
     ..aE<$0.InferenceFramework>(11, _omitFieldNames ? '' : 'preferredFramework',
         enumValues: $0.InferenceFramework.values)
+    ..aOM<TTSOptions>(12, _omitFieldNames ? '' : 'defaultOptions',
+        subBuilder: TTSOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -131,108 +109,38 @@ class TTSConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearModelId() => $_clearField(1);
 
-  /// Voice identifier to use for synthesis. For platform engines this is the
-  /// engine-specific voice id (e.g. "com.apple.ttsbundle.siri_female_en-US_compact").
-  @$pb.TagNumber(2)
-  $core.String get voice => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set voice($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasVoice() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearVoice() => $_clearField(2);
-
-  /// Language for synthesis (BCP-47, e.g. "en-US").
-  @$pb.TagNumber(3)
-  $core.String get languageCode => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set languageCode($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasLanguageCode() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearLanguageCode() => $_clearField(3);
-
-  /// Speaking rate (0.5 – 2.0; 1.0 is normal).
-  @$pb.TagNumber(4)
-  $core.double get speakingRate => $_getN(3);
-  @$pb.TagNumber(4)
-  set speakingRate($core.double value) => $_setFloat(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasSpeakingRate() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearSpeakingRate() => $_clearField(4);
-
-  /// Speech pitch (0.5 – 2.0; 1.0 is normal).
-  @$pb.TagNumber(5)
-  $core.double get pitch => $_getN(4);
-  @$pb.TagNumber(5)
-  set pitch($core.double value) => $_setFloat(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasPitch() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearPitch() => $_clearField(5);
-
-  /// Speech volume (0.0 – 1.0).
-  @$pb.TagNumber(6)
-  $core.double get volume => $_getN(5);
-  @$pb.TagNumber(6)
-  set volume($core.double value) => $_setFloat(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasVolume() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearVolume() => $_clearField(6);
-
-  /// Output audio format.
-  @$pb.TagNumber(7)
-  $0.AudioFormat get audioFormat => $_getN(6);
-  @$pb.TagNumber(7)
-  set audioFormat($0.AudioFormat value) => $_setField(7, value);
-  @$pb.TagNumber(7)
-  $core.bool hasAudioFormat() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearAudioFormat() => $_clearField(7);
-
-  /// Sample rate for output audio in Hz. 0 = engine default
-  /// (RAC_TTS_DEFAULT_SAMPLE_RATE = 22050).
-  @$pb.TagNumber(8)
-  $core.int get sampleRate => $_getIZ(7);
-  @$pb.TagNumber(8)
-  set sampleRate($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasSampleRate() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearSampleRate() => $_clearField(8);
-
   /// Whether to use neural / premium voice if available.
   @$pb.TagNumber(9)
-  $core.bool get enableNeuralVoice => $_getBF(8);
+  $core.bool get enableNeuralVoice => $_getBF(1);
   @$pb.TagNumber(9)
-  set enableNeuralVoice($core.bool value) => $_setBool(8, value);
+  set enableNeuralVoice($core.bool value) => $_setBool(1, value);
   @$pb.TagNumber(9)
-  $core.bool hasEnableNeuralVoice() => $_has(8);
+  $core.bool hasEnableNeuralVoice() => $_has(1);
   @$pb.TagNumber(9)
   void clearEnableNeuralVoice() => $_clearField(9);
 
-  /// Whether to enable SSML markup support.
-  @$pb.TagNumber(10)
-  $core.bool get enableSsml => $_getBF(9);
-  @$pb.TagNumber(10)
-  set enableSsml($core.bool value) => $_setBool(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasEnableSsml() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearEnableSsml() => $_clearField(10);
-
-  /// Preferred framework for the component. Absent = auto. Mirrors the C
-  /// ABI rac_tts_config_t preferred_framework field.
+  /// Preferred framework for the component. Absent = auto.
   @$pb.TagNumber(11)
-  $0.InferenceFramework get preferredFramework => $_getN(10);
+  $0.InferenceFramework get preferredFramework => $_getN(2);
   @$pb.TagNumber(11)
   set preferredFramework($0.InferenceFramework value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasPreferredFramework() => $_has(10);
+  $core.bool hasPreferredFramework() => $_has(2);
   @$pb.TagNumber(11)
   void clearPreferredFramework() => $_clearField(11);
+
+  /// Component-level defaults applied when a per-call TTSOptions is absent
+  /// or leaves a field unset.
+  @$pb.TagNumber(12)
+  TTSOptions get defaultOptions => $_getN(3);
+  @$pb.TagNumber(12)
+  set defaultOptions(TTSOptions value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasDefaultOptions() => $_has(3);
+  @$pb.TagNumber(12)
+  void clearDefaultOptions() => $_clearField(12);
+  @$pb.TagNumber(12)
+  TTSOptions ensureDefaultOptions() => $_ensure(3);
 }
 
 /// ---------------------------------------------------------------------------
@@ -249,7 +157,7 @@ class TTSOptions extends $pb.GeneratedMessage {
   factory TTSOptions({
     $core.String? voice,
     $core.String? languageCode,
-    $core.double? speakingRate,
+    $core.double? speed,
     $core.double? pitch,
     $core.double? volume,
     $core.bool? enableSsml,
@@ -261,7 +169,7 @@ class TTSOptions extends $pb.GeneratedMessage {
     final result = create();
     if (voice != null) result.voice = voice;
     if (languageCode != null) result.languageCode = languageCode;
-    if (speakingRate != null) result.speakingRate = speakingRate;
+    if (speed != null) result.speed = speed;
     if (pitch != null) result.pitch = pitch;
     if (volume != null) result.volume = volume;
     if (enableSsml != null) result.enableSsml = enableSsml;
@@ -287,8 +195,7 @@ class TTSOptions extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'voice')
     ..aOS(2, _omitFieldNames ? '' : 'languageCode')
-    ..aD(3, _omitFieldNames ? '' : 'speakingRate',
-        fieldType: $pb.PbFieldType.OF)
+    ..aD(3, _omitFieldNames ? '' : 'speed', fieldType: $pb.PbFieldType.OF)
     ..aD(4, _omitFieldNames ? '' : 'pitch', fieldType: $pb.PbFieldType.OF)
     ..aD(5, _omitFieldNames ? '' : 'volume', fieldType: $pb.PbFieldType.OF)
     ..aOB(6, _omitFieldNames ? '' : 'enableSsml')
@@ -337,18 +244,17 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearLanguageCode() => $_clearField(2);
 
-  /// Speech rate (0.0 – 2.0; 1.0 is normal). Note Swift/Kotlin use the name
-  /// `rate`, Dart uses `rate`, RN uses `rate`. C ABI field is `rate`. We
-  /// canonicalize on `speaking_rate` to match TTSConfiguration; bindings
-  /// alias to `rate` where appropriate.
+  /// Speech speed multiplier (1.0 = normal). Industry name (OpenAI
+  /// /audio/speech `speed`); replaces the rate/speaking_rate/speakingRate
+  /// split across the C ABI and SDKs.
   @$pb.TagNumber(3)
-  $core.double get speakingRate => $_getN(2);
+  $core.double get speed => $_getN(2);
   @$pb.TagNumber(3)
-  set speakingRate($core.double value) => $_setFloat(2, value);
+  set speed($core.double value) => $_setFloat(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasSpeakingRate() => $_has(2);
+  $core.bool hasSpeed() => $_has(2);
   @$pb.TagNumber(3)
-  void clearSpeakingRate() => $_clearField(3);
+  void clearSpeed() => $_clearField(3);
 
   /// Speech pitch (0.5 – 2.0; 1.0 is normal).
   @$pb.TagNumber(4)

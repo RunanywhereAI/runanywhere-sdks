@@ -31,7 +31,6 @@ export 'llm_service.pbenum.dart';
 class LLMGenerateRequest extends $pb.GeneratedMessage {
   factory LLMGenerateRequest({
     $core.String? prompt,
-    $core.bool? emitThoughts,
     $core.String? requestId,
     $core.String? modelId,
     $core.String? conversationId,
@@ -41,7 +40,6 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   }) {
     final result = create();
     if (prompt != null) result.prompt = prompt;
-    if (emitThoughts != null) result.emitThoughts = emitThoughts;
     if (requestId != null) result.requestId = requestId;
     if (modelId != null) result.modelId = modelId;
     if (conversationId != null) result.conversationId = conversationId;
@@ -65,7 +63,6 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'prompt')
-    ..aOB(7, _omitFieldNames ? '' : 'emitThoughts')
     ..aOS(14, _omitFieldNames ? '' : 'requestId')
     ..aOS(15, _omitFieldNames ? '' : 'modelId')
     ..aOS(16, _omitFieldNames ? '' : 'conversationId')
@@ -108,57 +105,48 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearPrompt() => $_clearField(1);
 
-  @$pb.TagNumber(7)
-  $core.bool get emitThoughts => $_getBF(1);
-  @$pb.TagNumber(7)
-  set emitThoughts($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(7)
-  $core.bool hasEmitThoughts() => $_has(1);
-  @$pb.TagNumber(7)
-  void clearEmitThoughts() => $_clearField(7);
-
   @$pb.TagNumber(14)
-  $core.String get requestId => $_getSZ(2);
+  $core.String get requestId => $_getSZ(1);
   @$pb.TagNumber(14)
-  set requestId($core.String value) => $_setString(2, value);
+  set requestId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(14)
-  $core.bool hasRequestId() => $_has(2);
+  $core.bool hasRequestId() => $_has(1);
   @$pb.TagNumber(14)
   void clearRequestId() => $_clearField(14);
 
   @$pb.TagNumber(15)
-  $core.String get modelId => $_getSZ(3);
+  $core.String get modelId => $_getSZ(2);
   @$pb.TagNumber(15)
-  set modelId($core.String value) => $_setString(3, value);
+  set modelId($core.String value) => $_setString(2, value);
   @$pb.TagNumber(15)
-  $core.bool hasModelId() => $_has(3);
+  $core.bool hasModelId() => $_has(2);
   @$pb.TagNumber(15)
   void clearModelId() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $core.String get conversationId => $_getSZ(4);
+  $core.String get conversationId => $_getSZ(3);
   @$pb.TagNumber(16)
-  set conversationId($core.String value) => $_setString(4, value);
+  set conversationId($core.String value) => $_setString(3, value);
   @$pb.TagNumber(16)
-  $core.bool hasConversationId() => $_has(4);
+  $core.bool hasConversationId() => $_has(3);
   @$pb.TagNumber(16)
   void clearConversationId() => $_clearField(16);
 
   @$pb.TagNumber(25)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(5);
+  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
 
   /// Canonical generation settings. When absent, commons applies its SDK
   /// defaults; callers that need explicit controls populate this message.
   @$pb.TagNumber(26)
-  $0.LLMGenerationOptions get options => $_getN(6);
+  $0.LLMGenerationOptions get options => $_getN(5);
   @$pb.TagNumber(26)
   set options($0.LLMGenerationOptions value) => $_setField(26, value);
   @$pb.TagNumber(26)
-  $core.bool hasOptions() => $_has(6);
+  $core.bool hasOptions() => $_has(5);
   @$pb.TagNumber(26)
   void clearOptions() => $_clearField(26);
   @$pb.TagNumber(26)
-  $0.LLMGenerationOptions ensureOptions() => $_ensure(6);
+  $0.LLMGenerationOptions ensureOptions() => $_ensure(5);
 
   /// Prior conversation turns (excludes the current `prompt`, which
   /// stays the live user turn, and `options.system_prompt`, which stays
@@ -167,7 +155,7 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   /// that owns its chat template renders {system_prompt, history, prompt} from
   /// its model's markers; engines that don't simply ignore this field.
   @$pb.TagNumber(27)
-  $pb.PbList<$1.ChatMessage> get history => $_getList(7);
+  $pb.PbList<$1.ChatMessage> get history => $_getList(6);
 }
 
 /// Aggregate terminal payload emitted by LLMStreamEvent. It intentionally keeps
@@ -177,8 +165,8 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   factory LLMStreamFinalResult({
     $core.String? text,
     $core.String? thinkingContent,
-    $core.int? promptTokens,
-    $core.int? completionTokens,
+    $core.int? inputTokens,
+    $core.int? outputTokens,
     $core.int? totalTokens,
     $fixnum.Int64? totalTimeMs,
     $fixnum.Int64? timeToFirstTokenMs,
@@ -194,8 +182,8 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
     final result = create();
     if (text != null) result.text = text;
     if (thinkingContent != null) result.thinkingContent = thinkingContent;
-    if (promptTokens != null) result.promptTokens = promptTokens;
-    if (completionTokens != null) result.completionTokens = completionTokens;
+    if (inputTokens != null) result.inputTokens = inputTokens;
+    if (outputTokens != null) result.outputTokens = outputTokens;
     if (totalTokens != null) result.totalTokens = totalTokens;
     if (totalTimeMs != null) result.totalTimeMs = totalTimeMs;
     if (timeToFirstTokenMs != null)
@@ -226,8 +214,8 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'text')
     ..aOS(2, _omitFieldNames ? '' : 'thinkingContent')
-    ..aI(3, _omitFieldNames ? '' : 'promptTokens')
-    ..aI(4, _omitFieldNames ? '' : 'completionTokens')
+    ..aI(3, _omitFieldNames ? '' : 'inputTokens')
+    ..aI(4, _omitFieldNames ? '' : 'outputTokens')
     ..aI(5, _omitFieldNames ? '' : 'totalTokens')
     ..aInt64(6, _omitFieldNames ? '' : 'totalTimeMs')
     ..aInt64(7, _omitFieldNames ? '' : 'timeToFirstTokenMs')
@@ -282,22 +270,22 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   void clearThinkingContent() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get promptTokens => $_getIZ(2);
+  $core.int get inputTokens => $_getIZ(2);
   @$pb.TagNumber(3)
-  set promptTokens($core.int value) => $_setSignedInt32(2, value);
+  set inputTokens($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasPromptTokens() => $_has(2);
+  $core.bool hasInputTokens() => $_has(2);
   @$pb.TagNumber(3)
-  void clearPromptTokens() => $_clearField(3);
+  void clearInputTokens() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get completionTokens => $_getIZ(3);
+  $core.int get outputTokens => $_getIZ(3);
   @$pb.TagNumber(4)
-  set completionTokens($core.int value) => $_setSignedInt32(3, value);
+  set outputTokens($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasCompletionTokens() => $_has(3);
+  $core.bool hasOutputTokens() => $_has(3);
   @$pb.TagNumber(4)
-  void clearCompletionTokens() => $_clearField(4);
+  void clearOutputTokens() => $_clearField(4);
 
   @$pb.TagNumber(5)
   $core.int get totalTokens => $_getIZ(4);
@@ -690,6 +678,474 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   $2.ToolCall ensureToolCall() => $_ensure(17);
 }
 
+/// ---------------------------------------------------------------------------
+/// Tool-calling session / run-loop envelopes. They live here (not in
+/// tool_calling.proto) because they carry an LLMGenerationOptions and
+/// llm_options.proto already imports tool_calling.proto — the reverse import
+/// would be a cycle. Moving them ended the inline re-declaration of sampling
+/// knobs the old ToolCallingSessionCreateRequest carried.
+/// ---------------------------------------------------------------------------
+class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
+  factory ToolCallingSessionCreateRequest({
+    $core.String? prompt,
+    $0.LLMGenerationOptions? generation,
+    $core.bool? validateCalls,
+    $core.Iterable<$1.ChatMessage>? history,
+  }) {
+    final result = create();
+    if (prompt != null) result.prompt = prompt;
+    if (generation != null) result.generation = generation;
+    if (validateCalls != null) result.validateCalls = validateCalls;
+    if (history != null) result.history.addAll(history);
+    return result;
+  }
+
+  ToolCallingSessionCreateRequest._();
+
+  factory ToolCallingSessionCreateRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ToolCallingSessionCreateRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ToolCallingSessionCreateRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'prompt')
+    ..aOM<$0.LLMGenerationOptions>(2, _omitFieldNames ? '' : 'generation',
+        subBuilder: $0.LLMGenerationOptions.create)
+    ..aOB(3, _omitFieldNames ? '' : 'validateCalls')
+    ..pPM<$1.ChatMessage>(4, _omitFieldNames ? '' : 'history',
+        subBuilder: $1.ChatMessage.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToolCallingSessionCreateRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToolCallingSessionCreateRequest copyWith(
+          void Function(ToolCallingSessionCreateRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ToolCallingSessionCreateRequest))
+          as ToolCallingSessionCreateRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingSessionCreateRequest create() =>
+      ToolCallingSessionCreateRequest._();
+  @$core.override
+  ToolCallingSessionCreateRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingSessionCreateRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ToolCallingSessionCreateRequest>(
+          create);
+  static ToolCallingSessionCreateRequest? _defaultInstance;
+
+  /// The live user turn.
+  @$pb.TagNumber(1)
+  $core.String get prompt => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set prompt($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasPrompt() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPrompt() => $_clearField(1);
+
+  /// Sampling, reasoning, system prompt — the same canonical knobs as any
+  /// other generation. tools/tool_choice policy travels in
+  /// generation.tool_calling.
+  @$pb.TagNumber(2)
+  $0.LLMGenerationOptions get generation => $_getN(1);
+  @$pb.TagNumber(2)
+  set generation($0.LLMGenerationOptions value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasGeneration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearGeneration() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $0.LLMGenerationOptions ensureGeneration() => $_ensure(1);
+
+  /// proto3 `optional` enables presence detection. When unset, commons
+  /// defaults to validate_calls=true so unknown tool calls short-circuit
+  /// before host execution. Callers that delegate validation to their
+  /// executor must explicitly set false.
+  @$pb.TagNumber(3)
+  $core.bool get validateCalls => $_getBF(2);
+  @$pb.TagNumber(3)
+  set validateCalls($core.bool value) => $_setBool(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasValidateCalls() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearValidateCalls() => $_clearField(3);
+
+  /// Prior conversation turns (excluding `prompt`), same contract as
+  /// LLMGenerateRequest.history.
+  @$pb.TagNumber(4)
+  $pb.PbList<$1.ChatMessage> get history => $_getList(3);
+}
+
+class ToolCallingSessionCreateResult extends $pb.GeneratedMessage {
+  factory ToolCallingSessionCreateResult({
+    $fixnum.Int64? sessionHandle,
+  }) {
+    final result = create();
+    if (sessionHandle != null) result.sessionHandle = sessionHandle;
+    return result;
+  }
+
+  ToolCallingSessionCreateResult._();
+
+  factory ToolCallingSessionCreateResult.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ToolCallingSessionCreateResult.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ToolCallingSessionCreateResult',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..a<$fixnum.Int64>(
+        1, _omitFieldNames ? '' : 'sessionHandle', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToolCallingSessionCreateResult clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToolCallingSessionCreateResult copyWith(
+          void Function(ToolCallingSessionCreateResult) updates) =>
+      super.copyWith(
+              (message) => updates(message as ToolCallingSessionCreateResult))
+          as ToolCallingSessionCreateResult;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingSessionCreateResult create() =>
+      ToolCallingSessionCreateResult._();
+  @$core.override
+  ToolCallingSessionCreateResult createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingSessionCreateResult getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ToolCallingSessionCreateResult>(create);
+  static ToolCallingSessionCreateResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get sessionHandle => $_getI64(0);
+  @$pb.TagNumber(1)
+  set sessionHandle($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSessionHandle() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionHandle() => $_clearField(1);
+}
+
+enum ToolCallingSessionEvent_Kind {
+  llmStreamEventBytes,
+  toolCall,
+  finalResult,
+  errorBytes,
+  notSet
+}
+
+class ToolCallingSessionEvent extends $pb.GeneratedMessage {
+  factory ToolCallingSessionEvent({
+    $core.List<$core.int>? llmStreamEventBytes,
+    $2.ToolCall? toolCall,
+    $2.ToolCallingResult? finalResult,
+    $core.List<$core.int>? errorBytes,
+    $fixnum.Int64? seq,
+  }) {
+    final result = create();
+    if (llmStreamEventBytes != null)
+      result.llmStreamEventBytes = llmStreamEventBytes;
+    if (toolCall != null) result.toolCall = toolCall;
+    if (finalResult != null) result.finalResult = finalResult;
+    if (errorBytes != null) result.errorBytes = errorBytes;
+    if (seq != null) result.seq = seq;
+    return result;
+  }
+
+  ToolCallingSessionEvent._();
+
+  factory ToolCallingSessionEvent.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ToolCallingSessionEvent.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static const $core.Map<$core.int, ToolCallingSessionEvent_Kind>
+      _ToolCallingSessionEvent_KindByTag = {
+    1: ToolCallingSessionEvent_Kind.llmStreamEventBytes,
+    2: ToolCallingSessionEvent_Kind.toolCall,
+    3: ToolCallingSessionEvent_Kind.finalResult,
+    4: ToolCallingSessionEvent_Kind.errorBytes,
+    0: ToolCallingSessionEvent_Kind.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ToolCallingSessionEvent',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..oo(0, [1, 2, 3, 4])
+    ..a<$core.List<$core.int>>(
+        1, _omitFieldNames ? '' : 'llmStreamEventBytes', $pb.PbFieldType.OY)
+    ..aOM<$2.ToolCall>(2, _omitFieldNames ? '' : 'toolCall',
+        subBuilder: $2.ToolCall.create)
+    ..aOM<$2.ToolCallingResult>(3, _omitFieldNames ? '' : 'finalResult',
+        subBuilder: $2.ToolCallingResult.create)
+    ..a<$core.List<$core.int>>(
+        4, _omitFieldNames ? '' : 'errorBytes', $pb.PbFieldType.OY)
+    ..a<$fixnum.Int64>(5, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToolCallingSessionEvent clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToolCallingSessionEvent copyWith(
+          void Function(ToolCallingSessionEvent) updates) =>
+      super.copyWith((message) => updates(message as ToolCallingSessionEvent))
+          as ToolCallingSessionEvent;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingSessionEvent create() => ToolCallingSessionEvent._();
+  @$core.override
+  ToolCallingSessionEvent createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingSessionEvent getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ToolCallingSessionEvent>(create);
+  static ToolCallingSessionEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  ToolCallingSessionEvent_Kind whichKind() =>
+      _ToolCallingSessionEvent_KindByTag[$_whichOneof(0)]!;
+  @$pb.TagNumber(1)
+  @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
+  @$pb.TagNumber(4)
+  void clearKind() => $_clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get llmStreamEventBytes => $_getN(0);
+  @$pb.TagNumber(1)
+  set llmStreamEventBytes($core.List<$core.int> value) => $_setBytes(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasLlmStreamEventBytes() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLlmStreamEventBytes() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $2.ToolCall get toolCall => $_getN(1);
+  @$pb.TagNumber(2)
+  set toolCall($2.ToolCall value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasToolCall() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearToolCall() => $_clearField(2);
+  @$pb.TagNumber(2)
+  $2.ToolCall ensureToolCall() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $2.ToolCallingResult get finalResult => $_getN(2);
+  @$pb.TagNumber(3)
+  set finalResult($2.ToolCallingResult value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasFinalResult() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFinalResult() => $_clearField(3);
+  @$pb.TagNumber(3)
+  $2.ToolCallingResult ensureFinalResult() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $core.List<$core.int> get errorBytes => $_getN(3);
+  @$pb.TagNumber(4)
+  set errorBytes($core.List<$core.int> value) => $_setBytes(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasErrorBytes() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearErrorBytes() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get seq => $_getI64(4);
+  @$pb.TagNumber(5)
+  set seq($fixnum.Int64 value) => $_setInt64(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasSeq() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSeq() => $_clearField(5);
+}
+
+class ToolCallingSessionStepWithResultRequest extends $pb.GeneratedMessage {
+  factory ToolCallingSessionStepWithResultRequest({
+    $fixnum.Int64? sessionHandle,
+    $core.String? toolCallId,
+    $core.String? resultJson,
+    $core.String? error,
+  }) {
+    final result = create();
+    if (sessionHandle != null) result.sessionHandle = sessionHandle;
+    if (toolCallId != null) result.toolCallId = toolCallId;
+    if (resultJson != null) result.resultJson = resultJson;
+    if (error != null) result.error = error;
+    return result;
+  }
+
+  ToolCallingSessionStepWithResultRequest._();
+
+  factory ToolCallingSessionStepWithResultRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ToolCallingSessionStepWithResultRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ToolCallingSessionStepWithResultRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..a<$fixnum.Int64>(
+        1, _omitFieldNames ? '' : 'sessionHandle', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(2, _omitFieldNames ? '' : 'toolCallId')
+    ..aOS(3, _omitFieldNames ? '' : 'resultJson')
+    ..aOS(4, _omitFieldNames ? '' : 'error')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToolCallingSessionStepWithResultRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToolCallingSessionStepWithResultRequest copyWith(
+          void Function(ToolCallingSessionStepWithResultRequest) updates) =>
+      super.copyWith((message) =>
+              updates(message as ToolCallingSessionStepWithResultRequest))
+          as ToolCallingSessionStepWithResultRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingSessionStepWithResultRequest create() =>
+      ToolCallingSessionStepWithResultRequest._();
+  @$core.override
+  ToolCallingSessionStepWithResultRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingSessionStepWithResultRequest getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<
+          ToolCallingSessionStepWithResultRequest>(create);
+  static ToolCallingSessionStepWithResultRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get sessionHandle => $_getI64(0);
+  @$pb.TagNumber(1)
+  set sessionHandle($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSessionHandle() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionHandle() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get toolCallId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set toolCallId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasToolCallId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearToolCallId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get resultJson => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set resultJson($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasResultJson() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearResultJson() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get error => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set error($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasError() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearError() => $_clearField(4);
+}
+
+class ToolCallingSessionDestroyRequest extends $pb.GeneratedMessage {
+  factory ToolCallingSessionDestroyRequest({
+    $fixnum.Int64? sessionHandle,
+  }) {
+    final result = create();
+    if (sessionHandle != null) result.sessionHandle = sessionHandle;
+    return result;
+  }
+
+  ToolCallingSessionDestroyRequest._();
+
+  factory ToolCallingSessionDestroyRequest.fromBuffer(
+          $core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ToolCallingSessionDestroyRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ToolCallingSessionDestroyRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..a<$fixnum.Int64>(
+        1, _omitFieldNames ? '' : 'sessionHandle', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToolCallingSessionDestroyRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ToolCallingSessionDestroyRequest copyWith(
+          void Function(ToolCallingSessionDestroyRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ToolCallingSessionDestroyRequest))
+          as ToolCallingSessionDestroyRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingSessionDestroyRequest create() =>
+      ToolCallingSessionDestroyRequest._();
+  @$core.override
+  ToolCallingSessionDestroyRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingSessionDestroyRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ToolCallingSessionDestroyRequest>(
+          create);
+  static ToolCallingSessionDestroyRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get sessionHandle => $_getI64(0);
+  @$pb.TagNumber(1)
+  set sessionHandle($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSessionHandle() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionHandle() => $_clearField(1);
+}
+
 class LLMApi {
   final $pb.RpcClient _client;
 
@@ -700,8 +1156,7 @@ class LLMApi {
   /// via the existing rac_llm_cancel() C ABI.
   ///
   /// Tool-driven streaming is not supported on this entry point even when
-  /// options.tool_calling is populated. Use the non-streaming tool-session
-  /// generation path for tool calling.
+  /// options.tool_calling is populated. Use the tool-calling session path.
   $async.Future<LLMStreamEvent> generate(
           $pb.ClientContext? ctx, LLMGenerateRequest request) =>
       _client.invoke<LLMStreamEvent>(

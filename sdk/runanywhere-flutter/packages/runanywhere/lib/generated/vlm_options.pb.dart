@@ -16,7 +16,8 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'model_types.pbenum.dart' as $0;
+import 'model_types.pbenum.dart' as $1;
+import 'thinking_tag_pattern.pb.dart' as $0;
 import 'vlm_options.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -341,7 +342,7 @@ class VLMConfiguration extends $pb.GeneratedMessage {
     $core.double? temperature,
     $core.String? systemPrompt,
     $core.bool? streamingEnabled,
-    $0.InferenceFramework? preferredFramework,
+    $1.InferenceFramework? preferredFramework,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
@@ -376,8 +377,8 @@ class VLMConfiguration extends $pb.GeneratedMessage {
     ..aD(5, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
     ..aOS(6, _omitFieldNames ? '' : 'systemPrompt')
     ..aOB(7, _omitFieldNames ? '' : 'streamingEnabled')
-    ..aE<$0.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework',
-        enumValues: $0.InferenceFramework.values)
+    ..aE<$1.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework',
+        enumValues: $1.InferenceFramework.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -465,9 +466,9 @@ class VLMConfiguration extends $pb.GeneratedMessage {
   void clearStreamingEnabled() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $0.InferenceFramework get preferredFramework => $_getN(7);
+  $1.InferenceFramework get preferredFramework => $_getN(7);
   @$pb.TagNumber(8)
-  set preferredFramework($0.InferenceFramework value) => $_setField(8, value);
+  set preferredFramework($1.InferenceFramework value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasPreferredFramework() => $_has(7);
   @$pb.TagNumber(8)
@@ -498,12 +499,11 @@ class VLMConfiguration extends $pb.GeneratedMessage {
 class VLMGenerationOptions extends $pb.GeneratedMessage {
   factory VLMGenerationOptions({
     $core.String? prompt,
-    $core.int? maxTokens,
+    $core.int? maxOutputTokens,
     $core.double? temperature,
     $core.double? topP,
     $core.int? topK,
     $core.Iterable<$core.String>? stopSequences,
-    $core.bool? streamingEnabled,
     $core.String? systemPrompt,
     $core.int? maxImageSize,
     $core.int? nThreads,
@@ -515,15 +515,15 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
     $core.double? repetitionPenalty,
     $core.double? minP,
     $core.bool? emitImageEmbeddings,
+    $0.ReasoningOptions? reasoning,
   }) {
     final result = create();
     if (prompt != null) result.prompt = prompt;
-    if (maxTokens != null) result.maxTokens = maxTokens;
+    if (maxOutputTokens != null) result.maxOutputTokens = maxOutputTokens;
     if (temperature != null) result.temperature = temperature;
     if (topP != null) result.topP = topP;
     if (topK != null) result.topK = topK;
     if (stopSequences != null) result.stopSequences.addAll(stopSequences);
-    if (streamingEnabled != null) result.streamingEnabled = streamingEnabled;
     if (systemPrompt != null) result.systemPrompt = systemPrompt;
     if (maxImageSize != null) result.maxImageSize = maxImageSize;
     if (nThreads != null) result.nThreads = nThreads;
@@ -538,6 +538,7 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
     if (minP != null) result.minP = minP;
     if (emitImageEmbeddings != null)
       result.emitImageEmbeddings = emitImageEmbeddings;
+    if (reasoning != null) result.reasoning = reasoning;
     return result;
   }
 
@@ -555,12 +556,11 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'prompt')
-    ..aI(2, _omitFieldNames ? '' : 'maxTokens')
+    ..aI(2, _omitFieldNames ? '' : 'maxOutputTokens')
     ..aD(3, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
     ..aD(4, _omitFieldNames ? '' : 'topP', fieldType: $pb.PbFieldType.OF)
     ..aI(5, _omitFieldNames ? '' : 'topK')
     ..pPS(6, _omitFieldNames ? '' : 'stopSequences')
-    ..aOB(7, _omitFieldNames ? '' : 'streamingEnabled')
     ..aOS(8, _omitFieldNames ? '' : 'systemPrompt')
     ..aI(9, _omitFieldNames ? '' : 'maxImageSize')
     ..aI(10, _omitFieldNames ? '' : 'nThreads')
@@ -575,6 +575,8 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OF)
     ..aD(17, _omitFieldNames ? '' : 'minP', fieldType: $pb.PbFieldType.OF)
     ..aOB(18, _omitFieldNames ? '' : 'emitImageEmbeddings')
+    ..aOM<$0.ReasoningOptions>(19, _omitFieldNames ? '' : 'reasoning',
+        subBuilder: $0.ReasoningOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -606,13 +608,13 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
   void clearPrompt() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get maxTokens => $_getIZ(1);
+  $core.int get maxOutputTokens => $_getIZ(1);
   @$pb.TagNumber(2)
-  set maxTokens($core.int value) => $_setSignedInt32(1, value);
+  set maxOutputTokens($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasMaxTokens() => $_has(1);
+  $core.bool hasMaxOutputTokens() => $_has(1);
   @$pb.TagNumber(2)
-  void clearMaxTokens() => $_clearField(2);
+  void clearMaxOutputTokens() => $_clearField(2);
 
   @$pb.TagNumber(3)
   $core.double get temperature => $_getN(2);
@@ -645,116 +647,119 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   $pb.PbList<$core.String> get stopSequences => $_getList(5);
 
-  @$pb.TagNumber(7)
-  $core.bool get streamingEnabled => $_getBF(6);
-  @$pb.TagNumber(7)
-  set streamingEnabled($core.bool value) => $_setBool(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasStreamingEnabled() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearStreamingEnabled() => $_clearField(7);
-
   @$pb.TagNumber(8)
-  $core.String get systemPrompt => $_getSZ(7);
+  $core.String get systemPrompt => $_getSZ(6);
   @$pb.TagNumber(8)
-  set systemPrompt($core.String value) => $_setString(7, value);
+  set systemPrompt($core.String value) => $_setString(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasSystemPrompt() => $_has(7);
+  $core.bool hasSystemPrompt() => $_has(6);
   @$pb.TagNumber(8)
   void clearSystemPrompt() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.int get maxImageSize => $_getIZ(8);
+  $core.int get maxImageSize => $_getIZ(7);
   @$pb.TagNumber(9)
-  set maxImageSize($core.int value) => $_setSignedInt32(8, value);
+  set maxImageSize($core.int value) => $_setSignedInt32(7, value);
   @$pb.TagNumber(9)
-  $core.bool hasMaxImageSize() => $_has(8);
+  $core.bool hasMaxImageSize() => $_has(7);
   @$pb.TagNumber(9)
   void clearMaxImageSize() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  $core.int get nThreads => $_getIZ(9);
+  $core.int get nThreads => $_getIZ(8);
   @$pb.TagNumber(10)
-  set nThreads($core.int value) => $_setSignedInt32(9, value);
+  set nThreads($core.int value) => $_setSignedInt32(8, value);
   @$pb.TagNumber(10)
-  $core.bool hasNThreads() => $_has(9);
+  $core.bool hasNThreads() => $_has(8);
   @$pb.TagNumber(10)
   void clearNThreads() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.bool get useGpu => $_getBF(10);
+  $core.bool get useGpu => $_getBF(9);
   @$pb.TagNumber(11)
-  set useGpu($core.bool value) => $_setBool(10, value);
+  set useGpu($core.bool value) => $_setBool(9, value);
   @$pb.TagNumber(11)
-  $core.bool hasUseGpu() => $_has(10);
+  $core.bool hasUseGpu() => $_has(9);
   @$pb.TagNumber(11)
   void clearUseGpu() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  VLMModelFamily get modelFamily => $_getN(11);
+  VLMModelFamily get modelFamily => $_getN(10);
   @$pb.TagNumber(12)
   set modelFamily(VLMModelFamily value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasModelFamily() => $_has(11);
+  $core.bool hasModelFamily() => $_has(10);
   @$pb.TagNumber(12)
   void clearModelFamily() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  VLMChatTemplate get customChatTemplate => $_getN(12);
+  VLMChatTemplate get customChatTemplate => $_getN(11);
   @$pb.TagNumber(13)
   set customChatTemplate(VLMChatTemplate value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasCustomChatTemplate() => $_has(12);
+  $core.bool hasCustomChatTemplate() => $_has(11);
   @$pb.TagNumber(13)
   void clearCustomChatTemplate() => $_clearField(13);
   @$pb.TagNumber(13)
-  VLMChatTemplate ensureCustomChatTemplate() => $_ensure(12);
+  VLMChatTemplate ensureCustomChatTemplate() => $_ensure(11);
 
   @$pb.TagNumber(14)
-  $core.String get imageMarkerOverride => $_getSZ(13);
+  $core.String get imageMarkerOverride => $_getSZ(12);
   @$pb.TagNumber(14)
-  set imageMarkerOverride($core.String value) => $_setString(13, value);
+  set imageMarkerOverride($core.String value) => $_setString(12, value);
   @$pb.TagNumber(14)
-  $core.bool hasImageMarkerOverride() => $_has(13);
+  $core.bool hasImageMarkerOverride() => $_has(12);
   @$pb.TagNumber(14)
   void clearImageMarkerOverride() => $_clearField(14);
 
   /// Additional llama.cpp sampling knobs and result controls.
   @$pb.TagNumber(15)
-  $fixnum.Int64 get seed => $_getI64(14);
+  $fixnum.Int64 get seed => $_getI64(13);
   @$pb.TagNumber(15)
-  set seed($fixnum.Int64 value) => $_setInt64(14, value);
+  set seed($fixnum.Int64 value) => $_setInt64(13, value);
   @$pb.TagNumber(15)
-  $core.bool hasSeed() => $_has(14);
+  $core.bool hasSeed() => $_has(13);
   @$pb.TagNumber(15)
   void clearSeed() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $core.double get repetitionPenalty => $_getN(15);
+  $core.double get repetitionPenalty => $_getN(14);
   @$pb.TagNumber(16)
-  set repetitionPenalty($core.double value) => $_setFloat(15, value);
+  set repetitionPenalty($core.double value) => $_setFloat(14, value);
   @$pb.TagNumber(16)
-  $core.bool hasRepetitionPenalty() => $_has(15);
+  $core.bool hasRepetitionPenalty() => $_has(14);
   @$pb.TagNumber(16)
   void clearRepetitionPenalty() => $_clearField(16);
 
   @$pb.TagNumber(17)
-  $core.double get minP => $_getN(16);
+  $core.double get minP => $_getN(15);
   @$pb.TagNumber(17)
-  set minP($core.double value) => $_setFloat(16, value);
+  set minP($core.double value) => $_setFloat(15, value);
   @$pb.TagNumber(17)
-  $core.bool hasMinP() => $_has(16);
+  $core.bool hasMinP() => $_has(15);
   @$pb.TagNumber(17)
   void clearMinP() => $_clearField(17);
 
   @$pb.TagNumber(18)
-  $core.bool get emitImageEmbeddings => $_getBF(17);
+  $core.bool get emitImageEmbeddings => $_getBF(16);
   @$pb.TagNumber(18)
-  set emitImageEmbeddings($core.bool value) => $_setBool(17, value);
+  set emitImageEmbeddings($core.bool value) => $_setBool(16, value);
   @$pb.TagNumber(18)
-  $core.bool hasEmitImageEmbeddings() => $_has(17);
+  $core.bool hasEmitImageEmbeddings() => $_has(16);
   @$pb.TagNumber(18)
   void clearEmitImageEmbeddings() => $_clearField(18);
+
+  /// Reasoning/thinking control — same message as LLMGenerationOptions.
+  @$pb.TagNumber(19)
+  $0.ReasoningOptions get reasoning => $_getN(17);
+  @$pb.TagNumber(19)
+  set reasoning($0.ReasoningOptions value) => $_setField(19, value);
+  @$pb.TagNumber(19)
+  $core.bool hasReasoning() => $_has(17);
+  @$pb.TagNumber(19)
+  void clearReasoning() => $_clearField(19);
+  @$pb.TagNumber(19)
+  $0.ReasoningOptions ensureReasoning() => $_ensure(17);
 }
 
 class VLMGenerationRequest extends $pb.GeneratedMessage {
@@ -885,8 +890,8 @@ class VLMGenerationRequest extends $pb.GeneratedMessage {
 class VLMResult extends $pb.GeneratedMessage {
   factory VLMResult({
     $core.String? text,
-    $core.int? promptTokens,
-    $core.int? completionTokens,
+    $core.int? inputTokens,
+    $core.int? outputTokens,
     $fixnum.Int64? totalTokens,
     $fixnum.Int64? processingTimeMs,
     $core.double? tokensPerSecond,
@@ -901,8 +906,8 @@ class VLMResult extends $pb.GeneratedMessage {
   }) {
     final result = create();
     if (text != null) result.text = text;
-    if (promptTokens != null) result.promptTokens = promptTokens;
-    if (completionTokens != null) result.completionTokens = completionTokens;
+    if (inputTokens != null) result.inputTokens = inputTokens;
+    if (outputTokens != null) result.outputTokens = outputTokens;
     if (totalTokens != null) result.totalTokens = totalTokens;
     if (processingTimeMs != null) result.processingTimeMs = processingTimeMs;
     if (tokensPerSecond != null) result.tokensPerSecond = tokensPerSecond;
@@ -932,8 +937,8 @@ class VLMResult extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'text')
-    ..aI(2, _omitFieldNames ? '' : 'promptTokens')
-    ..aI(3, _omitFieldNames ? '' : 'completionTokens')
+    ..aI(2, _omitFieldNames ? '' : 'inputTokens')
+    ..aI(3, _omitFieldNames ? '' : 'outputTokens')
     ..aInt64(4, _omitFieldNames ? '' : 'totalTokens')
     ..aInt64(5, _omitFieldNames ? '' : 'processingTimeMs')
     ..aD(6, _omitFieldNames ? '' : 'tokensPerSecond',
@@ -976,22 +981,22 @@ class VLMResult extends $pb.GeneratedMessage {
   void clearText() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $core.int get promptTokens => $_getIZ(1);
+  $core.int get inputTokens => $_getIZ(1);
   @$pb.TagNumber(2)
-  set promptTokens($core.int value) => $_setSignedInt32(1, value);
+  set inputTokens($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasPromptTokens() => $_has(1);
+  $core.bool hasInputTokens() => $_has(1);
   @$pb.TagNumber(2)
-  void clearPromptTokens() => $_clearField(2);
+  void clearInputTokens() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.int get completionTokens => $_getIZ(2);
+  $core.int get outputTokens => $_getIZ(2);
   @$pb.TagNumber(3)
-  set completionTokens($core.int value) => $_setSignedInt32(2, value);
+  set outputTokens($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasCompletionTokens() => $_has(2);
+  $core.bool hasOutputTokens() => $_has(2);
   @$pb.TagNumber(3)
-  void clearCompletionTokens() => $_clearField(3);
+  void clearOutputTokens() => $_clearField(3);
 
   @$pb.TagNumber(4)
   $fixnum.Int64 get totalTokens => $_getI64(3);

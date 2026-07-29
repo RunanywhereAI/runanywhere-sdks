@@ -14,7 +14,11 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'thinking_tag_pattern.pbenum.dart';
+
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+
+export 'thinking_tag_pattern.pbenum.dart';
 
 /// ---------------------------------------------------------------------------
 /// Pattern used to extract a model's "thinking" / reasoning block from its
@@ -88,6 +92,92 @@ class ThinkingTagPattern extends $pb.GeneratedMessage {
   $core.bool hasCloseTag() => $_has(1);
   @$pb.TagNumber(2)
   void clearCloseTag() => $_clearField(2);
+}
+
+class ReasoningOptions extends $pb.GeneratedMessage {
+  factory ReasoningOptions({
+    ReasoningMode? mode,
+    $core.bool? includeInOutput,
+    ThinkingTagPattern? pattern,
+  }) {
+    final result = create();
+    if (mode != null) result.mode = mode;
+    if (includeInOutput != null) result.includeInOutput = includeInOutput;
+    if (pattern != null) result.pattern = pattern;
+    return result;
+  }
+
+  ReasoningOptions._();
+
+  factory ReasoningOptions.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ReasoningOptions.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ReasoningOptions',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aE<ReasoningMode>(1, _omitFieldNames ? '' : 'mode',
+        enumValues: ReasoningMode.values)
+    ..aOB(2, _omitFieldNames ? '' : 'includeInOutput')
+    ..aOM<ThinkingTagPattern>(3, _omitFieldNames ? '' : 'pattern',
+        subBuilder: ThinkingTagPattern.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReasoningOptions clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ReasoningOptions copyWith(void Function(ReasoningOptions) updates) =>
+      super.copyWith((message) => updates(message as ReasoningOptions))
+          as ReasoningOptions;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ReasoningOptions create() => ReasoningOptions._();
+  @$core.override
+  ReasoningOptions createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ReasoningOptions getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ReasoningOptions>(create);
+  static ReasoningOptions? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ReasoningMode get mode => $_getN(0);
+  @$pb.TagNumber(1)
+  set mode(ReasoningMode value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasMode() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearMode() => $_clearField(1);
+
+  /// Emit thought tokens/content to the caller (stream TokenKind.THOUGHT
+  /// events and result thinking_content). False = thinking is stripped.
+  @$pb.TagNumber(2)
+  $core.bool get includeInOutput => $_getBF(1);
+  @$pb.TagNumber(2)
+  set includeInOutput($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasIncludeInOutput() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearIncludeInOutput() => $_clearField(2);
+
+  /// Tag override for models whose thinking markers differ from the
+  /// catalog default.
+  @$pb.TagNumber(3)
+  ThinkingTagPattern get pattern => $_getN(2);
+  @$pb.TagNumber(3)
+  set pattern(ThinkingTagPattern value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasPattern() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPattern() => $_clearField(3);
+  @$pb.TagNumber(3)
+  ThinkingTagPattern ensurePattern() => $_ensure(2);
 }
 
 const $core.bool _omitFieldNames =

@@ -34,60 +34,47 @@ export 'llm_options.pbenum.dart';
 /// ---------------------------------------------------------------------------
 class LLMGenerationOptions extends $pb.GeneratedMessage {
   factory LLMGenerationOptions({
-    $core.int? maxTokens,
+    $core.int? maxOutputTokens,
     $core.double? temperature,
     $core.double? topP,
     $core.int? topK,
     $core.double? repetitionPenalty,
     $core.Iterable<$core.String>? stopSequences,
-    $core.bool? streamingEnabled,
     $3.InferenceFramework? preferredFramework,
     $core.String? systemPrompt,
-    $core.String? jsonSchema,
-    $0.ThinkingTagPattern? thinkingPattern,
+    $0.ReasoningOptions? reasoning,
     ExecutionTarget? executionTarget,
     $1.StructuredOutputOptions? structuredOutput,
-    $core.bool? enableRealTimeTracking,
     $fixnum.Int64? seed,
     $core.double? frequencyPenalty,
     $core.double? presencePenalty,
     $core.int? repeatLastN,
     $core.double? minP,
-    $core.String? grammar,
-    $core.String? responseFormat,
     $core.bool? echoPrompt,
     $core.int? nThreads,
     $2.ToolCallingOptions? toolCalling,
-    $core.bool? disableThinking,
   }) {
     final result = create();
-    if (maxTokens != null) result.maxTokens = maxTokens;
+    if (maxOutputTokens != null) result.maxOutputTokens = maxOutputTokens;
     if (temperature != null) result.temperature = temperature;
     if (topP != null) result.topP = topP;
     if (topK != null) result.topK = topK;
     if (repetitionPenalty != null) result.repetitionPenalty = repetitionPenalty;
     if (stopSequences != null) result.stopSequences.addAll(stopSequences);
-    if (streamingEnabled != null) result.streamingEnabled = streamingEnabled;
     if (preferredFramework != null)
       result.preferredFramework = preferredFramework;
     if (systemPrompt != null) result.systemPrompt = systemPrompt;
-    if (jsonSchema != null) result.jsonSchema = jsonSchema;
-    if (thinkingPattern != null) result.thinkingPattern = thinkingPattern;
+    if (reasoning != null) result.reasoning = reasoning;
     if (executionTarget != null) result.executionTarget = executionTarget;
     if (structuredOutput != null) result.structuredOutput = structuredOutput;
-    if (enableRealTimeTracking != null)
-      result.enableRealTimeTracking = enableRealTimeTracking;
     if (seed != null) result.seed = seed;
     if (frequencyPenalty != null) result.frequencyPenalty = frequencyPenalty;
     if (presencePenalty != null) result.presencePenalty = presencePenalty;
     if (repeatLastN != null) result.repeatLastN = repeatLastN;
     if (minP != null) result.minP = minP;
-    if (grammar != null) result.grammar = grammar;
-    if (responseFormat != null) result.responseFormat = responseFormat;
     if (echoPrompt != null) result.echoPrompt = echoPrompt;
     if (nThreads != null) result.nThreads = nThreads;
     if (toolCalling != null) result.toolCalling = toolCalling;
-    if (disableThinking != null) result.disableThinking = disableThinking;
     return result;
   }
 
@@ -104,26 +91,23 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'LLMGenerationOptions',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aI(1, _omitFieldNames ? '' : 'maxTokens')
+    ..aI(1, _omitFieldNames ? '' : 'maxOutputTokens')
     ..aD(2, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
     ..aD(3, _omitFieldNames ? '' : 'topP', fieldType: $pb.PbFieldType.OF)
     ..aI(4, _omitFieldNames ? '' : 'topK')
     ..aD(5, _omitFieldNames ? '' : 'repetitionPenalty',
         fieldType: $pb.PbFieldType.OF)
     ..pPS(6, _omitFieldNames ? '' : 'stopSequences')
-    ..aOB(7, _omitFieldNames ? '' : 'streamingEnabled')
     ..aE<$3.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework',
         enumValues: $3.InferenceFramework.values)
     ..aOS(9, _omitFieldNames ? '' : 'systemPrompt')
-    ..aOS(10, _omitFieldNames ? '' : 'jsonSchema')
-    ..aOM<$0.ThinkingTagPattern>(11, _omitFieldNames ? '' : 'thinkingPattern',
-        subBuilder: $0.ThinkingTagPattern.create)
+    ..aOM<$0.ReasoningOptions>(11, _omitFieldNames ? '' : 'reasoning',
+        subBuilder: $0.ReasoningOptions.create)
     ..aE<ExecutionTarget>(12, _omitFieldNames ? '' : 'executionTarget',
         enumValues: ExecutionTarget.values)
     ..aOM<$1.StructuredOutputOptions>(
         13, _omitFieldNames ? '' : 'structuredOutput',
         subBuilder: $1.StructuredOutputOptions.create)
-    ..aOB(14, _omitFieldNames ? '' : 'enableRealTimeTracking')
     ..aInt64(15, _omitFieldNames ? '' : 'seed')
     ..aD(16, _omitFieldNames ? '' : 'frequencyPenalty',
         fieldType: $pb.PbFieldType.OF)
@@ -131,13 +115,10 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OF)
     ..aI(18, _omitFieldNames ? '' : 'repeatLastN')
     ..aD(19, _omitFieldNames ? '' : 'minP', fieldType: $pb.PbFieldType.OF)
-    ..aOS(20, _omitFieldNames ? '' : 'grammar')
-    ..aOS(21, _omitFieldNames ? '' : 'responseFormat')
     ..aOB(22, _omitFieldNames ? '' : 'echoPrompt')
     ..aI(23, _omitFieldNames ? '' : 'nThreads')
     ..aOM<$2.ToolCallingOptions>(24, _omitFieldNames ? '' : 'toolCalling',
         subBuilder: $2.ToolCallingOptions.create)
-    ..aOB(25, _omitFieldNames ? '' : 'disableThinking')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -162,13 +143,13 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   /// Maximum number of tokens to generate. 0 (default) = unset → engine
   /// default (typically 100).
   @$pb.TagNumber(1)
-  $core.int get maxTokens => $_getIZ(0);
+  $core.int get maxOutputTokens => $_getIZ(0);
   @$pb.TagNumber(1)
-  set maxTokens($core.int value) => $_setSignedInt32(0, value);
+  set maxOutputTokens($core.int value) => $_setSignedInt32(0, value);
   @$pb.TagNumber(1)
-  $core.bool hasMaxTokens() => $_has(0);
+  $core.bool hasMaxOutputTokens() => $_has(0);
   @$pb.TagNumber(1)
-  void clearMaxTokens() => $_clearField(1);
+  void clearMaxOutputTokens() => $_clearField(1);
 
   /// Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding.
   @$pb.TagNumber(2)
@@ -215,213 +196,146 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   $pb.PbList<$core.String> get stopSequences => $_getList(5);
 
-  /// Whether to stream tokens vs return result at end (Swift field).
-  @$pb.TagNumber(7)
-  $core.bool get streamingEnabled => $_getBF(6);
-  @$pb.TagNumber(7)
-  set streamingEnabled($core.bool value) => $_setBool(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasStreamingEnabled() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearStreamingEnabled() => $_clearField(7);
-
   /// Preferred inference framework. UNSPECIFIED = pick automatically.
   @$pb.TagNumber(8)
-  $3.InferenceFramework get preferredFramework => $_getN(7);
+  $3.InferenceFramework get preferredFramework => $_getN(6);
   @$pb.TagNumber(8)
   set preferredFramework($3.InferenceFramework value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasPreferredFramework() => $_has(7);
+  $core.bool hasPreferredFramework() => $_has(6);
   @$pb.TagNumber(8)
   void clearPreferredFramework() => $_clearField(8);
 
   /// System prompt to define AI behavior and formatting rules.
   @$pb.TagNumber(9)
-  $core.String get systemPrompt => $_getSZ(8);
+  $core.String get systemPrompt => $_getSZ(7);
   @$pb.TagNumber(9)
-  set systemPrompt($core.String value) => $_setString(8, value);
+  set systemPrompt($core.String value) => $_setString(7, value);
   @$pb.TagNumber(9)
-  $core.bool hasSystemPrompt() => $_has(8);
+  $core.bool hasSystemPrompt() => $_has(7);
   @$pb.TagNumber(9)
   void clearSystemPrompt() => $_clearField(9);
 
-  /// Optional structured-output mode (JSON schema). Engine returns text
-  /// that conforms to this schema. Swift wraps this in a StructuredOutputConfig
-  /// struct with the Generatable.Type — proto carries just the schema string.
-  @$pb.TagNumber(10)
-  $core.String get jsonSchema => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set jsonSchema($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasJsonSchema() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearJsonSchema() => $_clearField(10);
-
-  /// Optional thinking-tag pattern for extracting reasoning content from
-  /// models like Qwen3 / LFM2 that emit <think>...</think> blocks.
+  /// Reasoning/thinking control (mode, emission, tag pattern). Unset =
+  /// model default with thinking stripped from output.
   @$pb.TagNumber(11)
-  $0.ThinkingTagPattern get thinkingPattern => $_getN(10);
+  $0.ReasoningOptions get reasoning => $_getN(8);
   @$pb.TagNumber(11)
-  set thinkingPattern($0.ThinkingTagPattern value) => $_setField(11, value);
+  set reasoning($0.ReasoningOptions value) => $_setField(11, value);
   @$pb.TagNumber(11)
-  $core.bool hasThinkingPattern() => $_has(10);
+  $core.bool hasReasoning() => $_has(8);
   @$pb.TagNumber(11)
-  void clearThinkingPattern() => $_clearField(11);
+  void clearReasoning() => $_clearField(11);
   @$pb.TagNumber(11)
-  $0.ThinkingTagPattern ensureThinkingPattern() => $_ensure(10);
+  $0.ReasoningOptions ensureReasoning() => $_ensure(8);
 
   /// Routing hint: where this generation should run (on-device, cloud, or
   /// SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
   @$pb.TagNumber(12)
-  ExecutionTarget get executionTarget => $_getN(11);
+  ExecutionTarget get executionTarget => $_getN(9);
   @$pb.TagNumber(12)
   set executionTarget(ExecutionTarget value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasExecutionTarget() => $_has(11);
+  $core.bool hasExecutionTarget() => $_has(9);
   @$pb.TagNumber(12)
   void clearExecutionTarget() => $_clearField(12);
 
-  /// Optional structured-output configuration. Detailed message lives in
-  /// structured_output.proto so the schema/format details aren't duplicated
-  /// here. When set, supersedes the simpler `json_schema` string above.
+  /// The ONE output-constraint surface (typed or raw JSON schema, grammar,
+  /// regex — see structured_output.proto).
   @$pb.TagNumber(13)
-  $1.StructuredOutputOptions get structuredOutput => $_getN(12);
+  $1.StructuredOutputOptions get structuredOutput => $_getN(10);
   @$pb.TagNumber(13)
   set structuredOutput($1.StructuredOutputOptions value) =>
       $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasStructuredOutput() => $_has(12);
+  $core.bool hasStructuredOutput() => $_has(10);
   @$pb.TagNumber(13)
   void clearStructuredOutput() => $_clearField(13);
   @$pb.TagNumber(13)
-  $1.StructuredOutputOptions ensureStructuredOutput() => $_ensure(12);
-
-  /// Enable per-token/cost dashboard tracking for SDKs that surface live
-  /// generation telemetry. No-op for backends without a telemetry sink.
-  @$pb.TagNumber(14)
-  $core.bool get enableRealTimeTracking => $_getBF(13);
-  @$pb.TagNumber(14)
-  set enableRealTimeTracking($core.bool value) => $_setBool(13, value);
-  @$pb.TagNumber(14)
-  $core.bool hasEnableRealTimeTracking() => $_has(13);
-  @$pb.TagNumber(14)
-  void clearEnableRealTimeTracking() => $_clearField(14);
+  $1.StructuredOutputOptions ensureStructuredOutput() => $_ensure(10);
 
   /// Deterministic sampling seed. 0 = backend/default random seed.
   @$pb.TagNumber(15)
-  $fixnum.Int64 get seed => $_getI64(14);
+  $fixnum.Int64 get seed => $_getI64(11);
   @$pb.TagNumber(15)
-  set seed($fixnum.Int64 value) => $_setInt64(14, value);
+  set seed($fixnum.Int64 value) => $_setInt64(11, value);
   @$pb.TagNumber(15)
-  $core.bool hasSeed() => $_has(14);
+  $core.bool hasSeed() => $_has(11);
   @$pb.TagNumber(15)
   void clearSeed() => $_clearField(15);
 
   /// OpenAI-compatible sampling penalties. 0.0 = disabled.
   @$pb.TagNumber(16)
-  $core.double get frequencyPenalty => $_getN(15);
+  $core.double get frequencyPenalty => $_getN(12);
   @$pb.TagNumber(16)
-  set frequencyPenalty($core.double value) => $_setFloat(15, value);
+  set frequencyPenalty($core.double value) => $_setFloat(12, value);
   @$pb.TagNumber(16)
-  $core.bool hasFrequencyPenalty() => $_has(15);
+  $core.bool hasFrequencyPenalty() => $_has(12);
   @$pb.TagNumber(16)
   void clearFrequencyPenalty() => $_clearField(16);
 
   @$pb.TagNumber(17)
-  $core.double get presencePenalty => $_getN(16);
+  $core.double get presencePenalty => $_getN(13);
   @$pb.TagNumber(17)
-  set presencePenalty($core.double value) => $_setFloat(16, value);
+  set presencePenalty($core.double value) => $_setFloat(13, value);
   @$pb.TagNumber(17)
-  $core.bool hasPresencePenalty() => $_has(16);
+  $core.bool hasPresencePenalty() => $_has(13);
   @$pb.TagNumber(17)
   void clearPresencePenalty() => $_clearField(17);
 
   /// Repeat-penalty lookback window. 0 = backend default.
   @$pb.TagNumber(18)
-  $core.int get repeatLastN => $_getIZ(17);
+  $core.int get repeatLastN => $_getIZ(14);
   @$pb.TagNumber(18)
-  set repeatLastN($core.int value) => $_setSignedInt32(17, value);
+  set repeatLastN($core.int value) => $_setSignedInt32(14, value);
   @$pb.TagNumber(18)
-  $core.bool hasRepeatLastN() => $_has(17);
+  $core.bool hasRepeatLastN() => $_has(14);
   @$pb.TagNumber(18)
   void clearRepeatLastN() => $_clearField(18);
 
   /// Minimum probability sampling. 0.0 = disabled.
   @$pb.TagNumber(19)
-  $core.double get minP => $_getN(18);
+  $core.double get minP => $_getN(15);
   @$pb.TagNumber(19)
-  set minP($core.double value) => $_setFloat(18, value);
+  set minP($core.double value) => $_setFloat(15, value);
   @$pb.TagNumber(19)
-  $core.bool hasMinP() => $_has(18);
+  $core.bool hasMinP() => $_has(15);
   @$pb.TagNumber(19)
   void clearMinP() => $_clearField(19);
 
-  /// Grammar or constrained-decoding rule text (GBNF/regex/backend-specific).
-  @$pb.TagNumber(20)
-  $core.String get grammar => $_getSZ(19);
-  @$pb.TagNumber(20)
-  set grammar($core.String value) => $_setString(19, value);
-  @$pb.TagNumber(20)
-  $core.bool hasGrammar() => $_has(19);
-  @$pb.TagNumber(20)
-  void clearGrammar() => $_clearField(20);
-
-  /// Caller-visible format hint: "text", "json_object", "json_schema", etc.
-  @$pb.TagNumber(21)
-  $core.String get responseFormat => $_getSZ(20);
-  @$pb.TagNumber(21)
-  set responseFormat($core.String value) => $_setString(20, value);
-  @$pb.TagNumber(21)
-  $core.bool hasResponseFormat() => $_has(20);
-  @$pb.TagNumber(21)
-  void clearResponseFormat() => $_clearField(21);
-
   /// Include prompt text in the result/stream when the backend supports echo.
   @$pb.TagNumber(22)
-  $core.bool get echoPrompt => $_getBF(21);
+  $core.bool get echoPrompt => $_getBF(16);
   @$pb.TagNumber(22)
-  set echoPrompt($core.bool value) => $_setBool(21, value);
+  set echoPrompt($core.bool value) => $_setBool(16, value);
   @$pb.TagNumber(22)
-  $core.bool hasEchoPrompt() => $_has(21);
+  $core.bool hasEchoPrompt() => $_has(16);
   @$pb.TagNumber(22)
   void clearEchoPrompt() => $_clearField(22);
 
   /// Per-request backend thread hint. 0 = backend/runtime default.
   @$pb.TagNumber(23)
-  $core.int get nThreads => $_getIZ(22);
+  $core.int get nThreads => $_getIZ(17);
   @$pb.TagNumber(23)
-  set nThreads($core.int value) => $_setSignedInt32(22, value);
+  set nThreads($core.int value) => $_setSignedInt32(17, value);
   @$pb.TagNumber(23)
-  $core.bool hasNThreads() => $_has(22);
+  $core.bool hasNThreads() => $_has(17);
   @$pb.TagNumber(23)
   void clearNThreads() => $_clearField(23);
 
-  /// Tool-calling contract for this generation. The SDK owns executor
-  /// functions; proto carries only definitions and parser options.
+  /// Tool-calling contract for this generation: pure tool configuration
+  /// (definitions, choice policy, loop limits). Sampling and reasoning come
+  /// from THIS message — ToolCallingOptions carries none of its own.
   @$pb.TagNumber(24)
-  $2.ToolCallingOptions get toolCalling => $_getN(23);
+  $2.ToolCallingOptions get toolCalling => $_getN(18);
   @$pb.TagNumber(24)
   set toolCalling($2.ToolCallingOptions value) => $_setField(24, value);
   @$pb.TagNumber(24)
-  $core.bool hasToolCalling() => $_has(23);
+  $core.bool hasToolCalling() => $_has(18);
   @$pb.TagNumber(24)
   void clearToolCalling() => $_clearField(24);
   @$pb.TagNumber(24)
-  $2.ToolCallingOptions ensureToolCalling() => $_ensure(23);
-
-  /// When true, suppress the model's thinking/reasoning phase for this
-  /// generation (e.g. Qwen3 / LFM2 <think> blocks). Commons applies the
-  /// model's no-think directive at the prompt level, so no app prepends
-  /// "/no_think" by hand. Default false = the model's normal thinking
-  /// behavior.
-  @$pb.TagNumber(25)
-  $core.bool get disableThinking => $_getBF(24);
-  @$pb.TagNumber(25)
-  set disableThinking($core.bool value) => $_setBool(24, value);
-  @$pb.TagNumber(25)
-  $core.bool hasDisableThinking() => $_has(24);
-  @$pb.TagNumber(25)
-  void clearDisableThinking() => $_clearField(25);
+  $2.ToolCallingOptions ensureToolCalling() => $_ensure(18);
 }
 
 /// ---------------------------------------------------------------------------
@@ -432,7 +346,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     $core.String? text,
     $core.String? thinkingContent,
     $core.int? inputTokens,
-    $core.int? tokensGenerated,
+    $core.int? outputTokens,
     $core.String? modelUsed,
     $core.double? generationTimeMs,
     $core.double? ttftMs,
@@ -458,7 +372,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     if (text != null) result.text = text;
     if (thinkingContent != null) result.thinkingContent = thinkingContent;
     if (inputTokens != null) result.inputTokens = inputTokens;
-    if (tokensGenerated != null) result.tokensGenerated = tokensGenerated;
+    if (outputTokens != null) result.outputTokens = outputTokens;
     if (modelUsed != null) result.modelUsed = modelUsed;
     if (generationTimeMs != null) result.generationTimeMs = generationTimeMs;
     if (ttftMs != null) result.ttftMs = ttftMs;
@@ -500,7 +414,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'text')
     ..aOS(2, _omitFieldNames ? '' : 'thinkingContent')
     ..aI(3, _omitFieldNames ? '' : 'inputTokens')
-    ..aI(4, _omitFieldNames ? '' : 'tokensGenerated')
+    ..aI(4, _omitFieldNames ? '' : 'outputTokens')
     ..aOS(5, _omitFieldNames ? '' : 'modelUsed')
     ..aD(6, _omitFieldNames ? '' : 'generationTimeMs')
     ..aD(7, _omitFieldNames ? '' : 'ttftMs')
@@ -578,15 +492,15 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearInputTokens() => $_clearField(3);
 
-  /// Number of tokens used (output / completion tokens).
+  /// Number of output/completion tokens.
   @$pb.TagNumber(4)
-  $core.int get tokensGenerated => $_getIZ(3);
+  $core.int get outputTokens => $_getIZ(3);
   @$pb.TagNumber(4)
-  set tokensGenerated($core.int value) => $_setSignedInt32(3, value);
+  set outputTokens($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasTokensGenerated() => $_has(3);
+  $core.bool hasOutputTokens() => $_has(3);
   @$pb.TagNumber(4)
-  void clearTokensGenerated() => $_clearField(4);
+  void clearOutputTokens() => $_clearField(4);
 
   /// Model used for generation.
   @$pb.TagNumber(5)
@@ -790,129 +704,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   $pb.PbList<$2.ToolResult> get toolResults => $_getList(23);
 }
 
-/// Request envelope for one non-streaming LLM generation call. This is the
-/// proto-owned DTO SDKs can use instead of parallel prompt/options tuples.
-class LLMGenerationRequest extends $pb.GeneratedMessage {
-  factory LLMGenerationRequest({
-    $core.String? requestId,
-    $core.String? modelId,
-    $core.String? prompt,
-    LLMGenerationOptions? options,
-    $core.Iterable<$core.String>? contextChunks,
-    $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
-    $core.String? conversationId,
-  }) {
-    final result = create();
-    if (requestId != null) result.requestId = requestId;
-    if (modelId != null) result.modelId = modelId;
-    if (prompt != null) result.prompt = prompt;
-    if (options != null) result.options = options;
-    if (contextChunks != null) result.contextChunks.addAll(contextChunks);
-    if (metadata != null) result.metadata.addEntries(metadata);
-    if (conversationId != null) result.conversationId = conversationId;
-    return result;
-  }
-
-  LLMGenerationRequest._();
-
-  factory LLMGenerationRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory LLMGenerationRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LLMGenerationRequest',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'requestId')
-    ..aOS(2, _omitFieldNames ? '' : 'modelId')
-    ..aOS(3, _omitFieldNames ? '' : 'prompt')
-    ..aOM<LLMGenerationOptions>(4, _omitFieldNames ? '' : 'options',
-        subBuilder: LLMGenerationOptions.create)
-    ..pPS(5, _omitFieldNames ? '' : 'contextChunks')
-    ..m<$core.String, $core.String>(6, _omitFieldNames ? '' : 'metadata',
-        entryClassName: 'LLMGenerationRequest.MetadataEntry',
-        keyFieldType: $pb.PbFieldType.OS,
-        valueFieldType: $pb.PbFieldType.OS,
-        packageName: const $pb.PackageName('runanywhere.v1'))
-    ..aOS(7, _omitFieldNames ? '' : 'conversationId')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LLMGenerationRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LLMGenerationRequest copyWith(void Function(LLMGenerationRequest) updates) =>
-      super.copyWith((message) => updates(message as LLMGenerationRequest))
-          as LLMGenerationRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static LLMGenerationRequest create() => LLMGenerationRequest._();
-  @$core.override
-  LLMGenerationRequest createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static LLMGenerationRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LLMGenerationRequest>(create);
-  static LLMGenerationRequest? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get requestId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set requestId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasRequestId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearRequestId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get modelId => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set modelId($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasModelId() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearModelId() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.String get prompt => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set prompt($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasPrompt() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearPrompt() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  LLMGenerationOptions get options => $_getN(3);
-  @$pb.TagNumber(4)
-  set options(LLMGenerationOptions value) => $_setField(4, value);
-  @$pb.TagNumber(4)
-  $core.bool hasOptions() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearOptions() => $_clearField(4);
-  @$pb.TagNumber(4)
-  LLMGenerationOptions ensureOptions() => $_ensure(3);
-
-  @$pb.TagNumber(5)
-  $pb.PbList<$core.String> get contextChunks => $_getList(4);
-
-  @$pb.TagNumber(6)
-  $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(5);
-
-  @$pb.TagNumber(7)
-  $core.String get conversationId => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set conversationId($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasConversationId() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearConversationId() => $_clearField(7);
-}
-
 class LLMGenerationStatus extends $pb.GeneratedMessage {
   factory LLMGenerationStatus({
     $core.String? requestId,
@@ -1074,22 +865,16 @@ class LLMGenerationStatus extends $pb.GeneratedMessage {
 class LLMConfiguration extends $pb.GeneratedMessage {
   factory LLMConfiguration({
     $core.int? contextLength,
-    $core.double? temperature,
-    $core.int? maxTokens,
-    $core.String? systemPrompt,
-    $core.bool? streaming,
     $core.String? modelId,
     $3.InferenceFramework? preferredFramework,
+    LLMGenerationOptions? defaultOptions,
   }) {
     final result = create();
     if (contextLength != null) result.contextLength = contextLength;
-    if (temperature != null) result.temperature = temperature;
-    if (maxTokens != null) result.maxTokens = maxTokens;
-    if (systemPrompt != null) result.systemPrompt = systemPrompt;
-    if (streaming != null) result.streaming = streaming;
     if (modelId != null) result.modelId = modelId;
     if (preferredFramework != null)
       result.preferredFramework = preferredFramework;
+    if (defaultOptions != null) result.defaultOptions = defaultOptions;
     return result;
   }
 
@@ -1107,13 +892,11 @@ class LLMConfiguration extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'contextLength')
-    ..aD(2, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
-    ..aI(3, _omitFieldNames ? '' : 'maxTokens')
-    ..aOS(4, _omitFieldNames ? '' : 'systemPrompt')
-    ..aOB(5, _omitFieldNames ? '' : 'streaming')
     ..aOS(6, _omitFieldNames ? '' : 'modelId')
     ..aE<$3.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework',
         enumValues: $3.InferenceFramework.values)
+    ..aOM<LLMGenerationOptions>(8, _omitFieldNames ? '' : 'defaultOptions',
+        subBuilder: LLMGenerationOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1145,154 +928,40 @@ class LLMConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearContextLength() => $_clearField(1);
 
-  /// Default sampling temperature applied when a per-call value is unset.
-  @$pb.TagNumber(2)
-  $core.double get temperature => $_getN(1);
-  @$pb.TagNumber(2)
-  set temperature($core.double value) => $_setFloat(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasTemperature() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearTemperature() => $_clearField(2);
-
-  /// Default max output tokens applied when a per-call value is unset.
-  @$pb.TagNumber(3)
-  $core.int get maxTokens => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set maxTokens($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasMaxTokens() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearMaxTokens() => $_clearField(3);
-
-  /// Default system prompt baked into the component. Empty = no default.
-  @$pb.TagNumber(4)
-  $core.String get systemPrompt => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set systemPrompt($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasSystemPrompt() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearSystemPrompt() => $_clearField(4);
-
-  /// Whether streaming generation is enabled by default for this component.
-  @$pb.TagNumber(5)
-  $core.bool get streaming => $_getBF(4);
-  @$pb.TagNumber(5)
-  set streaming($core.bool value) => $_setBool(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasStreaming() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearStreaming() => $_clearField(5);
-
   /// Model identifier/path resolved by the component loader. Present in the
   /// C ABI rac_llm_config_t and needed for generated-proto service handles.
   @$pb.TagNumber(6)
-  $core.String get modelId => $_getSZ(5);
+  $core.String get modelId => $_getSZ(1);
   @$pb.TagNumber(6)
-  set modelId($core.String value) => $_setString(5, value);
+  set modelId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(6)
-  $core.bool hasModelId() => $_has(5);
+  $core.bool hasModelId() => $_has(1);
   @$pb.TagNumber(6)
   void clearModelId() => $_clearField(6);
 
   /// Preferred inference framework for this component. UNSPECIFIED / absent
   /// means "auto".
   @$pb.TagNumber(7)
-  $3.InferenceFramework get preferredFramework => $_getN(6);
+  $3.InferenceFramework get preferredFramework => $_getN(2);
   @$pb.TagNumber(7)
   set preferredFramework($3.InferenceFramework value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasPreferredFramework() => $_has(6);
+  $core.bool hasPreferredFramework() => $_has(2);
   @$pb.TagNumber(7)
   void clearPreferredFramework() => $_clearField(7);
-}
 
-/// ---------------------------------------------------------------------------
-/// Per-prompt generation hints (Swift GenerationHints in LLMTypes.swift:550).
-/// Carried alongside a prompt as a "soft" override of LLMConfiguration
-/// defaults when the engine has no explicit LLMGenerationOptions to use.
-/// ---------------------------------------------------------------------------
-class GenerationHints extends $pb.GeneratedMessage {
-  factory GenerationHints({
-    $core.double? temperature,
-    $core.int? maxTokens,
-    $core.String? systemRole,
-  }) {
-    final result = create();
-    if (temperature != null) result.temperature = temperature;
-    if (maxTokens != null) result.maxTokens = maxTokens;
-    if (systemRole != null) result.systemRole = systemRole;
-    return result;
-  }
-
-  GenerationHints._();
-
-  factory GenerationHints.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory GenerationHints.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'GenerationHints',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aD(1, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
-    ..aI(2, _omitFieldNames ? '' : 'maxTokens')
-    ..aOS(3, _omitFieldNames ? '' : 'systemRole')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  GenerationHints clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  GenerationHints copyWith(void Function(GenerationHints) updates) =>
-      super.copyWith((message) => updates(message as GenerationHints))
-          as GenerationHints;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static GenerationHints create() => GenerationHints._();
-  @$core.override
-  GenerationHints createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static GenerationHints getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<GenerationHints>(create);
-  static GenerationHints? _defaultInstance;
-
-  /// Suggested sampling temperature.
-  @$pb.TagNumber(1)
-  $core.double get temperature => $_getN(0);
-  @$pb.TagNumber(1)
-  set temperature($core.double value) => $_setFloat(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasTemperature() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearTemperature() => $_clearField(1);
-
-  /// Suggested max output tokens.
-  @$pb.TagNumber(2)
-  $core.int get maxTokens => $_getIZ(1);
-  @$pb.TagNumber(2)
-  set maxTokens($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasMaxTokens() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearMaxTokens() => $_clearField(2);
-
-  /// Suggested role to use for the system prompt (e.g. "system", "developer").
-  /// Empty = engine default ("system").
-  @$pb.TagNumber(3)
-  $core.String get systemRole => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set systemRole($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasSystemRole() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearSystemRole() => $_clearField(3);
+  /// Component-level defaults applied when a per-call options message is
+  /// absent or leaves a field unset.
+  @$pb.TagNumber(8)
+  LLMGenerationOptions get defaultOptions => $_getN(3);
+  @$pb.TagNumber(8)
+  set defaultOptions(LLMGenerationOptions value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasDefaultOptions() => $_has(3);
+  @$pb.TagNumber(8)
+  void clearDefaultOptions() => $_clearField(8);
+  @$pb.TagNumber(8)
+  LLMGenerationOptions ensureDefaultOptions() => $_ensure(3);
 }
 
 /// ---------------------------------------------------------------------------
@@ -1390,16 +1059,16 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
     $fixnum.Int64? latencyMs,
     $fixnum.Int64? memoryBytes,
     $core.double? throughputTokensPerSec,
-    $core.int? promptTokens,
-    $core.int? completionTokens,
+    $core.int? inputTokens,
+    $core.int? outputTokens,
   }) {
     final result = create();
     if (latencyMs != null) result.latencyMs = latencyMs;
     if (memoryBytes != null) result.memoryBytes = memoryBytes;
     if (throughputTokensPerSec != null)
       result.throughputTokensPerSec = throughputTokensPerSec;
-    if (promptTokens != null) result.promptTokens = promptTokens;
-    if (completionTokens != null) result.completionTokens = completionTokens;
+    if (inputTokens != null) result.inputTokens = inputTokens;
+    if (outputTokens != null) result.outputTokens = outputTokens;
     return result;
   }
 
@@ -1420,8 +1089,8 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
     ..aInt64(2, _omitFieldNames ? '' : 'memoryBytes')
     ..aD(3, _omitFieldNames ? '' : 'throughputTokensPerSec',
         fieldType: $pb.PbFieldType.OF)
-    ..aI(4, _omitFieldNames ? '' : 'promptTokens')
-    ..aI(5, _omitFieldNames ? '' : 'completionTokens')
+    ..aI(4, _omitFieldNames ? '' : 'inputTokens')
+    ..aI(5, _omitFieldNames ? '' : 'outputTokens')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1473,25 +1142,25 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearThroughputTokensPerSec() => $_clearField(3);
 
-  /// Prompt (input) token count.
+  /// Input (prompt) token count.
   @$pb.TagNumber(4)
-  $core.int get promptTokens => $_getIZ(3);
+  $core.int get inputTokens => $_getIZ(3);
   @$pb.TagNumber(4)
-  set promptTokens($core.int value) => $_setSignedInt32(3, value);
+  set inputTokens($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasPromptTokens() => $_has(3);
+  $core.bool hasInputTokens() => $_has(3);
   @$pb.TagNumber(4)
-  void clearPromptTokens() => $_clearField(4);
+  void clearInputTokens() => $_clearField(4);
 
-  /// Completion (output) token count.
+  /// Output (completion) token count.
   @$pb.TagNumber(5)
-  $core.int get completionTokens => $_getIZ(4);
+  $core.int get outputTokens => $_getIZ(4);
   @$pb.TagNumber(5)
-  set completionTokens($core.int value) => $_setSignedInt32(4, value);
+  set outputTokens($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasCompletionTokens() => $_has(4);
+  $core.bool hasOutputTokens() => $_has(4);
   @$pb.TagNumber(5)
-  void clearCompletionTokens() => $_clearField(5);
+  void clearOutputTokens() => $_clearField(5);
 }
 
 const $core.bool _omitFieldNames =

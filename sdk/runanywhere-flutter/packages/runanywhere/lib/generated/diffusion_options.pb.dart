@@ -380,7 +380,7 @@ class DiffusionGenerationOptions extends $pb.GeneratedMessage {
     $core.String? negativePrompt,
     $core.int? width,
     $core.int? height,
-    $core.int? numInferenceSteps,
+    $core.int? steps,
     $core.double? guidanceScale,
     $fixnum.Int64? seed,
     DiffusionScheduler? scheduler,
@@ -402,7 +402,7 @@ class DiffusionGenerationOptions extends $pb.GeneratedMessage {
     if (negativePrompt != null) result.negativePrompt = negativePrompt;
     if (width != null) result.width = width;
     if (height != null) result.height = height;
-    if (numInferenceSteps != null) result.numInferenceSteps = numInferenceSteps;
+    if (steps != null) result.steps = steps;
     if (guidanceScale != null) result.guidanceScale = guidanceScale;
     if (seed != null) result.seed = seed;
     if (scheduler != null) result.scheduler = scheduler;
@@ -441,7 +441,7 @@ class DiffusionGenerationOptions extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'negativePrompt')
     ..aI(3, _omitFieldNames ? '' : 'width')
     ..aI(4, _omitFieldNames ? '' : 'height')
-    ..aI(5, _omitFieldNames ? '' : 'numInferenceSteps')
+    ..aI(5, _omitFieldNames ? '' : 'steps')
     ..aD(6, _omitFieldNames ? '' : 'guidanceScale',
         fieldType: $pb.PbFieldType.OF)
     ..aInt64(7, _omitFieldNames ? '' : 'seed')
@@ -527,19 +527,20 @@ class DiffusionGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearHeight() => $_clearField(4);
 
-  /// Number of denoising steps. Range 1–50 (variant-dependent: SDXS=1,
-  /// SDXL_Turbo / LCM=4, SD*=20–28). 0 = use variant default.
+  /// Number of denoising steps (industry short name `steps`). Range 1–50
+  /// (variant-dependent: SDXS=1, SDXL_Turbo / LCM=4, SD*=20–28). 0 = use
+  /// variant default. Was `num_inference_steps`.
   @$pb.TagNumber(5)
-  $core.int get numInferenceSteps => $_getIZ(4);
+  $core.int get steps => $_getIZ(4);
   @$pb.TagNumber(5)
-  set numInferenceSteps($core.int value) => $_setSignedInt32(4, value);
+  set steps($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(5)
-  $core.bool hasNumInferenceSteps() => $_has(4);
+  $core.bool hasSteps() => $_has(4);
   @$pb.TagNumber(5)
-  void clearNumInferenceSteps() => $_clearField(5);
+  void clearSteps() => $_clearField(5);
 
   /// Classifier-free guidance scale. 0.0 = no CFG (required for SDXS /
-  /// SDXL_Turbo). Typical SD range 1.0–20.0; default 7.5.
+  /// SDXL_Turbo). Typical SD range 1.0–20.0.
   @$pb.TagNumber(6)
   $core.double get guidanceScale => $_getN(5);
   @$pb.TagNumber(6)

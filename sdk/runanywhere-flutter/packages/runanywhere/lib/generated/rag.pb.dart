@@ -16,6 +16,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'llm_options.pb.dart' as $0;
 import 'rag.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -512,34 +513,24 @@ class RAGIngestRequest extends $pb.GeneratedMessage {
 class RAGQueryOptions extends $pb.GeneratedMessage {
   factory RAGQueryOptions({
     $core.String? question,
-    $core.String? systemPrompt,
-    $core.int? maxTokens,
-    $core.double? temperature,
-    $core.double? topP,
-    $core.int? topK,
     $core.int? retrievalTopK,
     $core.double? similarityThreshold,
     $core.bool? stream,
-    $core.bool? disableThinking,
     $core.bool? enableMultiQuery,
     $core.int? multiQueryCount,
     $core.String? scopePrefix,
+    $0.LLMGenerationOptions? generation,
   }) {
     final result = create();
     if (question != null) result.question = question;
-    if (systemPrompt != null) result.systemPrompt = systemPrompt;
-    if (maxTokens != null) result.maxTokens = maxTokens;
-    if (temperature != null) result.temperature = temperature;
-    if (topP != null) result.topP = topP;
-    if (topK != null) result.topK = topK;
     if (retrievalTopK != null) result.retrievalTopK = retrievalTopK;
     if (similarityThreshold != null)
       result.similarityThreshold = similarityThreshold;
     if (stream != null) result.stream = stream;
-    if (disableThinking != null) result.disableThinking = disableThinking;
     if (enableMultiQuery != null) result.enableMultiQuery = enableMultiQuery;
     if (multiQueryCount != null) result.multiQueryCount = multiQueryCount;
     if (scopePrefix != null) result.scopePrefix = scopePrefix;
+    if (generation != null) result.generation = generation;
     return result;
   }
 
@@ -557,19 +548,15 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'question')
-    ..aOS(2, _omitFieldNames ? '' : 'systemPrompt')
-    ..aI(3, _omitFieldNames ? '' : 'maxTokens')
-    ..aD(4, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
-    ..aD(5, _omitFieldNames ? '' : 'topP', fieldType: $pb.PbFieldType.OF)
-    ..aI(6, _omitFieldNames ? '' : 'topK')
     ..aI(7, _omitFieldNames ? '' : 'retrievalTopK')
     ..aD(8, _omitFieldNames ? '' : 'similarityThreshold',
         fieldType: $pb.PbFieldType.OF)
     ..aOB(9, _omitFieldNames ? '' : 'stream')
-    ..aOB(10, _omitFieldNames ? '' : 'disableThinking')
     ..aOB(11, _omitFieldNames ? '' : 'enableMultiQuery')
     ..aI(12, _omitFieldNames ? '' : 'multiQueryCount')
     ..aOS(13, _omitFieldNames ? '' : 'scopePrefix')
+    ..aOM<$0.LLMGenerationOptions>(14, _omitFieldNames ? '' : 'generation',
+        subBuilder: $0.LLMGenerationOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -601,63 +588,13 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearQuestion() => $_clearField(1);
 
-  /// Optional system prompt override. Unset uses the pipeline default.
-  @$pb.TagNumber(2)
-  $core.String get systemPrompt => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set systemPrompt($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasSystemPrompt() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearSystemPrompt() => $_clearField(2);
-
-  /// Maximum tokens to generate in the answer.
-  @$pb.TagNumber(3)
-  $core.int get maxTokens => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set maxTokens($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasMaxTokens() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearMaxTokens() => $_clearField(3);
-
-  /// Sampling temperature. 0.0 = greedy, higher = more random.
-  @$pb.TagNumber(4)
-  $core.double get temperature => $_getN(3);
-  @$pb.TagNumber(4)
-  set temperature($core.double value) => $_setFloat(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasTemperature() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearTemperature() => $_clearField(4);
-
-  /// Nucleus (top-p) sampling parameter. 1.0 = disabled.
-  @$pb.TagNumber(5)
-  $core.double get topP => $_getN(4);
-  @$pb.TagNumber(5)
-  set topP($core.double value) => $_setFloat(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasTopP() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearTopP() => $_clearField(5);
-
-  /// Top-k sampling parameter. 0 = disabled.
-  @$pb.TagNumber(6)
-  $core.int get topK => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set topK($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasTopK() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearTopK() => $_clearField(6);
-
   /// Retrieval overrides. 0/unset = use RAGConfiguration defaults.
   @$pb.TagNumber(7)
-  $core.int get retrievalTopK => $_getIZ(6);
+  $core.int get retrievalTopK => $_getIZ(1);
   @$pb.TagNumber(7)
-  set retrievalTopK($core.int value) => $_setSignedInt32(6, value);
+  set retrievalTopK($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(7)
-  $core.bool hasRetrievalTopK() => $_has(6);
+  $core.bool hasRetrievalTopK() => $_has(1);
   @$pb.TagNumber(7)
   void clearRetrievalTopK() => $_clearField(7);
 
@@ -665,54 +602,42 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
   /// everything) is distinguishable from "unset" and can override a positive
   /// session-level default; unset falls back to RAGConfiguration.
   @$pb.TagNumber(8)
-  $core.double get similarityThreshold => $_getN(7);
+  $core.double get similarityThreshold => $_getN(2);
   @$pb.TagNumber(8)
-  set similarityThreshold($core.double value) => $_setFloat(7, value);
+  set similarityThreshold($core.double value) => $_setFloat(2, value);
   @$pb.TagNumber(8)
-  $core.bool hasSimilarityThreshold() => $_has(7);
+  $core.bool hasSimilarityThreshold() => $_has(2);
   @$pb.TagNumber(8)
   void clearSimilarityThreshold() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.bool get stream => $_getBF(8);
+  $core.bool get stream => $_getBF(3);
   @$pb.TagNumber(9)
-  set stream($core.bool value) => $_setBool(8, value);
+  set stream($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(9)
-  $core.bool hasStream() => $_has(8);
+  $core.bool hasStream() => $_has(3);
   @$pb.TagNumber(9)
   void clearStream() => $_clearField(9);
-
-  /// When true, suppress the answer model's thinking phase (maps to
-  /// LLMGenerationOptions.disable_thinking so commons prepends the no-think
-  /// directive instead of the app injecting "/no_think"). Default false.
-  @$pb.TagNumber(10)
-  $core.bool get disableThinking => $_getBF(9);
-  @$pb.TagNumber(10)
-  set disableThinking($core.bool value) => $_setBool(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasDisableThinking() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearDisableThinking() => $_clearField(10);
 
   /// Multi-query expansion: when true, the answer LLM rewrites the question
   /// into `multi_query_count` variants; retrieval runs for the original plus
   /// each variant and the rankings are RRF-fused before rerank. Falls back to
   /// a single query if expansion yields nothing.
   @$pb.TagNumber(11)
-  $core.bool get enableMultiQuery => $_getBF(10);
+  $core.bool get enableMultiQuery => $_getBF(4);
   @$pb.TagNumber(11)
-  set enableMultiQuery($core.bool value) => $_setBool(10, value);
+  set enableMultiQuery($core.bool value) => $_setBool(4, value);
   @$pb.TagNumber(11)
-  $core.bool hasEnableMultiQuery() => $_has(10);
+  $core.bool hasEnableMultiQuery() => $_has(4);
   @$pb.TagNumber(11)
   void clearEnableMultiQuery() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  $core.int get multiQueryCount => $_getIZ(11);
+  $core.int get multiQueryCount => $_getIZ(5);
   @$pb.TagNumber(12)
-  set multiQueryCount($core.int value) => $_setSignedInt32(11, value);
+  set multiQueryCount($core.int value) => $_setSignedInt32(5, value);
   @$pb.TagNumber(12)
-  $core.bool hasMultiQueryCount() => $_has(11);
+  $core.bool hasMultiQueryCount() => $_has(5);
   @$pb.TagNumber(12)
   void clearMultiQueryCount() => $_clearField(12);
 
@@ -720,13 +645,28 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
   /// this prefix are eligible (e.g. a chat/collection namespace). Unset =
   /// search the whole index.
   @$pb.TagNumber(13)
-  $core.String get scopePrefix => $_getSZ(12);
+  $core.String get scopePrefix => $_getSZ(6);
   @$pb.TagNumber(13)
-  set scopePrefix($core.String value) => $_setString(12, value);
+  set scopePrefix($core.String value) => $_setString(6, value);
   @$pb.TagNumber(13)
-  $core.bool hasScopePrefix() => $_has(12);
+  $core.bool hasScopePrefix() => $_has(6);
   @$pb.TagNumber(13)
   void clearScopePrefix() => $_clearField(13);
+
+  /// Answer-generation knobs (sampling, system prompt, reasoning). Unset =
+  /// pipeline defaults. RAG-appropriate defaults (e.g. max_output_tokens
+  /// 512, temperature 0.7) are applied by the pipeline when unset, not
+  /// re-declared here.
+  @$pb.TagNumber(14)
+  $0.LLMGenerationOptions get generation => $_getN(7);
+  @$pb.TagNumber(14)
+  set generation($0.LLMGenerationOptions value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasGeneration() => $_has(7);
+  @$pb.TagNumber(14)
+  void clearGeneration() => $_clearField(14);
+  @$pb.TagNumber(14)
+  $0.LLMGenerationOptions ensureGeneration() => $_ensure(7);
 }
 
 class RAGQueryRequest extends $pb.GeneratedMessage {

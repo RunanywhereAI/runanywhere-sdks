@@ -28,12 +28,14 @@ class SegmentationImage extends $pb.GeneratedMessage {
     $core.int? width,
     $core.int? height,
     SegmentationPixelFormat? pixelFormat,
+    $core.int? strideBytes,
   }) {
     final result = create();
     if (data != null) result.data = data;
     if (width != null) result.width = width;
     if (height != null) result.height = height;
     if (pixelFormat != null) result.pixelFormat = pixelFormat;
+    if (strideBytes != null) result.strideBytes = strideBytes;
     return result;
   }
 
@@ -56,6 +58,8 @@ class SegmentationImage extends $pb.GeneratedMessage {
     ..aI(3, _omitFieldNames ? '' : 'height', fieldType: $pb.PbFieldType.OU3)
     ..aE<SegmentationPixelFormat>(4, _omitFieldNames ? '' : 'pixelFormat',
         enumValues: SegmentationPixelFormat.values)
+    ..aI(5, _omitFieldNames ? '' : 'strideBytes',
+        fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -112,6 +116,18 @@ class SegmentationImage extends $pb.GeneratedMessage {
   $core.bool hasPixelFormat() => $_has(3);
   @$pb.TagNumber(4)
   void clearPixelFormat() => $_clearField(4);
+
+  /// Bytes per row. 0 = tightly packed (width * bytes-per-pixel). Was a
+  /// C-struct-only field (rac_segmentation_image_t.stride_bytes) with no
+  /// wire counterpart.
+  @$pb.TagNumber(5)
+  $core.int get strideBytes => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set strideBytes($core.int value) => $_setUnsignedInt32(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasStrideBytes() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearStrideBytes() => $_clearField(5);
 }
 
 class SegmentationOptions extends $pb.GeneratedMessage {
