@@ -57,8 +57,12 @@ def test_import_runanywhere_without_native() -> None:
 
 def test_version_string() -> None:
     import runanywhere
+    from pathlib import Path
 
-    assert runanywhere.__version__ == "0.20.11"
+    # Track the monorepo VERSION train — do not hardcode a release string here.
+    version_file = Path(__file__).resolve().parents[2] / "runanywhere-commons" / "VERSION"
+    expected = version_file.read_text(encoding="utf-8").strip()
+    assert runanywhere.__version__ == expected
 
 
 # The full public surface promised by __all__ / the Electron index.ts.
