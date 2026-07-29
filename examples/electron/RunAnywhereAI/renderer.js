@@ -119,6 +119,16 @@ async function releaseUnneeded(acquiring) {
   return drop;
 }
 
+// A model is identified EVERYWHERE by its id (a catalog id, or the id of a custom
+// entry). Only the loader needs the underlying source — an HF repo, URL or file
+// path — so the mapping lives here and nowhere else. Persisting the source instead
+// would mean the Models tab and the chip picker stored different things for the
+// same model, and the saved choice would not resolve on restart.
+function modelSource(id) {
+  const custom = customModels.find((m) => m.id === id);
+  return custom ? custom.source : id;
+}
+
 async function acquire(modality) {
   const id = selectedModel(modality);
   // Re-loading is only needed when the choice changed or nothing is loaded yet.
@@ -131,15 +141,22 @@ async function acquire(modality) {
     await releaseUnneeded(modality);
     setStatus(`loading ${id}…`);
     try {
-      const h = await loaders[modality](id);
+      const h = await loaders[modality](modelSource(id));
       loadedById[id] = h; loadedType[id] = modality;
       return h;
     } finally { setStatus('ready'); }
   })();
   // Don't memoize a rejection — one failed download would poison the modality
-  // for the rest of the session.
-  handles[modality] = p.catch((e) => { delete handles[modality]; delete handles[`${modality}:id`]; throw e; });
-  return handles[modality];
+  // for the rest of the session. Clear the slot ONLY if it still holds this
+  // attempt: a slow failing load can reject long after selectModel() + a fresh
+  // acquire() installed a healthy handle, and dropping that one would silently
+  // reload the model on next use.
+  const memo = p.catch((e) => {
+    if (handles[modality] === memo) { delete handles[modality]; delete handles[`${modality}:id`]; }
+    throw e;
+  });
+  handles[modality] = memo;
+  return memo;
 }
 
 // Switch a modality to another model: drop the old handle so the next acquire()
@@ -157,7 +174,11 @@ async function selectModel(modality, id) {
 // handle above goes stale whenever another LLM is loaded, and every later call
 // fails with "No model loaded". A host respawn invalidates it too. EVERY LLM caller
 // must go through withLlm so the recovery lives in one place instead of only chat.
-const STALE_MODEL_RE = /no model|not loaded|model.*load|invalid handle|host exited/i;
+// Anchored on the specific "your handle is gone" messages the host emits. A loose
+// /model.*load/ also matched real failures like "model failed to load: not enough
+// memory", so an OOM would immediately retry the same multi-GB load instead of
+// surfacing the error.
+const STALE_MODEL_RE = /no model loaded|model not loaded|no model is loaded|invalid handle|unknown handle|host exited|host is not running/i;
 async function withLlm(fn) {
   try {
     return await fn(await llm());
@@ -292,7 +313,7 @@ function renderChat() {
   }
   $('chatlog').scrollTop = $('chatlog').scrollHeight;
 }
-function buildPrompt(priorMessages, userText) {
+async function buildPrompt(priorMessages, userText) {
   let sys = settings.systemPrompt;
   // Reasoning mode: ask the model to think in <think></think> first. The SDK's
   // splitThinking (mirrored by assistantHtml) peels that back out for display.
@@ -302,14 +323,18 @@ function buildPrompt(priorMessages, userText) {
   turns.push({ role: 'user', content: userText });
   // formatChat renders the turn markup THIS model was trained on, and strips old
   // <think> blocks so stale reasoning is never replayed as context.
-  return ra.formatChat(turns, activeChatTemplate(), { suppressThinking: !settings.reasoning });
+  return ra.formatChat(turns, await activeChatTemplate(), { suppressThinking: !settings.reasoning });
 }
 
 // The turn markup the ACTIVE model expects. Getting this wrong is why a chat
 // appears to lose its memory: llama.cpp wraps an unrecognised prompt as a SINGLE
 // user message, so the whole transcript collapses into one turn and the model
 // answers as if every message were the first.
-function activeChatTemplate() {
+async function activeChatTemplate() {
+  // Awaited, not read from the possibly-empty cache: a message sent before
+  // wireUi()'s catalog fetch resolves would otherwise format a Llama-3 or Gemma
+  // model's prompt as ChatML — which is exactly the memory bug described above.
+  await ensureCatalog();
   const entry = catalogEntry(selectedModel('llm'));
   return (entry && entry.chatTemplate) || 'chatml';
 }
@@ -335,10 +360,11 @@ async function sendChat() {
   setStatus('generating…');
   try {
     let result = null;
+    const promptText = await buildPrompt(prior, text);
     // withLlm re-loads once if the handle was evicted by another model.
     await withLlm((h) => {
       asst.content = '';
-      return ra.generateStream(h, buildPrompt(prior, text), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
+      return ra.generateStream(h, promptText, { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
         if (e.isFinal) { result = e.result; }
         else { asst.content += e.token; bubble.innerHTML = assistantHtml(asst.content, true); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
       });
@@ -412,7 +438,9 @@ function buildCard(o) {
         } else {
           // Loading from here IS selecting: route through the same choke point the
           // per-tab chips use, so the Models tab and the chips can't disagree.
-          await selectModel(o.type, o.source);
+          // Select by id, exactly as the chip picker does — acquire() maps the
+          // id to its source. Storing o.source here made the two disagree.
+          await selectModel(o.type, o.key);
           await acquire(o.type);
         }
       } catch (e) { b.textContent = 'Error'; btns.forEach((x) => (x.disabled = false)); console.error(e); return; }
@@ -674,6 +702,17 @@ function catalogEntry(id) {
   return custom ? { label: custom.label || id, type: custom.type } : null;
 }
 let catalogCache = null;
+let catalogPromise = null;
+/** Resolve the catalog once and cache it; callers that need it await this. */
+function ensureCatalog() {
+  if (catalogCache) return Promise.resolve(catalogCache);
+  if (!catalogPromise) {
+    catalogPromise = Promise.resolve(ra.catalog())
+      .then((c) => { catalogCache = c; return c; })
+      .catch((e) => { catalogPromise = null; throw e; });
+  }
+  return catalogPromise;
+}
 
 function renderModelChips() {
   const slot = $('chipslot');
@@ -786,7 +825,7 @@ function wireUi() {
   applyDeviceUi();
   renderSidebar(); renderChat();
   // Warm the catalog so the model chips can show real labels immediately.
-  Promise.resolve(ra.catalog()).then((c) => { catalogCache = c; renderModelChips(); }).catch(() => {});
+  ensureCatalog().then(() => renderModelChips()).catch(() => {});
   renderModelChips();
   wireModels();
   $('newchat').addEventListener('click', () => { newConversation(); showTab('chat'); $('chatinput').focus(); });
@@ -948,7 +987,10 @@ function wireVoice() {
   let playing = null;
   let state = 'idle';
   let busy = false;          // a turn is in flight; ignore re-entrant taps
-  let abandoned = false;     // the user gave up on the in-flight turn
+  // Each turn takes a number so a cancelled-but-still-running turn can tell it is
+  // no longer current and must not touch shared state. See turn-guard.js for why
+  // a single `abandoned` boolean was not enough.
+  const turns = createTurnGuard();
   let levelRaf = 0;
   let level = 0;             // smoothed mic RMS, 0..1
 
@@ -1030,7 +1072,8 @@ function wireVoice() {
   async function finishTurn() {
     if (busy) return;
     busy = true;
-    abandoned = false;
+    const turn = turns.begin();
+    const mine = turn.current;               // false once this turn is superseded
     // EVERYTHING from here on is inside try/finally: a throw before the guarded
     // region used to leave busy=true forever, and the mic button simply stopped
     // responding with no error anywhere.
@@ -1041,6 +1084,7 @@ function wireVoice() {
       setVoiceState('thinking');
       phase('Transcribing what you said…');
       const heard = (await ra.transcribe(await stt(), toPcm16At16k(rec.samples, rec.rate)) || '').trim();
+      if (!mine()) return;
       if (!heard) { showError('I did not catch that — try again a little closer to the mic.'); setVoiceState('idle'); return; }
       transcript.hidden = false;
       $('voiceheard').textContent = heard;
@@ -1057,12 +1101,16 @@ function wireVoice() {
       // A spoken reply must never wait on visible deliberation.
       const voicePrompt = ra.formatChat(
         [{ role: 'system', content: spokenStyle }, { role: 'user', content: heard }],
-        activeChatTemplate(),
+        await activeChatTemplate(),
         { suppressThinking: true }
       );
       await withLlm((h) => ra.generate(h, voicePrompt, {
         temperature: settings.temperature, maxTokens: settings.maxTokens,
-      }, (t) => { reply += t; $('voicereply').textContent = ra.speakableText(ra.splitThinking(reply).response); }));
+      }, (t) => {
+        reply += t;
+        if (mine()) $('voicereply').textContent = ra.speakableText(ra.splitThinking(reply).response);
+      }));
+      if (!mine()) return;
       // The prompt is a request, not a guarantee: a small model still emits
       // "**Paris**", and the TTS voice pronounces that as "asterisk asterisk
       // Paris". speakableText is what actually makes the audio clean — it also
@@ -1071,9 +1119,11 @@ function wireVoice() {
       $('voicereply').textContent = reply;
       if (!reply) { setVoiceState('idle'); return; }
 
-      if (abandoned) return;
       phase('Generating speech…');
       const audio = await ra.synthesize(await tts(), reply);
+      // Synthesis is slow enough that the user can cancel during it — never speak
+      // over, or steal the orb from, whatever turn is current now.
+      if (!mine()) return;
       if (!audio || !audio.samples || !audio.samples.length) { setVoiceState('idle'); return; } // createBuffer(0) throws
       setVoiceState('speaking');
       playCtx = playCtx || new AudioContext();
@@ -1086,11 +1136,14 @@ function wireVoice() {
       await new Promise((r) => { src.onended = r; src.start(); });
       playing = null;
     } catch (e) {
-      showError(e.message || String(e));
+      if (mine()) showError(e.message || String(e));
     } finally {
-      clearTimeout(watchdog);
-      busy = false;
-      if (state !== 'listening') setVoiceState('idle');
+      // A superseded turn owns none of this — the turn that replaced it does.
+      if (mine()) {
+        clearTimeout(watchdog);
+        busy = false;
+        if (state !== 'listening') setVoiceState('idle');
+      }
     }
   }
 
@@ -1105,7 +1158,7 @@ function wireVoice() {
       // There is no cancel in the inference stack, so the work keeps running —
       // but the user is never trapped. Abandon the turn; the result is discarded
       // when it lands.
-      abandoned = true;
+      turns.cancel();         // the in-flight turn is no longer current
       busy = false;
       clearTimeout(watchdog);
       showError('Turn cancelled.');
@@ -1113,7 +1166,7 @@ function wireVoice() {
       return;
     }
     // idle, or any state we did not anticipate: self-heal and listen.
-    if (busy) { busy = false; abandoned = true; }
+    if (busy) { busy = false; turns.cancel(); }
     stopPlayback();
     beginListening();
   });
@@ -1158,7 +1211,8 @@ async function selfTest() {
     conv.messages.push({ role: 'assistant', content: '' }); // exercise chat plumbing minimally
     conv.messages.pop();
     let reply = '';
-    await withLlm((h) => ra.generateStream(h, buildPrompt([], 'Say hello in one short sentence.'), { maxTokens: 24 }, (e) => { if (!e.isFinal) reply += e.token; }));
+    const hello = await buildPrompt([], 'Say hello in one short sentence.');
+    await withLlm((h) => ra.generateStream(h, hello, { maxTokens: 24 }, (e) => { if (!e.isFinal) reply += e.token; }));
     if (!reply.trim()) throw new Error('empty chat reply');
     log('[selftest] chat OK: ' + JSON.stringify(reply.trim().slice(0, 70)));
 
