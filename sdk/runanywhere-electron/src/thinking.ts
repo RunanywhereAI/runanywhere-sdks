@@ -57,6 +57,32 @@ export function stripThinking(text: string): string {
   return splitThinking(text).response;
 }
 
+/**
+ * Remove EVERY thinking block from `text`, not just the first — used when a past
+ * assistant turn is replayed as conversation context.
+ *
+ * Deliberately an indexOf scan rather than a regex: `/<(think|thinking)>[\s\S]*?<\/>/`
+ * backtracks polynomially on input with many repeated `<think>` openers
+ * (js/polynomial-redos), and model output is untrusted input.
+ */
+export function stripAllThinking(text: string): string {
+  if (!text) return '';
+  let out = '';
+  let rest = text;
+  // Terminates: every iteration drops at least the open tag from `rest`.
+  for (;;) {
+    const open = firstOpen(rest);
+    if (!open) break;
+    const afterOpen = open.index + open.tag.length;
+    const closeTag = CLOSE_OF[open.tag];
+    const close = rest.indexOf(closeTag, afterOpen);
+    out += rest.slice(0, open.index);
+    if (close < 0) return out.trim();   // unterminated: drop the remainder
+    rest = rest.slice(close + closeTag.length);
+  }
+  return (out + rest).trim();
+}
+
 /** True while `text` is inside an as-yet-unclosed thinking block (for live streaming UIs). */
 export function isThinking(text: string): boolean {
   const lastOpen = Math.max(text.lastIndexOf('<think>'), text.lastIndexOf('<thinking>'));
