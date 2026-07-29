@@ -11,7 +11,7 @@
 const path = require('path');
 const { createStore, capConversations } = require('./store');
 const fs = require('fs');
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, session, shell } = require('electron');
 
 // Identity must be set before `app.getPath('userData')` is read so settings and
 // conversations land in %APPDATA%\RunAnywhere AI (not Electron's default).
@@ -132,7 +132,31 @@ if (!SELFTEST && !app.requestSingleInstanceLock()) {
         sandbox: false,
       },
     });
+    // setMenuBarVisibility only HIDES the stock menu — its accelerators still work,
+    // so Ctrl+Shift+I would open DevTools in a shipped build and hand anyone who can
+    // talk a user through a keystroke full access to the contextBridge. Replace the
+    // menu instead of hiding it, keeping the shortcuts users legitimately expect.
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { role: 'editMenu' },
+      {
+        label: 'View',
+        submenu: [
+          { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' },
+          { type: 'separator' }, { role: 'togglefullscreen' },
+        ],
+      },
+      { role: 'windowMenu' },
+    ]));
     win.setMenuBarVisibility(false);
+
+    // Electron auto-grants every permission a page asks for. This app legitimately
+    // needs the microphone (voice, VAD) and nothing else — deny the rest outright
+    // so a compromised page cannot reach geolocation, notifications or the camera.
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+      callback(permission === 'media' || permission === 'audioCapture');
+    });
+    session.defaultSession.setPermissionCheckHandler((_wc, permission) =>
+      permission === 'media' || permission === 'audioCapture');
 
     app.on('second-instance', () => {
       if (win && !win.isDestroyed()) {
@@ -168,11 +192,11 @@ if (!SELFTEST && !app.requestSingleInstanceLock()) {
     });
     win.webContents.on('unresponsive', () => console.error('[main] renderer unresponsive'));
 
-    // Electron >=34 passes a single details object with a string `level`
-    // ('info' | 'warning' | 'error' | 'debug'). The old positional form silently
-    // compared a string with `>= 2`, so renderer warnings and errors — the ones
-    // worth seeing — were never printed.
-    win.webContents.on('console-message', (_e, details) => {
+    // On webContents the details object is the FIRST argument (the remaining
+    // positional args are the deprecated pre-Electron-34 form). Reading the second
+    // argument gets the deprecated numeric level, whose `.level` is undefined — so
+    // renderer warnings and errors, the ones worth seeing, were never printed.
+    win.webContents.on('console-message', (details) => {
       const level = details && details.level;
       if (level === 'warning' || level === 'error') {
         console.log('[renderer]', level + ':', details.message);
