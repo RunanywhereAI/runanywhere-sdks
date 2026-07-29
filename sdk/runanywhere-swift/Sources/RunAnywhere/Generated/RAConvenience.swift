@@ -20,6 +20,7 @@ extension RAToolCallingOptions {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RAToolCallingOptions {
         var r = RAToolCallingOptions()
+        r.autoExecute = true
         r.maxToolCalls = 5
         return r
     }

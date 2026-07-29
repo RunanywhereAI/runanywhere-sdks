@@ -386,8 +386,13 @@ export interface ToolCallingOptions {
    * its registered tools (per-SDK convention).
    */
   tools: ToolDefinition[];
-  /** Whether to auto-execute tools or hand them back to the caller. */
-  autoExecute: boolean;
+  /**
+   * Whether to auto-execute tools or hand them back to the caller.
+   * Unset = true (the pre-v2 session default).
+   */
+  autoExecute?:
+    | boolean
+    | undefined;
   /**
    * If true, replaces the system prompt entirely (no auto-injected
    * tool instructions).
@@ -1732,7 +1737,7 @@ export const ToolResult: MessageFns<ToolResult> = {
 function createBaseToolCallingOptions(): ToolCallingOptions {
   return {
     tools: [],
-    autoExecute: false,
+    autoExecute: undefined,
     replaceSystemPrompt: false,
     keepToolsAvailable: false,
     format: undefined,
@@ -1748,7 +1753,7 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     for (const v of message.tools) {
       ToolDefinition.encode(v!, writer.uint32(10).fork()).join();
     }
-    if (message.autoExecute !== false) {
+    if (message.autoExecute !== undefined) {
       writer.uint32(24).bool(message.autoExecute);
     }
     if (message.replaceSystemPrompt !== false) {
@@ -1870,7 +1875,7 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
         ? globalThis.Boolean(object.autoExecute)
         : isSet(object.auto_execute)
         ? globalThis.Boolean(object.auto_execute)
-        : false,
+        : undefined,
       replaceSystemPrompt: isSet(object.replaceSystemPrompt)
         ? globalThis.Boolean(object.replaceSystemPrompt)
         : isSet(object.replace_system_prompt)
@@ -1910,7 +1915,7 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     if (message.tools?.length) {
       obj.tools = message.tools.map((e) => ToolDefinition.toJSON(e));
     }
-    if (message.autoExecute !== false) {
+    if (message.autoExecute !== undefined) {
       obj.autoExecute = message.autoExecute;
     }
     if (message.replaceSystemPrompt !== false) {
@@ -1943,7 +1948,7 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
   fromPartial<I extends Exact<DeepPartial<ToolCallingOptions>, I>>(object: I): ToolCallingOptions {
     const message = createBaseToolCallingOptions();
     message.tools = object.tools?.map((e) => ToolDefinition.fromPartial(e)) || [];
-    message.autoExecute = object.autoExecute ?? false;
+    message.autoExecute = object.autoExecute ?? undefined;
     message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
     message.keepToolsAvailable = object.keepToolsAvailable ?? false;
     message.format = object.format ?? undefined;

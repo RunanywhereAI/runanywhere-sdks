@@ -44,15 +44,16 @@ public class ToolCallingOptions(
   tools: List<ToolDefinition> = emptyList(),
   /**
    * Whether to auto-execute tools or hand them back to the caller.
+   * Unset = true (the pre-v2 session default).
    */
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
     jsonName = "autoExecute",
     schemaIndex = 1,
   )
-  public val auto_execute: Boolean = false,
+  public val auto_execute: Boolean? = null,
   /**
    * If true, replaces the system prompt entirely (no auto-injected
    * tool instructions).
@@ -163,7 +164,7 @@ public class ToolCallingOptions(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + tools.hashCode()
-      result = result * 37 + auto_execute.hashCode()
+      result = result * 37 + (auto_execute?.hashCode() ?: 0)
       result = result * 37 + replace_system_prompt.hashCode()
       result = result * 37 + keep_tools_available.hashCode()
       result = result * 37 + (format?.hashCode() ?: 0)
@@ -179,7 +180,7 @@ public class ToolCallingOptions(
   override fun toString(): String {
     val result = mutableListOf<String>()
     if (tools.isNotEmpty()) result += """tools=$tools"""
-    result += """auto_execute=$auto_execute"""
+    if (auto_execute != null) result += """auto_execute=$auto_execute"""
     result += """replace_system_prompt=$replace_system_prompt"""
     result += """keep_tools_available=$keep_tools_available"""
     if (format != null) result += """format=$format"""
@@ -192,7 +193,7 @@ public class ToolCallingOptions(
 
   public fun copy(
     tools: List<ToolDefinition> = this.tools,
-    auto_execute: Boolean = this.auto_execute,
+    auto_execute: Boolean? = this.auto_execute,
     replace_system_prompt: Boolean = this.replace_system_prompt,
     keep_tools_available: Boolean = this.keep_tools_available,
     format: ToolCallFormatName? = this.format,
@@ -217,9 +218,7 @@ public class ToolCallingOptions(
       override fun encodedSize(`value`: ToolCallingOptions): Int {
         var size = value.unknownFields.size
         size += ToolDefinition.ADAPTER.asRepeated().encodedSizeWithTag(1, value.tools)
-        if (value.auto_execute != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.auto_execute)
-        }
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.auto_execute)
         if (value.replace_system_prompt != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.replace_system_prompt)
         }
@@ -240,9 +239,7 @@ public class ToolCallingOptions(
 
       override fun encode(writer: ProtoWriter, `value`: ToolCallingOptions) {
         ToolDefinition.ADAPTER.asRepeated().encodeWithTag(writer, 1, value.tools)
-        if (value.auto_execute != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.auto_execute)
-        }
+        ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.auto_execute)
         if (value.replace_system_prompt != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.replace_system_prompt)
         }
@@ -278,15 +275,13 @@ public class ToolCallingOptions(
         if (value.replace_system_prompt != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.replace_system_prompt)
         }
-        if (value.auto_execute != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.auto_execute)
-        }
+        ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.auto_execute)
         ToolDefinition.ADAPTER.asRepeated().encodeWithTag(writer, 1, value.tools)
       }
 
       override fun decode(reader: ProtoReader): ToolCallingOptions {
         val tools = mutableListOf<ToolDefinition>()
-        var auto_execute: Boolean = false
+        var auto_execute: Boolean? = null
         var replace_system_prompt: Boolean = false
         var keep_tools_available: Boolean = false
         var format: ToolCallFormatName? = null

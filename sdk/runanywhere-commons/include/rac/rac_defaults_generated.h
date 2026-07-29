@@ -14,6 +14,7 @@
 #include "rac/core/rac_types.h"  // RAC_TRUE / RAC_FALSE
 
 // ToolCallingOptions (tool_calling.proto)
+#define RAC_DEFAULT_TOOL_CALLING_OPTIONS_AUTO_EXECUTE   RAC_TRUE
 #define RAC_DEFAULT_TOOL_CALLING_OPTIONS_MAX_TOOL_CALLS 5
 
 // StructuredOutputOptions (structured_output.proto)
@@ -168,5 +169,5 @@
 #define RAC_DEFAULT_VLM_GENERATION_OPTIONS_REPETITION_PENALTY 1.1f
 #define RAC_DEFAULT_VLM_GENERATION_OPTIONS_MIN_P              0.0f
 
-// 93 defaults across 31 messages.
+// 94 defaults across 31 messages.
 #endif  // RAC_DEFAULTS_GENERATED_H

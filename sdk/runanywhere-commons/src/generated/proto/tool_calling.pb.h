@@ -4316,7 +4316,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
   ::std::string* PROTOBUF_NONNULL _internal_mutable_forced_tool_name();
 
   public:
-  // bool auto_execute = 3;
+  // optional bool auto_execute = 3 [(.runanywhere.v1.rac_default) = "true"];
+  [[nodiscard]] bool has_auto_execute()
+      const;
   void clear_auto_execute() ;
   [[nodiscard]] bool auto_execute() const;
   void set_auto_execute(bool value);
@@ -7501,7 +7503,11 @@ ToolCallingOptions::_internal_mutable_tools() {
   return &_impl_.tools_;
 }
 
-// bool auto_execute = 3;
+// optional bool auto_execute = 3 [(.runanywhere.v1.rac_default) = "true"];
+inline bool ToolCallingOptions::has_auto_execute() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  return value;
+}
 inline void ToolCallingOptions::clear_auto_execute() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.auto_execute_ = false;

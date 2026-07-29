@@ -35,6 +35,7 @@ import 'package:runanywhere/generated/vlm_options.pb.dart';
 extension ToolCallingOptionsConvenience on ToolCallingOptions {
   static ToolCallingOptions defaults() {
     final r = ToolCallingOptions();
+    r.autoExecute = true;
     r.maxToolCalls = 5;
     return r;
   }

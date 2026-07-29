@@ -53,6 +53,7 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
 public fun ToolCallingOptions.Companion.defaults(): ToolCallingOptions =
     ToolCallingOptions(
+        auto_execute = true,
         max_tool_calls = 5,
     )
 

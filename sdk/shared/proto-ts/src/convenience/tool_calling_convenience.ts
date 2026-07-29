@@ -19,7 +19,7 @@ import { ValidationError } from './_errors';
 
 export const toolCallingOptionsDefaults = (): ToolCallingOptions => ({
   tools: [],
-  autoExecute: false,
+  autoExecute: true,
   replaceSystemPrompt: false,
   keepToolsAvailable: false,
   maxToolCalls: 5,

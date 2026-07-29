@@ -936,6 +936,7 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
   $pb.PbList<ToolDefinition> get tools => $_getList(0);
 
   /// Whether to auto-execute tools or hand them back to the caller.
+  /// Unset = true (the pre-v2 session default).
   @$pb.TagNumber(3)
   $core.bool get autoExecute => $_getBF(1);
   @$pb.TagNumber(3)

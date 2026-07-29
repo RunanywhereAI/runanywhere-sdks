@@ -551,7 +551,15 @@ public nonisolated struct RAToolCallingOptions: Sendable {
   public var tools: [RAToolDefinition] = []
 
   /// Whether to auto-execute tools or hand them back to the caller.
-  public var autoExecute: Bool = false
+  /// Unset = true (the pre-v2 session default).
+  public var autoExecute: Bool {
+    get {_autoExecute ?? false}
+    set {_autoExecute = newValue}
+  }
+  /// Returns true if `autoExecute` has been explicitly set.
+  public var hasAutoExecute: Bool {self._autoExecute != nil}
+  /// Clears the value of `autoExecute`. Subsequent reads from it will return its default value.
+  public mutating func clearAutoExecute() {self._autoExecute = nil}
 
   /// If true, replaces the system prompt entirely (no auto-injected
   /// tool instructions).
@@ -599,6 +607,7 @@ public nonisolated struct RAToolCallingOptions: Sendable {
 
   public init() {}
 
+  fileprivate var _autoExecute: Bool? = nil
   fileprivate var _format: RAToolCallFormatName? = nil
   fileprivate var _maxToolCalls: Int32? = nil
   fileprivate var _forcedToolName: String? = nil
@@ -1435,7 +1444,7 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.tools) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.autoExecute) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self._autoExecute) }()
       case 7: try { try decoder.decodeSingularBoolField(value: &self.replaceSystemPrompt) }()
       case 8: try { try decoder.decodeSingularBoolField(value: &self.keepToolsAvailable) }()
       case 10: try { try decoder.decodeSingularEnumField(value: &self._format) }()
@@ -1456,9 +1465,9 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
     if !self.tools.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.tools, fieldNumber: 1)
     }
-    if self.autoExecute != false {
-      try visitor.visitSingularBoolField(value: self.autoExecute, fieldNumber: 3)
-    }
+    try { if let v = self._autoExecute {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
+    } }()
     if self.replaceSystemPrompt != false {
       try visitor.visitSingularBoolField(value: self.replaceSystemPrompt, fieldNumber: 7)
     }
@@ -1485,7 +1494,7 @@ nonisolated extension RAToolCallingOptions: SwiftProtobuf.Message, SwiftProtobuf
 
   public static func ==(lhs: RAToolCallingOptions, rhs: RAToolCallingOptions) -> Bool {
     if lhs.tools != rhs.tools {return false}
-    if lhs.autoExecute != rhs.autoExecute {return false}
+    if lhs._autoExecute != rhs._autoExecute {return false}
     if lhs.replaceSystemPrompt != rhs.replaceSystemPrompt {return false}
     if lhs.keepToolsAvailable != rhs.keepToolsAvailable {return false}
     if lhs._format != rhs._format {return false}

@@ -195,7 +195,8 @@ message ToolCallingOptions {
     reserved 2, 4, 5, 6, 9, 11, 15, 17;
 
     // Whether to auto-execute tools or hand them back to the caller.
-    bool   auto_execute              = 3;
+    // Unset = true (the pre-v2 session default).
+    optional bool auto_execute       = 3 [(runanywhere.v1.rac_default) = "true"];
 
     // If true, replaces the system prompt entirely (no auto-injected
     // tool instructions).
