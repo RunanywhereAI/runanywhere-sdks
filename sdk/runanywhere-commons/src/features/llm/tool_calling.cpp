@@ -1834,15 +1834,6 @@ tool_calling_options_from_proto(const runanywhere::v1::ToolCallingOptions& proto
     if (proto.auto_execute()) {
         converted.options.auto_execute = RAC_TRUE;
     }
-    if (proto.has_temperature()) {
-        converted.options.temperature = proto.temperature();
-    }
-    if (proto.has_max_tokens()) {
-        converted.options.max_tokens = proto.max_tokens();
-    }
-    if (proto.has_system_prompt()) {
-        converted.system_prompt = proto.system_prompt();
-    }
     if (proto.replace_system_prompt()) {
         converted.options.replace_system_prompt = RAC_TRUE;
     }

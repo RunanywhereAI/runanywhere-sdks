@@ -298,11 +298,11 @@ rac_result_t options_from_proto(const runanywhere::v1::DiarizationOptions* proto
     *out_options = RAC_DIARIZATION_OPTIONS_DEFAULT;
     *out_encoding = runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
     if (proto) {
-        if (proto->has_sample_rate_hz()) {
-            out_options->sample_rate_hz = proto->sample_rate_hz();
+        if (proto->has_sample_rate()) {
+            out_options->sample_rate_hz = proto->sample_rate();
         }
-        if (proto->has_channel_count()) {
-            out_options->channel_count = proto->channel_count();
+        if (proto->has_channels()) {
+            out_options->channel_count = proto->channels();
         }
         if (proto->has_threshold()) {
             out_options->threshold = proto->threshold();

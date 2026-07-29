@@ -257,7 +257,7 @@ typedef struct rac_vlm_options {
  * not a struct-literal macro.
  */
 static const rac_vlm_options_t RAC_VLM_OPTIONS_DEFAULT = {
-    .max_tokens = RAC_DEFAULT_VLM_GENERATION_OPTIONS_MAX_TOKENS,
+    .max_tokens = RAC_DEFAULT_VLM_GENERATION_OPTIONS_MAX_OUTPUT_TOKENS,
     .temperature = RAC_DEFAULT_VLM_GENERATION_OPTIONS_TEMPERATURE,
     .top_p = RAC_DEFAULT_VLM_GENERATION_OPTIONS_TOP_P,
     .stop_sequences = RAC_NULL,

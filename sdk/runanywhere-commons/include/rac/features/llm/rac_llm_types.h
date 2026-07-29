@@ -164,7 +164,7 @@ typedef struct rac_llm_options {
  * n_threads=0. Engines apply each only when its non-disabled value is present.
  */
 static const rac_llm_options_t RAC_LLM_OPTIONS_DEFAULT = {
-    .max_tokens = RAC_DEFAULT_LLM_GENERATION_OPTIONS_MAX_TOKENS,
+    .max_tokens = RAC_DEFAULT_LLM_GENERATION_OPTIONS_MAX_OUTPUT_TOKENS,
     .temperature = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TEMPERATURE,
     .top_p = RAC_DEFAULT_LLM_GENERATION_OPTIONS_TOP_P,
     .stop_sequences = RAC_NULL,

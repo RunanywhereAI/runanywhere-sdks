@@ -1208,7 +1208,7 @@ extern "C" rac_result_t rac_vad_component_configure_proto(rac_handle_t handle,
                               ? static_cast<float>(proto.frame_length_ms()) / 1000.0f
                               : RAC_VAD_DEFAULT_FRAME_LENGTH;
     config.energy_threshold =
-        proto.threshold() > 0.0f ? proto.threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+        proto.activation_threshold() > 0.0f ? proto.activation_threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
     config.enable_auto_calibration = proto.enable_auto_calibration() ? RAC_TRUE : RAC_FALSE;
     return rac_vad_component_configure(handle, &config);
 #endif
@@ -1261,7 +1261,7 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, con
                                : RAC_VAD_DEFAULT_ENERGY_THRESHOLD);
     }
 
-    const bool has_override = options.threshold() > 0.0f;
+    const bool has_override = options.activation_threshold() > 0.0f;
 
     // Serialize the get→set(override)→process→
     // restore window on the same per-handle mutex used by the streaming
@@ -1276,9 +1276,9 @@ extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle, con
         auto handle_mutex = rac::vad::get_or_create_threshold_mutex(handle);
         std::lock_guard<std::mutex> threshold_lock(*handle_mutex);
         const float original_threshold = rac_vad_component_get_energy_threshold(handle);
-        rc = rac_vad_component_set_energy_threshold(handle, options.threshold());
+        rc = rac_vad_component_set_energy_threshold(handle, options.activation_threshold());
         if (rc == RAC_SUCCESS) {
-            threshold = options.threshold();
+            threshold = options.activation_threshold();
             rc = rac_vad_component_process(handle, samples, num_samples, &is_speech);
             const rac_result_t restore_rc =
                 rac_vad_component_set_energy_threshold(handle, original_threshold);
@@ -1540,8 +1540,8 @@ rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_proto_bytes,
     }
 
     float threshold = RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
-    if (request.has_options() && request.options().threshold() > 0.0f) {
-        threshold = request.options().threshold();
+    if (request.has_options() && request.options().activation_threshold() > 0.0f) {
+        threshold = request.options().activation_threshold();
         if (ref.ops->set_threshold) {
             (void)ref.ops->set_threshold(ref.impl, threshold);
         }
@@ -1627,7 +1627,7 @@ rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_proto_byte
         proto.frame_length_ms() > 0 ? proto.frame_length_ms()
                                     : static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f);
     const float threshold =
-        proto.threshold() > 0.0f ? proto.threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+        proto.activation_threshold() > 0.0f ? proto.activation_threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
 
     rac_result_t op_rc = RAC_SUCCESS;
     if (ref.ops && ref.ops->set_threshold) {

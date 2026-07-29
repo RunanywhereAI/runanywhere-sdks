@@ -91,70 +91,6 @@ uint8_t* copy_bytes(const ::std::string& bytes) {
     return out;
 }
 
-// ---- STT language enum mapping --------------------------------------------
-//
-// Drift reconciliation: C ABI uses BCP-47 strings ("en", "en-US", "es-MX"),
-// proto uses the STTLanguage enum. We strip the region tag and look up the
-// base language code.
-
-::runanywhere::v1::STTLanguage stt_language_from_string(const char* lang) {
-    if (!lang || *lang == '\0')
-        return ::runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
-    // Take the first 2 chars, lowercase, ignore region after '-' / '_'.
-    char base[3] = {0, 0, 0};
-    base[0] = static_cast<char>(::tolower(static_cast<unsigned char>(lang[0])));
-    if (lang[1] != '\0' && lang[1] != '-' && lang[1] != '_') {
-        base[1] = static_cast<char>(::tolower(static_cast<unsigned char>(lang[1])));
-    }
-    static const std::unordered_map<std::string, ::runanywhere::v1::STTLanguage> table = {
-        {"en", ::runanywhere::v1::STT_LANGUAGE_EN}, {"es", ::runanywhere::v1::STT_LANGUAGE_ES},
-        {"fr", ::runanywhere::v1::STT_LANGUAGE_FR}, {"de", ::runanywhere::v1::STT_LANGUAGE_DE},
-        {"zh", ::runanywhere::v1::STT_LANGUAGE_ZH}, {"ja", ::runanywhere::v1::STT_LANGUAGE_JA},
-        {"ko", ::runanywhere::v1::STT_LANGUAGE_KO}, {"it", ::runanywhere::v1::STT_LANGUAGE_IT},
-        {"pt", ::runanywhere::v1::STT_LANGUAGE_PT}, {"ar", ::runanywhere::v1::STT_LANGUAGE_AR},
-        {"ru", ::runanywhere::v1::STT_LANGUAGE_RU}, {"hi", ::runanywhere::v1::STT_LANGUAGE_HI},
-    };
-    // Special case: literal "auto" -> AUTO.
-    if (std::strncmp(lang, "auto", 4) == 0)
-        return ::runanywhere::v1::STT_LANGUAGE_AUTO;
-    auto it = table.find(base);
-    return (it != table.end()) ? it->second : ::runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
-}
-
-const char* stt_language_to_string(::runanywhere::v1::STTLanguage e) {
-    switch (e) {
-        case ::runanywhere::v1::STT_LANGUAGE_AUTO:
-            return "auto";
-        case ::runanywhere::v1::STT_LANGUAGE_EN:
-            return "en";
-        case ::runanywhere::v1::STT_LANGUAGE_ES:
-            return "es";
-        case ::runanywhere::v1::STT_LANGUAGE_FR:
-            return "fr";
-        case ::runanywhere::v1::STT_LANGUAGE_DE:
-            return "de";
-        case ::runanywhere::v1::STT_LANGUAGE_ZH:
-            return "zh";
-        case ::runanywhere::v1::STT_LANGUAGE_JA:
-            return "ja";
-        case ::runanywhere::v1::STT_LANGUAGE_KO:
-            return "ko";
-        case ::runanywhere::v1::STT_LANGUAGE_IT:
-            return "it";
-        case ::runanywhere::v1::STT_LANGUAGE_PT:
-            return "pt";
-        case ::runanywhere::v1::STT_LANGUAGE_AR:
-            return "ar";
-        case ::runanywhere::v1::STT_LANGUAGE_RU:
-            return "ru";
-        case ::runanywhere::v1::STT_LANGUAGE_HI:
-            return "hi";
-        case ::runanywhere::v1::STT_LANGUAGE_UNSPECIFIED:
-        default:
-            return "";
-    }
-}
-
 // ---- Audio format enum mapping --------------------------------------------
 // Both enums share the same ordering for the formats they overlap on. The C
 // enum starts at PCM=0; proto starts at UNSPECIFIED=0 with PCM=1. Apply +1 / -1
@@ -210,12 +146,14 @@ bool rac_stt_options_from_proto(const ::runanywhere::v1::STTOptions& in, rac_stt
     if (!out)
         return false;
     *out = RAC_STT_OPTIONS_DEFAULT;
-    if (in.language() == ::runanywhere::v1::STT_LANGUAGE_AUTO) {
-        out->detect_language = RAC_TRUE;
-        out->language = "auto";
-    } else if (in.language() != ::runanywhere::v1::STT_LANGUAGE_UNSPECIFIED) {
+    // Borrows the proto's string storage; `in` must outlive `out` (adapter
+    // contract — callers hold the request across the call).
+    if (in.has_language() && !in.language().empty() && in.language() != "auto") {
         out->detect_language = RAC_FALSE;
-        out->language = stt_language_to_string(in.language());
+        out->language = in.language().c_str();
+    } else {
+        out->detect_language = RAC_TRUE;
+        out->language = nullptr;
     }
     out->enable_punctuation = in.enable_punctuation() ? RAC_TRUE : RAC_FALSE;
     out->enable_diarization = in.enable_diarization() ? RAC_TRUE : RAC_FALSE;
@@ -297,7 +235,9 @@ bool rac_stt_result_to_proto(const rac_stt_result_t* in, ::runanywhere::v1::STTO
     out->Clear();
     if (in->text)
         out->set_text(in->text);
-    out->set_language(stt_language_from_string(in->detected_language));
+    if (in->detected_language && in->detected_language[0] != '\0') {
+        out->set_language(in->detected_language);
+    }
     out->set_confidence(in->confidence);
     for (size_t i = 0; i < in->num_words; ++i) {
         rac_stt_word_to_proto(&in->words[i], out->add_words());
@@ -318,8 +258,8 @@ bool rac_tts_options_from_proto(const ::runanywhere::v1::TTSOptions& in, rac_tts
     out->voice = copy_string(in.voice());
     if (!in.language_code().empty())
         out->language = copy_string(in.language_code());
-    if (in.speaking_rate() > 0.0f)
-        out->rate = in.speaking_rate();
+    if (in.speed() > 0.0f)
+        out->rate = in.speed();
     if (in.pitch() > 0.0f)
         out->pitch = in.pitch();
     if (in.volume() > 0.0f)
@@ -416,15 +356,14 @@ bool rac_vlm_options_from_proto(const ::runanywhere::v1::VLMGenerationOptions& i
         return false;
     rac_vlm_options_t defaults = RAC_VLM_OPTIONS_DEFAULT;
     *out = defaults;
-    if (in.max_tokens() > 0)
-        out->max_tokens = in.max_tokens();
+    if (in.max_output_tokens() > 0)
+        out->max_tokens = in.max_output_tokens();
     // VLMGenerationOptions is an explicit per-request value. Zero is the
     // documented greedy-decoding sentinel, not an absent scalar; callers that
     // want the sampled default construct VLMGenerationOptions.defaults().
     out->temperature = in.temperature();
     if (in.top_p() > 0.0f)
         out->top_p = in.top_p();
-    out->streaming_enabled = in.streaming_enabled() ? RAC_TRUE : RAC_FALSE;
     if (in.max_image_size() > 0)
         out->max_image_size = in.max_image_size();
     if (in.n_threads() > 0)
@@ -580,9 +519,9 @@ bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMR
     out->Clear();
     if (in->text)
         out->set_text(in->text);
-    out->set_prompt_tokens(in->prompt_tokens);
+    out->set_input_tokens(in->prompt_tokens);
     out->set_image_tokens(in->image_tokens);
-    out->set_completion_tokens(in->completion_tokens);
+    out->set_output_tokens(in->completion_tokens);
     out->set_total_tokens(in->total_tokens);
     out->set_time_to_first_token_ms(in->time_to_first_token_ms);
     out->set_image_encode_time_ms(in->image_encode_time_ms);
@@ -750,8 +689,8 @@ bool rac_diffusion_options_from_proto(const ::runanywhere::v1::DiffusionGenerati
         out->width = in.width();
     if (in.height() > 0)
         out->height = in.height();
-    if (in.num_inference_steps() > 0)
-        out->steps = in.num_inference_steps();
+    if (in.steps() > 0)
+        out->steps = in.steps();
     if (in.guidance_scale() > 0.0f)
         out->guidance_scale = in.guidance_scale();
     out->seed = in.seed();
@@ -902,8 +841,7 @@ bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOption
 
     switch (in.normalize_mode()) {
         case ::runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED:
-            out->normalize =
-                in.normalize() ? RAC_EMBEDDINGS_NORMALIZE_L2 : RAC_EMBEDDINGS_NORMALIZE_NONE;
+            out->normalize = RAC_EMBEDDINGS_NORMALIZE_L2;
             break;
         case ::runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_NONE:
             out->normalize = RAC_EMBEDDINGS_NORMALIZE_NONE;

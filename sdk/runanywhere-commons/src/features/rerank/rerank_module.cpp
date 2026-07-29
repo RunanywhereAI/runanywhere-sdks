@@ -199,8 +199,8 @@ rac_result_t result_to_proto(const rac_rerank_result_t& source, size_t candidate
         }
         auto* destination = out->add_items();
         destination->set_id(item.id ? item.id : "");
-        destination->set_score(item.score);
-        destination->set_original_index(item.original_index);
+        destination->set_relevance_score(item.score);
+        destination->set_index(item.original_index);
         destination->set_rank(item.rank);
     }
     out->set_processing_time_ms(source.processing_time_ms);

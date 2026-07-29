@@ -1098,7 +1098,7 @@ extern "C" rac_result_t rac_voice_agent_transcribe_proto(rac_voice_agent_handle_
         output.set_text(stt.text);
     output.set_confidence(stt.confidence);
     if (stt.detected_language)
-        output.set_language_code(stt.detected_language);
+        output.set_language(stt.detected_language);
     if (stt.processing_time_ms > 0) {
         auto* metadata = output.mutable_metadata();
         metadata->set_processing_time_ms(stt.processing_time_ms);

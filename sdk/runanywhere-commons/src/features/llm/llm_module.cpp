@@ -1426,8 +1426,9 @@ void thinking_tags_from_request_or_model(const LLMGenerateRequest& request,
     if (out_close_tag) {
         out_close_tag->clear();
     }
-    if (request.has_options() && request.options().has_thinking_pattern()) {
-        const auto& pattern = request.options().thinking_pattern();
+    if (request.has_options() && request.options().has_reasoning() &&
+        request.options().reasoning().has_pattern()) {
+        const auto& pattern = request.options().reasoning().pattern();
         if (!pattern.open_tag().empty() && !pattern.close_tag().empty()) {
             if (out_open_tag) {
                 *out_open_tag = pattern.open_tag();
@@ -1459,9 +1460,9 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
     const bool has_options = request.has_options();
     const auto& opts = request.options();
 
-    // max_tokens proto3 zero means "unset → engine default" (idl/llm_options.proto:45-47).
-    if (has_options && opts.max_tokens() > 0) {
-        options.max_tokens = opts.max_tokens();
+    // max_output_tokens proto3 zero means "unset → engine default".
+    if (has_options && opts.max_output_tokens() > 0) {
+        options.max_tokens = opts.max_output_tokens();
     }
 
     // temperature: when the canonical LLMGenerationOptions is set, pass its value through
@@ -1495,13 +1496,16 @@ options_from_request(const LLMGenerateRequest& request, const std::string& syste
     options.min_p = has_options ? opts.min_p() : 0.0f;
     options.seed = has_options ? opts.seed() : 0;
     options.n_threads = has_options ? opts.n_threads() : 0;
-    options.disable_thinking = (has_options && opts.disable_thinking()) ? RAC_TRUE : RAC_FALSE;
+    options.disable_thinking =
+        (has_options && opts.has_reasoning() &&
+         opts.reasoning().mode() == runanywhere::v1::REASONING_MODE_OFF)
+            ? RAC_TRUE
+            : RAC_FALSE;
 
-    grammar_storage = has_options ? opts.grammar() : std::string{};
-    if (grammar_storage.empty() && has_options && opts.has_structured_output() &&
-        opts.structured_output().has_grammar()) {
-        grammar_storage = opts.structured_output().grammar();
-    }
+    grammar_storage = (has_options && opts.has_structured_output() &&
+                       opts.structured_output().has_grammar())
+                          ? opts.structured_output().grammar()
+                          : std::string{};
     options.grammar = grammar_storage.empty() ? nullptr : grammar_storage.c_str();
 
     options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
@@ -1618,7 +1622,7 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_res
         out->set_thinking_content(sanitize_utf8(std::string(thinking, thinking_len)));
     }
     out->set_input_tokens(raw.prompt_tokens);
-    out->set_tokens_generated(raw.completion_tokens);
+    out->set_output_tokens(raw.completion_tokens);
     out->set_total_tokens(raw.total_tokens);
     out->set_model_used(ref.model_id ? ref.model_id : "");
     out->set_generation_time_ms(static_cast<double>(raw.total_time_ms));
@@ -1644,8 +1648,8 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_res
     auto* perf = out->mutable_performance();
     perf->set_latency_ms(raw.total_time_ms);
     perf->set_throughput_tokens_per_sec(raw.tokens_per_second);
-    perf->set_prompt_tokens(raw.prompt_tokens);
-    perf->set_completion_tokens(raw.completion_tokens);
+    perf->set_input_tokens(raw.prompt_tokens);
+    perf->set_output_tokens(raw.completion_tokens);
 }
 
 void set_structured_output_if_present(const char* response, LLMGenerationResult* out) {
@@ -2021,8 +2025,8 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     if (!ctx->thinking_text.empty()) {
         final_result.set_thinking_content(ctx->thinking_text);
     }
-    final_result.set_prompt_tokens(ctx->prompt_tokens);
-    final_result.set_completion_tokens(ctx->token_count);
+    final_result.set_input_tokens(ctx->prompt_tokens);
+    final_result.set_output_tokens(ctx->token_count);
     final_result.set_total_tokens(ctx->prompt_tokens + ctx->token_count);
     const int64_t total_time_ms = now_ms() - ctx->started_ms;
     final_result.set_total_time_ms(total_time_ms);
@@ -2232,7 +2236,8 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.ref = &ref;
     ctx.started_ms = now_ms();
     ctx.prompt_tokens = estimate_tokens(request.prompt().c_str());
-    ctx.emit_thoughts = request.emit_thoughts();
+    ctx.emit_thoughts = request.has_options() && request.options().has_reasoning() &&
+                        request.options().reasoning().include_in_output();
     ctx.request_id = request.request_id();
     ctx.conversation_id = request.conversation_id();
     thinking_tags_from_request_or_model(request, ref, &ctx.thinking_open_tag,

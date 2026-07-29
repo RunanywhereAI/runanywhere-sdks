@@ -408,17 +408,21 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
                                std::function<bool(const std::string&)> on_token,
                                runanywhere::v1::RAGResult* out_proto, std::string* out_error) {
     const std::string question = query_proto.question();
-    const std::string system_prompt =
-        query_proto.has_system_prompt() ? query_proto.system_prompt() : std::string();
+    const auto& gen = query_proto.generation();
+    const std::string system_prompt = gen.has_system_prompt() ? gen.system_prompt() : std::string();
 
-    // Base off RAC_LLM_OPTIONS_DEFAULT so the sampling fields RAGQueryOptions
-    // does not expose carry the proto-documented defaults instead of zero-init.
+    // Base off RAC_LLM_OPTIONS_DEFAULT, then apply the embedded generation
+    // knobs with the RAG pipeline defaults (max 512 tokens, top_p 0.9) when
+    // unset.
     rac_llm_options_t opts = RAC_LLM_OPTIONS_DEFAULT;
-    opts.max_tokens = query_proto.max_tokens() > 0 ? query_proto.max_tokens() : 512;
-    opts.temperature = query_proto.temperature();
-    opts.top_p = query_proto.top_p() > 0.0f ? query_proto.top_p() : 0.9f;
-    opts.top_k = query_proto.top_k();
-    opts.disable_thinking = query_proto.disable_thinking() ? RAC_TRUE : RAC_FALSE;
+    opts.max_tokens = gen.max_output_tokens() > 0 ? gen.max_output_tokens() : 512;
+    opts.temperature = query_proto.has_generation() ? gen.temperature() : opts.temperature;
+    opts.top_p = gen.top_p() > 0.0f ? gen.top_p() : 0.9f;
+    opts.top_k = gen.top_k();
+    opts.disable_thinking =
+        (gen.has_reasoning() && gen.reasoning().mode() == runanywhere::v1::REASONING_MODE_OFF)
+            ? RAC_TRUE
+            : RAC_FALSE;
     opts.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
 
     RAGBackend::QueryOverrides overrides;

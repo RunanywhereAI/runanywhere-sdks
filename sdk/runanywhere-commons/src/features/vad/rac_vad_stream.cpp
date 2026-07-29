@@ -200,7 +200,7 @@ rac_result_t rac_vad_stream_start_proto(rac_handle_t handle, const uint8_t* opti
         // are debounce gates owned by the VAD backend itself; the streaming
         // ABI cannot retune the backend per session today, so they are
         // intentionally not propagated.
-        s.threshold_override = parsed.threshold() > 0.0f ? parsed.threshold() : 0.0f;
+        s.threshold_override = parsed.activation_threshold() > 0.0f ? parsed.activation_threshold() : 0.0f;
     }
     *out_session_id = id;
     return RAC_SUCCESS;

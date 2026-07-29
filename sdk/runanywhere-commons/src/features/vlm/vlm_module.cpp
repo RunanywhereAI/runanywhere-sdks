@@ -1052,7 +1052,7 @@ struct StreamCtx {
 void populate_result_from_stream(const StreamCtx& ctx, int64_t elapsed_ms,
                                  runanywhere::v1::VLMResult* out) {
     out->set_text(ctx.text);
-    out->set_completion_tokens(ctx.token_count);
+    out->set_output_tokens(ctx.token_count);
     out->set_total_tokens(ctx.token_count);
     out->set_processing_time_ms(elapsed_ms);
     if (elapsed_ms > 0) {
@@ -1292,9 +1292,9 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
                                         ? std::to_string(res_w) + "x" + std::to_string(res_h)
                                         : std::string();
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.generate", 1.0f, 1, result.completion_tokens(), nullptr,
+                       "vlm.generate", 1.0f, 1, result.output_tokens(), nullptr,
                        static_cast<double>(result.processing_time_ms()), ref.model_id,
-                       result.prompt_tokens(), result.total_tokens(),
+                       result.input_tokens(), result.total_tokens(),
                        static_cast<double>(result.tokens_per_second()),
                        static_cast<double>(result.time_to_first_token_ms()), ref.framework_name,
                        static_cast<double>(options.temperature), options.max_tokens,
@@ -1409,7 +1409,7 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
                 : std::string();
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
                            "vlm.stream", 1.0f, 1, ctx.token_count, nullptr,
-                           static_cast<double>(elapsed_ms), ref.model_id, result.prompt_tokens(),
+                           static_cast<double>(elapsed_ms), ref.model_id, result.input_tokens(),
                            result.total_tokens(), static_cast<double>(result.tokens_per_second()),
                            static_cast<double>(result.time_to_first_token_ms()), ref.framework_name,
                            static_cast<double>(options.temperature), options.max_tokens,

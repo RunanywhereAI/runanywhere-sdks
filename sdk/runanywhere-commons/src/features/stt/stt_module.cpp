@@ -368,77 +368,18 @@ rac_result_t copy_proto_message(const google::protobuf::MessageLite& message,
     return rac::proto::copy_message(message, out, "failed to serialize STT proto result");
 }
 
-const char* language_code(runanywhere::v1::STTLanguage language) {
-    switch (language) {
-        case runanywhere::v1::STT_LANGUAGE_EN:
-            return "en";
-        case runanywhere::v1::STT_LANGUAGE_ES:
-            return "es";
-        case runanywhere::v1::STT_LANGUAGE_FR:
-            return "fr";
-        case runanywhere::v1::STT_LANGUAGE_DE:
-            return "de";
-        case runanywhere::v1::STT_LANGUAGE_ZH:
-            return "zh";
-        case runanywhere::v1::STT_LANGUAGE_JA:
-            return "ja";
-        case runanywhere::v1::STT_LANGUAGE_KO:
-            return "ko";
-        case runanywhere::v1::STT_LANGUAGE_IT:
-            return "it";
-        case runanywhere::v1::STT_LANGUAGE_PT:
-            return "pt";
-        case runanywhere::v1::STT_LANGUAGE_AR:
-            return "ar";
-        case runanywhere::v1::STT_LANGUAGE_RU:
-            return "ru";
-        case runanywhere::v1::STT_LANGUAGE_HI:
-            return "hi";
-        default:
-            return nullptr;
-    }
-}
-
-runanywhere::v1::STTLanguage language_from_code(const char* language) {
-    if (!language || language[0] == '\0') {
-        return runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
-    }
-    if (std::strncmp(language, "en", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_EN;
-    if (std::strncmp(language, "es", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_ES;
-    if (std::strncmp(language, "fr", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_FR;
-    if (std::strncmp(language, "de", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_DE;
-    if (std::strncmp(language, "zh", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_ZH;
-    if (std::strncmp(language, "ja", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_JA;
-    if (std::strncmp(language, "ko", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_KO;
-    if (std::strncmp(language, "it", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_IT;
-    if (std::strncmp(language, "pt", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_PT;
-    if (std::strncmp(language, "ar", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_AR;
-    if (std::strncmp(language, "ru", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_RU;
-    if (std::strncmp(language, "hi", 2) == 0)
-        return runanywhere::v1::STT_LANGUAGE_HI;
-    return runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
-}
-
+// Language is one BCP-47 string on the wire: unset/empty = auto-detect.
+// `storage` must outlive `options` — the C struct points into it.
 rac_stt_options_t options_from_proto(const runanywhere::v1::STTOptions& proto,
-                                     const rac_stt_options_t& defaults) {
+                                     const rac_stt_options_t& defaults, std::string& storage) {
     rac_stt_options_t options = defaults;
-    if (proto.language() == runanywhere::v1::STT_LANGUAGE_AUTO) {
-        options.detect_language = RAC_TRUE;
-        options.language = nullptr;
-    } else if (const char* language = language_code(proto.language())) {
-        options.language = language;
+    if (proto.has_language() && !proto.language().empty() && proto.language() != "auto") {
+        storage = proto.language();
+        options.language = storage.c_str();
         options.detect_language = RAC_FALSE;
+    } else {
+        options.language = nullptr;
+        options.detect_language = RAC_TRUE;
     }
     options.enable_punctuation = proto.enable_punctuation() ? RAC_TRUE : RAC_FALSE;
     options.enable_diarization = proto.enable_diarization() ? RAC_TRUE : RAC_FALSE;
@@ -460,8 +401,11 @@ void fill_stt_output(const rac_stt_result_t& result, const rac_stt_options_t& op
     if (result.text) {
         out->set_text(result.text);
     }
-    out->set_language(result.detected_language ? language_from_code(result.detected_language)
-                                               : language_from_code(options.language));
+    if (result.detected_language && result.detected_language[0] != '\0') {
+        out->set_language(result.detected_language);
+    } else if (options.language && options.language[0] != '\0') {
+        out->set_language(options.language);
+    }
     out->set_confidence(result.confidence);
     for (size_t i = 0; i < result.num_words; ++i) {
         auto* word = out->add_words();
@@ -1399,7 +1343,9 @@ rac_stt_component_transcribe_proto(rac_handle_t handle, const void* audio_data, 
         return rac_proto_buffer_set_error(out_result, rc, "STT model is not loaded");
     }
 
-    rac_stt_options_t options = options_from_proto(proto_options, RAC_STT_OPTIONS_DEFAULT);
+    std::string language_storage;
+    rac_stt_options_t options =
+        options_from_proto(proto_options, RAC_STT_OPTIONS_DEFAULT, language_storage);
     rac_stt_result_t result = {};
     publish_stt_voice_event(runanywhere::v1::VOICE_EVENT_KIND_STT_PROCESSING, nullptr, 0.0f);
     rac_result_t rc =
@@ -1472,7 +1418,9 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
         return rc;
     }
 
-    rac_stt_options_t options = options_from_proto(proto_options, RAC_STT_OPTIONS_DEFAULT);
+    std::string language_storage;
+    rac_stt_options_t options =
+        options_from_proto(proto_options, RAC_STT_OPTIONS_DEFAULT, language_storage);
 
     struct StreamContext {
         rac_stt_proto_stream_event_callback_fn callback;
@@ -1510,13 +1458,17 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
         partial->set_is_final(is_final == RAC_TRUE);
         partial->set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
         partial->set_request_id(ctx->request_id);
-        partial->set_language(language_from_code(ctx->options.language));
+        if (ctx->options.language && ctx->options.language[0] != '\0') {
+            partial->set_language(ctx->options.language);
+        }
         if (is_final == RAC_TRUE) {
             auto* final_output = event.mutable_final_output();
             if (partial_text) {
                 final_output->set_text(partial_text);
             }
-            final_output->set_language(language_from_code(ctx->options.language));
+            if (ctx->options.language && ctx->options.language[0] != '\0') {
+                final_output->set_language(ctx->options.language);
+            }
             final_output->set_duration_ms(
                 estimate_audio_length_ms(ctx->audio_size, ctx->options.sample_rate));
             final_output->mutable_metadata()->set_audio_length_ms(final_output->duration_ms());
@@ -1798,9 +1750,9 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
                                           "failed to convert STTOptions");
     }
-    if (request.has_options() && request.options().has_language_code() &&
-        !request.options().language_code().empty()) {
-        options.language = request.options().language_code().c_str();
+    if (request.has_options() && request.options().has_language() &&
+        !request.options().language().empty()) {
+        options.language = request.options().language().c_str();
         options.detect_language = RAC_FALSE;
     }
     if (request.audio().sample_rate() > 0) {
@@ -1923,9 +1875,9 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
         rac::lifecycle::release_lifecycle_stt(&ref);
         return RAC_ERROR_DECODING_ERROR;
     }
-    if (request.has_options() && request.options().has_language_code() &&
-        !request.options().language_code().empty()) {
-        options.language = request.options().language_code().c_str();
+    if (request.has_options() && request.options().has_language() &&
+        !request.options().language().empty()) {
+        options.language = request.options().language().c_str();
         options.detect_language = RAC_FALSE;
     }
     if (request.audio().sample_rate() > 0) {
@@ -1942,7 +1894,7 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
         void* user_data;
         std::string request_id;
         uint64_t next_seq;
-        runanywhere::v1::STTLanguage language;
+        std::string language;
         size_t audio_size;
         int32_t sample_rate;
         size_t sample_width;
@@ -1961,16 +1913,16 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     const int32_t effective_sample_rate =
         options.sample_rate > 0 ? options.sample_rate : RAC_STT_DEFAULT_SAMPLE_RATE;
 
-    runanywhere::v1::STTLanguage language_enum = runanywhere::v1::STT_LANGUAGE_UNSPECIFIED;
-    if (request.has_options()) {
-        language_enum = request.options().language();
+    std::string request_language;
+    if (request.has_options() && request.options().has_language()) {
+        request_language = request.options().language();
     }
 
     StreamCtx ctx{.fn = callback,
                   .user_data = user_data,
                   .request_id = request_id,
                   .next_seq = 1,
-                  .language = language_enum,
+                  .language = request_language,
                   .audio_size = request.audio().audio_data().size(),
                   .sample_rate = effective_sample_rate,
                   .sample_width = sample_width};
@@ -2011,13 +1963,17 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
         partial->set_is_final(is_final == RAC_TRUE);
         partial->set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
         partial->set_request_id(c->request_id);
-        partial->set_language(c->language);
+        if (!c->language.empty()) {
+            partial->set_language(c->language);
+        }
         if (is_final == RAC_TRUE) {
             auto* final_output = event.mutable_final_output();
             if (partial_text) {
                 final_output->set_text(partial_text);
             }
-            final_output->set_language(c->language);
+            if (!c->language.empty()) {
+                final_output->set_language(c->language);
+            }
             const int64_t audio_length_ms =
                 estimate_audio_length_ms(c->audio_size, c->sample_rate, c->sample_width);
             final_output->set_duration_ms(audio_length_ms);

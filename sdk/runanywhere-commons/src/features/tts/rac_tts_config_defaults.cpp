@@ -64,15 +64,16 @@ rac_tts_configuration_defaults_proto(rac_proto_buffer_t* out_RATTSConfiguration)
 #else
     runanywhere::v1::TTSConfiguration cfg;
     // model_id defaults to empty string (proto zero value).
-    cfg.set_voice(std::string("default"));
-    cfg.set_language_code(std::string("en-US"));
-    cfg.set_speaking_rate(1.0f);
-    cfg.set_pitch(1.0f);
-    cfg.set_volume(1.0f);
-    cfg.set_audio_format(runanywhere::v1::AUDIO_FORMAT_PCM);
-    cfg.set_sample_rate(22050);
     cfg.set_enable_neural_voice(true);
-    cfg.set_enable_ssml(false);
+    auto* opts = cfg.mutable_default_options();
+    opts->set_voice(std::string("default"));
+    opts->set_language_code(std::string("en-US"));
+    opts->set_speed(1.0f);
+    opts->set_pitch(1.0f);
+    opts->set_volume(1.0f);
+    opts->set_audio_format(runanywhere::v1::AUDIO_FORMAT_PCM);
+    opts->set_sample_rate(22050);
+    opts->set_enable_ssml(false);
     return copy_proto(cfg, out_RATTSConfiguration);
 #endif
 }

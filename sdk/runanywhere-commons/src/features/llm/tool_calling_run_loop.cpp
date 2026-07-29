@@ -42,6 +42,8 @@
 #include "rac/foundation/rac_proto_buffer.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
+#include "chat.pb.h"
+#include "llm_service.pb.h"
 #include "tool_calling.pb.h"
 #endif
 
@@ -220,17 +222,9 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const LoopContext& ct
     options.set_format(ctx.format);
     options.set_max_tool_calls(static_cast<int32_t>(ctx.max_tool_calls));
     options.set_keep_tools_available(ctx.keep_tools_available);
-    if (ctx.generation.max_tokens > 0) {
-        options.set_max_tokens(ctx.generation.max_tokens);
-    }
-    if (ctx.generation.temperature > 0.0f) {
-        options.set_temperature(ctx.generation.temperature);
-    }
-    if (!ctx.generation.system_prompt.empty()) {
-        options.set_system_prompt(ctx.generation.system_prompt);
-    }
-    // Honor ToolCallingSessionCreateRequest.tool_choice / forced_tool_name
-    // The request-level fields take precedence over any
+    // Sampling/system prompt stay on the generation snapshot; ToolCallingOptions
+    // carries tool config only.
+    // The request-level tool_choice / forced_tool_name take precedence over any
     // tool_options the caller might have pre-populated, so the high-level
     // run-loop / session APIs surface the OpenAI-style tool_choice knob
     // that the format/validate primitives already read.
@@ -439,63 +433,56 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
+    const auto& gen = request.generation();
+    const auto& tool_cfg = gen.tool_calling();
+
     LoopContext ctx;
     ctx.user_prompt = request.prompt();
-    ctx.generation.max_tokens = request.max_tokens();
-    ctx.generation.temperature = request.temperature();
-    ctx.generation.top_p = request.top_p();
-    ctx.generation.system_prompt = request.system_prompt();
-    ctx.format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
-                     ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON
-                     : request.format();
+    ctx.generation.max_tokens = gen.max_output_tokens();
+    ctx.generation.temperature = gen.temperature();
+    ctx.generation.top_p = gen.top_p();
+    ctx.generation.system_prompt = gen.system_prompt();
+    ctx.format = tool_cfg.has_format() ? tool_cfg.format()
+                                       : runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON;
     // Probe grammar capability once up front (cheap acquire/release) so the prompt can
     // be built in the bare-Pythonic format the QHexRT grammar enforces. Non-grammar
     // engines keep the caller's declared format — a strict no-op for them (RUN-80).
     ctx.grammar_backend = rac::llm::lifecycle_llm_supports_grammar();
     ctx.max_tool_calls =
-        request.max_tool_calls() == 0 ? kDefaultMaxToolCalls : request.max_tool_calls();
-    ctx.auto_execute = request.has_auto_execute() ? request.auto_execute() : true;
-    ctx.replace_system_prompt = request.replace_system_prompt();
-    ctx.require_json_arguments = request.require_json_arguments();
-    ctx.keep_tools_available = request.keep_tools_available();
-    ctx.generation.disable_thinking = request.disable_thinking();
-    // Prior conversation turns (tool_calling.proto field 19). Threaded onto the
-    // generation snapshot so EVERY generate in the loop inherits it — the initial
-    // tool-decision generate (generation_for_tool_step copies base) and the
-    // follow-up generate (followup_ctx = ctx copies it). request.history already
-    // EXCLUDES the current turn (which travels as prompt) and is pre-alternated
-    // [user,asst,...], so we forward it as-is and do NOT pop a trailing turn —
-    // unlike llm_module's normalizer, whose history includes the current turn.
-    ctx.generation.history.assign(request.history().begin(), request.history().end());
-    // Positional-parity safety net. The history slot is role-less and positional
-    // [user0, asst0, user1, ...], so the CALLER owns full normalization — drop
-    // leading-assistant, coalesce consecutive same-role, exclude the current turn —
-    // exactly as the standard path's commons normalizer (llm_module.cpp) does for a
-    // role-tagged ChatMessage list (the Android app mirrors it in
-    // ChatRequestPolicy.toToolCallingHistory). This guard only corrects an ODD count
-    // (a dangling trailing turn); it deliberately does NOT coalesce interior same-role
-    // runs, which role-less strings cannot detect — that must happen upstream.
+        tool_cfg.max_tool_calls() == 0 ? kDefaultMaxToolCalls : tool_cfg.max_tool_calls();
+    ctx.auto_execute = tool_cfg.has_auto_execute() ? tool_cfg.auto_execute() : true;
+    ctx.replace_system_prompt = tool_cfg.replace_system_prompt();
+    ctx.require_json_arguments = tool_cfg.require_json_arguments();
+    ctx.keep_tools_available = tool_cfg.keep_tools_available();
+    ctx.generation.disable_thinking =
+        gen.has_reasoning() && gen.reasoning().mode() == runanywhere::v1::REASONING_MODE_OFF;
+    // Prior conversation turns, EXCLUDING the current turn (which travels as
+    // prompt). Threaded onto the generation snapshot so EVERY generate in the
+    // loop inherits it. History is role-tagged ChatMessages now; the internal
+    // snapshot is still positional [user0, asst0, ...], so drop leading
+    // assistant turns and keep contents in order.
+    for (const auto& msg : request.history()) {
+        if (ctx.generation.history.empty() &&
+            msg.role() != runanywhere::v1::MessageRole::MESSAGE_ROLE_USER) {
+            continue;
+        }
+        ctx.generation.history.push_back(msg.content());
+    }
     if (ctx.generation.history.size() % 2 != 0) {
         ctx.generation.history.pop_back();
     }
-    // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
-    // The field is `optional bool` so we can preserve the documented default
-    // (validate=true) when the caller did not set it, while still letting hosts
-    // that delegate validation/authorization to their executor opt out by
-    // explicitly setting validate_calls=false.
+    // validate_calls is `optional bool`: preserve the documented default
+    // (validate=true) when unset; hosts that delegate validation to their
+    // executor opt out explicitly.
     ctx.validate_calls = request.has_validate_calls() ? request.validate_calls() : true;
-    // pick up the request-level OpenAI-style tool_choice and
-    // forced_tool_name knobs (idl/tool_calling.proto fields 7/8) — these are
-    // copied onto every ToolCallingOptions snapshot the loop synthesizes for
-    // format/validate proto calls.
-    if (request.has_tool_choice()) {
+    if (tool_cfg.tool_choice() != runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED) {
         ctx.has_tool_choice = true;
-        ctx.tool_choice = request.tool_choice();
+        ctx.tool_choice = tool_cfg.tool_choice();
     }
-    if (request.has_forced_tool_name()) {
-        ctx.forced_tool_name = request.forced_tool_name();
+    if (tool_cfg.has_forced_tool_name()) {
+        ctx.forced_tool_name = tool_cfg.forced_tool_name();
     }
-    for (const auto& tool : request.tools()) {
+    for (const auto& tool : tool_cfg.tools()) {
         *ctx.tool_options.add_tools() = tool;
         // Names drive the QHexRT grammar spec (RUN-80); ignored by non-grammar engines.
         ctx.generation.tool_names.push_back(tool.name());

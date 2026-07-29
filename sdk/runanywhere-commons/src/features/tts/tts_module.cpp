@@ -151,8 +151,8 @@ rac_tts_options_t options_from_proto(const runanywhere::v1::TTSOptions& proto,
     if (!proto.language_code().empty()) {
         options.language = proto.language_code().c_str();
     }
-    if (proto.speaking_rate() > 0.0f) {
-        options.rate = proto.speaking_rate();
+    if (proto.speed() > 0.0f) {
+        options.rate = proto.speed();
     }
     if (proto.pitch() > 0.0f) {
         options.pitch = proto.pitch();

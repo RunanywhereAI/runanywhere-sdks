@@ -508,15 +508,16 @@ void populate_voice_agent(const YamlNode& node, runanywhere::v1::VoiceAgentConfi
     if (auto n = node.find("barge_in_threshold_ms"))
         cfg->set_barge_in_threshold_ms(to_int(n->scalar));
     if (auto n = node.find("system_prompt"))
-        cfg->set_system_prompt(n->scalar);
+        cfg->mutable_generation()->set_system_prompt(n->scalar);
     if (auto n = node.find("max_context_tokens"))
         cfg->set_max_context_tokens(to_int(n->scalar));
     if (auto n = node.find("temperature"))
-        cfg->set_temperature(to_float(n->scalar));
+        cfg->mutable_generation()->set_temperature(to_float(n->scalar));
     if (auto n = node.find("emit_partials"))
         cfg->set_emit_partials(to_bool(n->scalar));
     if (auto n = node.find("emit_thoughts"))
-        cfg->set_emit_thoughts(to_bool(n->scalar));
+        cfg->mutable_generation()->mutable_reasoning()->set_include_in_output(
+            to_bool(n->scalar));
 }
 
 runanywhere::v1::VectorStore parse_vector_store(const std::string& s) {

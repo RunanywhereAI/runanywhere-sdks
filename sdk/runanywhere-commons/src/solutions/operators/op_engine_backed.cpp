@@ -215,7 +215,7 @@ class GenerateTextNode final : public OperatorNode {
             options->set_system_prompt(system_prompt_);
         }
         if (max_tokens_ > 0) {
-            options->set_max_tokens(max_tokens_);
+            options->set_max_output_tokens(max_tokens_);
         }
         if (!model_id_.empty()) {
             request.set_model_id(model_id_);
@@ -445,7 +445,7 @@ class DetectVoiceNode final : public OperatorNode {
         audio->set_sample_rate(sample_rate_);
         audio->set_channels(1);
         if (threshold_ > 0.0f) {
-            request.mutable_options()->set_threshold(threshold_);
+            request.mutable_options()->set_activation_threshold(threshold_);
         }
 
         std::vector<uint8_t> bytes(request.ByteSizeLong());
@@ -624,7 +624,7 @@ class RetrieveNode final : public OperatorNode {
         runanywhere::v1::RAGQueryOptions request;
         request.set_question(item.text());
         if (!system_prompt_.empty()) {
-            request.set_system_prompt(system_prompt_);
+            request.mutable_generation()->set_system_prompt(system_prompt_);
         }
         if (retrieval_top_k_ > 0) {
             request.set_retrieval_top_k(retrieval_top_k_);
