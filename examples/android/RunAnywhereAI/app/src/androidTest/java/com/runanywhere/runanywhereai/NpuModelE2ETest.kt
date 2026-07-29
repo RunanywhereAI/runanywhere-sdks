@@ -8,6 +8,7 @@ import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelImportRequest
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.ModelUnloadRequest
+import ai.runanywhere.proto.v1.ReasoningOptions
 import ai.runanywhere.proto.v1.ThinkingTagPattern
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -566,10 +567,10 @@ class NpuModelE2ETest {
     /** Greedy (temp=0) generation collecting per-token ids (for token-level parity) + perf metrics. */
     private suspend fun greedyGenerate(prompt: String, maxNew: Int): Gen {
         val opts = RALLMGenerationOptions(
-            max_tokens = maxNew,
+            max_output_tokens = maxNew,
             temperature = 0f,
             top_p = 1f,
-            thinking_pattern = THINKING_TAGS,
+            reasoning = ReasoningOptions(include_in_output = true, pattern = THINKING_TAGS),
         )
         val ids = ArrayList<Int>(); val sb = StringBuilder()
         val t0 = System.currentTimeMillis(); var ttftWall = 0.0
@@ -583,7 +584,7 @@ class NpuModelE2ETest {
             if (ev.is_final) ev.result?.let { r ->
                 ttft = r.time_to_first_token_ms.toDouble(); tps = r.tokens_per_second.toDouble()
                 decMs = r.decode_time_ms.toDouble(); preMs = r.prompt_eval_time_ms.toDouble()
-                totMs = r.total_time_ms.toDouble(); outTok = r.completion_tokens; inTok = r.prompt_tokens
+                totMs = r.total_time_ms.toDouble(); outTok = r.output_tokens; inTok = r.input_tokens
             }
         }
         val totalWall = (System.currentTimeMillis() - t0).toDouble()
@@ -621,7 +622,7 @@ class NpuModelE2ETest {
                 // match the fp32 gold deterministically, not a sampled variant. (0f is also the option
                 // default, but pin it explicitly so a future default change can't silently un-greedy the gate.)
                 RunAnywhere.processImage(RAVLMImage.fromFilePath(f.absolutePath),
-                    RAVLMGenerationOptions(prompt = prompt, max_tokens = budget, temperature = 0f, top_p = 0f, top_k = 0))
+                    RAVLMGenerationOptions(prompt = prompt, max_output_tokens = budget, temperature = 0f, top_p = 0f, top_k = 0))
             }
             val text = r.text.trim()
             val visibleAnswer = NpuMetrics.answerText(text)
@@ -633,7 +634,7 @@ class NpuModelE2ETest {
                 .put("ttft_ms", round2(r.time_to_first_token_ms.toDouble()))
                 .put("tokens_per_s", round2(r.tokens_per_second.toDouble()))
                 .put("total_ms", round2(r.processing_time_ms.toDouble()))
-                .put("out_tok", r.completion_tokens).put("img_tok", r.image_tokens)
+                .put("out_tok", r.output_tokens).put("img_tok", r.image_tokens)
                 .put("metric", "keyword:${kws.firstOrNull() ?: ""}").put("max_new", budget).put("pass", pass))
             report.put("vision_ms", round2(r.image_encode_time_ms.toDouble()))
                 .put("ttft_ms", round2(r.time_to_first_token_ms.toDouble()))

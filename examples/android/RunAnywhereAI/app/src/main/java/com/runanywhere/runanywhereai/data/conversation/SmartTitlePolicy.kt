@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.data.conversation
 
+import ai.runanywhere.proto.v1.ReasoningMode
+import ai.runanywhere.proto.v1.ReasoningOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 
 internal object SmartTitlePolicy {
@@ -22,10 +24,10 @@ internal object SmartTitlePolicy {
 
     fun generationOptions(systemPrompt: String): RALLMGenerationOptions =
         RALLMGenerationOptions(
-            max_tokens = MAX_TOKENS,
+            max_output_tokens = MAX_TOKENS,
             temperature = TEMPERATURE,
             system_prompt = systemPrompt,
-            disable_thinking = true,
+            reasoning = ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF),
         )
 
     fun normalizedTitle(raw: String): String? {

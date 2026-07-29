@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.stt
 
-import ai.runanywhere.proto.v1.STTLanguage
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -192,7 +191,7 @@ class SttViewModel : ViewModel() {
                 RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT)
                 RunAnywhere.transcribeStream(
                     channel.receiveAsFlow(),
-                    RASTTOptions(language = STTLanguage.STT_LANGUAGE_EN, enable_punctuation = true),
+                    RASTTOptions(language = "en", enable_punctuation = true),
                 ).collect { partial -> onLivePartial(partial) }
             } catch (e: CancellationException) {
                 throw e
@@ -368,7 +367,7 @@ class SttViewModel : ViewModel() {
         val started = System.currentTimeMillis()
         val output = RunAnywhere.transcribe(
             audio,
-            RASTTOptions(language = STTLanguage.STT_LANGUAGE_EN, enable_punctuation = true),
+            RASTTOptions(language = "en", enable_punctuation = true),
         )
         val elapsed = System.currentTimeMillis() - started
         val text = output.text.trim()

@@ -62,11 +62,8 @@ internal object ChatRequestPolicy {
         turn: ChatTurnSnapshot,
         options: RALLMGenerationOptions,
         conversationId: String,
-        streaming: Boolean,
     ): RALLMGenerateRequest =
-        options.copy(
-            streaming_enabled = streaming,
-        ).toRALLMGenerateRequest(turn.prompt).copy(
+        options.toRALLMGenerateRequest(turn.prompt).copy(
             conversation_id = conversationId,
             history = turn.history,
         )

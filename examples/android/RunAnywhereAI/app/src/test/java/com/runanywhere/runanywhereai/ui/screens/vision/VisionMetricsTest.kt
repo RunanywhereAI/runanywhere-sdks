@@ -8,7 +8,7 @@ class VisionMetricsTest {
     @Test
     fun `maps canonical engine metrics without wall clock substitution`() {
         val metrics = VLMResult(
-            completion_tokens = 37,
+            output_tokens = 37,
             tokens_per_second = 14.25f,
             processing_time_ms = 2_800,
             image_encode_time_ms = 315,

@@ -5,7 +5,6 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelListRequest
 import ai.runanywhere.proto.v1.ModelUnloadRequest
-import ai.runanywhere.proto.v1.STTLanguage
 import ai.runanywhere.proto.v1.VLMImageFormat
 import android.content.Context
 import android.graphics.Bitmap
@@ -170,14 +169,14 @@ class BenchmarkRunner(private val context: Context) {
             withContext(Dispatchers.Default) {
                 RunAnywhere.generate(
                     "Hello",
-                    RALLMGenerationOptions(max_tokens = 5, temperature = 0f),
+                    RALLMGenerationOptions(max_output_tokens = 5, temperature = 0f),
                 )
             }
         } ?: throw IllegalStateException("LLM benchmark warmup timed out")
         check(warmup.error_message.isNullOrBlank()) {
             warmup.error_message ?: "LLM benchmark warmup failed"
         }
-        check(warmup.tokens_generated > 0) {
+        check(warmup.output_tokens > 0) {
             "LLM benchmark warmup produced zero output tokens"
         }
     }
@@ -186,7 +185,7 @@ class BenchmarkRunner(private val context: Context) {
     // wall-clock TTFT fallback when the backend omits it (parity with iOS).
     private suspend fun measureLlm(maxTokens: Int): Pair<RALLMGenerationResult, Double> {
         val options = RALLMGenerationOptions(
-            max_tokens = maxTokens,
+            max_output_tokens = maxTokens,
             temperature = 0f,
             system_prompt = LLM_SYSTEM_PROMPT,
         )
@@ -211,7 +210,7 @@ class BenchmarkRunner(private val context: Context) {
             val seconds = if (silent) 2.0 else 3.0
             val pcm = if (silent) SyntheticInput.silentPcm(seconds) else SyntheticInput.sinePcm(seconds)
             val options = RASTTOptions(
-                language = STTLanguage.STT_LANGUAGE_EN,
+                language = "en",
                 enable_punctuation = true,
                 enable_word_timestamps = true,
             )
@@ -248,7 +247,7 @@ class BenchmarkRunner(private val context: Context) {
         try {
             val options = RATTSOptions(
                 language_code = "en-US",
-                speaking_rate = 1f,
+                speed = 1f,
                 pitch = 1f,
                 volume = 1f,
                 audio_format = AudioFormat.AUDIO_FORMAT_PCM,
@@ -292,14 +291,14 @@ class BenchmarkRunner(private val context: Context) {
                 val image = RAVLMImage(file_path = file.absolutePath, format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH)
                 val warmupMs = measureMs {
                     runCatching {
-                        RunAnywhere.processImage(image, RAVLMGenerationOptions(prompt = "Hi", max_tokens = 1, temperature = 0f))
+                        RunAnywhere.processImage(image, RAVLMGenerationOptions(prompt = "Hi", max_output_tokens = 1, temperature = 0f))
                     }
                 }
                 // Flush any lingering generation state / KV cache before the measured run.
                 RunAnywhere.cancelVLMGeneration()
                 val result = RunAnywhere.processImage(
                     image,
-                    RAVLMGenerationOptions(prompt = VLM_PROMPT, max_tokens = 128, temperature = 0f),
+                    RAVLMGenerationOptions(prompt = VLM_PROMPT, max_output_tokens = 128, temperature = 0f),
                 )
                 val memAfter = SyntheticInput.availableMemoryBytes(context)
                 return BenchmarkMetrics(
@@ -308,8 +307,8 @@ class BenchmarkRunner(private val context: Context) {
                     endToEndLatencyMs = result.processing_time_ms.toDouble(),
                     tokensPerSecond = result.tokens_per_second.toDouble().takeIf { it > 0 },
                     ttftMs = result.time_to_first_token_ms.toDouble().takeIf { it > 0 },
-                    inputTokens = result.prompt_tokens,
-                    outputTokens = result.completion_tokens,
+                    inputTokens = result.input_tokens,
+                    outputTokens = result.output_tokens,
                     memoryDeltaBytes = memBefore - memAfter,
                 ).requireSuccessfulOutput(BenchmarkCategory.VLM)
             } finally {

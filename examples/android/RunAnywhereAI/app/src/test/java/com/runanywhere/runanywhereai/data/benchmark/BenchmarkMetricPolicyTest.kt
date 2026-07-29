@@ -12,7 +12,7 @@ class BenchmarkMetricPolicyTest {
         val metrics = llmBenchmarkMetrics(
             result = RALLMGenerationResult(
                 input_tokens = 41,
-                tokens_generated = 256,
+                output_tokens = 256,
                 generation_time_ms = 20_500.0,
                 ttft_ms = 500.0,
                 tokens_per_second = 12.8,
@@ -34,7 +34,7 @@ class BenchmarkMetricPolicyTest {
     fun `throughput is derived from native decode time when backend omits it`() {
         val metrics = llmBenchmarkMetrics(
             result = RALLMGenerationResult(
-                tokens_generated = 256,
+                output_tokens = 256,
                 generation_time_ms = 20_500.0,
                 tokens_per_second = 0.0,
                 decode_time_ms = 20_000,
@@ -52,7 +52,7 @@ class BenchmarkMetricPolicyTest {
     fun `zero output cannot be reported as a successful llm benchmark`() {
         assertThrows(IllegalArgumentException::class.java) {
             llmBenchmarkMetrics(
-                result = RALLMGenerationResult(tokens_generated = 0, generation_time_ms = 1_000.0),
+                result = RALLMGenerationResult(output_tokens = 0, generation_time_ms = 1_000.0),
                 loadTimeMs = 0.0,
                 warmupTimeMs = 0.0,
                 measuredEndToEndMs = 1_000.0,

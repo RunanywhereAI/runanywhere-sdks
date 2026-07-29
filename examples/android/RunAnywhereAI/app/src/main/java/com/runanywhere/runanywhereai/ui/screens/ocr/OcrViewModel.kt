@@ -154,7 +154,7 @@ internal object OcrGenerationPolicy {
             prompt = " ",
             // OCR returns the full document in one shot (suite max_new=1).
             // Parse is a longer structured decode — give it room for multi-page text.
-            max_tokens = if (parse) 512 else 1,
+            max_output_tokens = if (parse) 512 else 1,
             temperature = 0f,
             top_p = 0f,
             top_k = 0,

@@ -198,8 +198,8 @@ class DiarizationViewModel(application: Application) : AndroidViewModel(applicat
                     RunAnywhere.diarize(
                         audio,
                         DiarizationOptions(
-                            sample_rate_hz = AudioRecorder.SAMPLE_RATE,
-                            channel_count = 1,
+                            sample_rate = AudioRecorder.SAMPLE_RATE,
+                            channels = 1,
                             encoding = DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE,
                         ),
                     )

@@ -229,7 +229,7 @@ class VoiceViewModel : ViewModel() {
 
     private fun voiceGenOptions() =
         RALLMGenerationOptions(
-            max_tokens = 200,
+            max_output_tokens = 200,
             temperature = 0.7f,
             top_p = 0.95f,
             // Same persona as chat so the small on-device models use conversation context instead of
@@ -238,7 +238,7 @@ class VoiceViewModel : ViewModel() {
         )
 
     private fun ttsOptions() =
-        RATTSOptions(language_code = "en-US", speaking_rate = 1f, volume = 1f)
+        RATTSOptions(language_code = "en-US", speed = 1f, volume = 1f)
 
     // Speak one chunk, hard-splitting anything longer than the engine can take and skipping
     // blank/symbol-only text (an empty phoneme sequence also fails synthesis). A single failed chunk

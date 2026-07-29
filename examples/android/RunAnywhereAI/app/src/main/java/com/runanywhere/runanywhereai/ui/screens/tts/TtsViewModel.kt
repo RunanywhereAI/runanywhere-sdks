@@ -126,7 +126,7 @@ class TtsViewModel(application: Application) : AndroidViewModel(application) {
         isGenerating = false
     }
 
-    private fun options() = RATTSOptions(language_code = "en-US", speaking_rate = speed, volume = 1f)
+    private fun options() = RATTSOptions(language_code = "en-US", speed = speed, volume = 1f)
 
     private fun isSystem(voice: RAModelInfo): Boolean =
         voice.id == "system-tts" || voice.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS

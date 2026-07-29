@@ -1,6 +1,9 @@
 package com.runanywhere.runanywhereai.ui.screens.rag
 
+import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.RAGQueryOptions
+import ai.runanywhere.proto.v1.ReasoningMode
+import ai.runanywhere.proto.v1.ReasoningOptions
 import com.runanywhere.sdk.public.extensions.defaults
 
 internal object RagGenerationPolicy {
@@ -15,13 +18,15 @@ internal object RagGenerationPolicy {
 
     fun options(question: String, multiQueryEnabled: Boolean): RAGQueryOptions =
         RAGQueryOptions.defaults(question = question).copy(
-            system_prompt = SYSTEM_PROMPT,
-            max_tokens = MAX_OUTPUT_TOKENS,
-            temperature = 0.0f,
-            top_p = 1.0f,
-            top_k = 0,
+            generation = LLMGenerationOptions(
+                system_prompt = SYSTEM_PROMPT,
+                max_output_tokens = MAX_OUTPUT_TOKENS,
+                temperature = 0.0f,
+                top_p = 1.0f,
+                top_k = 0,
+                reasoning = ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF),
+            ),
             stream = false,
-            disable_thinking = true,
             enable_multi_query = multiQueryEnabled,
         )
 }

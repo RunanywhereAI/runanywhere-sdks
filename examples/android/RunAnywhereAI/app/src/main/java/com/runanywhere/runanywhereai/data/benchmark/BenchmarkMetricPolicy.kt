@@ -20,7 +20,7 @@ internal fun llmBenchmarkMetrics(
     require(result.error_message.isNullOrBlank()) {
         result.error_message ?: "LLM benchmark generation failed"
     }
-    val outputTokens = result.tokens_generated
+    val outputTokens = result.output_tokens
     require(outputTokens > 0) { "LLM benchmark produced zero output tokens" }
 
     val endToEndMs = result.generation_time_ms.takeIf { it > 0 } ?: measuredEndToEndMs

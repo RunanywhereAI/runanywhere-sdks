@@ -3,6 +3,8 @@ package com.runanywhere.runanywhereai.ui.screens.chat
 import ai.runanywhere.proto.v1.GenerationEventKind
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
+import ai.runanywhere.proto.v1.ReasoningMode
+import ai.runanywhere.proto.v1.ReasoningOptions
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.VLMImageFormat
 import android.app.Application
@@ -336,7 +338,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             turn = effectiveTurn,
                             options = generationOptions(activeModel),
                             conversationId = ensureConversationId(),
-                            streaming = streaming,
                         )
                         if (streaming) {
                             streamReply(request, llmRequest, replyIndex, activeModel)
@@ -424,7 +425,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     reply.copy(
                         text = result.text.ifBlank { "I could not read that image." },
                         stats = GenerationStats(
-                            tokens = result.completion_tokens,
+                            tokens = result.output_tokens,
                             tokensPerSecond = result.tokens_per_second.toDouble(),
                             timeToFirstTokenMs = result.time_to_first_token_ms.takeIf { it > 0 },
                             totalTimeMs = result.processing_time_ms,
@@ -603,17 +604,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // answers. Well-behaved (non-NPU / non-reasoning) models keep the user's temperature setting.
         val forceGreedy = activeModel.framework ==
             ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
+        // Only apply the "disable thinking" preference to models that actually think — on a
+        // non-thinking model the runtime's no-think prefill leaks as literal text ("no think")
+        // and corrupts the prompt (e.g. Llama). Bug 5 follow-up. Thought tokens are only
+        // emitted when include_in_output is set, so the "show thinking" toggle maps to it.
+        val reasoning = when {
+            !activeModel.model.supports_thinking -> null
+            s.disableThinking -> ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF)
+            else -> ReasoningOptions(
+                include_in_output = true,
+                pattern = activeModel.model.thinking_pattern,
+            )
+        }
         return RALLMGenerationOptions(
-            max_tokens = budget.effectiveMaxTokens,
+            max_output_tokens = budget.effectiveMaxTokens,
             temperature = if (forceGreedy) 0f else s.temperature,
             system_prompt = s.systemPrompt.ifBlank { null },
-            thinking_pattern = activeModel.model.thinking_pattern.takeIf {
-                activeModel.model.supports_thinking && !s.disableThinking
-            },
-            // Only apply the "disable thinking" preference to models that actually think — on a
-            // non-thinking model the runtime's no-think prefill leaks as literal text ("no think")
-            // and corrupts the prompt (e.g. Llama). Bug 5 follow-up.
-            disable_thinking = s.disableThinking && activeModel.model.supports_thinking,
+            reasoning = reasoning,
         )
     }
 
@@ -638,7 +645,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val sdkMetrics = activeGenerationMetrics
         val totalMs = result.generation_time_ms.toLong()
         val tps = result.tokens_per_second.takeIf { it > 0 }
-            ?: if (totalMs > 0 && result.tokens_generated > 0) result.tokens_generated * 1000.0 / totalMs else 0.0
+            ?: if (totalMs > 0 && result.output_tokens > 0) result.output_tokens * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
                 text = result.text,
@@ -647,7 +654,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // fall back to the value recorded from the SDK's first-token event;
                 // framework falls back to the loaded model's analytics key.
                 stats = GenerationStats(
-                    tokens = result.tokens_generated,
+                    tokens = result.output_tokens,
                     tokensPerSecond = tps,
                     timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 }
                         ?: activeGenerationTTFTMs,
@@ -668,7 +675,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         index: Int,
         activeModel: RuntimeModelSnapshot,
     ) {
-        if (llmRequest.emit_thoughts) {
+        if (llmRequest.options?.reasoning?.include_in_output == true) {
             updateReply(request, index) { it.copy(thinking = "") }
         }
         val events = RunAnywhere.generateStream(llmRequest)
@@ -694,7 +701,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         val sdkMetrics = activeGenerationMetrics
         val totalMs = result.generation_time_ms.toLong()
-        val tokens = result.tokens_generated.takeIf { it > 0 } ?: sdkMetrics?.outputTokens ?: 0
+        val tokens = result.output_tokens.takeIf { it > 0 } ?: sdkMetrics?.outputTokens ?: 0
         val tps = result.tokens_per_second.takeIf { it > 0 }
             ?: sdkMetrics?.tokensPerSecond?.takeIf { it > 0 }
             ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0

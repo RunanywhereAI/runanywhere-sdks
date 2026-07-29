@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai
 import ai.runanywhere.proto.v1.DownloadStage
 import ai.runanywhere.proto.v1.DownloadState
 import ai.runanywhere.proto.v1.ModelUnloadRequest
-import ai.runanywhere.proto.v1.STTLanguage
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -177,7 +176,7 @@ class PortableNvidiaE2ETest {
                 if (language == null) {
                     defaults
                 } else {
-                    defaults.copy(language = sttLanguage(language), language_code = language)
+                    defaults.copy(language = language)
                 }
             }
 
@@ -261,7 +260,7 @@ class PortableNvidiaE2ETest {
             val systemPrompt = args.getString("sys")?.takeIf { it.isNotBlank() }
             val options =
                 RALLMGenerationOptions(
-                    max_tokens = maxNew,
+                    max_output_tokens = maxNew,
                     temperature = 0f,
                     top_p = 1f,
                     system_prompt = systemPrompt,
@@ -276,8 +275,8 @@ class PortableNvidiaE2ETest {
                     event.token?.let { if (it.isNotEmpty()) text.append(it) }
                     if (event.is_final) {
                         event.result?.let {
-                            promptTokens = it.prompt_tokens
-                            completionTokens = it.completion_tokens
+                            promptTokens = it.input_tokens
+                            completionTokens = it.output_tokens
                         }
                     }
                 }
@@ -354,16 +353,6 @@ class PortableNvidiaE2ETest {
                 .filter { it.isDigit() }
                 .toLong()
         }.getOrDefault(-1L)
-
-    private fun sttLanguage(tag: String): STTLanguage =
-        when (tag.lowercase().substringBefore('-')) {
-            "ja" -> STTLanguage.STT_LANGUAGE_JA
-            "es" -> STTLanguage.STT_LANGUAGE_ES
-            "fr" -> STTLanguage.STT_LANGUAGE_FR
-            "de" -> STTLanguage.STT_LANGUAGE_DE
-            "zh" -> STTLanguage.STT_LANGUAGE_ZH
-            else -> STTLanguage.STT_LANGUAGE_EN
-        }
 
     private fun l2Norm(vector: FloatArray): Double = sqrt(vector.sumOf { it.toDouble() * it })
 

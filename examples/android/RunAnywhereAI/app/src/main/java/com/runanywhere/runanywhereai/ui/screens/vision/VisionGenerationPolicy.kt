@@ -44,7 +44,7 @@ internal object VisionGenerationPolicy {
     ): RAVLMGenerationOptions =
         RAVLMGenerationOptions(
             prompt = prompt,
-            max_tokens = maxTokens(model.context_length, mode, userLimit),
+            max_output_tokens = maxTokens(model.context_length, mode, userLimit),
             // Pin the complete greedy configuration. Temperature alone is
             // sufficient today, but explicit top-p/top-k avoids default drift.
             temperature = 0f,

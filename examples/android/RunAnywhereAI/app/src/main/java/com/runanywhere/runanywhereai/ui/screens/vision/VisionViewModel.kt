@@ -172,7 +172,7 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
 
 internal fun VLMResult.toUiMetrics(): VlmMetrics =
     VlmMetrics(
-        tokens = completion_tokens,
+        tokens = output_tokens,
         tokensPerSecond = tokens_per_second.toDouble(),
         processingMs = processing_time_ms,
         imageEncodeMs = image_encode_time_ms,

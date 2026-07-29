@@ -54,7 +54,7 @@ class VisionGenerationPolicyTest {
             systemPrompt = "Be precise.",
         )
 
-        assertEquals(96, options.max_tokens)
+        assertEquals(96, options.max_output_tokens)
         assertEquals(0f, options.temperature)
         assertEquals(0f, options.top_p)
         assertEquals(0, options.top_k)
