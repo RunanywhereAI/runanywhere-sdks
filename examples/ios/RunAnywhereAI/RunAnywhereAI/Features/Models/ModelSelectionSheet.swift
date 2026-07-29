@@ -732,6 +732,12 @@ extension ModelSelectionSheet {
             }
         }
 
+        #if os(iOS)
+        if context == .llm, connectController.isConnected {
+            connectController.disconnect()
+        }
+        #endif
+
         await onModelSelected(model)
     }
 }

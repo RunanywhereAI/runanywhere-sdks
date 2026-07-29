@@ -42,13 +42,17 @@ private enum ConnectProtoABI {
         "rac_connect_host_validate_invocation_proto",
         as: NativeProtoABI.ProtoRequest.self
     )
+    static let hostValidateCancel = NativeProtoABI.load(
+        "rac_connect_host_validate_cancel_proto",
+        as: NativeProtoABI.ProtoRequest.self
+    )
 }
 
 extension CppBridge {
 
     /// Typed C++ coordination for local runtime hosts and clients.
     /// Platform SDKs provide discovery and channel transport adapters.
-    public enum Connect {
+    enum Connect {
 
         static func platformPolicy(
             _ request: RAConnectPlatformPolicyRequest
@@ -128,6 +132,17 @@ extension CppBridge {
                 request,
                 symbol: ConnectProtoABI.hostValidateInvocation,
                 symbolName: "rac_connect_host_validate_invocation_proto",
+                responseType: RAConnectInvocationValidation.self
+            )
+        }
+
+        static func validateCancel(
+            _ request: RAConnectInvocationCancelRequest
+        ) throws -> RAConnectInvocationValidation {
+            try NativeProtoABI.invoke(
+                request,
+                symbol: ConnectProtoABI.hostValidateCancel,
+                symbolName: "rac_connect_host_validate_cancel_proto",
                 responseType: RAConnectInvocationValidation.self
             )
         }

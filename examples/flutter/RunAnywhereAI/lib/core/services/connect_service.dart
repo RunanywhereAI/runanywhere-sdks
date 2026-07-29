@@ -25,6 +25,9 @@ final class ConnectService extends ChangeNotifier {
   Future<void> connect(ConnectHost host) => session.connect(host);
   Future<void> disconnect() => session.disconnect();
 
+  /// Cancel one in-flight hosted generation without ending the session.
+  bool cancelGeneration(String requestId) => session.cancelGeneration(requestId);
+
   @override
   void dispose() {
     unawaited(_subscription.cancel());

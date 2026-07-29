@@ -355,6 +355,16 @@ export interface ConnectInvocationValidation {
 }
 
 /**
+ * Clients cancel one in-flight generation by request id without tearing down
+ * the TCP session. Commons validates session ownership; the host adapter then
+ * cancels the local runtime for that request and emits a terminal stream event.
+ */
+export interface ConnectInvocationCancelRequest {
+  sessionId: string;
+  requestId: string;
+}
+
+/**
  * Hosts forward the SDK's canonical stream events without translating them to
  * a platform-specific token shape. This is the portable streaming surface for
  * future Kotlin, React Native, Flutter, and Web clients.
@@ -388,6 +398,7 @@ export interface ConnectHeartbeatResponse {
 export interface ConnectClientFrame {
   invocation?: ConnectInvocationRequest | undefined;
   heartbeat?: ConnectHeartbeatRequest | undefined;
+  cancel?: ConnectInvocationCancelRequest | undefined;
 }
 
 export interface ConnectHostFrame {
@@ -1856,6 +1867,92 @@ export const ConnectInvocationValidation: MessageFns<ConnectInvocationValidation
   },
 };
 
+function createBaseConnectInvocationCancelRequest(): ConnectInvocationCancelRequest {
+  return { sessionId: "", requestId: "" };
+}
+
+export const ConnectInvocationCancelRequest: MessageFns<ConnectInvocationCancelRequest> = {
+  encode(message: ConnectInvocationCancelRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionId !== "") {
+      writer.uint32(10).string(message.sessionId);
+    }
+    if (message.requestId !== "") {
+      writer.uint32(18).string(message.requestId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ConnectInvocationCancelRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseConnectInvocationCancelRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ConnectInvocationCancelRequest {
+    return {
+      sessionId: isSet(object.sessionId)
+        ? globalThis.String(object.sessionId)
+        : isSet(object.session_id)
+        ? globalThis.String(object.session_id)
+        : "",
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+    };
+  },
+
+  toJSON(message: ConnectInvocationCancelRequest): unknown {
+    const obj: any = {};
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ConnectInvocationCancelRequest>, I>>(base?: I): ConnectInvocationCancelRequest {
+    return ConnectInvocationCancelRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ConnectInvocationCancelRequest>, I>>(
+    object: I,
+  ): ConnectInvocationCancelRequest {
+    const message = createBaseConnectInvocationCancelRequest();
+    message.sessionId = object.sessionId ?? "";
+    message.requestId = object.requestId ?? "";
+    return message;
+  },
+};
+
 function createBaseConnectInvocationEvent(): ConnectInvocationEvent {
   return { requestId: "", event: undefined };
 }
@@ -2099,7 +2196,7 @@ export const ConnectHeartbeatResponse: MessageFns<ConnectHeartbeatResponse> = {
 };
 
 function createBaseConnectClientFrame(): ConnectClientFrame {
-  return { invocation: undefined, heartbeat: undefined };
+  return { invocation: undefined, heartbeat: undefined, cancel: undefined };
 }
 
 export const ConnectClientFrame: MessageFns<ConnectClientFrame> = {
@@ -2109,6 +2206,9 @@ export const ConnectClientFrame: MessageFns<ConnectClientFrame> = {
     }
     if (message.heartbeat !== undefined) {
       ConnectHeartbeatRequest.encode(message.heartbeat, writer.uint32(18).fork()).join();
+    }
+    if (message.cancel !== undefined) {
+      ConnectInvocationCancelRequest.encode(message.cancel, writer.uint32(26).fork()).join();
     }
     return writer;
   },
@@ -2136,6 +2236,14 @@ export const ConnectClientFrame: MessageFns<ConnectClientFrame> = {
           message.heartbeat = ConnectHeartbeatRequest.decode(reader, reader.uint32());
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.cancel = ConnectInvocationCancelRequest.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2149,6 +2257,7 @@ export const ConnectClientFrame: MessageFns<ConnectClientFrame> = {
     return {
       invocation: isSet(object.invocation) ? ConnectInvocationRequest.fromJSON(object.invocation) : undefined,
       heartbeat: isSet(object.heartbeat) ? ConnectHeartbeatRequest.fromJSON(object.heartbeat) : undefined,
+      cancel: isSet(object.cancel) ? ConnectInvocationCancelRequest.fromJSON(object.cancel) : undefined,
     };
   },
 
@@ -2159,6 +2268,9 @@ export const ConnectClientFrame: MessageFns<ConnectClientFrame> = {
     }
     if (message.heartbeat !== undefined) {
       obj.heartbeat = ConnectHeartbeatRequest.toJSON(message.heartbeat);
+    }
+    if (message.cancel !== undefined) {
+      obj.cancel = ConnectInvocationCancelRequest.toJSON(message.cancel);
     }
     return obj;
   },
@@ -2173,6 +2285,9 @@ export const ConnectClientFrame: MessageFns<ConnectClientFrame> = {
       : undefined;
     message.heartbeat = (object.heartbeat !== undefined && object.heartbeat !== null)
       ? ConnectHeartbeatRequest.fromPartial(object.heartbeat)
+      : undefined;
+    message.cancel = (object.cancel !== undefined && object.cancel !== null)
+      ? ConnectInvocationCancelRequest.fromPartial(object.cancel)
       : undefined;
     return message;
   },

@@ -121,7 +121,7 @@ final class ConnectSession {
           ? 'Flutter device'
           : displayName.trim();
 
-  static const int protocolVersion = 1;
+  static const int defaultProtocolVersion = 1;
   static const String _serviceName = '_runanywhere-connect._tcp.local';
 
   final String _displayName;
@@ -135,6 +135,7 @@ final class ConnectSession {
   bool _stopped = false;
   bool _discoveryResourcesHeld = false;
   String? _activeSessionId;
+  int _protocolVersion = defaultProtocolVersion;
 
   ConnectState get state => _state;
   Stream<ConnectState> get states => _states.stream;
@@ -205,9 +206,13 @@ final class ConnectSession {
               ? _displayName
               : _displayName.substring(0, 128),
           platform: ConnectPlatform.CONNECT_PLATFORM_FLUTTER,
-          protocolVersion: protocolVersion,
+          // Commons stamps the authoritative version onto the returned hello.
+          protocolVersion: _protocolVersion,
         ),
       )..instanceId = _clientInstanceId;
+      if (hello.protocolVersion > 0) {
+        _protocolVersion = hello.protocolVersion;
+      }
       final response = await _socket.connect(endpoint, hello);
       final session = DartBridgeConnect.validateHost(response);
       if (session.state !=
@@ -285,9 +290,21 @@ final class ConnectSession {
         ),
       );
     } catch (error) {
+      // Cancellation / clean host rejection must not tear the session down.
+      if (error is SDKException &&
+          error.message.contains('cancelled')) {
+        rethrow;
+      }
       _handleDisconnect(error);
       rethrow;
     }
+  }
+
+  /// Cancel one in-flight hosted generation by request id without disconnecting.
+  bool cancelGeneration(String requestId) {
+    final sessionId = _activeSessionId;
+    if (sessionId == null || requestId.isEmpty) return false;
+    return _socket.cancelGeneration(sessionId, requestId);
   }
 
   Future<void> disconnect() async {
@@ -321,7 +338,7 @@ final class ConnectSession {
               (value) => ConnectHost(
                 id: value.id,
                 displayName: value.displayName,
-                protocolVersion: protocolVersion,
+                protocolVersion: _protocolVersion,
               ),
             )
             .toList(growable: false);
@@ -489,13 +506,26 @@ final class _ConnectEndpoint {
   final int port;
 }
 
+final class _PendingClientInvocation {
+  _PendingClientInvocation(this.request, this.completer);
+
+  final connect_pb.ConnectInvocationRequest request;
+  final Completer<void> completer;
+}
+
 final class _ConnectSocket {
+  static const Duration _generationReadTimeout = Duration(seconds: 120);
+
   Socket? _socket;
   StreamIterator<Uint8List>? _iterator;
   final List<int> _buffer = <int>[];
   Timer? _heartbeat;
   bool _operationActive = false;
+  bool _heartbeatInFlight = false;
   bool _closed = true;
+  String? _activeGenerationRequestId;
+  String? _activeSessionId;
+  _PendingClientInvocation? _pendingInvocation;
 
   Future<connect_pb.ConnectHandshakeResponse> connect(
     _ConnectEndpoint endpoint,
@@ -528,11 +558,12 @@ final class _ConnectSocket {
 
   void startHeartbeat(String sessionId, void Function(Object) onDisconnected) {
     _heartbeat?.cancel();
+    _activeSessionId = sessionId;
     var sequence = 0;
     _heartbeat = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (_closed || _operationActive) return;
+      if (_closed || _operationActive || _heartbeatInFlight) return;
       unawaited(() async {
-        _operationActive = true;
+        _heartbeatInFlight = true;
         try {
           sequence += 1;
           _writeFrame(
@@ -556,7 +587,11 @@ final class _ConnectSocket {
         } catch (error) {
           onDisconnected(error);
         } finally {
-          _operationActive = false;
+          _heartbeatInFlight = false;
+          final pending = _pendingInvocation;
+          if (pending != null && !pending.completer.isCompleted) {
+            pending.completer.complete();
+          }
         }
       }());
     });
@@ -572,17 +607,47 @@ final class _ConnectSocket {
     }
     if (_operationActive) {
       throw SDKException.networkError(
-        'Another Connect operation is already running',
+        'Wait for the current response to finish before sending another message.',
       );
     }
+    // Mirror Swift PendingClientInvocation: wait for an in-flight heartbeat
+    // instead of failing the user's turn.
+    if (_heartbeatInFlight) {
+      if (_pendingInvocation != null) {
+        throw SDKException.networkError(
+          'Wait for the current response to finish before sending another message.',
+        );
+      }
+      final completer = Completer<void>();
+      _pendingInvocation = _PendingClientInvocation(request, completer);
+      try {
+        await completer.future.timeout(const Duration(seconds: 5));
+      } finally {
+        if (identical(_pendingInvocation?.completer, completer)) {
+          _pendingInvocation = null;
+        }
+      }
+      if (_closed || _socket == null) {
+        throw SDKException.networkError(
+          'The selected host is no longer connected',
+        );
+      }
+      if (_operationActive || _heartbeatInFlight) {
+        throw SDKException.networkError(
+          'Wait for the current response to finish before sending another message.',
+        );
+      }
+    }
+
     _operationActive = true;
+    _activeGenerationRequestId = request.requestId;
     try {
       _writeFrame(
         connect_pb.ConnectClientFrame(invocation: request).writeToBuffer(),
       );
       while (true) {
         final frame = connect_pb.ConnectHostFrame.fromBuffer(
-          await _readFrame(),
+          await _readFrame().timeout(_generationReadTimeout),
         );
         if (!frame.hasInvocationEvent() ||
             frame.invocationEvent.requestId != request.requestId ||
@@ -595,9 +660,68 @@ final class _ConnectSocket {
         yield event;
         if (event.isFinal) break;
       }
+    } on TimeoutException {
+      await close();
+      throw SDKException.timeout(
+        'The host stopped sending generation frames.',
+      );
+    } on SocketException {
+      await close();
+      rethrow;
+    } catch (error) {
+      // Stream subscription cancellation lands here as a generic error after
+      // the await is interrupted. Prefer cancel-over-wire and keep the session.
+      if (error is SDKException) rethrow;
+      final cancelled = cancelGeneration(request.sessionId, request.requestId);
+      if (cancelled) {
+        await _drainUntilFinal(request.requestId);
+        throw SDKException.networkError('Generation cancelled');
+      }
+      await close();
+      rethrow;
     } finally {
+      _activeGenerationRequestId = null;
       _operationActive = false;
     }
+  }
+
+  /// Best-effort cancel without disconnecting. Returns true when written.
+  bool cancelGeneration(String sessionId, String requestId) {
+    if (_closed ||
+        sessionId.isEmpty ||
+        requestId.isEmpty ||
+        _activeGenerationRequestId != requestId) {
+      return false;
+    }
+    try {
+      _writeFrame(
+        connect_pb.ConnectClientFrame(
+          cancel: connect_pb.ConnectInvocationCancelRequest(
+            sessionId: sessionId,
+            requestId: requestId,
+          ),
+        ).writeToBuffer(),
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _drainUntilFinal(String requestId) async {
+    try {
+      while (true) {
+        final frame = connect_pb.ConnectHostFrame.fromBuffer(
+          await _readFrame().timeout(_generationReadTimeout),
+        );
+        if (!frame.hasInvocationEvent()) continue;
+        if (frame.invocationEvent.requestId != requestId) continue;
+        if (frame.invocationEvent.hasEvent() &&
+            frame.invocationEvent.event.isFinal) {
+          break;
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> close() async {
@@ -605,6 +729,16 @@ final class _ConnectSocket {
     _heartbeat = null;
     _closed = true;
     _operationActive = false;
+    _heartbeatInFlight = false;
+    _activeGenerationRequestId = null;
+    _activeSessionId = null;
+    final pending = _pendingInvocation;
+    _pendingInvocation = null;
+    if (pending != null && !pending.completer.isCompleted) {
+      pending.completer.completeError(
+        SDKException.networkError('Connect session closed'),
+      );
+    }
     final iterator = _iterator;
     _iterator = null;
     final socket = _socket;

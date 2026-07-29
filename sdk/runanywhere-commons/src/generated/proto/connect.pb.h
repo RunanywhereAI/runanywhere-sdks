@@ -162,6 +162,14 @@ extern const ::google::protobuf::internal::ClassDataFull ConnectHostStopRequest_
 #else
 extern const ConnectHostStopRequestGlobalsTypeInternal ConnectHostStopRequest_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
+class ConnectInvocationCancelRequest;
+struct ConnectInvocationCancelRequestGlobalsTypeInternal;
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+extern ConnectInvocationCancelRequestGlobalsTypeInternal ConnectInvocationCancelRequest_globals_;
+extern const ::google::protobuf::internal::ClassDataFull ConnectInvocationCancelRequest_class_data_;
+#else
+extern const ConnectInvocationCancelRequestGlobalsTypeInternal ConnectInvocationCancelRequest_globals_;
+#endif  // PROTOBUF_MESSAGE_GLOBALS
 class ConnectInvocationEvent;
 struct ConnectInvocationEventGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -1534,6 +1542,229 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectInvocationValidation final :
 };
 // -------------------------------------------------------------------
 
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectInvocationCancelRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ConnectInvocationCancelRequest) */ {
+ public:
+  inline ConnectInvocationCancelRequest() : ConnectInvocationCancelRequest(nullptr) {}
+  ~ConnectInvocationCancelRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ConnectInvocationCancelRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ConnectInvocationCancelRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ConnectInvocationCancelRequest(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline ConnectInvocationCancelRequest(const ConnectInvocationCancelRequest& from) : ConnectInvocationCancelRequest(nullptr, from) {}
+  inline ConnectInvocationCancelRequest(ConnectInvocationCancelRequest&& from) noexcept : ConnectInvocationCancelRequest(nullptr, ::std::move(from)) {}
+  inline ConnectInvocationCancelRequest& operator=(const ConnectInvocationCancelRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ConnectInvocationCancelRequest& operator=(ConnectInvocationCancelRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ConnectInvocationCancelRequest& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ConnectInvocationCancelRequest>(&ConnectInvocationCancelRequest_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 14;
+  friend void swap(ConnectInvocationCancelRequest& a, ConnectInvocationCancelRequest& b) { a.Swap(&b); }
+  inline void Swap(ConnectInvocationCancelRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ConnectInvocationCancelRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ConnectInvocationCancelRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ConnectInvocationCancelRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ConnectInvocationCancelRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ConnectInvocationCancelRequest& from) { ConnectInvocationCancelRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ConnectInvocationCancelRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ConnectInvocationCancelRequest"; }
+
+  explicit ConnectInvocationCancelRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ConnectInvocationCancelRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ConnectInvocationCancelRequest& from);
+  ConnectInvocationCancelRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ConnectInvocationCancelRequest&& from) noexcept
+      : ConnectInvocationCancelRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kSessionIdFieldNumber = 1,
+    kRequestIdFieldNumber = 2,
+  };
+  // string session_id = 1;
+  void clear_session_id() ;
+  [[nodiscard]] const ::std::string& session_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_session_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_session_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_session_id();
+  void set_allocated_session_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_session_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_session_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_session_id();
+
+  public:
+  // string request_id = 2;
+  void clear_request_id() ;
+  [[nodiscard]] const ::std::string& request_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_request_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_request_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
+  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_request_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ConnectInvocationCancelRequest)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<1, 2,
+                          0, 74,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ConnectInvocationCancelRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr session_id_;
+    ::google::protobuf::internal::ArenaStringPtr request_id_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_connect_2eproto;
+};
+// -------------------------------------------------------------------
+
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectHostStopRequest final : public ::google::protobuf::internal::ZeroFieldsBase
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.ConnectHostStopRequest) */ {
  public:
@@ -1728,7 +1959,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectHeartbeatResponse final : pu
   [[nodiscard]] static const ConnectHeartbeatResponse& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ConnectHeartbeatResponse>(&ConnectHeartbeatResponse_globals_);
   }
-  static constexpr int kIndexInFileMessages = 16;
+  static constexpr int kIndexInFileMessages = 17;
   friend void swap(ConnectHeartbeatResponse& a, ConnectHeartbeatResponse& b) { a.Swap(&b); }
   inline void Swap(ConnectHeartbeatResponse* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1946,7 +2177,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectHeartbeatRequest final : pub
   [[nodiscard]] static const ConnectHeartbeatRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ConnectHeartbeatRequest>(&ConnectHeartbeatRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 15;
+  static constexpr int kIndexInFileMessages = 16;
   friend void swap(ConnectHeartbeatRequest& a, ConnectHeartbeatRequest& b) { a.Swap(&b); }
   inline void Swap(ConnectHeartbeatRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3944,7 +4175,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectInvocationEvent final : publ
   [[nodiscard]] static const ConnectInvocationEvent& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ConnectInvocationEvent>(&ConnectInvocationEvent_globals_);
   }
-  static constexpr int kIndexInFileMessages = 14;
+  static constexpr int kIndexInFileMessages = 15;
   friend void swap(ConnectInvocationEvent& a, ConnectInvocationEvent& b) { a.Swap(&b); }
   inline void Swap(ConnectInvocationEvent* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4173,7 +4404,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectHostFrame final : public ::g
     kHeartbeat = 2,
     PAYLOAD_NOT_SET = 0,
   };
-  static constexpr int kIndexInFileMessages = 18;
+  static constexpr int kIndexInFileMessages = 19;
   friend void swap(ConnectHostFrame& a, ConnectHostFrame& b) { a.Swap(&b); }
   inline void Swap(ConnectHostFrame* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4660,9 +4891,10 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectClientFrame final : public :
   enum PayloadCase {
     kInvocation = 1,
     kHeartbeat = 2,
+    kCancel = 3,
     PAYLOAD_NOT_SET = 0,
   };
-  static constexpr int kIndexInFileMessages = 17;
+  static constexpr int kIndexInFileMessages = 18;
   friend void swap(ConnectClientFrame& a, ConnectClientFrame& b) { a.Swap(&b); }
   inline void Swap(ConnectClientFrame* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4756,6 +4988,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectClientFrame final : public :
   enum : int {
     kInvocationFieldNumber = 1,
     kHeartbeatFieldNumber = 2,
+    kCancelFieldNumber = 3,
   };
   // .runanywhere.v1.ConnectInvocationRequest invocation = 1;
   [[nodiscard]] bool has_invocation()
@@ -4797,6 +5030,26 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectClientFrame final : public :
   ::runanywhere::v1::ConnectHeartbeatRequest* PROTOBUF_NONNULL _internal_mutable_heartbeat();
 
   public:
+  // .runanywhere.v1.ConnectInvocationCancelRequest cancel = 3;
+  [[nodiscard]] bool has_cancel()
+      const;
+  private:
+  bool _internal_has_cancel() const;
+
+  public:
+  void clear_cancel() ;
+  [[nodiscard]] const ::runanywhere::v1::ConnectInvocationCancelRequest& cancel() const;
+  [[nodiscard]] ::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NULLABLE release_cancel();
+  ::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NONNULL mutable_cancel();
+  void set_allocated_cancel(::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_cancel(::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NULLABLE unsafe_arena_release_cancel();
+
+  private:
+  const ::runanywhere::v1::ConnectInvocationCancelRequest& _internal_cancel() const;
+  ::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NONNULL _internal_mutable_cancel();
+
+  public:
   void clear_payload();
   PayloadCase payload_case() const;
   // @@protoc_insertion_point(class_scope:runanywhere.v1.ConnectClientFrame)
@@ -4804,11 +5057,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectClientFrame final : public :
   class _Internal;
   void set_has_invocation();
   void set_has_heartbeat();
+  void set_has_cancel();
   [[nodiscard]] inline bool has_payload() const;
   inline void clear_has_payload();
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<0, 2,
-                          2, 0,
+      ::google::protobuf::internal::TcParseTable<0, 3,
+                          3, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -4837,8 +5091,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ConnectClientFrame final : public :
     union PayloadUnion {
       constexpr PayloadUnion() : _constinit_{} {}
       ::google::protobuf::internal::ConstantInitialized _constinit_;
-      ::runanywhere::v1::ConnectInvocationRequest* PROTOBUF_NULLABLE invocation_;
-      ::runanywhere::v1::ConnectHeartbeatRequest* PROTOBUF_NULLABLE heartbeat_;
+      ::google::protobuf::Message* PROTOBUF_NULLABLE invocation_;
+      ::google::protobuf::Message* PROTOBUF_NULLABLE heartbeat_;
+      ::google::protobuf::Message* PROTOBUF_NULLABLE cancel_;
     } payload_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::uint32_t _oneof_case_[1];
@@ -7305,6 +7560,138 @@ inline void ConnectInvocationValidation::set_allocated_rejection_reason(::std::s
 
 // -------------------------------------------------------------------
 
+// ConnectInvocationCancelRequest
+
+// string session_id = 1;
+inline void ConnectInvocationCancelRequest::clear_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.session_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
+inline const ::std::string& ConnectInvocationCancelRequest::session_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ConnectInvocationCancelRequest.session_id)
+  return _internal_session_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ConnectInvocationCancelRequest::set_session_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.session_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ConnectInvocationCancelRequest.session_id)
+}
+inline ::std::string* PROTOBUF_NONNULL ConnectInvocationCancelRequest::mutable_session_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_session_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ConnectInvocationCancelRequest.session_id)
+  return _s;
+}
+inline const ::std::string& ConnectInvocationCancelRequest::_internal_session_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.session_id_.Get();
+}
+inline void ConnectInvocationCancelRequest::_internal_set_session_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.session_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ConnectInvocationCancelRequest::_internal_mutable_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.session_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ConnectInvocationCancelRequest::release_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ConnectInvocationCancelRequest.session_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.session_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.session_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ConnectInvocationCancelRequest::set_allocated_session_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.session_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.session_id_.IsDefault()) {
+    _impl_.session_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ConnectInvocationCancelRequest.session_id)
+}
+
+// string request_id = 2;
+inline void ConnectInvocationCancelRequest::clear_request_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.request_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+inline const ::std::string& ConnectInvocationCancelRequest::request_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ConnectInvocationCancelRequest.request_id)
+  return _internal_request_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ConnectInvocationCancelRequest::set_request_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.request_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ConnectInvocationCancelRequest.request_id)
+}
+inline ::std::string* PROTOBUF_NONNULL ConnectInvocationCancelRequest::mutable_request_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_request_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ConnectInvocationCancelRequest.request_id)
+  return _s;
+}
+inline const ::std::string& ConnectInvocationCancelRequest::_internal_request_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.request_id_.Get();
+}
+inline void ConnectInvocationCancelRequest::_internal_set_request_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.request_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ConnectInvocationCancelRequest::_internal_mutable_request_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.request_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ConnectInvocationCancelRequest::release_request_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ConnectInvocationCancelRequest.request_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.request_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.request_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ConnectInvocationCancelRequest::set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.request_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.request_id_.IsDefault()) {
+    _impl_.request_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ConnectInvocationCancelRequest.request_id)
+}
+
+// -------------------------------------------------------------------
+
 // ConnectInvocationEvent
 
 // string request_id = 1;
@@ -7677,7 +8064,7 @@ inline ::runanywhere::v1::ConnectInvocationRequest* PROTOBUF_NULLABLE ConnectCli
   // @@protoc_insertion_point(field_release:runanywhere.v1.ConnectClientFrame.invocation)
   if (payload_case() == kInvocation) {
     clear_has_payload();
-    auto* temp = _impl_.payload_.invocation_;
+    auto* temp = reinterpret_cast<::runanywhere::v1::ConnectInvocationRequest*>(_impl_.payload_.invocation_);
     if (GetArena() != nullptr) {
       temp = ::google::protobuf::internal::DuplicateIfNonNull(temp);
     }
@@ -7688,7 +8075,7 @@ inline ::runanywhere::v1::ConnectInvocationRequest* PROTOBUF_NULLABLE ConnectCli
   }
 }
 inline const ::runanywhere::v1::ConnectInvocationRequest& ConnectClientFrame::_internal_invocation() const {
-  return payload_case() == kInvocation ? static_cast<const ::runanywhere::v1::ConnectInvocationRequest&>(*_impl_.payload_.invocation_)
+  return payload_case() == kInvocation ? static_cast<const ::runanywhere::v1::ConnectInvocationRequest&>(*reinterpret_cast<::runanywhere::v1::ConnectInvocationRequest*>(_impl_.payload_.invocation_))
                      : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::ConnectInvocationRequest>(&::runanywhere::v1::ConnectInvocationRequest_globals_);
 }
 inline const ::runanywhere::v1::ConnectInvocationRequest& ConnectClientFrame::invocation() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -7699,7 +8086,7 @@ inline ::runanywhere::v1::ConnectInvocationRequest* PROTOBUF_NULLABLE ConnectCli
   // @@protoc_insertion_point(field_unsafe_arena_release:runanywhere.v1.ConnectClientFrame.invocation)
   if (payload_case() == kInvocation) {
     clear_has_payload();
-    auto* temp = _impl_.payload_.invocation_;
+    auto* temp = reinterpret_cast<::runanywhere::v1::ConnectInvocationRequest*>(_impl_.payload_.invocation_);
     _impl_.payload_.invocation_ = nullptr;
     return temp;
   } else {
@@ -7714,7 +8101,7 @@ inline void ConnectClientFrame::unsafe_arena_set_allocated_invocation(
   clear_payload();
   if (value) {
     set_has_invocation();
-    _impl_.payload_.invocation_ = value;
+    _impl_.payload_.invocation_ = reinterpret_cast<::google::protobuf::Message*>(value);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.ConnectClientFrame.invocation)
 }
@@ -7722,10 +8109,10 @@ inline ::runanywhere::v1::ConnectInvocationRequest* PROTOBUF_NONNULL ConnectClie
   if (payload_case() != kInvocation) {
     clear_payload();
     set_has_invocation();
-    _impl_.payload_.invocation_ = 
-        ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ConnectInvocationRequest>(GetArena());
+    _impl_.payload_.invocation_ = reinterpret_cast<::google::protobuf::Message*>(
+        ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ConnectInvocationRequest>(GetArena()));
   }
-  return _impl_.payload_.invocation_;
+  return reinterpret_cast<::runanywhere::v1::ConnectInvocationRequest*>(_impl_.payload_.invocation_);
 }
 inline ::runanywhere::v1::ConnectInvocationRequest* PROTOBUF_NONNULL ConnectClientFrame::mutable_invocation()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -7759,7 +8146,7 @@ inline ::runanywhere::v1::ConnectHeartbeatRequest* PROTOBUF_NULLABLE ConnectClie
   // @@protoc_insertion_point(field_release:runanywhere.v1.ConnectClientFrame.heartbeat)
   if (payload_case() == kHeartbeat) {
     clear_has_payload();
-    auto* temp = _impl_.payload_.heartbeat_;
+    auto* temp = reinterpret_cast<::runanywhere::v1::ConnectHeartbeatRequest*>(_impl_.payload_.heartbeat_);
     if (GetArena() != nullptr) {
       temp = ::google::protobuf::internal::DuplicateIfNonNull(temp);
     }
@@ -7770,7 +8157,7 @@ inline ::runanywhere::v1::ConnectHeartbeatRequest* PROTOBUF_NULLABLE ConnectClie
   }
 }
 inline const ::runanywhere::v1::ConnectHeartbeatRequest& ConnectClientFrame::_internal_heartbeat() const {
-  return payload_case() == kHeartbeat ? static_cast<const ::runanywhere::v1::ConnectHeartbeatRequest&>(*_impl_.payload_.heartbeat_)
+  return payload_case() == kHeartbeat ? static_cast<const ::runanywhere::v1::ConnectHeartbeatRequest&>(*reinterpret_cast<::runanywhere::v1::ConnectHeartbeatRequest*>(_impl_.payload_.heartbeat_))
                      : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::ConnectHeartbeatRequest>(&::runanywhere::v1::ConnectHeartbeatRequest_globals_);
 }
 inline const ::runanywhere::v1::ConnectHeartbeatRequest& ConnectClientFrame::heartbeat() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -7781,7 +8168,7 @@ inline ::runanywhere::v1::ConnectHeartbeatRequest* PROTOBUF_NULLABLE ConnectClie
   // @@protoc_insertion_point(field_unsafe_arena_release:runanywhere.v1.ConnectClientFrame.heartbeat)
   if (payload_case() == kHeartbeat) {
     clear_has_payload();
-    auto* temp = _impl_.payload_.heartbeat_;
+    auto* temp = reinterpret_cast<::runanywhere::v1::ConnectHeartbeatRequest*>(_impl_.payload_.heartbeat_);
     _impl_.payload_.heartbeat_ = nullptr;
     return temp;
   } else {
@@ -7796,7 +8183,7 @@ inline void ConnectClientFrame::unsafe_arena_set_allocated_heartbeat(
   clear_payload();
   if (value) {
     set_has_heartbeat();
-    _impl_.payload_.heartbeat_ = value;
+    _impl_.payload_.heartbeat_ = reinterpret_cast<::google::protobuf::Message*>(value);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.ConnectClientFrame.heartbeat)
 }
@@ -7804,15 +8191,97 @@ inline ::runanywhere::v1::ConnectHeartbeatRequest* PROTOBUF_NONNULL ConnectClien
   if (payload_case() != kHeartbeat) {
     clear_payload();
     set_has_heartbeat();
-    _impl_.payload_.heartbeat_ = 
-        ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ConnectHeartbeatRequest>(GetArena());
+    _impl_.payload_.heartbeat_ = reinterpret_cast<::google::protobuf::Message*>(
+        ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ConnectHeartbeatRequest>(GetArena()));
   }
-  return _impl_.payload_.heartbeat_;
+  return reinterpret_cast<::runanywhere::v1::ConnectHeartbeatRequest*>(_impl_.payload_.heartbeat_);
 }
 inline ::runanywhere::v1::ConnectHeartbeatRequest* PROTOBUF_NONNULL ConnectClientFrame::mutable_heartbeat()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   ::runanywhere::v1::ConnectHeartbeatRequest* _msg = _internal_mutable_heartbeat();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.ConnectClientFrame.heartbeat)
+  return _msg;
+}
+
+// .runanywhere.v1.ConnectInvocationCancelRequest cancel = 3;
+inline bool ConnectClientFrame::has_cancel() const {
+  return payload_case() == kCancel;
+}
+inline bool ConnectClientFrame::_internal_has_cancel() const {
+  return payload_case() == kCancel;
+}
+inline void ConnectClientFrame::set_has_cancel() {
+  _impl_._oneof_case_[0] = kCancel;
+}
+inline void ConnectClientFrame::clear_cancel() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (payload_case() == kCancel) {
+    if (GetArena() == nullptr) {
+      delete _impl_.payload_.cancel_;
+    } else if (::google::protobuf::internal::DebugHardenClearOneofMessageOnArena()) {
+      ::google::protobuf::internal::MaybePoisonAfterClear(_impl_.payload_.cancel_);
+    }
+    clear_has_payload();
+  }
+}
+inline ::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NULLABLE ConnectClientFrame::release_cancel() {
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ConnectClientFrame.cancel)
+  if (payload_case() == kCancel) {
+    clear_has_payload();
+    auto* temp = reinterpret_cast<::runanywhere::v1::ConnectInvocationCancelRequest*>(_impl_.payload_.cancel_);
+    if (GetArena() != nullptr) {
+      temp = ::google::protobuf::internal::DuplicateIfNonNull(temp);
+    }
+    _impl_.payload_.cancel_ = nullptr;
+    return temp;
+  } else {
+    return nullptr;
+  }
+}
+inline const ::runanywhere::v1::ConnectInvocationCancelRequest& ConnectClientFrame::_internal_cancel() const {
+  return payload_case() == kCancel ? static_cast<const ::runanywhere::v1::ConnectInvocationCancelRequest&>(*reinterpret_cast<::runanywhere::v1::ConnectInvocationCancelRequest*>(_impl_.payload_.cancel_))
+                     : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::ConnectInvocationCancelRequest>(&::runanywhere::v1::ConnectInvocationCancelRequest_globals_);
+}
+inline const ::runanywhere::v1::ConnectInvocationCancelRequest& ConnectClientFrame::cancel() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ConnectClientFrame.cancel)
+  return _internal_cancel();
+}
+inline ::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NULLABLE ConnectClientFrame::unsafe_arena_release_cancel() {
+  // @@protoc_insertion_point(field_unsafe_arena_release:runanywhere.v1.ConnectClientFrame.cancel)
+  if (payload_case() == kCancel) {
+    clear_has_payload();
+    auto* temp = reinterpret_cast<::runanywhere::v1::ConnectInvocationCancelRequest*>(_impl_.payload_.cancel_);
+    _impl_.payload_.cancel_ = nullptr;
+    return temp;
+  } else {
+    return nullptr;
+  }
+}
+inline void ConnectClientFrame::unsafe_arena_set_allocated_cancel(
+    ::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NULLABLE value) {
+  // We rely on the oneof clear method to free the earlier contents
+  // of this oneof. We can directly use the pointer we're given to
+  // set the new value.
+  clear_payload();
+  if (value) {
+    set_has_cancel();
+    _impl_.payload_.cancel_ = reinterpret_cast<::google::protobuf::Message*>(value);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.ConnectClientFrame.cancel)
+}
+inline ::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NONNULL ConnectClientFrame::_internal_mutable_cancel() {
+  if (payload_case() != kCancel) {
+    clear_payload();
+    set_has_cancel();
+    _impl_.payload_.cancel_ = reinterpret_cast<::google::protobuf::Message*>(
+        ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ConnectInvocationCancelRequest>(GetArena()));
+  }
+  return reinterpret_cast<::runanywhere::v1::ConnectInvocationCancelRequest*>(_impl_.payload_.cancel_);
+}
+inline ::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NONNULL ConnectClientFrame::mutable_cancel()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  ::runanywhere::v1::ConnectInvocationCancelRequest* _msg = _internal_mutable_cancel();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ConnectClientFrame.cancel)
   return _msg;
 }
 

@@ -12,6 +12,7 @@ import {
   ConnectPlatformPolicyRequest,
   ConnectRoleAvailability,
   ConnectSessionState,
+  type ConnectInvocationCancelRequest,
   type ConnectInvocationRequest,
   type ConnectModelDescriptor,
 } from '@runanywhere/proto-ts/connect';
@@ -26,6 +27,11 @@ import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
 } from '../../services/ProtoBytes';
+import {
+  concatBytes,
+  encodeConnectFrame,
+  extractConnectFrames,
+} from './ConnectFraming';
 
 export interface ConnectHost {
   id: string;
@@ -69,8 +75,9 @@ interface ConnectEndpoint {
   port: number;
 }
 
-const PROTOCOL_VERSION = 1;
-const MAX_FRAME_LENGTH = 4 * 1024 * 1024;
+/** Fallback until commons stamps the negotiated version onto a client hello. */
+const DEFAULT_PROTOCOL_VERSION = 1;
+const GENERATION_READ_TIMEOUT_MS = 120_000;
 type NativeSocket = ReturnType<typeof TcpSocket.createConnection>;
 
 interface ZeroconfService {
@@ -122,6 +129,7 @@ export class ConnectSession {
   );
   private zeroconf?: ZeroconfInstance;
   private activeSessionId?: string;
+  private protocolVersion = DEFAULT_PROTOCOL_VERSION;
   private stateValue: ConnectState = {
     status: 'idle',
     availableHosts: [],
@@ -227,12 +235,16 @@ export class ConnectSession {
       const request = ConnectClientStartRequest.encode({
         displayName: this.displayName.slice(0, 128),
         platform: ConnectPlatform.CONNECT_PLATFORM_REACT_NATIVE,
-        protocolVersion: PROTOCOL_VERSION,
+        protocolVersion: this.protocolVersion,
       }).finish();
       const helloBytes = await native.connectClientCreateHelloProto(
         bytesToArrayBuffer(request)
       );
       const hello = ConnectClientHello.decode(arrayBufferToBytes(helloBytes));
+      // Prefer the commons-stamped protocol version from the hello.
+      if (hello.protocolVersion > 0) {
+        this.protocolVersion = hello.protocolVersion;
+      }
       const response = await this.transport.connect(endpoint, hello);
       const responseBytes = ConnectHandshakeResponse.encode(response).finish();
       const sessionBytes = await native.connectClientValidateHostProto(
@@ -302,9 +314,26 @@ export class ConnectSession {
     try {
       yield* this.transport.generate(invocation);
     } catch (error) {
+      // Clean cancel must not demote a healthy hosted session.
+      if (
+        error instanceof Error &&
+        /cancelled/i.test(error.message)
+      ) {
+        throw error;
+      }
       this.handleDisconnect(error);
       throw error;
     }
+  }
+
+  /**
+   * Cancel one in-flight hosted generation by request id without disconnecting.
+   * Returns true when a cancel frame was written on the live socket.
+   */
+  cancelGeneration(requestId: string): boolean {
+    const sessionId = this.activeSessionId;
+    if (!sessionId || !requestId) return false;
+    return this.transport.cancelGeneration(sessionId, requestId);
   }
 
   disconnect(): void {
@@ -368,7 +397,7 @@ export class ConnectSession {
       .map((endpoint) => ({
         id: endpoint.id,
         displayName: endpoint.displayName,
-        protocolVersion: PROTOCOL_VERSION,
+        protocolVersion: this.protocolVersion,
       }));
     this.emit({ ...this.stateValue, availableHosts });
   }
@@ -398,7 +427,7 @@ export class ConnectSession {
 
 class ConnectSocket {
   private socket?: NativeSocket;
-  private buffer: number[] = [];
+  private buffer = new Uint8Array(0);
   private frames: Uint8Array[] = [];
   private waiters: Array<{
     resolve: (frame: Uint8Array) => void;
@@ -406,8 +435,14 @@ class ConnectSocket {
   }> = [];
   private heartbeat?: ReturnType<typeof setInterval>;
   private operationActive = false;
+  private heartbeatInFlight = false;
   private closed = true;
   private manualClose = false;
+  private activeGenerationRequestId?: string;
+  private pendingHeartbeatWaiter?: {
+    resolve: () => void;
+    reject: (error: Error) => void;
+  };
 
   constructor(private readonly onDisconnected: (error: Error) => void) {}
 
@@ -445,8 +480,9 @@ class ConnectSocket {
     if (this.heartbeat) clearInterval(this.heartbeat);
     let sequence = 0;
     this.heartbeat = setInterval(() => {
-      if (this.closed || this.operationActive) return;
+      if (this.closed || this.operationActive || this.heartbeatInFlight) return;
       void (async () => {
+        this.heartbeatInFlight = true;
         this.operationActive = true;
         try {
           sequence += 1;
@@ -471,7 +507,11 @@ class ConnectSocket {
         } catch (error) {
           this.fail(asError(error));
         } finally {
+          this.heartbeatInFlight = false;
           this.operationActive = false;
+          const waiter = this.pendingHeartbeatWaiter;
+          this.pendingHeartbeatWaiter = undefined;
+          waiter?.resolve();
         }
       })();
     }, 3000);
@@ -486,15 +526,44 @@ class ConnectSocket {
       );
     }
     if (this.operationActive) {
-      throw SDKException.networkError(
-        'Another Connect operation is already running'
+      if (!this.heartbeatInFlight || this.pendingHeartbeatWaiter) {
+        throw SDKException.networkError(
+          'Another Connect operation is already running'
+        );
+      }
+      // Mirror Swift/Flutter: wait for the in-flight heartbeat instead of
+      // failing the user's turn.
+      await withTimeout(
+        new Promise<void>((resolve, reject) => {
+          this.pendingHeartbeatWaiter = { resolve, reject };
+        }),
+        5000,
+        'Timed out waiting for Connect heartbeat to finish'
       );
+      if (this.closed || !this.socket) {
+        throw SDKException.networkError(
+          'The selected host is no longer connected'
+        );
+      }
+      if (this.operationActive || this.heartbeatInFlight) {
+        throw SDKException.networkError(
+          'Another Connect operation is already running'
+        );
+      }
     }
     this.operationActive = true;
+    this.activeGenerationRequestId = invocation.requestId;
+    let sawFinal = false;
     try {
       this.writeFrame(ConnectClientFrame.encode({ invocation }).finish());
       while (true) {
-        const frame = ConnectHostFrame.decode(await this.nextFrame());
+        const frame = ConnectHostFrame.decode(
+          await withTimeout(
+            this.nextFrame(),
+            GENERATION_READ_TIMEOUT_MS,
+            'The host stopped sending generation frames.'
+          )
+        );
         const event = frame.invocationEvent;
         if (event?.requestId !== invocation.requestId || !event.event) {
           throw SDKException.networkError(
@@ -502,10 +571,67 @@ class ConnectSocket {
           );
         }
         yield event.event;
-        if (event.event.isFinal) return;
+        if (event.event.isFinal) {
+          sawFinal = true;
+          return;
+        }
       }
     } finally {
+      // Abandoned generator before isFinal: cancel if possible, otherwise
+      // invalidate the socket so subsequent frames cannot desync.
+      if (!sawFinal && !this.closed) {
+        const cancelled = this.cancelGeneration(
+          invocation.sessionId,
+          invocation.requestId
+        );
+        if (cancelled) {
+          await this.drainUntilFinal(invocation.requestId);
+        } else {
+          this.fail(new Error('Generation cancelled'));
+        }
+      }
+      this.activeGenerationRequestId = undefined;
       this.operationActive = false;
+    }
+  }
+
+  cancelGeneration(sessionId: string, requestId: string): boolean {
+    if (
+      this.closed ||
+      !sessionId ||
+      !requestId ||
+      this.activeGenerationRequestId !== requestId
+    ) {
+      return false;
+    }
+    try {
+      const cancel: ConnectInvocationCancelRequest = {
+        sessionId,
+        requestId,
+      };
+      this.writeFrame(ConnectClientFrame.encode({ cancel }).finish());
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async drainUntilFinal(requestId: string): Promise<void> {
+    try {
+      while (true) {
+        const frame = ConnectHostFrame.decode(
+          await withTimeout(
+            this.nextFrame(),
+            GENERATION_READ_TIMEOUT_MS,
+            'The host stopped sending generation frames.'
+          )
+        );
+        const event = frame.invocationEvent;
+        if (event?.requestId !== requestId) continue;
+        if (event.event?.isFinal) return;
+      }
+    } catch {
+      // Best-effort drain; session may already be closing.
     }
   }
 
@@ -513,50 +639,50 @@ class ConnectSocket {
     this.manualClose = true;
     this.closed = true;
     this.operationActive = false;
+    this.heartbeatInFlight = false;
+    this.activeGenerationRequestId = undefined;
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = undefined;
     this.socket?.destroy();
     this.socket = undefined;
     this.rejectWaiters(new Error('Connect session closed'));
-    this.buffer = [];
+    const pending = this.pendingHeartbeatWaiter;
+    this.pendingHeartbeatWaiter = undefined;
+    pending?.reject(new Error('Connect session closed'));
+    this.buffer = new Uint8Array(0);
     this.frames = [];
   }
 
   private receiveData(data: Uint8Array | string): void {
     if (typeof data === 'string') return;
-    this.buffer.push(...data);
-    while (this.buffer.length >= 4) {
-      const length =
-        ((this.buffer[0] << 24) >>> 0) |
-        (this.buffer[1] << 16) |
-        (this.buffer[2] << 8) |
-        this.buffer[3];
-      if (length < 1 || length > MAX_FRAME_LENGTH) {
-        this.fail(new Error('The Connect host returned an invalid frame size'));
-        return;
+    try {
+      const chunk =
+        data instanceof Uint8Array ? data : new Uint8Array(data as ArrayBuffer);
+      const extracted = extractConnectFrames(
+        concatBytes(this.buffer, new Uint8Array(chunk))
+      );
+      this.buffer = new Uint8Array(extracted.remaining);
+      for (const frame of extracted.frames) {
+        const waiter = this.waiters.shift();
+        if (waiter) waiter.resolve(new Uint8Array(frame));
+        else this.frames.push(new Uint8Array(frame));
       }
-      if (this.buffer.length < length + 4) return;
-      const frame = Uint8Array.from(this.buffer.slice(4, length + 4));
-      this.buffer.splice(0, length + 4);
-      const waiter = this.waiters.shift();
-      if (waiter) waiter.resolve(frame);
-      else this.frames.push(frame);
+    } catch (error) {
+      this.fail(asError(error));
     }
   }
 
   private writeFrame(payload: Uint8Array): void {
-    if (
-      !this.socket ||
-      payload.length < 1 ||
-      payload.length > MAX_FRAME_LENGTH
-    ) {
+    if (!this.socket) {
       throw SDKException.networkError('Connect frame size is invalid');
     }
-    const frame = new Uint8Array(payload.length + 4);
-    const view = new DataView(frame.buffer);
-    view.setUint32(0, payload.length, false);
-    frame.set(payload, 4);
-    this.socket.write(frame);
+    try {
+      this.socket.write(encodeConnectFrame(payload));
+    } catch (error) {
+      throw SDKException.networkError(
+        error instanceof Error ? error.message : 'Connect frame size is invalid'
+      );
+    }
   }
 
   private nextFrame(): Promise<Uint8Array> {

@@ -610,14 +610,20 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                   )}
                 </TouchableOpacity>
               ) : (
-                connectState.availableHosts.map((host) => (
+                connectState.availableHosts.map((host) => {
+                  const connectingThis =
+                    connectState.status === 'connecting' &&
+                    connectState.connectingHost?.id === host.id;
+                  const connectingOther =
+                    connectState.status === 'connecting' && !connectingThis;
+                  return (
                   <TouchableOpacity
                     key={host.id}
                     style={styles.connectRow}
                     onPress={() => {
                       handleConnect(host).catch(() => undefined);
                     }}
-                    disabled={connectState.status === 'connecting'}
+                    disabled={connectingThis || connectingOther}
                   >
                     <View
                       style={[
@@ -647,7 +653,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                         Language model available on this host
                       </Text>
                     </View>
-                    {connectState.status === 'connecting' ? (
+                    {connectingThis ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
                       <Text
@@ -661,7 +667,8 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                       </Text>
                     )}
                   </TouchableOpacity>
-                ))
+                  );
+                })
               )}
             </View>
           </View>

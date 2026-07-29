@@ -150,6 +150,7 @@ public final class ConnectSession: ObservableObject {
     /// Start browsing for Mac hosts over the local network.
     public func startBrowsing() async throws {
         try requireInitialized()
+        try await RunAnywhere.ensureServicesReady()
         #if os(iOS)
         lastError = nil
         transport.startBrowsing()
@@ -179,7 +180,15 @@ public final class ConnectSession: ObservableObject {
         generationHandler: @escaping ConnectHostGenerationHandler
     ) async throws {
         try requireInitialized()
+        try await RunAnywhere.ensureServicesReady()
         #if os(macOS)
+        if status == .hosting || transport.isHosting {
+            throw SDKException(
+                code: .invalidState,
+                message: "Stop the current Connect host before starting another one.",
+                category: .network
+            )
+        }
         lastError = nil
         var request = RAConnectHostStartRequest()
         request.displayName = sanitizedDisplayName(displayName ?? ProcessInfo.processInfo.hostName)
@@ -231,6 +240,7 @@ public final class ConnectSession: ObservableObject {
     /// Pair the current iPhone or iPad with a discovered Mac host.
     public func connect(to host: ConnectHost) async throws {
         try requireInitialized()
+        try await RunAnywhere.ensureServicesReady()
         #if os(iOS)
         lastError = nil
         connectingHost = host
@@ -244,7 +254,24 @@ public final class ConnectSession: ObservableObject {
         do {
             var hello = try CppBridge.Connect.createClientHello(request)
             hello.instanceID = clientInstanceID
-            let response = try await transport.connect(to: host, hello: hello)
+            // Prefer the commons-stamped protocol version from the hello.
+            if hello.protocolVersion > 0 {
+                request.protocolVersion = hello.protocolVersion
+            }
+            let response = try await withThrowingTaskGroup(of: RAConnectHandshakeResponse.self) { group in
+                group.addTask {
+                    try await self.transport.connect(to: host, hello: hello)
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 5_000_000_000)
+                    throw ConnectTransportError.network(
+                        "Timed out connecting to \(host.displayName)."
+                    )
+                }
+                let value = try await group.next()!
+                group.cancelAll()
+                return value
+            }
             let sessionState = try CppBridge.Connect.validateHost(response)
             guard sessionState.state == .connected,
                   !sessionState.sessionID.isEmpty,
@@ -274,6 +301,7 @@ public final class ConnectSession: ObservableObject {
             status = .connected
             transport.startClientHeartbeat(sessionID: sessionState.sessionID)
         } catch {
+            transport.disconnectClient()
             clearClientState()
             connectingHost = nil
             status = .failed(error.localizedDescription)
@@ -314,6 +342,13 @@ public final class ConnectSession: ObservableObject {
         return try await transport.invoke(invocation)
         #else
         throw unsupported("Only iPhone and iPad may generate through a Connect host in this release.")
+        #endif
+    }
+
+    /// Cancel one in-flight hosted generation by request id without disconnecting.
+    public func cancelGeneration(requestID: String? = nil) {
+        #if os(iOS)
+        transport.cancelClientInvocation(requestID: requestID)
         #endif
     }
 
@@ -460,6 +495,7 @@ private final class ConnectTransport: @unchecked Sendable {
     private static let maximumFrameLength = 4 * 1024 * 1024
     private static let heartbeatInterval: DispatchTimeInterval = .seconds(3)
     private static let heartbeatTimeout: DispatchTimeInterval = .seconds(2)
+    private static let generationReadTimeout: DispatchTimeInterval = .seconds(120)
 
     var onHostsChanged: (([ConnectHost]) -> Void)?
     var onHostClientCountChanged: ((Int) -> Void)?
@@ -477,10 +513,15 @@ private final class ConnectTransport: @unchecked Sendable {
     private var clientEventContinuation: AsyncStream<RALLMStreamEvent>.Continuation?
     private var clientHeartbeatTimer: DispatchSourceTimer?
     private var clientHeartbeatTimeout: DispatchWorkItem?
+    private var clientGenerationTimeout: DispatchWorkItem?
     private var activeClientSessionID: String?
     private var clientHeartbeatSequence: UInt64 = 0
     private var clientHeartbeatInFlight = false
     private var pendingClientInvocation: PendingClientInvocation?
+
+    var isHosting: Bool {
+        queue.sync { listener != nil }
+    }
 
     func startBrowsing() {
         queue.async { [weak self] in
@@ -517,7 +558,12 @@ private final class ConnectTransport: @unchecked Sendable {
         generationHandler: @escaping ConnectHostGenerationHandler
     ) throws {
         try queue.sync { [weak self] in
-            guard let self, self.listener == nil else { return }
+            guard let self else { return }
+            guard self.listener == nil else {
+                throw ConnectTransportError.network(
+                    "Stop the current Connect host before starting another one."
+                )
+            }
 
             let listener = try NWListener(using: .tcp)
             listener.service = NWListener.Service(
@@ -650,11 +696,17 @@ private final class ConnectTransport: @unchecked Sendable {
 
         activeClientRequestID = requestID
         clientEventContinuation = streamContinuation
-        streamContinuation.onTermination = { [weak self] _ in
+        streamContinuation.onTermination = { [weak self] reason in
             guard let transport = self else { return }
             transport.queue.async { [transport] in
                 guard transport.activeClientRequestID == requestID else { return }
-                transport.finishClientInvocation()
+                // Cancelled collectors should ask the host to finish cleanly so
+                // the TCP session stays reusable (Swift/Kotlin/Flutter parity).
+                if case .cancelled = reason {
+                    transport.sendClientCancel(requestID: requestID, keepSessionAlive: true)
+                } else {
+                    transport.finishClientInvocation()
+                }
             }
         }
 
@@ -665,6 +717,7 @@ private final class ConnectTransport: @unchecked Sendable {
                 guard let self else { return }
                 switch result {
                 case .success:
+                    self.armClientGenerationTimeout(on: connection, requestID: requestID)
                     self.receiveClientInvocationEvent(on: connection, requestID: requestID)
                 case let .failure(error):
                     self.finishClientInvocation(with: error)
@@ -677,6 +730,81 @@ private final class ConnectTransport: @unchecked Sendable {
             clearClientConnection(connection, notify: true, reason: error)
             continuation.resume(throwing: error)
         }
+    }
+
+    /// Cancel the active client generation without tearing down the session.
+    func cancelClientInvocation(requestID: String?) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            let target = requestID ?? self.activeClientRequestID
+            guard let target, self.activeClientRequestID == target else { return }
+            self.sendClientCancel(requestID: target, keepSessionAlive: true)
+        }
+    }
+
+    private func sendClientCancel(requestID: String, keepSessionAlive: Bool) {
+        guard let connection = clientConnection,
+              let sessionID = activeClientSessionID,
+              activeClientRequestID == requestID else {
+            finishClientInvocation()
+            return
+        }
+
+        var cancel = RAConnectInvocationCancelRequest()
+        cancel.sessionID = sessionID
+        cancel.requestID = requestID
+        var frame = RAConnectClientFrame()
+        frame.cancel = cancel
+
+        do {
+            try sendFrame(try frame.serializedData(), on: connection) { [weak self] result in
+                guard let self else { return }
+                switch result {
+                case .success:
+                    // Keep reading until the host emits a terminal event so the
+                    // framed stream stays aligned for the next prompt.
+                    self.receiveClientInvocationEvent(on: connection, requestID: requestID)
+                case let .failure(error):
+                    if keepSessionAlive {
+                        self.finishClientInvocation(with: error)
+                        self.clearClientConnection(connection, notify: true, reason: error)
+                    } else {
+                        self.finishClientInvocation()
+                    }
+                }
+            }
+        } catch {
+            if keepSessionAlive {
+                finishClientInvocation(with: error)
+                clearClientConnection(connection, notify: true, reason: error)
+            } else {
+                finishClientInvocation()
+            }
+        }
+    }
+
+    private func armClientGenerationTimeout(on connection: NWConnection, requestID: String) {
+        clientGenerationTimeout?.cancel()
+        let timeout = DispatchWorkItem { [weak self, weak connection] in
+            guard let self,
+                  let connection,
+                  self.clientConnection === connection,
+                  self.activeClientRequestID == requestID else {
+                return
+            }
+            let error = ConnectTransportError.network(
+                "The Mac stopped sending generation frames."
+            )
+            self.finishClientInvocation(with: error)
+            self.clearClientConnection(connection, notify: true, reason: error)
+        }
+        clientGenerationTimeout = timeout
+        queue.asyncAfter(deadline: .now() + Self.generationReadTimeout, execute: timeout)
+    }
+
+    private func clearClientGenerationTimeout() {
+        clientGenerationTimeout?.cancel()
+        clientGenerationTimeout = nil
     }
 
     private func sendClientHeartbeatIfIdle() {
@@ -895,6 +1023,8 @@ private final class ConnectTransport: @unchecked Sendable {
                         self.handleHostInvocation(invocation, on: hosted)
                     case let .heartbeat(heartbeat):
                         self.respondToHeartbeat(heartbeat, on: hosted)
+                    case let .cancel(cancel):
+                        self.handleHostCancel(cancel, on: hosted)
                     }
                 } catch {
                     hosted.connection.cancel()
@@ -906,6 +1036,14 @@ private final class ConnectTransport: @unchecked Sendable {
     }
 
     private func handleHostInvocation(_ invocation: RAConnectInvocationRequest, on hosted: HostedConnection) {
+        if hosted.activeRequestID != nil {
+            sendHostTerminalError(
+                "Wait for the current response to finish before sending another message.",
+                requestID: invocation.requestID,
+                on: hosted
+            )
+            return
+        }
         do {
             let validation = try CppBridge.Connect.validateInvocation(invocation)
             guard validation.accepted, invocation.sessionID == hosted.sessionID else {
@@ -932,12 +1070,42 @@ private final class ConnectTransport: @unchecked Sendable {
                 handler: handler,
                 on: hosted
             )
+            // Keep reading so cancel/heartbeat frames can arrive mid-generation.
+            receiveHostFrame(on: hosted)
         } catch {
             sendHostTerminalError(
                 error.localizedDescription,
                 requestID: invocation.requestID,
                 on: hosted
             )
+        }
+    }
+
+    private func handleHostCancel(
+        _ cancel: RAConnectInvocationCancelRequest,
+        on hosted: HostedConnection
+    ) {
+        do {
+            let validation = try CppBridge.Connect.validateCancel(cancel)
+            guard validation.accepted,
+                  cancel.sessionID == hosted.sessionID,
+                  !cancel.requestID.isEmpty else {
+                // Invalid cancel must not interrupt an unrelated generation;
+                // keep reading frames on this connection.
+                receiveHostFrame(on: hosted)
+                return
+            }
+            guard hosted.activeRequestID == cancel.requestID else {
+                receiveHostFrame(on: hosted)
+                return
+            }
+            Task {
+                await RunAnywhere.cancelGeneration()
+            }
+            // Keep reading while the generation task emits its terminal event.
+            receiveHostFrame(on: hosted)
+        } catch {
+            receiveHostFrame(on: hosted)
         }
     }
 
@@ -974,8 +1142,15 @@ private final class ConnectTransport: @unchecked Sendable {
         handler: @escaping ConnectHostGenerationHandler,
         on hosted: HostedConnection
     ) {
+        hosted.activeRequestID = requestID
         Task { [weak self, weak hosted] in
             guard let self, let hosted else { return }
+            defer {
+                self.queue.async { [weak hosted] in
+                    guard let hosted, hosted.activeRequestID == requestID else { return }
+                    hosted.activeRequestID = nil
+                }
+            }
             do {
                 let events = try await handler(request)
                 var receivedTerminalEvent = false
@@ -1005,10 +1180,8 @@ private final class ConnectTransport: @unchecked Sendable {
                     on: hosted.connection
                 )
             }
-            self.queue.async { [weak self, weak hosted] in
-                guard let self, let hosted else { return }
-                self.receiveHostFrame(on: hosted)
-            }
+            // receiveHostFrame stays armed for the lifetime of the connection so
+            // cancel frames are not blocked behind generation completion.
         }
     }
 
@@ -1064,6 +1237,7 @@ private final class ConnectTransport: @unchecked Sendable {
                     if envelope.event.isFinal {
                         self.finishClientInvocation()
                     } else {
+                        self.armClientGenerationTimeout(on: connection, requestID: requestID)
                         self.receiveClientInvocationEvent(on: connection, requestID: requestID)
                     }
                 } catch {
@@ -1169,7 +1343,11 @@ private final class ConnectTransport: @unchecked Sendable {
         with error: Error? = nil,
         emitError: Bool = true
     ) {
-        guard let continuation = clientEventContinuation else { return }
+        clearClientGenerationTimeout()
+        guard let continuation = clientEventContinuation else {
+            activeClientRequestID = nil
+            return
+        }
         if let error, emitError {
             var event = RALLMStreamEvent()
             event.requestID = activeClientRequestID ?? ""
@@ -1270,6 +1448,7 @@ private final class HostedConnection: @unchecked Sendable {
     let connection: NWConnection
     let sessionID: String
     let clientInstanceID: String
+    var activeRequestID: String?
 
     init(connection: NWConnection, sessionID: String, clientInstanceID: String) {
         self.connection = connection

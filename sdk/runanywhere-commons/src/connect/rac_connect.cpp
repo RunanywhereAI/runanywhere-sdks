@@ -22,6 +22,10 @@ namespace {
 constexpr uint32_t kConnectProtocolVersion = 1;
 constexpr size_t kMaxDisplayNameLength = 128;
 constexpr size_t kMaxModelIdLength = 512;
+// Soft cap for an unauthenticated LAN host. Reconnects from the same client
+// instance_id still collapse to one entry; this only bounds distinct peers and
+// leaked sessions that never close their transport.
+constexpr size_t kMaxConnectSessions = 16;
 
 #if defined(RAC_HAVE_PROTOBUF)
 
@@ -423,12 +427,6 @@ rac_result_t rac_connect_host_accept_client_proto(const uint8_t* hello_bytes, si
         return reject_handshake(host, "Client identity is invalid", out_response);
     }
 
-    std::string session_id;
-    const rac_result_t id_result = generate_ephemeral_id(&session_id, out_response);
-    if (id_result != RAC_SUCCESS) {
-        return id_result;
-    }
-
     // Network transitions can leave the old transport connection alive long
     // enough for the same device to complete a new handshake. Invalidate that
     // device's previous session before registering the replacement.
@@ -439,6 +437,16 @@ rac_result_t rac_connect_host_accept_client_proto(const uint8_t* hello_bytes, si
             ++it;
         }
     }
+    if (host.session_clients.size() >= kMaxConnectSessions) {
+        return reject_handshake(host, "Connect host has too many active sessions", out_response);
+    }
+
+    std::string session_id;
+    const rac_result_t id_result = generate_ephemeral_id(&session_id, out_response);
+    if (id_result != RAC_SUCCESS) {
+        return id_result;
+    }
+
     host.session_clients.emplace(session_id, hello.instance_id());
 
     v1::ConnectHandshakeResponse response;
@@ -570,6 +578,46 @@ rac_result_t rac_connect_host_validate_invocation_proto(const uint8_t* request_b
         validation.set_rejection_reason("Connect generation request is incomplete");
     } else if (request.generation().model_id() != host.model.model_id()) {
         validation.set_rejection_reason("Requested model is not shared by this host");
+    } else {
+        validation.set_accepted(true);
+    }
+    return serialize_message(validation, out_validation);
+#endif
+}
+
+rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* request_bytes,
+                                                    size_t request_size,
+                                                    rac_proto_buffer_t* out_validation) {
+    if (out_validation == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_proto_buffer_init(out_validation);
+
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_bytes;
+    (void)request_size;
+    rac_proto_buffer_set_error(out_validation, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                               "Connect requires protobuf support");
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    v1::ConnectInvocationCancelRequest request;
+    const rac_result_t parse_result =
+        parse_message(request_bytes, request_size, &request, out_validation,
+                      "Invalid ConnectInvocationCancelRequest protobuf payload");
+    if (parse_result != RAC_SUCCESS) {
+        return parse_result;
+    }
+
+    v1::ConnectInvocationValidation validation;
+    std::lock_guard<std::mutex> lock(runtime_mutex());
+    const HostRuntime& host = runtime();
+    if (!host.is_hosting) {
+        validation.set_rejection_reason("Connect host is not active");
+    } else if (request.session_id().empty() ||
+               host.session_clients.find(request.session_id()) == host.session_clients.end()) {
+        validation.set_rejection_reason("Connect session is not active");
+    } else if (request.request_id().empty()) {
+        validation.set_rejection_reason("Connect cancellation request is incomplete");
     } else {
         validation.set_accepted(true);
     }

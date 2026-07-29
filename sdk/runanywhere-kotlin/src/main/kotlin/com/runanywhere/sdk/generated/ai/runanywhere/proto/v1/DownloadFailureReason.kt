@@ -51,8 +51,8 @@ public enum class DownloadFailureReason(
     @JvmField
     public val ADAPTER: ProtoAdapter<DownloadFailureReason> =
         object : EnumAdapter<DownloadFailureReason>(
-      DownloadFailureReason::class, 
-      PROTO_3, 
+      DownloadFailureReason::class,
+      PROTO_3,
       DownloadFailureReason.DOWNLOAD_FAILURE_REASON_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DownloadFailureReason? = DownloadFailureReason.fromValue(`value`)

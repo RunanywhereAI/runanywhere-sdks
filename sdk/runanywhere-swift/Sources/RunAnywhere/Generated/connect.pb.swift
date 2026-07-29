@@ -543,6 +543,23 @@ public nonisolated struct RAConnectInvocationValidation: Sendable {
   public init() {}
 }
 
+/// Clients cancel one in-flight generation by request id without tearing down
+/// the TCP session. Commons validates session ownership; the host adapter then
+/// cancels the local runtime for that request and emits a terminal stream event.
+public nonisolated struct RAConnectInvocationCancelRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sessionID: String = String()
+
+  public var requestID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 /// Hosts forward the SDK's canonical stream events without translating them to
 /// a platform-specific token shape. This is the portable streaming surface for
 /// future Kotlin, React Native, Flutter, and Web clients.
@@ -627,11 +644,20 @@ public nonisolated struct RAConnectClientFrame: Sendable {
     set {payload = .heartbeat(newValue)}
   }
 
+  public var cancel: RAConnectInvocationCancelRequest {
+    get {
+      if case .cancel(let v)? = payload {return v}
+      return RAConnectInvocationCancelRequest()
+    }
+    set {payload = .cancel(newValue)}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_Payload: Equatable, Sendable {
     case invocation(RAConnectInvocationRequest)
     case heartbeat(RAConnectHeartbeatRequest)
+    case cancel(RAConnectInvocationCancelRequest)
 
   }
 
@@ -1281,6 +1307,41 @@ nonisolated extension RAConnectInvocationValidation: SwiftProtobuf.Message, Swif
   }
 }
 
+nonisolated extension RAConnectInvocationCancelRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ConnectInvocationCancelRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_id\0\u{3}request_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 1)
+    }
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAConnectInvocationCancelRequest, rhs: RAConnectInvocationCancelRequest) -> Bool {
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.requestID != rhs.requestID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 nonisolated extension RAConnectInvocationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ConnectInvocationEvent"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}event\0")
@@ -1392,7 +1453,7 @@ nonisolated extension RAConnectHeartbeatResponse: SwiftProtobuf.Message, SwiftPr
 
 nonisolated extension RAConnectClientFrame: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ConnectClientFrame"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}invocation\0\u{1}heartbeat\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}invocation\0\u{1}heartbeat\0\u{1}cancel\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1426,6 +1487,19 @@ nonisolated extension RAConnectClientFrame: SwiftProtobuf.Message, SwiftProtobuf
           self.payload = .heartbeat(v)
         }
       }()
+      case 3: try {
+        var v: RAConnectInvocationCancelRequest?
+        var hadOneofValue = false
+        if let current = self.payload {
+          hadOneofValue = true
+          if case .cancel(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.payload = .cancel(v)
+        }
+      }()
       default: break
       }
     }
@@ -1444,6 +1518,10 @@ nonisolated extension RAConnectClientFrame: SwiftProtobuf.Message, SwiftProtobuf
     case .heartbeat?: try {
       guard case .heartbeat(let v)? = self.payload else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    }()
+    case .cancel?: try {
+      guard case .cancel(let v)? = self.payload else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     }()
     case nil: break
     }

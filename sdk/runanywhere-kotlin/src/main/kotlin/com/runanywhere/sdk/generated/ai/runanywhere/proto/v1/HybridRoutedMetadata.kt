@@ -170,11 +170,11 @@ public class HybridRoutedMetadata(
     @JvmField
     public val ADAPTER: ProtoAdapter<HybridRoutedMetadata> =
         object : ProtoAdapter<HybridRoutedMetadata>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      HybridRoutedMetadata::class, 
-      "type.googleapis.com/runanywhere.v1.HybridRoutedMetadata", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      HybridRoutedMetadata::class,
+      "type.googleapis.com/runanywhere.v1.HybridRoutedMetadata",
+      PROTO_3,
+      null,
       "hybrid_router.proto"
     ) {
       override fun encodedSize(`value`: HybridRoutedMetadata): Int {

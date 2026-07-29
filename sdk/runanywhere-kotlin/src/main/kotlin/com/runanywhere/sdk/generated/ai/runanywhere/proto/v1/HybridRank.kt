@@ -33,8 +33,8 @@ public enum class HybridRank(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<HybridRank> = object : EnumAdapter<HybridRank>(
-      HybridRank::class, 
-      PROTO_3, 
+      HybridRank::class,
+      PROTO_3,
       HybridRank.HYBRID_RANK_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): HybridRank? = HybridRank.fromValue(`value`)

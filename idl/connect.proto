@@ -168,6 +168,14 @@ message ConnectInvocationValidation {
     string rejection_reason = 2;
 }
 
+// Clients cancel one in-flight generation by request id without tearing down
+// the TCP session. Commons validates session ownership; the host adapter then
+// cancels the local runtime for that request and emits a terminal stream event.
+message ConnectInvocationCancelRequest {
+    string session_id = 1;
+    string request_id = 2;
+}
+
 // Hosts forward the SDK's canonical stream events without translating them to
 // a platform-specific token shape. This is the portable streaming surface for
 // future Kotlin, React Native, Flutter, and Web clients.
@@ -197,6 +205,7 @@ message ConnectClientFrame {
     oneof payload {
         ConnectInvocationRequest invocation = 1;
         ConnectHeartbeatRequest heartbeat = 2;
+        ConnectInvocationCancelRequest cancel = 3;
     }
 }
 

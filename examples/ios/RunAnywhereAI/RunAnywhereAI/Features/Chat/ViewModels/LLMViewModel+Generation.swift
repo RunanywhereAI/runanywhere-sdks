@@ -24,7 +24,8 @@ extension LLMViewModel {
         // updates. Avoids the synthetic result construction the example used
         // to do alongside a hardcoded `framework = "llamacpp"` literal.
         let history = Self.makeHistory(from: self.messagesValue, currentUserIndex: messageIndex - 1)
-        let request = Self.makeRequest(prompt: prompt, options: options, history: history)
+        var request = Self.makeRequest(prompt: prompt, options: options, history: history)
+        request = connectAwareRequest(request, messageIndex: messageIndex)
         let eventStream = try await generationStream(for: request)
         let result = await RunAnywhere.aggregateStream(
             prompt: prompt,
@@ -72,7 +73,8 @@ extension LLMViewModel {
         generationID: UUID?
     ) async throws {
         let history = Self.makeHistory(from: self.messagesValue, currentUserIndex: messageIndex - 1)
-        let request = Self.makeRequest(prompt: prompt, options: options, history: history)
+        var request = Self.makeRequest(prompt: prompt, options: options, history: history)
+        request = connectAwareRequest(request, messageIndex: messageIndex)
         let result: RALLMGenerationResult
         #if os(iOS)
         if isUsingConnect {
@@ -82,6 +84,11 @@ extension LLMViewModel {
                 prompt: prompt,
                 events: try await generationStream(for: request)
             )
+            if !result.errorMessage.isEmpty {
+                throw NSError(domain: "RunAnywhereAI", code: -1, userInfo: [
+                    NSLocalizedDescriptionKey: result.errorMessage
+                ])
+            }
         } else {
             result = try await RunAnywhere.generate(request)
         }
@@ -164,6 +171,17 @@ extension LLMViewModel {
         #endif
         return try await RunAnywhere.generateStream(request)
     }
+
+    #if os(iOS)
+    private func connectAwareRequest(_ request: RALLMGenerateRequest, messageIndex: Int) -> RALLMGenerateRequest {
+        guard isUsingConnect, messageIndex < messagesValue.count else { return request }
+        var updated = request
+        updated.requestID = messagesValue[messageIndex].id.uuidString
+        updated.conversationID = currentConversation?.id ?? ""
+        activeHostedRequestID = updated.requestID
+        return updated
+    }
+    #endif
 
     // MARK: - Message Updates
 
@@ -295,6 +313,11 @@ extension LLMViewModel {
         // clear it exactly once for a normal completion or a Stop.
         self.setActiveGenerationID(nil)
         self.setIsGenerating(false)
+        #if os(iOS)
+        if activeHostedRequestID != nil {
+            activeHostedRequestID = nil
+        }
+        #endif
 
         // Guard the JSON write against a conversation swap that somehow kept the
         // id (should not normally happen once the id matches).

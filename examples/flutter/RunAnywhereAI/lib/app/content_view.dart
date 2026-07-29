@@ -170,8 +170,11 @@ class _ConnectBanner extends StatefulWidget {
 
 class _ConnectBannerState extends State<_ConnectBanner> {
   String? _dismissedKey;
+  String? _autoDismissScheduledKey;
 
   String? get _key => switch (widget.state.status) {
+    ConnectStatus.connecting =>
+      'connecting:${widget.state.connectingHost?.id}',
     ConnectStatus.connected =>
       'connected:${widget.state.activeHost?.id}:${widget.state.activeModel?.id}',
     ConnectStatus.disconnected =>
@@ -185,19 +188,57 @@ class _ConnectBannerState extends State<_ConnectBanner> {
     super.didUpdateWidget(oldWidget);
     final key = _key;
     if (key == null || key == _dismissedKey) return;
-    _dismissedKey = null;
-    if (widget.state.status == ConnectStatus.connected) {
+    // Schedule auto-dismiss once per banner key so reconnect churn does not
+    // reset a user-dismissed or already-scheduled banner.
+    if (widget.state.status == ConnectStatus.connected &&
+        key != _autoDismissScheduledKey) {
+      _autoDismissScheduledKey = key;
       Future<void>.delayed(const Duration(seconds: 6), () {
         if (mounted && _key == key) setState(() => _dismissedKey = key);
       });
     }
   }
 
+  (String, String, String, Color, IconData) get _presentation {
+    final state = widget.state;
+    return switch (state.status) {
+      ConnectStatus.connected => (
+        state.activeHost?.displayName ?? 'Connected to Host',
+        state.activeModel?.displayName ?? 'Hosted model ready',
+        'connected',
+        AppColors.statusGreen,
+        Icons.check_circle,
+      ),
+      ConnectStatus.connecting => (
+        'Connecting to ${state.connectingHost?.displayName ?? 'host'}',
+        'Checking the selected model',
+        'connecting',
+        AppColors.primaryAccent,
+        Icons.sync,
+      ),
+      ConnectStatus.failed => (
+        'Couldn\'t connect',
+        state.message ?? 'Check the host and your local network',
+        'failed',
+        AppColors.statusOrange,
+        Icons.warning_amber_rounded,
+      ),
+      ConnectStatus.disconnected => (
+        'Host connection lost',
+        state.message ?? 'Choose a local model or reconnect',
+        'disconnected',
+        AppColors.statusOrange,
+        Icons.warning_amber_rounded,
+      ),
+      _ => ('', '', 'other', AppColors.primaryAccent, Icons.desktop_windows_outlined),
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final key = _key;
     final visible = key != null && key != _dismissedKey;
-    final connected = widget.state.status == ConnectStatus.connected;
+    final (title, subtitle, _, tint, icon) = _presentation;
     return AnimatedSlide(
       duration: const Duration(milliseconds: 220),
       offset: visible ? Offset.zero : const Offset(0, -1.2),
@@ -210,24 +251,14 @@ class _ConnectBannerState extends State<_ConnectBanner> {
             margin: const EdgeInsets.symmetric(horizontal: 16),
             elevation: 8,
             child: ListTile(
-              leading: Icon(
-                connected ? Icons.check_circle : Icons.warning_amber_rounded,
-                color: connected ? AppColors.statusGreen : AppColors.primaryRed,
-              ),
+              leading: Icon(icon, color: tint),
               title: Text(
-                connected
-                    ? widget.state.activeHost?.displayName ??
-                          'Connected to Host'
-                    : 'Host connection lost',
+                title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
-                connected
-                    ? widget.state.activeModel?.displayName ??
-                          'Hosted model ready'
-                    : widget.state.message ??
-                          'Choose a local model or reconnect',
+                subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

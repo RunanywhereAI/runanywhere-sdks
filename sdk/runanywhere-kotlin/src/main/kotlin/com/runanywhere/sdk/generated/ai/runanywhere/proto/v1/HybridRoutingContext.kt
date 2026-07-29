@@ -61,11 +61,11 @@ public class HybridRoutingContext(
     @JvmField
     public val ADAPTER: ProtoAdapter<HybridRoutingContext> =
         object : ProtoAdapter<HybridRoutingContext>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      HybridRoutingContext::class, 
-      "type.googleapis.com/runanywhere.v1.HybridRoutingContext", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      HybridRoutingContext::class,
+      "type.googleapis.com/runanywhere.v1.HybridRoutingContext",
+      PROTO_3,
+      null,
       "hybrid_router.proto"
     ) {
       override fun encodedSize(`value`: HybridRoutingContext): Int {

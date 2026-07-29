@@ -112,7 +112,8 @@ class ChatViewModel extends ChangeNotifier {
   String? get loadedModelName =>
       ConnectService.shared.state.activeModel?.displayName ?? _loadedModelName;
   sdk.InferenceFramework? get loadedFramework => _loadedFramework;
-  bool get loadedModelSupportsLora => _loadedModelSupportsLora;
+  bool get loadedModelSupportsLora =>
+      isUsingHostedModel ? false : _loadedModelSupportsLora;
   bool get isModelLoaded =>
       ConnectService.shared.state.isConnected || sdk.RunAnywhere.llm.isLoaded;
   bool get isUsingHostedModel => ConnectService.shared.state.isConnected;
@@ -137,6 +138,10 @@ class ChatViewModel extends ChangeNotifier {
   double? _timeToFirstToken;
   StreamSubscription<sdk.ModelLifecycleChange>? _lifecycleSubscription;
   bool _initialized = false;
+  /// Tracks the in-flight hosted request so Stop can cancel by id.
+  String? _activeHostedRequestId;
+  /// Guards hosted stream callbacks against stale conversation turns.
+  int _hostedConversationToken = 0;
 
   // --- Lifecycle ------------------------------------------------------------
 
@@ -179,9 +184,22 @@ class ChatViewModel extends ChangeNotifier {
     ConnectService.shared.removeListener(_connectChanged);
     unawaited(_lifecycleSubscription?.cancel());
     if (_isGenerating) {
-      sdk.RunAnywhere.llm.cancelGeneration();
+      _cancelActiveGeneration();
     }
     super.dispose();
+  }
+
+  void _cancelActiveGeneration() {
+    if (isUsingHostedModel) {
+      final requestId = _activeHostedRequestId;
+      if (requestId != null) {
+        ConnectService.shared.cancelGeneration(requestId);
+      }
+      _hostedConversationToken += 1;
+      _activeHostedRequestId = null;
+    } else {
+      sdk.RunAnywhere.llm.cancelGeneration();
+    }
   }
 
   /// Sync loaded-model state from the SDK snapshot.
@@ -299,7 +317,11 @@ class ChatViewModel extends ChangeNotifier {
   /// Stop the in-flight generation (mirrors iOS `stopGeneration`).
   void stopGeneration() {
     if (isUsingHostedModel) {
-      unawaited(ConnectService.shared.disconnect());
+      final requestId = _activeHostedRequestId;
+      if (requestId != null) {
+        ConnectService.shared.cancelGeneration(requestId);
+      }
+      _hostedConversationToken += 1;
     } else {
       sdk.RunAnywhere.llm.cancelGeneration();
     }
@@ -311,7 +333,7 @@ class ChatViewModel extends ChangeNotifier {
   /// message, iOS parity).
   void clearChat() {
     if (_isGenerating) {
-      sdk.RunAnywhere.llm.cancelGeneration();
+      _cancelActiveGeneration();
     }
     _messages.clear();
     _errorMessage = null;
@@ -323,7 +345,7 @@ class ChatViewModel extends ChangeNotifier {
   /// Restore a persisted conversation into the chat.
   void loadConversation(Conversation conversation) {
     if (_isGenerating) {
-      sdk.RunAnywhere.llm.cancelGeneration();
+      _cancelActiveGeneration();
       _isGenerating = false;
     }
     _currentConversation = conversation;
@@ -496,14 +518,24 @@ class ChatViewModel extends ChangeNotifier {
     final modelName = loadedModelName;
     final assistantMessage = _appendEmptyAssistantMessage();
     final messageIndex = _messages.length - 1;
+    final conversationToken = ++_hostedConversationToken;
+    final requestId = assistantMessage.id;
+    _activeHostedRequestId = requestId;
 
     try {
+      final conversationId = _currentConversation?.id ?? '';
       final result = await sdk.RunAnywhere.aggregateStream(
         prompt: prompt,
         events: ConnectService.shared.session.generateStream(
-          sdk.LLMGenerateRequest(prompt: prompt, options: options),
+          sdk.LLMGenerateRequest(
+            prompt: prompt,
+            options: options,
+            requestId: requestId,
+            conversationId: conversationId,
+          ),
         ),
         onToken: (aggregated) async {
+          if (conversationToken != _hostedConversationToken) return;
           if (_timeToFirstToken == null && _generationStartTime != null) {
             _timeToFirstToken =
                 DateTime.now()
@@ -517,6 +549,7 @@ class ChatViewModel extends ChangeNotifier {
           notifyListeners();
         },
       );
+      if (conversationToken != _hostedConversationToken) return;
       if (result.errorMessage.isNotEmpty) {
         throw Exception(result.errorMessage);
       }
@@ -540,10 +573,15 @@ class ChatViewModel extends ChangeNotifier {
       _persistMessage(finalMessage);
       notifyListeners();
     } catch (error) {
+      if (conversationToken != _hostedConversationToken) return;
       _messages.removeLast();
       _errorMessage = 'Hosted generation failed: $error';
       _isGenerating = false;
       notifyListeners();
+    } finally {
+      if (_activeHostedRequestId == requestId) {
+        _activeHostedRequestId = null;
+      }
     }
   }
 

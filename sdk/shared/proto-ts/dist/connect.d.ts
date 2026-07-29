@@ -163,6 +163,15 @@ export interface ConnectInvocationValidation {
     rejectionReason: string;
 }
 /**
+ * Clients cancel one in-flight generation by request id without tearing down
+ * the TCP session. Commons validates session ownership; the host adapter then
+ * cancels the local runtime for that request and emits a terminal stream event.
+ */
+export interface ConnectInvocationCancelRequest {
+    sessionId: string;
+    requestId: string;
+}
+/**
  * Hosts forward the SDK's canonical stream events without translating them to
  * a platform-specific token shape. This is the portable streaming surface for
  * future Kotlin, React Native, Flutter, and Web clients.
@@ -193,6 +202,7 @@ export interface ConnectHeartbeatResponse {
 export interface ConnectClientFrame {
     invocation?: ConnectInvocationRequest | undefined;
     heartbeat?: ConnectHeartbeatRequest | undefined;
+    cancel?: ConnectInvocationCancelRequest | undefined;
 }
 export interface ConnectHostFrame {
     invocationEvent?: ConnectInvocationEvent | undefined;
@@ -212,6 +222,7 @@ export declare const ConnectClientSessionState: MessageFns<ConnectClientSessionS
 export declare const ConnectSessionCloseRequest: MessageFns<ConnectSessionCloseRequest>;
 export declare const ConnectInvocationRequest: MessageFns<ConnectInvocationRequest>;
 export declare const ConnectInvocationValidation: MessageFns<ConnectInvocationValidation>;
+export declare const ConnectInvocationCancelRequest: MessageFns<ConnectInvocationCancelRequest>;
 export declare const ConnectInvocationEvent: MessageFns<ConnectInvocationEvent>;
 export declare const ConnectHeartbeatRequest: MessageFns<ConnectHeartbeatRequest>;
 export declare const ConnectHeartbeatResponse: MessageFns<ConnectHeartbeatResponse>;

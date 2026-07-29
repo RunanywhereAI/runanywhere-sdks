@@ -140,11 +140,11 @@ public class NpuCapability(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<NpuCapability> = object : ProtoAdapter<NpuCapability>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      NpuCapability::class, 
-      "type.googleapis.com/runanywhere.v1.NpuCapability", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      NpuCapability::class,
+      "type.googleapis.com/runanywhere.v1.NpuCapability",
+      PROTO_3,
+      null,
       "hardware_profile.proto"
     ) {
       override fun encodedSize(`value`: NpuCapability): Int {

@@ -49,11 +49,18 @@ public class ConnectClientFrame(
     schemaIndex = 1,
   )
   public val heartbeat: ConnectHeartbeatRequest? = null,
+  @field:WireField(
+    tag = 3,
+    adapter = "ai.runanywhere.proto.v1.ConnectInvocationCancelRequest#ADAPTER",
+    oneofName = "payload",
+    schemaIndex = 2,
+  )
+  public val cancel: ConnectInvocationCancelRequest? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ConnectClientFrame, Nothing>(ADAPTER, unknownFields) {
   init {
-    require(countNonNull(invocation, heartbeat) <= 1) {
-      "At most one of invocation, heartbeat may be non-null"
+    require(countNonNull(invocation, heartbeat, cancel) <= 1) {
+      "At most one of invocation, heartbeat, cancel may be non-null"
     }
   }
 
@@ -69,6 +76,7 @@ public class ConnectClientFrame(
     if (unknownFields != other.unknownFields) return false
     if (invocation != other.invocation) return false
     if (heartbeat != other.heartbeat) return false
+    if (cancel != other.cancel) return false
     return true
   }
 
@@ -78,6 +86,7 @@ public class ConnectClientFrame(
       result = unknownFields.hashCode()
       result = result * 37 + (invocation?.hashCode() ?: 0)
       result = result * 37 + (heartbeat?.hashCode() ?: 0)
+      result = result * 37 + (cancel?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -87,41 +96,46 @@ public class ConnectClientFrame(
     val result = mutableListOf<String>()
     if (invocation != null) result += """invocation=$invocation"""
     if (heartbeat != null) result += """heartbeat=$heartbeat"""
+    if (cancel != null) result += """cancel=$cancel"""
     return result.joinToString(prefix = "ConnectClientFrame{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     invocation: ConnectInvocationRequest? = this.invocation,
     heartbeat: ConnectHeartbeatRequest? = this.heartbeat,
+    cancel: ConnectInvocationCancelRequest? = this.cancel,
     unknownFields: ByteString = this.unknownFields,
-  ): ConnectClientFrame = ConnectClientFrame(invocation, heartbeat, unknownFields)
+  ): ConnectClientFrame = ConnectClientFrame(invocation, heartbeat, cancel, unknownFields)
 
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<ConnectClientFrame> =
         object : ProtoAdapter<ConnectClientFrame>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      ConnectClientFrame::class, 
-      "type.googleapis.com/runanywhere.v1.ConnectClientFrame", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      ConnectClientFrame::class,
+      "type.googleapis.com/runanywhere.v1.ConnectClientFrame",
+      PROTO_3,
+      null,
       "connect.proto"
     ) {
       override fun encodedSize(`value`: ConnectClientFrame): Int {
         var size = value.unknownFields.size
         size += ConnectInvocationRequest.ADAPTER.encodedSizeWithTag(1, value.invocation)
         size += ConnectHeartbeatRequest.ADAPTER.encodedSizeWithTag(2, value.heartbeat)
+        size += ConnectInvocationCancelRequest.ADAPTER.encodedSizeWithTag(3, value.cancel)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ConnectClientFrame) {
         ConnectInvocationRequest.ADAPTER.encodeWithTag(writer, 1, value.invocation)
         ConnectHeartbeatRequest.ADAPTER.encodeWithTag(writer, 2, value.heartbeat)
+        ConnectInvocationCancelRequest.ADAPTER.encodeWithTag(writer, 3, value.cancel)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ConnectClientFrame) {
         writer.writeBytes(value.unknownFields)
+        ConnectInvocationCancelRequest.ADAPTER.encodeWithTag(writer, 3, value.cancel)
         ConnectHeartbeatRequest.ADAPTER.encodeWithTag(writer, 2, value.heartbeat)
         ConnectInvocationRequest.ADAPTER.encodeWithTag(writer, 1, value.invocation)
       }
@@ -129,16 +143,19 @@ public class ConnectClientFrame(
       override fun decode(reader: ProtoReader): ConnectClientFrame {
         var invocation: ConnectInvocationRequest? = null
         var heartbeat: ConnectHeartbeatRequest? = null
+        var cancel: ConnectInvocationCancelRequest? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> invocation = ConnectInvocationRequest.ADAPTER.decode(reader)
             2 -> heartbeat = ConnectHeartbeatRequest.ADAPTER.decode(reader)
+            3 -> cancel = ConnectInvocationCancelRequest.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ConnectClientFrame(
           invocation = invocation,
           heartbeat = heartbeat,
+          cancel = cancel,
           unknownFields = unknownFields
         )
       }
@@ -146,6 +163,7 @@ public class ConnectClientFrame(
       override fun redact(`value`: ConnectClientFrame): ConnectClientFrame = value.copy(
         invocation = value.invocation?.let(ConnectInvocationRequest.ADAPTER::redact),
         heartbeat = value.heartbeat?.let(ConnectHeartbeatRequest.ADAPTER::redact),
+        cancel = value.cancel?.let(ConnectInvocationCancelRequest.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

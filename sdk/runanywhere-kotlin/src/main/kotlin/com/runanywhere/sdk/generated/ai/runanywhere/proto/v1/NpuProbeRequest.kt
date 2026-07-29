@@ -55,11 +55,11 @@ public class NpuProbeRequest(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<NpuProbeRequest> = object : ProtoAdapter<NpuProbeRequest>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      NpuProbeRequest::class, 
-      "type.googleapis.com/runanywhere.v1.NpuProbeRequest", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      NpuProbeRequest::class,
+      "type.googleapis.com/runanywhere.v1.NpuProbeRequest",
+      PROTO_3,
+      null,
       "hardware_profile.proto"
     ) {
       override fun encodedSize(`value`: NpuProbeRequest): Int {

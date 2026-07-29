@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: connect.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ConnectHostFrame = exports.ConnectClientFrame = exports.ConnectHeartbeatResponse = exports.ConnectHeartbeatRequest = exports.ConnectInvocationEvent = exports.ConnectInvocationValidation = exports.ConnectInvocationRequest = exports.ConnectSessionCloseRequest = exports.ConnectClientSessionState = exports.ConnectHandshakeResponse = exports.ConnectClientHello = exports.ConnectClientStartRequest = exports.ConnectHostState = exports.ConnectHostStopRequest = exports.ConnectHostStartRequest = exports.ConnectModelDescriptor = exports.ConnectDiscoveryMetadata = exports.ConnectPlatformPolicy = exports.ConnectPlatformPolicyRequest = exports.ConnectSessionState = exports.ConnectHandshakeStatus = exports.ConnectRoleAvailability = exports.ConnectPlatform = exports.protobufPackage = void 0;
+exports.ConnectHostFrame = exports.ConnectClientFrame = exports.ConnectHeartbeatResponse = exports.ConnectHeartbeatRequest = exports.ConnectInvocationEvent = exports.ConnectInvocationCancelRequest = exports.ConnectInvocationValidation = exports.ConnectInvocationRequest = exports.ConnectSessionCloseRequest = exports.ConnectClientSessionState = exports.ConnectHandshakeResponse = exports.ConnectClientHello = exports.ConnectClientStartRequest = exports.ConnectHostState = exports.ConnectHostStopRequest = exports.ConnectHostStartRequest = exports.ConnectModelDescriptor = exports.ConnectDiscoveryMetadata = exports.ConnectPlatformPolicy = exports.ConnectPlatformPolicyRequest = exports.ConnectSessionState = exports.ConnectHandshakeStatus = exports.ConnectRoleAvailability = exports.ConnectPlatform = exports.protobufPackage = void 0;
 exports.connectPlatformFromJSON = connectPlatformFromJSON;
 exports.connectPlatformToJSON = connectPlatformToJSON;
 exports.connectRoleAvailabilityFromJSON = connectRoleAvailabilityFromJSON;
@@ -1570,6 +1570,82 @@ exports.ConnectInvocationValidation = {
         return message;
     },
 };
+function createBaseConnectInvocationCancelRequest() {
+    return { sessionId: "", requestId: "" };
+}
+exports.ConnectInvocationCancelRequest = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.sessionId !== "") {
+            writer.uint32(10).string(message.sessionId);
+        }
+        if (message.requestId !== "") {
+            writer.uint32(18).string(message.requestId);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseConnectInvocationCancelRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.sessionId = reader.string();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            sessionId: isSet(object.sessionId)
+                ? globalThis.String(object.sessionId)
+                : isSet(object.session_id)
+                    ? globalThis.String(object.session_id)
+                    : "",
+            requestId: isSet(object.requestId)
+                ? globalThis.String(object.requestId)
+                : isSet(object.request_id)
+                    ? globalThis.String(object.request_id)
+                    : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.sessionId !== "") {
+            obj.sessionId = message.sessionId;
+        }
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.ConnectInvocationCancelRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseConnectInvocationCancelRequest();
+        message.sessionId = object.sessionId ?? "";
+        message.requestId = object.requestId ?? "";
+        return message;
+    },
+};
 function createBaseConnectInvocationEvent() {
     return { requestId: "", event: undefined };
 }
@@ -1789,7 +1865,7 @@ exports.ConnectHeartbeatResponse = {
     },
 };
 function createBaseConnectClientFrame() {
-    return { invocation: undefined, heartbeat: undefined };
+    return { invocation: undefined, heartbeat: undefined, cancel: undefined };
 }
 exports.ConnectClientFrame = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1798,6 +1874,9 @@ exports.ConnectClientFrame = {
         }
         if (message.heartbeat !== undefined) {
             exports.ConnectHeartbeatRequest.encode(message.heartbeat, writer.uint32(18).fork()).join();
+        }
+        if (message.cancel !== undefined) {
+            exports.ConnectInvocationCancelRequest.encode(message.cancel, writer.uint32(26).fork()).join();
         }
         return writer;
     },
@@ -1822,6 +1901,13 @@ exports.ConnectClientFrame = {
                     message.heartbeat = exports.ConnectHeartbeatRequest.decode(reader, reader.uint32());
                     continue;
                 }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.cancel = exports.ConnectInvocationCancelRequest.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1834,6 +1920,7 @@ exports.ConnectClientFrame = {
         return {
             invocation: isSet(object.invocation) ? exports.ConnectInvocationRequest.fromJSON(object.invocation) : undefined,
             heartbeat: isSet(object.heartbeat) ? exports.ConnectHeartbeatRequest.fromJSON(object.heartbeat) : undefined,
+            cancel: isSet(object.cancel) ? exports.ConnectInvocationCancelRequest.fromJSON(object.cancel) : undefined,
         };
     },
     toJSON(message) {
@@ -1843,6 +1930,9 @@ exports.ConnectClientFrame = {
         }
         if (message.heartbeat !== undefined) {
             obj.heartbeat = exports.ConnectHeartbeatRequest.toJSON(message.heartbeat);
+        }
+        if (message.cancel !== undefined) {
+            obj.cancel = exports.ConnectInvocationCancelRequest.toJSON(message.cancel);
         }
         return obj;
     },
@@ -1856,6 +1946,9 @@ exports.ConnectClientFrame = {
             : undefined;
         message.heartbeat = (object.heartbeat !== undefined && object.heartbeat !== null)
             ? exports.ConnectHeartbeatRequest.fromPartial(object.heartbeat)
+            : undefined;
+        message.cancel = (object.cancel !== undefined && object.cancel !== null)
+            ? exports.ConnectInvocationCancelRequest.fromPartial(object.cancel)
             : undefined;
         return message;
     },

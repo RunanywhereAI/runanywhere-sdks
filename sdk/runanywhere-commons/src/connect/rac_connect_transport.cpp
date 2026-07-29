@@ -85,6 +85,9 @@ rac_result_t rac_connect_transport_register(const rac_connect_transport_ops_t* o
         if (init_result != RAC_SUCCESS) {
             RAC_LOG_ERROR(kTag, "Connect transport init failed: rc=%d",
                           static_cast<int>(init_result));
+            // Init never completed, so destroy must not run on teardown. Clear
+            // the hook before the shared_ptr goes out of scope.
+            replacement->ops.destroy = nullptr;
             return init_result;
         }
     }

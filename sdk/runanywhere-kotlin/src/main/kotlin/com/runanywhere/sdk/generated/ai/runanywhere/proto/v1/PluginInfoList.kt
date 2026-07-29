@@ -81,11 +81,11 @@ public class PluginInfoList(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<PluginInfoList> = object : ProtoAdapter<PluginInfoList>(
-      FieldEncoding.LENGTH_DELIMITED, 
-      PluginInfoList::class, 
-      "type.googleapis.com/runanywhere.v1.PluginInfoList", 
-      PROTO_3, 
-      null, 
+      FieldEncoding.LENGTH_DELIMITED,
+      PluginInfoList::class,
+      "type.googleapis.com/runanywhere.v1.PluginInfoList",
+      PROTO_3,
+      null,
       "plugin_loader.proto"
     ) {
       override fun encodedSize(`value`: PluginInfoList): Int {

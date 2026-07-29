@@ -57,6 +57,8 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_connect_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::ConnectInvocationValidation
         {&::_pbi::kDescriptorMethods, &::descriptor_table_connect_2eproto, /* tracker*/ nullptr,},
+        // ::runanywhere::v1::ConnectInvocationCancelRequest
+        {&::_pbi::kDescriptorMethods, &::descriptor_table_connect_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::ConnectInvocationEvent
         {&::_pbi::kDescriptorMethods, &::descriptor_table_connect_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::ConnectHeartbeatRequest
@@ -851,6 +853,162 @@ const ::_pbi::ClassData* ConnectInvocationValidation_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class ConnectInvocationCancelRequest::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<ConnectInvocationCancelRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ConnectInvocationCancelRequest, _impl_._has_bits_);
+};
+
+constexpr ConnectInvocationCancelRequest::ParseTableT_ ConnectInvocationCancelRequest::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(ConnectInvocationCancelRequest, _impl_._has_bits_),
+      0, // no _extensions_
+      2, 8,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967292,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      2,  // num_field_entries
+      0,  // num_aux_entries
+      offsetof(ParseTableT_, field_names),  // no aux_entries
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::ConnectInvocationCancelRequest>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      // string request_id = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 1, 0,
+        PROTOBUF_FIELD_OFFSET(ConnectInvocationCancelRequest, _impl_.request_id_)}},
+      // string session_id = 1;
+      {::_pbi::TcParser::FastUS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(ConnectInvocationCancelRequest, _impl_.session_id_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // string session_id = 1;
+      {PROTOBUF_FIELD_OFFSET(ConnectInvocationCancelRequest, _impl_.session_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string request_id = 2;
+      {PROTOBUF_FIELD_OFFSET(ConnectInvocationCancelRequest, _impl_.request_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    }},
+    // no aux_entries
+    {{
+      "\55\12\12\0\0\0\0\0"
+      "runanywhere.v1.ConnectInvocationCancelRequest"
+      "session_id"
+      "request_id"
+    }},
+  };
+}
+
+
+inline constexpr ConnectInvocationCancelRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        session_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        request_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()) {}
+
+template <typename>
+constexpr ConnectInvocationCancelRequest::ConnectInvocationCancelRequest(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL ConnectInvocationCancelRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ConnectInvocationCancelRequest(arena);
+}
+constexpr auto ConnectInvocationCancelRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ConnectInvocationCancelRequest), alignof(ConnectInvocationCancelRequest));
+}
+constexpr auto ConnectInvocationCancelRequest::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &ConnectInvocationCancelRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ConnectInvocationCancelRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ConnectInvocationCancelRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ConnectInvocationCancelRequest>(), &ConnectInvocationCancelRequest::ByteSizeLong,
+              &ConnectInvocationCancelRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ConnectInvocationCancelRequest, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[14],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_connect_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct ConnectInvocationCancelRequestGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr ConnectInvocationCancelRequestGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 ConnectInvocationCancelRequest_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(ConnectInvocationCancelRequest::InternalGenerateClassData_(
+            _default, &ConnectInvocationCancelRequest_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<ConnectInvocationCancelRequest>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~ConnectInvocationCancelRequestGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) ConnectInvocationCancelRequest _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<ConnectInvocationCancelRequest>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(ConnectInvocationCancelRequestGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ConnectInvocationCancelRequestGlobalsTypeInternal ConnectInvocationCancelRequest_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* ConnectInvocationCancelRequest_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return ConnectInvocationCancelRequest_globals_.GetClassData();
+#else
+  return ConnectInvocationCancelRequest_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 class ConnectHostStopRequest::_Internal {
  public:
 };
@@ -1077,7 +1235,7 @@ constexpr auto ConnectHeartbeatResponse::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[16],
+      &file_reflection_data[17],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_connect_2eproto,
@@ -1230,7 +1388,7 @@ constexpr auto ConnectHeartbeatRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[15],
+      &file_reflection_data[16],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_connect_2eproto,
@@ -2633,7 +2791,7 @@ constexpr auto ConnectInvocationEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[14],
+      &file_reflection_data[15],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_connect_2eproto,
@@ -2785,7 +2943,7 @@ constexpr auto ConnectHostFrame::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[18],
+      &file_reflection_data[19],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_connect_2eproto,
@@ -3018,12 +3176,12 @@ constexpr ConnectClientFrame::ParseTableT_ ConnectClientFrame::InternalGenerateP
       PROTOBUF_FIELD_OFFSET(ConnectClientFrame,
                             _impl_._cached_size_),  // no hasbits
       0, // no _extensions_
-      2, 0,  // max_field_number, fast_idx_mask
+      3, 0,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967292,  // skipmap
+      4294967288,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      2,  // num_field_entries
-      2,  // num_aux_entries
+      3,  // num_field_entries
+      3,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -3040,6 +3198,8 @@ constexpr ConnectClientFrame::ParseTableT_ ConnectClientFrame::InternalGenerateP
       {PROTOBUF_FIELD_OFFSET(ConnectClientFrame, _impl_.payload_.invocation_), _Internal::kOneofCaseOffset + 0, 0, (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
       // .runanywhere.v1.ConnectHeartbeatRequest heartbeat = 2;
       {PROTOBUF_FIELD_OFFSET(ConnectClientFrame, _impl_.payload_.heartbeat_), _Internal::kOneofCaseOffset + 0, 1, (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
+      // .runanywhere.v1.ConnectInvocationCancelRequest cancel = 3;
+      {PROTOBUF_FIELD_OFFSET(ConnectClientFrame, _impl_.payload_.cancel_), _Internal::kOneofCaseOffset + 0, 2, (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -3051,6 +3211,11 @@ constexpr ConnectClientFrame::ParseTableT_ ConnectClientFrame::InternalGenerateP
         {::_pbi::TcParser::GetTable<::runanywhere::v1::ConnectHeartbeatRequest>()},
         #else
         {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ConnectHeartbeatRequest_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::ConnectInvocationCancelRequest>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ConnectInvocationCancelRequest_globals_},
         #endif
     }},
     {{
@@ -3107,7 +3272,7 @@ constexpr auto ConnectClientFrame::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[17],
+      &file_reflection_data[18],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_connect_2eproto,
@@ -3298,6 +3463,13 @@ const ::uint32_t
         1,
         0,
         0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ConnectInvocationCancelRequest, _impl_._has_bits_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ConnectInvocationCancelRequest, _impl_.session_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ConnectInvocationCancelRequest, _impl_.request_id_),
+        0,
+        1,
+        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ConnectInvocationEvent, _impl_._has_bits_),
         5, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ConnectInvocationEvent, _impl_.request_id_),
@@ -3320,6 +3492,7 @@ const ::uint32_t
         1,
         0x004, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ConnectClientFrame, _impl_._oneof_case_[0]),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ConnectClientFrame, _impl_.payload_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ConnectClientFrame, _impl_.payload_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ConnectClientFrame, _impl_.payload_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ConnectClientFrame, _impl_.payload_),
@@ -3346,11 +3519,12 @@ static const ::_pbi::MigrationSchema
         {109, sizeof(::runanywhere::v1::ConnectSessionCloseRequest)},
         {114, sizeof(::runanywhere::v1::ConnectInvocationRequest)},
         {123, sizeof(::runanywhere::v1::ConnectInvocationValidation)},
-        {130, sizeof(::runanywhere::v1::ConnectInvocationEvent)},
-        {137, sizeof(::runanywhere::v1::ConnectHeartbeatRequest)},
-        {144, sizeof(::runanywhere::v1::ConnectHeartbeatResponse)},
-        {151, sizeof(::runanywhere::v1::ConnectClientFrame)},
-        {156, sizeof(::runanywhere::v1::ConnectHostFrame)},
+        {130, sizeof(::runanywhere::v1::ConnectInvocationCancelRequest)},
+        {137, sizeof(::runanywhere::v1::ConnectInvocationEvent)},
+        {144, sizeof(::runanywhere::v1::ConnectHeartbeatRequest)},
+        {151, sizeof(::runanywhere::v1::ConnectHeartbeatResponse)},
+        {158, sizeof(::runanywhere::v1::ConnectClientFrame)},
+        {164, sizeof(::runanywhere::v1::ConnectHostFrame)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -3368,6 +3542,7 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::runanywhere::v1::ConnectSessionCloseRequest_globals_,
         &::runanywhere::v1::ConnectInvocationRequest_globals_,
         &::runanywhere::v1::ConnectInvocationValidation_globals_,
+        &::runanywhere::v1::ConnectInvocationCancelRequest_globals_,
         &::runanywhere::v1::ConnectInvocationEvent_globals_,
         &::runanywhere::v1::ConnectHeartbeatRequest_globals_,
         &::runanywhere::v1::ConnectHeartbeatResponse_globals_,
@@ -3427,45 +3602,48 @@ const char descriptor_table_protodef_connect_2eproto[] ABSL_ATTRIBUTE_SECTION_VA
     "ration\030\003 \001(\0132\".runanywhere.v1.LLMGenerat"
     "eRequest\"I\n\033ConnectInvocationValidation\022"
     "\020\n\010accepted\030\001 \001(\010\022\030\n\020rejection_reason\030\002 "
-    "\001(\t\"[\n\026ConnectInvocationEvent\022\022\n\nrequest"
-    "_id\030\001 \001(\t\022-\n\005event\030\002 \001(\0132\036.runanywhere.v"
-    "1.LLMStreamEvent\"\?\n\027ConnectHeartbeatRequ"
-    "est\022\022\n\nsession_id\030\001 \001(\t\022\020\n\010sequence\030\002 \001("
-    "\004\"@\n\030ConnectHeartbeatResponse\022\022\n\nsession"
-    "_id\030\001 \001(\t\022\020\n\010sequence\030\002 \001(\004\"\235\001\n\022ConnectC"
-    "lientFrame\022>\n\ninvocation\030\001 \001(\0132(.runanyw"
-    "here.v1.ConnectInvocationRequestH\000\022<\n\the"
-    "artbeat\030\002 \001(\0132\'.runanywhere.v1.ConnectHe"
-    "artbeatRequestH\000B\t\n\007payload\"\240\001\n\020ConnectH"
-    "ostFrame\022B\n\020invocation_event\030\001 \001(\0132&.run"
-    "anywhere.v1.ConnectInvocationEventH\000\022=\n\t"
-    "heartbeat\030\002 \001(\0132(.runanywhere.v1.Connect"
-    "HeartbeatResponseH\000B\t\n\007payload*\235\002\n\017Conne"
-    "ctPlatform\022 \n\034CONNECT_PLATFORM_UNSPECIFI"
-    "ED\020\000\022\032\n\026CONNECT_PLATFORM_MACOS\020\001\022\030\n\024CONN"
-    "ECT_PLATFORM_IOS\020\002\022\033\n\027CONNECT_PLATFORM_I"
-    "PADOS\020\003\022\034\n\030CONNECT_PLATFORM_ANDROID\020\004\022!\n"
-    "\035CONNECT_PLATFORM_REACT_NATIVE\020\005\022\034\n\030CONN"
-    "ECT_PLATFORM_FLUTTER\020\006\022\030\n\024CONNECT_PLATFO"
-    "RM_WEB\020\007\022\034\n\030CONNECT_PLATFORM_WINDOWS\020\010*\272"
-    "\001\n\027ConnectRoleAvailability\022)\n%CONNECT_RO"
-    "LE_AVAILABILITY_UNSPECIFIED\020\000\022&\n\"CONNECT"
-    "_ROLE_AVAILABILITY_DISABLED\020\001\022%\n!CONNECT"
-    "_ROLE_AVAILABILITY_PLANNED\020\002\022%\n!CONNECT_"
-    "ROLE_AVAILABILITY_ENABLED\020\003*\220\001\n\026ConnectH"
-    "andshakeStatus\022(\n$CONNECT_HANDSHAKE_STAT"
-    "US_UNSPECIFIED\020\000\022%\n!CONNECT_HANDSHAKE_ST"
-    "ATUS_ACCEPTED\020\001\022%\n!CONNECT_HANDSHAKE_STA"
-    "TUS_REJECTED\020\002*\321\001\n\023ConnectSessionState\022%"
-    "\n!CONNECT_SESSION_STATE_UNSPECIFIED\020\000\022$\n"
-    " CONNECT_SESSION_STATE_CONNECTING\020\001\022#\n\037C"
-    "ONNECT_SESSION_STATE_CONNECTED\020\002\022&\n\"CONN"
-    "ECT_SESSION_STATE_DISCONNECTED\020\003\022 \n\034CONN"
-    "ECT_SESSION_STATE_FAILED\020\004B\207\001\n\027ai.runany"
-    "where.proto.v1B\014ConnectProtoP\001Z<github.c"
-    "om/runanywhere/runanywhere-sdks/idl/v1;r"
-    "unanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272"
-    "\002\002RAb\006proto3"
+    "\001(\t\"H\n\036ConnectInvocationCancelRequest\022\022\n"
+    "\nsession_id\030\001 \001(\t\022\022\n\nrequest_id\030\002 \001(\t\"[\n"
+    "\026ConnectInvocationEvent\022\022\n\nrequest_id\030\001 "
+    "\001(\t\022-\n\005event\030\002 \001(\0132\036.runanywhere.v1.LLMS"
+    "treamEvent\"\?\n\027ConnectHeartbeatRequest\022\022\n"
+    "\nsession_id\030\001 \001(\t\022\020\n\010sequence\030\002 \001(\004\"@\n\030C"
+    "onnectHeartbeatResponse\022\022\n\nsession_id\030\001 "
+    "\001(\t\022\020\n\010sequence\030\002 \001(\004\"\337\001\n\022ConnectClientF"
+    "rame\022>\n\ninvocation\030\001 \001(\0132(.runanywhere.v"
+    "1.ConnectInvocationRequestH\000\022<\n\theartbea"
+    "t\030\002 \001(\0132\'.runanywhere.v1.ConnectHeartbea"
+    "tRequestH\000\022@\n\006cancel\030\003 \001(\0132..runanywhere"
+    ".v1.ConnectInvocationCancelRequestH\000B\t\n\007"
+    "payload\"\240\001\n\020ConnectHostFrame\022B\n\020invocati"
+    "on_event\030\001 \001(\0132&.runanywhere.v1.ConnectI"
+    "nvocationEventH\000\022=\n\theartbeat\030\002 \001(\0132(.ru"
+    "nanywhere.v1.ConnectHeartbeatResponseH\000B"
+    "\t\n\007payload*\235\002\n\017ConnectPlatform\022 \n\034CONNEC"
+    "T_PLATFORM_UNSPECIFIED\020\000\022\032\n\026CONNECT_PLAT"
+    "FORM_MACOS\020\001\022\030\n\024CONNECT_PLATFORM_IOS\020\002\022\033"
+    "\n\027CONNECT_PLATFORM_IPADOS\020\003\022\034\n\030CONNECT_P"
+    "LATFORM_ANDROID\020\004\022!\n\035CONNECT_PLATFORM_RE"
+    "ACT_NATIVE\020\005\022\034\n\030CONNECT_PLATFORM_FLUTTER"
+    "\020\006\022\030\n\024CONNECT_PLATFORM_WEB\020\007\022\034\n\030CONNECT_"
+    "PLATFORM_WINDOWS\020\010*\272\001\n\027ConnectRoleAvaila"
+    "bility\022)\n%CONNECT_ROLE_AVAILABILITY_UNSP"
+    "ECIFIED\020\000\022&\n\"CONNECT_ROLE_AVAILABILITY_D"
+    "ISABLED\020\001\022%\n!CONNECT_ROLE_AVAILABILITY_P"
+    "LANNED\020\002\022%\n!CONNECT_ROLE_AVAILABILITY_EN"
+    "ABLED\020\003*\220\001\n\026ConnectHandshakeStatus\022(\n$CO"
+    "NNECT_HANDSHAKE_STATUS_UNSPECIFIED\020\000\022%\n!"
+    "CONNECT_HANDSHAKE_STATUS_ACCEPTED\020\001\022%\n!C"
+    "ONNECT_HANDSHAKE_STATUS_REJECTED\020\002*\321\001\n\023C"
+    "onnectSessionState\022%\n!CONNECT_SESSION_ST"
+    "ATE_UNSPECIFIED\020\000\022$\n CONNECT_SESSION_STA"
+    "TE_CONNECTING\020\001\022#\n\037CONNECT_SESSION_STATE"
+    "_CONNECTED\020\002\022&\n\"CONNECT_SESSION_STATE_DI"
+    "SCONNECTED\020\003\022 \n\034CONNECT_SESSION_STATE_FA"
+    "ILED\020\004B\207\001\n\027ai.runanywhere.proto.v1B\014Conn"
+    "ectProtoP\001Z<github.com/runanywhere/runan"
+    "ywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RA"
+    "V1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_connect_2eproto_deps[1] = {
@@ -3475,13 +3653,13 @@ static ::absl::once_flag descriptor_table_connect_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_connect_2eproto = {
     false,
     false,
-    3572,
+    3712,
     descriptor_table_protodef_connect_2eproto,
     "connect.proto",
     &descriptor_table_connect_2eproto_once,
     descriptor_table_connect_2eproto_deps,
     1,
-    19,
+    20,
     schemas,
     file_message_globals,
     TableStruct_connect_2eproto::offsets,
@@ -7381,6 +7559,258 @@ void ConnectInvocationValidation::InternalSwap(ConnectInvocationValidation* PROT
 }
 // ===================================================================
 
+ConnectInvocationCancelRequest::ConnectInvocationCancelRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, ConnectInvocationCancelRequest_get_class_data()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.ConnectInvocationCancelRequest)
+}
+PROTOBUF_NDEBUG_INLINE ConnectInvocationCancelRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::ConnectInvocationCancelRequest& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        session_id_(arena, from.session_id_),
+        request_id_(arena, from.request_id_) {}
+
+ConnectInvocationCancelRequest::ConnectInvocationCancelRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const ConnectInvocationCancelRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, ConnectInvocationCancelRequest_get_class_data()) {
+
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  ConnectInvocationCancelRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ConnectInvocationCancelRequest)
+}
+PROTOBUF_NDEBUG_INLINE ConnectInvocationCancelRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        session_id_(arena),
+        request_id_(arena) {}
+
+inline void ConnectInvocationCancelRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+}
+ConnectInvocationCancelRequest::~ConnectInvocationCancelRequest() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.ConnectInvocationCancelRequest)
+  SharedDtor(*this);
+}
+inline void ConnectInvocationCancelRequest::SharedDtor(MessageLite& self) {
+  ConnectInvocationCancelRequest& this_ = static_cast<ConnectInvocationCancelRequest&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.session_id_.Destroy();
+  this_._impl_.request_id_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull ConnectInvocationCancelRequest_class_data_ =
+        ConnectInvocationCancelRequest::InternalGenerateClassData_(ConnectInvocationCancelRequest_globals_._default);
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+ConnectInvocationCancelRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&ConnectInvocationCancelRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(ConnectInvocationCancelRequest_class_data_.tc_table);
+  return ConnectInvocationCancelRequest_class_data_.base();
+}
+#else
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+ConnectInvocationCancelRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&ConnectInvocationCancelRequest_globals_);
+  ::google::protobuf::internal::PrefetchToLocalCache(
+      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&ConnectInvocationCancelRequest_globals_));
+  return ConnectInvocationCancelRequest_globals_.GetClassData();
+}
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const ConnectInvocationCancelRequest::ParseTableT_
+    ConnectInvocationCancelRequest::_table_ =
+        ConnectInvocationCancelRequest::InternalGenerateParseTable_(ConnectInvocationCancelRequest_class_data_.base());
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_NOINLINE void ConnectInvocationCancelRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.ConnectInvocationCancelRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.session_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.request_id_.ClearNonDefaultToEmpty();
+    }
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL ConnectInvocationCancelRequest::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const ConnectInvocationCancelRequest& this_ = static_cast<const ConnectInvocationCancelRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL ConnectInvocationCancelRequest::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const ConnectInvocationCancelRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.ConnectInvocationCancelRequest)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string session_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_session_id().empty()) {
+      const ::std::string& _s = this_._internal_session_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ConnectInvocationCancelRequest.session_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // string request_id = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_request_id().empty()) {
+      const ::std::string& _s = this_._internal_request_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ConnectInvocationCancelRequest.request_id");
+      target = stream->WriteStringMaybeAliased(2, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.ConnectInvocationCancelRequest)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t ConnectInvocationCancelRequest::ByteSizeLong(const MessageLite& base) {
+  const ConnectInvocationCancelRequest& this_ = static_cast<const ConnectInvocationCancelRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t ConnectInvocationCancelRequest::ByteSizeLong() const {
+  const ConnectInvocationCancelRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.ConnectInvocationCancelRequest)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // string session_id = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_session_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_session_id());
+      }
+    }
+    // string request_id = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_request_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_request_id());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void ConnectInvocationCancelRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                      const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this = static_cast<ConnectInvocationCancelRequest*>(&to_msg);
+  auto& from = static_cast<const ConnectInvocationCancelRequest&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.ConnectInvocationCancelRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_session_id().empty()) {
+        _this->_internal_set_session_id(from._internal_session_id());
+      } else {
+        if (_this->_impl_.session_id_.IsDefault()) {
+          _this->_internal_set_session_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_request_id().empty()) {
+        _this->_internal_set_request_id(from._internal_request_id());
+      } else {
+        if (_this->_impl_.request_id_.IsDefault()) {
+          _this->_internal_set_request_id("");
+        }
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void ConnectInvocationCancelRequest::CopyFrom(const ConnectInvocationCancelRequest& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.ConnectInvocationCancelRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void ConnectInvocationCancelRequest::InternalSwap(ConnectInvocationCancelRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.session_id_, &other->_impl_.session_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.request_id_, &other->_impl_.request_id_, arena);
+}
+
+::google::protobuf::Metadata ConnectInvocationCancelRequest::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
 void ConnectInvocationEvent::clear_event() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.event_ != nullptr) _impl_.event_->Clear();
@@ -8147,6 +8577,19 @@ void ConnectClientFrame::set_allocated_heartbeat(::runanywhere::v1::ConnectHeart
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ConnectClientFrame.heartbeat)
 }
+void ConnectClientFrame::set_allocated_cancel(::runanywhere::v1::ConnectInvocationCancelRequest* PROTOBUF_NULLABLE cancel) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  clear_payload();
+  if (cancel) {
+    ::google::protobuf::Arena* submessage_arena = cancel->GetArena();
+    if (message_arena != submessage_arena) {
+      cancel = ::google::protobuf::internal::GetOwnedMessage(message_arena, cancel, submessage_arena);
+    }
+    set_has_cancel();
+    _impl_.payload_.cancel_ = cancel;
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ConnectClientFrame.cancel)
+}
 ConnectClientFrame::ConnectClientFrame(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, ConnectClientFrame_get_class_data()) {
@@ -8186,6 +8629,9 @@ ConnectClientFrame::ConnectClientFrame(
         break;
       case kHeartbeat:
         _impl_.payload_.heartbeat_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.payload_.heartbeat_);
+        break;
+      case kCancel:
+        _impl_.payload_.cancel_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.payload_.cancel_);
         break;
   }
 
@@ -8235,6 +8681,14 @@ void ConnectClientFrame::clear_payload() {
         delete _impl_.payload_.heartbeat_;
       } else if (::google::protobuf::internal::DebugHardenClearOneofMessageOnArena()) {
         ::google::protobuf::internal::MaybePoisonAfterClear(_impl_.payload_.heartbeat_);
+      }
+      break;
+    }
+    case kCancel: {
+      if (GetArena() == nullptr) {
+        delete _impl_.payload_.cancel_;
+      } else if (::google::protobuf::internal::DebugHardenClearOneofMessageOnArena()) {
+        ::google::protobuf::internal::MaybePoisonAfterClear(_impl_.payload_.cancel_);
       }
       break;
     }
@@ -8314,6 +8768,12 @@ PROTOBUF_NOINLINE void ConnectClientFrame::Clear() {
           stream);
       break;
     }
+    case kCancel: {
+      target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+          3, *this_._impl_.payload_.cancel_, this_._impl_.payload_.cancel_->GetCachedSize(), target,
+          stream);
+      break;
+    }
     default:
       break;
   }
@@ -8351,6 +8811,12 @@ PROTOBUF_NOINLINE void ConnectClientFrame::Clear() {
     case kHeartbeat: {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.payload_.heartbeat_);
+      break;
+    }
+    // .runanywhere.v1.ConnectInvocationCancelRequest cancel = 3;
+    case kCancel: {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.payload_.cancel_);
       break;
     }
     case PAYLOAD_NOT_SET: {
@@ -8399,6 +8865,14 @@ void ConnectClientFrame::MergeImpl(::google::protobuf::MessageLite& to_msg,
           _this->_impl_.payload_.heartbeat_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.payload_.heartbeat_);
         } else {
           _this->_impl_.payload_.heartbeat_->MergeFrom(*from._impl_.payload_.heartbeat_);
+        }
+        break;
+      }
+      case kCancel: {
+        if (oneof_needs_init) {
+          _this->_impl_.payload_.cancel_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.payload_.cancel_);
+        } else {
+          _this->_impl_.payload_.cancel_->MergeFrom(*from._impl_.payload_.cancel_);
         }
         break;
       }

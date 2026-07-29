@@ -46,8 +46,8 @@ public enum class HexagonArch(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<HexagonArch> = object : EnumAdapter<HexagonArch>(
-      HexagonArch::class, 
-      PROTO_3, 
+      HexagonArch::class,
+      PROTO_3,
       HexagonArch.HEXAGON_ARCH_UNKNOWN
     ) {
       override fun fromValue(`value`: Int): HexagonArch? = HexagonArch.fromValue(`value`)

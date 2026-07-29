@@ -187,6 +187,12 @@ struct ChatInterfaceView: View {
         .onChange(of: connectController.session.status) { _, _ in
             Task { await synchronizeConnectState() }
         }
+        .onChange(of: connectController.session.activeHost?.id) { _, _ in
+            Task { await synchronizeConnectState() }
+        }
+        .onChange(of: connectController.session.activeModel?.id) { _, _ in
+            Task { await synchronizeConnectState() }
+        }
         #endif
         .onChange(of: viewModel.isModelLoaded) { wasLoaded, isLoaded in
             if isLoaded && !wasLoaded {
@@ -419,7 +425,7 @@ extension ChatInterfaceView {
                                   : viewModel.selectedFramework?.consumerBackendIcon ?? "cube")
                                 .font(.system(size: 7))
                             Text(viewModel.isUsingConnect
-                                 ? "Mac"
+                                 ? (viewModel.connectedHostName ?? "Host")
                                  : viewModel.selectedFramework?.consumerBackendShortLabel ?? "Ready")
                                 .font(.system(size: 8, weight: .medium))
                         }
@@ -660,6 +666,12 @@ extension ChatInterfaceView {
     }
 
     func handleModelSelected(_ model: RAModelInfo) async {
+        #if os(iOS)
+        if connectController.isConnected {
+            connectController.disconnect()
+            await viewModel.deactivateConnectModel()
+        }
+        #endif
         await MainActor.run {
             ModelListViewModel.shared.setCurrentModel(model)
         }

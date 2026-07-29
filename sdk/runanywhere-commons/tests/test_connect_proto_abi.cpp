@@ -220,6 +220,58 @@ void test_host_handshake_and_reconnect_deduplication() {
     stop_host();
 }
 
+void test_session_cap_and_cancel_validation() {
+    stop_host();
+
+    v1::ConnectHostState host_state;
+    const v1::ConnectHostStartRequest mac_host = make_host_start(v1::CONNECT_PLATFORM_MACOS);
+    CHECK(call_proto(rac_connect_host_start_proto, mac_host, &host_state) == RAC_SUCCESS,
+          "macOS host starts for session-cap tests");
+
+    std::string last_session_id;
+    for (int index = 0; index < 16; ++index) {
+        const v1::ConnectClientHello hello =
+            make_client_hello(v1::CONNECT_PLATFORM_ANDROID, "client-" + std::to_string(index));
+        v1::ConnectHandshakeResponse response;
+        CHECK(call_proto(rac_connect_host_accept_client_proto, hello, &response) == RAC_SUCCESS,
+              "Distinct clients are admitted up to the session cap");
+        CHECK(response.status() == v1::CONNECT_HANDSHAKE_STATUS_ACCEPTED,
+              "Distinct client handshake is accepted under the cap");
+        last_session_id = response.session_id();
+    }
+
+    v1::ConnectHostState capped_state;
+    CHECK(call_proto(rac_connect_host_start_proto, mac_host, &capped_state) == RAC_SUCCESS,
+          "Host state remains readable at the session cap");
+    CHECK(capped_state.active_client_count() == 16, "Session registry reports 16 active clients");
+
+    const v1::ConnectClientHello overflow =
+        make_client_hello(v1::CONNECT_PLATFORM_ANDROID, "client-overflow");
+    v1::ConnectHandshakeResponse rejected;
+    CHECK(call_proto(rac_connect_host_accept_client_proto, overflow, &rejected) == RAC_SUCCESS,
+          "Overflow handshake still returns a typed response");
+    CHECK(rejected.status() == v1::CONNECT_HANDSHAKE_STATUS_REJECTED,
+          "Overflow handshake is rejected at the session cap");
+
+    v1::ConnectInvocationCancelRequest cancel;
+    cancel.set_session_id(last_session_id);
+    cancel.set_request_id("req-1");
+    v1::ConnectInvocationValidation accepted;
+    CHECK(call_proto(rac_connect_host_validate_cancel_proto, cancel, &accepted) == RAC_SUCCESS,
+          "Cancel validation accepts an active session request");
+    CHECK(accepted.accepted(), "Cancel validation marks the request accepted");
+
+    v1::ConnectInvocationCancelRequest stale;
+    stale.set_session_id("missing-session");
+    stale.set_request_id("req-2");
+    v1::ConnectInvocationValidation rejected_cancel;
+    CHECK(call_proto(rac_connect_host_validate_cancel_proto, stale, &rejected_cancel) == RAC_SUCCESS,
+          "Cancel validation returns a typed rejection for unknown sessions");
+    CHECK(!rejected_cancel.accepted(), "Unknown-session cancel is rejected");
+
+    stop_host();
+}
+
 #endif
 
 }  // namespace
@@ -233,6 +285,7 @@ int main() {
     test_platform_role_policy();
     test_client_admission();
     test_host_handshake_and_reconnect_deduplication();
+    test_session_cap_and_cancel_validation();
     std::fprintf(stdout, "  %d checks, %d failures\n", g_checks, g_failures);
     return g_failures == 0 ? 0 : 1;
 #endif

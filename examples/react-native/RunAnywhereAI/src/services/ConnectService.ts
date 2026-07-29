@@ -14,4 +14,6 @@ export const ConnectService = {
   findHosts: (): Promise<void> => session.startBrowsing(),
   connect: (host: ConnectHost): Promise<void> => session.connect(host),
   disconnect: (): void => session.disconnect(),
+  cancelGeneration: (requestId: string): boolean =>
+    session.cancelGeneration(requestId),
 };

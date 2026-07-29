@@ -87,6 +87,10 @@ final class LLMViewModel {
     /// and merges it into the persisted `MessageAnalytics`.
     private(set) var activeGenerationTTFTMs: Double?
     private var isViewModelInitialized = false
+    #if os(iOS)
+    /// Tracks the in-flight hosted request so Stop can cancel by id.
+    private(set) var activeHostedRequestID: String?
+    #endif
 
     // MARK: - Internal Accessors for Extensions
 
@@ -222,6 +226,13 @@ final class LLMViewModel {
         activeGenerationID = nil
         generatingConversationId = nil
         setIsGenerating(false)
+        #if os(iOS)
+        if isUsingConnect, let requestID = activeHostedRequestID {
+            ConnectClientController.shared.session.cancelGeneration(requestID: requestID)
+            activeHostedRequestID = nil
+            return
+        }
+        #endif
         Task { await RunAnywhere.cancelGeneration() }
     }
 
@@ -417,7 +428,7 @@ final class LLMViewModel {
     ) async throws {
         // Check if tool calling is enabled and we have registered tools
         let registeredTools = await RunAnywhere.getRegisteredTools()
-        let shouldUseToolCalling = useToolCalling && !registeredTools.isEmpty
+        let shouldUseToolCalling = useToolCalling && !isUsingConnect && !registeredTools.isEmpty
 
         if shouldUseToolCalling {
             logger.info("Using tool calling with \(registeredTools.count) registered tools")
@@ -477,6 +488,12 @@ final class LLMViewModel {
         // the still-running generation on the single-callback LLM component.
         generationTask?.cancel()
 
+        #if os(iOS)
+        if isUsingConnect, let requestID = activeHostedRequestID {
+            ConnectClientController.shared.session.cancelGeneration(requestID: requestID)
+            return
+        }
+        #endif
         Task {
             await RunAnywhere.cancelGeneration()
         }

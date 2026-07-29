@@ -93,6 +93,15 @@ RAC_API rac_result_t rac_connect_host_validate_invocation_proto(const uint8_t* r
                                                                 size_t request_size,
                                                                 rac_proto_buffer_t* out_validation);
 
+/**
+ * Validate a typed remote cancellation request before the platform host
+ * runtime cancels the matching in-flight generation. The request must belong
+ * to an active Connect session and name a non-empty request id.
+ */
+RAC_API rac_result_t rac_connect_host_validate_cancel_proto(const uint8_t* request_bytes,
+                                                            size_t request_size,
+                                                            rac_proto_buffer_t* out_validation);
+
 #ifdef __cplusplus
 }
 #endif

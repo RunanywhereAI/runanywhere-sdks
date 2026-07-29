@@ -21,6 +21,7 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RALLMGenerateRequest
 import com.runanywhere.sdk.public.types.RALLMStreamEvent
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -67,6 +68,9 @@ data class ConnectState(
     val lastDisconnectedHost: ConnectHost? = null,
     val lastDisconnectedModel: ConnectModel? = null,
     val message: String? = null,
+    /** Commons-stamped protocol version from the last successful client hello. */
+    val protocolVersion: Int = ConnectSession.DEFAULT_PROTOCOL_VERSION,
+    val activeSessionId: String? = null,
 ) {
     val isConnected: Boolean get() = status == ConnectStatus.CONNECTED
 }
@@ -99,28 +103,28 @@ class ConnectSession(
             onFailure = ::handleFailure,
         )
 
-    private var activeSessionId: String? = null
-
     /** Begin Android NSD discovery. This is the point that may trigger local-network permission UI. */
     suspend fun startBrowsing() {
         requireInitialized()
-        val policy =
-            CppBridgeConnect.platformPolicy(
-                ConnectPlatformPolicyRequest(platform = ConnectPlatform.CONNECT_PLATFORM_ANDROID),
-            )
-        if (policy.client_role != ConnectRoleAvailability.CONNECT_ROLE_AVAILABILITY_ENABLED) {
-            throw SDKException.invalidState("Connect client support is not enabled for Android")
-        }
-
-        _state.update { current ->
-            current.copy(
-                status = if (current.isConnected) current.status else ConnectStatus.DISCOVERING,
-                message = null,
-            )
-        }
         try {
+            val policy =
+                CppBridgeConnect.platformPolicy(
+                    ConnectPlatformPolicyRequest(platform = ConnectPlatform.CONNECT_PLATFORM_ANDROID),
+                )
+            if (policy.client_role != ConnectRoleAvailability.CONNECT_ROLE_AVAILABILITY_ENABLED) {
+                throw SDKException.invalidState("Connect client support is not enabled for Android")
+            }
+
+            _state.update { current ->
+                current.copy(
+                    status = if (current.isConnected) current.status else ConnectStatus.DISCOVERING,
+                    message = null,
+                )
+            }
             discovery.start()
-        } catch (error: Throwable) {
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
             handleFailure(error)
             throw error
         }
@@ -146,26 +150,29 @@ class ConnectSession(
                 ?: throw SDKException.networkError("The selected host is no longer available")
 
         socket.close(notify = false)
-        activeSessionId = null
         _state.update {
             it.copy(
                 status = ConnectStatus.CONNECTING,
                 connectingHost = host,
                 activeHost = null,
                 activeModel = null,
+                activeSessionId = null,
                 message = null,
             )
         }
 
         try {
+            val protocolVersion = _state.value.protocolVersion
             val baseHello =
                 CppBridgeConnect.createClientHello(
                     ConnectClientStartRequest(
                         display_name = androidDisplayName(),
                         platform = ConnectPlatform.CONNECT_PLATFORM_ANDROID,
-                        protocol_version = PROTOCOL_VERSION,
+                        // Commons stamps the authoritative version onto the hello.
+                        protocol_version = protocolVersion,
                     ),
                 )
+            val negotiatedVersion = baseHello.protocol_version.takeIf { it > 0 } ?: protocolVersion
             val response =
                 socket.connect(
                     endpoint = endpoint,
@@ -202,22 +209,36 @@ class ConnectSession(
                     contextWindow = modelDescriptor.context_window,
                     supportsStreaming = modelDescriptor.supports_streaming,
                 )
-            activeSessionId = session.session_id
             _state.update {
                 it.copy(
                     status = ConnectStatus.CONNECTED,
                     connectingHost = null,
                     activeHost = connectedHost,
                     activeModel = connectedModel,
+                    activeSessionId = session.session_id,
+                    protocolVersion = negotiatedVersion,
                     lastDisconnectedHost = null,
                     lastDisconnectedModel = null,
                     message = null,
                 )
             }
             socket.startHeartbeat(session.session_id)
-        } catch (error: Throwable) {
+        } catch (error: CancellationException) {
+            // Propagate coroutine cancellation without publishing a FAILED snapshot.
             socket.close(notify = false)
-            activeSessionId = null
+            _state.update {
+                it.copy(
+                    status = ConnectStatus.IDLE,
+                    connectingHost = null,
+                    activeHost = null,
+                    activeModel = null,
+                    activeSessionId = null,
+                    message = null,
+                )
+            }
+            throw error
+        } catch (error: Exception) {
+            socket.close(notify = false)
             val message = error.message ?: "Unable to connect to the selected host"
             _state.update {
                 it.copy(
@@ -225,6 +246,7 @@ class ConnectSession(
                     connectingHost = null,
                     activeHost = null,
                     activeModel = null,
+                    activeSessionId = null,
                     message = message,
                 )
             }
@@ -235,7 +257,7 @@ class ConnectSession(
     /** Run text generation on the active host model without loading a local model. */
     fun generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamEvent> {
         val snapshot = _state.value
-        val sessionId = activeSessionId
+        val sessionId = snapshot.activeSessionId
         val model = snapshot.activeModel
         if (snapshot.status != ConnectStatus.CONNECTED || sessionId.isNullOrBlank() || model == null) {
             throw SDKException.networkError("Connect to a host before generating text")
@@ -251,16 +273,26 @@ class ConnectSession(
         )
     }
 
+    /**
+     * Cancel one in-flight hosted generation by request id without disconnecting.
+     * Returns true when a cancel frame was written on the live socket.
+     */
+    fun cancelGeneration(requestId: String): Boolean {
+        val sessionId = _state.value.activeSessionId ?: return false
+        if (requestId.isBlank()) return false
+        return socket.cancelGeneration(sessionId, requestId)
+    }
+
     /** End the active connection while leaving the session reusable. */
     fun disconnect() {
         socket.close(notify = false)
-        activeSessionId = null
         _state.update {
             it.copy(
                 status = ConnectStatus.IDLE,
                 connectingHost = null,
                 activeHost = null,
                 activeModel = null,
+                activeSessionId = null,
                 lastDisconnectedHost = null,
                 lastDisconnectedModel = null,
                 message = null,
@@ -272,7 +304,6 @@ class ConnectSession(
     fun stop() {
         discovery.stop()
         socket.close(notify = false)
-        activeSessionId = null
         synchronized(endpointsLock) { endpoints.clear() }
         _state.value = ConnectState()
         scope.cancel()
@@ -283,12 +314,13 @@ class ConnectSession(
             endpoints.clear()
             resolved.associateByTo(endpoints) { it.id }
         }
+        val protocolVersion = _state.value.protocolVersion
         val hosts =
             resolved.map {
                 ConnectHost(
                     id = it.id,
                     displayName = it.displayName,
-                    protocolVersion = PROTOCOL_VERSION,
+                    protocolVersion = protocolVersion,
                 )
             }
         _state.update { it.copy(availableHosts = hosts) }
@@ -297,7 +329,6 @@ class ConnectSession(
     private fun handleDisconnect(error: Throwable) {
         val previous = _state.value
         if (previous.status != ConnectStatus.CONNECTED) return
-        activeSessionId = null
         val host = previous.activeHost
         val model = previous.activeModel
         val reason = disconnectMessage(error, host)
@@ -307,6 +338,7 @@ class ConnectSession(
                 connectingHost = null,
                 activeHost = null,
                 activeModel = null,
+                activeSessionId = null,
                 lastDisconnectedHost = host,
                 lastDisconnectedModel = model,
                 message = reason,
@@ -354,7 +386,8 @@ class ConnectSession(
         return candidate.take(128).ifBlank { "Android device" }
     }
 
-    private companion object {
-        const val PROTOCOL_VERSION = 1
+    companion object {
+        /** Fallback until commons stamps the negotiated version onto a client hello. */
+        const val DEFAULT_PROTOCOL_VERSION = 1
     }
 }

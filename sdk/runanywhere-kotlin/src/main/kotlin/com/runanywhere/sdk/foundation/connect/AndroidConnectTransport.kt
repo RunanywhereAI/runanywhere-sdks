@@ -10,6 +10,7 @@ import ai.runanywhere.proto.v1.ConnectClientHello
 import ai.runanywhere.proto.v1.ConnectHandshakeResponse
 import ai.runanywhere.proto.v1.ConnectHeartbeatRequest
 import ai.runanywhere.proto.v1.ConnectHostFrame
+import ai.runanywhere.proto.v1.ConnectInvocationCancelRequest
 import ai.runanywhere.proto.v1.ConnectInvocationRequest
 import android.content.Context
 import android.net.nsd.NsdManager
@@ -23,6 +24,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -35,7 +37,6 @@ import java.io.EOFException
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketTimeoutException
-import java.util.concurrent.atomic.AtomicBoolean
 
 internal data class AndroidConnectEndpoint(
     val id: String,
@@ -62,7 +63,7 @@ internal class AndroidConnectDiscovery(
             listener = candidate
             try {
                 nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, candidate)
-            } catch (error: Throwable) {
+            } catch (error: Exception) {
                 listener = null
                 throw error
             }
@@ -79,7 +80,10 @@ internal class AndroidConnectDiscovery(
                 value
             }
         if (current != null) {
-            runCatching { nsdManager.stopServiceDiscovery(current) }
+            try {
+                nsdManager.stopServiceDiscovery(current)
+            } catch (_: Exception) {
+            }
         }
         onEndpointsChanged(emptyList())
     }
@@ -167,11 +171,24 @@ internal class AndroidConnectSocket(
     private val onDisconnected: (Throwable) -> Unit,
 ) {
     private val operationMutex = Mutex()
-    private val disconnected = AtomicBoolean(true)
+    private val streamsLock = Any()
+
+    @Volatile
+    private var disconnected = true
+
+    @Volatile
     private var socket: Socket? = null
+
+    @Volatile
     private var input: DataInputStream? = null
+
+    @Volatile
     private var output: DataOutputStream? = null
+
     private var heartbeatJob: Job? = null
+
+    @Volatile
+    private var activeGenerationRequestId: String? = null
 
     suspend fun connect(
         endpoint: AndroidConnectEndpoint,
@@ -186,20 +203,24 @@ internal class AndroidConnectSocket(
                 candidate.tcpNoDelay = true
                 val candidateInput = DataInputStream(BufferedInputStream(candidate.getInputStream()))
                 val candidateOutput = DataOutputStream(BufferedOutputStream(candidate.getOutputStream()))
-                socket = candidate
-                input = candidateInput
-                output = candidateOutput
-                disconnected.set(false)
+                publishStreams(candidate, candidateInput, candidateOutput, disconnected = false)
                 writeFrame(ConnectClientHello.ADAPTER.encode(hello))
                 val response = ConnectHandshakeResponse.ADAPTER.decode(readFrame())
                 candidate.soTimeout = 0
                 response
-            } catch (error: Throwable) {
-                runCatching { candidate.close() }
-                socket = null
-                input = null
-                output = null
-                disconnected.set(true)
+            } catch (error: CancellationException) {
+                try {
+                    candidate.close()
+                } catch (_: Exception) {
+                }
+                publishStreams(null, null, null, disconnected = true)
+                throw error
+            } catch (error: Exception) {
+                try {
+                    candidate.close()
+                } catch (_: Exception) {
+                }
+                publishStreams(null, null, null, disconnected = true)
                 throw mapNetworkError("Unable to connect to ${endpoint.displayName}", error)
             }
         }
@@ -209,7 +230,7 @@ internal class AndroidConnectSocket(
         heartbeatJob =
             scope.launch(Dispatchers.IO) {
                 var sequence = 0L
-                while (isActive && !disconnected.get()) {
+                while (isActive && !disconnected) {
                     delay(HEARTBEAT_INTERVAL_MS)
                     if (!operationMutex.tryLock()) continue
                     try {
@@ -233,21 +254,21 @@ internal class AndroidConnectSocket(
                             throw SDKException.networkError("The Connect host returned an invalid heartbeat")
                         }
                         activeSocket.soTimeout = 0
-                    } catch (error: Throwable) {
-                        if (error !is CancellationException) {
-                            close(
-                                notify = true,
-                                reason =
-                                    if (error is SocketTimeoutException) {
-                                        SDKException.timeout(
-                                            "The host stopped responding. It may have stopped or left the network.",
-                                            error,
-                                        )
-                                    } else {
-                                        mapNetworkError("The connection to the host ended", error)
-                                    },
-                            )
-                        }
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Exception) {
+                        close(
+                            notify = true,
+                            reason =
+                                if (error is SocketTimeoutException) {
+                                    SDKException.timeout(
+                                        "The host stopped responding. It may have stopped or left the network.",
+                                        error,
+                                    )
+                                } else {
+                                    mapNetworkError("The connection to the host ended", error)
+                                },
+                        )
                         return@launch
                     } finally {
                         operationMutex.unlock()
@@ -259,8 +280,9 @@ internal class AndroidConnectSocket(
     fun generate(invocation: ConnectInvocationRequest): Flow<RALLMStreamEvent> =
         flow {
             operationMutex.lock()
+            activeGenerationRequestId = invocation.request_id
             try {
-                requireSocket().soTimeout = 0
+                requireSocket().soTimeout = GENERATION_READ_TIMEOUT_MS
                 writeFrame(
                     ConnectClientFrame.ADAPTER.encode(
                         ConnectClientFrame(invocation = invocation),
@@ -278,17 +300,35 @@ internal class AndroidConnectSocket(
                     if (envelope.event.is_final) break
                 }
             } catch (error: CancellationException) {
-                // A partially consumed framed stream cannot be reused safely.
-                close(notify = true, reason = error)
+                // Prefer cancel-over-wire so the host finishes cleanly and the
+                // TCP session remains usable for the next prompt (Swift parity).
+                val cancelled = trySendCancel(invocation.session_id, invocation.request_id)
+                if (cancelled) {
+                    drainUntilFinal(invocation.request_id)
+                } else {
+                    close(notify = true, reason = error)
+                }
                 throw error
-            } catch (error: Throwable) {
+            } catch (error: Exception) {
                 val mapped = mapNetworkError("Generation through the host failed", error)
                 close(notify = true, reason = mapped)
                 throw mapped
             } finally {
+                activeGenerationRequestId = null
+                try {
+                    requireSocket().soTimeout = 0
+                } catch (_: Exception) {
+                }
                 operationMutex.unlock()
             }
-        }
+        }.flowOn(Dispatchers.IO)
+
+    /**
+     * Best-effort cancel of the in-flight generation. Does not disconnect.
+     * Returns true when the cancel frame was written on the live socket.
+     */
+    fun cancelGeneration(sessionId: String, requestId: String): Boolean =
+        trySendCancel(sessionId, requestId)
 
     fun close(
         notify: Boolean = false,
@@ -296,31 +336,95 @@ internal class AndroidConnectSocket(
     ) {
         heartbeatJob?.cancel()
         heartbeatJob = null
-        val hadConnection = !disconnected.getAndSet(true)
-        val current = socket
-        socket = null
-        input = null
-        output = null
-        runCatching { current?.close() }
+        activeGenerationRequestId = null
+        val hadConnection =
+            synchronized(streamsLock) {
+                val wasOpen = !disconnected
+                disconnected = true
+                val current = socket
+                socket = null
+                input = null
+                output = null
+                try {
+                    current?.close()
+                } catch (_: Exception) {
+                }
+                wasOpen
+            }
         if (notify && hadConnection) onDisconnected(reason)
     }
 
+    private fun trySendCancel(sessionId: String, requestId: String): Boolean {
+        if (sessionId.isBlank() || requestId.isBlank()) return false
+        if (disconnected) return false
+        return try {
+            writeFrame(
+                ConnectClientFrame.ADAPTER.encode(
+                    ConnectClientFrame(
+                        cancel =
+                            ConnectInvocationCancelRequest(
+                                session_id = sessionId,
+                                request_id = requestId,
+                            ),
+                    ),
+                ),
+            )
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun drainUntilFinal(requestId: String) {
+        try {
+            requireSocket().soTimeout = GENERATION_READ_TIMEOUT_MS
+            while (true) {
+                val frame = ConnectHostFrame.ADAPTER.decode(readFrame())
+                val envelope = frame.invocation_event ?: break
+                if (envelope.request_id != requestId) continue
+                if (envelope.event?.is_final == true) break
+            }
+        } catch (_: Exception) {
+            // Session may already be closing; keep the connection if possible.
+        }
+    }
+
+    private fun publishStreams(
+        candidate: Socket?,
+        candidateInput: DataInputStream?,
+        candidateOutput: DataOutputStream?,
+        disconnected: Boolean,
+    ) {
+        synchronized(streamsLock) {
+            socket = candidate
+            input = candidateInput
+            output = candidateOutput
+            this.disconnected = disconnected
+        }
+    }
+
     private fun requireSocket(): Socket =
-        socket?.takeUnless { it.isClosed }
-            ?: throw SDKException.networkError("The selected host is no longer connected")
+        synchronized(streamsLock) {
+            socket?.takeUnless { it.isClosed || disconnected }
+        } ?: throw SDKException.networkError("The selected host is no longer connected")
 
     private fun writeFrame(payload: ByteArray) {
         require(payload.isNotEmpty() && payload.size <= MAXIMUM_FRAME_LENGTH) {
             "Connect frame size is invalid"
         }
-        val stream = output ?: throw EOFException("Connect output stream is closed")
-        stream.writeInt(payload.size)
-        stream.write(payload)
-        stream.flush()
+        synchronized(streamsLock) {
+            val stream = output ?: throw EOFException("Connect output stream is closed")
+            stream.writeInt(payload.size)
+            stream.write(payload)
+            stream.flush()
+        }
     }
 
     private fun readFrame(): ByteArray {
-        val stream = input ?: throw EOFException("Connect input stream is closed")
+        val stream =
+            synchronized(streamsLock) {
+                input ?: throw EOFException("Connect input stream is closed")
+            }
         val length = stream.readInt()
         if (length !in 1..MAXIMUM_FRAME_LENGTH) {
             throw SDKException.networkError("The Connect host returned an invalid frame size")
@@ -341,5 +445,7 @@ internal class AndroidConnectSocket(
         const val HANDSHAKE_TIMEOUT_MS = 5_000
         const val HEARTBEAT_INTERVAL_MS = 3_000L
         const val HEARTBEAT_TIMEOUT_MS = 2_000
+        /** Generous inter-frame timeout so a stalled host is visible without false positives. */
+        const val GENERATION_READ_TIMEOUT_MS = 120_000
     }
 }

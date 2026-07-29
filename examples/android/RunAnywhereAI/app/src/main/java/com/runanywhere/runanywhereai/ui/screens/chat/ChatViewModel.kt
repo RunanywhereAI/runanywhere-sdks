@@ -165,6 +165,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var connectStateJob: Job? = null
     private var connectSession: ConnectSession? = null
     private var connectState by mutableStateOf(ConnectState())
+    /// In-flight hosted request id for Connect cancel-by-id (Stop keeps session).
+    private var activeHostedRequestId: String? = null
+    /// Invalidates late hosted stream writes after Stop or conversation swap.
+    private var hostedConversationToken: Long = 0
     private val smartTitleLifecycle = SmartTitleLifecycle()
     private val generationOwnership = ChatGenerationOwnership()
     private var activeReplyIndex: Int? = null
@@ -329,13 +333,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         conversationId = ensureConversationId(),
                         streaming = streaming,
                     )
+                    val hostedRequestId = UUID.randomUUID().toString()
+                    activeHostedRequestId = hostedRequestId
+                    val hostedToken = ++hostedConversationToken
                     generateHostedReply(
                         request = request,
-                        llmRequest = llmRequest,
+                        llmRequest = llmRequest.copy(request_id = hostedRequestId),
                         index = replyIndex,
                         model = hostedModel,
                         session = hostedSession,
                         streamUpdates = streaming,
+                        hostedToken = hostedToken,
                     )
                 } else {
                     val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
@@ -676,12 +684,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         model: ConnectModel,
         session: ConnectSession,
         streamUpdates: Boolean,
+        hostedToken: Long,
     ) {
         val events = session.generateStream(llmRequest)
         val result = RunAnywhere.aggregateStream(llmRequest.prompt, events) { accumulated ->
+            if (hostedToken != hostedConversationToken) return@aggregateStream
             if (streamUpdates) updateReply(request, index) { it.copy(text = accumulated) }
         }
 
+        if (hostedToken != hostedConversationToken) return
         ensureOwns(request)
         if (!result.error_message.isNullOrBlank()) {
             updateReply(request, index) {
@@ -710,6 +721,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         conversationModelName = model.displayName
+        if (activeHostedRequestId == llmRequest.request_id) {
+            activeHostedRequestId = null
+        }
     }
 
     private suspend fun generateReply(
@@ -1020,6 +1034,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // Both APIs are safe to call when their modality is inactive.
                 // Running them off Main keeps Stop/New Chat/model selection responsive.
                 withContext(Dispatchers.Default) {
+                    if (isUsingConnect) {
+                        activeHostedRequestId?.let { requestId ->
+                            connectSession?.cancelGeneration(requestId)
+                        }
+                        hostedConversationToken += 1
+                        activeHostedRequestId = null
+                    }
+                    // Local modalities still need native cancel; safe when inactive.
                     runCatching { RunAnywhere.cancelGeneration() }
                     runCatching { RunAnywhere.cancelVLMGeneration() }
                 }
@@ -1103,7 +1125,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val storedMessages = messages.map { it.toStored() }
         // Mirrors iOS finalizeGeneration: record the active model on the
         // conversation after each exchange.
-        val activeModelName = RuntimeModelSelection.cached(ModelSelectionContext.LLM)?.model?.name
+        val activeModelName = when {
+            isUsingConnect -> connectState.activeModel?.displayName
+            else -> RuntimeModelSelection.cached(ModelSelectionContext.LLM)?.model?.name
+        }
         val shouldGenerateSmartTitle = messages.size >= 2 &&
             RuntimeModelSelection.cached(ModelSelectionContext.LLM) != null
         val previousSave = persistJob?.takeIf { it.isActive }

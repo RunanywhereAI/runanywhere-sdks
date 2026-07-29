@@ -33,8 +33,8 @@ public enum class DiarizationAudioEncoding(
     @JvmField
     public val ADAPTER: ProtoAdapter<DiarizationAudioEncoding> =
         object : EnumAdapter<DiarizationAudioEncoding>(
-      DiarizationAudioEncoding::class, 
-      PROTO_3, 
+      DiarizationAudioEncoding::class,
+      PROTO_3,
       DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): DiarizationAudioEncoding? = DiarizationAudioEncoding.fromValue(`value`)

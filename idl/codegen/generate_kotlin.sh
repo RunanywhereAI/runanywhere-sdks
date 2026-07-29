@@ -90,6 +90,11 @@ if command -v wire-compiler >/dev/null 2>&1; then
     find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "*Client.kt" -delete
     find "${OUT_DIR}/ai/runanywhere/proto/v1/" -name "Grpc*Client.kt" -delete
 
+    # Wire emits trailing spaces on multi-line ADAPTER constructor args; strip
+    # them so CI whitespace gates and review diffs stay clean after regen.
+    find "${OUT_DIR}/ai/runanywhere/proto/v1" -name '*.kt' -print0 \
+        | xargs -0 sed -i '' -E 's/[[:space:]]+$//'
+
     echo "✓ Kotlin proto codegen → ${OUT_DIR} (gRPC client stubs stripped)"
 
     # Note: protoc-gen-grpckt (grpc-kotlin official plugin) emits

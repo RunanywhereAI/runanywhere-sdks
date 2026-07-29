@@ -9,6 +9,7 @@
 #include "rac/connect/rac_connect.h"
 
 #include <stdexcept>
+#include <utility>
 
 namespace margelo::nitro::runanywhere {
 
@@ -17,23 +18,31 @@ namespace {
 using ConnectProtoFunction = rac_result_t (*)(const uint8_t *, size_t,
                                                rac_proto_buffer_t *);
 
+/// RAII guard so every exit path frees the commons-owned proto buffer.
+struct ProtoBufferGuard {
+  rac_proto_buffer_t buffer{};
+
+  ProtoBufferGuard() { rac_proto_buffer_init(&buffer); }
+
+  ~ProtoBufferGuard() { rac_proto_buffer_free(&buffer); }
+
+  ProtoBufferGuard(const ProtoBufferGuard &) = delete;
+  ProtoBufferGuard &operator=(const ProtoBufferGuard &) = delete;
+};
+
 std::shared_ptr<ArrayBuffer>
 callConnectProto(const std::shared_ptr<ArrayBuffer> &input,
                  ConnectProtoFunction function, const char *operation) {
-  rac_proto_buffer_t output;
-  rac_proto_buffer_init(&output);
-  const auto result = function(input->data(), input->size(), &output);
+  ProtoBufferGuard output;
+  const auto result = function(input->data(), input->size(), &output.buffer);
   if (result != RAC_SUCCESS) {
-    rac_proto_buffer_free(&output);
     throw std::runtime_error(std::string(operation) + " failed: " +
                              std::to_string(result));
   }
 
-  auto buffer = output.data && output.size > 0
-                    ? ArrayBuffer::copy(output.data, output.size)
-                    : ArrayBuffer::allocate(0);
-  rac_proto_buffer_free(&output);
-  return buffer;
+  return output.buffer.data && output.buffer.size > 0
+             ? ArrayBuffer::copy(output.buffer.data, output.buffer.size)
+             : ArrayBuffer::allocate(0);
 }
 
 } // namespace

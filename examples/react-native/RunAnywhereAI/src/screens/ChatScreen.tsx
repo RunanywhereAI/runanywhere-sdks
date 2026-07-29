@@ -26,6 +26,7 @@ import React, {
   useRef,
   useCallback,
   useEffect,
+  useMemo,
   useSyncExternalStore,
 } from 'react';
 import {
@@ -156,28 +157,57 @@ export const ChatScreen: React.FC = () => {
     ConnectService.getSnapshot,
     ConnectService.getSnapshot
   );
-  const [showConnectBanner, setShowConnectBanner] = useState(false);
+  const [dismissedConnectBannerKey, setDismissedConnectBannerKey] = useState<
+    string | null
+  >(null);
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
+  const activeHostedRequestIdRef = useRef<string | null>(null);
+  const hostedGenerationTokenRef = useRef(0);
 
   // Safe area insets for header status bar handling
   const insets = useSafeAreaInsets();
 
-  useEffect(() => {
-    if (
-      connectState.status !== 'connected' &&
-      connectState.status !== 'disconnected' &&
-      connectState.status !== 'failed'
-    ) {
-      return;
+  const connectBannerKey = useMemo(() => {
+    switch (connectState.status) {
+      case 'connecting':
+        return `connecting:${connectState.connectingHost?.id ?? 'unknown'}`;
+      case 'connected':
+        return `connected:${connectState.activeHost?.id}:${connectState.activeModel?.id}`;
+      case 'disconnected':
+        return `disconnected:${connectState.activeHost?.id ?? connectState.message}:${connectState.message}`;
+      case 'failed':
+        return `failed:${connectState.message}`;
+      default:
+        return null;
     }
-    setShowConnectBanner(true);
+  }, [
+    connectState.status,
+    connectState.connectingHost?.id,
+    connectState.activeHost?.id,
+    connectState.activeModel?.id,
+    connectState.message,
+  ]);
+
+  const shouldShowConnectBanner =
+    connectBannerKey != null && dismissedConnectBannerKey !== connectBannerKey;
+
+  useEffect(() => {
+    if (connectBannerKey == null) return;
+    setDismissedConnectBannerKey(null);
     if (connectState.status !== 'connected') return;
-    const timer = setTimeout(() => setShowConnectBanner(false), 6000);
+    const timer = setTimeout(() => {
+      setDismissedConnectBannerKey(connectBannerKey);
+    }, 6000);
     return () => clearTimeout(timer);
-  }, [connectState.status, connectState.activeHost?.id, connectState.message]);
+  }, [connectBannerKey, connectState.status]);
+
+  useEffect(() => {
+    hostedGenerationTokenRef.current += 1;
+    activeHostedRequestIdRef.current = null;
+  }, [currentConversation?.id]);
 
   // Initialize conversation store and create first conversation
   useEffect(() => {
@@ -426,6 +456,18 @@ export const ChatScreen: React.FC = () => {
         timestamp: new Date(),
       };
 
+      // Snapshot prior turns before appending the new user message so hosted
+      // generation receives the conversation history the host expects.
+      const priorHistory = currentConversation.messages.map((message) => ({
+        role:
+          message.role === MessageRole.User
+            ? 1
+            : message.role === MessageRole.Assistant
+              ? 2
+              : 3,
+        content: message.content,
+      }));
+
       // Add user message to conversation
       await addMessage(userMessage, currentConversation.id);
       const prompt = text;
@@ -434,6 +476,8 @@ export const ChatScreen: React.FC = () => {
 
       const assistantMessageId = generateId();
       let assistantMessageInserted = false;
+      const generationToken = ++hostedGenerationTokenRef.current;
+      const conversationIdAtStart = currentConversation.id;
 
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -507,6 +551,9 @@ export const ChatScreen: React.FC = () => {
         };
         await addMessage(initialAssistantMessage, currentConversation.id);
         assistantMessageInserted = true;
+        if (hostedModel) {
+          activeHostedRequestIdRef.current = assistantMessageId;
+        }
 
         let finalMessage: Message;
         if (shouldUseTools) {
@@ -585,13 +632,14 @@ export const ChatScreen: React.FC = () => {
                 conversationId: currentConversation.id,
                 metadata: {},
                 options: genOptions,
-                history: [],
+                history: priorHistory,
               })
             : RunAnywhere.generateStream(prompt, genOptions);
           const result = await RunAnywhere.aggregateStream(
             prompt,
             eventStream,
             async (transcript) => {
+              if (generationToken !== hostedGenerationTokenRef.current) return;
               accumulatedText = transcript;
               updateMessage(
                 {
@@ -607,12 +655,17 @@ export const ChatScreen: React.FC = () => {
                     frameworkDisplayName: frameworkName,
                   },
                 },
-                currentConversation.id
+                conversationIdAtStart
               );
               flatListRef.current?.scrollToEnd({ animated: false });
               await new Promise<void>((resolve) => setTimeout(resolve, 0));
             }
           );
+
+          if (generationToken !== hostedGenerationTokenRef.current) return;
+          if (result.errorMessage) {
+            throw new Error(result.errorMessage);
+          }
 
           const finalContent =
             result.text || accumulatedText || '(No response generated)';
@@ -651,10 +704,11 @@ export const ChatScreen: React.FC = () => {
         }
 
         // Apply analytics fields in-memory first, then persist once.
-        updateMessage(finalMessage, currentConversation.id);
+        if (generationToken !== hostedGenerationTokenRef.current) return;
+        updateMessage(finalMessage, conversationIdAtStart);
         const latestConversation = useConversationStore
           .getState()
-          .conversations.find((c) => c.id === currentConversation.id);
+          .conversations.find((c) => c.id === conversationIdAtStart);
         if (latestConversation) {
           await updateConversation(latestConversation);
         }
@@ -696,6 +750,7 @@ export const ChatScreen: React.FC = () => {
         }
       } finally {
         generationAbortRef.current = null;
+        activeHostedRequestIdRef.current = null;
         setIsLoading(false);
       }
     },
@@ -714,7 +769,14 @@ export const ChatScreen: React.FC = () => {
 
   const handleStopGeneration = useCallback(() => {
     generationAbortRef.current?.abort();
-    RunAnywhere.cancelGeneration().catch(() => undefined);
+    const hostedRequestId = activeHostedRequestIdRef.current;
+    if (hostedRequestId) {
+      ConnectService.cancelGeneration(hostedRequestId);
+    } else {
+      RunAnywhere.cancelGeneration().catch(() => undefined);
+    }
+    hostedGenerationTokenRef.current += 1;
+    activeHostedRequestIdRef.current = null;
     setIsLoading(false);
   }, []);
 
@@ -797,54 +859,74 @@ export const ChatScreen: React.FC = () => {
   const hasUsableModel = !!currentModel || connectState.status === 'connected';
   const showOverlay = !hasUsableModel && !isModelLoading;
 
+  const connectBannerPresentation = useMemo(() => {
+    switch (connectState.status) {
+      case 'connected':
+        return {
+          title: connectState.activeHost?.displayName ?? 'Connected to Host',
+          subtitle:
+            connectState.activeModel?.displayName ?? 'Hosted model ready',
+          icon: 'checkmark-circle' as const,
+          tint: colors.success,
+        };
+      case 'connecting':
+        return {
+          title: `Connecting to ${connectState.connectingHost?.displayName ?? 'host'}`,
+          subtitle: 'Checking the selected model',
+          icon: 'sync' as const,
+          tint: colors.primary,
+        };
+      case 'failed':
+        return {
+          title: 'Couldn\'t connect',
+          subtitle:
+            connectState.message ??
+            'Check the host and your local network',
+          icon: 'alert-circle-outline' as const,
+          tint: colors.error,
+        };
+      case 'disconnected':
+        return {
+          title: 'Host connection lost',
+          subtitle:
+            connectState.message ?? 'Choose a local model or reconnect',
+          icon: 'alert-circle-outline' as const,
+          tint: colors.error,
+        };
+      default:
+        return null;
+    }
+  }, [connectState, colors.error, colors.primary, colors.success]);
+
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {renderHeader()}
 
-      {showConnectBanner && (
+      {shouldShowConnectBanner && connectBannerPresentation && (
         <View style={[styles.connectBanner, { top: insets.top + 64 }]}>
           <View
             style={[
               styles.connectBannerIcon,
-              {
-                backgroundColor:
-                  connectState.status === 'connected'
-                    ? colors.success
-                    : colors.error,
-              },
+              { backgroundColor: connectBannerPresentation.tint },
             ]}
           >
             <Icon
-              name={
-                connectState.status === 'connected'
-                  ? 'checkmark-circle'
-                  : 'alert-circle-outline'
-              }
+              name={connectBannerPresentation.icon}
               size={24}
               color={colors.onPrimary}
             />
           </View>
           <View style={styles.connectBannerText}>
             <Text style={styles.connectBannerTitle} numberOfLines={1}>
-              {connectState.status === 'connected'
-                ? `Connected to ${connectState.activeHost?.displayName || 'Host'}`
-                : 'Host connection ended'}
+              {connectBannerPresentation.title}
             </Text>
             <Text style={styles.connectBannerSubtitle} numberOfLines={1}>
-              {connectState.status === 'connected'
-                ? connectState.activeModel?.displayName
-                : connectState.message || 'Choose a local model or reconnect'}
+              {connectBannerPresentation.subtitle}
             </Text>
           </View>
-          {connectState.status === 'connected' && (
-            <TouchableOpacity
-              style={styles.connectBannerAction}
-              onPress={() => ConnectService.disconnect()}
-            >
-              <Text style={styles.connectBannerActionText}>Disconnect</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={() => setShowConnectBanner(false)}>
+          <TouchableOpacity
+            onPress={() => setDismissedConnectBannerKey(connectBannerKey)}
+          >
             <Icon name="close" size={22} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
         </View>

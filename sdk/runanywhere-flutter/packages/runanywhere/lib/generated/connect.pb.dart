@@ -1221,6 +1221,78 @@ class ConnectInvocationValidation extends $pb.GeneratedMessage {
   void clearRejectionReason() => $_clearField(2);
 }
 
+/// Clients cancel one in-flight generation by request id without tearing down
+/// the TCP session. Commons validates session ownership; the host adapter then
+/// cancels the local runtime for that request and emits a terminal stream event.
+class ConnectInvocationCancelRequest extends $pb.GeneratedMessage {
+  factory ConnectInvocationCancelRequest({
+    $core.String? sessionId,
+    $core.String? requestId,
+  }) {
+    final result = create();
+    if (sessionId != null) result.sessionId = sessionId;
+    if (requestId != null) result.requestId = requestId;
+    return result;
+  }
+
+  ConnectInvocationCancelRequest._();
+
+  factory ConnectInvocationCancelRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ConnectInvocationCancelRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ConnectInvocationCancelRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(2, _omitFieldNames ? '' : 'requestId')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConnectInvocationCancelRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ConnectInvocationCancelRequest copyWith(
+          void Function(ConnectInvocationCancelRequest) updates) =>
+      super.copyWith(
+              (message) => updates(message as ConnectInvocationCancelRequest))
+          as ConnectInvocationCancelRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ConnectInvocationCancelRequest create() =>
+      ConnectInvocationCancelRequest._();
+  @$core.override
+  ConnectInvocationCancelRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ConnectInvocationCancelRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ConnectInvocationCancelRequest>(create);
+  static ConnectInvocationCancelRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sessionId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sessionId($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSessionId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get requestId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set requestId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasRequestId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearRequestId() => $_clearField(2);
+}
+
 /// Hosts forward the SDK's canonical stream events without translating them to
 /// a platform-specific token shape. This is the portable streaming surface for
 /// future Kotlin, React Native, Flutter, and Web clients.
@@ -1436,7 +1508,7 @@ class ConnectHeartbeatResponse extends $pb.GeneratedMessage {
   void clearSequence() => $_clearField(2);
 }
 
-enum ConnectClientFrame_Payload { invocation, heartbeat, notSet }
+enum ConnectClientFrame_Payload { invocation, heartbeat, cancel, notSet }
 
 /// Every frame after the initial ClientHello handshake is carried in one of
 /// these explicit envelopes. This leaves typed inference traffic untouched
@@ -1445,10 +1517,12 @@ class ConnectClientFrame extends $pb.GeneratedMessage {
   factory ConnectClientFrame({
     ConnectInvocationRequest? invocation,
     ConnectHeartbeatRequest? heartbeat,
+    ConnectInvocationCancelRequest? cancel,
   }) {
     final result = create();
     if (invocation != null) result.invocation = invocation;
     if (heartbeat != null) result.heartbeat = heartbeat;
+    if (cancel != null) result.cancel = cancel;
     return result;
   }
 
@@ -1465,17 +1539,20 @@ class ConnectClientFrame extends $pb.GeneratedMessage {
       _ConnectClientFrame_PayloadByTag = {
     1: ConnectClientFrame_Payload.invocation,
     2: ConnectClientFrame_Payload.heartbeat,
+    3: ConnectClientFrame_Payload.cancel,
     0: ConnectClientFrame_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(
       _omitMessageNames ? '' : 'ConnectClientFrame',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..oo(0, [1, 2])
+    ..oo(0, [1, 2, 3])
     ..aOM<ConnectInvocationRequest>(1, _omitFieldNames ? '' : 'invocation',
         subBuilder: ConnectInvocationRequest.create)
     ..aOM<ConnectHeartbeatRequest>(2, _omitFieldNames ? '' : 'heartbeat',
         subBuilder: ConnectHeartbeatRequest.create)
+    ..aOM<ConnectInvocationCancelRequest>(3, _omitFieldNames ? '' : 'cancel',
+        subBuilder: ConnectInvocationCancelRequest.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1499,10 +1576,12 @@ class ConnectClientFrame extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(1)
   @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
   ConnectClientFrame_Payload whichPayload() =>
       _ConnectClientFrame_PayloadByTag[$_whichOneof(0)]!;
   @$pb.TagNumber(1)
   @$pb.TagNumber(2)
+  @$pb.TagNumber(3)
   void clearPayload() => $_clearField($_whichOneof(0));
 
   @$pb.TagNumber(1)
@@ -1526,6 +1605,17 @@ class ConnectClientFrame extends $pb.GeneratedMessage {
   void clearHeartbeat() => $_clearField(2);
   @$pb.TagNumber(2)
   ConnectHeartbeatRequest ensureHeartbeat() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  ConnectInvocationCancelRequest get cancel => $_getN(2);
+  @$pb.TagNumber(3)
+  set cancel(ConnectInvocationCancelRequest value) => $_setField(3, value);
+  @$pb.TagNumber(3)
+  $core.bool hasCancel() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCancel() => $_clearField(3);
+  @$pb.TagNumber(3)
+  ConnectInvocationCancelRequest ensureCancel() => $_ensure(2);
 }
 
 enum ConnectHostFrame_Payload { invocationEvent, heartbeat, notSet }

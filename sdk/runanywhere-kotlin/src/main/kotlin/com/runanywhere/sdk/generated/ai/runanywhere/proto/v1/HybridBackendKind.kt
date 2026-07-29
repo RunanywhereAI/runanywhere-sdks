@@ -41,8 +41,8 @@ public enum class HybridBackendKind(
   public companion object {
     @JvmField
     public val ADAPTER: ProtoAdapter<HybridBackendKind> = object : EnumAdapter<HybridBackendKind>(
-      HybridBackendKind::class, 
-      PROTO_3, 
+      HybridBackendKind::class,
+      PROTO_3,
       HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED
     ) {
       override fun fromValue(`value`: Int): HybridBackendKind? = HybridBackendKind.fromValue(`value`)

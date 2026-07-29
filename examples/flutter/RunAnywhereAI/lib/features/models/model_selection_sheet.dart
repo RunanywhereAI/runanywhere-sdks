@@ -90,7 +90,10 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
 
   void _connectChanged() {
     if (mounted) setState(() {});
-    if (_connect.state.isConnected && mounted) {
+    // Auto-pop only for the LLM picker — Connect is an LLM-only entry point.
+    if (widget.context == ModelSelectionContext.llm &&
+        _connect.state.isConnected &&
+        mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) Navigator.of(context).pop();
       });
@@ -201,8 +204,13 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
                   ),
           )
         else
-          ...state.availableHosts.map(
-            (host) => ListTile(
+          ...state.availableHosts.map((host) {
+            final connectingThis =
+                state.status == ConnectStatus.connecting &&
+                state.connectingHost?.id == host.id;
+            final connectingOther =
+                state.status == ConnectStatus.connecting && !connectingThis;
+            return ListTile(
               leading: const Icon(Icons.desktop_windows_outlined),
               title: Text(
                 host.displayName,
@@ -211,18 +219,18 @@ class _ModelSelectionSheetState extends State<ModelSelectionSheet> {
               ),
               subtitle: const Text('Hosted language model available'),
               trailing: FilledButton.tonal(
-                onPressed: state.status == ConnectStatus.connecting
+                onPressed: connectingThis || connectingOther
                     ? null
                     : () => unawaited(_connect.connect(host)),
-                child: state.status == ConnectStatus.connecting
+                child: connectingThis
                     ? const SizedBox.square(
                         dimension: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Text('Connect'),
               ),
-            ),
-          ),
+            );
+          }),
         if (state.status == ConnectStatus.failed && state.message != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.large),
