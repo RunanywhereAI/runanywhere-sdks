@@ -11,17 +11,17 @@ the SDK's example/demo.
 
 Double-click the **RunAnywhere AI** desktop shortcut, or:
 
-```
-apps\desktop\RunAnywhere AI.cmd          # CPU (default)
-apps\desktop\RunAnywhere AI.cmd --gpu    # CUDA prebuild (needs an NVIDIA driver stack)
+```bat
+"examples\electron\RunAnywhereAI\RunAnywhere AI.cmd"
+"examples\electron\RunAnywhereAI\RunAnywhere AI (GPU).cmd"
 ```
 
 or from a terminal:
 
-```
-cd apps/desktop
-npm start          # CPU
-npm run start:gpu  # CUDA
+```bat
+cd examples/electron/RunAnywhereAI
+npm start          :: CPU
+npm run start:gpu  :: CUDA
 ```
 
 Prerequisites: the SDK must be built (`cd sdk/runanywhere-electron && npm install && npm run build`)
@@ -52,7 +52,7 @@ fails, so it is never the silent default. The active device is shown in the head
 
 Runs the real code paths headlessly and exits 0/1:
 
-```
+```bat
 set RA_SELFTEST=1 && npx electron .
 ```
 
