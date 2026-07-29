@@ -15,6 +15,9 @@
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_llm_thinking.h"
 
+// src-internal header (RUN-81): the engine-gated no-think directive helper.
+#include "features/llm/llm_thinking_directive_internal.h"
+
 namespace {
 
 #define ASSERT_EQ_STR(actual, expected)                                                           \
@@ -209,6 +212,39 @@ int test_null_inputs_rejected() {
     return 0;
 }
 
+// RUN-81: the no-think directive is an ALLOWLIST — only QHexRT suppresses
+// natively; every other/unknown engine keeps injecting so llama.cpp/onnx/cloud
+// still receive the Qwen "/no_think" token. This locks the multi-engine safety
+// guarantee at the helper level.
+int test_no_think_directive_engine_gated() {
+    using rac::llm::apply_no_think_directive;
+    using rac::llm::engine_handles_disable_thinking_natively;
+
+    ASSERT_EQ_INT(engine_handles_disable_thinking_natively("INFERENCE_FRAMEWORK_QHEXRT"), true);
+    ASSERT_EQ_INT(engine_handles_disable_thinking_natively("INFERENCE_FRAMEWORK_LLAMA_CPP"), false);
+    ASSERT_EQ_INT(engine_handles_disable_thinking_natively("INFERENCE_FRAMEWORK_ONNX"), false);
+    ASSERT_EQ_INT(engine_handles_disable_thinking_natively("INFERENCE_FRAMEWORK_CLOUD"), false);
+    ASSERT_EQ_INT(engine_handles_disable_thinking_natively(nullptr), false);
+
+    // disable=false is a passthrough regardless of engine.
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_FALSE, "INFERENCE_FRAMEWORK_LLAMA_CPP").c_str(),
+                  "hi");
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_FALSE, "INFERENCE_FRAMEWORK_QHEXRT").c_str(),
+                  "hi");
+
+    // disable=true: injected for non-native engines + unknown, skipped for QHexRT.
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, "INFERENCE_FRAMEWORK_LLAMA_CPP").c_str(),
+                  "/no_think\nhi");
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, "INFERENCE_FRAMEWORK_ONNX").c_str(),
+                  "/no_think\nhi");
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, nullptr).c_str(), "/no_think\nhi");
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE, "INFERENCE_FRAMEWORK_QHEXRT").c_str(),
+                  "hi");
+    // 2-arg overload (no framework in scope) injects — the safe default.
+    ASSERT_EQ_STR(apply_no_think_directive("hi", RAC_TRUE).c_str(), "/no_think\nhi");
+    return 0;
+}
+
 }  // namespace
 
 int main() {
@@ -239,6 +275,7 @@ int main() {
     RUN(test_split_tokens_proportional);
     RUN(test_split_tokens_zero_total);
     RUN(test_null_inputs_rejected);
+    RUN(test_no_think_directive_engine_gated);
 
     std::printf("\n%d test(s) failed\n", failures);
     return failures == 0 ? 0 : 1;

@@ -70,7 +70,7 @@ When the correct behavior is ambiguous, check the iOS Swift implementation first
 
 Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-commons`, ~118K first-party LOC plus ~420K generated proto bindings) implements all AI business logic behind a pure C ABI (`rac_*` prefix). Five platform SDKs are thin bridges that supply platform services (file I/O, HTTP, Keychain, audio) via an inversion-of-control struct and call into the C core for all inference. Protobuf IDL schemas generate type-safe bindings for every language.
 
-**Current version**: `0.20.11` (canonical source: `sdk/runanywhere-commons/VERSION`)
+**Current version**: `0.20.12` (canonical source: `sdk/runanywhere-commons/VERSION`)
 
 ### SDK Implementations
 | SDK | Path | Bridge Mechanism | Platforms |
@@ -97,6 +97,8 @@ Cross-platform on-device AI SDK monorepo. A single C/C++ core (`runanywhere-comm
 | Flutter | `examples/flutter/RunAnywhereAI/` | Flutter + Dart FFI |
 | React Native | `examples/react-native/RunAnywhereAI/` | RN 0.85 + NitroModules |
 | Web | `examples/web/RunAnywhereAI/` | Vanilla TS + Vite |
+
+All example apps share one visual identity — brand orange `#FF6900` (the logo primary, **not** the legacy `#FF5500`), documented in `examples/DESIGN_GUIDELINE.md`. Each app hand-maintains a small theme file that mirrors that doc; see the "Design System" section in each app's `AGENTS.md`.
 
 ### Playground
 `Playground/` contains 6 standalone demo projects (not part of any build system): YapRun (iOS dictation app), swift-starter-app, on-device-browser-agent, android-use-agent, linux-voice-assistant, openclaw-hybrid-assistant.
@@ -129,11 +131,11 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
                     │  Service Layer (dispatch)      │
                     │  Plugin Registry               │
                     └───────────────┬───────────────┘
-                                    │ rac_engine_vtable_t (v4)
+                                    │ rac_engine_vtable_t (v8)
           ┌─────────────┬───────────┼───────────┬─────────────┐
           ▼             ▼           ▼           ▼             ▼
-      llamacpp      sherpa-onnx  qhexrt     coreml/cloud    onnx
-     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (Apple/HTTP)   (Embed)
+      llamacpp      sherpa-onnx  qhexrt     coreml/cloud       onnx
+     (LLM,VLM)    (STT,TTS,VAD) (HNPU)     (Apple/HTTP)   (Embed,Segment)
 ```
 
 ### Key Architectural Patterns
@@ -142,7 +144,7 @@ Platform SDKs (thin bridges — supply platform services, call C ABI)
 
 **Two-Phase SDK Initialization**: All SDKs follow the same pattern: Phase 1 (synchronous — register platform adapter, load native libs, configure logging) then Phase 2 (async — authenticate, register device, fetch model assignments, discover downloaded models).
 
-**Plugin ABI v4**: Every backend publishes a `rac_engine_vtable_t` with 7 primitive slots (`llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`). NULL slot = not supported. `RAC_PLUGIN_API_VERSION = 4u` — version mismatch causes immediate rejection. (Wire value 6, formerly `rerank_ops`/`RAC_PRIMITIVE_RERANK`, is retired.)
+**Plugin ABI v8**: Every backend publishes a `rac_engine_vtable_t` with 10 active primitive slots (`llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`, `diarization_ops`, `segmentation_ops`, `rerank_ops`) plus 7 reserved slots. NULL slot = not supported. `RAC_PLUGIN_API_VERSION = 8u` — version mismatch causes immediate rejection. (`rerank_ops`/`RAC_PRIMITIVE_RERANK` was revived as a first-class cross-encoder reranking primitive in ABI v8 at **wire value 11**, promoted from `reserved_slot_2` at the same binary offset; the original wire value 6 — retired in ABI v4 — stays permanently retired.)
 
 **Static vs Dynamic Plugins**: iOS and WASM force `RAC_STATIC_PLUGINS=ON` (no `dlopen`). Android/Linux/macOS default to dynamic loading via `rac_registry_load_plugin()`. Static registration uses `RAC_STATIC_PLUGIN_REGISTER(name)` macro with `-force_load` / `--whole-archive` linker flags.
 
@@ -306,18 +308,21 @@ Three npm packages: `@runanywhere/web` (core TS), `@runanywhere/web-llamacpp` (W
 cd sdk/runanywhere-web/
 
 # Build WASM (requires Emscripten SDK)
-./wasm/scripts/build.sh --llamacpp --vlm       # CPU variant
-./wasm/scripts/build.sh --llamacpp --webgpu     # WebGPU variant
-./wasm/scripts/build-sherpa-onnx.sh             # Sherpa-ONNX WASM
+npm run build:wasm -- --core
+npm run build:wasm -- --llamacpp                 # CPU variant
+npm run build:wasm -- --webgpu                   # WebGPU variant
+npm run build:wasm -- --onnx                     # ONNX + Sherpa artifact
 
 # Build TypeScript
-npm run build:ts
+npm run build
 
 # Type-check
 npm run typecheck
 ```
 
-WASM outputs: `packages/llamacpp/wasm/racommons-llamacpp.{js,wasm}`, `packages/onnx/wasm/sherpa/sherpa-onnx.wasm`
+The current artifact and deployment contract is maintained in
+`sdk/runanywhere-web/AGENTS.md`; it supersedes historical standalone
+`wasm/sherpa/` paths. Do not use or recreate those removed paths.
 
 ### IDL Codegen
 
@@ -417,7 +422,7 @@ yarn typecheck      # Primary verification gate
 cd examples/web/RunAnywhereAI/
 
 npm install
-npm run dev          # Vite dev server at port 5173
+npm run dev          # Vite dev server at port 3000
 npm run build        # Production build
 ```
 
@@ -583,7 +588,7 @@ This is a cross-platform SDK monorepo. On a Linux cloud VM, the buildable servic
 |-----------|-------|------|------|-------|
 | Kotlin SDK (Android target) | `cd sdk/runanywhere-kotlin && ./gradlew compileDebugKotlin -Prunanywhere.useLocalNatives=false` | Android unit tests require device/emulator | `cd sdk/runanywhere-kotlin && ./gradlew ktlintCheck` | Single-target Android library (no KMP). `androidx.annotation` is always available because the build only targets Android. |
 | Web SDK (TypeScript) | `npm run build -w packages/core` (from `sdk/runanywhere-web/`) | N/A | `npm run typecheck -w packages/core` | `llamacpp` package has a pre-existing duplicate index signature TS error |
-| Web Example App | `npm run dev` (from `examples/web/RunAnywhereAI/`) | Manual browser testing at `localhost:5173` | N/A | Full Vite app, works in demo mode without WASM |
+| Web Example App | `npm run dev` (from `examples/web/RunAnywhereAI/`) | Manual browser testing at `localhost:3000` | N/A | Full Vite app, works in demo mode without WASM |
 | C++ Commons (core) | `cmake -B build ... && cmake --build build` (from `sdk/runanywhere-commons/`) | `./build/tests/test_core --run-all` (13 tests, no models needed) | N/A | Must use `gcc`/`g++` via `CC=gcc CXX=g++` (clang lacks C++ stdlib headers). Pass `-DRAC_BUILD_PLATFORM=OFF` on Linux |
 | C++ Commons (full backends) | `CC=gcc CXX=g++ ./scripts/build-linux.sh` | Backend tests need downloaded models | N/A | Builds the canonical Linux release preset and packages the staged shared libraries and public headers. |
 | Linux Voice Assistant | `cmake -B build && cmake --build build` (from `Playground/linux-voice-assistant/`) | `./build/test-pipeline <audio.wav>` runs full VAD→STT→LLM→TTS pipeline | N/A | Requires: ALSA headers (`libasound2-dev`), built commons with backends, downloaded models (`./scripts/download-models.sh`). Audio capture needs real hardware; `test-pipeline` works headless |

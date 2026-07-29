@@ -5,7 +5,7 @@
  *
  * The fixture under RAC_TEST_PLUGIN_BAD_ABI_PATH is the same as the good
  * fixture but compiled with -DRAC_TEST_PLUGIN_FORCE_BAD_ABI so its
- * `metadata.abi_version` equals the host's plus 99. The registry MUST
+ * `metadata.abi_version` is the immediately preceding v6. The v7 registry MUST
  * return RAC_ERROR_ABI_VERSION_MISMATCH and MUST NOT add it to the
  * primitive table.
  */

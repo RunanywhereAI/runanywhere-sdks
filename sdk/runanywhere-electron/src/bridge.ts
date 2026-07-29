@@ -1,0 +1,121 @@
+// bridge.ts — loads the native N-API addon and adapts its callback-based
+// streaming into an AsyncIterable. The addon is resolved from (in order): the
+// RUNANYWHERE_NATIVE_PATH env var, the local dev build output, or the packaged
+// location. Sidecar DLLs (onnxruntime, sherpa) must sit next to the .node.
+import * as fs from 'fs';
+import * as path from 'path';
+
+import { asSDKException } from './errors';
+
+// Re-exported for existing importers (RunAnywhere.ts imports it from here); the
+// implementation now lives in stream.ts so it stays addon-free and testable.
+export { toAsyncIterable } from './stream';
+
+/** Raw surface exported by runanywhere_native.node. */
+export interface NativeAddon {
+  readonly version: string;
+  initialize(secureDir: string, baseDir?: string): void;
+  secureSet(key: string, value: string): void;
+  secureGet(key: string): string | null;
+  secureDelete(key: string): void;
+  createVad(threshold?: number): number;
+  vadProcess(handle: number, samples: Float32Array): boolean;
+  vadIsActive(handle: number): boolean;
+  vadSetThreshold(handle: number, threshold: number): void;
+  vadReset(handle: number): void;
+  unloadVad(handle: number): void;
+  loadModel(modelPath: string, id?: string, name?: string): number;
+  // (handle, prompt, onToken) or (handle, prompt, options, onToken) — the addon
+  // detects whether arg 3 is the callback or a generation-options object.
+  generate(
+    handle: number,
+    prompt: string,
+    optionsOrOnToken: object | ((t: string) => void),
+    onToken?: (t: string) => void
+  ): Promise<void>;
+  unloadModel(handle: number): void;
+  loadVlmModel(modelPath: string, mmprojPath: string, id?: string, name?: string): number;
+  generateVlm(
+    handle: number, imagePath: string, prompt: string, onToken: (t: string) => void
+  ): Promise<void>;
+  unloadVlmModel(handle: number): void;
+  loadEmbeddingModel(modelPath: string, configJson?: string): number;
+  embed(handle: number, text: string): Float32Array;
+  unloadEmbeddingModel(handle: number): void;
+  loadSttModel(modelDir: string, id?: string, name?: string): number;
+  transcribe(handle: number, pcm16: Uint8Array): string;
+  unloadSttModel(handle: number): void;
+  loadTtsVoice(voiceDir: string, id?: string, name?: string): number;
+  synthesize(handle: number, text: string): { sampleRate: number; samples: Float32Array };
+  unloadTtsVoice(handle: number): void;
+  shutdown(): void;
+  // Model registry + RAG (proto-byte). registerModel populates commons' global
+  // registry so RAG can resolve embedding/LLM ids to paths; the rag* methods take
+  // and return serialized runanywhere.v1 RAG protos as bytes.
+  registerModel(id: string, localPath: string, category?: number, framework?: number): void;
+  // create/ingest/query run on a worker thread (model load / embedding / LLM), so
+  // they return a Promise; the utility-host dispatch awaits it.
+  ragCreateSession(configProtoBytes: Uint8Array): Promise<number>;
+  ragIngest(handle: number, documentProtoBytes: Uint8Array): Promise<Uint8Array>;
+  ragQuery(handle: number, queryProtoBytes: Uint8Array): Promise<Uint8Array>;
+  ragStats(handle: number): Uint8Array;
+  ragClear(handle: number): Uint8Array;
+  ragDestroySession(handle: number): void;
+}
+
+function resolveAddon(): NativeAddon {
+  const candidates = [
+    process.env.RUNANYWHERE_NATIVE_PATH,
+    // Packaged prebuild bundled by scripts/bundle-native.js (dist -> pkg root).
+    path.resolve(
+      __dirname, '..', 'prebuilds', `${process.platform}-${process.arch}`,
+      'runanywhere_native.node'
+    ),
+    // Local dev build (repo build dir): dist -> electron -> sdk -> repo root.
+    path.resolve(
+      __dirname, '..', '..', '..', 'build', 'windows-release', 'sdk',
+      'runanywhere-electron', 'native', 'Release', 'runanywhere_native.node'
+    ),
+    // Packaged (cmake-js default output next to the native package).
+    path.resolve(__dirname, '..', 'native', 'build', 'Release', 'runanywhere_native.node'),
+  ].filter((p): p is string => Boolean(p));
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      return require(p) as NativeAddon;
+    }
+  }
+  throw new Error(
+    'runanywhere_native.node not found. Set RUNANYWHERE_NATIVE_PATH to the built addon.\nTried:\n  ' +
+      candidates.join('\n  ')
+  );
+}
+
+/**
+ * Wrap every native binding so thrown / rejected values become SDKException
+ * with `.code` / `.category` parsed from ``"… failed: -<rac>"`` messages.
+ */
+function wrapNative(raw: NativeAddon): NativeAddon {
+  return new Proxy(raw, {
+    get(target, prop, receiver) {
+      const v = Reflect.get(target, prop, receiver);
+      if (typeof v !== 'function') return v;
+      return (...args: unknown[]) => {
+        try {
+          const r = (v as (...a: unknown[]) => unknown).apply(target, args);
+          if (r != null && typeof (r as { then?: unknown }).then === 'function') {
+            return (r as Promise<unknown>).catch((e) => {
+              throw asSDKException(e);
+            });
+          }
+          return r;
+        } catch (e) {
+          throw asSDKException(e);
+        }
+      };
+    },
+  }) as NativeAddon;
+}
+
+export const addon: NativeAddon = wrapNative(resolveAddon());

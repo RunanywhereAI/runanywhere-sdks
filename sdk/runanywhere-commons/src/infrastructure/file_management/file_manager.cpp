@@ -307,6 +307,7 @@ rac_result_t rac_file_manager_delete_model(const rac_file_callbacks_t* cb, const
     }
 
     RAC_LOG_INFO(LOG_CATEGORY, "Deleted model folder");
+
     return RAC_SUCCESS;
 }
 

@@ -20,9 +20,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import {
+  typography,
+  useTheme,
+  useThemedStyles,
+  type ColorScheme,
+} from '../theme/system';
 import type { Message, MessageAnalytics, Conversation } from '../types/chat';
 import { MessageRole } from '../types/chat';
 
@@ -52,15 +55,18 @@ const PerformanceCard: React.FC<PerformanceCardProps> = ({
   value,
   icon,
   color,
-}) => (
-  <View style={[styles.performanceCard, { borderColor: `${color}30` }]}>
-    <View style={styles.performanceCardHeader}>
-      <Icon name={icon} size={18} color={color} />
+}) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={[styles.performanceCard, { borderColor: `${color}30` }]}>
+      <View style={styles.performanceCardHeader}>
+        <Icon name={icon} size={18} color={color} />
+      </View>
+      <Text style={styles.performanceCardValue}>{value}</Text>
+      <Text style={styles.performanceCardTitle}>{title}</Text>
     </View>
-    <Text style={styles.performanceCardValue}>{value}</Text>
-    <Text style={styles.performanceCardTitle}>{title}</Text>
-  </View>
-);
+  );
+};
 
 /**
  * Metric View Component
@@ -71,12 +77,15 @@ interface MetricViewProps {
   color: string;
 }
 
-const MetricView: React.FC<MetricViewProps> = ({ label, value, color }) => (
-  <View style={styles.metricView}>
-    <Text style={[styles.metricValue, { color }]}>{value}</Text>
-    <Text style={styles.metricLabel}>{label}</Text>
-  </View>
-);
+const MetricView: React.FC<MetricViewProps> = ({ label, value, color }) => {
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.metricView}>
+      <Text style={[styles.metricValue, { color }]}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+};
 
 /**
  * Message Analytics Row Component
@@ -91,64 +100,70 @@ const MessageAnalyticsRow: React.FC<MessageAnalyticsRowProps> = ({
   messageNumber,
   message,
   analytics,
-}) => (
-  <View style={styles.messageRow}>
-    <View style={styles.messageRowHeader}>
-      <Text style={styles.messageRowTitle}>Message #{messageNumber}</Text>
-      <View style={styles.messageRowBadges}>
-        {message.modelInfo && (
-          <View style={[styles.badge, styles.badgeBlue]}>
-            <Text style={styles.badgeTextBlue}>
-              {message.modelInfo.modelName}
-            </Text>
-          </View>
+}) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+  return (
+    <View style={styles.messageRow}>
+      <View style={styles.messageRowHeader}>
+        <Text style={styles.messageRowTitle}>Message #{messageNumber}</Text>
+        <View style={styles.messageRowBadges}>
+          {message.modelInfo && (
+            <View style={[styles.badge, styles.badgeModel]}>
+              <Text style={styles.badgeTextModel}>
+                {message.modelInfo.modelName}
+              </Text>
+            </View>
+          )}
+          {message.modelInfo?.framework && (
+            <View style={[styles.badge, styles.badgeFramework]}>
+              <Text style={styles.badgeTextFramework}>
+                {message.modelInfo.framework}
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.metricsRow}>
+        <MetricView
+          label="Time"
+          value={`${(analytics.performance.latencyMs / 1000).toFixed(1)}s`}
+          color={colors.success}
+        />
+        {analytics.timeToFirstToken && (
+          <MetricView
+            label="TTFT"
+            value={`${(analytics.timeToFirstToken / 1000).toFixed(1)}s`}
+            color={colors.primary}
+          />
         )}
-        {message.modelInfo?.framework && (
-          <View style={[styles.badge, styles.badgePurple]}>
-            <Text style={styles.badgeTextPurple}>
-              {message.modelInfo.framework}
-            </Text>
-          </View>
+        {analytics.performance.throughputTokensPerSec > 0 && (
+          <MetricView
+            label="Speed"
+            value={`${Math.round(analytics.performance.throughputTokensPerSec)} tok/s`}
+            color={colors.tertiary}
+          />
+        )}
+        {analytics.wasThinkingMode && (
+          <Icon name="bulb-outline" size={14} color={colors.tertiary} />
         )}
       </View>
-    </View>
 
-    <View style={styles.metricsRow}>
-      <MetricView
-        label="Time"
-        value={`${(analytics.performance.latencyMs / 1000).toFixed(1)}s`}
-        color={Colors.statusGreen}
-      />
-      {analytics.timeToFirstToken && (
-        <MetricView
-          label="TTFT"
-          value={`${(analytics.timeToFirstToken / 1000).toFixed(1)}s`}
-          color={Colors.statusBlue}
-        />
-      )}
-      {analytics.performance.throughputTokensPerSec > 0 && (
-        <MetricView
-          label="Speed"
-          value={`${Math.round(analytics.performance.throughputTokensPerSec)} tok/s`}
-          color={Colors.primaryPurple}
-        />
-      )}
-      {analytics.wasThinkingMode && (
-        <Icon name="bulb-outline" size={14} color={Colors.statusOrange} />
-      )}
+      <Text style={styles.messagePreview} numberOfLines={2}>
+        {message.content.slice(0, 100)}
+      </Text>
     </View>
-
-    <Text style={styles.messagePreview} numberOfLines={2}>
-      {message.content.slice(0, 100)}
-    </Text>
-  </View>
-);
+  );
+};
 
 export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
   messages,
   conversation,
   onClose,
 }) => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
 
   // Extract analytics from messages
@@ -266,7 +281,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
           name="stats-chart"
           size={18}
           color={
-            activeTab === 'overview' ? Colors.primaryBlue : Colors.textSecondary
+            activeTab === 'overview' ? colors.primary : colors.onSurfaceVariant
           }
         />
         <Text
@@ -287,7 +302,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
           name="chatbubbles-outline"
           size={18}
           color={
-            activeTab === 'messages' ? Colors.primaryBlue : Colors.textSecondary
+            activeTab === 'messages' ? colors.primary : colors.onSurfaceVariant
           }
         />
         <Text
@@ -309,8 +324,8 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
           size={18}
           color={
             activeTab === 'performance'
-              ? Colors.primaryBlue
-              : Colors.textSecondary
+              ? colors.primary
+              : colors.onSurfaceVariant
           }
         />
         <Text
@@ -337,13 +352,13 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
           <Icon
             name="chatbubble-ellipses-outline"
             size={18}
-            color={Colors.primaryBlue}
+            color={colors.primary}
           />
           <Text style={styles.summaryText}>{conversationSummary}</Text>
         </View>
         {conversation && (
           <View style={styles.summaryRow}>
-            <Icon name="time-outline" size={18} color={Colors.primaryBlue} />
+            <Icon name="time-outline" size={18} color={colors.primary} />
             <Text style={styles.summaryText}>
               Created {new Date(conversation.createdAt).toLocaleDateString()}
             </Text>
@@ -351,7 +366,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         )}
         {analyticsMessages.length > 0 && (
           <View style={styles.summaryRow}>
-            <Icon name="cube-outline" size={18} color={Colors.primaryBlue} />
+            <Icon name="cube-outline" size={18} color={colors.primary} />
             <Text style={styles.summaryText}>
               {metrics.modelsUsed.size} model
               {metrics.modelsUsed.size === 1 ? '' : 's'} used
@@ -369,25 +384,25 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
               title="Avg Response Time"
               value={`${metrics.averageResponseTime.toFixed(1)}s`}
               icon="timer-outline"
-              color={Colors.statusGreen}
+              color={colors.success}
             />
             <PerformanceCard
               title="Avg Speed"
               value={`${Math.round(metrics.averageTokensPerSecond)} tok/s`}
               icon="speedometer-outline"
-              color={Colors.statusBlue}
+              color={colors.primary}
             />
             <PerformanceCard
               title="Total Tokens"
               value={metrics.totalTokens.toLocaleString()}
               icon="text-outline"
-              color={Colors.primaryPurple}
+              color={colors.tertiary}
             />
             <PerformanceCard
               title="Success Rate"
               value={`${Math.round(metrics.completionRate)}%`}
               icon="checkmark-circle-outline"
-              color={Colors.statusOrange}
+              color={colors.secondary}
             />
           </View>
         </View>
@@ -395,11 +410,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
 
       {analyticsMessages.length === 0 && (
         <View style={styles.emptyState}>
-          <Icon
-            name="analytics-outline"
-            size={48}
-            color={Colors.textTertiary}
-          />
+          <Icon name="analytics-outline" size={48} color={colors.outline} />
           <Text style={styles.emptyText}>No analytics data available yet</Text>
           <Text style={styles.emptySubtext}>
             Start a conversation to see performance metrics
@@ -427,11 +438,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
       showsVerticalScrollIndicator={false}
       ListEmptyComponent={
         <View style={styles.emptyState}>
-          <Icon
-            name="chatbubbles-outline"
-            size={48}
-            color={Colors.textTertiary}
-          />
+          <Icon name="chatbubbles-outline" size={48} color={colors.outline} />
           <Text style={styles.emptyText}>No messages with analytics</Text>
         </View>
       }
@@ -473,7 +480,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Thinking Mode Analysis</Text>
           <View style={styles.thinkingAnalysis}>
-            <Icon name="bulb-outline" size={20} color={Colors.primaryPurple} />
+            <Icon name="bulb-outline" size={20} color={colors.tertiary} />
             <Text style={styles.thinkingText}>
               Used in {metrics.thinkingModeCount} messages (
               {Math.round(metrics.thinkingModePercentage)}%)
@@ -484,11 +491,7 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
 
       {analyticsMessages.length === 0 && (
         <View style={styles.emptyState}>
-          <Icon
-            name="speedometer-outline"
-            size={48}
-            color={Colors.textTertiary}
-          />
+          <Icon name="speedometer-outline" size={48} color={colors.outline} />
           <Text style={styles.emptyText}>No performance data available</Text>
         </View>
       )}
@@ -530,236 +533,237 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundGrouped,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Padding.padding16,
-    paddingVertical: Padding.padding12,
-    backgroundColor: Colors.backgroundPrimary,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  title: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-  },
-  closeButton: {
-    paddingVertical: Spacing.small,
-    paddingHorizontal: Spacing.medium,
-  },
-  closeButtonText: {
-    ...Typography.body,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: Colors.backgroundPrimary,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Padding.padding12,
-    gap: Spacing.xSmall,
-  },
-  tabActive: {
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.primaryBlue,
-  },
-  tabText: {
-    ...Typography.footnote,
-    color: Colors.textSecondary,
-  },
-  tabTextActive: {
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-  },
-  tabContent: {
-    flex: 1,
-    padding: Padding.padding16,
-  },
-  card: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderRadius: BorderRadius.medium,
-    padding: Padding.padding16,
-    marginBottom: Spacing.medium,
-  },
-  cardTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.medium,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.smallMedium,
-    marginBottom: Spacing.small,
-  },
-  summaryText: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-  },
-  performanceGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.medium,
-  },
-  performanceCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.regular,
-    padding: Padding.padding12,
-    borderWidth: 1,
-  },
-  performanceCardHeader: {
-    marginBottom: Spacing.small,
-  },
-  performanceCardValue: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.xxSmall,
-  },
-  performanceCardTitle: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-  metricView: {
-    alignItems: 'center',
-  },
-  metricValue: {
-    ...Typography.footnote,
-    fontWeight: '600',
-  },
-  metricLabel: {
-    ...Typography.caption2,
-    color: Colors.textSecondary,
-  },
-  messagesList: {
-    padding: Padding.padding16,
-  },
-  messageRow: {
-    backgroundColor: Colors.backgroundPrimary,
-    borderRadius: BorderRadius.regular,
-    padding: Padding.padding16,
-    marginBottom: Spacing.medium,
-  },
-  messageRowHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.small,
-  },
-  messageRowTitle: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-    fontWeight: '600',
-  },
-  messageRowBadges: {
-    flexDirection: 'row',
-    gap: Spacing.small,
-  },
-  badge: {
-    paddingHorizontal: Spacing.small,
-    paddingVertical: Spacing.xxSmall,
-    borderRadius: BorderRadius.small,
-  },
-  badgeBlue: {
-    backgroundColor: Colors.badgeBlue,
-  },
-  badgePurple: {
-    backgroundColor: Colors.badgePurple,
-  },
-  badgeTextBlue: {
-    ...Typography.caption2,
-    color: Colors.primaryBlue,
-    fontWeight: '600',
-  },
-  badgeTextPurple: {
-    ...Typography.caption2,
-    color: Colors.primaryPurple,
-    fontWeight: '600',
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.large,
-    marginBottom: Spacing.small,
-  },
-  messagePreview: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-  modelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: BorderRadius.regular,
-    padding: Padding.padding12,
-    marginBottom: Spacing.small,
-  },
-  modelInfo: {
-    flex: 1,
-  },
-  modelName: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-    fontWeight: '500',
-  },
-  modelMessages: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-  },
-  modelStats: {
-    alignItems: 'flex-end',
-  },
-  modelStatValue: {
-    ...Typography.caption,
-    color: Colors.statusGreen,
-  },
-  modelStatSpeed: {
-    ...Typography.caption,
-    color: Colors.primaryBlue,
-  },
-  thinkingAnalysis: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.smallMedium,
-    backgroundColor: `${Colors.primaryPurple}10`,
-    borderRadius: BorderRadius.regular,
-    padding: Padding.padding12,
-  },
-  thinkingText: {
-    ...Typography.subheadline,
-    color: Colors.textPrimary,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Padding.padding40,
-  },
-  emptyText: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    marginTop: Spacing.medium,
-  },
-  emptySubtext: {
-    ...Typography.footnote,
-    color: Colors.textTertiary,
-    marginTop: Spacing.xSmall,
-  },
-});
+const createStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.surfaceContainer,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    title: {
+      ...typography.titleMedium,
+      color: colors.onSurface,
+    },
+    closeButton: {
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+    },
+    closeButtonText: {
+      ...typography.bodyLarge,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    tabsContainer: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.outlineVariant,
+    },
+    tab: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      gap: 4,
+    },
+    tabActive: {
+      borderBottomWidth: 2,
+      borderBottomColor: colors.primary,
+    },
+    tabText: {
+      ...typography.bodySmall,
+      color: colors.onSurfaceVariant,
+    },
+    tabTextActive: {
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    tabContent: {
+      flex: 1,
+      padding: 16,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      padding: 16,
+      marginBottom: 10,
+    },
+    cardTitle: {
+      ...typography.titleMedium,
+      color: colors.onSurface,
+      marginBottom: 10,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 6,
+    },
+    summaryText: {
+      ...typography.bodyMedium,
+      color: colors.onSurface,
+    },
+    performanceGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    performanceCard: {
+      flex: 1,
+      minWidth: '45%',
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: 8,
+      padding: 12,
+      borderWidth: 1,
+    },
+    performanceCardHeader: {
+      marginBottom: 6,
+    },
+    performanceCardValue: {
+      ...typography.titleLarge,
+      color: colors.onSurface,
+      marginBottom: 2,
+    },
+    performanceCardTitle: {
+      ...typography.bodySmall,
+      color: colors.onSurfaceVariant,
+    },
+    metricView: {
+      alignItems: 'center',
+    },
+    metricValue: {
+      ...typography.bodySmall,
+      fontWeight: '600',
+    },
+    metricLabel: {
+      ...typography.labelSmall,
+      color: colors.onSurfaceVariant,
+    },
+    messagesList: {
+      padding: 16,
+    },
+    messageRow: {
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      padding: 16,
+      marginBottom: 10,
+    },
+    messageRowHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    messageRowTitle: {
+      ...typography.bodyMedium,
+      color: colors.onSurface,
+      fontWeight: '600',
+    },
+    messageRowBadges: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    badge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    badgeModel: {
+      backgroundColor: colors.primaryContainer,
+    },
+    badgeFramework: {
+      backgroundColor: colors.tertiaryContainer,
+    },
+    badgeTextModel: {
+      ...typography.labelSmall,
+      color: colors.onPrimaryContainer,
+      fontWeight: '600',
+    },
+    badgeTextFramework: {
+      ...typography.labelSmall,
+      color: colors.onTertiaryContainer,
+      fontWeight: '600',
+    },
+    metricsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      marginBottom: 6,
+    },
+    messagePreview: {
+      ...typography.bodySmall,
+      color: colors.onSurfaceVariant,
+    },
+    modelRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 6,
+    },
+    modelInfo: {
+      flex: 1,
+    },
+    modelName: {
+      ...typography.bodyMedium,
+      color: colors.onSurface,
+      fontWeight: '500',
+    },
+    modelMessages: {
+      ...typography.bodySmall,
+      color: colors.onSurfaceVariant,
+    },
+    modelStats: {
+      alignItems: 'flex-end',
+    },
+    modelStatValue: {
+      ...typography.bodySmall,
+      color: colors.success,
+    },
+    modelStatSpeed: {
+      ...typography.bodySmall,
+      color: colors.primary,
+    },
+    thinkingAnalysis: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: `${colors.tertiary}10`,
+      borderRadius: 8,
+      padding: 12,
+    },
+    thinkingText: {
+      ...typography.bodyMedium,
+      color: colors.onSurface,
+    },
+    emptyState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 40,
+    },
+    emptyText: {
+      ...typography.bodyLarge,
+      color: colors.onSurfaceVariant,
+      marginTop: 10,
+    },
+    emptySubtext: {
+      ...typography.bodySmall,
+      color: colors.outline,
+      marginTop: 4,
+    },
+  });
 
 export default ChatAnalyticsScreen;

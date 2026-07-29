@@ -31,6 +31,7 @@
 
 package com.runanywhere.sdk.httptransport
 
+import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import okhttp3.Call
@@ -72,7 +73,7 @@ object OkHttpHttpTransport {
      * still delivering cancellation promptly (the native side checks
      * `cancel_requested` on every delivered chunk).
      */
-    private const val STREAM_CHUNK_SIZE = 256 * 1024
+    private const val STREAM_CHUNK_SIZE = RADefaults.Network.STREAM_CHUNK_BYTES
 
     /**
      * Default OkHttp client backing the buffered `request_send` path.
@@ -87,10 +88,10 @@ object OkHttpHttpTransport {
     private val defaultClient: OkHttpClient by lazy {
         OkHttpClient
             .Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .callTimeout(600, TimeUnit.SECONDS)
+            .connectTimeout(RADefaults.Network.CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout(RADefaults.Network.REQUEST_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+            .writeTimeout(RADefaults.Network.REQUEST_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+            .callTimeout(RADefaults.Network.RESOURCE_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
@@ -115,9 +116,10 @@ object OkHttpHttpTransport {
             val base = clientRef.get() ?: defaultClient
             return base
                 .newBuilder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(24, TimeUnit.HOURS)
-                .writeTimeout(60, TimeUnit.SECONDS)
+                .connectTimeout(RADefaults.Network.CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+                .readTimeout(RADefaults.Network.STREAMING_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+                .writeTimeout(RADefaults.Network.REQUEST_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+                // No call timeout: a streaming body has no bounded total duration.
                 .callTimeout(0, TimeUnit.MILLISECONDS)
                 // Screen-off / doze can drop the socket mid-transfer; let OkHttp
                 // transparently retry a failed connection instead of bubbling the

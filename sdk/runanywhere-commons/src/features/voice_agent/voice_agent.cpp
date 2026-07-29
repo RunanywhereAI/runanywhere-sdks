@@ -111,6 +111,10 @@ rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_han
     return RAC_SUCCESS;
 }
 
+const char* rac_voice_agent_default_vad_model_id(void) {
+    return RAC_DEFAULT_VOICE_AGENT_DEFAULT_VAD_MODEL_ID;
+}
+
 void rac_voice_agent_destroy(rac_voice_agent_handle_t handle) {
     if (!handle) {
         return;

@@ -6,6 +6,7 @@
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "bridges/ExternalConfigGuard.hpp"
 #include "rac/core/rac_error_proto.h"
+#include "rac/rac_defaults_generated.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 
@@ -78,7 +79,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         // Parse config
         std::string apiKey = config::trim(extractStringValue(configJson, "apiKey"));
         std::string baseURL = config::trim(extractStringValue(
-            configJson, "baseURL", "https://api.runanywhere.ai"));
+            configJson, "baseURL", RAC_DEFAULT_ENVIRONMENT_PRODUCTION_BASE_URL));
         std::string envStr = extractStringValue(configJson, "environment", "production");
         std::string sdkVersionFromConfig = extractStringValue(configJson, "sdkVersion", "0.2.0");
         std::string platformFromConfig = extractStringValue(configJson, "platform", defaultNativePlatform());
@@ -88,10 +89,17 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         bool discoverDownloadedModels = extractBoolValue(configJson, "discoverDownloadedModels", true);
         bool rescanLocalModels = extractBoolValue(configJson, "rescanLocalModels", true);
 
-        // Determine environment (canonical commons rac_environment_t).
+        // Product surface: development | production only.
         rac_environment_t env = RAC_ENV_PRODUCTION;
-        if (envStr == "development") env = RAC_ENV_DEVELOPMENT;
-        else if (envStr == "staging") env = RAC_ENV_STAGING;
+        if (envStr == "development" || envStr == "dev") {
+            env = RAC_ENV_DEVELOPMENT;
+        } else if (envStr == "production" || envStr == "prod") {
+            env = RAC_ENV_PRODUCTION;
+        } else {
+            setLastError("Invalid environment '" + envStr +
+                         "' (expected development or production)");
+            throw std::invalid_argument("Invalid SDK environment: " + envStr);
+        }
 
         InitBridge::shared().setSdkVersion(sdkVersionFromConfig);
 

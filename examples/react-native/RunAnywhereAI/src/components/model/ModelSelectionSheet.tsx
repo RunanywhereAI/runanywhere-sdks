@@ -42,6 +42,7 @@ import {
   getNpuCatalogSnapshot,
   subscribeNpuCatalog,
 } from '../../services/NpuModelCatalog';
+import { RAG_EMBEDDING_FRAMEWORKS } from '../../services/EmbeddingCatalogPolicy';
 import { listVisibleCatalogModels } from '../../services/ModelRegistryQueries';
 import { ConnectService } from '../../services/ConnectService';
 
@@ -114,13 +115,10 @@ const getCategoryForContext = (
 /** Framework restriction for a context; null = any framework. */
 const getAllowedFrameworksForContext = (
   context: ModelSelectionContext
-): Set<InferenceFramework> | null => {
+): ReadonlySet<InferenceFramework> | null => {
   switch (context) {
     case ModelSelectionContext.RagEmbedding:
-      return new Set([
-        InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-        InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-      ]);
+      return RAG_EMBEDDING_FRAMEWORKS;
     case ModelSelectionContext.RagLLM:
       return new Set([
         InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,

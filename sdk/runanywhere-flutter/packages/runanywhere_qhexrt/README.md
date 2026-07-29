@@ -1,25 +1,57 @@
 # runanywhere_qhexrt
 
-On-device NPU acceleration backend for the RunAnywhere Flutter SDK. Runs LLM, VLM, STT and TTS entirely on-device on Qualcomm Snapdragon Hexagon NPUs (V75 / V79 / V81). Android `arm64-v8a` only.
+**Qualcomm Hexagon NPU backend for the RunAnywhere Flutter SDK** — on-device LLM, VLM, STT, and TTS on Snapdragon V75/V79/V81 NPUs. Android `arm64-v8a` only.
 
-## Install
+[![pub package](https://img.shields.io/pub/v/runanywhere_qhexrt.svg)](https://pub.dev/packages/runanywhere_qhexrt)
+
+---
+
+## Installation
+
 ```yaml
 dependencies:
-  runanywhere_qhexrt: ^0.20.9
+  runanywhere: 0.20.11
+  runanywhere_qhexrt: 0.20.11
 ```
 
-## Use
-Register the backend, then use the standard RunAnywhere APIs — the SDK automatically routes supported models to the NPU.
+See the [Flutter SDK README](../../README.md) for Android setup.
+
+---
+
+## Usage
 
 ```dart
+import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_qhexrt/qhexrt.dart';
 
-final npu = QHexRT.probeNpu(); // pre-flight capability probe, safe on any device
+await RunAnywhere.initialize();
+
+final npu = QHexRT.probeNpu(); // safe on any device
+if (npu.qhexrtSupported) {
+  await QHexRT.register();
+}
+// Register, download, load, and infer via core RunAnywhere APIs
 ```
 
+See the [Flutter SDK README](../../README.md) for full examples.
+
+---
+
 ## Requirements
+
 - Android `arm64-v8a`
-- A Qualcomm Snapdragon device with a Hexagon V75 / V79 / V81 NPU
+- Qualcomm Snapdragon device with Hexagon V75, V79, or V81 NPU
+
+---
+
+## Support
+
+- [Flutter SDK documentation](../../README.md)
+- [Discord](https://discord.gg/N359FBbDVd)
+- [founders@runanywhere.ai](mailto:founders@runanywhere.ai)
+
+---
 
 ## License
-Proprietary. See `LICENSE`.
+
+Proprietary. See [LICENSE](LICENSE).

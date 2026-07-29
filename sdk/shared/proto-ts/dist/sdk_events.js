@@ -88,6 +88,8 @@ var SDKComponent;
     SDKComponent[SDKComponent["SDK_COMPONENT_VOICE_AGENT"] = 9] = "SDK_COMPONENT_VOICE_AGENT";
     SDKComponent[SDKComponent["SDK_COMPONENT_WAKEWORD"] = 10] = "SDK_COMPONENT_WAKEWORD";
     SDKComponent[SDKComponent["SDK_COMPONENT_SPEAKER_DIARIZATION"] = 11] = "SDK_COMPONENT_SPEAKER_DIARIZATION";
+    SDKComponent[SDKComponent["SDK_COMPONENT_SEMANTIC_SEGMENTATION"] = 12] = "SDK_COMPONENT_SEMANTIC_SEGMENTATION";
+    SDKComponent[SDKComponent["SDK_COMPONENT_RERANK"] = 13] = "SDK_COMPONENT_RERANK";
     SDKComponent[SDKComponent["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(SDKComponent || (exports.SDKComponent = SDKComponent = {}));
 function sDKComponentFromJSON(object) {
@@ -128,6 +130,12 @@ function sDKComponentFromJSON(object) {
         case 11:
         case "SDK_COMPONENT_SPEAKER_DIARIZATION":
             return SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION;
+        case 12:
+        case "SDK_COMPONENT_SEMANTIC_SEGMENTATION":
+            return SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION;
+        case 13:
+        case "SDK_COMPONENT_RERANK":
+            return SDKComponent.SDK_COMPONENT_RERANK;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -160,6 +168,10 @@ function sDKComponentToJSON(object) {
             return "SDK_COMPONENT_WAKEWORD";
         case SDKComponent.SDK_COMPONENT_SPEAKER_DIARIZATION:
             return "SDK_COMPONENT_SPEAKER_DIARIZATION";
+        case SDKComponent.SDK_COMPONENT_SEMANTIC_SEGMENTATION:
+            return "SDK_COMPONENT_SEMANTIC_SEGMENTATION";
+        case SDKComponent.SDK_COMPONENT_RERANK:
+            return "SDK_COMPONENT_RERANK";
         case SDKComponent.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -4026,6 +4038,7 @@ function createBaseGenerationEvent() {
         modelName: "",
         durationMs: 0,
         framework: 0,
+        promptEvalTimeMs: 0,
     };
 }
 exports.GenerationEvent = {
@@ -4128,6 +4141,9 @@ exports.GenerationEvent = {
         }
         if (message.framework !== 0) {
             writer.uint32(264).int32(message.framework);
+        }
+        if (message.promptEvalTimeMs !== 0) {
+            writer.uint32(272).int64(message.promptEvalTimeMs);
         }
         return writer;
     },
@@ -4369,6 +4385,13 @@ exports.GenerationEvent = {
                     message.framework = reader.int32();
                     continue;
                 }
+                case 34: {
+                    if (tag !== 272) {
+                        break;
+                    }
+                    message.promptEvalTimeMs = longToNumber(reader.int64());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -4516,6 +4539,11 @@ exports.GenerationEvent = {
                     ? globalThis.Number(object.duration_ms)
                     : 0,
             framework: isSet(object.framework) ? globalThis.Number(object.framework) : 0,
+            promptEvalTimeMs: isSet(object.promptEvalTimeMs)
+                ? globalThis.Number(object.promptEvalTimeMs)
+                : isSet(object.prompt_eval_time_ms)
+                    ? globalThis.Number(object.prompt_eval_time_ms)
+                    : 0,
         };
     },
     toJSON(message) {
@@ -4619,6 +4647,9 @@ exports.GenerationEvent = {
         if (message.framework !== 0) {
             obj.framework = Math.round(message.framework);
         }
+        if (message.promptEvalTimeMs !== 0) {
+            obj.promptEvalTimeMs = Math.round(message.promptEvalTimeMs);
+        }
         return obj;
     },
     create(base) {
@@ -4659,6 +4690,7 @@ exports.GenerationEvent = {
         message.modelName = object.modelName ?? "";
         message.durationMs = object.durationMs ?? 0;
         message.framework = object.framework ?? 0;
+        message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
         return message;
     },
 };

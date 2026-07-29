@@ -47,9 +47,9 @@ const enableWebGPU = runFullE2E
   || process.env.RA_ENABLE_WEBGPU_BROWSER === '1';
 const browserChannel = process.env.RA_BROWSER_CHANNEL
   ?? (process.env.RA_RUN_VLM_E2E === '1' || runFullE2E ? 'chrome' : undefined);
-const localReleaseURL = 'http://127.0.0.1:43173';
+const localReleaseURL = 'http://localhost:43173';
 const baseURL = configuredRemoteURL
-  ?? (runFullE2E ? localReleaseURL : 'http://127.0.0.1:5173');
+  ?? (runFullE2E ? localReleaseURL : 'http://localhost:3000');
 const launchArgs = [
   ...(enableWebGPU ? webgpuArgs : []),
   ...(runFullE2E ? fakeMediaArgs : []),
@@ -100,8 +100,8 @@ export default defineConfig({
     // The full release gate builds and previews this clone on a dedicated
     // port, never reusing a potentially stale server from another checkout.
     command: runFullE2E
-      ? 'cd ../../examples/web/RunAnywhereAI && npm run build && npm run preview -- --host 127.0.0.1 --port 43173 --strictPort'
-      : 'cd ../../examples/web/RunAnywhereAI && npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
+      ? 'cd ../../examples/web/RunAnywhereAI && npm run build && npm run preview -- --host localhost --port 43173 --strictPort'
+      : 'cd ../../examples/web/RunAnywhereAI && npm run dev',
     url: baseURL,
     reuseExistingServer: runFullE2E ? false : !process.env.CI,
     gracefulShutdown: runFullE2E ? { signal: 'SIGTERM', timeout: 5_000 } : undefined,

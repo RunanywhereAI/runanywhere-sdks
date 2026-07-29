@@ -17,6 +17,7 @@
 #include "ExternalConfigGuard.hpp"
 #include "rac_dev_config.h"
 #include "rac_sdk_event_stream.h"  // rac_events_set_telemetry_sink
+#include "rac_sdk_state.h"         // rac_state_get_base_url (staging override)
 
 // Platform-specific logging
 #if defined(ANDROID) || defined(__ANDROID__)
@@ -297,28 +298,15 @@ static void telemetryHttpCallback(void *userData, const char *endpoint,
   std::string baseURL;
   std::string apiKey;
 
-  if (env == RAC_ENV_DEVELOPMENT) {
-    // Development: Use Supabase from C++ dev config (development_config.cpp)
-    // NO FALLBACK - credentials must come from C++ config only
-    auto supabaseConfig = config::makeEndpointConfig(
-        rac_dev_config_get_supabase_url() ? rac_dev_config_get_supabase_url()
-                                          : "",
-        rac_dev_config_get_supabase_key() ? rac_dev_config_get_supabase_key()
-                                          : "");
-
-    if (!supabaseConfig.usable) {
-      LOGI("Skipping telemetry/device registration: no usable config");
-      rac_telemetry_manager_http_complete(manager, RAC_TRUE, "{}", nullptr);
-      return;
-    }
-
-    baseURL = supabaseConfig.baseURL;
-    apiKey = supabaseConfig.token;
-    LOGD("Telemetry using configured development Supabase endpoint");
-  } else {
-    // Production/Staging: Use configured Railway URL
-    // These come from SDK initialization (App.tsx -> RunAnywhere.initialize)
-    baseURL = config::trim(InitBridge::shared().getBaseURL());
+  {
+    // Effective config from commons state (baked OSS URL fills development when empty)
+    // overrides whatever the app passed (baked URL, keyless), dev/prod use the
+    // effective URL falling back to the SDK-initialization value. There is no
+    // direct-to-datastore path — the backend is always reached through this URL.
+    const char *stateURL = rac_state_get_base_url();
+    baseURL = (stateURL != nullptr && stateURL[0] != '\0')
+                  ? config::trim(stateURL)
+                  : config::trim(InitBridge::shared().getBaseURL());
 
     // For production mode, prefer JWT access token (from authentication)
     // over raw API key. This matches Swift/Kotlin behavior.
@@ -327,15 +315,25 @@ static void telemetryHttpCallback(void *userData, const char *endpoint,
       apiKey = accessToken; // Use JWT for Authorization header
       LOGD("Telemetry using JWT access token");
     } else {
-      // Fallback to API key if not authenticated yet
-      apiKey = config::trim(InitBridge::shared().getApiKey());
-      LOGD("Telemetry using API key (not authenticated)");
+      // Fall back to the commons-state key. Staging clears it (keyless):
+      // the POST goes out with no Authorization header and the backend
+      // attributes it to the PUBLIC org — a stale app key would 401.
+      const char *stateKey = rac_state_get_api_key();
+      apiKey = config::trim(stateKey != nullptr ? stateKey : "");
+      LOGD("Telemetry using %s (not authenticated)",
+           apiKey.empty() ? "keyless mode" : "API key");
     }
 
-    if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(apiKey)) {
+    // Keyless staging is valid: the request goes out unauthenticated and
+    // the backend attributes it to the PUBLIC org. Only a usable URL is
+    // mandatory.
+    if (!config::isUsableHttpUrl(baseURL)) {
       LOGI("Skipping telemetry/device registration: no usable config");
       rac_telemetry_manager_http_complete(manager, RAC_TRUE, "{}", nullptr);
       return;
+    }
+    if (!config::isUsableSecret(apiKey)) {
+      apiKey.clear();
     }
 
     LOGD("Telemetry using configured production/staging endpoint");

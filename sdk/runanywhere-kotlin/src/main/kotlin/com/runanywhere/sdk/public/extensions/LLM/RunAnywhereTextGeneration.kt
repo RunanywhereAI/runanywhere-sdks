@@ -16,8 +16,8 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.TokenKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
-import com.runanywhere.sdk.foundation.bridge.extensions.defaults
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.analyticsKey

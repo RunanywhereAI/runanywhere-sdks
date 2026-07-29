@@ -1,57 +1,45 @@
 # @runanywhere/mlx
 
-Apple MLX backend registration for the RunAnywhere React Native SDK.
+**Apple MLX backend registration for the RunAnywhere React Native SDK** — iOS-only; model lifecycle and inference live in `@runanywhere/core`.
 
-The package owns only backend registration and its iOS runtime binaries. Model
-catalog, download, lifecycle, LLM, VLM, speech, and embedding APIs remain in
-`@runanywhere/core`, which is the shared public surface across backends.
-
-## Requirements
-
-- `@runanywhere/core` 0.20.11+
-- React Native 0.83.1+
-- Xcode 26+ with the Swift 6.2 toolchain
-- A physical Apple device running iOS 17.5+
-
-MLX is an Apple-only backend. Android autolinking is intentionally disabled.
-The arm64 iOS Simulator artifact supports package, compile, link, and startup
-validation only; `MLX.register()` and `MLX.isAvailable()` return `false` there.
+---
 
 ## Installation
 
 ```bash
-npm install @runanywhere/core @runanywhere/mlx @runanywhere/proto-ts
+npm install @runanywhere/core@0.20.12 @runanywhere/mlx@0.20.11
 cd ios && pod install && cd ..
 ```
 
-The published package must contain `RABackendMLX.xcframework`,
-`RunAnywhereMLXRuntime.xcframework`, and `RunAnywhereMLXMetal.xcframework`.
-Packaging and CocoaPods fail when any runtime artifact is missing; the
-TypeScript facade is not published as a standalone substitute for native MLX
-support.
+Requires Xcode 26+ and a physical iOS 17.5+ device. `MLX.register()` returns `false` on simulator. See the [React Native SDK README](../../README.md).
+
+---
 
 ## Usage
 
 ```typescript
 import { RunAnywhere } from '@runanywhere/core';
 import { MLX } from '@runanywhere/mlx';
-import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 
 const registered = await MLX.register();
-if (!registered) {
-  throw new Error('MLX is unavailable on this target');
+if (registered) {
+  await RunAnywhere.initialize();
+  // Register, download, load, and infer via @runanywhere/core
 }
-
-await RunAnywhere.initialize();
-await RunAnywhere.registerModel({
-  id: 'mlx-qwen3-0.6b-4bit',
-  name: 'MLX Qwen3 0.6B 4bit',
-  url: 'https://huggingface.co/mlx-community/Qwen3-0.6B-4bit',
-  framework: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
-  memoryRequirement: 650_000_000,
-  supportsThinking: true,
-});
 ```
 
-The native MLX engine uses its fixed router priority. The facade also exposes
-`MLX.unregister()`, `MLX.isRegistered()`, and `MLX.isAvailable()`.
+See the [React Native SDK README](../../README.md) for full examples.
+
+---
+
+## Support
+
+- [React Native SDK documentation](../../README.md)
+- [Discord](https://discord.gg/N359FBbDVd)
+- [founders@runanywhere.ai](mailto:founders@runanywhere.ai)
+
+---
+
+## License
+
+RunAnywhere License. See [LICENSE](LICENSE).

@@ -19,6 +19,7 @@
 
 package com.runanywhere.sdk.httptransport
 
+import com.runanywhere.sdk.generated.RADefaults
 import okhttp3.Call
 import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -50,14 +51,14 @@ import java.util.concurrent.atomic.AtomicReference
  *   - [setHttpClient] lets hosts swap in a custom OkHttpClient
  */
 object OkHttpHttpTransport {
-    private const val STREAM_CHUNK_SIZE = 32 * 1024
+    private const val STREAM_CHUNK_SIZE = RADefaults.Network.STREAM_CHUNK_BYTES
 
     /** Default OkHttp client. Lazily built on first use. Mirrors Swift's `sharedSession`. */
     private val defaultClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(RADefaults.Network.CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+            .readTimeout(RADefaults.Network.REQUEST_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+            .writeTimeout(RADefaults.Network.REQUEST_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
@@ -67,7 +68,8 @@ object OkHttpHttpTransport {
      * Dedicated streaming OkHttp client. Mirrors the Swift adapter's per-call
      * streaming session built with `timeoutIntervalForResource = 24 * 60 * 60`.
      * A multi-GB GGUF download over a slow cellular link can legitimately run
-     * for hours, so the read timeout is bumped from the default 120s to 24h.
+     * for hours, so the read timeout uses the pool's streaming window, not the
+     * per-request one.
      * Connect / write timeouts retain the default's tighter bounds because
      * those phases still complete in seconds even on slow links.
      *
@@ -80,9 +82,9 @@ object OkHttpHttpTransport {
             val base = clientRef.get() ?: defaultClient
             return base
                 .newBuilder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(Duration.ofHours(24))
-                .writeTimeout(60, TimeUnit.SECONDS)
+                .connectTimeout(RADefaults.Network.CONNECT_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+                .readTimeout(Duration.ofMillis(RADefaults.Network.STREAMING_TIMEOUT_MS.toLong()))
+                .writeTimeout(RADefaults.Network.REQUEST_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
                 .build()
         }
 
@@ -370,7 +372,7 @@ object OkHttpHttpTransport {
             val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte)
             // Streaming downloads use the dedicated streaming client with a
             // 24-hour read timeout (multi-GB GGUFs over slow links can take
-            // hours); the default 120s would abort them mid-transfer.
+            // hours); the per-request read timeout would abort them mid-transfer.
             val clientForCall = resolveStreamingClient(timeoutMs, followRedirects)
 
             val call = clientForCall.newCall(request)

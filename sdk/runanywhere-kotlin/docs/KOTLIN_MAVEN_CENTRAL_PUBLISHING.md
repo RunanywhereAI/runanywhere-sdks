@@ -13,12 +13,15 @@ AAR; all three copies come from the same NDK runtime for a given ABI.
 | `io.github.sanchitmonga22:runanywhere-sdk` | 5 per ABI | Core SDK and cloud backend |
 | `io.github.sanchitmonga22:runanywhere-llamacpp` | 4 per ABI | LlamaCPP LLM/VLM backend |
 | `io.github.sanchitmonga22:runanywhere-onnx` | 9 per ABI | ONNX and Sherpa STT/TTS/VAD backends |
+| `io.github.sanchitmonga22:runanywhere-qhexrt-android` | 13 host + 3 skels (arm64 only) | QHexRT Hexagon NPU backend (separate package) |
 
 The SDK is a single-target Android library (not KMP), so there are no `-android`
-variants or separate KMP metadata artifacts — these three are the whole set.
+variants or separate KMP metadata artifacts for the core three.
 
-With three ABIs (`arm64-v8a`, `armeabi-v7a`, `x86_64`), the Maven bundle
-contains 15 core, 12 LlamaCPP, and 27 ONNX/Sherpa entries: **54 `.so` entries**.
+With three ABIs (`arm64-v8a`, `armeabi-v7a`, `x86_64`), the public Maven bundle
+from `package-sdk.sh` contains 15 core, 12 LlamaCPP, and 27 ONNX/Sherpa entries:
+**54 `.so` entries**. QHexRT is packaged separately via `package-qhexrt.sh`
+(`arm64-v8a` only) and is not part of that public zip.
 
 ---
 
@@ -108,11 +111,14 @@ Use a GitHub release that contains all three canonical Android archives:
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
-export SDK_VERSION=0.20.6
-export NATIVE_VERSION=0.20.6
+export SDK_VERSION=0.20.11
+export NATIVE_VERSION=0.20.11
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 export MAVEN_CENTRAL_USERNAME="<USERNAME>"
 export MAVEN_CENTRAL_PASSWORD="<PASSWORD>"
+export GPG_KEY_ID="<KEY_ID>"
+export GPG_SIGNING_KEY="<BASE64_ARMORED_PRIVATE_KEY>"
+export GPG_SIGNING_PASSWORD="<PASSPHRASE>"
 
 NATIVE_ARCHIVES="$(mktemp -d)"
 for ABI in arm64-v8a armeabi-v7a x86_64; do
@@ -128,7 +134,10 @@ bash sdk/runanywhere-kotlin/scripts/package-sdk.sh \
   --natives-from "$NATIVE_ARCHIVES"
 
 cd sdk/runanywhere-kotlin
-./gradlew clean publishAllPublicationsToMavenCentralRepository \
+./gradlew clean \
+  :publishReleasePublicationToMavenCentralRepository \
+  :modules:runanywhere-core-llamacpp:publishReleasePublicationToMavenCentralRepository \
+  :modules:runanywhere-core-onnx:publishReleasePublicationToMavenCentralRepository \
   -Prunanywhere.useLocalNatives=true \
   -x buildLocalJniLibs \
   --no-daemon
@@ -144,7 +153,7 @@ extract the exact component trees, and let the package contract stage them:
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
-export SDK_VERSION=0.20.6
+export SDK_VERSION=0.20.11
 export RAC_RELEASE_VERSION="$SDK_VERSION"
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 export ANDROID_NDK_HOME="$HOME/Library/Android/sdk/ndk/27.3.13750724"
@@ -227,10 +236,46 @@ Check: [Central Portal Deployments](https://central.sonatype.com/publishing/depl
 
 ## CI/CD Quick Release
 
-1. Go to **GitHub Actions** > **Publish to Maven Central**
-2. Enter version (e.g., `0.20.6`) and run
-3. CI uploads to OSSRH staging. Auto-close happens after ~10 min.
-4. If stuck, manually close/release via the staging API commands above.
+Maven Central publishing is **manual** (not automated in GitHub Actions).
+`.github/workflows/release.yml` only attaches a local Maven repository zip to
+the GitHub Release. Use the local release steps above to upload to OSSRH, then
+close/promote via the staging API.
+
+---
+
+## QHexRT (Hexagon NPU) package
+
+QHexRT is published as a **separate** artifact so the default public bundle stays
+free of proprietary QAIRT/QNN redistributables.
+
+```bash
+# After staging QHexRT natives via:
+#   QHexRT/tools/scripts/stage_prebuilt_for_sdk.sh ...
+#   RAC_BUILD_JOBS=2 ./scripts/build/build-core-android.sh arm64-v8a
+
+export SDK_VERSION=0.20.11
+export MAVEN_CENTRAL_USERNAME="<USERNAME>"
+export MAVEN_CENTRAL_PASSWORD="<PASSWORD>"
+export GPG_KEY_ID="<KEY_ID>"
+export GPG_SIGNING_KEY="<BASE64_ARMORED_PRIVATE_KEY>"
+export GPG_SIGNING_PASSWORD="<PASSPHRASE>"
+
+bash sdk/runanywhere-kotlin/scripts/package-qhexrt.sh --mode local
+
+cd sdk/runanywhere-kotlin
+./gradlew :modules:runanywhere-core-qhexrt:publishReleasePublicationToMavenCentralRepository \
+  -Prunanywhere.useLocalNatives=true \
+  -x buildLocalJniLibs \
+  --no-daemon
+```
+
+Then close/promote the staging repo with the same API commands as the core
+artifacts. Consumers depend on:
+
+```kotlin
+implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
+implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.11")
+```
 
 ---
 
@@ -245,13 +290,16 @@ repositories {
 // build.gradle.kts
 dependencies {
     // Required: core SDK
-    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.6")
+    implementation("io.github.sanchitmonga22:runanywhere-sdk:0.20.11")
 
     // Optional: LLM + VLM (add only if you need text/vision generation)
-    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.6")
+    implementation("io.github.sanchitmonga22:runanywhere-llamacpp:0.20.11")
 
     // Optional: STT/TTS/VAD (add only if you need speech features)
-    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.6")
+    implementation("io.github.sanchitmonga22:runanywhere-onnx:0.20.11")
+
+    // Optional: Snapdragon Hexagon NPU (arm64-v8a only)
+    implementation("io.github.sanchitmonga22:runanywhere-qhexrt-android:0.20.11")
 }
 ```
 
@@ -289,6 +337,9 @@ No `pickFirsts` or workarounds needed. Each AAR bundles only its own native libs
 
 | Version | Date | Notes |
 |---------|------|-------|
+| 0.20.11 | 2026-07-27 | Public QHexRT package (`runanywhere-qhexrt-android`), NVIDIA/Magpie/Cosmos catalog, re-cut tag from HEAD |
+| 0.20.10 | 2026-07 | Core + LlamaCPP + ONNX on Maven Central |
+| 0.20.9 | 2026-06 | One-off `runanywhere-qhexrt-android` publish (then excluded from public train) |
 | 0.20.6 | 2026-02-16 | Self-contained AARs (zero duplicate .so), VLM-enabled, native libs rebuilt from source |
 | 0.20.5 | 2026-02-16 | Removed stale .so from module dirs (Option B: SDK bundles everything) |
 | 0.20.4 | 2026-02-16 | Native libs rebuilt from source with VLM (llama.cpp b8011 + mtmd) |

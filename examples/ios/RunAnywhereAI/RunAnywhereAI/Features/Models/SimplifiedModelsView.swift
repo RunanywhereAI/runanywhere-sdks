@@ -40,15 +40,15 @@ struct SimplifiedModelsView: View {
         )
     }
 
-    /// Models not already surfaced in the recommended hero, grouped into families.
-    private var browseFamilies: [ModelFamily] {
+    /// Models not already surfaced in the recommended hero, grouped by organisation.
+    private var browseOrgs: [ModelOrgGroup] {
         let surfaced = recommendation.surfacedModelIDs
         let remaining = viewModel.availableModels.filter { model in
             !surfaced.contains(model.id)
                 && selectedModality.matches(model)
                 && searchMatches(model)
         }
-        return ModelFamilyCatalog.families(from: remaining)
+        return ModelOrgCatalog.groups(from: remaining)
     }
 
     private var hasActiveFilters: Bool {
@@ -263,7 +263,7 @@ struct SimplifiedModelsView: View {
         Group {
             searchSection
 
-            if browseFamilies.isEmpty && !showsImageGenPlaceholder {
+            if browseOrgs.isEmpty && !showsImageGenPlaceholder {
                 Section {
                     emptyBrowseState
                 } header: {
@@ -271,10 +271,10 @@ struct SimplifiedModelsView: View {
                 }
             } else {
                 Section {
-                    ForEach(browseFamilies) { family in
+                    ForEach(browseOrgs) { group in
                         NavigationLink {
-                            ModelFamilyDetailView(
-                                family: family,
+                            ModelOrgDetailView(
+                                group: group,
                                 tier: hardwareTier,
                                 selectedModelID: selectedModel?.id,
                                 isLoadingModel: viewModel.isLoadingModel,
@@ -282,12 +282,12 @@ struct SimplifiedModelsView: View {
                                 handlers: handlers
                             )
                         } label: {
-                            ModelFamilyRow(family: family)
+                            ModelOrgRow(group: group)
                         }
                     }
 
                     if showsImageGenPlaceholder {
-                        ComingSoonFamilyRow(
+                        ComingSoonOrgRow(
                             title: "Image Generation",
                             tagline: "Apple on-device image generation",
                             systemImage: "photo.artframe"
@@ -296,7 +296,7 @@ struct SimplifiedModelsView: View {
                 } header: {
                     Text("Browse Models")
                 } footer: {
-                    Text("Pick a family, then choose the size that fits. We preselect the best one for you.")
+                    Text("Pick an organisation, then choose the model that fits. We preselect the best one for you.")
                         .font(AppTypography.caption)
                 }
             }
@@ -308,7 +308,7 @@ struct SimplifiedModelsView: View {
     /// query is empty or plausibly matches it.
     private var showsImageGenPlaceholder: Bool {
         guard selectedModality.showsImageGenerationPlaceholder else { return false }
-        guard !browseFamilies.contains(where: { $0.category == .imageGeneration }) else { return false }
+        guard !browseOrgs.contains(where: { $0.category == .imageGeneration }) else { return false }
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !query.isEmpty else { return true }
         return "image generation apple coreml photo art".contains(query)

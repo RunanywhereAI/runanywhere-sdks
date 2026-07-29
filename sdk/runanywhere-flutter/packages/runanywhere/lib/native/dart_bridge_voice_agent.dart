@@ -23,6 +23,7 @@ import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/voice_agent_service.pb.dart'
     as voice_agent_pb;
 import 'package:runanywhere/generated/voice_events.pb.dart' as voice_events_pb;
@@ -181,7 +182,7 @@ class DartBridgeVoiceAgent {
     final result = NativeFunctions.voiceAgentInitializeWithLoadedModels(handle);
     if (result != RAC_SUCCESS) {
       throw StateError(
-        'Failed to initialize voice agent: ${RacResultCode.getMessage(result)}',
+        'Failed to initialize voice agent: ${RacResultCodes.message(result)}',
       );
     }
     _logger.info('Voice agent initialized with loaded models');
@@ -458,7 +459,7 @@ class DartBridgeVoiceAgent {
       );
       if (status != RAC_SUCCESS) {
         throw StateError(
-          'Response generation failed: ${RacResultCode.getMessage(status)}',
+          'Response generation failed: ${RacResultCodes.message(status)}',
         );
       }
       return resultPtr.value != nullptr ? resultPtr.value.toDartString() : '';

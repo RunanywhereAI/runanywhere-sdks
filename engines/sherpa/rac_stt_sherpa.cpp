@@ -37,8 +37,8 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
         return RAC_ERROR_NULL_POINTER;
     }
 
-    std::unique_ptr<rac_sherpa_stt_handle_impl> handle(
-        new (std::nothrow) rac_sherpa_stt_handle_impl());
+    std::unique_ptr<rac_sherpa_stt_handle_impl> handle(new (std::nothrow)
+                                                           rac_sherpa_stt_handle_impl());
     if (!handle) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
@@ -75,6 +75,12 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
                     break;
                 case RAC_STT_SHERPA_MODEL_NEMO_CTC:
                     model_type = runanywhere::STTModelType::NEMO_CTC;
+                    break;
+                case RAC_STT_SHERPA_MODEL_TRANSDUCER:
+                    model_type = runanywhere::STTModelType::TRANSDUCER;
+                    break;
+                case RAC_STT_SHERPA_MODEL_CANARY:
+                    model_type = runanywhere::STTModelType::CANARY;
                     break;
                 case RAC_STT_SHERPA_MODEL_AUTO:
                     // Auto-detect: let load_model figure it out from directory structure
@@ -200,17 +206,37 @@ rac_bool_t rac_stt_sherpa_supports_streaming(rac_handle_t handle) {
     return (h->stt && h->stt->supports_streaming()) ? RAC_TRUE : RAC_FALSE;
 }
 
-rac_result_t rac_stt_sherpa_create_stream(rac_handle_t handle, rac_handle_t* out_stream) {
+rac_bool_t rac_stt_sherpa_supports_persistent_streaming(rac_handle_t handle) {
+    if (handle == nullptr) {
+        return RAC_FALSE;
+    }
+    auto* h = static_cast<rac_sherpa_stt_handle_impl*>(handle);
+    return (h->stt && h->stt->supports_persistent_streaming()) ? RAC_TRUE : RAC_FALSE;
+}
+
+rac_result_t rac_stt_sherpa_create_stream_with_options(rac_handle_t handle,
+                                                       const rac_stt_options_t* options,
+                                                       rac_handle_t* out_stream) {
     if (handle == nullptr || out_stream == nullptr) {
         return RAC_ERROR_NULL_POINTER;
     }
+    *out_stream = nullptr;
 
     auto* h = static_cast<rac_sherpa_stt_handle_impl*>(handle);
     if (!h->stt) {
         return RAC_ERROR_INVALID_HANDLE;
     }
 
-    std::string stream_id = h->stt->create_stream();
+    nlohmann::json stream_config = nlohmann::json::object();
+    if (options) {
+        stream_config["sample_rate"] = options->sample_rate > 0 ? options->sample_rate : 16000;
+        stream_config["detect_language"] = options->detect_language == RAC_TRUE;
+        if (options->language && options->language[0] != '\0') {
+            stream_config["language"] = options->language;
+        }
+    }
+
+    std::string stream_id = h->stt->create_stream(stream_config);
     if (stream_id.empty()) {
         return RAC_ERROR_BACKEND_INIT_FAILED;
     }
@@ -221,6 +247,10 @@ rac_result_t rac_stt_sherpa_create_stream(rac_handle_t handle, rac_handle_t* out
     }
     *out_stream = static_cast<rac_handle_t>(stream_copy);
     return RAC_SUCCESS;
+}
+
+rac_result_t rac_stt_sherpa_create_stream(rac_handle_t handle, rac_handle_t* out_stream) {
+    return rac_stt_sherpa_create_stream_with_options(handle, nullptr, out_stream);
 }
 
 rac_result_t rac_stt_sherpa_feed_audio(rac_handle_t handle, rac_handle_t stream,
@@ -244,6 +274,43 @@ rac_result_t rac_stt_sherpa_feed_audio(rac_handle_t handle, rac_handle_t stream,
     bool success = h->stt->feed_audio(stream_id, samples, effective_rate);
 
     return success ? RAC_SUCCESS : RAC_ERROR_INFERENCE_FAILED;
+}
+
+rac_result_t rac_stt_sherpa_feed_stream_audio_chunk(rac_handle_t handle, rac_handle_t stream,
+                                                    const int16_t* samples, size_t count,
+                                                    rac_stt_stream_callback_t callback,
+                                                    void* user_data) {
+    if (handle == nullptr || stream == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    if (count > 0 && samples == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    auto* h = static_cast<rac_sherpa_stt_handle_impl*>(handle);
+    if (!h->stt) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    if (!h->stt->supports_persistent_streaming()) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    std::vector<float> float_samples(count);
+    if (count > 0) {
+        rac::audio::rac_audio_pcm16_to_float32(samples, count, float_samples.data());
+    }
+
+    std::vector<runanywhere::SherpaStreamUpdate> updates;
+    auto* stream_id = static_cast<char*>(stream);
+    if (!h->stt->feed_audio_and_decode(stream_id, float_samples, &updates)) {
+        return RAC_ERROR_INFERENCE_FAILED;
+    }
+    if (callback) {
+        for (const auto& update : updates) {
+            callback(update.text.c_str(), update.is_final ? RAC_TRUE : RAC_FALSE, user_data);
+        }
+    }
+    return RAC_SUCCESS;
 }
 
 rac_bool_t rac_stt_sherpa_stream_is_ready(rac_handle_t handle, rac_handle_t stream) {

@@ -542,6 +542,15 @@ endif()
 # archive to a known directory and add it to the linker search path so the
 # `-l` lookup succeeds.
 if(MSVC)
+    # zlib's own CMake gives the static target OUTPUT_NAME `zs` on Windows, but
+    # commons + libarchive reference it by the bare string `zlibstatic`
+    # (ZLIB_LIBRARIES=zlibstatic), so the link line looks for `zlibstatic.lib` —
+    # which never exists, producing LNK1181 the first time an executable links the
+    # chain. We build static-only (no shared zlib.lib to disambiguate from), so
+    # force the output name back to match the reference.
+    if(TARGET zlibstatic)
+        set_target_properties(zlibstatic PROPERTIES OUTPUT_NAME zlibstatic)
+    endif()
     foreach(_cfg Release Debug RelWithDebInfo MinSizeRel)
         string(TOUPPER "${_cfg}" _CFG)
         if(TARGET zlibstatic)
@@ -666,21 +675,19 @@ else()
         message(FATAL_ERROR "Missing credential-free development config template: ${DEV_CONFIG_TEMPLATE}")
     endif()
     set(RAC_DEV_CONFIG_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/development_config.cpp")
-    # The tracked template carries only "YOUR_*" placeholders (never real
-    # credentials). Release/CI builds substitute the real values from the
-    # environment (GitHub Actions secrets SUPABASE_URL / SUPABASE_ANON_KEY /
-    # BUILD_TOKEN) into the generated source — so credentials live in CI secrets,
-    # never in the public source tree. When the env is unset (normal local build)
-    # the placeholders pass through and the dev config stays the credential-free
-    # stub (usability checks treat "YOUR_*" as unavailable).
+    # The tracked template carries only the "YOUR_STAGING_BASE_URL" placeholder
+    # (never a real host). Release/CI builds substitute the neutral backend base
+    # URL from the environment (GitHub Actions secret STAGING_BASE_URL) into the
+    # generated source. When the env is unset (normal local build) the placeholder
+    # passes through and the dev config stays a stub (usability checks treat
+    # "YOUR_*" as unavailable). No credentials, project refs, or tokens are ever
+    # baked — only this neutral base URL.
     file(READ "${DEV_CONFIG_TEMPLATE}" _rac_dev_cfg)
-    if(NOT "$ENV{SUPABASE_URL}" STREQUAL "")
-        string(REPLACE "YOUR_SUPABASE_PROJECT_URL" "$ENV{SUPABASE_URL}" _rac_dev_cfg "${_rac_dev_cfg}")
-        string(REPLACE "YOUR_SUPABASE_ANON_KEY" "$ENV{SUPABASE_ANON_KEY}" _rac_dev_cfg "${_rac_dev_cfg}")
-        string(REPLACE "YOUR_BUILD_TOKEN" "$ENV{BUILD_TOKEN}" _rac_dev_cfg "${_rac_dev_cfg}")
-        message(STATUS "Injected development config from environment (CI secrets)")
+    if(NOT "$ENV{STAGING_BASE_URL}" STREQUAL "")
+        string(REPLACE "YOUR_STAGING_BASE_URL" "$ENV{STAGING_BASE_URL}" _rac_dev_cfg "${_rac_dev_cfg}")
+        message(STATUS "Injected staging base URL from environment (CI secret)")
     else()
-        message(STATUS "Using credential-free development config stub")
+        message(STATUS "Using placeholder staging base URL (no baked backend URL)")
     endif()
     file(WRITE "${RAC_DEV_CONFIG_SOURCE}" "${_rac_dev_cfg}")
 endif()
@@ -812,11 +819,6 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # rac::http::execute / execute_stream. The facade routes through the
     # platform transport vtable above and has no portable HTTP fallback.
     src/infrastructure/http/rac_http_internal.cpp
-    # Supabase-style upsert request flag. Lets platform SDKs
-    # arm a request via `rac_http_request_set_upsert_mode`; the dispatch
-    # sites in rac_http_client_default.cpp / rac_http_client_emscripten.cpp
-    # consume it and apply the on_conflict URL rewrite + Prefer header.
-    src/infrastructure/http/rac_http_upsert_mode.cpp
     # Process-wide Hugging Face token (rac_http_hf_token_set + HF_TOKEN env
     # fallback). The dispatch sites attach `Authorization: Bearer` to
     # huggingface.co/hf.co requests so downloads, HEAD preflight, and the
@@ -831,6 +833,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
     src/infrastructure/device/rac_device_manager.cpp
+    src/infrastructure/device/cpu_state.cpp
     # Persistent device-id resolution chain
     # (Keychain -> identifierForVendor -> generate UUID) collapsed from each
     # platform SDK into a single C entry point.
@@ -900,6 +903,16 @@ set(RAC_FEATURES_SOURCES
     src/features/stt/rac_stt_stream.cpp
     # Canonical STTConfiguration defaults helper
     src/features/stt/rac_stt_config_defaults.cpp
+    # Standalone speaker diarization (offline + persistent stream sessions)
+    src/features/diarization/diarization_module.cpp
+    src/features/diarization/rac_diarization_service.cpp
+    src/features/diarization/rac_diarization_stream.cpp
+    # Semantic image segmentation (source-dimension uint16 class masks)
+    src/features/segmentation/segmentation_module.cpp
+    src/features/segmentation/rac_segmentation_service.cpp
+    # Cross-encoder reranking (query × candidate relevance scoring)
+    src/features/rerank/rerank_module.cpp
+    src/features/rerank/rac_rerank_service.cpp
     # TTS
     # W4: unified module — merges tts_component.cpp + TTS slice of
     # rac_nonllm_lifecycle_proto_abi.cpp.
@@ -1071,6 +1084,16 @@ endif()
 # without their public-API #warning. SDK code outside commons does NOT see
 # this define, so accidental SDK-side inclusion still triggers the warning.
 target_compile_definitions(rac_commons PRIVATE RAC_BUILDING_COMMONS=1)
+
+# Windows/MSVC: <winnt.h> defines ERROR_SEVERITY_SUCCESS/INFORMATIONAL/WARNING/ERROR
+# and <wingdi.h> defines ERROR as macros that collide with generated protobuf enum
+# values (e.g. runanywhere::ErrorSeverity::ERROR_SEVERITY_WARNING in errors.pb.h).
+# Force-include a compat header that pulls <windows.h> once, then #undefs them; the
+# windows.h include guard keeps them gone for the rest of each TU. No proto drift.
+if(MSVC)
+    target_compile_options(rac_commons PRIVATE
+        "/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/win_msvc_compat.h")
+endif()
 
 # Canonical SDK version string (from the VERSION file) injected as a compile
 # define so rac_get_version()/rac_sdk_get_version() return the real release
@@ -1361,6 +1384,9 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/tool_calling.pb.cc
     ${_RAC_PROTO_GEN_DIR}/structured_output.pb.cc
     ${_RAC_PROTO_GEN_DIR}/stt_options.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/diarization.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/segmentation.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/rerank.pb.cc
     ${_RAC_PROTO_GEN_DIR}/tts_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/vad_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/vlm_options.pb.cc
@@ -1430,6 +1456,11 @@ if(RAC_ENABLE_PROTOBUF)
         set(protobuf_BUILD_EXAMPLES        OFF CACHE BOOL "" FORCE)
         set(protobuf_INSTALL               OFF CACHE BOOL "" FORCE)
         set(protobuf_BUILD_SHARED_LIBS     OFF CACHE BOOL "" FORCE)
+        # protobuf defaults protobuf_MSVC_STATIC_RUNTIME=ON (static CRT /MT), but
+        # the rest of the build (rac_commons, llama.cpp, libarchive, desktop exes,
+        # and the Node .node addon) uses the dynamic CRT /MD. Mixing /MT and /MD in
+        # one link fails with LNK2038; Node/Electron require /MD. Force /MD here.
+        set(protobuf_MSVC_STATIC_RUNTIME   OFF CACHE BOOL "" FORCE)
         set(protobuf_WITH_ZLIB             OFF CACHE BOOL "" FORCE)
         # Skip building upb (Universal Protocol Buffers) entirely. Upstream
         # protobuf v34 builds protoc-gen-upb / protoc-gen-upbdefs /

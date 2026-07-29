@@ -103,11 +103,13 @@ class RunAnywhereApplication : Application() {
         val hasBackendConfig =
             BuildConfig.RUNANYWHERE_API_KEY.isNotBlank() &&
                 BuildConfig.RUNANYWHERE_BASE_URL.isNotBlank()
-        val environment = if (hasBackendConfig) {
-            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
-        } else {
-            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-        }
+        // No API key → development (keyless OSS → baked staging backend /
+        // PUBLIC org). With key+URL → production (org-scoped JWT path).
+         val environment = if (hasBackendConfig) {
+             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+         } else {
+             SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+         }
         RunAnywhere.initialize(
             context = this@RunAnywhereApplication,
             apiKey = BuildConfig.RUNANYWHERE_API_KEY.takeIf {
@@ -116,8 +118,6 @@ class RunAnywhereApplication : Application() {
             baseURL = BuildConfig.RUNANYWHERE_BASE_URL.takeIf {
                 environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             },
-            // Configured app builds always use the full production diagnostics tier.
-            // Unconfigured local builds retain the SDK development fallback.
             environment = environment,
         )
         // QHexRT (Qualcomm Hexagon NPU). Registration is rejected internally on parts outside
@@ -137,7 +137,8 @@ class RunAnywhereApplication : Application() {
         }
         HybridDeviceState.setProvider(AndroidDeviceStateProvider(applicationContext))
         // Re-apply the persisted HuggingFace token (Settings screen) so private
-        // model repos (e.g. gated NPU bundles) download across app restarts.
+        // model repos (e.g. gated NPU bundles) download across app restarts. Sourced only from
+        // the user-provisioned token in protected app storage — never embedded in the APK.
         SettingsRepository.settings.hfToken.takeIf { it.isNotBlank() }?.let { RunAnywhere.setHfToken(it) }
         ModelBootstrap.setupModels()
         CloudProviderRepository.registerAll()

@@ -43,9 +43,12 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { Colors } from '../theme/colors';
-import { Typography } from '../theme/typography';
-import { Spacing, Padding, IconSize } from '../theme/spacing';
+import {
+  typography,
+  useTheme,
+  useThemedStyles,
+  type ColorScheme,
+} from '../theme/system';
 import { ModelRequiredOverlay } from '../components/common';
 import { ChatHeader } from '../features/chat/components/ChatHeader';
 import { PromptSuggestions } from '../features/chat/components/PromptSuggestions';
@@ -119,6 +122,8 @@ function makeToolCallInfo(
 }
 
 export const ChatScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   // Conversation store
   const {
     conversations,
@@ -755,8 +760,8 @@ export const ChatScreen: React.FC = () => {
       <View style={styles.emptyIconContainer}>
         <Icon
           name="chatbubble-ellipses-outline"
-          size={IconSize.large}
-          color={Colors.textTertiary}
+          size={48}
+          color={colors.outline}
         />
       </View>
       <Text style={styles.emptyTitle}>Start a conversation</Text>
@@ -798,7 +803,17 @@ export const ChatScreen: React.FC = () => {
 
       {showConnectBanner && (
         <View style={[styles.connectBanner, { top: insets.top + 64 }]}>
-          <View style={styles.connectBannerIcon}>
+          <View
+            style={[
+              styles.connectBannerIcon,
+              {
+                backgroundColor:
+                  connectState.status === 'connected'
+                    ? colors.success
+                    : colors.error,
+              },
+            ]}
+          >
             <Icon
               name={
                 connectState.status === 'connected'
@@ -806,11 +821,7 @@ export const ChatScreen: React.FC = () => {
                   : 'alert-circle-outline'
               }
               size={24}
-              color={
-                connectState.status === 'connected'
-                  ? Colors.statusGreen
-                  : Colors.primaryRed
-              }
+              color={colors.onPrimary}
             />
           </View>
           <View style={styles.connectBannerText}>
@@ -834,7 +845,7 @@ export const ChatScreen: React.FC = () => {
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => setShowConnectBanner(false)}>
-            <Icon name="close" size={22} color={Colors.textTertiary} />
+            <Icon name="close" size={22} color={colors.onSurfaceVariant} />
           </TouchableOpacity>
         </View>
       )}
@@ -882,9 +893,7 @@ export const ChatScreen: React.FC = () => {
                   name="sparkles"
                   size={14}
                   color={
-                    loraAdapterCount > 0
-                      ? Colors.textWhite
-                      : Colors.primaryPurple
+                    loraAdapterCount > 0 ? colors.onPrimary : colors.primary
                   }
                 />
                 <Text
@@ -979,156 +988,123 @@ export const ChatScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundPrimary,
-  },
-  connectBanner: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 50,
-    minHeight: 68,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.96)',
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    shadowColor: '#000000',
-    shadowOpacity: 0.14,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
-  connectBannerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.badgeGreen,
-  },
-  connectBannerText: {
-    flex: 1,
-  },
-  connectBannerTitle: {
-    ...Typography.headline,
-    color: Colors.textPrimary,
-  },
-  connectBannerSubtitle: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  connectBannerAction: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: Colors.backgroundSecondary,
-  },
-  connectBannerActionText: {
-    ...Typography.caption,
-    color: Colors.primaryRed,
-    fontWeight: '600',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Padding.padding16,
-    paddingTop: 0,
-    paddingBottom: Padding.padding12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderLight,
-  },
-  titleContainer: {
-    alignItems: 'center',
-  },
-  title: {
-    ...Typography.title2,
-    color: Colors.textPrimary,
-  },
-  conversationCount: {
-    ...Typography.caption2,
-    color: Colors.textTertiary,
-    marginTop: 2,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.small,
-  },
-  headerButton: {
-    padding: Spacing.small,
-  },
-  headerButtonDisabled: {
-    opacity: 0.5,
-  },
-  list: {
-    flex: 1,
-  },
-  messagesList: {
-    paddingVertical: Spacing.medium,
-  },
-  emptyList: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: Padding.padding40,
-  },
-  emptyIconContainer: {
-    width: IconSize.huge,
-    height: IconSize.huge,
-    borderRadius: IconSize.huge / 2,
-    backgroundColor: Colors.backgroundSecondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.large,
-  },
-  emptyTitle: {
-    ...Typography.title3,
-    color: Colors.textPrimary,
-    marginBottom: Spacing.small,
-  },
-  emptySubtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    maxWidth: 280,
-  },
-  loraRow: {
-    flexDirection: 'row',
-    paddingHorizontal: Padding.padding16,
-    paddingTop: 2,
-    paddingBottom: 6,
-  },
-  loraPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: Colors.primaryPurple,
-    borderRadius: 14,
-    paddingHorizontal: Padding.padding12,
-    paddingVertical: 4,
-  },
-  loraPillActive: {
-    backgroundColor: Colors.primaryPurple,
-  },
-  loraPillText: {
-    ...Typography.caption2,
-    color: Colors.primaryPurple,
-  },
-  loraPillTextActive: {
-    color: Colors.textWhite,
-  },
-});
+const createStyles = (colors: ColorScheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    connectBanner: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      zIndex: 50,
+      minHeight: 68,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 24,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      shadowColor: '#000000',
+      shadowOpacity: 0.14,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 8,
+    },
+    connectBannerIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    connectBannerText: {
+      flex: 1,
+    },
+    connectBannerTitle: {
+      ...typography.titleMedium,
+      color: colors.onSurface,
+    },
+    connectBannerSubtitle: {
+      ...typography.labelSmall,
+      color: colors.onSurfaceVariant,
+      marginTop: 2,
+    },
+    connectBannerAction: {
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      borderRadius: 999,
+      backgroundColor: colors.surfaceContainer,
+    },
+    connectBannerActionText: {
+      ...typography.labelSmall,
+      color: colors.error,
+      fontWeight: '600',
+    },
+    list: {
+      flex: 1,
+    },
+    messagesList: {
+      paddingVertical: 10,
+    },
+    emptyList: {
+      flexGrow: 1,
+      justifyContent: 'center',
+    },
+    emptyState: {
+      alignItems: 'center',
+      padding: 40,
+    },
+    emptyIconContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.surfaceContainer,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    emptyTitle: {
+      ...typography.titleLarge,
+      color: colors.onSurface,
+      marginBottom: 6,
+    },
+    emptySubtitle: {
+      ...typography.bodyLarge,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      maxWidth: 280,
+    },
+    loraRow: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingTop: 2,
+      paddingBottom: 6,
+    },
+    loraPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+    },
+    loraPillActive: {
+      backgroundColor: colors.primary,
+    },
+    loraPillText: {
+      ...typography.labelSmall,
+      color: colors.primary,
+    },
+    loraPillTextActive: {
+      color: colors.onPrimary,
+    },
+  });
 
 export default ChatScreen;

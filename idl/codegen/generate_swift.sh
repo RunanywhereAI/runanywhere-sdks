@@ -40,8 +40,12 @@ if [ -z "${RAC_PROTO_FILES:-}" ]; then
 fi
 
 # Language-specific exclusions (basenames of .proto files to skip).
-# Empty today — every schema in idl/ is emitted for Swift.
-RAC_PROTO_EXCLUDES_SWIFT=()
+# sdk_defaults.proto is the central default pool: it carries rac_default
+# annotations and nothing sends its messages over a wire, so no message types
+# are emitted for it. idl/codegen/generate_defaults_pool.py turns it into plain
+# per-language constants instead. Mirrors DECLARATION_ONLY_FILES in
+# idl/codegen/_convenience_common.py.
+RAC_PROTO_EXCLUDES_SWIFT=(sdk_defaults.proto)
 
 MESSAGE_PROTOS=()
 while IFS= read -r proto_path; do

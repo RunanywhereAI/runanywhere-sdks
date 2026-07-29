@@ -5,8 +5,11 @@
  *
  * @internal @experimental
  *
- * INTERNAL/EXPERIMENTAL — NOT a stable public surface. The T6.1 Worker
- * streaming path ships as scaffolding only: no production backend
+ * INTERNAL/EXPERIMENTAL — NOT a stable public surface. This stream-only
+ * bridge is retained for compatibility while Stage 3's `BackendWorkerHost`
+ * / `runBackendWorker` RPC path becomes the production successor. New
+ * modality work must target that backend-neutral protocol, not this bridge.
+ * The T6.1 Worker streaming path ships as scaffolding only: no production backend
  * (`@runanywhere/web-llamacpp`, `@runanywhere/web-onnx`) currently
  * installs the `StreamWorkerFactory` or calls `setStreamWorkerInit`, so
  * `OffscreenRuntimeBridge.tryGet()` returns `null` in every production
@@ -63,6 +66,7 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from './StreamWorker.js';
+import { workerDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('OffscreenRuntimeBridge');
 
@@ -474,7 +478,7 @@ let _warnedNoInit = false;
  * so the timer only fires on genuine breakage (404 worker bundle,
  * malformed wasm, throw-before-onmessage). See pass2-syn-092.
  */
-const HANDSHAKE_TIMEOUT_MS = 10_000;
+const HANDSHAKE_TIMEOUT_MS = workerDefaults.handshakeTimeoutMs;
 
 function toRequestKind(req: BridgeStreamRequest): StreamRequestKind {
   return req.kind;

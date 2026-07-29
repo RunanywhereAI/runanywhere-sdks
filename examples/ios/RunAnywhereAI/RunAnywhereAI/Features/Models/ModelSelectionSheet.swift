@@ -23,6 +23,8 @@ enum ModelSelectionContext {
     case vlm           // Vision Language Model - show VLM frameworks
     case ragEmbedding  // RAG embedding model - ONNX language/embedding models
     case ragLLM        // RAG generation model - LLM for answering questions
+    case diarization   // Speaker diarization - BYO ONNX Sortformer
+    case segmentation  // Semantic segmentation - BYO SegFormer
 
     var title: String {
         switch self {
@@ -34,6 +36,8 @@ enum ModelSelectionContext {
         case .vlm: return "Choose Vision Model"
         case .ragEmbedding: return "Choose Document Model"
         case .ragLLM: return "Choose Answer Model"
+        case .diarization: return "Choose Diarization Model"
+        case .segmentation: return "Choose Segmentation Model"
         }
     }
 
@@ -55,6 +59,10 @@ enum ModelSelectionContext {
             return [.embedding]
         case .ragLLM:
             return [.language]
+        case .diarization:
+            return [.speakerDiarization]
+        case .segmentation:
+            return [.semanticSegmentation]
         }
     }
 
@@ -62,12 +70,18 @@ enum ModelSelectionContext {
     var allowedFrameworks: Set<InferenceFramework>? {
         switch self {
         case .ragEmbedding:
-            return [.onnx, .mlx]
+            return [.llamaCpp, .onnx, .mlx]
         case .ragLLM:
             return [.llamaCpp, .mlx]
         default:
             return nil
         }
+    }
+
+    /// Reserved for BYO folder modalities. Catalog diarization / segmentation
+    /// use Get → Use like STT; keep this false so the import CTA stays hidden.
+    var supportsFolderImport: Bool {
+        false
     }
 }
 
@@ -141,7 +155,7 @@ struct ModelSelectionSheet: View {
     }
 
     /// The single best-for-device model for this scoped context, highlighted at
-    /// the top of the picker.
+    /// the top of the picker with Get / Use.
     private var recommendedModel: RAModelInfo? {
         let selection = recommendationEngine.recommend(
             tier: hardwareTier,
@@ -160,17 +174,33 @@ struct ModelSelectionSheet: View {
             pick = selection.recommendedVLM
         case .ragEmbedding:
             pick = selection.recommendedEmbedding
-        case .vad:
-            pick = nil
+        case .vad, .diarization, .segmentation:
+            // Single-model (or tiny) catalogs: put the smallest candidate in
+            // Recommended so Get/Use is one tap — don't bury it behind
+            // "Open source · 1 model".
+            pick = candidateModels
+                .sorted { $0.consumerSizeBytes < $1.consumerSizeBytes }
+                .first
         }
         guard let pick, candidateModels.contains(where: { $0.id == pick.id }) else { return nil }
         return pick
     }
 
-    /// Families over all scoped candidates. The recommended pick stays in its
-    /// family too, so every family detail shows its complete variant list.
-    private var browseFamilies: [ModelFamily] {
-        ModelFamilyCatalog.families(from: filteredModels)
+    /// Tiny catalogs (VAD / diarization / SegFormer) skip the org drill-down
+    /// and list models with Get/Use inline.
+    private var prefersFlatModelList: Bool {
+        switch context {
+        case .vad, .diarization, .segmentation:
+            return true
+        default:
+            return filteredModels.count <= 3
+        }
+    }
+
+    /// Organisations over all scoped candidates. The recommended pick stays in
+    /// its org too, so every org detail shows its complete model list.
+    private var browseOrgs: [ModelOrgGroup] {
+        ModelOrgCatalog.groups(from: filteredModels)
     }
 
     private var handlers: ModelActionHandlers {
@@ -192,7 +222,7 @@ struct ModelSelectionSheet: View {
                     connectSection
                     #endif
                     recommendedSection
-                    familiesSection
+                    orgsSection
                 }
                 if isLoadingModel {
                     LoadingModelOverlay(loadingProgress: loadingProgress)
@@ -469,38 +499,93 @@ struct ModelSelectionSheet: View {
                 )
             } header: {
                 Label("Recommended", systemImage: "sparkles")
+            } footer: {
+                if prefersFlatModelList {
+                    Text("Tap Get to download (~\(recommended.consumerSizeLabel)), then Use to load.")
+                        .font(AppTypography.caption)
+                }
             }
         }
     }
 
-    @ViewBuilder private var familiesSection: some View {
-        if browseFamilies.isEmpty {
+    @ViewBuilder private var orgsSection: some View {
+        if filteredModels.isEmpty {
             Section {
                 emptyStateView
             } header: {
                 Text("Browse Models")
             }
-        } else {
-            Section {
-                ForEach(browseFamilies) { family in
-                    NavigationLink {
-                        ModelFamilyDetailView(
-                            family: family,
-                            tier: hardwareTier,
-                            selectedModelID: selectedModel?.id,
+        } else if prefersFlatModelList {
+            // Avoid "Open source · 1 model" with no Get button on the first screen.
+            // When Recommended already shows the only/best pick, don't duplicate it.
+            let recommendedID = searchText.isEmpty ? recommendedModel?.id : nil
+            let models = filteredModels
+                .filter { $0.id != recommendedID }
+                .sorted { $0.consumerSizeBytes < $1.consumerSizeBytes }
+            if !models.isEmpty {
+                Section {
+                    ForEach(models, id: \.id) { model in
+                        ModelVariantRow(
+                            variant: model,
+                            highlight: nil,
+                            availabilityReason: unavailableReason(for: model),
+                            isSelected: selectedModel?.id == model.id,
                             isLoadingModel: isLoadingModel,
-                            availabilityReason: unavailableReason(for:),
                             handlers: handlers
                         )
-                    } label: {
-                        ModelFamilyRow(family: family)
                     }
+                } header: {
+                    Text("Available models")
+                } footer: {
+                    Text("Tap Get to download, then Use to load.")
+                        .font(AppTypography.caption)
                 }
-            } header: {
-                Text("Browse Models")
-            } footer: {
-                Text("Pick a family, then choose the size that fits. Tap Use to switch models.")
-                    .font(AppTypography.caption)
+            }
+        } else {
+            let ready = browseOrgs.filter { $0.hasReadyVariant }
+            let rest = browseOrgs.filter { !$0.hasReadyVariant }
+            if !ready.isEmpty {
+                Section {
+                    ForEach(ready) { group in
+                        NavigationLink {
+                            ModelOrgDetailView(
+                                group: group,
+                                tier: hardwareTier,
+                                selectedModelID: selectedModel?.id,
+                                isLoadingModel: isLoadingModel,
+                                availabilityReason: unavailableReason(for:),
+                                handlers: handlers
+                            )
+                        } label: {
+                            ModelOrgRow(group: group)
+                        }
+                    }
+                } header: {
+                    Text("On this device")
+                }
+            }
+            if !rest.isEmpty {
+                Section {
+                    ForEach(rest) { group in
+                        NavigationLink {
+                            ModelOrgDetailView(
+                                group: group,
+                                tier: hardwareTier,
+                                selectedModelID: selectedModel?.id,
+                                isLoadingModel: isLoadingModel,
+                                availabilityReason: unavailableReason(for:),
+                                handlers: handlers
+                            )
+                        } label: {
+                            ModelOrgRow(group: group)
+                        }
+                    }
+                } header: {
+                    Text(ready.isEmpty ? "All organisations" : "More organisations")
+                } footer: {
+                    Text("Pick an organisation, then choose the model that fits. Tap Use to switch.")
+                        .font(AppTypography.caption)
+                }
             }
         }
     }
@@ -509,14 +594,17 @@ struct ModelSelectionSheet: View {
         VStack(alignment: .center, spacing: AppSpacing.mediumLarge) {
             if candidateModels.isEmpty {
                 ProgressView()
+                Text("Loading available models...")
+                    .font(AppTypography.subheadline)
+                    .foregroundColor(AppColors.textSecondary)
             } else {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundColor(AppColors.textSecondary.opacity(0.7))
+                Text("No models match your search")
+                    .font(AppTypography.subheadline)
+                    .foregroundColor(AppColors.textSecondary)
             }
-            Text(candidateModels.isEmpty ? "Loading available models..." : "No models match your search")
-                .font(AppTypography.subheadline)
-                .foregroundColor(AppColors.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, AppSpacing.xLarge)
@@ -599,6 +687,8 @@ extension ModelSelectionSheet {
         case .vad: category = .voiceActivityDetection
         case .voice: category = voiceContextCategory(for: model)
         case .vlm: category = .multimodal
+        case .diarization: category = .speakerDiarization
+        case .segmentation: category = .semanticSegmentation
         case .ragEmbedding, .ragLLM:
             // RAG models are referenced by local file path at pipeline creation time,
             // not pre-loaded into memory via the SDK model loader.

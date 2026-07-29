@@ -1353,6 +1353,7 @@ class GenerationEvent extends $pb.GeneratedMessage {
     $core.String? modelName,
     $core.double? durationMs,
     $core.int? framework,
+    $fixnum.Int64? promptEvalTimeMs,
   }) {
     final result = create();
     if (kind != null) result.kind = kind;
@@ -1392,6 +1393,7 @@ class GenerationEvent extends $pb.GeneratedMessage {
     if (modelName != null) result.modelName = modelName;
     if (durationMs != null) result.durationMs = durationMs;
     if (framework != null) result.framework = framework;
+    if (promptEvalTimeMs != null) result.promptEvalTimeMs = promptEvalTimeMs;
     return result;
   }
 
@@ -1443,6 +1445,7 @@ class GenerationEvent extends $pb.GeneratedMessage {
     ..aOS(31, _omitFieldNames ? '' : 'modelName')
     ..aD(32, _omitFieldNames ? '' : 'durationMs')
     ..aI(33, _omitFieldNames ? '' : 'framework')
+    ..aInt64(34, _omitFieldNames ? '' : 'promptEvalTimeMs')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1778,6 +1781,15 @@ class GenerationEvent extends $pb.GeneratedMessage {
   $core.bool hasFramework() => $_has(32);
   @$pb.TagNumber(33)
   void clearFramework() => $_clearField(33);
+
+  @$pb.TagNumber(34)
+  $fixnum.Int64 get promptEvalTimeMs => $_getI64(33);
+  @$pb.TagNumber(34)
+  set promptEvalTimeMs($fixnum.Int64 value) => $_setInt64(33, value);
+  @$pb.TagNumber(34)
+  $core.bool hasPromptEvalTimeMs() => $_has(33);
+  @$pb.TagNumber(34)
+  void clearPromptEvalTimeMs() => $_clearField(34);
 }
 
 /// ---------------------------------------------------------------------------

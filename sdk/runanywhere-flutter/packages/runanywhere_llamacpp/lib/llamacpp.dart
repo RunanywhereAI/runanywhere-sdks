@@ -28,7 +28,7 @@
 library;
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere_llamacpp/native/llamacpp_bindings.dart';
 
 /// LlamaCPP module for LLM text generation.
@@ -89,11 +89,11 @@ class LlamaCpp {
 
       final result = _bindings!.register();
       _logger.info(
-          'rac_backend_llamacpp_register() returned: $result (${RacResultCode.getMessage(result)})');
+          'rac_backend_llamacpp_register() returned: $result (${RacResultCodes.message(result)})');
 
       // RAC_SUCCESS = 0, RAC_ERROR_MODULE_ALREADY_REGISTERED = specific code
-      if (result != RacResultCode.success &&
-          result != RacResultCode.errorModuleAlreadyRegistered) {
+      if (result != RacResultCodes.success &&
+          result != RacResultCodes.errorModuleAlreadyRegistered) {
         _logger.error('C++ backend registration FAILED with code: $result');
         return;
       }

@@ -19,6 +19,9 @@ require_command() {
 
 verify_output() {
   local output_root="${1:-dist}"
+  # Five canonical JS/WASM pairs = ten SDK runtime files (core, llama CPU,
+  # llama WebGPU, speech CPU, speech WebGPU). Diffusion is workspace-only and
+  # must not be added here until it ships WASM.
   local required_files=(
     index.html
     coi-serviceworker.js
@@ -30,6 +33,8 @@ verify_output() {
     assets/racommons-llamacpp-webgpu.wasm
     assets/racommons-onnx-sherpa.js
     assets/racommons-onnx-sherpa.wasm
+    assets/racommons-onnx-sherpa-webgpu.js
+    assets/racommons-onnx-sherpa-webgpu.wasm
   )
   local invalid_files=()
   local relative_path

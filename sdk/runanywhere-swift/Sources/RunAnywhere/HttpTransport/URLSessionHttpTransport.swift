@@ -44,8 +44,8 @@ public enum URLSessionHttpTransport {
     /// responses).
     fileprivate static let sharedSession: URLSession = { // swiftlint:disable:this strict_fileprivate
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 60
-        config.timeoutIntervalForResource = 600
+        config.timeoutIntervalForRequest = TimeInterval(RADefaults.Network.requestTimeoutMs) / 1000.0
+        config.timeoutIntervalForResource = TimeInterval(RADefaults.Network.resourceTimeoutMs) / 1000.0
         config.urlCache = nil
         config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         config.httpAdditionalHeaders = nil
@@ -520,10 +520,10 @@ private enum RequestExecutor { // swiftlint:disable:this unused_declaration
             let config = URLSessionConfiguration.default
             config.timeoutIntervalForRequest = snapshot.timeoutMs > 0
                 ? TimeInterval(snapshot.timeoutMs) / 1000.0
-                : 60
+                : TimeInterval(RADefaults.Network.requestTimeoutMs) / 1000.0
             // Resource timeout covers the whole transfer; a 10 GB GGUF
             // over a slow cellular link can legitimately run for hours.
-            config.timeoutIntervalForResource = 24 * 60 * 60
+            config.timeoutIntervalForResource = TimeInterval(RADefaults.Network.streamingTimeoutMs) / 1000.0
             config.urlCache = nil
             config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
             // Streaming downloads benefit from NSURLSession queuing a

@@ -57,6 +57,8 @@ constexpr int32_t kProtoMcMultimodal = 6;
 constexpr int32_t kProtoMcAudio = 7;
 constexpr int32_t kProtoMcEmbedding = 8;
 constexpr int32_t kProtoMcVoiceActivityDetection = 9;
+constexpr int32_t kProtoMcSpeakerDiarization = 10;
+constexpr int32_t kProtoMcSemanticSegmentation = 11;
 
 // ModelSource
 constexpr int32_t kProtoMsUnspecified = 0;
@@ -242,6 +244,12 @@ rac_result_t rac_model_category_from_proto(int32_t proto_value, rac_model_catego
         case kProtoMcVoiceActivityDetection:
             *out = RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
             return RAC_SUCCESS;
+        case kProtoMcSpeakerDiarization:
+            *out = RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION;
+            return RAC_SUCCESS;
+        case kProtoMcSemanticSegmentation:
+            *out = RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION;
+            return RAC_SUCCESS;
         default:
             *out = RAC_MODEL_CATEGORY_UNKNOWN;
             return RAC_ERROR_INVALID_ARGUMENT;
@@ -279,6 +287,12 @@ rac_result_t rac_model_category_to_proto(rac_model_category_t value, int32_t* ou
             return RAC_SUCCESS;
         case RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
             *out = kProtoMcVoiceActivityDetection;
+            return RAC_SUCCESS;
+        case RAC_MODEL_CATEGORY_SPEAKER_DIARIZATION:
+            *out = kProtoMcSpeakerDiarization;
+            return RAC_SUCCESS;
+        case RAC_MODEL_CATEGORY_SEMANTIC_SEGMENTATION:
+            *out = kProtoMcSemanticSegmentation;
             return RAC_SUCCESS;
         case RAC_MODEL_CATEGORY_UNKNOWN:
             // No proto equivalent — map to UNSPECIFIED (0).

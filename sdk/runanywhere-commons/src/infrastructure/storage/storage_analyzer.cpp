@@ -64,6 +64,14 @@ int64_t clamp_non_negative(int64_t value) {
     return value < 0 ? 0 : value;
 }
 
+// Built-in platform pseudo-models (Apple Foundation Models, System TTS,
+// CoreML Diffusion) register with a "builtin://" local_path and have no
+// on-disk artifact, so they are not user-manageable storage entries.
+bool is_builtin_pseudo_model(const rac_model_info_t* model) {
+    return model != nullptr && model->local_path != nullptr &&
+           std::strncmp(model->local_path, "builtin://", 10) == 0;
+}
+
 float used_percent(int64_t total, int64_t used) {
     if (total <= 0 || used <= 0) {
         return 0.0f;
@@ -415,7 +423,7 @@ std::vector<DeleteCandidateRow> collect_model_delete_candidates(
         for (size_t i = 0; i < model_count; ++i) {
             const rac_model_info_t* current = models[i];
             if (!current || !current->id || !current->local_path ||
-                std::strlen(current->local_path) == 0) {
+                std::strlen(current->local_path) == 0 || is_builtin_pseudo_model(current)) {
                 continue;
             }
             add_model_candidate_from_info(handle, current, current->id, options.allow_loaded_models,
@@ -631,13 +639,18 @@ rac_result_t rac_storage_analyzer_analyze(rac_storage_analyzer_handle_t handle,
         }
     }
 
-    out_info->model_count = model_count;
     out_info->total_models_size = 0;
 
-    // Calculate metrics for each model
+    // Calculate metrics for each model. Built-in pseudo-models are skipped:
+    // they have no bytes on disk, so reporting them as 0-byte "downloaded
+    // models" only misleads storage UIs (issue #272's "Zero KB" rows).
+    size_t metrics_count = 0;
     for (size_t i = 0; i < model_count; i++) {
         const rac_model_info_t* model = models[i];
-        rac_model_storage_metrics_t* metrics = &out_info->models[i];
+        if (is_builtin_pseudo_model(model)) {
+            continue;
+        }
+        rac_model_storage_metrics_t* metrics = &out_info->models[metrics_count];
 
         // Copy model info
         metrics->model_id = model->id ? strdup(model->id) : nullptr;
@@ -678,7 +691,9 @@ rac_result_t rac_storage_analyzer_analyze(rac_storage_analyzer_handle_t handle,
         }
 
         out_info->total_models_size += metrics->size_on_disk;
+        metrics_count++;
     }
+    out_info->model_count = metrics_count;
 
     // Free the models array from registry
     rac_model_info_array_free(models, model_count);

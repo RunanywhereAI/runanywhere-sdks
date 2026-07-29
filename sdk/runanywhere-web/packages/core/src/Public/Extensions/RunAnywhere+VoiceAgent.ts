@@ -52,16 +52,29 @@ import {
   MessageRole,
   type ChatMessage,
 } from '@runanywhere/proto-ts/chat';
-import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule.js';
+import {
+  getModuleForCapability,
+  type EmscriptenRunanywhereModule,
+} from '../../runtime/EmscriptenModule.js';
+import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
+import { hasBackendWorkerOwnedModels } from '../../runtime/BackendWorkerModelOwnership.js';
+import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const logger = new SDKLogger('VoiceAgent');
 const VOICE_SYSTEM_PROMPT =
   'You are a helpful voice assistant. Respond in one or two short, natural, spoken sentences. ' +
   'Be direct, warm, and conversational. Do not use markdown, bullet points, code blocks, or emoji. ' +
   'If you are unsure or lack the information, say so briefly instead of guessing.';
-const VOICE_MAX_TOKENS = 200;
+// Web assembles its own LLM options in TypeScript rather than going through the
+// C++ voice orchestrator, so these have to be read from the pool explicitly.
+// They previously read 200 / 0.7 while the other four platforms inherited 96 /
+// 0.0 from commons, which made Web voice replies roughly twice as long and
+// non-deterministic.
+const VOICE_MAX_TOKENS = voiceAgentDefaults.maxTokens;
+const VOICE_TEMPERATURE = voiceAgentDefaults.temperature;
 const VOICE_MAX_HISTORY_ENTRIES = 20;
-const DEFAULT_VAD_ENERGY_THRESHOLD = 0.005;
+const DEFAULT_VAD_ENERGY_THRESHOLD = voiceAgentDefaults.speechRmsThreshold;
 const MODEL_VAD_PROBABILITY_THRESHOLD = 0.5;
 
 export type VoiceAgentAvailabilitySource =
@@ -111,6 +124,93 @@ export function setVoiceAgentProvider(provider: VoiceAgentProvider | null): void
   _provider = provider;
 }
 
+/**
+ * When BackendWorkers own STT/TTS/VAD/LLM, the native single-heap voice-agent
+ * handle cannot see those models (fopen against empty main MEMFS → Silero
+ * "does not exist", processVoiceTurn → RAC_ERROR_NOT_INITIALIZED). Compose
+ * turns through the public STT/LLM/TTS facades that already RPC to workers.
+ */
+function prefersSplitBackendVoiceAgent(): boolean {
+  if (hasBackendWorkerOwnedModels('onnx') || hasBackendWorkerOwnedModels('llamacpp')) {
+    return true;
+  }
+  const onnx = getActiveBackendWorkerHost('onnx');
+  const llama = getActiveBackendWorkerHost('llamacpp');
+  return onnx?.diagnostics.executionContext === 'worker'
+    && llama?.diagnostics.executionContext === 'worker';
+}
+
+/**
+ * Explicit backend-registration hook for the split-WASM voice pipeline.
+ * Backend bridges invoke this after their capability registrations; facade
+ * calls never manufacture a cross-WASM provider as a hidden default.
+ */
+export function registerVoiceAgentProvider(provider?: VoiceAgentProvider): boolean {
+  // Explicit caller-provided providers always win.
+  let resolved = provider ?? null;
+  const nativeAvailable = VoiceAgentProtoAdapter.tryDefault()?.supportsProtoVoiceAgent() ?? false;
+
+  // Production off-main-thread path: STT/TTS/LLM live in DedicatedWorkers.
+  // Prefer CrossWasm composition so each turn hits worker-owned facades.
+  if (!resolved && prefersSplitBackendVoiceAgent() && supportsCrossWasmVoiceAgent()) {
+    if (_provider?.providerKind !== 'cross-wasm') {
+      logger.info(
+        'Using CrossWasm voice-agent provider (modality models are BackendWorker-owned).',
+      );
+    }
+    resolved = _provider?.providerKind === 'cross-wasm'
+      ? _provider
+      : new CrossWasmVoiceAgentProvider();
+  }
+
+  if (!resolved && _provider?.providerKind === 'wasm-handle' && !prefersSplitBackendVoiceAgent()) {
+    resolved = _provider;
+  }
+  if (!resolved && !prefersSplitBackendVoiceAgent()) {
+    resolved = tryCreateNativeVoiceAgentProvider();
+  }
+  // Last resort when the native ABI is absent entirely.
+  if (!resolved && !nativeAvailable && supportsCrossWasmVoiceAgent()) {
+    logger.warning('Native voice-agent ABI is unavailable; using degraded CrossWasm provider.');
+    resolved = new CrossWasmVoiceAgentProvider();
+  }
+  if (!resolved) return false;
+  setVoiceAgentProvider(resolved);
+  return true;
+}
+
+function tryCreateNativeVoiceAgentProvider(): VoiceAgentProvider | null {
+  const adapter = VoiceAgentProtoAdapter.tryDefault();
+  if (!adapter?.supportsProtoVoiceAgent()) return null;
+  const module = getModuleForCapability('voice-agent') as
+    | (EmscriptenRunanywhereModule & {
+      _rac_voice_agent_create_standalone?: (outHandle: number) => number;
+    })
+    | null;
+  if (
+    !module
+    || typeof module._rac_voice_agent_create_standalone !== 'function'
+    || typeof module._malloc !== 'function'
+    || typeof module._free !== 'function'
+    || typeof module.getValue !== 'function'
+  ) {
+    return null;
+  }
+  const outPtr = module._malloc(4);
+  if (!outPtr) return null;
+  try {
+    const rc = module._rac_voice_agent_create_standalone(outPtr);
+    if (rc !== 0) return null;
+    const handle = module.getValue(outPtr, '*');
+    if (!handle) return null;
+    return createVoiceAgentHandleProvider({ handle, module });
+  } catch {
+    return null;
+  } finally {
+    module._free(outPtr);
+  }
+}
+
 export function createVoiceAgentHandleProvider(
   source: Extract<VoiceAgentStreamSource, { handle: number }>,
 ): VoiceAgentProvider {
@@ -150,9 +250,6 @@ function evictUnavailableCrossWasmProvider(): void {
 
 function activeProvider(): VoiceAgentProvider | null {
   evictUnavailableCrossWasmProvider();
-  if (!_provider && supportsCrossWasmVoiceAgent()) {
-    _provider = new CrossWasmVoiceAgentProvider();
-  }
   return _provider;
 }
 
@@ -233,7 +330,7 @@ function requireProvider(feature: string): VoiceAgentProvider {
 }
 
 /** Default Silero VAD model id seeded by every example app's catalog. */
-export const defaultVADModelID = 'silero-vad';
+export const defaultVADModelID = voiceAgentDefaults.defaultVadModelId;
 
 /**
  * Ensure a VAD model is loaded in the canonical lifecycle before a voice-agent
@@ -596,7 +693,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
       const llm = await TextGeneration.generate({
         prompt: transcription,
         maxTokens: configuredMaxTokens > 0 ? configuredMaxTokens : VOICE_MAX_TOKENS,
-        temperature: 0.7,
+        temperature: VOICE_TEMPERATURE,
         systemPrompt: VOICE_SYSTEM_PROMPT,
         history: voiceHistoryMessages(this.conversationHistory),
         conversationId: sessionId,
@@ -722,7 +819,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     return (await TextGeneration.generate({
       prompt,
       maxTokens: configuredMaxTokens > 0 ? configuredMaxTokens : VOICE_MAX_TOKENS,
-      temperature: 0.7,
+      temperature: VOICE_TEMPERATURE,
       systemPrompt: VOICE_SYSTEM_PROMPT,
       history: voiceHistoryMessages(this.conversationHistory),
       conversationId: this.config.sessionId ?? 'web-voice-agent',
@@ -1045,7 +1142,7 @@ function modelNotLoadedException(message: string): SDKException {
 
 function defaultVoiceAgentComposeConfig(ttsVoiceID?: string): VoiceAgentComposeConfig {
   return {
-    vadSampleRate: 16000,
+    vadSampleRate: audioCaptureDefaults.micSampleRateHz,
     vadFrameLength: 0.1,
     vadEnergyThreshold: DEFAULT_VAD_ENERGY_THRESHOLD,
     sessionId: 'web-voice-agent',
@@ -1127,6 +1224,9 @@ export async function initializeVoiceAgentWithLoadedModels(
   if (ensureVAD) {
     await ensureDefaultVAD();
   }
+  // Re-bind after models are loaded: ONNX/Llama registration may have
+  // installed a native handle before BackendWorkers owned STT/LLM/TTS.
+  registerVoiceAgentProvider();
   await requireProvider('initializeVoiceAgentWithLoadedModels').initializeVoiceAgentWithLoadedModels(ttsVoiceID);
 }
 

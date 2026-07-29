@@ -56,15 +56,19 @@ option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
 # Drop libonnxruntime.a under
 # sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/ to enable.
 if(EMSCRIPTEN)
-    set(RAC_ONNX_WASM_RUNTIME_DIR
-        "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm")
+    if(NOT DEFINED RAC_ONNX_WASM_RUNTIME_DIR OR RAC_ONNX_WASM_RUNTIME_DIR STREQUAL "")
+        set(RAC_ONNX_WASM_RUNTIME_DIR
+            "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm"
+            CACHE PATH "Vendored ONNX Runtime WASM root (CPU or WebGPU)" FORCE)
+    endif()
     if(NOT EXISTS "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a")
         message(STATUS "RAC_BACKEND_ONNX: no WASM ORT archive at "
                        "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a; "
                        "disabling ONNX backend")
         set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
     else()
-        message(STATUS "RAC_BACKEND_ONNX: found vendored WASM ORT archive; "
+        message(STATUS "RAC_BACKEND_ONNX: found vendored WASM ORT archive at "
+                       "${RAC_ONNX_WASM_RUNTIME_DIR}; "
                        "building ONNX backend for Emscripten")
     endif()
 endif()
@@ -116,6 +120,10 @@ get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../s
 set(ONNX_BACKEND_SOURCES
     rac_backend_onnx_register.cpp
     rac_plugin_entry_onnx.cpp
+    onnx_segmentation_provider.cpp
+    rac_onnx_segmentation_register.cpp
+    onnx_diarization_provider.cpp
+    rac_onnx_diarization_register.cpp
 )
 
 # ONNX embedding provider: engine-owned primitive. The
@@ -237,8 +245,9 @@ elseif(RAC_PLATFORM_ANDROID)
     target_compile_options(rac_backend_onnx PRIVATE -O3 -ffunction-sections -fdata-sections)
     # 16KB page alignment for Android 15+ (API 35) compliance - required Nov 2025
     rac_apply_android_page_alignment(rac_backend_onnx)
-    # NNAPI / ORT compile definitions belong to runtimes/onnxrt, not this engine.
-    message(STATUS "ONNX Backend: NNAPI EP enabled for Android")
+    # The onnxrt runtime's NNAPI selector is currently a capability stub and
+    # does not append the NNAPI EP to SessionOptions. Report CPU truthfully.
+    message(STATUS "ONNX Backend: CPU EP for Android (NNAPI EP not wired)")
 
 elseif(RAC_PLATFORM_MACOS)
     target_link_libraries(rac_backend_onnx PUBLIC
@@ -315,5 +324,7 @@ endif()
 message(STATUS "ONNX Backend Configuration:")
 message(STATUS "  ONNX Runtime: Enabled")
 message(STATUS "  Speech services: owned by engines/sherpa")
+message(STATUS "  Segmentation: SegFormer FP32 via onnxrt")
+message(STATUS "  Diarization:  Streaming Sortformer 4spk v2.1 via onnxrt")
 message(STATUS "  Diffusion:    Not in ONNX backend (Apple CoreML only)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")

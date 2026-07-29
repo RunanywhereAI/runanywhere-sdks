@@ -44,7 +44,7 @@ public extension RunAnywhere {
             request.downloadSizeBytes = memoryRequirement
         }
         if modality.requiresContextLength {
-            request.contextLength = 2048
+            request.contextLength = Int32(RADefaults.Storage.contextLength)
         }
         if supportsThinking {
             request.supportsThinking = true
@@ -133,7 +133,8 @@ public extension RunAnywhere {
         memoryRequirement: Int64? = nil,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
-        source: RAModelSource = .remote
+        source: RAModelSource = .remote,
+        downloadSize: Int64? = nil
     ) async throws -> RAModelInfo {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
@@ -146,20 +147,37 @@ public extension RunAnywhere {
         request.category = modality
         request.files = descriptors
         request.source = source
-        if let memoryRequirement {
-            request.memoryRequiredBytes = memoryRequirement
-            request.downloadSizeBytes = memoryRequirement
-        }
+        applyMultiFileRegistrationSizes(
+            memoryRequirement: memoryRequirement,
+            downloadSize: downloadSize,
+            to: &request
+        )
         if let contextLength {
             request.contextLength = Int32(contextLength)
         } else if modality.requiresContextLength {
-            request.contextLength = 2048
+            request.contextLength = Int32(RADefaults.Storage.contextLength)
         }
         if supportsThinking {
             request.supportsThinking = true
         }
 
         return try await CppBridge.ModelRegistry.shared.registerMultiFile(request)
+    }
+
+    /// Keeps runtime memory planning independent from the final download
+    /// footprint. A nil download size preserves the legacy behavior by using
+    /// the runtime memory requirement for both fields.
+    internal static func applyMultiFileRegistrationSizes(
+        memoryRequirement: Int64?,
+        downloadSize: Int64?,
+        to request: inout RARegisterMultiFileModelRequest
+    ) {
+        if let memoryRequirement {
+            request.memoryRequiredBytes = memoryRequirement
+        }
+        if let resolvedDownloadSize = downloadSize ?? memoryRequirement {
+            request.downloadSizeBytes = resolvedDownloadSize
+        }
     }
 
     /// Download a registered model. Commons owns planning, transfer (via the

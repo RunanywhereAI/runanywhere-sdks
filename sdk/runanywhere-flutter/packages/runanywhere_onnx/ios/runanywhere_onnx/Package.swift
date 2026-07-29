@@ -3,7 +3,7 @@
 import PackageDescription
 import Foundation
 
-let sdkVersion = "0.20.11"
+let sdkVersion = "0.20.12"
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 
 func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
@@ -23,11 +23,11 @@ func runAnywhereBinaryTarget(name: String, checksum: String) -> Target {
 
 let onnxTarget = runAnywhereBinaryTarget(
     name: "RABackendONNX",
-    checksum: "b50a9ebcf49a34f1cbefa6be445ced74cfa3ef47281fccfa7b1b272ba81aef79"
+    checksum: "0e548dcc59d8bb49446ff8d02c94b97130a1c6c7b18b6c768a9be4acc16edbf2"
 )
 let sherpaTarget = runAnywhereBinaryTarget(
     name: "RABackendSherpa",
-    checksum: "75735609334d61180c623fbf2e09f8e74a2d990b84799b3ebde1334a5ac4f38c"
+    checksum: "36a0965157111f6f0b9b16a6c6d622b9ee537f1df2ecfa3558553233cff27a64"
 )
 // Apple CoreML Stable-Diffusion engine. RACommons references
 // _rac_plugin_entry_coreml (0.20.10 enabled the CoreML backend in commons),

@@ -14,6 +14,8 @@ export 'generated/component_types.pb.dart';
 export 'generated/component_types.pbenum.dart';
 export 'generated/connect.pb.dart';
 export 'generated/connect.pbenum.dart';
+export 'generated/diarization.pb.dart';
+export 'generated/diarization.pbenum.dart';
 export 'generated/diffusion_options.pb.dart';
 export 'generated/diffusion_options.pbenum.dart';
 export 'generated/download_service.pb.dart';

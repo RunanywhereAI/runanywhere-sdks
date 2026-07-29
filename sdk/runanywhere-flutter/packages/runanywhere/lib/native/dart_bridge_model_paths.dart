@@ -7,6 +7,8 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart' as model_enum;
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
@@ -82,7 +84,7 @@ class DartBridgeModelPaths {
 
   static final _logger = SDKLogger('DartBridge.ModelPaths');
   static final DartBridgeModelPaths instance = DartBridgeModelPaths._();
-  static const _pathBufferSize = 1024;
+  static const _pathBufferSize = RADefaultsFFI.pathBufferBytes;
 
   // MARK: - Configuration
 
@@ -116,7 +118,7 @@ class DartBridgeModelPaths {
     final dirPtr = dir.toNativeUtf8();
     try {
       final result = setBase(dirPtr);
-      if (result != RacResultCode.success) {
+      if (result != RacResultCodes.success) {
         throw SDKException.invalidConfiguration(
           'rac_model_paths_set_base_dir failed: $result',
         );
@@ -144,7 +146,7 @@ class DartBridgeModelPaths {
       final buffer = calloc<Uint8>(_pathBufferSize).cast<Utf8>();
       try {
         final result = getDir(buffer, _pathBufferSize);
-        if (result == RacResultCode.success) {
+        if (result == RacResultCodes.success) {
           return buffer.toDartString();
         }
       } finally {
@@ -171,7 +173,7 @@ class DartBridgeModelPaths {
       final buffer = calloc<Uint8>(_pathBufferSize).cast<Utf8>();
       try {
         final result = getDir(framework.toC(), buffer, _pathBufferSize);
-        if (result == RacResultCode.success) {
+        if (result == RacResultCodes.success) {
           return buffer.toDartString();
         }
       } finally {
@@ -204,7 +206,7 @@ class DartBridgeModelPaths {
           buffer,
           _pathBufferSize,
         );
-        if (result == RacResultCode.success) {
+        if (result == RacResultCodes.success) {
           return buffer.toDartString();
         }
       } finally {
@@ -269,7 +271,7 @@ class DartBridgeModelPaths {
             checksumPtr,
             resolutionPtr,
           );
-          if (result != RacResultCode.success) {
+          if (result != RacResultCodes.success) {
             _logger.debug(
               'rac_model_paths_resolve_artifact failed: '
               'code=$result model=${model.id}',
@@ -308,7 +310,7 @@ class DartBridgeModelPaths {
       final buffer = calloc<Uint8>(256).cast<Utf8>();
       try {
         final result = extractFn(pathPtr, buffer, 256);
-        if (result == RacResultCode.success) {
+        if (result == RacResultCodes.success) {
           return buffer.toDartString();
         }
       } finally {

@@ -25,10 +25,10 @@
 import 'dart:typed_data';
 
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/solutions.pb.dart' as proto;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_solutions.dart';
-import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
 
 /// Lifecycle handle for a started solution.
 ///
@@ -64,7 +64,7 @@ class SolutionHandle {
     final rc = DartBridgeSolutions.feed(_handle, item);
     if (rc != 0) {
       throw SDKException.invalidState(
-        'rac_solution_feed failed: ${RacResultCode.getMessage(rc)}',
+        'rac_solution_feed failed: ${RacResultCodes.message(rc)}',
       );
     }
   }
@@ -88,7 +88,7 @@ class SolutionHandle {
     _requireAlive();
     if (rc != 0) {
       throw SDKException.invalidState(
-        'rac_solution_$op failed: ${RacResultCode.getMessage(rc)}',
+        'rac_solution_$op failed: ${RacResultCodes.message(rc)}',
       );
     }
   }
@@ -145,7 +145,7 @@ class RunAnywhereSolutions {
     if (!result.success || result.handle == null) {
       throw SDKException.invalidConfiguration(
         'rac_solution_create_from_proto failed: '
-        '${RacResultCode.getMessage(result.resultCode)}',
+        '${RacResultCodes.message(result.resultCode)}',
       );
     }
     return SolutionHandle._(result.handle!);
@@ -156,7 +156,7 @@ class RunAnywhereSolutions {
     if (!result.success || result.handle == null) {
       throw SDKException.invalidConfiguration(
         'rac_solution_create_from_yaml failed: '
-        '${RacResultCode.getMessage(result.resultCode)}',
+        '${RacResultCodes.message(result.resultCode)}',
       );
     }
     return SolutionHandle._(result.handle!);

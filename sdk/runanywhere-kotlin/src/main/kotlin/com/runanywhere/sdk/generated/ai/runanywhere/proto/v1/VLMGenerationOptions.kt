@@ -33,6 +33,14 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
+ * The rac_default annotations on VLMGenerationOptions are the single
+ * declaration of the VLM sampling defaults, and RAC_VLM_OPTIONS_DEFAULT is
+ * generated from them. Four SDKs previously kept their own tables and had
+ * drifted to three different max_tokens values (Swift 128,
+ * Kotlin/Flutter/Web 256) against the C layer's 2048, while all four set
+ * top_k=40 where C said 0. The C values win.
+ *
+ * Detached from the message on purpose; see the same note in llm_options.proto.
  * ---------------------------------------------------------------------------
  * VLM generation options — per-request sampling + prompt parameters.
  * Sources pre-IDL:
@@ -63,6 +71,8 @@ public class VLMGenerationOptions(
     schemaIndex = 0,
   )
   public val prompt: String = "",
+  @RacDefaultOption("2048")
+  @RacMinOption(0)
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -71,6 +81,9 @@ public class VLMGenerationOptions(
     schemaIndex = 1,
   )
   public val max_tokens: Int = 0,
+  @RacDefaultOption("0.7")
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(2.0)
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -78,6 +91,9 @@ public class VLMGenerationOptions(
     schemaIndex = 2,
   )
   public val temperature: Float = 0f,
+  @RacDefaultOption("0.9")
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(1.0)
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -86,6 +102,8 @@ public class VLMGenerationOptions(
     schemaIndex = 3,
   )
   public val top_p: Float = 0f,
+  @RacDefaultOption("0")
+  @RacMinOption(0)
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -95,6 +113,7 @@ public class VLMGenerationOptions(
   )
   public val top_k: Int = 0,
   stop_sequences: List<String> = emptyList(),
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -126,6 +145,7 @@ public class VLMGenerationOptions(
     schemaIndex = 9,
   )
   public val n_threads: Int = 0,
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -166,6 +186,8 @@ public class VLMGenerationOptions(
     schemaIndex = 14,
   )
   public val seed: Long = 0L,
+  @RacDefaultOption("1.1")
+  @RacMinFloatOption(0.0)
   @field:WireField(
     tag = 16,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

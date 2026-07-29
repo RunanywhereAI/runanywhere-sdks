@@ -230,6 +230,19 @@ export const VAD = {
   streamVoiceAuto: streamVoiceActivity,
 
   /**
+   * Reset the lifecycle-loaded VAD service (clears speech-segment buffers).
+   * Handle-less form backing Swift's parameterless `RunAnywhere.resetVAD()`.
+   * No-op returning false when no VAD model is loaded through lifecycle.
+   */
+  resetVoiceAuto(): boolean {
+    if (!currentLifecycleVADModel()) return false;
+    return (
+      lifecycleVADAdapter('RunAnywhere.vad.resetVoiceAuto').resetLifecycle() !=
+      null
+    );
+  },
+
+  /**
    * Returns true when the WASM module is loaded with both the proto-byte VAD
    * exports AND the component lifecycle exports (create / destroy).
    */
@@ -419,7 +432,7 @@ export async function detectVoice(
   }
   // The threshold was applied by configureLifecycle. Keeping the per-frame
   // override at zero avoids rebuilding Sherpa's detector for this frame.
-  const result = adapter.processLifecycle(
+  const result = await adapter.processLifecycle(
     audio,
     callOptions(options, 0),
     config.sampleRate || 16_000,
@@ -473,7 +486,7 @@ export async function* streamVoiceActivity(
     const frameOptions = callOptions(options, 0);
     for await (const chunk of audio) {
       if (chunk.length === 0) continue;
-      const result = adapter.processLifecycle(chunk, frameOptions, configuredRate);
+      const result = await adapter.processLifecycle(chunk, frameOptions, configuredRate);
       if (!result) {
         throw SDKException.processingFailed(
           'rac_vad_process_lifecycle_proto returned no VADResult bytes.',

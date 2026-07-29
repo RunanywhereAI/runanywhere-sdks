@@ -23,6 +23,7 @@ import {
   type HybridFilter as HybridFilterProto,
 } from '@runanywhere/proto-ts/hybrid_router';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
+import { hybridDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 export { HybridRank };
 
@@ -111,7 +112,7 @@ export type HybridCascade = {
  * `RAC_HYBRID_STT_CONFIDENCE_THRESHOLD` — the router uses the threshold carried
  * in the installed policy; this is only the recommended value to build it with.
  */
-export const HYBRID_STT_CONFIDENCE_THRESHOLD = 0.5;
+export const HYBRID_STT_CONFIDENCE_THRESHOLD = hybridDefaults.sttConfidenceThreshold;
 
 /** Cascade constructor. */
 export const Cascades = {

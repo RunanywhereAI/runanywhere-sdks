@@ -23,9 +23,9 @@ import kotlinx.coroutines.sync.withLock
 // epoch-millis timestamp. Proto fields use scalar defaults ("" / 0) instead of
 // nullable — empty/zero means "unset".
 
-// Per-environment LoggingConfiguration presets. The proto LoggingConfiguration
-// is a flat message with no companion helpers, so the development/staging/
-// production factories live here.
+// LoggingConfiguration presets. The proto LoggingConfiguration is a flat
+// message with no companion helpers, so the named factories live here.
+// `staging` is a log-level profile only — not an SDK environment.
 
 internal object LoggingConfigurationPresets {
     /** Development: console + debug level, no device metadata. */
@@ -55,7 +55,6 @@ internal object LoggingConfigurationPresets {
     fun forEnvironment(environment: SDKEnvironment): LoggingConfiguration =
         when (environment) {
             SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> development
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> staging
             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> production
             SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> development
         }

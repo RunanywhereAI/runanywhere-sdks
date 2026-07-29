@@ -106,7 +106,7 @@ static const rac_engine_manifest_t k_qhexrt_manifest = {
     .version = nullptr,
     .package_owner = "runanywhere",
     .package_name = "runanywhere_qhexrt",
-    .availability = RAC_ENGINE_AVAILABILITY_PRIVATE,
+    .availability = RAC_ENGINE_AVAILABILITY_PUBLIC,
     // Above llamacpp (100). Safe only because lifecycle pins QNN-context models
     // to framework QHEXRT; generic primitive selection remains plain priority.
     .priority = 150,
@@ -133,10 +133,10 @@ static const rac_engine_vtable_t g_qhexrt_engine_vtable = {
     /* embedding_ops    */ &g_qhexrt_embeddings_ops,
     /* vlm_ops          */ &g_qhexrt_vlm_ops,
     /* diffusion_ops    */ &g_qhexrt_diffusion_ops,
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
 
-    /* reserved_slot_0..9 */
-    nullptr,
-    nullptr,
+    /* reserved_slot_2..9 */
     nullptr,
     nullptr,
     nullptr,

@@ -1,3 +1,7 @@
+## [0.20.12] - 2026-07-28
+
+- Suite version bump; Kotlin/QHexRT Maven release.
+
 ## [0.20.11] - 2026-07-16
 
 - Version-aligned release with benchmark aggregation, variance reporting, and updated model catalogs.

@@ -9,6 +9,7 @@ import com.runanywhere.sdk.public.extensions.synthesize
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.processImage
+import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
@@ -30,6 +31,7 @@ import java.io.File
  * not yet published to HF), without a normal registerModel() call re-downloading over the hand-staged files.
  *
  * Run: -e class com.runanywhere.runanywhereai.NpuLoadOnlyTest -e modelId <id> -e text "<text>"
+ * ASR: … -e mode stt -e pcmPath <device path to 16 kHz mono s16le PCM>
  */
 @RunWith(AndroidJUnit4::class)
 class NpuLoadOnlyTest {
@@ -85,6 +87,19 @@ class NpuLoadOnlyTest {
                     val out = r.text.trim().replace("\n", " ")
                     line = "NPU_E2E id=$modelId phase=done status=PASS framework=${load.framework.name} " +
                         "sys=${if (sys != null) "Y" else "N"} imgTok=${r.image_tokens} outTok=${r.completion_tokens} text=\"${out.take(240)}\""
+                    Log.i(tag, line); assertTrue(line, line.contains("status=PASS")); return@runBlocking
+                }
+                if (mode == "stt") {
+                    // 16 kHz mono s16le PCM from an arbitrary on-device path, so a clip of any
+                    // duration can be fed to a fixed-T' encoder (the canonical suites are pinned to
+                    // clips that fit the compiled window).
+                    val pcmPath = args.getString("pcmPath") ?: error("stt mode requires -e pcmPath")
+                    val pcm = File(pcmPath).readBytes()
+                    val audioSeconds = pcm.size / 2.0 / 16_000.0
+                    val r = withTimeout(300_000) { RunAnywhere.transcribe(pcm) }
+                    val out = r.text.trim().replace("\n", " ")
+                    line = "NPU_E2E id=$modelId phase=done status=PASS framework=${load.framework.name} " +
+                        "audioSeconds=$audioSeconds bytes=${pcm.size} text=\"${out.take(240)}\""
                     Log.i(tag, line); assertTrue(line, line.contains("status=PASS")); return@runBlocking
                 }
                 val r = withTimeout(60_000) { RunAnywhere.synthesize(text) }

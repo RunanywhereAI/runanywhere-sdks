@@ -27,6 +27,7 @@
 
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_model_lifecycle.h"
+#include "rac/features/diarization/rac_diarization_service.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -110,6 +111,8 @@ void destroy_loaded_model(const std::shared_ptr<LoadedModel>& model) {
     model->embeddings_ops = nullptr;
     model->vlm_ops = nullptr;
     model->diffusion_ops = nullptr;
+    model->diarization_ops = nullptr;
+    model->segmentation_ops = nullptr;
 }
 
 // Cross-modality DSP eviction. A single Hexagon NPU cannot hold an LLM, a VLM,
@@ -288,6 +291,42 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
                 };
             }
             break;
+        case RAC_PRIMITIVE_DIARIZE:
+            if (!vt->diarization_ops || !vt->diarization_ops->create) {
+                return RAC_ERROR_BACKEND_NOT_FOUND;
+            }
+            rc = vt->diarization_ops->create(resolved_path.c_str(), nullptr, &impl);
+            if (rc == RAC_SUCCESS && impl && vt->diarization_ops->initialize) {
+                rc = vt->diarization_ops->initialize(impl, resolved_path.c_str());
+            }
+            if (rc == RAC_SUCCESS && impl) {
+                auto* ops = vt->diarization_ops;
+                *out_destroy = [ops, impl]() {
+                    if (ops->cleanup)
+                        (void)ops->cleanup(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
+                };
+            }
+            break;
+        case RAC_PRIMITIVE_SEGMENT:
+            if (!vt->segmentation_ops || !vt->segmentation_ops->create) {
+                return RAC_ERROR_BACKEND_NOT_FOUND;
+            }
+            rc = vt->segmentation_ops->create(resolved_path.c_str(), nullptr, &impl);
+            if (rc == RAC_SUCCESS && impl && vt->segmentation_ops->initialize) {
+                rc = vt->segmentation_ops->initialize(impl, resolved_path.c_str());
+            }
+            if (rc == RAC_SUCCESS && impl) {
+                auto* ops = vt->segmentation_ops;
+                *out_destroy = [ops, impl]() {
+                    if (ops->cleanup)
+                        (void)ops->cleanup(impl);
+                    if (ops->destroy)
+                        ops->destroy(impl);
+                };
+            }
+            break;
         default:
             return RAC_ERROR_UNSUPPORTED_MODALITY;
     }
@@ -323,6 +362,16 @@ rac_result_t create_backend_impl(const rac_engine_vtable_t* vt, rac_primitive_t 
                 case RAC_PRIMITIVE_DIFFUSION:
                     if (vt->diffusion_ops && vt->diffusion_ops->destroy) {
                         vt->diffusion_ops->destroy(impl);
+                    }
+                    break;
+                case RAC_PRIMITIVE_DIARIZE:
+                    if (vt->diarization_ops && vt->diarization_ops->destroy) {
+                        vt->diarization_ops->destroy(impl);
+                    }
+                    break;
+                case RAC_PRIMITIVE_SEGMENT:
+                    if (vt->segmentation_ops && vt->segmentation_ops->destroy) {
+                        vt->segmentation_ops->destroy(impl);
                     }
                     break;
                 default:
@@ -735,11 +784,10 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
                                             swap_previous->model_id, &resident, nullptr, nullptr);
         } else {
-            detail::publish_component_event(component,
-                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
-                                            request.model_id(), &result, nullptr,
-                                            result.error_message().c_str());
+            detail::publish_component_event(
+                component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+                runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result,
+                nullptr, result.error_message().c_str());
         }
         return detail::copy_proto(result, out_result);
     }
@@ -798,11 +846,10 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY,
                                             swap_previous->model_id, &resident, nullptr, nullptr);
         } else {
-            detail::publish_component_event(component,
-                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
-                                            runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
-                                            request.model_id(), &result, nullptr,
-                                            result.error_message().c_str());
+            detail::publish_component_event(
+                component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
+                runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result,
+                nullptr, result.error_message().c_str());
         }
         return detail::copy_proto(result, out_result);
     }
@@ -833,6 +880,10 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         loaded->vlm_ops = vt->vlm_ops;
     } else if (primitive == RAC_PRIMITIVE_DIFFUSION) {
         loaded->diffusion_ops = vt->diffusion_ops;
+    } else if (primitive == RAC_PRIMITIVE_DIARIZE) {
+        loaded->diarization_ops = vt->diarization_ops;
+    } else if (primitive == RAC_PRIMITIVE_SEGMENT) {
+        loaded->segmentation_ops = vt->segmentation_ops;
     }
     loaded->impl = impl;
     loaded->model.CopyFrom(model);

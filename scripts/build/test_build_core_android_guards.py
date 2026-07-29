@@ -184,6 +184,18 @@ class BuildCoreAndroidGuardTest(unittest.TestCase):
         self.assertIn('-name "librac_backend_qhexrt.so"', SOURCE)
         self.assertIn('-delete', SOURCE)
 
+    def test_reusable_presets_force_every_public_android_backend_on(self):
+        for setting in (
+            '"-DRAC_BUILD_BACKENDS=ON"',
+            '"-DRAC_BACKEND_CLOUD=ON"',
+            '"-DRAC_BACKEND_RAG=ON"',
+            '"-DRAC_BACKEND_LLAMACPP=ON"',
+            '"-DRAC_BACKEND_ONNX=ON"',
+            '"-DRAC_RUNTIME_ONNXRT=ON"',
+            '"-DRAC_BACKEND_SHERPA=ON"',
+        ):
+            self.assertIn(setting, SOURCE)
+
 
 if __name__ == "__main__":
     unittest.main()

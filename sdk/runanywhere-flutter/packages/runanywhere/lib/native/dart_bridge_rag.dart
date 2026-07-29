@@ -9,6 +9,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/rag.pb.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -37,7 +38,7 @@ class DartBridgeRAG {
     if (result != RAC_SUCCESS && result != -401) {
       throw StateError(
         'rac_backend_rag_register failed: '
-        '${RacResultCode.getMessage(result)}',
+        '${RacResultCodes.message(result)}',
       );
     }
     _registered = true;
@@ -54,7 +55,7 @@ class DartBridgeRAG {
     if (result != RAC_SUCCESS && result != -401) {
       throw StateError(
         'rac_backend_rag_unregister failed: '
-        '${RacResultCode.getMessage(result)}',
+        '${RacResultCodes.message(result)}',
       );
     }
     _registered = false;
@@ -77,7 +78,7 @@ class DartBridgeRAG {
       if (rc != RAC_SUCCESS) {
         throw StateError(
           'rac_rag_session_create_proto failed: '
-          '${RacResultCode.getMessage(rc)}',
+          '${RacResultCodes.message(rc)}',
         );
       }
       _session = out.value;
@@ -251,7 +252,7 @@ class DartBridgeRAG {
           controller.addError(
             StateError(
               'rac_rag_query_stream_proto failed: '
-              '${RacResultCode.getMessage(message)}',
+              '${RacResultCodes.message(message)}',
             ),
           );
         }

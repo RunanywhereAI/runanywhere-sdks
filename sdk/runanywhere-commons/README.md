@@ -1,205 +1,101 @@
 # RunAnywhere Commons
 
-**runanywhere-commons** is a unified C/C++ library that serves as the foundation for the RunAnywhere SDK ecosystem. It provides the core infrastructure, service abstraction layer, and ML backend integrations that power on-device AI capabilities across iOS, Android, macOS, and Linux platforms.
+**Internal C/C++ core** for the RunAnywhere SDK ecosystem. This is not a consumer-facing SDK — platform SDKs (Swift, Kotlin, React Native, Flutter, Web, Python, Electron, CLI) bind to commons through the stable `rac_*` C ABI.
 
----
+Commons provides the shared infrastructure, engine plugin registry, model lifecycle, download orchestration, and ML backend integrations that power on-device AI across iOS, Android, macOS, Linux, Windows, and WebAssembly.
 
-## Table of Contents
+**Version:** tracks the repo `VERSION` file (currently **0.20.11**).
 
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [Architecture Overview](#architecture-overview)
-- [Supported Capabilities](#supported-capabilities)
-- [Backend Integrations](#backend-integrations)
-- [Getting Started](#getting-started)
-- [Building](#building)
-- [API Reference](#api-reference)
-- [Platform Integration](#platform-integration)
-- [Dependencies](#dependencies)
-- [Version Management](#version-management)
+## What commons provides
 
----
+- **Unified C API** — all public functions use the `rac_` prefix
+- **Engine plugin registry** — vtable-based backends registered at startup or via `dlopen`
+- **Cross-platform core** — single codebase for mobile, desktop, and WASM targets
+- **AI primitives** — LLM, VLM, STT, TTS, VAD, embeddings, RAG, Voice Agent, and more
+- **Platform adapters** — storage, logging, secure store, and HTTP download hooks for each host SDK
 
-## Overview
-
-RunAnywhere Commons is the shared C++ layer that sits between platform SDKs (Swift, Kotlin, Flutter) and ML inference backends (LlamaCPP, Sherpa-ONNX, ONNX, cloud). It provides:
-
-- **Unified C API** - All public functions use the `rac_` prefix and follow a consistent vtable-based abstraction pattern
-- **Backend Abstraction** - Multiple ML backends can be registered and selected at runtime based on model requirements
-- **Service Registry** - Priority-based provider selection matching the Swift SDK's `ServiceRegistry` pattern
-- **Cross-Platform Support** - Single codebase targeting iOS, Android, macOS, and Linux
-- **Platform Services** - Native integration with Apple Foundation Models and System TTS on Apple platforms
-
-### Design Principles
-
-- **C++ Core, C API Surface** - C++20 internally, pure C API for FFI compatibility
-- **Vtable-Based Polymorphism** - No C++ virtual inheritance at API boundaries
-- **Priority-Based Dispatch** - Service providers register with priority; first capable handler wins
-- **Lazy Initialization** - Services created on-demand, not at startup
-- **Single Source of Truth** - Events, analytics, and state managed centrally in C++
-
----
-
-## Key Features
-
-### Core Infrastructure
-- **Logging System** - Platform-bridged logging with categories (`RAC_LOG_INFO`, `RAC_LOG_ERROR`)
-- **Error Handling** - Comprehensive error codes (-100 to -999 range) with detailed messages
-- **Event System** - Cross-platform analytics events emitted from C++ to platform SDKs
-- **Memory Management** - Consistent allocation/deallocation patterns (`rac_alloc`, `rac_free`)
-
-### Service Layer
-- **Module Registry** - Backend modules register capabilities at startup
-- **Service Registry** - Priority-based factory pattern for service creation
-- **Lifecycle Management** - Consistent state machine for component lifecycle
-- **Model Registry** - Central model metadata and path management
-
-### AI Capabilities
-- **LLM (Text Generation)** - Streaming and batch generation with metrics
-- **STT (Speech-to-Text)** - Real-time and batch transcription
-- **TTS (Text-to-Speech)** - High-quality speech synthesis
-- **VAD (Voice Activity Detection)** - Energy-based voice detection
-- **Voice Agent** - Orchestrated pipeline (VAD → STT → LLM → TTS)
-
----
-
-## Architecture Overview
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Swift/Kotlin SDKs                        │
-│              (RunAnywhere, RunAnywhereKotlin)               │
-└────────────────────────────┬────────────────────────────────┘
-                             │ C API (rac_*)
-┌────────────────────────────▼────────────────────────────────┐
-│              RAC Public C API (rac_*)                       │
-│   rac_llm_service.h, rac_stt_service.h, rac_tts_service.h   │
-│   rac_vad_service.h, rac_voice_agent.h                      │
-└────────────────────────────┬────────────────────────────────┘
-                             │ rac_engine_vtable_t dispatch
-┌────────────────────────────▼────────────────────────────────┐
-│          Plugin Registry + Engine Router                     │
-│   - ABI-versioned vtable handshake (RAC_PLUGIN_API_VERSION)  │
-│   - Hardware-aware routing (Metal/ANE/CUDA/QNN)              │
-│   - Static register or dlopen-loaded (rac_registry_load_plugin) │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                   Engine Plugins (engines/)                  │
-│   ┌─────────────┐  ┌─────────────────┐  ┌───────────────┐   │
-│   │  llamacpp/  │  │  sherpa/ onnx/  │  │  cloud/       │   │
-│   │  LLM (GGUF) │  │ STT/TTS/VAD,    │  │  STT (HTTP,   │   │
-│   │  Metal GPU  │  │ embeddings      │  │  cloud)       │   │
-│   └─────────────┘  └─────────────────┘  └───────────────┘   │
-│                                                              │
-│   ┌─────────────────────────────────────────────────────┐   │
-│   │                  platform/                           │   │
-│   │   Apple Foundation Models (LLM) + System TTS         │   │
-│   │   (Swift callbacks, iOS/macOS only)                  │   │
-│   └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Platform SDKs                                                           │
+│  Swift · Kotlin · React Native · Flutter · Web · Python · Electron · CLI │
+└───────────────────────────────┬──────────────────────────────────────────┘
+                                │ C ABI (rac_*)
+┌───────────────────────────────▼──────────────────────────────────────────┐
+│  RAC Public C API                                                        │
+│  rac_llm_service.h · rac_stt_service.h · rac_tts_service.h · …         │
+└───────────────────────────────┬──────────────────────────────────────────┘
+                                │ rac_engine_vtable_t dispatch
+┌───────────────────────────────▼──────────────────────────────────────────┐
+│  Plugin Registry + Engine Router                                         │
+│  ABI-versioned handshake · hardware-aware routing · static or dlopen     │
+└───────────────────────────────┬──────────────────────────────────────────┘
+                                │
+┌───────────────────────────────▼──────────────────────────────────────────┐
+│  Engine Plugins (engines/)                                               │
+│  ┌─────────────┐  ┌─────────────────┐  ┌───────────────┐  ┌───────────┐ │
+│  │  llamacpp/  │  │  sherpa/ onnx/  │  │  qhexrt/      │  │ cloud/    │ │
+│  │  LLM + VLM  │  │ STT/TTS/VAD,    │  │ LLM/VLM/STT/  │  │ STT       │ │
+│  │  (GGUF),    │  │ embeddings,     │  │ TTS on the    │  │ (HTTP)    │ │
+│  │  rerank     │  │ diarize/segment │  │ Hexagon NPU   │  │           │ │
+│  │  Metal/CUDA │  │                 │  │ (Snapdragon)  │  │           │ │
+│  └─────────────┘  └─────────────────┘  └───────────────┘  └───────────┘ │
+│  ┌─────────────┐  ┌─────────────────┐                                    │
+│  │  coreml/    │  │  platform/      │   (Apple only)                     │
+│  │  diffusion  │  │  Apple FM,      │                                    │
+│  │             │  │  System TTS     │                                    │
+│  └─────────────┘  └─────────────────┘                                    │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
----
+## Supported capabilities
 
-## Supported Capabilities
+Each row is a plugin ABI primitive (`RAC_PRIMITIVE_*`) with the engines that fill its vtable slot. A NULL slot means the engine does not serve that primitive.
 
-| Capability | Description | Backends |
-|------------|-------------|----------|
-| **TEXT_GENERATION** | LLM text generation with streaming | LlamaCPP, Platform (Apple FM) |
-| **STT** | Speech-to-text transcription | Sherpa (offline ONNX), Cloud STT (online HTTP) |
-| **TTS** | Text-to-speech synthesis | ONNX (Sherpa), Platform (System TTS) |
-| **VAD** | Voice activity detection | ONNX (Silero), Built-in (Energy-based) |
-| **VOICE_AGENT** | Full voice pipeline orchestration | Composite (STT+LLM+TTS+VAD) |
+| Primitive | vtable slot | Backends |
+|-----------|-------------|----------|
+| **GENERATE_TEXT** (LLM) | `llm_ops` | LlamaCPP, QHexRT (Hexagon NPU), Platform (Apple Foundation Models), MLX (Apple; registered from the Swift SDK) |
+| **VLM** | `vlm_ops` | LlamaCPP (mmproj), QHexRT, MLX |
+| **TRANSCRIBE** (STT) | `stt_ops` | Sherpa (offline ONNX), QHexRT, Cloud STT (online HTTP) |
+| **SYNTHESIZE** (TTS) | `tts_ops` | Sherpa/ONNX (Piper), QHexRT, Platform (System TTS) |
+| **DETECT_VOICE** (VAD) | `vad_ops` | Sherpa (Silero), built-in energy VAD |
+| **EMBED** | `embedding_ops` | ONNX Runtime |
+| **DIARIZE** | `diarization_ops` | ONNX (Sortformer) |
+| **SEGMENT** | `segmentation_ops` | ONNX |
+| **RERANK** | `rerank_ops` | LlamaCPP (rank-pooling GGUF) |
+| **DIFFUSION** | `diffusion_ops` | Platform (Core ML, Apple) |
 
----
+RAG and Voice Agent are composed pipelines rather than primitives: they orchestrate the services above and own no vtable of their own.
 
-## Backend Integrations
-
-### LlamaCPP Backend
-- **Capability**: LLM text generation
-- **Model Format**: GGUF (quantized models)
-- **GPU Acceleration**: Metal (iOS/macOS), CPU NEON (Android)
-- **Features**: Streaming generation, chat templates, cancellation
-- **Header**: `include/rac/backends/rac_llm_llamacpp.h`
-
-```c
-// Create and load a GGUF model
-rac_handle_t handle;
-rac_llm_llamacpp_create("/path/to/model.gguf", NULL, &handle);
-
-// Generate text with streaming
-rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
-options.max_tokens = 256;
-options.temperature = 0.7f;
-
-rac_llm_llamacpp_generate_stream(handle, "Hello, world!", &options,
-    token_callback, user_data);
-```
-
-### Sherpa-ONNX Backend
-- **Capabilities**: STT, TTS, VAD
-- **Model Format**: ONNX
-- **Supported Models**: Whisper, Zipformer, Paraformer (STT); VITS/Piper (TTS); Silero (VAD)
-- **Registration**: `rac/plugin/rac_plugin_entry_sherpa.h`
-- **Inference APIs**: generated-proto lifecycle/component APIs under `rac/features/{stt,tts,vad}`
-
-```c
-// Dynamic-linkage hosts explicitly register the speech engine, then load and
-// invoke models through the shared lifecycle APIs.
-rac_result_t rc = rac_backend_sherpa_register();
-```
-
-The generic ONNX Runtime engine is separate and provides embeddings. It is
-registered through `rac/plugin/rac_plugin_entry_onnx.h`.
-
-### Cloud STT Backend
-- **Capability**: STT (speech-to-text), online
-- **Transport**: Generic HTTP; provider selected at create() via `config_json["provider"]` (e.g. Sarvam)
-- **Features**: Server-side transcription with a single shared engine + per-provider adapters
-- **Header**: `engines/cloud/include/rac/backends/rac_stt_cloud.h`
-
-> Offline STT is served by the Sherpa engine; the hybrid confidence router
-> picks Sherpa (offline) vs Cloud STT (online) per request.
-
-### Platform Backend (Apple-only)
-- **Capabilities**: LLM (Apple Foundation Models), TTS (System TTS)
-- **Pattern**: C++ provides vtable registration, Swift provides actual implementation via callbacks
-- **Features**: On-device Apple Intelligence models, system voices
-- **Headers**: `rac_llm_platform.h`, `rac_tts_platform.h`
-
----
-
-## Getting Started
+## Getting started (contributors)
 
 ### Prerequisites
 
-- **CMake** 3.22 or higher
-- **C++20** compatible compiler (Clang, GCC, MSVC)
-- **Platform-specific**: Xcode 15+ (iOS/macOS), Android NDK r25+ (Android)
+- CMake 3.24+
+- C++20 compiler (Clang, GCC, or MSVC)
+- Platform toolchains as needed (Xcode 26+, Android NDK 27.3.13750724, MSVC on Windows)
 
-### Quick Start
+### Clone and build
 
 ```bash
-# Clone the repository
-cd runanywhere-all/sdks/sdk/runanywhere-commons
+git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
+cd runanywhere-sdks/sdk/runanywhere-commons
 
-# Configure and build (macOS/Linux)
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 
-# Build with backends
+# With ML backends
 cmake -B build -DRAC_BUILD_BACKENDS=ON
 cmake --build build
 ```
 
-### Basic Usage
+### Minimal usage (C)
 
 ```c
 #include "rac/core/rac_core.h"
 #include "rac/features/llm/rac_llm_service.h"
 
-// Initialize the library
 rac_config_t config = {
     .platform_adapter = &my_platform_adapter,
     .log_level = RAC_LOG_INFO,
@@ -207,328 +103,81 @@ rac_config_t config = {
 };
 rac_init(&config);
 
-// Register backends
 rac_backend_llamacpp_register();
 rac_backend_onnx_register();
 
-// Create an LLM service
 rac_handle_t llm;
 rac_llm_create("my-model-id", &llm);
 
-// Generate text
 rac_llm_result_t result;
 rac_llm_generate(llm, "Hello!", NULL, &result);
-printf("Response: %s\n", result.text);
 
-// Cleanup
 rac_llm_result_free(&result);
 rac_llm_destroy(llm);
 rac_shutdown();
 ```
 
----
-
-## Building
-
-### CMake Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `RAC_BUILD_JNI` | OFF | Build JNI bridge for Android/JVM |
-| `RAC_BUILD_TESTS` | OFF | Build unit tests |
-| `RAC_BUILD_SHARED` | OFF | Build shared libraries (default: static) |
-| `RAC_BUILD_PLATFORM` | ON | Build platform backend (Apple FM, System TTS) |
-| `RAC_INCLUDE_LOCAL_DEV_CONFIG` | OFF | Compile the ignored local development credentials; local development only, never packaging |
-| `RAC_BUILD_BACKENDS` | OFF | Build ML backends |
-| `RAC_BACKEND_LLAMACPP` | ON | Build LlamaCPP backend (when BACKENDS=ON) |
-| `RAC_BACKEND_ONNX` | ON | Build ONNX backend (when BACKENDS=ON) |
-| `RAC_BACKEND_SHERPA` | ON | Build Sherpa-ONNX backend — offline STT/TTS/VAD (when BACKENDS=ON) |
-| `RAC_BACKEND_CLOUD` | ON | Build cloud HTTP backend — online STT (when BACKENDS=ON) |
-
-### Platform-Specific Builds
-
-#### iOS
-```bash
-./scripts/build-ios.sh # Build the canonical Apple slice set and package every XCFramework
-```
-
-#### Android
-```bash
-./scripts/build-android.sh arm64-v8a
-./scripts/build-android.sh armeabi-v7a
-./scripts/build-android.sh x86_64
-```
-
-Each invocation builds the complete public backend set for exactly one ABI,
-enforces the native-library validation gates (including 16 KB ELF alignment),
-and creates `dist/RACommons-android-<abi>-v<version>.zip` plus its checksum.
-
-### Build Outputs
-
-#### iOS/macOS
-```
-../runanywhere-swift/Binaries/
-├── RACommons.xcframework
-├── RABackendLLAMACPP.xcframework
-├── RABackendONNX.xcframework
-├── RABackendSherpa.xcframework
-└── RABackendMLX.xcframework
-
-dist/packages/<Framework>-ios-v<version>.zip
-```
-
-#### Android
-```
-dist/RACommons-android-<abi>-v<version>.zip
-```
-
----
-
-## API Reference
-
-### Core API
-
-```c
-// Initialization
-rac_result_t rac_init(const rac_config_t* config);
-void rac_shutdown(void);
-rac_bool_t rac_is_initialized(void);
-rac_version_t rac_get_version(void);
-
-// Engine Plugin Registry (rac/plugin/rac_plugin_entry.h, rac_plugin_loader.h)
-//
-// Engines are the single registration unit. Each fills a rac_engine_vtable_t
-// (one op-struct per served primitive) plus a rac_engine_manifest_t, and
-// registers it via rac_plugin_register; metadata.abi_version must equal
-// RAC_PLUGIN_API_VERSION (3u). Static builds wire this through
-// RAC_STATIC_PLUGIN_REGISTER(<name>) at file scope in the engine's
-// rac_plugin_entry_<name>.cpp; shared builds expose the same entry symbol
-// for dlopen via rac_registry_load_plugin.
-rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable);
-rac_result_t rac_registry_load_plugin(const char* path);
-rac_result_t rac_registry_unload_plugin(const char* name);
-uint32_t     rac_plugin_api_version(void);
-
-// Dispatch: the registry returns the highest-priority plugin that serves a
-// primitive (plain priority order — no scoring). The public primitive APIs
-// (rac_llm_create, rac_stt_create, ...) resolve through it internally; a
-// specific engine can be pinned by name via rac_plugin_find_for_engine.
-const rac_engine_vtable_t* rac_plugin_find(rac_primitive_t primitive);
-const rac_engine_vtable_t* rac_plugin_find_for_engine(rac_primitive_t primitive,
-                                                      const char* engine_name);
-```
-
-> Historical: v2 used a separate capability-oriented service registry
-> (`rac_service_register_provider` / `rac_service_create`) and a module
-> registry (`rac_module_register` / `rac_module_list`). Both surfaces were
-> removed in the v3 ABI cut-over and replaced by the unified engine-plugin
-> vtable above. See `include/rac/plugin/rac_engine_vtable.h` for the 8 active
-> + 10 reserved primitive slots.
-
-### LLM Service
-
-```c
-rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle);
-rac_result_t rac_llm_generate(rac_handle_t handle, const char* prompt,
-                              const rac_llm_options_t* options, rac_llm_result_t* out_result);
-rac_result_t rac_llm_generate_stream(rac_handle_t handle, const char* prompt,
-                                     const rac_llm_options_t* options,
-                                     rac_llm_stream_callback_fn callback, void* user_data);
-rac_result_t rac_llm_cancel(rac_handle_t handle);
-void rac_llm_destroy(rac_handle_t handle);
-```
-
-### STT Service
-
-```c
-rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle);
-rac_result_t rac_stt_transcribe(rac_handle_t handle, const void* audio_data, size_t audio_size,
-                                const rac_stt_options_t* options, rac_stt_result_t* out_result);
-rac_result_t rac_stt_transcribe_stream(rac_handle_t handle, const void* audio_data,
-                                       size_t audio_size, const rac_stt_options_t* options,
-                                       rac_stt_stream_callback_t callback, void* user_data);
-void rac_stt_destroy(rac_handle_t handle);
-```
-
-### TTS Service
-
-```c
-rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle);
-rac_result_t rac_tts_synthesize(rac_handle_t handle, const char* text,
-                                const rac_tts_options_t* options, rac_tts_result_t* out_result);
-rac_result_t rac_tts_stop(rac_handle_t handle);
-void rac_tts_destroy(rac_handle_t handle);
-```
-
-### VAD Service
-
-```c
-rac_result_t rac_vad_configure_lifecycle_proto(const uint8_t* request_bytes,
-                                               size_t request_size,
-                                               rac_proto_buffer_t* out_result);
-rac_result_t rac_vad_start_lifecycle_proto(rac_proto_buffer_t* out_result);
-rac_result_t rac_vad_process_lifecycle_proto(const uint8_t* request_bytes,
-                                             size_t request_size,
-                                             rac_proto_buffer_t* out_result);
-rac_result_t rac_vad_stop_lifecycle_proto(rac_proto_buffer_t* out_result);
-```
-
-### Voice Agent
-
-```c
-rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_handle);
-rac_result_t rac_voice_agent_initialize_proto(rac_voice_agent_handle_t handle,
-                                              const uint8_t* config_bytes,
-                                              size_t config_size,
-                                              rac_proto_buffer_t* out_result);
-rac_result_t rac_voice_agent_process_voice_turn_proto(rac_voice_agent_handle_t handle,
-                                                      const void* audio_data,
-                                                      size_t audio_size,
-                                                      rac_proto_buffer_t* out_result);
-void rac_voice_agent_destroy(rac_voice_agent_handle_t handle);
-```
-
----
-
-## Platform Integration
-
-### Swift SDK Integration
-
-The Swift SDK (`runanywhere-swift`) integrates via the `CRACommons` module:
-
-1. Swift imports C headers via module map
-2. `SwiftPlatformAdapter` provides platform callbacks (storage, logging)
-3. `CommonsErrorMapping` converts `rac_result_t` to Swift `SDKError`
-4. `EventBridge` subscribes to C++ events, republishes to Swift `EventBus`
-
-### Kotlin SDK Integration
-
-The Kotlin SDK (`runanywhere-kotlin`) integrates via JNI:
-
-1. JNI bridge libraries: `librac_*_jni.so`
-2. Platform adapter implemented via JNI callbacks
-3. Type marshaling between Java and C types
-4. Coroutine-based async wrappers around blocking C calls
-
-### Platform Adapter
-
-Platform SDKs must provide a `rac_platform_adapter_t` with callbacks for:
-
-```c
-typedef struct rac_platform_adapter {
-    // File operations
-    rac_bool_t (*file_exists)(const char* path, void* user_data);
-    rac_result_t (*file_read)(const char* path, void** out_data, size_t* out_size, void* user_data);
-    rac_result_t (*file_write)(const char* path, const void* data, size_t size, void* user_data);
-
-    // Secure storage
-    rac_result_t (*secure_get)(const char* key, char** out_value, void* user_data);
-    rac_result_t (*secure_set)(const char* key, const char* value, void* user_data);
-
-    // Logging
-    void (*log)(rac_log_level_t level, const char* category, const char* message, void* user_data);
-
-    // Time
-    int64_t (*now_ms)(void* user_data);
-
-    // Optional: HTTP download, archive extraction
-    // ...
-
-    void* user_data;
-} rac_platform_adapter_t;
-```
-
----
-
-## Dependencies
-
-### External Dependencies
-
-| Dependency | Version | Purpose |
-|------------|---------|---------|
-| **llama.cpp** | b9959 | LLM inference engine |
-| **Sherpa-ONNX** | 1.13.2 | STT/TTS/VAD via ONNX Runtime |
-| **ONNX Runtime** | Platform pin in `VERSIONS` | Neural network inference |
-| **Protobuf / Abseil** | 35.1 / 20260107.1 | Namespace-isolated wire runtime |
-| **nlohmann/json** | 3.12.0 | JSON parsing |
-| **libarchive** | 3.8.7 | ZIP / tar.gz / tar.bz2 model archive extraction |
-| **HTTP transport** | Platform adapter | URLSession, OkHttp, browser fetch, or the host-provided transport; commons does not bundle a TLS stack. |
-
-### Binary Outputs
-
-| Framework | Size | Provides |
-|-----------|------|----------|
-| `RACommons.xcframework` | ~2MB | Core infrastructure, registries, events |
-| `RABackendLLAMACPP.xcframework` | ~15-25MB | LLM capability (GGUF models) |
-| `RABackendONNX.xcframework` | ~50-70MB | STT, TTS, VAD (ONNX models) |
-
----
-
-## Version Management
-
-All versions are centralized in the `VERSIONS` file:
-
-```bash
-PROJECT_VERSION=0.20.0
-IOS_DEPLOYMENT_TARGET=17.5
-MACOS_DEPLOYMENT_TARGET=14.5
-ANDROID_MIN_SDK=24
-ONNX_VERSION_IOS=1.24.3
-SHERPA_ONNX_VERSION_IOS=1.13.2
-LLAMACPP_VERSION=b9959
-PROTOBUF_VERSION=35.1
-ABSEIL_VERSION=20260107.1
-```
-
-Load versions in scripts:
-```bash
-source scripts/load-versions.sh
-echo "Using llama.cpp version: $LLAMACPP_VERSION"
-```
-
-Load versions in CMake:
-```cmake
-include(LoadVersions)
-message(STATUS "ONNX Runtime version: ${RAC_ONNX_VERSION_IOS}")
-```
-
----
-
-## Error Codes
-
-Error codes are organized by range:
-
-| Range | Category |
-|-------|----------|
-| 0 | Success |
-| -100 to -109 | Initialization errors |
-| -110 to -129 | Model errors |
-| -130 to -149 | Generation errors |
-| -150 to -179 | Network errors |
-| -180 to -219 | Storage errors |
-| -220 to -229 | Hardware errors |
-| -230 to -249 | Component state errors |
-| -250 to -279 | Validation errors |
-| -280 to -299 | Audio errors |
-| -300 to -319 | Language/Voice errors |
-| -400 to -499 | Module/Service errors |
-| -600 to -699 | Backend errors |
-| -700 to -799 | Event errors |
-
----
-
-## Contributing
-
-See the main repository [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines.
-
-### Code Style
-
-- Follow Google C++ Style Guide with project customizations
-- Run `./scripts/lint-cpp.sh --fix` before committing
-- All public symbols use `rac_` prefix
-
----
+## Backend overview
+
+### LlamaCPP
+
+GGUF models for LLM and VLM. GPU acceleration via Metal (Apple), CUDA (Windows/Linux), and WebGPU (Web). Header: `include/rac/backends/rac_llm_llamacpp.h`.
+
+### Sherpa-ONNX
+
+Offline STT, TTS, and VAD via ONNX. Registration: `rac/plugin/rac_plugin_entry_sherpa.h`.
+
+### ONNX Runtime
+
+Embeddings and general ONNX inference. Registration: `rac/plugin/rac_plugin_entry_onnx.h`.
+
+### QHexRT
+
+LLM, VLM, STT, and TTS on the Qualcomm Hexagon NPU from QNN context bundles. Android arm64 only; registers itself only on supported Snapdragon parts. Registration: `rac_backend_qhexrt_register()`.
+
+### Cloud STT
+
+Online speech-to-text over HTTP. Offline STT is served by Sherpa; a hybrid router picks per request.
+
+### Platform (Apple)
+
+Apple Foundation Models (LLM) and System TTS via Swift callbacks on iOS/macOS.
+
+### Core ML
+
+Image generation (diffusion) on Apple platforms. Registration: `rac/plugin/rac_plugin_entry_coreml.h`.
+
+## Platform SDK integration
+
+| SDK | Binding |
+|-----|---------|
+| Swift | `CRACommons` module, XCFrameworks in `runanywhere-swift` |
+| Kotlin | JNI (`librac_*_jni.so`) |
+| React Native | JSI / native module over commons |
+| Flutter | FFI over commons |
+| Web | Emscripten WASM modules in `runanywhere-web` |
+| Python | pybind11 / scikit-build extension in `runanywhere-python` |
+| Electron | N-API addon in `runanywhere-electron` |
+| CLI | Direct C++ consumer (`rcli`) |
+
+Each host implements a `rac_platform_adapter_t` for file I/O, secure storage, logging, and downloads.
+
+## Version management
+
+Version pins for dependencies and the project version live in `VERSIONS` and the repo-root `VERSION` file. Load in scripts with `source scripts/load-versions.sh` or in CMake with `include(LoadVersions)`.
+
+## Further reading
+
+- Contributor build guide: [docs/DEVELOPMENT.md](./docs/DEVELOPMENT.md)
+- Architecture details: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+- Per-platform integration notes: [docs/md/](./docs/md/)
+
+## Support
+
+- Documentation: [docs.runanywhere.ai](https://docs.runanywhere.ai)
+- Discord: [discord.gg/N359FBbDVd](https://discord.gg/N359FBbDVd)
+- Email: [founders@runanywhere.ai](mailto:founders@runanywhere.ai)
 
 ## License
 
-See [LICENSE](../../LICENSE) for details.
+See the repository [LICENSE](../../LICENSE).

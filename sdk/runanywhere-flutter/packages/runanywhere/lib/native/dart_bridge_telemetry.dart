@@ -431,8 +431,6 @@ class DartBridgeTelemetry {
     switch (env) {
       case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 0;
-      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return 1;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 2;
       default:

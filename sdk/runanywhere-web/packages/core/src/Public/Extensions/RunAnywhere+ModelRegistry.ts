@@ -7,7 +7,8 @@ import type {
 
   ModelCategory} from '@runanywhere/proto-ts/model_types';
 import {
-  InferenceFramework
+  InferenceFramework,
+  ModelFileRole,
 } from '@runanywhere/proto-ts/model_types';
 import {
   ModelRegistryAdapter,
@@ -18,6 +19,10 @@ import {
   getModuleForCapability,
   type EmscriptenRunanywhereModule,
 } from '../../runtime/EmscriptenModule.js';
+import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
+import { SDKLogger } from '../../Foundation/SDKLogger.js';
+
+const logger = new SDKLogger('ModelRegistry');
 
 interface DefaultFrameworkModule extends EmscriptenRunanywhereModule {
   /** Proto-int wrapper over rac_model_category_default_framework (wasm_exports.cpp). */
@@ -68,20 +73,28 @@ export const ModelRegistry = {
     return requireAdapter().updateDownloadStatus(modelId, localPath);
   },
 
+  // Read APIs degrade gracefully when no backend adapter is installed yet
+  // (backends register asynchronously on Web), returning the declared `null`
+  // instead of throwing. This mirrors iOS (`RAModelGetResult(found: false)` /
+  // `RAModelListResult(success: false)`) and Kotlin, which return empty
+  // results rather than throwing on not-ready reads. Use `availability()` to
+  // distinguish "not installed" from "installed but empty". Mutating APIs above
+  // still throw via `requireAdapter()`, since a write with no registry is a
+  // caller error.
   getModel(modelId: string): ModelInfo | null {
-    return requireAdapter().get(modelId);
+    return ModelRegistryAdapter.tryDefault()?.get(modelId) ?? null;
   },
 
   listModels(): ModelInfoList | null {
-    return requireAdapter().list();
+    return ModelRegistryAdapter.tryDefault()?.list() ?? null;
   },
 
   queryModels(query: ModelQuery): ModelInfoList | null {
-    return requireAdapter().query(query);
+    return ModelRegistryAdapter.tryDefault()?.query(query) ?? null;
   },
 
   downloadedModels(): ModelInfoList | null {
-    return requireAdapter().listDownloaded();
+    return ModelRegistryAdapter.tryDefault()?.listDownloaded() ?? null;
   },
 
   removeModel(modelId: string): boolean {
@@ -106,5 +119,27 @@ export const ModelRegistry = {
     return (protoFramework in InferenceFramework
       ? protoFramework
       : InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN) as InferenceFramework;
+  },
+
+  /**
+   * Classify a sidecar filename's descriptor role for a given modality.
+   * Routed through the shared commons classifier
+   * (`rac_wasm_infer_model_file_role`) so the heuristic stays byte-identical
+   * with every other SDK. Mirrors Swift
+   * `RunAnywhere.inferModelFileRole(filename:modality:)`. Returns
+   * `MODEL_FILE_ROLE_PRIMARY_MODEL` when the WASM export is unavailable.
+   */
+  inferModelFileRole(filename: string, modality: ModelCategory): ModelFileRole {
+    const module = getModuleForCapability('commons');
+    if (!module) {
+      return ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL;
+    }
+    const role = new ProtoWasmBridge(module, logger).inferModelFileRole(
+      filename,
+      modality,
+    );
+    return (role in ModelFileRole
+      ? role
+      : ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL) as ModelFileRole;
   },
 };

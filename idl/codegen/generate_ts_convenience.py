@@ -51,6 +51,10 @@ from typing import Iterable
 
 from google.protobuf import descriptor_pb2
 
+# Imported rather than restated: a second copy of this list is exactly the drift
+# the annotations exist to prevent.
+from _convenience_common import DECLARATION_ONLY_FILES
+
 # --- RunAnywhere proto-annotation field numbers (mirror idl/rac_options.proto).
 RAC_DEFAULT_FIELD_NUM       = 50001
 RAC_REQUIRED_FIELD_NUM      = 50002
@@ -555,7 +559,7 @@ def _emit_message_validate(
             checks.append("  }")
 
         if (min_f is not None or max_f is not None) and field.type in _FLOAT_TYPES:
-            parts = []
+            parts = [f"!Number.isFinite(m.{ts_field})"]
             if min_f is not None:
                 parts.append(f"m.{ts_field} < {min_f}")
             if max_f is not None:
@@ -607,7 +611,7 @@ def _collect_message_symbols_per_file(
     enum_consts: dict[str, set[str]] = {}
 
     for file_desc in fds.file:
-        if file_desc.package != "runanywhere.v1":
+        if file_desc.package != "runanywhere.v1" or file_desc.name in DECLARATION_ONLY_FILES:
             continue
         base = _file_basename(file_desc)
         for enum_desc in file_desc.enum_type:
@@ -693,9 +697,11 @@ def _process_file(
     if not blocks:
         return None
 
-    # Drop any cross-file enum import that turned out to live in our own
-    # file (e.g. message and its enum are both top-level in the same proto).
-    imports_from_other.pop(base, None)
+    # Enum defaults are collected by owner file. When the enum lives beside
+    # the message, promote it into the local generated-module import instead
+    # of dropping it (an unannotated enum has no accessor block to add the
+    # import independently).
+    imports_from_self.update(imports_from_other.pop(base, set()))
 
     return GeneratedFile(
         base_name=base,
@@ -810,7 +816,7 @@ def main() -> int:
     total_validate = 0
 
     for file_desc in fds.file:
-        if file_desc.package != "runanywhere.v1":
+        if file_desc.package != "runanywhere.v1" or file_desc.name in DECLARATION_ONLY_FILES:
             continue
         generated = _process_file(file_desc, enum_owner_file, enum_const_names)
         if generated is None:

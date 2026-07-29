@@ -41,7 +41,7 @@ The Swift SDK (`sdk/runanywhere-swift/`) is a thin platform bridge that adapts A
 - macOS deployment target: 14.5
 - Swift tools version: 5.9 (`Package.swift:1`)
 - Xcode required: 15+
-- Current SDK version: `0.20.11` (`sdk/runanywhere-swift/VERSION:1`)
+- Current SDK version: `0.20.12` (`sdk/runanywhere-swift/VERSION:1`)
 
 ### §1.3 Package layout (preview)
 
@@ -87,7 +87,7 @@ The full slot map and per-slot implementation notes are documented in §6.5.18 (
 sdk/runanywhere-swift/
 ├── Package.swift               ← local dev manifest (references Binaries/)
 ├── Package.resolved
-├── VERSION                     ← 0.20.11
+├── VERSION                     ← 0.20.12
 ├── AGENTS.md
 ├── README.md
 ├── ARCHITECTURE.md             ← this document
@@ -211,7 +211,7 @@ public typealias SDKEnvironment = RASDKEnvironment  // line 20
 
 `RASDKEnvironment` is the proto3-generated enum from `idl/model_types.proto`. The hand-written enum was removed; all SDK logic operates on the generated type through extensions.
 
-Cases (from proto): `.development`, `.staging`, `.production`, `.unspecified` (proto default), `UNRECOGNIZED` (proto catch-all).
+Cases (from proto): `.development`, `.production`, `.unspecified` (proto default), `UNRECOGNIZED` (proto catch-all). Staging was removed; its wire number is reserved.
 
 #### Codable conformance (lines 29–39)
 
@@ -221,15 +221,15 @@ Cases (from proto): `.development`, `.staging`, `.production`, `.unspecified` (p
 
 | Symbol | Type | Mechanism | Line |
 |---|---|---|---|
-| `deployableCases` | `static [RASDKEnvironment]` | Hardcoded array `[.development, .staging, .production]` | 47 |
-| `cEnvironment` | `rac_environment_t` | Switch to C enum constants (`RAC_ENV_DEVELOPMENT`, `RAC_ENV_STAGING`, `RAC_ENV_PRODUCTION`) | 54 |
+| `deployableCases` | `static [RASDKEnvironment]` | Hardcoded array `[.development, .production]` | 47 |
+| `cEnvironment` | `rac_environment_t` | Switch to C enum constants (`RAC_ENV_DEVELOPMENT`, `RAC_ENV_PRODUCTION`) | 54 |
 | `description` | `String` | Switch returning human-readable label | 64 |
 | `isProduction` | `Bool` | `rac_env_is_production(cEnvironment)` | 74 |
 | `isTesting` | `Bool` | `rac_env_is_testing(cEnvironment)` | 77 |
 | `requiresBackendURL` | `Bool` | `rac_env_requires_backend_url(cEnvironment)` | 80 |
 | `isCompatibleWithCurrentBuild` | `Bool` | Swift `#if DEBUG` check; production returns `false` in DEBUG builds | 86 |
 | `isDebugBuild` | `static Bool` | `#if DEBUG` flag | 102 |
-| `defaultLogLevel` | `LogLevel` | Switch: `.development` → `.debug`, `.staging` → `.info`, `.production` → `.warning` | 113 |
+| `defaultLogLevel` | `LogLevel` | Switch: `.development` → `.debug`, `.production` → `.warning` | 113 |
 | `shouldSendTelemetry` | `Bool` | `rac_env_should_send_telemetry(cEnvironment)` | 123 |
 | `useMockData` | `Bool` | `self == .development` | 126 |
 | `shouldSyncWithBackend` | `Bool` | `rac_env_should_sync_with_backend(cEnvironment)` | 129 |
@@ -1568,7 +1568,7 @@ Seven files under `Foundation/Bridge/Extensions/` form the type-conversion layer
 
 | Constant | Value / Derivation |
 |---|---|
-| `version` | `"0.20.11"` (line 14) — kept in sync with `sdk/runanywhere-commons/VERSION` |
+| `version` | `"0.20.12"` (line 14) — kept in sync with `sdk/runanywhere-commons/VERSION` |
 | `name` | `"RunAnywhere SDK"` (line 17) |
 | `userAgent` | `"\(name)/\(version) (Swift)"` (line 20) |
 | `platform` | Compile-time conditional (lines 23–33): `"ios"`, `"macos"`, `"tvos"`, `"watchos"`, or `"unknown"` |
@@ -1840,7 +1840,7 @@ Metadata sanitization: `sanitizeMetadata(_:)` calls `rac_log_metadata_should_red
 
 Pre-instantiated: `SDKLogger.shared` ("RunAnywhere"), `.llm`, `.stt`, `.tts`, `.download`, `.models`.
 
-Environment presets: `.development` → minLevel `.debug`; `.staging` → `.info`; `.production` → `.warning`.
+Environment presets: `.development` → minLevel `.debug`; `.production` → `.warning`.
 
 #### §9.4.2 Custom Log Destinations
 
@@ -2203,17 +2203,17 @@ Swift manages this in `NativeProtoABI`:
 
 NULL fields cause C++ to fall back or return `RAC_ERROR_NOT_SUPPORTED`. See §6.5.19 for the Swift implementation of each slot.
 
-### §13.4 Plugin ABI v4 — `rac_engine_vtable_t`
+### §13.4 Plugin ABI v7 — `rac_engine_vtable_t`
 
 Every backend publishes a single `rac_engine_vtable_t`:
 
 - `rac_engine_metadata_t metadata` — `abi_version` (must equal `RAC_PLUGIN_API_VERSION`), `name`, `display_name`, `engine_version`, `priority`, `capability_flags`, optional `runtimes[]` + `formats[]`.
 - `rac_result_t (*capability_check)(void)` — called once after ABI version validation.
 - `void (*on_unload)(void)` — called on unload.
-- 7 named primitive slots: `llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`. NULL means the engine does not serve that primitive. (The former `rerank_ops` was removed in ABI v4.)
-- 10 `const void* reserved_slot_N` fields.
+- 9 active primitive slots: `llm_ops`, `stt_ops`, `tts_ops`, `vad_ops`, `embedding_ops`, `vlm_ops`, `diffusion_ops`, `diarization_ops`, `segmentation_ops`. NULL means the engine does not serve that primitive. (The former `rerank_ops` was removed in ABI v4 and remains retired.)
+- 8 `const void* reserved_slot_N` fields.
 
-`metadata.abi_version` must equal `RAC_PLUGIN_API_VERSION` (currently `4u`); mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`. On iOS, `RAC_STATIC_PLUGINS=ON` forces static registration via `RAC_STATIC_PLUGIN_REGISTER(name)` + `-force_load`; no `dlopen`.
+`metadata.abi_version` must equal `RAC_PLUGIN_API_VERSION` (currently `7u`); mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`. On iOS, `RAC_STATIC_PLUGINS=ON` forces static registration via `RAC_STATIC_PLUGIN_REGISTER(name)` + `-force_load`; no `dlopen`.
 
 ### §13.5 Streaming fan-out — `HandleStreamAdapter`
 
@@ -2617,7 +2617,7 @@ All files in `Generated/` are produced by `idl/codegen/generate_all.sh` and must
 - **`NativeProtoABI`** — Internal Swift `enum` (`CppBridge+NativeProtoABI.swift`) holding `load`, `require`, `withSerializedBytes`, `decode`, `free`, `invoke` helpers for the proto-byte ABI. All other slices call through this enum.
 - **`RA*` typealias prefix** — Proto-generated Swift types keep their `RA` prefix. Public extensions then declare typealiases stripping it for the caller's convenience.
 - **`RAC_STATIC_PLUGINS`** — CMake flag forcing static plugin registration on iOS/WASM. Combined with `-force_load` linker flags via `RAC_STATIC_PLUGIN_REGISTER(name)` macro.
-- **`RAC_PLUGIN_API_VERSION`** — C macro currently `3u`. `rac_engine_vtable_t.metadata.abi_version` must equal this; mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`.
+- **`RAC_PLUGIN_API_VERSION`** — C macro currently `7u`. `rac_engine_vtable_t.metadata.abi_version` must equal this; mismatch causes `RAC_ERROR_ABI_VERSION_MISMATCH`.
 - **Proto-byte buffer** — A `rac_proto_buffer_t` filled by C++ with serialized proto bytes. Swift wraps in `Data`, deserializes to the response type, then frees via `rac_proto_buffer_free` (via `NativeProtoABI.free`).
 - **Two-phase init** — Swift SDK contract: synchronous Phase 1 (`rac_sdk_init_phase1_proto`) registers platform services and validates inputs; async Phase 2 (`rac_sdk_init_phase2_proto`) performs HTTP/auth/device registration. Phase 2 failures are non-fatal.
 - **Platform adapter IoC** — `rac_platform_adapter_t` flat C struct of function pointers. Swift populates this struct; C++ calls into it for all platform services (file I/O, Keychain, logging, clock, memory, HTTP download).

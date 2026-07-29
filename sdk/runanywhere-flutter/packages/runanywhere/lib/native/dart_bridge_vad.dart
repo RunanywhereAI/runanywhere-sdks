@@ -12,6 +12,7 @@ import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/vad_options.pb.dart' as vad_pb;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/native_functions.dart';
@@ -59,7 +60,7 @@ class DartBridgeVAD {
 
         if (result != RAC_SUCCESS) {
           throw StateError(
-            'Failed to create VAD component: ${RacResultCode.getMessage(result)}',
+            'Failed to create VAD component: ${RacResultCodes.message(result)}',
           );
         }
 

@@ -115,8 +115,9 @@ const rac_engine_vtable_t k_probe_engine = {
     /* embedding_ops    */ nullptr,
     /* vlm_ops          */ nullptr,
     /* diffusion_ops    */ nullptr,
-    nullptr,
-    nullptr,
+    /* diarization_ops  */ nullptr,
+    /* segmentation_ops */ nullptr,
+    /* reserved_slot_2..9 */
     nullptr,
     nullptr,
     nullptr,

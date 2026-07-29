@@ -19,6 +19,8 @@ Modules/
 
 EXTERNAL/
 
-# Documentation (auto-generated, keep local only)
-docs/
+# Documentation (auto-generated DocC output, keep local only).
+# The hand-written contributor guide is tracked.
+docs/*
+!docs/DEVELOPMENT.md
 Docs/

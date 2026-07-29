@@ -13,6 +13,7 @@ import 'package:runanywhere/generated/component_types.pbenum.dart'
 import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCategory;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
@@ -54,7 +55,7 @@ class RunAnywhereVAD {
     final request = VADProcessRequest(
       audio: VADAudioSource(
         audioData: audio,
-        sampleRate: 16000,
+        sampleRate: RADefaultsAudioCapture.micSampleRateHz,
         channels: 1,
       ),
       options: options ?? VADOptions(),

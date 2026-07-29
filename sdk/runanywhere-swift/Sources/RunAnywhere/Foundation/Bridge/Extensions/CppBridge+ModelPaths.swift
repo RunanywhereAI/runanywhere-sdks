@@ -17,7 +17,7 @@ extension CppBridge {
     public enum ModelPaths {
 
         private static let logger = SDKLogger(category: "CppBridge.ModelPaths")
-        private static let pathBufferSize = 1024
+        private static let pathBufferSize = RADefaults.FFI.pathBufferBytes
 
         private static func decodeCStringBuffer(_ buffer: [CChar]) -> String {
             let bytes = buffer.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }

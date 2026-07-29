@@ -36,6 +36,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.ui.screens.models.brand
+import com.runanywhere.runanywhereai.ui.screens.models.displayTitle
 import com.runanywhere.runanywhereai.ui.screens.models.shortLabel
 import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
@@ -183,7 +184,12 @@ private fun ModelCard(
 
             Column(modifier = Modifier.padding(end = dimens.spacingSm)) {
                 Text(
-                    text = hostedModel?.displayName ?: model?.name ?: fallbackModelName ?: "Select Model",
+                    // Hosted Connect models keep their host display name; local
+                    // models use the same cleaned title the picker shows.
+                    text = hostedModel?.displayName
+                        ?: model?.displayTitle()
+                        ?: fallbackModelName
+                        ?: "Select Model",
                     overflow = TextOverflow.Ellipsis,
                     maxLines = 1,
                     style = MaterialTheme.typography.titleMedium,

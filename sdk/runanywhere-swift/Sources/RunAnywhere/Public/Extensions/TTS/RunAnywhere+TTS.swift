@@ -119,7 +119,10 @@ public extension RunAnywhere {
 
         // Convert Float32 PCM to WAV format using C++ utility
         let sampleRate = output.sampleRate > 0 ? output.sampleRate : options.sampleRate
-        let wavData = try convertPCMToWAV(pcmData: output.audioData, sampleRate: sampleRate > 0 ? sampleRate : 22_050)
+        let wavSampleRate = sampleRate > 0
+            ? sampleRate
+            : Int32(RADefaults.AudioCapture.ttsSampleRateHz)
+        let wavData = try convertPCMToWAV(pcmData: output.audioData, sampleRate: wavSampleRate)
 
         // Play the audio using platform audio manager
         if !wavData.isEmpty {
