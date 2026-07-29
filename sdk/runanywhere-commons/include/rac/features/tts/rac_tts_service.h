@@ -263,6 +263,14 @@ RAC_API rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result
  */
 RAC_API rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out);
 
+/**
+ * Report the lifecycle-loaded TTS service's state as serialized
+ * runanywhere.v1.TTSServiceState bytes: readiness, current voice, available
+ * voices, and supported language codes (BCP-47). Succeeds with is_ready=false
+ * when no voice is loaded. Caller MUST release with rac_proto_buffer_free().
+ */
+RAC_API rac_result_t rac_tts_state_lifecycle_proto(rac_proto_buffer_t* out_result);
+
 // =============================================================================
 // CANONICAL DEFAULTS
 // =============================================================================

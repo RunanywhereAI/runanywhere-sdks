@@ -1473,4 +1473,61 @@ rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out) {
 #endif
 }
 
+rac_result_t rac_tts_state_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out_result);
+#else
+    runanywhere::v1::TTSServiceState state;
+
+    rac::lifecycle::LifecycleTtsRef ref;
+    if (rac::lifecycle::acquire_lifecycle_tts(&ref) != RAC_SUCCESS) {
+        state.set_is_ready(false);
+        return copy_proto(state, out_result);
+    }
+
+    state.set_is_ready(true);
+    if (ref.model_id) {
+        state.set_current_voice(ref.model_id);
+    }
+
+    if (ref.ops && ref.ops->get_info) {
+        rac_tts_info_t info = {};
+        if (ref.ops->get_info(ref.impl, &info) == RAC_SUCCESS) {
+            for (size_t i = 0; i < info.num_voices; ++i) {
+                const char* id = info.available_voices ? info.available_voices[i] : nullptr;
+                if (!id)
+                    continue;
+                runanywhere::v1::TTSVoiceInfo* voice = state.add_voices();
+                voice->set_id(id);
+                voice->set_display_name(id);
+            }
+        }
+    }
+
+    if (ref.ops && ref.ops->get_languages) {
+        char* json = nullptr;
+        if (ref.ops->get_languages(ref.impl, &json) == RAC_SUCCESS && json) {
+            // Engines emit a flat JSON string array (["en-US",...]); pull out
+            // the quoted values without a JSON dependency.
+            const char* p = json;
+            while ((p = std::strchr(p, '"')) != nullptr) {
+                const char* end = std::strchr(p + 1, '"');
+                if (!end)
+                    break;
+                if (end > p + 1) {
+                    state.add_supported_language_codes(std::string(p + 1, end));
+                }
+                p = end + 1;
+            }
+            std::free(json);
+        }
+    }
+
+    rac::lifecycle::release_lifecycle_tts(&ref);
+    return copy_proto(state, out_result);
+#endif
+}
+
 }  // extern "C"

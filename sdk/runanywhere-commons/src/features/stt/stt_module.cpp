@@ -1837,6 +1837,50 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
 #endif
 }
 
+rac_result_t rac_stt_state_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out_result);
+#else
+    runanywhere::v1::STTServiceState state;
+
+    rac::lifecycle::LifecycleSttRef ref;
+    if (rac::lifecycle::acquire_lifecycle_stt(&ref) != RAC_SUCCESS) {
+        state.set_is_ready(false);
+        return copy_proto(state, out_result);
+    }
+
+    state.set_is_ready(true);
+    if (ref.model_id) {
+        state.set_current_model(ref.model_id);
+    }
+    state.set_supports_streaming(ref.ops && ref.ops->transcribe_stream != nullptr);
+
+    if (ref.ops && ref.ops->get_languages) {
+        char* json = nullptr;
+        if (ref.ops->get_languages(ref.impl, &json) == RAC_SUCCESS && json) {
+            // Engines emit a flat JSON string array (["en","es",...]); pull
+            // out the quoted values without a JSON dependency.
+            const char* p = json;
+            while ((p = std::strchr(p, '"')) != nullptr) {
+                const char* end = std::strchr(p + 1, '"');
+                if (!end)
+                    break;
+                if (end > p + 1) {
+                    state.add_supported_language_codes(std::string(p + 1, end));
+                }
+                p = end + 1;
+            }
+            std::free(json);
+        }
+    }
+
+    rac::lifecycle::release_lifecycle_stt(&ref);
+    return copy_proto(state, out_result);
+#endif
+}
+
 rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_stt_lifecycle_stream_event_callback_fn callback, void* user_data) {

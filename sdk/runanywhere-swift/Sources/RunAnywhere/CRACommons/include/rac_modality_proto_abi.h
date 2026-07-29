@@ -55,6 +55,9 @@ RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
     size_t request_proto_size,
     rac_modality_proto_callback_fn callback,
     void* user_data);
+// Serialized runanywhere.v1.STTServiceState (readiness, current model,
+// streaming support, supported language codes).
+RAC_API rac_result_t rac_stt_state_lifecycle_proto(rac_proto_buffer_t* out_result);
 
 // TTS component proto ABI.
 RAC_API rac_result_t rac_tts_component_list_voices_proto(
@@ -74,6 +77,9 @@ RAC_API rac_result_t rac_tts_component_synthesize_stream_proto(
     size_t options_proto_size,
     rac_modality_proto_callback_fn callback,
     void* user_data);
+// Serialized runanywhere.v1.TTSServiceState (readiness, current voice,
+// available voices, supported language codes).
+RAC_API rac_result_t rac_tts_state_lifecycle_proto(rac_proto_buffer_t* out_result);
 
 // VAD component proto ABI.
 RAC_API rac_result_t rac_vad_component_configure_proto(

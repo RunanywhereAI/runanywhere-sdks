@@ -326,6 +326,15 @@ RAC_API rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
 RAC_API rac_result_t
 rac_stt_configuration_defaults_proto(rac_proto_buffer_t* out_RASTTConfiguration);
 
+/**
+ * Report the lifecycle-loaded STT service's state as serialized
+ * runanywhere.v1.STTServiceState bytes: readiness, current model, streaming
+ * support, and the supported language codes (BCP-47). Succeeds with
+ * is_ready=false when no STT model is loaded. Caller MUST release with
+ * rac_proto_buffer_free().
+ */
+RAC_API rac_result_t rac_stt_state_lifecycle_proto(rac_proto_buffer_t* out_result);
+
 #ifdef __cplusplus
 }
 #endif
