@@ -117,6 +117,19 @@ export interface VoiceAgentTurnRequest_MetadataEntry {
 }
 
 /**
+ * One audio frame fed into a live voice-agent session. Replaces the
+ * seven-scalar rac_voice_agent_feed_audio_proto signature.
+ */
+export interface VoiceAgentAudioFrame {
+  audioData: Uint8Array;
+  sampleRate: number;
+  channels: number;
+  encoding: AudioEncoding;
+  /** Marks the end of the utterance (flush). */
+  isFinal: boolean;
+}
+
+/**
  * ---------------------------------------------------------------------------
  * Voice session behavior configuration.
  *
@@ -1138,6 +1151,142 @@ export const VoiceAgentTurnRequest_MetadataEntry: MessageFns<VoiceAgentTurnReque
     const message = createBaseVoiceAgentTurnRequest_MetadataEntry();
     message.key = object.key ?? "";
     message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseVoiceAgentAudioFrame(): VoiceAgentAudioFrame {
+  return { audioData: new Uint8Array(0), sampleRate: 0, channels: 0, encoding: 0, isFinal: false };
+}
+
+export const VoiceAgentAudioFrame: MessageFns<VoiceAgentAudioFrame> = {
+  encode(message: VoiceAgentAudioFrame, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.audioData.length !== 0) {
+      writer.uint32(10).bytes(message.audioData);
+    }
+    if (message.sampleRate !== 0) {
+      writer.uint32(16).int32(message.sampleRate);
+    }
+    if (message.channels !== 0) {
+      writer.uint32(24).int32(message.channels);
+    }
+    if (message.encoding !== 0) {
+      writer.uint32(32).int32(message.encoding);
+    }
+    if (message.isFinal !== false) {
+      writer.uint32(40).bool(message.isFinal);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): VoiceAgentAudioFrame {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseVoiceAgentAudioFrame();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.audioData = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.sampleRate = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.channels = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.encoding = reader.int32() as any;
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.isFinal = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): VoiceAgentAudioFrame {
+    return {
+      audioData: isSet(object.audioData)
+        ? bytesFromBase64(object.audioData)
+        : isSet(object.audio_data)
+        ? bytesFromBase64(object.audio_data)
+        : new Uint8Array(0),
+      sampleRate: isSet(object.sampleRate)
+        ? globalThis.Number(object.sampleRate)
+        : isSet(object.sample_rate)
+        ? globalThis.Number(object.sample_rate)
+        : 0,
+      channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
+      encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : 0,
+      isFinal: isSet(object.isFinal)
+        ? globalThis.Boolean(object.isFinal)
+        : isSet(object.is_final)
+        ? globalThis.Boolean(object.is_final)
+        : false,
+    };
+  },
+
+  toJSON(message: VoiceAgentAudioFrame): unknown {
+    const obj: any = {};
+    if (message.audioData.length !== 0) {
+      obj.audioData = base64FromBytes(message.audioData);
+    }
+    if (message.sampleRate !== 0) {
+      obj.sampleRate = Math.round(message.sampleRate);
+    }
+    if (message.channels !== 0) {
+      obj.channels = Math.round(message.channels);
+    }
+    if (message.encoding !== 0) {
+      obj.encoding = audioEncodingToJSON(message.encoding);
+    }
+    if (message.isFinal !== false) {
+      obj.isFinal = message.isFinal;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<VoiceAgentAudioFrame>, I>>(base?: I): VoiceAgentAudioFrame {
+    return VoiceAgentAudioFrame.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<VoiceAgentAudioFrame>, I>>(object: I): VoiceAgentAudioFrame {
+    const message = createBaseVoiceAgentAudioFrame();
+    message.audioData = object.audioData ?? new Uint8Array(0);
+    message.sampleRate = object.sampleRate ?? 0;
+    message.channels = object.channels ?? 0;
+    message.encoding = object.encoding ?? 0;
+    message.isFinal = object.isFinal ?? false;
     return message;
   },
 };

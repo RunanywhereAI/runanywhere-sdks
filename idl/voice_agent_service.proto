@@ -129,6 +129,17 @@ message VoiceAgentTurnRequest {
     map<string, string> metadata = 8;
 }
 
+// One audio frame fed into a live voice-agent session. Replaces the
+// seven-scalar rac_voice_agent_feed_audio_proto signature.
+message VoiceAgentAudioFrame {
+    bytes audio_data = 1;
+    int32 sample_rate = 2;
+    int32 channels = 3;
+    AudioEncoding encoding = 4;
+    // Marks the end of the utterance (flush).
+    bool is_final = 5;
+}
+
 // ---------------------------------------------------------------------------
 // Voice session behavior configuration.
 //

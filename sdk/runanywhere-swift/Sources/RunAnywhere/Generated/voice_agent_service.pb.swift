@@ -245,6 +245,29 @@ public nonisolated struct RAVoiceAgentTurnRequest: Sendable {
   fileprivate var _sessionConfig: RAVoiceSessionConfig? = nil
 }
 
+/// One audio frame fed into a live voice-agent session. Replaces the
+/// seven-scalar rac_voice_agent_feed_audio_proto signature.
+public nonisolated struct RAVoiceAgentAudioFrame: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var audioData: Data = Data()
+
+  public var sampleRate: Int32 = 0
+
+  public var channels: Int32 = 0
+
+  public var encoding: RAAudioEncoding = .unspecified
+
+  /// Marks the end of the utterance (flush).
+  public var isFinal: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 /// ---------------------------------------------------------------------------
 /// Voice session behavior configuration.
 ///
@@ -862,6 +885,56 @@ nonisolated extension RAVoiceAgentTurnRequest: SwiftProtobuf.Message, SwiftProto
     if lhs.encoding != rhs.encoding {return false}
     if lhs._sessionConfig != rhs._sessionConfig {return false}
     if lhs.metadata != rhs.metadata {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RAVoiceAgentAudioFrame: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VoiceAgentAudioFrame"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}sample_rate\0\u{1}channels\0\u{1}encoding\0\u{3}is_final\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBytesField(value: &self.audioData) }()
+      case 2: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.channels) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.encoding) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.isFinal) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.audioData.isEmpty {
+      try visitor.visitSingularBytesField(value: self.audioData, fieldNumber: 1)
+    }
+    if self.sampleRate != 0 {
+      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 2)
+    }
+    if self.channels != 0 {
+      try visitor.visitSingularInt32Field(value: self.channels, fieldNumber: 3)
+    }
+    if self.encoding != .unspecified {
+      try visitor.visitSingularEnumField(value: self.encoding, fieldNumber: 4)
+    }
+    if self.isFinal != false {
+      try visitor.visitSingularBoolField(value: self.isFinal, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVoiceAgentAudioFrame, rhs: RAVoiceAgentAudioFrame) -> Bool {
+    if lhs.audioData != rhs.audioData {return false}
+    if lhs.sampleRate != rhs.sampleRate {return false}
+    if lhs.channels != rhs.channels {return false}
+    if lhs.encoding != rhs.encoding {return false}
+    if lhs.isFinal != rhs.isFinal {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

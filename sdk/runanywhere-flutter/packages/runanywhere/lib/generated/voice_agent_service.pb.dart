@@ -568,6 +568,113 @@ class VoiceAgentTurnRequest extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(7);
 }
 
+/// One audio frame fed into a live voice-agent session. Replaces the
+/// seven-scalar rac_voice_agent_feed_audio_proto signature.
+class VoiceAgentAudioFrame extends $pb.GeneratedMessage {
+  factory VoiceAgentAudioFrame({
+    $core.List<$core.int>? audioData,
+    $core.int? sampleRate,
+    $core.int? channels,
+    $0.AudioEncoding? encoding,
+    $core.bool? isFinal,
+  }) {
+    final result = create();
+    if (audioData != null) result.audioData = audioData;
+    if (sampleRate != null) result.sampleRate = sampleRate;
+    if (channels != null) result.channels = channels;
+    if (encoding != null) result.encoding = encoding;
+    if (isFinal != null) result.isFinal = isFinal;
+    return result;
+  }
+
+  VoiceAgentAudioFrame._();
+
+  factory VoiceAgentAudioFrame.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory VoiceAgentAudioFrame.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'VoiceAgentAudioFrame',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
+      createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(
+        1, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
+    ..aI(2, _omitFieldNames ? '' : 'sampleRate')
+    ..aI(3, _omitFieldNames ? '' : 'channels')
+    ..aE<$0.AudioEncoding>(4, _omitFieldNames ? '' : 'encoding',
+        enumValues: $0.AudioEncoding.values)
+    ..aOB(5, _omitFieldNames ? '' : 'isFinal')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VoiceAgentAudioFrame clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  VoiceAgentAudioFrame copyWith(void Function(VoiceAgentAudioFrame) updates) =>
+      super.copyWith((message) => updates(message as VoiceAgentAudioFrame))
+          as VoiceAgentAudioFrame;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VoiceAgentAudioFrame create() => VoiceAgentAudioFrame._();
+  @$core.override
+  VoiceAgentAudioFrame createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static VoiceAgentAudioFrame getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<VoiceAgentAudioFrame>(create);
+  static VoiceAgentAudioFrame? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get audioData => $_getN(0);
+  @$pb.TagNumber(1)
+  set audioData($core.List<$core.int> value) => $_setBytes(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasAudioData() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAudioData() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get sampleRate => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set sampleRate($core.int value) => $_setSignedInt32(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSampleRate() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSampleRate() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get channels => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set channels($core.int value) => $_setSignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasChannels() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearChannels() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $0.AudioEncoding get encoding => $_getN(3);
+  @$pb.TagNumber(4)
+  set encoding($0.AudioEncoding value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasEncoding() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearEncoding() => $_clearField(4);
+
+  /// Marks the end of the utterance (flush).
+  @$pb.TagNumber(5)
+  $core.bool get isFinal => $_getBF(4);
+  @$pb.TagNumber(5)
+  set isFinal($core.bool value) => $_setBool(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasIsFinal() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearIsFinal() => $_clearField(5);
+}
+
 /// ---------------------------------------------------------------------------
 /// Voice session behavior configuration.
 ///
