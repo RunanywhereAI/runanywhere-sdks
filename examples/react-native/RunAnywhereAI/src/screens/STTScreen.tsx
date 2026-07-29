@@ -30,15 +30,11 @@ import {
   type PushableAudioStream,
 } from '@runanywhere/core';
 import {
-  AudioFormat,
   ModelCategory,
   ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import {
-  STTLanguage,
-  type STTPartialResult,
-} from '@runanywhere/proto-ts/stt_options';
+import { type STTPartialResult } from '@runanywhere/proto-ts/stt_options';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
 import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
@@ -82,9 +78,7 @@ function wrapPcm16InWav(pcmChunks: Uint8Array[]): Uint8Array {
 
 async function transcribePcmChunks(pcmChunks: Uint8Array[]) {
   return RunAnywhere.transcribe(wrapPcm16InWav(pcmChunks), {
-    language: STTLanguage.STT_LANGUAGE_EN,
-    audioFormat: AudioFormat.AUDIO_FORMAT_WAV,
-    sampleRate: CAPTURE_SAMPLE_RATE,
+    language: 'en',
   });
 }
 
@@ -335,9 +329,7 @@ export const STTScreen: React.FC = () => {
       const audioStream = createPushableAudioStream();
       liveAudioStreamRef.current = audioStream;
       const partials = RunAnywhere.transcribeStream(audioStream.iterable, {
-        language: STTLanguage.STT_LANGUAGE_EN,
-        audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-        sampleRate: CAPTURE_SAMPLE_RATE,
+        language: 'en',
       });
       liveTranscriptionTaskRef.current = consumeLiveTranscription(partials);
       await beginCapture((chunk) => audioStream.push(chunk));

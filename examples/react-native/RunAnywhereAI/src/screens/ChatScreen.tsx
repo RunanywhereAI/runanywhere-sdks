@@ -68,6 +68,10 @@ import { getPrimaryFramework } from '../utils/modelDisplay';
 import { RunAnywhere } from '@runanywhere/core';
 import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import {
+  ReasoningMode,
+  ReasoningOptions,
+} from '@runanywhere/proto-ts/thinking_tag_pattern';
+import {
   ToolCallFormatName,
   ToolCallingOptions,
 } from '@runanywhere/proto-ts/tool_calling';
@@ -421,22 +425,32 @@ export const ChatScreen: React.FC = () => {
         const shouldUseTools = toolsEnabled && registeredTools.length > 0;
         const supportsThinking = currentModel?.supportsThinking ?? false;
         const wasThinkingMode = supportsThinking && options.thinkingModeEnabled;
-        const disableThinking =
-          supportsThinking && !options.thinkingModeEnabled;
+        // Thought tokens only surface when reasoning.includeInOutput is set,
+        // so the "show thinking" toggle maps to it. Non-thinking models get no
+        // reasoning message at all — the no-think directive leaks as literal
+        // prompt text on models like Llama.
+        const reasoning = !supportsThinking
+          ? undefined
+          : options.thinkingModeEnabled
+            ? ReasoningOptions.fromPartial({
+                includeInOutput: true,
+                pattern: currentModel?.thinkingPattern,
+              })
+            : ReasoningOptions.fromPartial({
+                mode: ReasoningMode.REASONING_MODE_OFF,
+              });
         const generationStartMs = Date.now();
         const abortController = new AbortController();
         generationAbortRef.current = abortController;
 
         const genOptions = LLMGenerationOptions.fromPartial({
-          maxTokens: options.maxTokens ?? 512,
+          maxOutputTokens: options.maxTokens ?? 512,
           temperature: options.temperature ?? 0.7,
           topP: 1.0,
           topK: 0,
           repetitionPenalty: 1.0,
           stopSequences: [],
-          streamingEnabled: true,
           systemPrompt: options.systemPrompt,
-          enableRealTimeTracking: false,
           seed: 0,
           frequencyPenalty: 0,
           presencePenalty: 0,
@@ -444,7 +458,7 @@ export const ChatScreen: React.FC = () => {
           minP: 0,
           echoPrompt: false,
           nThreads: 0,
-          disableThinking,
+          reasoning,
         });
 
         const frameworkName = RunAnywhere.formatFramework(
@@ -476,10 +490,6 @@ export const ChatScreen: React.FC = () => {
             maxToolCalls: 5,
             keepToolsAvailable: false,
             format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED,
-            maxTokens: options.maxTokens,
-            temperature: options.temperature,
-            systemPrompt: options.systemPrompt,
-            disableThinking,
           });
           const result = await RunAnywhere.generateWithTools(
             prompt,
@@ -487,10 +497,11 @@ export const ChatScreen: React.FC = () => {
             {
               signal: abortController.signal,
               llmOptions: {
-                maxTokens: options.maxTokens,
+                maxOutputTokens: options.maxTokens,
                 temperature: options.temperature,
                 topP: 1.0,
                 systemPrompt: options.systemPrompt,
+                reasoning,
               },
             }
           );
@@ -521,8 +532,8 @@ export const ChatScreen: React.FC = () => {
                 memoryBytes: 0,
                 throughputTokensPerSec:
                   elapsedMs > 0 ? estimatedTokens / (elapsedMs / 1000) : 0,
-                promptTokens: Math.max(1, Math.floor(prompt.length / 4)),
-                completionTokens: estimatedTokens,
+                inputTokens: Math.max(1, Math.floor(prompt.length / 4)),
+                outputTokens: estimatedTokens,
               },
               completionStatus: result.errorMessage ? 'error' : 'completed',
               wasThinkingMode,
@@ -585,8 +596,8 @@ export const ChatScreen: React.FC = () => {
                 latencyMs: result.generationTimeMs,
                 memoryBytes: 0,
                 throughputTokensPerSec: result.tokensPerSecond,
-                promptTokens: result.inputTokens,
-                completionTokens: result.tokensGenerated,
+                inputTokens: result.inputTokens,
+                outputTokens: result.outputTokens,
               },
               timeToFirstToken: result.ttftMs,
               thinkingTokens: result.thinkingTokens,
@@ -629,8 +640,8 @@ export const ChatScreen: React.FC = () => {
               latencyMs: 0,
               memoryBytes: 0,
               throughputTokensPerSec: 0,
-              promptTokens: 0,
-              completionTokens: 0,
+              inputTokens: 0,
+              outputTokens: 0,
             },
             completionStatus: wasStopped ? 'interrupted' : 'error',
             wasThinkingMode: false,

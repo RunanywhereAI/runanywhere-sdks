@@ -84,8 +84,7 @@ export class VLMService {
         image,
         VLMGenerationOptions.fromPartial({
           prompt,
-          maxTokens,
-          streamingEnabled: true,
+          maxOutputTokens: maxTokens,
         })
       );
 

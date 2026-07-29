@@ -205,8 +205,8 @@ export const ChatAnalyticsScreen: React.FC<ChatAnalyticsScreenProps> = ({
     const totalTokens = analyticsMessages.reduce(
       (sum, { analytics }) =>
         sum +
-        analytics.performance.promptTokens +
-        analytics.performance.completionTokens,
+        analytics.performance.inputTokens +
+        analytics.performance.outputTokens,
       0
     );
     const completedCount = analyticsMessages.filter(

@@ -25,19 +25,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RunAnywhere } from '@runanywhere/core';
 import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import {
-  AudioFormat,
   ModelCategory,
   ModelLoadRequest,
   ModelUnloadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import { STTLanguage } from '@runanywhere/proto-ts/stt_options';
 import { Icon, useTheme } from '../theme/system';
-import {
-  silentAudioWav,
-  sineWaveAudioWav,
-  SYNTHETIC_AUDIO_SAMPLE_RATE,
-} from '../utils/syntheticAudio';
+import { silentAudioWav, sineWaveAudioWav } from '../utils/syntheticAudio';
 import {
   DEFAULT_INFERENCE_FRAMEWORK,
   getFrameworkColor,
@@ -125,20 +119,24 @@ async function runLLMScenario(
   try {
     const warmupEvents = RunAnywhere.generateStream(
       'Hello',
-      LLMGenerationOptions.fromPartial({ maxTokens: 5, temperature: 0 })
+      LLMGenerationOptions.fromPartial({ maxOutputTokens: 5, temperature: 0 })
     );
-    for await (const event of warmupEvents) {
-      if (event.isFinal) break;
+    // Manual iteration — Hermes doesn't support for-await over Nitro iterables.
+    const warmupIter = warmupEvents[Symbol.asyncIterator]();
+    let warmupStep = await warmupIter.next();
+    while (!warmupStep.done) {
+      if (warmupStep.value.isFinal) break;
+      warmupStep = await warmupIter.next();
     }
+    await warmupIter.return?.();
 
     const benchStart = Date.now();
     const events = RunAnywhere.generateStream(
       LLM_PROMPT,
       LLMGenerationOptions.fromPartial({
-        maxTokens,
+        maxOutputTokens: maxTokens,
         temperature: 0,
         systemPrompt: LLM_SYSTEM_PROMPT,
-        streamingEnabled: true,
       })
     );
     const result = await RunAnywhere.aggregateStream(LLM_PROMPT, events);
@@ -153,8 +151,8 @@ async function runLLMScenario(
     if (result.tokensPerSecond > 0) {
       parts.push(`${result.tokensPerSecond.toFixed(1)} tok/s`);
     }
-    if (result.tokensGenerated > 0) {
-      parts.push(`${result.tokensGenerated} tokens`);
+    if (result.outputTokens > 0) {
+      parts.push(`${result.outputTokens} tokens`);
     }
     return { loadTimeMs, metricSummary: parts.join(' · ') };
   } finally {
@@ -178,11 +176,7 @@ async function runSTTScenario(
         : sineWaveAudioWav(durationSeconds);
 
     const benchStart = Date.now();
-    const result = await RunAnywhere.transcribe(wav, {
-      language: STTLanguage.STT_LANGUAGE_EN,
-      audioFormat: AudioFormat.AUDIO_FORMAT_WAV,
-      sampleRate: SYNTHETIC_AUDIO_SAMPLE_RATE,
-    });
+    const result = await RunAnywhere.transcribe(wav, { language: 'en' });
     const latencyMs = Date.now() - benchStart;
 
     const parts = [`${latencyMs.toFixed(0)} ms`, `${durationSeconds}s audio`];

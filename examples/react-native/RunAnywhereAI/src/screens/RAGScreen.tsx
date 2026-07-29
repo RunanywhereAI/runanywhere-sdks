@@ -42,6 +42,11 @@ import { RunAnywhere } from '@runanywhere/core';
 import type { ModelInfo as SDKModelInfo } from '@runanywhere/proto-ts/model_types';
 import { GENERATION_SETTINGS_KEYS } from '../types/settings';
 import { RAGConfiguration, RAGDocument } from '@runanywhere/proto-ts/rag';
+import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+import {
+  ReasoningMode,
+  ReasoningOptions,
+} from '@runanywhere/proto-ts/thinking_tag_pattern';
 import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 
 // MARK: - Types
@@ -278,8 +283,16 @@ export const RAGScreen: React.FC = () => {
       );
       const thinkingModeEnabled = thinkingStr === 'true';
       const supportsThinking = selectedLLMModel?.supportsThinking ?? false;
+      const generation =
+        supportsThinking && !thinkingModeEnabled
+          ? LLMGenerationOptions.fromPartial({
+              reasoning: ReasoningOptions.fromPartial({
+                mode: ReasoningMode.REASONING_MODE_OFF,
+              }),
+            })
+          : undefined;
       const result = await RunAnywhere.ragQuery(question, {
-        disableThinking: supportsThinking && !thinkingModeEnabled,
+        generation,
         enableMultiQuery: multiQueryEnabled,
       });
       setMessages((prev) => [

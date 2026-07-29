@@ -266,7 +266,7 @@ export const TTSScreen: React.FC = () => {
       const sdkConfig = {
         voice: 'default',
         languageCode: '',
-        speakingRate: speed,
+        speed,
         pitch,
         volume,
         enableSsml: false,
