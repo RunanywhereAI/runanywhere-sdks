@@ -37,6 +37,7 @@
 #include "google/protobuf/unknown_field_set.h"
 #include "model_types.pb.h"
 #include "rac_options.pb.h"
+#include "thinking_tag_pattern.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -761,8 +762,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMResult final : public ::google::
     kHardwareUsedFieldNumber = 10,
     kErrorMessageFieldNumber = 11,
     kFinishReasonFieldNumber = 13,
-    kPromptTokensFieldNumber = 2,
-    kCompletionTokensFieldNumber = 3,
+    kInputTokensFieldNumber = 2,
+    kOutputTokensFieldNumber = 3,
     kTotalTokensFieldNumber = 4,
     kProcessingTimeMsFieldNumber = 5,
     kTokensPerSecondFieldNumber = 6,
@@ -836,24 +837,24 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMResult final : public ::google::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_finish_reason();
 
   public:
-  // int32 prompt_tokens = 2;
-  void clear_prompt_tokens() ;
-  [[nodiscard]] ::int32_t prompt_tokens() const;
-  void set_prompt_tokens(::int32_t value);
+  // int32 input_tokens = 2;
+  void clear_input_tokens() ;
+  [[nodiscard]] ::int32_t input_tokens() const;
+  void set_input_tokens(::int32_t value);
 
   private:
-  ::int32_t _internal_prompt_tokens() const;
-  void _internal_set_prompt_tokens(::int32_t value);
+  ::int32_t _internal_input_tokens() const;
+  void _internal_set_input_tokens(::int32_t value);
 
   public:
-  // int32 completion_tokens = 3;
-  void clear_completion_tokens() ;
-  [[nodiscard]] ::int32_t completion_tokens() const;
-  void set_completion_tokens(::int32_t value);
+  // int32 output_tokens = 3;
+  void clear_output_tokens() ;
+  [[nodiscard]] ::int32_t output_tokens() const;
+  void set_output_tokens(::int32_t value);
 
   private:
-  ::int32_t _internal_completion_tokens() const;
-  void _internal_set_completion_tokens(::int32_t value);
+  ::int32_t _internal_output_tokens() const;
+  void _internal_set_output_tokens(::int32_t value);
 
   public:
   // int64 total_tokens = 4;
@@ -973,8 +974,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMResult final : public ::google::
     ::google::protobuf::internal::ArenaStringPtr hardware_used_;
     ::google::protobuf::internal::ArenaStringPtr error_message_;
     ::google::protobuf::internal::ArenaStringPtr finish_reason_;
-    ::int32_t prompt_tokens_;
-    ::int32_t completion_tokens_;
+    ::int32_t input_tokens_;
+    ::int32_t output_tokens_;
     ::int64_t total_tokens_;
     ::int64_t processing_time_ms_;
     float tokens_per_second_;
@@ -2517,14 +2518,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
     kSystemPromptFieldNumber = 8,
     kImageMarkerOverrideFieldNumber = 14,
     kCustomChatTemplateFieldNumber = 13,
-    kMaxTokensFieldNumber = 2,
+    kReasoningFieldNumber = 19,
+    kMaxOutputTokensFieldNumber = 2,
     kTemperatureFieldNumber = 3,
     kTopPFieldNumber = 4,
     kTopKFieldNumber = 5,
     kMaxImageSizeFieldNumber = 9,
     kNThreadsFieldNumber = 10,
     kModelFamilyFieldNumber = 12,
-    kStreamingEnabledFieldNumber = 7,
     kUseGpuFieldNumber = 11,
     kEmitImageEmbeddingsFieldNumber = 18,
     kSeedFieldNumber = 15,
@@ -2623,14 +2624,30 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   ::runanywhere::v1::VLMChatTemplate* PROTOBUF_NONNULL _internal_mutable_custom_chat_template();
 
   public:
-  // int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
-  void clear_max_tokens() ;
-  [[nodiscard]] ::int32_t max_tokens() const;
-  void set_max_tokens(::int32_t value);
+  // optional .runanywhere.v1.ReasoningOptions reasoning = 19;
+  [[nodiscard]] bool has_reasoning()
+      const;
+  void clear_reasoning() ;
+  [[nodiscard]] const ::runanywhere::v1::ReasoningOptions& reasoning() const;
+  [[nodiscard]] ::runanywhere::v1::ReasoningOptions* PROTOBUF_NULLABLE release_reasoning();
+  ::runanywhere::v1::ReasoningOptions* PROTOBUF_NONNULL mutable_reasoning();
+  void set_allocated_reasoning(::runanywhere::v1::ReasoningOptions* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_reasoning(::runanywhere::v1::ReasoningOptions* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::ReasoningOptions* PROTOBUF_NULLABLE unsafe_arena_release_reasoning();
 
   private:
-  ::int32_t _internal_max_tokens() const;
-  void _internal_set_max_tokens(::int32_t value);
+  const ::runanywhere::v1::ReasoningOptions& _internal_reasoning() const;
+  ::runanywhere::v1::ReasoningOptions* PROTOBUF_NONNULL _internal_mutable_reasoning();
+
+  public:
+  // int32 max_output_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
+  void clear_max_output_tokens() ;
+  [[nodiscard]] ::int32_t max_output_tokens() const;
+  void set_max_output_tokens(::int32_t value);
+
+  private:
+  ::int32_t _internal_max_output_tokens() const;
+  void _internal_set_max_output_tokens(::int32_t value);
 
   public:
   // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
@@ -2693,16 +2710,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   void _internal_set_model_family(::runanywhere::v1::VLMModelFamily value);
 
   public:
-  // bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
-  void clear_streaming_enabled() ;
-  [[nodiscard]] bool streaming_enabled() const;
-  void set_streaming_enabled(bool value);
-
-  private:
-  bool _internal_streaming_enabled() const;
-  void _internal_set_streaming_enabled(bool value);
-
-  public:
   // bool use_gpu = 11 [(.runanywhere.v1.rac_default) = "true"];
   void clear_use_gpu() ;
   [[nodiscard]] bool use_gpu() const;
@@ -2743,7 +2750,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   void _internal_set_repetition_penalty(float value);
 
   public:
-  // float min_p = 17;
+  // float min_p = 17 [(.runanywhere.v1.rac_default) = "0.0"];
   void clear_min_p() ;
   [[nodiscard]] float min_p() const;
   void set_min_p(float value);
@@ -2758,7 +2765,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
   class _Internal;
   using ParseTableT_ =
       ::google::protobuf::internal::TcParseTable<5, 18,
-                          1, 114,
+                          2, 114,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2791,14 +2798,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VLMGenerationOptions final : public
     ::google::protobuf::internal::ArenaStringPtr system_prompt_;
     ::google::protobuf::internal::ArenaStringPtr image_marker_override_;
     ::runanywhere::v1::VLMChatTemplate* PROTOBUF_NULLABLE custom_chat_template_;
-    ::int32_t max_tokens_;
+    ::runanywhere::v1::ReasoningOptions* PROTOBUF_NULLABLE reasoning_;
+    ::int32_t max_output_tokens_;
     float temperature_;
     float top_p_;
     ::int32_t top_k_;
     ::int32_t max_image_size_;
     ::int32_t n_threads_;
     int model_family_;
-    bool streaming_enabled_;
     bool use_gpu_;
     bool emit_image_embeddings_;
     ::int64_t seed_;
@@ -4256,35 +4263,35 @@ inline void VLMGenerationOptions::set_allocated_prompt(::std::string* PROTOBUF_N
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VLMGenerationOptions.prompt)
 }
 
-// int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
-inline void VLMGenerationOptions::clear_max_tokens() {
+// int32 max_output_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
+inline void VLMGenerationOptions::clear_max_output_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  _impl_.max_output_tokens_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
-inline ::int32_t VLMGenerationOptions::max_tokens() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VLMGenerationOptions.max_tokens)
-  return _internal_max_tokens();
+inline ::int32_t VLMGenerationOptions::max_output_tokens() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VLMGenerationOptions.max_output_tokens)
+  return _internal_max_output_tokens();
 }
-inline void VLMGenerationOptions::set_max_tokens(::int32_t value) {
-  _internal_set_max_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VLMGenerationOptions.max_tokens)
+inline void VLMGenerationOptions::set_max_output_tokens(::int32_t value) {
+  _internal_set_max_output_tokens(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VLMGenerationOptions.max_output_tokens)
 }
-inline ::int32_t VLMGenerationOptions::_internal_max_tokens() const {
+inline ::int32_t VLMGenerationOptions::_internal_max_output_tokens() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.max_tokens_;
+  return _impl_.max_output_tokens_;
 }
-inline void VLMGenerationOptions::_internal_set_max_tokens(::int32_t value) {
+inline void VLMGenerationOptions::_internal_set_max_output_tokens(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_tokens_ = value;
+  _impl_.max_output_tokens_ = value;
 }
 
 // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
 inline void VLMGenerationOptions::clear_temperature() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.temperature_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline float VLMGenerationOptions::temperature() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VLMGenerationOptions.temperature)
@@ -4292,7 +4299,7 @@ inline float VLMGenerationOptions::temperature() const {
 }
 inline void VLMGenerationOptions::set_temperature(float value) {
   _internal_set_temperature(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VLMGenerationOptions.temperature)
 }
 inline float VLMGenerationOptions::_internal_temperature() const {
@@ -4308,7 +4315,7 @@ inline void VLMGenerationOptions::_internal_set_temperature(float value) {
 inline void VLMGenerationOptions::clear_top_p() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_p_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline float VLMGenerationOptions::top_p() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VLMGenerationOptions.top_p)
@@ -4316,7 +4323,7 @@ inline float VLMGenerationOptions::top_p() const {
 }
 inline void VLMGenerationOptions::set_top_p(float value) {
   _internal_set_top_p(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VLMGenerationOptions.top_p)
 }
 inline float VLMGenerationOptions::_internal_top_p() const {
@@ -4332,7 +4339,7 @@ inline void VLMGenerationOptions::_internal_set_top_p(float value) {
 inline void VLMGenerationOptions::clear_top_k() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_k_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
 inline ::int32_t VLMGenerationOptions::top_k() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VLMGenerationOptions.top_k)
@@ -4340,7 +4347,7 @@ inline ::int32_t VLMGenerationOptions::top_k() const {
 }
 inline void VLMGenerationOptions::set_top_k(::int32_t value) {
   _internal_set_top_k(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VLMGenerationOptions.top_k)
 }
 inline ::int32_t VLMGenerationOptions::_internal_top_k() const {
@@ -4424,30 +4431,6 @@ VLMGenerationOptions::_internal_mutable_stop_sequences() {
   return &_impl_.stop_sequences_;
 }
 
-// bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
-inline void VLMGenerationOptions::clear_streaming_enabled() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.streaming_enabled_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
-}
-inline bool VLMGenerationOptions::streaming_enabled() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VLMGenerationOptions.streaming_enabled)
-  return _internal_streaming_enabled();
-}
-inline void VLMGenerationOptions::set_streaming_enabled(bool value) {
-  _internal_set_streaming_enabled(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VLMGenerationOptions.streaming_enabled)
-}
-inline bool VLMGenerationOptions::_internal_streaming_enabled() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.streaming_enabled_;
-}
-inline void VLMGenerationOptions::_internal_set_streaming_enabled(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.streaming_enabled_ = value;
-}
-
 // optional string system_prompt = 8;
 inline bool VLMGenerationOptions::has_system_prompt() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
@@ -4520,7 +4503,7 @@ inline void VLMGenerationOptions::set_allocated_system_prompt(::std::string* PRO
 inline void VLMGenerationOptions::clear_max_image_size() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_image_size_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
 }
 inline ::int32_t VLMGenerationOptions::max_image_size() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VLMGenerationOptions.max_image_size)
@@ -4528,7 +4511,7 @@ inline ::int32_t VLMGenerationOptions::max_image_size() const {
 }
 inline void VLMGenerationOptions::set_max_image_size(::int32_t value) {
   _internal_set_max_image_size(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VLMGenerationOptions.max_image_size)
 }
 inline ::int32_t VLMGenerationOptions::_internal_max_image_size() const {
@@ -4544,7 +4527,7 @@ inline void VLMGenerationOptions::_internal_set_max_image_size(::int32_t value) 
 inline void VLMGenerationOptions::clear_n_threads() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.n_threads_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
 }
 inline ::int32_t VLMGenerationOptions::n_threads() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VLMGenerationOptions.n_threads)
@@ -4552,7 +4535,7 @@ inline ::int32_t VLMGenerationOptions::n_threads() const {
 }
 inline void VLMGenerationOptions::set_n_threads(::int32_t value) {
   _internal_set_n_threads(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VLMGenerationOptions.n_threads)
 }
 inline ::int32_t VLMGenerationOptions::_internal_n_threads() const {
@@ -4592,7 +4575,7 @@ inline void VLMGenerationOptions::_internal_set_use_gpu(bool value) {
 inline void VLMGenerationOptions::clear_model_family() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.model_family_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
 }
 inline ::runanywhere::v1::VLMModelFamily VLMGenerationOptions::model_family() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VLMGenerationOptions.model_family)
@@ -4600,7 +4583,7 @@ inline ::runanywhere::v1::VLMModelFamily VLMGenerationOptions::model_family() co
 }
 inline void VLMGenerationOptions::set_model_family(::runanywhere::v1::VLMModelFamily value) {
   _internal_set_model_family(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VLMGenerationOptions.model_family)
 }
 inline ::runanywhere::v1::VLMModelFamily VLMGenerationOptions::_internal_model_family() const {
@@ -4826,7 +4809,7 @@ inline void VLMGenerationOptions::_internal_set_repetition_penalty(float value) 
   _impl_.repetition_penalty_ = value;
 }
 
-// float min_p = 17;
+// float min_p = 17 [(.runanywhere.v1.rac_default) = "0.0"];
 inline void VLMGenerationOptions::clear_min_p() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.min_p_ = 0;
@@ -4872,6 +4855,99 @@ inline bool VLMGenerationOptions::_internal_emit_image_embeddings() const {
 inline void VLMGenerationOptions::_internal_set_emit_image_embeddings(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.emit_image_embeddings_ = value;
+}
+
+// optional .runanywhere.v1.ReasoningOptions reasoning = 19;
+inline bool VLMGenerationOptions::has_reasoning() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  PROTOBUF_ASSUME(!value || _impl_.reasoning_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::ReasoningOptions& VLMGenerationOptions::_internal_reasoning() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::ReasoningOptions* p = _impl_.reasoning_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::ReasoningOptions>(&::runanywhere::v1::ReasoningOptions_globals_);
+}
+inline const ::runanywhere::v1::ReasoningOptions& VLMGenerationOptions::reasoning() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VLMGenerationOptions.reasoning)
+  return _internal_reasoning();
+}
+inline void VLMGenerationOptions::unsafe_arena_set_allocated_reasoning(
+    ::runanywhere::v1::ReasoningOptions* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.reasoning_);
+  }
+  _impl_.reasoning_ = reinterpret_cast<::runanywhere::v1::ReasoningOptions*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VLMGenerationOptions.reasoning)
+}
+inline ::runanywhere::v1::ReasoningOptions* PROTOBUF_NULLABLE VLMGenerationOptions::release_reasoning() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ::runanywhere::v1::ReasoningOptions* released = _impl_.reasoning_;
+  _impl_.reasoning_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::ReasoningOptions* PROTOBUF_NULLABLE VLMGenerationOptions::unsafe_arena_release_reasoning() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VLMGenerationOptions.reasoning)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ::runanywhere::v1::ReasoningOptions* temp = _impl_.reasoning_;
+  _impl_.reasoning_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::ReasoningOptions* PROTOBUF_NONNULL VLMGenerationOptions::_internal_mutable_reasoning() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.reasoning_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::ReasoningOptions>(GetArena());
+    _impl_.reasoning_ = reinterpret_cast<::runanywhere::v1::ReasoningOptions*>(p);
+  }
+  return _impl_.reasoning_;
+}
+inline ::runanywhere::v1::ReasoningOptions* PROTOBUF_NONNULL VLMGenerationOptions::mutable_reasoning()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ::runanywhere::v1::ReasoningOptions* _msg = _internal_mutable_reasoning();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VLMGenerationOptions.reasoning)
+  return _msg;
+}
+inline void VLMGenerationOptions::set_allocated_reasoning(::runanywhere::v1::ReasoningOptions* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.reasoning_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  }
+
+  _impl_.reasoning_ = reinterpret_cast<::runanywhere::v1::ReasoningOptions*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VLMGenerationOptions.reasoning)
 }
 
 // -------------------------------------------------------------------
@@ -5264,52 +5340,52 @@ inline void VLMResult::set_allocated_text(::std::string* PROTOBUF_NULLABLE value
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VLMResult.text)
 }
 
-// int32 prompt_tokens = 2;
-inline void VLMResult::clear_prompt_tokens() {
+// int32 input_tokens = 2;
+inline void VLMResult::clear_input_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.prompt_tokens_ = 0;
+  _impl_.input_tokens_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
-inline ::int32_t VLMResult::prompt_tokens() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VLMResult.prompt_tokens)
-  return _internal_prompt_tokens();
+inline ::int32_t VLMResult::input_tokens() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VLMResult.input_tokens)
+  return _internal_input_tokens();
 }
-inline void VLMResult::set_prompt_tokens(::int32_t value) {
-  _internal_set_prompt_tokens(value);
+inline void VLMResult::set_input_tokens(::int32_t value) {
+  _internal_set_input_tokens(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VLMResult.prompt_tokens)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VLMResult.input_tokens)
 }
-inline ::int32_t VLMResult::_internal_prompt_tokens() const {
+inline ::int32_t VLMResult::_internal_input_tokens() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.prompt_tokens_;
+  return _impl_.input_tokens_;
 }
-inline void VLMResult::_internal_set_prompt_tokens(::int32_t value) {
+inline void VLMResult::_internal_set_input_tokens(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.prompt_tokens_ = value;
+  _impl_.input_tokens_ = value;
 }
 
-// int32 completion_tokens = 3;
-inline void VLMResult::clear_completion_tokens() {
+// int32 output_tokens = 3;
+inline void VLMResult::clear_output_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.completion_tokens_ = 0;
+  _impl_.output_tokens_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
-inline ::int32_t VLMResult::completion_tokens() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VLMResult.completion_tokens)
-  return _internal_completion_tokens();
+inline ::int32_t VLMResult::output_tokens() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VLMResult.output_tokens)
+  return _internal_output_tokens();
 }
-inline void VLMResult::set_completion_tokens(::int32_t value) {
-  _internal_set_completion_tokens(value);
+inline void VLMResult::set_output_tokens(::int32_t value) {
+  _internal_set_output_tokens(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VLMResult.completion_tokens)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VLMResult.output_tokens)
 }
-inline ::int32_t VLMResult::_internal_completion_tokens() const {
+inline ::int32_t VLMResult::_internal_output_tokens() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.completion_tokens_;
+  return _impl_.output_tokens_;
 }
-inline void VLMResult::_internal_set_completion_tokens(::int32_t value) {
+inline void VLMResult::_internal_set_output_tokens(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.completion_tokens_ = value;
+  _impl_.output_tokens_ = value;
 }
 
 // int64 total_tokens = 4;

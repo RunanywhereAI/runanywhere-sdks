@@ -724,23 +724,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
 
   // accessors -------------------------------------------------------
   enum : int {
-    kNormalizeFieldNumber = 1,
     kTruncateFieldNumber = 2,
     kBatchSizeFieldNumber = 3,
     kNormalizeModeFieldNumber = 4,
     kPoolingFieldNumber = 5,
     kNThreadsFieldNumber = 6,
   };
-  // bool normalize = 1 [(.runanywhere.v1.rac_default) = "true"];
-  void clear_normalize() ;
-  [[nodiscard]] bool normalize() const;
-  void set_normalize(bool value);
-
-  private:
-  bool _internal_normalize() const;
-  void _internal_set_normalize(bool value);
-
-  public:
   // optional bool truncate = 2;
   [[nodiscard]] bool has_truncate()
       const;
@@ -753,7 +742,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
   void _internal_set_truncate(bool value);
 
   public:
-  // optional int32 batch_size = 3;
+  // optional int32 batch_size = 3 [(.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8192];
   [[nodiscard]] bool has_batch_size()
       const;
   void clear_batch_size() ;
@@ -765,7 +754,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
   void _internal_set_batch_size(::int32_t value);
 
   public:
-  // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4;
+  // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"];
   void clear_normalize_mode() ;
   [[nodiscard]] ::runanywhere::v1::EmbeddingsNormalizeMode normalize_mode() const;
   void set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value);
@@ -785,7 +774,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
   void _internal_set_pooling(::runanywhere::v1::EmbeddingsPoolingStrategy value);
 
   public:
-  // int32 n_threads = 6;
+  // int32 n_threads = 6 [(.runanywhere.v1.rac_default) = "0"];
   void clear_n_threads() ;
   [[nodiscard]] ::int32_t n_threads() const;
   void set_n_threads(::int32_t value);
@@ -799,7 +788,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
+      ::google::protobuf::internal::TcParseTable<3, 5,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -828,7 +817,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
         const EmbeddingsOptions& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    bool normalize_;
     bool truncate_;
     ::int32_t batch_size_;
     int normalize_mode_;
@@ -1264,9 +1252,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
     kConfigJsonFieldNumber = 9,
     kEmbeddingDimensionFieldNumber = 2,
     kMaxSequenceLengthFieldNumber = 3,
-    kNormalizeFieldNumber = 4,
     kPreferredFrameworkFieldNumber = 5,
-    kMaxTokensFieldNumber = 6,
     kNormalizeModeFieldNumber = 7,
     kPoolingFieldNumber = 8,
   };
@@ -1322,18 +1308,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   void _internal_set_max_sequence_length(::int32_t value);
 
   public:
-  // optional bool normalize = 4 [(.runanywhere.v1.rac_default) = "true"];
-  [[nodiscard]] bool has_normalize()
-      const;
-  void clear_normalize() ;
-  [[nodiscard]] bool normalize() const;
-  void set_normalize(bool value);
-
-  private:
-  bool _internal_normalize() const;
-  void _internal_set_normalize(bool value);
-
-  public:
   // optional .runanywhere.v1.InferenceFramework preferred_framework = 5;
   [[nodiscard]] bool has_preferred_framework()
       const;
@@ -1346,17 +1320,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   void _internal_set_preferred_framework(::runanywhere::v1::InferenceFramework value);
 
   public:
-  // int32 max_tokens = 6;
-  void clear_max_tokens() ;
-  [[nodiscard]] ::int32_t max_tokens() const;
-  void set_max_tokens(::int32_t value);
-
-  private:
-  ::int32_t _internal_max_tokens() const;
-  void _internal_set_max_tokens(::int32_t value);
-
-  public:
-  // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7;
+  // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_L2"];
   void clear_normalize_mode() ;
   [[nodiscard]] ::runanywhere::v1::EmbeddingsNormalizeMode normalize_mode() const;
   void set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value);
@@ -1366,7 +1330,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   void _internal_set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value);
 
   public:
-  // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8;
+  // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
   void clear_pooling() ;
   [[nodiscard]] ::runanywhere::v1::EmbeddingsPoolingStrategy pooling() const;
   void set_pooling(::runanywhere::v1::EmbeddingsPoolingStrategy value);
@@ -1380,8 +1344,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 9,
-                          0, 74,
+      ::google::protobuf::internal::TcParseTable<3, 7,
+                          0, 66,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -1413,9 +1377,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
     ::google::protobuf::internal::ArenaStringPtr config_json_;
     ::int32_t embedding_dimension_;
     ::int32_t max_sequence_length_;
-    bool normalize_;
     int preferred_framework_;
-    ::int32_t max_tokens_;
     int normalize_mode_;
     int pooling_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -2735,43 +2697,15 @@ inline void EmbeddingsConfiguration::_internal_set_max_sequence_length(::int32_t
   _impl_.max_sequence_length_ = value;
 }
 
-// optional bool normalize = 4 [(.runanywhere.v1.rac_default) = "true"];
-inline bool EmbeddingsConfiguration::has_normalize() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
-  return value;
-}
-inline void EmbeddingsConfiguration::clear_normalize() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.normalize_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline bool EmbeddingsConfiguration::normalize() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.normalize)
-  return _internal_normalize();
-}
-inline void EmbeddingsConfiguration::set_normalize(bool value) {
-  _internal_set_normalize(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.normalize)
-}
-inline bool EmbeddingsConfiguration::_internal_normalize() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.normalize_;
-}
-inline void EmbeddingsConfiguration::_internal_set_normalize(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.normalize_ = value;
-}
-
 // optional .runanywhere.v1.InferenceFramework preferred_framework = 5;
 inline bool EmbeddingsConfiguration::has_preferred_framework() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
   return value;
 }
 inline void EmbeddingsConfiguration::clear_preferred_framework() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.preferred_framework_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::runanywhere::v1::InferenceFramework EmbeddingsConfiguration::preferred_framework() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.preferred_framework)
@@ -2779,7 +2713,7 @@ inline ::runanywhere::v1::InferenceFramework EmbeddingsConfiguration::preferred_
 }
 inline void EmbeddingsConfiguration::set_preferred_framework(::runanywhere::v1::InferenceFramework value) {
   _internal_set_preferred_framework(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.preferred_framework)
 }
 inline ::runanywhere::v1::InferenceFramework EmbeddingsConfiguration::_internal_preferred_framework() const {
@@ -2791,35 +2725,11 @@ inline void EmbeddingsConfiguration::_internal_set_preferred_framework(::runanyw
   _impl_.preferred_framework_ = value;
 }
 
-// int32 max_tokens = 6;
-inline void EmbeddingsConfiguration::clear_max_tokens() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
-}
-inline ::int32_t EmbeddingsConfiguration::max_tokens() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.max_tokens)
-  return _internal_max_tokens();
-}
-inline void EmbeddingsConfiguration::set_max_tokens(::int32_t value) {
-  _internal_set_max_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.max_tokens)
-}
-inline ::int32_t EmbeddingsConfiguration::_internal_max_tokens() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.max_tokens_;
-}
-inline void EmbeddingsConfiguration::_internal_set_max_tokens(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_tokens_ = value;
-}
-
-// .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7;
+// .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_L2"];
 inline void EmbeddingsConfiguration::clear_normalize_mode() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.normalize_mode_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::runanywhere::v1::EmbeddingsNormalizeMode EmbeddingsConfiguration::normalize_mode() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.normalize_mode)
@@ -2827,7 +2737,7 @@ inline ::runanywhere::v1::EmbeddingsNormalizeMode EmbeddingsConfiguration::norma
 }
 inline void EmbeddingsConfiguration::set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value) {
   _internal_set_normalize_mode(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.normalize_mode)
 }
 inline ::runanywhere::v1::EmbeddingsNormalizeMode EmbeddingsConfiguration::_internal_normalize_mode() const {
@@ -2839,11 +2749,11 @@ inline void EmbeddingsConfiguration::_internal_set_normalize_mode(::runanywhere:
   _impl_.normalize_mode_ = value;
 }
 
-// .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8;
+// .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
 inline void EmbeddingsConfiguration::clear_pooling() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.pooling_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::runanywhere::v1::EmbeddingsPoolingStrategy EmbeddingsConfiguration::pooling() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.pooling)
@@ -2851,7 +2761,7 @@ inline ::runanywhere::v1::EmbeddingsPoolingStrategy EmbeddingsConfiguration::poo
 }
 inline void EmbeddingsConfiguration::set_pooling(::runanywhere::v1::EmbeddingsPoolingStrategy value) {
   _internal_set_pooling(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.pooling)
 }
 inline ::runanywhere::v1::EmbeddingsPoolingStrategy EmbeddingsConfiguration::_internal_pooling() const {
@@ -2935,39 +2845,15 @@ inline void EmbeddingsConfiguration::set_allocated_config_json(::std::string* PR
 
 // EmbeddingsOptions
 
-// bool normalize = 1 [(.runanywhere.v1.rac_default) = "true"];
-inline void EmbeddingsOptions::clear_normalize() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.normalize_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline bool EmbeddingsOptions::normalize() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.normalize)
-  return _internal_normalize();
-}
-inline void EmbeddingsOptions::set_normalize(bool value) {
-  _internal_set_normalize(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.normalize)
-}
-inline bool EmbeddingsOptions::_internal_normalize() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.normalize_;
-}
-inline void EmbeddingsOptions::_internal_set_normalize(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.normalize_ = value;
-}
-
 // optional bool truncate = 2;
 inline bool EmbeddingsOptions::has_truncate() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
   return value;
 }
 inline void EmbeddingsOptions::clear_truncate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.truncate_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
 inline bool EmbeddingsOptions::truncate() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.truncate)
@@ -2975,7 +2861,7 @@ inline bool EmbeddingsOptions::truncate() const {
 }
 inline void EmbeddingsOptions::set_truncate(bool value) {
   _internal_set_truncate(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.truncate)
 }
 inline bool EmbeddingsOptions::_internal_truncate() const {
@@ -2987,15 +2873,15 @@ inline void EmbeddingsOptions::_internal_set_truncate(bool value) {
   _impl_.truncate_ = value;
 }
 
-// optional int32 batch_size = 3;
+// optional int32 batch_size = 3 [(.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8192];
 inline bool EmbeddingsOptions::has_batch_size() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   return value;
 }
 inline void EmbeddingsOptions::clear_batch_size() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.batch_size_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline ::int32_t EmbeddingsOptions::batch_size() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.batch_size)
@@ -3003,7 +2889,7 @@ inline ::int32_t EmbeddingsOptions::batch_size() const {
 }
 inline void EmbeddingsOptions::set_batch_size(::int32_t value) {
   _internal_set_batch_size(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.batch_size)
 }
 inline ::int32_t EmbeddingsOptions::_internal_batch_size() const {
@@ -3015,11 +2901,11 @@ inline void EmbeddingsOptions::_internal_set_batch_size(::int32_t value) {
   _impl_.batch_size_ = value;
 }
 
-// .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4;
+// .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"];
 inline void EmbeddingsOptions::clear_normalize_mode() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.normalize_mode_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline ::runanywhere::v1::EmbeddingsNormalizeMode EmbeddingsOptions::normalize_mode() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.normalize_mode)
@@ -3027,7 +2913,7 @@ inline ::runanywhere::v1::EmbeddingsNormalizeMode EmbeddingsOptions::normalize_m
 }
 inline void EmbeddingsOptions::set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value) {
   _internal_set_normalize_mode(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.normalize_mode)
 }
 inline ::runanywhere::v1::EmbeddingsNormalizeMode EmbeddingsOptions::_internal_normalize_mode() const {
@@ -3043,7 +2929,7 @@ inline void EmbeddingsOptions::_internal_set_normalize_mode(::runanywhere::v1::E
 inline void EmbeddingsOptions::clear_pooling() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.pooling_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::runanywhere::v1::EmbeddingsPoolingStrategy EmbeddingsOptions::pooling() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.pooling)
@@ -3051,7 +2937,7 @@ inline ::runanywhere::v1::EmbeddingsPoolingStrategy EmbeddingsOptions::pooling()
 }
 inline void EmbeddingsOptions::set_pooling(::runanywhere::v1::EmbeddingsPoolingStrategy value) {
   _internal_set_pooling(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.pooling)
 }
 inline ::runanywhere::v1::EmbeddingsPoolingStrategy EmbeddingsOptions::_internal_pooling() const {
@@ -3063,11 +2949,11 @@ inline void EmbeddingsOptions::_internal_set_pooling(::runanywhere::v1::Embeddin
   _impl_.pooling_ = value;
 }
 
-// int32 n_threads = 6;
+// int32 n_threads = 6 [(.runanywhere.v1.rac_default) = "0"];
 inline void EmbeddingsOptions::clear_n_threads() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.n_threads_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::int32_t EmbeddingsOptions::n_threads() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.n_threads)
@@ -3075,7 +2961,7 @@ inline ::int32_t EmbeddingsOptions::n_threads() const {
 }
 inline void EmbeddingsOptions::set_n_threads(::int32_t value) {
   _internal_set_n_threads(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.n_threads)
 }
 inline ::int32_t EmbeddingsOptions::_internal_n_threads() const {

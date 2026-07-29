@@ -391,9 +391,9 @@ constexpr EmbeddingsOptions::ParseTableT_ EmbeddingsOptions::InternalGeneratePar
       0, // no _extensions_
       6, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967232,  // skipmap
+      4294967233,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      6,  // num_field_entries
+      5,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -404,46 +404,41 @@ constexpr EmbeddingsOptions::ParseTableT_ EmbeddingsOptions::InternalGeneratePar
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // bool normalize = 1 [(.runanywhere.v1.rac_default) = "true"];
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(EmbeddingsOptions, _impl_.normalize_), 0>(),
-       {8, 0, 0,
-        PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.normalize_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // optional bool truncate = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(EmbeddingsOptions, _impl_.truncate_), 1>(),
-       {16, 1, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(EmbeddingsOptions, _impl_.truncate_), 0>(),
+       {16, 0, 0,
         PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.truncate_)}},
-      // optional int32 batch_size = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsOptions, _impl_.batch_size_), 2>(),
-       {24, 2, 0,
+      // optional int32 batch_size = 3 [(.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8192];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsOptions, _impl_.batch_size_), 1>(),
+       {24, 1, 0,
         PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.batch_size_)}},
-      // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsOptions, _impl_.normalize_mode_), 3>(),
-       {32, 3, 0,
+      // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsOptions, _impl_.normalize_mode_), 2>(),
+       {32, 2, 0,
         PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.normalize_mode_)}},
       // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsOptions, _impl_.pooling_), 4>(),
-       {40, 4, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsOptions, _impl_.pooling_), 3>(),
+       {40, 3, 0,
         PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.pooling_)}},
-      // int32 n_threads = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsOptions, _impl_.n_threads_), 5>(),
-       {48, 5, 0,
+      // int32 n_threads = 6 [(.runanywhere.v1.rac_default) = "0"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsOptions, _impl_.n_threads_), 4>(),
+       {48, 4, 0,
         PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.n_threads_)}},
       {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
-      // bool normalize = 1 [(.runanywhere.v1.rac_default) = "true"];
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.normalize_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // optional bool truncate = 2;
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.truncate_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // optional int32 batch_size = 3;
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.batch_size_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4;
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.normalize_mode_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.truncate_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // optional int32 batch_size = 3 [(.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8192];
+      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.batch_size_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"];
+      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.normalize_mode_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 5;
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.pooling_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // int32 n_threads = 6;
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.n_threads_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.pooling_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // int32 n_threads = 6 [(.runanywhere.v1.rac_default) = "0"];
+      {PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.n_threads_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     }},
     // no aux_entries
     {{
@@ -456,7 +451,6 @@ inline constexpr EmbeddingsOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        normalize_{false},
         truncate_{false},
         batch_size_{0},
         normalize_mode_{static_cast< ::runanywhere::v1::EmbeddingsNormalizeMode >(0)},
@@ -753,11 +747,11 @@ constexpr EmbeddingsConfiguration::ParseTableT_ EmbeddingsConfiguration::Interna
     {
       PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_._has_bits_),
       0, // no _extensions_
-      9, 120,  // max_field_number, fast_idx_mask
+      9, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966784,  // skipmap
+      4294966824,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      9,  // num_field_entries
+      7,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -767,7 +761,10 @@ constexpr EmbeddingsConfiguration::ParseTableT_ EmbeddingsConfiguration::Interna
       ::_pbi::TcParser::GetTable<::runanywhere::v1::EmbeddingsConfiguration>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsConfiguration, _impl_.pooling_), 6>(),
+       {64, 6, 0,
+        PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.pooling_)}},
       // string model_id = 1 [(.runanywhere.v1.rac_required) = true];
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
@@ -780,36 +777,16 @@ constexpr EmbeddingsConfiguration::ParseTableT_ EmbeddingsConfiguration::Interna
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsConfiguration, _impl_.max_sequence_length_), 3>(),
        {24, 3, 0,
         PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.max_sequence_length_)}},
-      // optional bool normalize = 4 [(.runanywhere.v1.rac_default) = "true"];
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(EmbeddingsConfiguration, _impl_.normalize_), 4>(),
-       {32, 4, 0,
-        PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.normalize_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // optional .runanywhere.v1.InferenceFramework preferred_framework = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsConfiguration, _impl_.preferred_framework_), 5>(),
-       {40, 5, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsConfiguration, _impl_.preferred_framework_), 4>(),
+       {40, 4, 0,
         PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.preferred_framework_)}},
-      // int32 max_tokens = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsConfiguration, _impl_.max_tokens_), 6>(),
-       {48, 6, 0,
-        PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.max_tokens_)}},
-      // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsConfiguration, _impl_.normalize_mode_), 7>(),
-       {56, 7, 0,
+      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_L2"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsConfiguration, _impl_.normalize_mode_), 5>(),
+       {56, 5, 0,
         PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.normalize_mode_)}},
-      // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsConfiguration, _impl_.pooling_), 8>(),
-       {64, 8, 0,
-        PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.pooling_)}},
-      // optional string config_json = 9;
-      {::_pbi::TcParser::FastUS1,
-       {74, 1, 0,
-        PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.config_json_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
@@ -819,22 +796,18 @@ constexpr EmbeddingsConfiguration::ParseTableT_ EmbeddingsConfiguration::Interna
       {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.embedding_dimension_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 max_sequence_length = 3 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
       {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.max_sequence_length_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional bool normalize = 4 [(.runanywhere.v1.rac_default) = "true"];
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.normalize_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // optional .runanywhere.v1.InferenceFramework preferred_framework = 5;
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.preferred_framework_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // int32 max_tokens = 6;
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.max_tokens_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7;
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.normalize_mode_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8;
-      {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.pooling_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.preferred_framework_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_L2"];
+      {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.normalize_mode_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
+      {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.pooling_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional string config_json = 9;
       {PROTOBUF_FIELD_OFFSET(EmbeddingsConfiguration, _impl_.config_json_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     }},
     // no aux_entries
     {{
-      "\46\10\0\0\0\0\0\0\0\13\0\0\0\0\0\0"
+      "\46\10\0\0\0\0\0\13"
       "runanywhere.v1.EmbeddingsConfiguration"
       "model_id"
       "config_json"
@@ -855,9 +828,7 @@ inline constexpr EmbeddingsConfiguration::Impl_::Impl_(
             ::_pbi::ConstantInitialized()),
         embedding_dimension_{0},
         max_sequence_length_{0},
-        normalize_{false},
         preferred_framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)},
-        max_tokens_{0},
         normalize_mode_{static_cast< ::runanywhere::v1::EmbeddingsNormalizeMode >(0)},
         pooling_{static_cast< ::runanywhere::v1::EmbeddingsPoolingStrategy >(0)} {}
 
@@ -1865,13 +1836,11 @@ const ::uint32_t
         protodesc_cold) = {
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsConfiguration, _impl_._has_bits_),
-        12, // hasbit index offset
+        10, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsConfiguration, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsConfiguration, _impl_.embedding_dimension_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsConfiguration, _impl_.max_sequence_length_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsConfiguration, _impl_.normalize_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsConfiguration, _impl_.preferred_framework_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsConfiguration, _impl_.max_tokens_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsConfiguration, _impl_.normalize_mode_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsConfiguration, _impl_.pooling_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsConfiguration, _impl_.config_json_),
@@ -1881,13 +1850,10 @@ const ::uint32_t
         4,
         5,
         6,
-        7,
-        8,
         1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsOptions, _impl_._has_bits_),
-        9, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsOptions, _impl_.normalize_),
+        8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsOptions, _impl_.truncate_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsOptions, _impl_.batch_size_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsOptions, _impl_.normalize_mode_),
@@ -1898,7 +1864,6 @@ const ::uint32_t
         2,
         3,
         4,
-        5,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector_MetadataEntry_DoNotUse, _impl_._has_bits_),
         5, // hasbit index offset
@@ -2004,15 +1969,15 @@ const ::uint32_t
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::EmbeddingsConfiguration)},
-        {21, sizeof(::runanywhere::v1::EmbeddingsOptions)},
-        {36, sizeof(::runanywhere::v1::EmbeddingVector_MetadataEntry_DoNotUse)},
-        {43, sizeof(::runanywhere::v1::EmbeddingVector)},
-        {58, sizeof(::runanywhere::v1::EmbeddingsRequest_MetadataEntry_DoNotUse)},
-        {65, sizeof(::runanywhere::v1::EmbeddingsRequest)},
-        {78, sizeof(::runanywhere::v1::EmbeddingsResult)},
-        {97, sizeof(::runanywhere::v1::EmbeddingsServiceState)},
-        {112, sizeof(::runanywhere::v1::EmbeddingsCreateRequest)},
-        {121, sizeof(::runanywhere::v1::EmbeddingsCreateResult)},
+        {17, sizeof(::runanywhere::v1::EmbeddingsOptions)},
+        {30, sizeof(::runanywhere::v1::EmbeddingVector_MetadataEntry_DoNotUse)},
+        {37, sizeof(::runanywhere::v1::EmbeddingVector)},
+        {52, sizeof(::runanywhere::v1::EmbeddingsRequest_MetadataEntry_DoNotUse)},
+        {59, sizeof(::runanywhere::v1::EmbeddingsRequest)},
+        {72, sizeof(::runanywhere::v1::EmbeddingsResult)},
+        {91, sizeof(::runanywhere::v1::EmbeddingsServiceState)},
+        {106, sizeof(::runanywhere::v1::EmbeddingsCreateRequest)},
+        {115, sizeof(::runanywhere::v1::EmbeddingsCreateResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -2031,74 +1996,75 @@ const char descriptor_table_protodef_embeddings_5foptions_2eproto[] ABSL_ATTRIBU
     protodesc_cold) = {
     "\n\030embeddings_options.proto\022\016runanywhere."
     "v1\032\021model_types.proto\032\021rac_options.proto"
-    "\"\316\003\n\027EmbeddingsConfiguration\022\026\n\010model_id"
+    "\"\336\003\n\027EmbeddingsConfiguration\022\026\n\010model_id"
     "\030\001 \001(\tB\004\220\265\030\001\022(\n\023embedding_dimension\030\002 \001("
     "\005B\013\212\265\030\003384\240\265\030\001\022(\n\023max_sequence_length\030\003 "
-    "\001(\005B\013\212\265\030\003512\240\265\030\001\022 \n\tnormalize\030\004 \001(\010B\010\212\265\030"
-    "\004trueH\000\210\001\001\022D\n\023preferred_framework\030\005 \001(\0162"
-    "\".runanywhere.v1.InferenceFrameworkH\001\210\001\001"
-    "\022\022\n\nmax_tokens\030\006 \001(\005\022\?\n\016normalize_mode\030\007"
-    " \001(\0162\'.runanywhere.v1.EmbeddingsNormaliz"
-    "eMode\022:\n\007pooling\030\010 \001(\0162).runanywhere.v1."
-    "EmbeddingsPoolingStrategy\022\030\n\013config_json"
-    "\030\t \001(\tH\002\210\001\001B\014\n\n_normalizeB\026\n\024_preferred_"
-    "frameworkB\016\n\014_config_json\"\214\002\n\021Embeddings"
-    "Options\022\033\n\tnormalize\030\001 \001(\010B\010\212\265\030\004true\022\025\n\010"
-    "truncate\030\002 \001(\010H\000\210\001\001\022\027\n\nbatch_size\030\003 \001(\005H"
-    "\001\210\001\001\022\?\n\016normalize_mode\030\004 \001(\0162\'.runanywhe"
-    "re.v1.EmbeddingsNormalizeMode\022:\n\007pooling"
-    "\030\005 \001(\0162).runanywhere.v1.EmbeddingsPoolin"
-    "gStrategy\022\021\n\tn_threads\030\006 \001(\005B\013\n\t_truncat"
-    "eB\r\n\013_batch_size\"\363\001\n\017EmbeddingVector\022\016\n\006"
-    "values\030\001 \003(\002\022\021\n\004norm\030\002 \001(\002H\000\210\001\001\022\021\n\004text\030"
-    "\003 \001(\tH\001\210\001\001\022\021\n\tdimension\030\004 \001(\005\022\023\n\013input_i"
-    "ndex\030\005 \001(\005\022\?\n\010metadata\030\006 \003(\0132-.runanywhe"
-    "re.v1.EmbeddingVector.MetadataEntry\032/\n\rM"
-    "etadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t"
-    ":\0028\001B\007\n\005_normB\007\n\005_text\"\223\002\n\021EmbeddingsReq"
-    "uest\022\r\n\005texts\030\001 \003(\t\0227\n\007options\030\002 \001(\0132!.r"
-    "unanywhere.v1.EmbeddingsOptionsH\000\210\001\001\022\022\n\n"
-    "request_id\030\003 \001(\t\022\025\n\010model_id\030\004 \001(\tH\001\210\001\001\022"
-    "A\n\010metadata\030\005 \003(\0132/.runanywhere.v1.Embed"
-    "dingsRequest.MetadataEntry\032/\n\rMetadataEn"
-    "try\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\n\n\010_"
-    "optionsB\013\n\t_model_id\"\202\002\n\020EmbeddingsResul"
-    "t\0220\n\007vectors\030\001 \003(\0132\037.runanywhere.v1.Embe"
-    "ddingVector\022\021\n\tdimension\030\002 \001(\005\022\032\n\022proces"
-    "sing_time_ms\030\003 \001(\003\022\023\n\013tokens_used\030\004 \001(\005\022"
-    "\025\n\010model_id\030\005 \001(\tH\000\210\001\001\022\032\n\rerror_message\030"
-    "\006 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\007 \001(\005\022\022\n\nreques"
-    "t_id\030\010 \001(\tB\013\n\t_model_idB\020\n\016_error_messag"
-    "e\"\301\001\n\026EmbeddingsServiceState\022\020\n\010is_ready"
-    "\030\001 \001(\010\022\032\n\rcurrent_model\030\002 \001(\tH\000\210\001\001\022\021\n\tdi"
-    "mension\030\003 \001(\005\022\022\n\nmax_tokens\030\004 \001(\005\022\032\n\rerr"
-    "or_message\030\005 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\006 \001("
-    "\005B\020\n\016_current_modelB\020\n\016_error_message\"\254\001"
-    "\n\027EmbeddingsCreateRequest\022\020\n\010model_id\030\001 "
-    "\001(\t\022C\n\rconfiguration\030\002 \001(\0132\'.runanywhere"
-    ".v1.EmbeddingsConfigurationH\000\210\001\001\022\030\n\013conf"
-    "ig_json\030\003 \001(\tH\001\210\001\001B\020\n\016_configurationB\016\n\014"
-    "_config_json\"\214\001\n\026EmbeddingsCreateResult\022"
-    "\016\n\006handle\030\001 \001(\004\022\020\n\010model_id\030\002 \001(\t\022\021\n\tdim"
-    "ension\030\003 \001(\005\022\022\n\nmax_tokens\030\004 \001(\005\022\022\n\nerro"
-    "r_code\030\005 \001(\005\022\025\n\rerror_message\030\006 \001(\t*\212\001\n\027"
-    "EmbeddingsNormalizeMode\022)\n%EMBEDDINGS_NO"
-    "RMALIZE_MODE_UNSPECIFIED\020\000\022\"\n\036EMBEDDINGS"
-    "_NORMALIZE_MODE_NONE\020\001\022 \n\034EMBEDDINGS_NOR"
-    "MALIZE_MODE_L2\020\002*\271\001\n\031EmbeddingsPoolingSt"
-    "rategy\022+\n\'EMBEDDINGS_POOLING_STRATEGY_UN"
-    "SPECIFIED\020\000\022$\n EMBEDDINGS_POOLING_STRATE"
-    "GY_MEAN\020\001\022#\n\037EMBEDDINGS_POOLING_STRATEGY"
-    "_CLS\020\002\022$\n EMBEDDINGS_POOLING_STRATEGY_LA"
-    "ST\020\0032\255\001\n\nEmbeddings\022L\n\005Embed\022!.runanywhe"
-    "re.v1.EmbeddingsRequest\032 .runanywhere.v1"
-    ".EmbeddingsResult\022Q\n\nEmbedBatch\022!.runany"
-    "where.v1.EmbeddingsRequest\032 .runanywhere"
-    ".v1.EmbeddingsResultB\221\001\n\027ai.runanywhere."
-    "proto.v1B\026EmbeddingsOptionsProtoP\001Z<gith"
-    "ub.com/runanywhere/runanywhere-sdks/idl/"
-    "v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere"
-    ".V1\272\002\002RAb\006proto3"
+    "\001(\005B\013\212\265\030\003512\240\265\030\001\022D\n\023preferred_framework\030"
+    "\005 \001(\0162\".runanywhere.v1.InferenceFramewor"
+    "kH\000\210\001\001\022a\n\016normalize_mode\030\007 \001(\0162\'.runanyw"
+    "here.v1.EmbeddingsNormalizeModeB \212\265\030\034EMB"
+    "EDDINGS_NORMALIZE_MODE_L2\022`\n\007pooling\030\010 \001"
+    "(\0162).runanywhere.v1.EmbeddingsPoolingStr"
+    "ategyB$\212\265\030 EMBEDDINGS_POOLING_STRATEGY_M"
+    "EAN\022\030\n\013config_json\030\t \001(\tH\001\210\001\001B\026\n\024_prefer"
+    "red_frameworkB\016\n\014_config_jsonJ\004\010\004\020\005J\004\010\006\020"
+    "\007\"\262\002\n\021EmbeddingsOptions\022\025\n\010truncate\030\002 \001("
+    "\010H\000\210\001\001\022\"\n\nbatch_size\030\003 \001(\005B\t\240\265\030\001\250\265\030\200@H\001\210"
+    "\001\001\022j\n\016normalize_mode\030\004 \001(\0162\'.runanywhere"
+    ".v1.EmbeddingsNormalizeModeB)\212\265\030%EMBEDDI"
+    "NGS_NORMALIZE_MODE_UNSPECIFIED\022:\n\007poolin"
+    "g\030\005 \001(\0162).runanywhere.v1.EmbeddingsPooli"
+    "ngStrategy\022\030\n\tn_threads\030\006 \001(\005B\005\212\265\030\0010B\013\n\t"
+    "_truncateB\r\n\013_batch_sizeJ\004\010\001\020\002\"\363\001\n\017Embed"
+    "dingVector\022\016\n\006values\030\001 \003(\002\022\021\n\004norm\030\002 \001(\002"
+    "H\000\210\001\001\022\021\n\004text\030\003 \001(\tH\001\210\001\001\022\021\n\tdimension\030\004 "
+    "\001(\005\022\023\n\013input_index\030\005 \001(\005\022\?\n\010metadata\030\006 \003"
+    "(\0132-.runanywhere.v1.EmbeddingVector.Meta"
+    "dataEntry\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022"
+    "\r\n\005value\030\002 \001(\t:\0028\001B\007\n\005_normB\007\n\005_text\"\223\002\n"
+    "\021EmbeddingsRequest\022\r\n\005texts\030\001 \003(\t\0227\n\007opt"
+    "ions\030\002 \001(\0132!.runanywhere.v1.EmbeddingsOp"
+    "tionsH\000\210\001\001\022\022\n\nrequest_id\030\003 \001(\t\022\025\n\010model_"
+    "id\030\004 \001(\tH\001\210\001\001\022A\n\010metadata\030\005 \003(\0132/.runany"
+    "where.v1.EmbeddingsRequest.MetadataEntry"
+    "\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030"
+    "\002 \001(\t:\0028\001B\n\n\010_optionsB\013\n\t_model_id\"\202\002\n\020E"
+    "mbeddingsResult\0220\n\007vectors\030\001 \003(\0132\037.runan"
+    "ywhere.v1.EmbeddingVector\022\021\n\tdimension\030\002"
+    " \001(\005\022\032\n\022processing_time_ms\030\003 \001(\003\022\023\n\013toke"
+    "ns_used\030\004 \001(\005\022\025\n\010model_id\030\005 \001(\tH\000\210\001\001\022\032\n\r"
+    "error_message\030\006 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\007"
+    " \001(\005\022\022\n\nrequest_id\030\010 \001(\tB\013\n\t_model_idB\020\n"
+    "\016_error_message\"\301\001\n\026EmbeddingsServiceSta"
+    "te\022\020\n\010is_ready\030\001 \001(\010\022\032\n\rcurrent_model\030\002 "
+    "\001(\tH\000\210\001\001\022\021\n\tdimension\030\003 \001(\005\022\022\n\nmax_token"
+    "s\030\004 \001(\005\022\032\n\rerror_message\030\005 \001(\tH\001\210\001\001\022\022\n\ne"
+    "rror_code\030\006 \001(\005B\020\n\016_current_modelB\020\n\016_er"
+    "ror_message\"\254\001\n\027EmbeddingsCreateRequest\022"
+    "\020\n\010model_id\030\001 \001(\t\022C\n\rconfiguration\030\002 \001(\013"
+    "2\'.runanywhere.v1.EmbeddingsConfiguratio"
+    "nH\000\210\001\001\022\030\n\013config_json\030\003 \001(\tH\001\210\001\001B\020\n\016_con"
+    "figurationB\016\n\014_config_json\"\214\001\n\026Embedding"
+    "sCreateResult\022\016\n\006handle\030\001 \001(\004\022\020\n\010model_i"
+    "d\030\002 \001(\t\022\021\n\tdimension\030\003 \001(\005\022\022\n\nmax_tokens"
+    "\030\004 \001(\005\022\022\n\nerror_code\030\005 \001(\005\022\025\n\rerror_mess"
+    "age\030\006 \001(\t*\212\001\n\027EmbeddingsNormalizeMode\022)\n"
+    "%EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED\020\000"
+    "\022\"\n\036EMBEDDINGS_NORMALIZE_MODE_NONE\020\001\022 \n\034"
+    "EMBEDDINGS_NORMALIZE_MODE_L2\020\002*\271\001\n\031Embed"
+    "dingsPoolingStrategy\022+\n\'EMBEDDINGS_POOLI"
+    "NG_STRATEGY_UNSPECIFIED\020\000\022$\n EMBEDDINGS_"
+    "POOLING_STRATEGY_MEAN\020\001\022#\n\037EMBEDDINGS_PO"
+    "OLING_STRATEGY_CLS\020\002\022$\n EMBEDDINGS_POOLI"
+    "NG_STRATEGY_LAST\020\0032\255\001\n\nEmbeddings\022L\n\005Emb"
+    "ed\022!.runanywhere.v1.EmbeddingsRequest\032 ."
+    "runanywhere.v1.EmbeddingsResult\022Q\n\nEmbed"
+    "Batch\022!.runanywhere.v1.EmbeddingsRequest"
+    "\032 .runanywhere.v1.EmbeddingsResultB\221\001\n\027a"
+    "i.runanywhere.proto.v1B\026EmbeddingsOption"
+    "sProtoP\001Z<github.com/runanywhere/runanyw"
+    "here-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1"
+    "\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_embeddings_5foptions_2eproto_deps[2] = {
@@ -2109,7 +2075,7 @@ static ::absl::once_flag descriptor_table_embeddings_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_embeddings_5foptions_2eproto = {
     false,
     false,
-    2776,
+    2830,
     descriptor_table_protodef_embeddings_5foptions_2eproto,
     "embeddings_options.proto",
     &descriptor_table_embeddings_5foptions_2eproto_once,
@@ -2256,12 +2222,11 @@ PROTOBUF_NOINLINE void EmbeddingsConfiguration::Clear() {
       _impl_.config_json_.ClearNonDefaultToEmpty();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000fcU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007cU)) {
     ::memset(&_impl_.embedding_dimension_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.normalize_mode_) -
-        reinterpret_cast<char*>(&_impl_.embedding_dimension_)) + sizeof(_impl_.normalize_mode_));
+        reinterpret_cast<char*>(&_impl_.pooling_) -
+        reinterpret_cast<char*>(&_impl_.embedding_dimension_)) + sizeof(_impl_.pooling_));
   }
-  _impl_.pooling_ = 0;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -2313,31 +2278,15 @@ PROTOBUF_NOINLINE void EmbeddingsConfiguration::Clear() {
     }
   }
 
-  // optional bool normalize = 4 [(.runanywhere.v1.rac_default) = "true"];
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteBoolToArray(
-        4, this_._internal_normalize(), target);
-  }
-
   // optional .runanywhere.v1.InferenceFramework preferred_framework = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteEnumToArray(
         5, this_._internal_preferred_framework(), target);
   }
 
-  // int32 max_tokens = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (this_._internal_max_tokens() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
-              stream, this_._internal_max_tokens(), target);
-    }
-  }
-
-  // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_L2"];
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_normalize_mode() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -2345,8 +2294,8 @@ PROTOBUF_NOINLINE void EmbeddingsConfiguration::Clear() {
     }
   }
 
-  // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_pooling() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -2387,8 +2336,7 @@ PROTOBUF_NOINLINE void EmbeddingsConfiguration::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  total_size += static_cast<bool>(0x00000010U & cached_has_bits) * 2;
-  if (BatchCheckHasBit(cached_has_bits, 0x000000efU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     // string model_id = 1 [(.runanywhere.v1.rac_required) = true];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_model_id().empty()) {
@@ -2416,28 +2364,19 @@ PROTOBUF_NOINLINE void EmbeddingsConfiguration::Clear() {
       }
     }
     // optional .runanywhere.v1.InferenceFramework preferred_framework = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       total_size += 1 +
                     ::_pbi::WireFormatLite::EnumSize(this_._internal_preferred_framework());
     }
-    // int32 max_tokens = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (this_._internal_max_tokens() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_max_tokens());
-      }
-    }
-    // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_L2"];
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_normalize_mode() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_normalize_mode());
       }
     }
-  }
-   {
-    // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_pooling() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_pooling());
@@ -2461,7 +2400,7 @@ void EmbeddingsConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_model_id().empty()) {
         _this->_internal_set_model_id(from._internal_model_id());
@@ -2485,25 +2424,17 @@ void EmbeddingsConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _this->_impl_.normalize_ = from._impl_.normalize_;
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _this->_impl_.preferred_framework_ = from._impl_.preferred_framework_;
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (from._internal_max_tokens() != 0) {
-        _this->_impl_.max_tokens_ = from._impl_.max_tokens_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_normalize_mode() != 0) {
         _this->_impl_.normalize_mode_ = from._impl_.normalize_mode_;
       }
     }
-  }
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (from._internal_pooling() != 0) {
-      _this->_impl_.pooling_ = from._impl_.pooling_;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (from._internal_pooling() != 0) {
+        _this->_impl_.pooling_ = from._impl_.pooling_;
+      }
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -2568,10 +2499,10 @@ PROTOBUF_NDEBUG_INLINE EmbeddingsOptions::Impl_::Impl_(
 inline void EmbeddingsOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, normalize_),
+               offsetof(Impl_, truncate_),
            0,
            offsetof(Impl_, n_threads_) -
-               offsetof(Impl_, normalize_) +
+               offsetof(Impl_, truncate_) +
                sizeof(Impl_::n_threads_));
 }
 EmbeddingsOptions::~EmbeddingsOptions() {
@@ -2622,10 +2553,10 @@ PROTOBUF_NOINLINE void EmbeddingsOptions::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
-    ::memset(&_impl_.normalize_, 0, static_cast<::size_t>(
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    ::memset(&_impl_.truncate_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.n_threads_) -
-        reinterpret_cast<char*>(&_impl_.normalize_)) + sizeof(_impl_.n_threads_));
+        reinterpret_cast<char*>(&_impl_.truncate_)) + sizeof(_impl_.n_threads_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -2650,31 +2581,22 @@ PROTOBUF_NOINLINE void EmbeddingsOptions::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // bool normalize = 1 [(.runanywhere.v1.rac_default) = "true"];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (this_._internal_normalize() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          1, this_._internal_normalize(), target);
-    }
-  }
-
   // optional bool truncate = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteBoolToArray(
         2, this_._internal_truncate(), target);
   }
 
-  // optional int32 batch_size = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  // optional int32 batch_size = 3 [(.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8192];
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     target =
         ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
             stream, this_._internal_batch_size(), target);
   }
 
-  // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"];
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_normalize_mode() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -2683,7 +2605,7 @@ PROTOBUF_NOINLINE void EmbeddingsOptions::Clear() {
   }
 
   // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_pooling() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -2691,8 +2613,8 @@ PROTOBUF_NOINLINE void EmbeddingsOptions::Clear() {
     }
   }
 
-  // int32 n_threads = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  // int32 n_threads = 6 [(.runanywhere.v1.rac_default) = "0"];
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_n_threads() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
@@ -2725,35 +2647,29 @@ PROTOBUF_NOINLINE void EmbeddingsOptions::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  total_size += static_cast<bool>(0x00000002U & cached_has_bits) * 2;
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003dU)) {
-    // bool normalize = 1 [(.runanywhere.v1.rac_default) = "true"];
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (this_._internal_normalize() != 0) {
-        total_size += 2;
-      }
-    }
-    // optional int32 batch_size = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  total_size += static_cast<bool>(0x00000001U & cached_has_bits) * 2;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001eU)) {
+    // optional int32 batch_size = 3 [(.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8192];
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
           this_._internal_batch_size());
     }
-    // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"];
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_normalize_mode() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_normalize_mode());
       }
     }
     // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_pooling() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_pooling());
       }
     }
-    // int32 n_threads = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    // int32 n_threads = 6 [(.runanywhere.v1.rac_default) = "0"];
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_n_threads() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_n_threads());
@@ -2777,29 +2693,24 @@ void EmbeddingsOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (from._internal_normalize() != 0) {
-        _this->_impl_.normalize_ = from._impl_.normalize_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       _this->_impl_.truncate_ = from._impl_.truncate_;
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       _this->_impl_.batch_size_ = from._impl_.batch_size_;
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_normalize_mode() != 0) {
         _this->_impl_.normalize_mode_ = from._impl_.normalize_mode_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_pooling() != 0) {
         _this->_impl_.pooling_ = from._impl_.pooling_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_n_threads() != 0) {
         _this->_impl_.n_threads_ = from._impl_.n_threads_;
       }
@@ -2825,9 +2736,9 @@ void EmbeddingsOptions::InternalSwap(EmbeddingsOptions* PROTOBUF_RESTRICT PROTOB
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.n_threads_)
       + sizeof(EmbeddingsOptions::_impl_.n_threads_)
-      - PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.normalize_)>(
-          reinterpret_cast<char*>(&_impl_.normalize_),
-          reinterpret_cast<char*>(&other->_impl_.normalize_));
+      - PROTOBUF_FIELD_OFFSET(EmbeddingsOptions, _impl_.truncate_)>(
+          reinterpret_cast<char*>(&_impl_.truncate_),
+          reinterpret_cast<char*>(&other->_impl_.truncate_));
 }
 
 ::google::protobuf::Metadata EmbeddingsOptions::GetMetadata() const {

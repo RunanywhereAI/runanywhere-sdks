@@ -599,35 +599,35 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationOptions final : public :
 
   // accessors -------------------------------------------------------
   enum : int {
-    kSampleRateHzFieldNumber = 1,
-    kChannelCountFieldNumber = 2,
+    kSampleRateFieldNumber = 1,
+    kChannelsFieldNumber = 2,
     kEncodingFieldNumber = 3,
     kThresholdFieldNumber = 4,
     kMinimumDurationMsFieldNumber = 5,
     kMergeGapMsFieldNumber = 6,
   };
-  // optional int32 sample_rate_hz = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
-  [[nodiscard]] bool has_sample_rate_hz()
+  // optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+  [[nodiscard]] bool has_sample_rate()
       const;
-  void clear_sample_rate_hz() ;
-  [[nodiscard]] ::int32_t sample_rate_hz() const;
-  void set_sample_rate_hz(::int32_t value);
+  void clear_sample_rate() ;
+  [[nodiscard]] ::int32_t sample_rate() const;
+  void set_sample_rate(::int32_t value);
 
   private:
-  ::int32_t _internal_sample_rate_hz() const;
-  void _internal_set_sample_rate_hz(::int32_t value);
+  ::int32_t _internal_sample_rate() const;
+  void _internal_set_sample_rate(::int32_t value);
 
   public:
-  // optional int32 channel_count = 2 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1];
-  [[nodiscard]] bool has_channel_count()
+  // optional int32 channels = 2 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1];
+  [[nodiscard]] bool has_channels()
       const;
-  void clear_channel_count() ;
-  [[nodiscard]] ::int32_t channel_count() const;
-  void set_channel_count(::int32_t value);
+  void clear_channels() ;
+  [[nodiscard]] ::int32_t channels() const;
+  void set_channels(::int32_t value);
 
   private:
-  ::int32_t _internal_channel_count() const;
-  void _internal_set_channel_count(::int32_t value);
+  ::int32_t _internal_channels() const;
+  void _internal_set_channels(::int32_t value);
 
   public:
   // optional .runanywhere.v1.DiarizationAudioEncoding encoding = 3 [(.runanywhere.v1.rac_default) = "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE"];
@@ -707,8 +707,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationOptions final : public :
         const DiarizationOptions& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::int32_t sample_rate_hz_;
-    ::int32_t channel_count_;
+    ::int32_t sample_rate_;
+    ::int32_t channels_;
     int encoding_;
     float threshold_;
     ::int64_t minimum_duration_ms_;
@@ -1497,60 +1497,60 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationStreamEvent final : publ
 
 // DiarizationOptions
 
-// optional int32 sample_rate_hz = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
-inline bool DiarizationOptions::has_sample_rate_hz() const {
+// optional int32 sample_rate = 1 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
+inline bool DiarizationOptions::has_sample_rate() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
   return value;
 }
-inline void DiarizationOptions::clear_sample_rate_hz() {
+inline void DiarizationOptions::clear_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.sample_rate_hz_ = 0;
+  _impl_.sample_rate_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
-inline ::int32_t DiarizationOptions::sample_rate_hz() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.sample_rate_hz)
-  return _internal_sample_rate_hz();
+inline ::int32_t DiarizationOptions::sample_rate() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.sample_rate)
+  return _internal_sample_rate();
 }
-inline void DiarizationOptions::set_sample_rate_hz(::int32_t value) {
-  _internal_set_sample_rate_hz(value);
+inline void DiarizationOptions::set_sample_rate(::int32_t value) {
+  _internal_set_sample_rate(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.sample_rate_hz)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.sample_rate)
 }
-inline ::int32_t DiarizationOptions::_internal_sample_rate_hz() const {
+inline ::int32_t DiarizationOptions::_internal_sample_rate() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.sample_rate_hz_;
+  return _impl_.sample_rate_;
 }
-inline void DiarizationOptions::_internal_set_sample_rate_hz(::int32_t value) {
+inline void DiarizationOptions::_internal_set_sample_rate(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.sample_rate_hz_ = value;
+  _impl_.sample_rate_ = value;
 }
 
-// optional int32 channel_count = 2 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1];
-inline bool DiarizationOptions::has_channel_count() const {
+// optional int32 channels = 2 [(.runanywhere.v1.rac_default) = "1", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1];
+inline bool DiarizationOptions::has_channels() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   return value;
 }
-inline void DiarizationOptions::clear_channel_count() {
+inline void DiarizationOptions::clear_channels() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.channel_count_ = 0;
+  _impl_.channels_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
-inline ::int32_t DiarizationOptions::channel_count() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.channel_count)
-  return _internal_channel_count();
+inline ::int32_t DiarizationOptions::channels() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.channels)
+  return _internal_channels();
 }
-inline void DiarizationOptions::set_channel_count(::int32_t value) {
-  _internal_set_channel_count(value);
+inline void DiarizationOptions::set_channels(::int32_t value) {
+  _internal_set_channels(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.channel_count)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.channels)
 }
-inline ::int32_t DiarizationOptions::_internal_channel_count() const {
+inline ::int32_t DiarizationOptions::_internal_channels() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.channel_count_;
+  return _impl_.channels_;
 }
-inline void DiarizationOptions::_internal_set_channel_count(::int32_t value) {
+inline void DiarizationOptions::_internal_set_channels(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.channel_count_ = value;
+  _impl_.channels_ = value;
 }
 
 // optional .runanywhere.v1.DiarizationAudioEncoding encoding = 3 [(.runanywhere.v1.rac_default) = "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE"];

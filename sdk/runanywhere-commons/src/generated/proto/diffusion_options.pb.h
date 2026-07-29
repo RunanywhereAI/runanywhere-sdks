@@ -36,6 +36,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "model_types.pb.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -1548,7 +1549,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionGenerationOptions final : 
     kMaskImageMediaTypeFieldNumber = 18,
     kWidthFieldNumber = 3,
     kHeightFieldNumber = 4,
-    kNumInferenceStepsFieldNumber = 5,
+    kStepsFieldNumber = 5,
     kGuidanceScaleFieldNumber = 6,
     kSeedFieldNumber = 7,
     kSchedulerFieldNumber = 8,
@@ -1561,7 +1562,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionGenerationOptions final : 
     kReturnLatentsFieldNumber = 20,
     kBatchSizeFieldNumber = 19,
   };
-  // string prompt = 1;
+  // string prompt = 1 [(.runanywhere.v1.rac_required) = true];
   void clear_prompt() ;
   [[nodiscard]] const ::std::string& prompt() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -1659,7 +1660,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionGenerationOptions final : 
   ::std::string* PROTOBUF_NONNULL _internal_mutable_mask_image_media_type();
 
   public:
-  // int32 width = 3;
+  // int32 width = 3 [(.runanywhere.v1.rac_default) = "0"];
   void clear_width() ;
   [[nodiscard]] ::int32_t width() const;
   void set_width(::int32_t value);
@@ -1669,7 +1670,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionGenerationOptions final : 
   void _internal_set_width(::int32_t value);
 
   public:
-  // int32 height = 4;
+  // int32 height = 4 [(.runanywhere.v1.rac_default) = "0"];
   void clear_height() ;
   [[nodiscard]] ::int32_t height() const;
   void set_height(::int32_t value);
@@ -1679,17 +1680,17 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionGenerationOptions final : 
   void _internal_set_height(::int32_t value);
 
   public:
-  // int32 num_inference_steps = 5;
-  void clear_num_inference_steps() ;
-  [[nodiscard]] ::int32_t num_inference_steps() const;
-  void set_num_inference_steps(::int32_t value);
+  // int32 steps = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 50];
+  void clear_steps() ;
+  [[nodiscard]] ::int32_t steps() const;
+  void set_steps(::int32_t value);
 
   private:
-  ::int32_t _internal_num_inference_steps() const;
-  void _internal_set_num_inference_steps(::int32_t value);
+  ::int32_t _internal_steps() const;
+  void _internal_set_steps(::int32_t value);
 
   public:
-  // float guidance_scale = 6;
+  // float guidance_scale = 6 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 20];
   void clear_guidance_scale() ;
   [[nodiscard]] float guidance_scale() const;
   void set_guidance_scale(float value);
@@ -1699,7 +1700,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionGenerationOptions final : 
   void _internal_set_guidance_scale(float value);
 
   public:
-  // int64 seed = 7;
+  // int64 seed = 7 [(.runanywhere.v1.rac_default) = "-1"];
   void clear_seed() ;
   [[nodiscard]] ::int64_t seed() const;
   void set_seed(::int64_t value);
@@ -1729,7 +1730,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionGenerationOptions final : 
   void _internal_set_mode(::runanywhere::v1::DiffusionMode value);
 
   public:
-  // float denoise_strength = 12;
+  // float denoise_strength = 12 [(.runanywhere.v1.rac_default) = "0.75", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   void clear_denoise_strength() ;
   [[nodiscard]] float denoise_strength() const;
   void set_denoise_strength(float value);
@@ -1840,7 +1841,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionGenerationOptions final : 
     ::google::protobuf::internal::ArenaStringPtr mask_image_media_type_;
     ::int32_t width_;
     ::int32_t height_;
-    ::int32_t num_inference_steps_;
+    ::int32_t steps_;
     float guidance_scale_;
     ::int64_t seed_;
     int scheduler_;
@@ -4367,7 +4368,7 @@ inline void DiffusionConfig::set_allocated_configuration(::runanywhere::v1::Diff
 
 // DiffusionGenerationOptions
 
-// string prompt = 1;
+// string prompt = 1 [(.runanywhere.v1.rac_required) = true];
 inline void DiffusionGenerationOptions::clear_prompt() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.prompt_.ClearToEmpty();
@@ -4495,7 +4496,7 @@ inline void DiffusionGenerationOptions::set_allocated_negative_prompt(::std::str
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DiffusionGenerationOptions.negative_prompt)
 }
 
-// int32 width = 3;
+// int32 width = 3 [(.runanywhere.v1.rac_default) = "0"];
 inline void DiffusionGenerationOptions::clear_width() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.width_ = 0;
@@ -4519,7 +4520,7 @@ inline void DiffusionGenerationOptions::_internal_set_width(::int32_t value) {
   _impl_.width_ = value;
 }
 
-// int32 height = 4;
+// int32 height = 4 [(.runanywhere.v1.rac_default) = "0"];
 inline void DiffusionGenerationOptions::clear_height() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.height_ = 0;
@@ -4543,31 +4544,31 @@ inline void DiffusionGenerationOptions::_internal_set_height(::int32_t value) {
   _impl_.height_ = value;
 }
 
-// int32 num_inference_steps = 5;
-inline void DiffusionGenerationOptions::clear_num_inference_steps() {
+// int32 steps = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 50];
+inline void DiffusionGenerationOptions::clear_steps() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.num_inference_steps_ = 0;
+  _impl_.steps_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
-inline ::int32_t DiffusionGenerationOptions::num_inference_steps() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionGenerationOptions.num_inference_steps)
-  return _internal_num_inference_steps();
+inline ::int32_t DiffusionGenerationOptions::steps() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionGenerationOptions.steps)
+  return _internal_steps();
 }
-inline void DiffusionGenerationOptions::set_num_inference_steps(::int32_t value) {
-  _internal_set_num_inference_steps(value);
+inline void DiffusionGenerationOptions::set_steps(::int32_t value) {
+  _internal_set_steps(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionGenerationOptions.num_inference_steps)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionGenerationOptions.steps)
 }
-inline ::int32_t DiffusionGenerationOptions::_internal_num_inference_steps() const {
+inline ::int32_t DiffusionGenerationOptions::_internal_steps() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.num_inference_steps_;
+  return _impl_.steps_;
 }
-inline void DiffusionGenerationOptions::_internal_set_num_inference_steps(::int32_t value) {
+inline void DiffusionGenerationOptions::_internal_set_steps(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.num_inference_steps_ = value;
+  _impl_.steps_ = value;
 }
 
-// float guidance_scale = 6;
+// float guidance_scale = 6 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 20];
 inline void DiffusionGenerationOptions::clear_guidance_scale() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.guidance_scale_ = 0;
@@ -4591,7 +4592,7 @@ inline void DiffusionGenerationOptions::_internal_set_guidance_scale(float value
   _impl_.guidance_scale_ = value;
 }
 
-// int64 seed = 7;
+// int64 seed = 7 [(.runanywhere.v1.rac_default) = "-1"];
 inline void DiffusionGenerationOptions::clear_seed() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.seed_ = ::int64_t{0};
@@ -4799,7 +4800,7 @@ inline void DiffusionGenerationOptions::set_allocated_mask_image(::std::string* 
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DiffusionGenerationOptions.mask_image)
 }
 
-// float denoise_strength = 12;
+// float denoise_strength = 12 [(.runanywhere.v1.rac_default) = "0.75", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline void DiffusionGenerationOptions::clear_denoise_strength() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.denoise_strength_ = 0;

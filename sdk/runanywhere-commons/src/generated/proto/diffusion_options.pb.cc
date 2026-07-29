@@ -837,7 +837,7 @@ constexpr DiffusionGenerationOptions::ParseTableT_ DiffusionGenerationOptions::I
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // string prompt = 1;
+      // string prompt = 1 [(.runanywhere.v1.rac_required) = true];
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.prompt_)}},
@@ -845,23 +845,23 @@ constexpr DiffusionGenerationOptions::ParseTableT_ DiffusionGenerationOptions::I
       {::_pbi::TcParser::FastUS1,
        {18, 1, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.negative_prompt_)}},
-      // int32 width = 3;
+      // int32 width = 3 [(.runanywhere.v1.rac_default) = "0"];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.width_), 6>(),
        {24, 6, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.width_)}},
-      // int32 height = 4;
+      // int32 height = 4 [(.runanywhere.v1.rac_default) = "0"];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.height_), 7>(),
        {32, 7, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.height_)}},
-      // int32 num_inference_steps = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.num_inference_steps_), 8>(),
+      // int32 steps = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 50];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiffusionGenerationOptions, _impl_.steps_), 8>(),
        {40, 8, 0,
-        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.num_inference_steps_)}},
-      // float guidance_scale = 6;
+        PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.steps_)}},
+      // float guidance_scale = 6 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 20];
       {::_pbi::TcParser::FastF32S1,
        {53, 9, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.guidance_scale_)}},
-      // int64 seed = 7;
+      // int64 seed = 7 [(.runanywhere.v1.rac_default) = "-1"];
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiffusionGenerationOptions, _impl_.seed_), 10>(),
        {56, 10, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.seed_)}},
@@ -881,7 +881,7 @@ constexpr DiffusionGenerationOptions::ParseTableT_ DiffusionGenerationOptions::I
       {::_pbi::TcParser::FastBS1,
        {90, 3, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.mask_image_)}},
-      // float denoise_strength = 12;
+      // float denoise_strength = 12 [(.runanywhere.v1.rac_default) = "0.75", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
        {101, 13, 0,
         PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.denoise_strength_)}},
@@ -931,19 +931,19 @@ constexpr DiffusionGenerationOptions::ParseTableT_ DiffusionGenerationOptions::I
     }}, {{
       65535, 65535
     }}, {{
-      // string prompt = 1;
+      // string prompt = 1 [(.runanywhere.v1.rac_required) = true];
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.prompt_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string negative_prompt = 2;
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.negative_prompt_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 width = 3;
+      // int32 width = 3 [(.runanywhere.v1.rac_default) = "0"];
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.width_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 height = 4;
+      // int32 height = 4 [(.runanywhere.v1.rac_default) = "0"];
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.height_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 num_inference_steps = 5;
-      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.num_inference_steps_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // float guidance_scale = 6;
+      // int32 steps = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 50];
+      {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.steps_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // float guidance_scale = 6 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 20];
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.guidance_scale_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int64 seed = 7;
+      // int64 seed = 7 [(.runanywhere.v1.rac_default) = "-1"];
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.seed_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // .runanywhere.v1.DiffusionScheduler scheduler = 8;
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.scheduler_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
@@ -953,7 +953,7 @@ constexpr DiffusionGenerationOptions::ParseTableT_ DiffusionGenerationOptions::I
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.input_image_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
       // optional bytes mask_image = 11;
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.mask_image_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBytes | ::_fl::kRepAString)},
-      // float denoise_strength = 12;
+      // float denoise_strength = 12 [(.runanywhere.v1.rac_default) = "0.75", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.denoise_strength_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // bool report_intermediate_images = 13;
       {PROTOBUF_FIELD_OFFSET(DiffusionGenerationOptions, _impl_.report_intermediate_images_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
@@ -1009,7 +1009,7 @@ inline constexpr DiffusionGenerationOptions::Impl_::Impl_(
             ::_pbi::ConstantInitialized()),
         width_{0},
         height_{0},
-        num_inference_steps_{0},
+        steps_{0},
         guidance_scale_{0},
         seed_{::int64_t{0}},
         scheduler_{static_cast< ::runanywhere::v1::DiffusionScheduler >(0)},
@@ -2376,7 +2376,7 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.negative_prompt_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.width_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.height_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.num_inference_steps_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.steps_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.guidance_scale_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.seed_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiffusionGenerationOptions, _impl_.scheduler_),
@@ -2578,153 +2578,157 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_diffusion_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\027diffusion_options.proto\022\016runanywhere.v"
-    "1\032\021model_types.proto\"\227\001\n\030DiffusionTokeni"
-    "zerSource\022:\n\004kind\030\001 \001(\0162,.runanywhere.v1"
-    ".DiffusionTokenizerSourceKind\022\030\n\013custom_"
-    "path\030\002 \001(\tH\000\210\001\001\022\025\n\rauto_download\030\003 \001(\010B\016"
-    "\n\014_custom_path\"\330\002\n\026DiffusionConfiguratio"
-    "n\022<\n\rmodel_variant\030\001 \001(\0162%.runanywhere.v"
-    "1.DiffusionModelVariant\022B\n\020tokenizer_sou"
-    "rce\030\002 \001(\0132(.runanywhere.v1.DiffusionToke"
-    "nizerSource\022\035\n\025enable_safety_checker\030\003 \001"
-    "(\010\022\025\n\rmax_memory_mb\030\004 \001(\005\022\025\n\010model_id\030\005 "
-    "\001(\tH\000\210\001\001\022D\n\023preferred_framework\030\006 \001(\0162\"."
-    "runanywhere.v1.InferenceFrameworkH\001\210\001\001B\013"
-    "\n\t_model_idB\026\n\024_preferred_frameworkJ\004\010\007\020"
-    "\010\"\241\001\n\017DiffusionConfig\022\022\n\nmodel_path\030\001 \001("
-    "\t\022\020\n\010model_id\030\002 \001(\t\022\022\n\nmodel_name\030\003 \001(\t\022"
-    "B\n\rconfiguration\030\004 \001(\0132&.runanywhere.v1."
-    "DiffusionConfigurationH\000\210\001\001B\020\n\016_configur"
-    "ation\"\225\005\n\032DiffusionGenerationOptions\022\016\n\006"
-    "prompt\030\001 \001(\t\022\027\n\017negative_prompt\030\002 \001(\t\022\r\n"
-    "\005width\030\003 \001(\005\022\016\n\006height\030\004 \001(\005\022\033\n\023num_infe"
-    "rence_steps\030\005 \001(\005\022\026\n\016guidance_scale\030\006 \001("
-    "\002\022\014\n\004seed\030\007 \001(\003\0225\n\tscheduler\030\010 \001(\0162\".run"
-    "anywhere.v1.DiffusionScheduler\022+\n\004mode\030\t"
-    " \001(\0162\035.runanywhere.v1.DiffusionMode\022\030\n\013i"
-    "nput_image\030\n \001(\014H\000\210\001\001\022\027\n\nmask_image\030\013 \001("
-    "\014H\001\210\001\001\022\030\n\020denoise_strength\030\014 \001(\002\022\"\n\032repo"
-    "rt_intermediate_images\030\r \001(\010\022\027\n\017progress"
-    "_stride\030\016 \001(\005\022\031\n\021input_image_width\030\017 \001(\005"
-    "\022\032\n\022input_image_height\030\020 \001(\005\022#\n\026input_im"
-    "age_media_type\030\021 \001(\tH\002\210\001\001\022\"\n\025mask_image_"
-    "media_type\030\022 \001(\tH\003\210\001\001\022\022\n\nbatch_size\030\023 \001("
-    "\005\022\026\n\016return_latents\030\024 \001(\010B\016\n\014_input_imag"
-    "eB\r\n\013_mask_imageB\031\n\027_input_image_media_t"
-    "ypeB\030\n\026_mask_image_media_type\"\237\002\n\032Diffus"
-    "ionGenerationRequest\022\022\n\nrequest_id\030\001 \001(\t"
-    "\022@\n\007options\030\002 \001(\0132*.runanywhere.v1.Diffu"
-    "sionGenerationOptionsH\000\210\001\001\022\025\n\010model_id\030\003"
-    " \001(\tH\001\210\001\001\022J\n\010metadata\030\004 \003(\01328.runanywher"
-    "e.v1.DiffusionGenerationRequest.Metadata"
-    "Entry\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005v"
-    "alue\030\002 \001(\t:\0028\001B\n\n\010_optionsB\013\n\t_model_id\""
-    "\342\002\n\021DiffusionProgress\022\030\n\020progress_percen"
-    "t\030\001 \001(\002\022\024\n\014current_step\030\002 \001(\005\022\023\n\013total_s"
-    "teps\030\003 \001(\005\022\r\n\005stage\030\004 \001(\t\022$\n\027intermediat"
-    "e_image_data\030\005 \001(\014H\000\210\001\001\022 \n\030intermediate_"
-    "image_width\030\006 \001(\005\022!\n\031intermediate_image_"
-    "height\030\007 \001(\005\022\024\n\014timestamp_ms\030\010 \001(\003\022\016\n\006et"
-    "a_ms\030\t \001(\003\022*\n\035intermediate_image_media_t"
-    "ype\030\n \001(\tH\001\210\001\001B\032\n\030_intermediate_image_da"
-    "taB \n\036_intermediate_image_media_type\"\345\002\n"
-    "\017DiffusionResult\022\022\n\nimage_data\030\001 \001(\014\022\r\n\005"
-    "width\030\002 \001(\005\022\016\n\006height\030\003 \001(\005\022\021\n\tseed_used"
-    "\030\004 \001(\003\022\025\n\rtotal_time_ms\030\005 \001(\003\022\023\n\013safety_"
-    "flag\030\006 \001(\010\022:\n\016used_scheduler\030\007 \001(\0162\".run"
-    "anywhere.v1.DiffusionScheduler\022\032\n\rerror_"
-    "message\030\010 \001(\tH\000\210\001\001\022\022\n\nerror_code\030\t \001(\005\022\035"
-    "\n\020image_media_type\030\n \001(\tH\001\210\001\001\022\024\n\014batch_i"
-    "mages\030\013 \003(\014\022\030\n\020images_generated\030\014 \001(\005B\020\n"
-    "\016_error_messageB\023\n\021_image_media_type\"\214\004\n"
-    "\025DiffusionCapabilities\022A\n\022supported_vari"
-    "ants\030\001 \003(\0162%.runanywhere.v1.DiffusionMod"
-    "elVariant\022@\n\024supported_schedulers\030\002 \003(\0162"
-    "\".runanywhere.v1.DiffusionScheduler\022\031\n\021m"
-    "ax_resolution_px\030\003 \001(\005\0226\n\017supported_mode"
-    "s\030\004 \003(\0162\035.runanywhere.v1.DiffusionMode\022\024"
-    "\n\014max_width_px\030\005 \001(\005\022\025\n\rmax_height_px\030\006 "
-    "\001(\005\022$\n\034supports_intermediate_images\030\007 \001("
-    "\010\022\037\n\027supports_safety_checker\030\010 \001(\010\022\020\n\010is"
-    "_ready\030\t \001(\010\022\032\n\rcurrent_model\030\n \001(\tH\000\210\001\001"
-    "\022\036\n\026safety_checker_enabled\030\013 \001(\010\022!\n\031supp"
-    "orts_batch_generation\030\014 \001(\010\022$\n\034supported"
-    "_output_media_types\030\r \003(\tB\020\n\016_current_mo"
-    "del\"\317\002\n\024DiffusionStreamEvent\022\013\n\003seq\030\001 \001("
-    "\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequest_id\030\003 "
-    "\001(\t\0226\n\004kind\030\004 \001(\0162(.runanywhere.v1.Diffu"
-    "sionStreamEventKind\0228\n\010progress\030\005 \001(\0132!."
-    "runanywhere.v1.DiffusionProgressH\000\210\001\001\0224\n"
-    "\006result\030\006 \001(\0132\037.runanywhere.v1.Diffusion"
-    "ResultH\001\210\001\001\022\032\n\rerror_message\030\007 \001(\tH\002\210\001\001\022"
-    "\022\n\nerror_code\030\010 \001(\005B\013\n\t_progressB\t\n\007_res"
-    "ultB\020\n\016_error_message\"\271\002\n\025DiffusionServi"
-    "ceState\022\020\n\010is_ready\030\001 \001(\010\022\032\n\rcurrent_mod"
-    "el\030\002 \001(\tH\000\210\001\001\022@\n\014capabilities\030\003 \001(\0132%.ru"
-    "nanywhere.v1.DiffusionCapabilitiesH\001\210\001\001\022"
-    "\025\n\ris_generating\030\004 \001(\010\022\036\n\021active_request"
-    "_id\030\005 \001(\tH\002\210\001\001\022\032\n\rerror_message\030\006 \001(\tH\003\210"
-    "\001\001\022\022\n\nerror_code\030\007 \001(\005B\020\n\016_current_model"
-    "B\017\n\r_capabilitiesB\024\n\022_active_request_idB"
-    "\020\n\016_error_message*\223\001\n\rDiffusionMode\022\036\n\032D"
-    "IFFUSION_MODE_UNSPECIFIED\020\000\022 \n\034DIFFUSION"
-    "_MODE_TEXT_TO_IMAGE\020\001\022!\n\035DIFFUSION_MODE_"
-    "IMAGE_TO_IMAGE\020\002\022\035\n\031DIFFUSION_MODE_INPAI"
-    "NTING\020\003*\376\002\n\022DiffusionScheduler\022#\n\037DIFFUS"
-    "ION_SCHEDULER_UNSPECIFIED\020\000\022 \n\034DIFFUSION"
-    "_SCHEDULER_DPMPP_2M\020\001\022\'\n#DIFFUSION_SCHED"
-    "ULER_DPMPP_2M_KARRAS\020\002\022\034\n\030DIFFUSION_SCHE"
-    "DULER_DDIM\020\003\022\034\n\030DIFFUSION_SCHEDULER_DDPM"
-    "\020\004\022\035\n\031DIFFUSION_SCHEDULER_EULER\020\005\022\037\n\033DIF"
-    "FUSION_SCHEDULER_EULER_A\020\006\022\034\n\030DIFFUSION_"
-    "SCHEDULER_PNDM\020\007\022\033\n\027DIFFUSION_SCHEDULER_"
-    "LMS\020\010\022\033\n\027DIFFUSION_SCHEDULER_LCM\020\t\022$\n DI"
-    "FFUSION_SCHEDULER_DPMPP_2M_SDE\020\n*\225\002\n\025Dif"
-    "fusionModelVariant\022\'\n#DIFFUSION_MODEL_VA"
-    "RIANT_UNSPECIFIED\020\000\022\"\n\036DIFFUSION_MODEL_V"
-    "ARIANT_SD_1_5\020\001\022\"\n\036DIFFUSION_MODEL_VARIA"
-    "NT_SD_2_1\020\002\022 \n\034DIFFUSION_MODEL_VARIANT_S"
-    "DXL\020\003\022&\n\"DIFFUSION_MODEL_VARIANT_SDXL_TU"
-    "RBO\020\004\022 \n\034DIFFUSION_MODEL_VARIANT_SDXS\020\005\022"
-    "\037\n\033DIFFUSION_MODEL_VARIANT_LCM\020\006*\220\002\n\034Dif"
-    "fusionTokenizerSourceKind\022/\n+DIFFUSION_T"
-    "OKENIZER_SOURCE_KIND_UNSPECIFIED\020\000\0220\n,DI"
-    "FFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD"
-    "15\020\001\022/\n+DIFFUSION_TOKENIZER_SOURCE_KIND_"
-    "BUNDLED_SD2\020\002\0220\n,DIFFUSION_TOKENIZER_SOU"
-    "RCE_KIND_BUNDLED_SDXL\020\003\022*\n&DIFFUSION_TOK"
-    "ENIZER_SOURCE_KIND_CUSTOM\020\004*\240\002\n\030Diffusio"
-    "nStreamEventKind\022+\n\'DIFFUSION_STREAM_EVE"
-    "NT_KIND_UNSPECIFIED\020\000\022\'\n#DIFFUSION_STREA"
-    "M_EVENT_KIND_STARTED\020\001\022(\n$DIFFUSION_STRE"
-    "AM_EVENT_KIND_PROGRESS\020\002\0222\n.DIFFUSION_ST"
-    "REAM_EVENT_KIND_INTERMEDIATE_IMAGE\020\003\022)\n%"
-    "DIFFUSION_STREAM_EVENT_KIND_COMPLETED\020\004\022"
-    "%\n!DIFFUSION_STREAM_EVENT_KIND_ERROR\020\0052\302"
-    "\001\n\tDiffusion\022W\n\010Generate\022*.runanywhere.v"
-    "1.DiffusionGenerationRequest\032\037.runanywhe"
-    "re.v1.DiffusionResult\022\\\n\006Stream\022*.runany"
-    "where.v1.DiffusionGenerationRequest\032$.ru"
-    "nanywhere.v1.DiffusionStreamEvent0\001B\220\001\n\027"
-    "ai.runanywhere.proto.v1B\025DiffusionOption"
-    "sProtoP\001Z<github.com/runanywhere/runanyw"
-    "here-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1"
-    "\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "1\032\021model_types.proto\032\021rac_options.proto\""
+    "\227\001\n\030DiffusionTokenizerSource\022:\n\004kind\030\001 \001"
+    "(\0162,.runanywhere.v1.DiffusionTokenizerSo"
+    "urceKind\022\030\n\013custom_path\030\002 \001(\tH\000\210\001\001\022\025\n\rau"
+    "to_download\030\003 \001(\010B\016\n\014_custom_path\"\330\002\n\026Di"
+    "ffusionConfiguration\022<\n\rmodel_variant\030\001 "
+    "\001(\0162%.runanywhere.v1.DiffusionModelVaria"
+    "nt\022B\n\020tokenizer_source\030\002 \001(\0132(.runanywhe"
+    "re.v1.DiffusionTokenizerSource\022\035\n\025enable"
+    "_safety_checker\030\003 \001(\010\022\025\n\rmax_memory_mb\030\004"
+    " \001(\005\022\025\n\010model_id\030\005 \001(\tH\000\210\001\001\022D\n\023preferred"
+    "_framework\030\006 \001(\0162\".runanywhere.v1.Infere"
+    "nceFrameworkH\001\210\001\001B\013\n\t_model_idB\026\n\024_prefe"
+    "rred_frameworkJ\004\010\007\020\010\"\241\001\n\017DiffusionConfig"
+    "\022\022\n\nmodel_path\030\001 \001(\t\022\020\n\010model_id\030\002 \001(\t\022\022"
+    "\n\nmodel_name\030\003 \001(\t\022B\n\rconfiguration\030\004 \001("
+    "\0132&.runanywhere.v1.DiffusionConfiguratio"
+    "nH\000\210\001\001B\020\n\016_configuration\"\361\005\n\032DiffusionGe"
+    "nerationOptions\022\024\n\006prompt\030\001 \001(\tB\004\220\265\030\001\022\027\n"
+    "\017negative_prompt\030\002 \001(\t\022\024\n\005width\030\003 \001(\005B\005\212"
+    "\265\030\0010\022\025\n\006height\030\004 \001(\005B\005\212\265\030\0010\022\034\n\005steps\030\005 \001"
+    "(\005B\r\212\265\030\0010\240\265\030\000\250\265\0302\0225\n\016guidance_scale\030\006 \001("
+    "\002B\035\212\265\030\0030.0\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\0004@\022\024\n\004seed"
+    "\030\007 \001(\003B\006\212\265\030\002-1\0225\n\tscheduler\030\010 \001(\0162\".runa"
+    "nywhere.v1.DiffusionScheduler\022+\n\004mode\030\t "
+    "\001(\0162\035.runanywhere.v1.DiffusionMode\022\030\n\013in"
+    "put_image\030\n \001(\014H\000\210\001\001\022\027\n\nmask_image\030\013 \001(\014"
+    "H\001\210\001\001\0228\n\020denoise_strength\030\014 \001(\002B\036\212\265\030\0040.7"
+    "5\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\"\n\032report_interm"
+    "ediate_images\030\r \001(\010\022\027\n\017progress_stride\030\016"
+    " \001(\005\022\031\n\021input_image_width\030\017 \001(\005\022\032\n\022input"
+    "_image_height\030\020 \001(\005\022#\n\026input_image_media"
+    "_type\030\021 \001(\tH\002\210\001\001\022\"\n\025mask_image_media_typ"
+    "e\030\022 \001(\tH\003\210\001\001\022\022\n\nbatch_size\030\023 \001(\005\022\026\n\016retu"
+    "rn_latents\030\024 \001(\010B\016\n\014_input_imageB\r\n\013_mas"
+    "k_imageB\031\n\027_input_image_media_typeB\030\n\026_m"
+    "ask_image_media_type\"\237\002\n\032DiffusionGenera"
+    "tionRequest\022\022\n\nrequest_id\030\001 \001(\t\022@\n\007optio"
+    "ns\030\002 \001(\0132*.runanywhere.v1.DiffusionGener"
+    "ationOptionsH\000\210\001\001\022\025\n\010model_id\030\003 \001(\tH\001\210\001\001"
+    "\022J\n\010metadata\030\004 \003(\01328.runanywhere.v1.Diff"
+    "usionGenerationRequest.MetadataEntry\032/\n\r"
+    "MetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001("
+    "\t:\0028\001B\n\n\010_optionsB\013\n\t_model_id\"\342\002\n\021Diffu"
+    "sionProgress\022\030\n\020progress_percent\030\001 \001(\002\022\024"
+    "\n\014current_step\030\002 \001(\005\022\023\n\013total_steps\030\003 \001("
+    "\005\022\r\n\005stage\030\004 \001(\t\022$\n\027intermediate_image_d"
+    "ata\030\005 \001(\014H\000\210\001\001\022 \n\030intermediate_image_wid"
+    "th\030\006 \001(\005\022!\n\031intermediate_image_height\030\007 "
+    "\001(\005\022\024\n\014timestamp_ms\030\010 \001(\003\022\016\n\006eta_ms\030\t \001("
+    "\003\022*\n\035intermediate_image_media_type\030\n \001(\t"
+    "H\001\210\001\001B\032\n\030_intermediate_image_dataB \n\036_in"
+    "termediate_image_media_type\"\345\002\n\017Diffusio"
+    "nResult\022\022\n\nimage_data\030\001 \001(\014\022\r\n\005width\030\002 \001"
+    "(\005\022\016\n\006height\030\003 \001(\005\022\021\n\tseed_used\030\004 \001(\003\022\025\n"
+    "\rtotal_time_ms\030\005 \001(\003\022\023\n\013safety_flag\030\006 \001("
+    "\010\022:\n\016used_scheduler\030\007 \001(\0162\".runanywhere."
+    "v1.DiffusionScheduler\022\032\n\rerror_message\030\010"
+    " \001(\tH\000\210\001\001\022\022\n\nerror_code\030\t \001(\005\022\035\n\020image_m"
+    "edia_type\030\n \001(\tH\001\210\001\001\022\024\n\014batch_images\030\013 \003"
+    "(\014\022\030\n\020images_generated\030\014 \001(\005B\020\n\016_error_m"
+    "essageB\023\n\021_image_media_type\"\214\004\n\025Diffusio"
+    "nCapabilities\022A\n\022supported_variants\030\001 \003("
+    "\0162%.runanywhere.v1.DiffusionModelVariant"
+    "\022@\n\024supported_schedulers\030\002 \003(\0162\".runanyw"
+    "here.v1.DiffusionScheduler\022\031\n\021max_resolu"
+    "tion_px\030\003 \001(\005\0226\n\017supported_modes\030\004 \003(\0162\035"
+    ".runanywhere.v1.DiffusionMode\022\024\n\014max_wid"
+    "th_px\030\005 \001(\005\022\025\n\rmax_height_px\030\006 \001(\005\022$\n\034su"
+    "pports_intermediate_images\030\007 \001(\010\022\037\n\027supp"
+    "orts_safety_checker\030\010 \001(\010\022\020\n\010is_ready\030\t "
+    "\001(\010\022\032\n\rcurrent_model\030\n \001(\tH\000\210\001\001\022\036\n\026safet"
+    "y_checker_enabled\030\013 \001(\010\022!\n\031supports_batc"
+    "h_generation\030\014 \001(\010\022$\n\034supported_output_m"
+    "edia_types\030\r \003(\tB\020\n\016_current_model\"\317\002\n\024D"
+    "iffusionStreamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014time"
+    "stamp_us\030\002 \001(\003\022\022\n\nrequest_id\030\003 \001(\t\0226\n\004ki"
+    "nd\030\004 \001(\0162(.runanywhere.v1.DiffusionStrea"
+    "mEventKind\0228\n\010progress\030\005 \001(\0132!.runanywhe"
+    "re.v1.DiffusionProgressH\000\210\001\001\0224\n\006result\030\006"
+    " \001(\0132\037.runanywhere.v1.DiffusionResultH\001\210"
+    "\001\001\022\032\n\rerror_message\030\007 \001(\tH\002\210\001\001\022\022\n\nerror_"
+    "code\030\010 \001(\005B\013\n\t_progressB\t\n\007_resultB\020\n\016_e"
+    "rror_message\"\271\002\n\025DiffusionServiceState\022\020"
+    "\n\010is_ready\030\001 \001(\010\022\032\n\rcurrent_model\030\002 \001(\tH"
+    "\000\210\001\001\022@\n\014capabilities\030\003 \001(\0132%.runanywhere"
+    ".v1.DiffusionCapabilitiesH\001\210\001\001\022\025\n\ris_gen"
+    "erating\030\004 \001(\010\022\036\n\021active_request_id\030\005 \001(\t"
+    "H\002\210\001\001\022\032\n\rerror_message\030\006 \001(\tH\003\210\001\001\022\022\n\nerr"
+    "or_code\030\007 \001(\005B\020\n\016_current_modelB\017\n\r_capa"
+    "bilitiesB\024\n\022_active_request_idB\020\n\016_error"
+    "_message*\223\001\n\rDiffusionMode\022\036\n\032DIFFUSION_"
+    "MODE_UNSPECIFIED\020\000\022 \n\034DIFFUSION_MODE_TEX"
+    "T_TO_IMAGE\020\001\022!\n\035DIFFUSION_MODE_IMAGE_TO_"
+    "IMAGE\020\002\022\035\n\031DIFFUSION_MODE_INPAINTING\020\003*\376"
+    "\002\n\022DiffusionScheduler\022#\n\037DIFFUSION_SCHED"
+    "ULER_UNSPECIFIED\020\000\022 \n\034DIFFUSION_SCHEDULE"
+    "R_DPMPP_2M\020\001\022\'\n#DIFFUSION_SCHEDULER_DPMP"
+    "P_2M_KARRAS\020\002\022\034\n\030DIFFUSION_SCHEDULER_DDI"
+    "M\020\003\022\034\n\030DIFFUSION_SCHEDULER_DDPM\020\004\022\035\n\031DIF"
+    "FUSION_SCHEDULER_EULER\020\005\022\037\n\033DIFFUSION_SC"
+    "HEDULER_EULER_A\020\006\022\034\n\030DIFFUSION_SCHEDULER"
+    "_PNDM\020\007\022\033\n\027DIFFUSION_SCHEDULER_LMS\020\010\022\033\n\027"
+    "DIFFUSION_SCHEDULER_LCM\020\t\022$\n DIFFUSION_S"
+    "CHEDULER_DPMPP_2M_SDE\020\n*\225\002\n\025DiffusionMod"
+    "elVariant\022\'\n#DIFFUSION_MODEL_VARIANT_UNS"
+    "PECIFIED\020\000\022\"\n\036DIFFUSION_MODEL_VARIANT_SD"
+    "_1_5\020\001\022\"\n\036DIFFUSION_MODEL_VARIANT_SD_2_1"
+    "\020\002\022 \n\034DIFFUSION_MODEL_VARIANT_SDXL\020\003\022&\n\""
+    "DIFFUSION_MODEL_VARIANT_SDXL_TURBO\020\004\022 \n\034"
+    "DIFFUSION_MODEL_VARIANT_SDXS\020\005\022\037\n\033DIFFUS"
+    "ION_MODEL_VARIANT_LCM\020\006*\220\002\n\034DiffusionTok"
+    "enizerSourceKind\022/\n+DIFFUSION_TOKENIZER_"
+    "SOURCE_KIND_UNSPECIFIED\020\000\0220\n,DIFFUSION_T"
+    "OKENIZER_SOURCE_KIND_BUNDLED_SD15\020\001\022/\n+D"
+    "IFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_S"
+    "D2\020\002\0220\n,DIFFUSION_TOKENIZER_SOURCE_KIND_"
+    "BUNDLED_SDXL\020\003\022*\n&DIFFUSION_TOKENIZER_SO"
+    "URCE_KIND_CUSTOM\020\004*\240\002\n\030DiffusionStreamEv"
+    "entKind\022+\n\'DIFFUSION_STREAM_EVENT_KIND_U"
+    "NSPECIFIED\020\000\022\'\n#DIFFUSION_STREAM_EVENT_K"
+    "IND_STARTED\020\001\022(\n$DIFFUSION_STREAM_EVENT_"
+    "KIND_PROGRESS\020\002\0222\n.DIFFUSION_STREAM_EVEN"
+    "T_KIND_INTERMEDIATE_IMAGE\020\003\022)\n%DIFFUSION"
+    "_STREAM_EVENT_KIND_COMPLETED\020\004\022%\n!DIFFUS"
+    "ION_STREAM_EVENT_KIND_ERROR\020\0052\302\001\n\tDiffus"
+    "ion\022W\n\010Generate\022*.runanywhere.v1.Diffusi"
+    "onGenerationRequest\032\037.runanywhere.v1.Dif"
+    "fusionResult\022\\\n\006Stream\022*.runanywhere.v1."
+    "DiffusionGenerationRequest\032$.runanywhere"
+    ".v1.DiffusionStreamEvent0\001B\220\001\n\027ai.runany"
+    "where.proto.v1B\025DiffusionOptionsProtoP\001Z"
+    "<github.com/runanywhere/runanywhere-sdks"
+    "/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runany"
+    "where.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_diffusion_5foptions_2eproto_deps[1] = {
+    descriptor_table_diffusion_5foptions_2eproto_deps[2] = {
         &::descriptor_table_model_5ftypes_2eproto,
+        &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_diffusion_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_diffusion_5foptions_2eproto = {
     false,
     false,
-    5310,
+    5421,
     descriptor_table_protodef_diffusion_5foptions_2eproto,
     "diffusion_options.proto",
     &descriptor_table_diffusion_5foptions_2eproto_once,
     descriptor_table_diffusion_5foptions_2eproto_deps,
-    1,
+    2,
     11,
     schemas,
     file_message_globals,
@@ -3846,9 +3850,9 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
         reinterpret_cast<char*>(&_impl_.width_)) + sizeof(_impl_.height_));
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    ::memset(&_impl_.num_inference_steps_, 0, static_cast<::size_t>(
+    ::memset(&_impl_.steps_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.input_image_width_) -
-        reinterpret_cast<char*>(&_impl_.num_inference_steps_)) + sizeof(_impl_.input_image_width_));
+        reinterpret_cast<char*>(&_impl_.steps_)) + sizeof(_impl_.input_image_width_));
   }
   if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
     ::memset(&_impl_.input_image_height_, 0, static_cast<::size_t>(
@@ -3878,7 +3882,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // string prompt = 1;
+  // string prompt = 1 [(.runanywhere.v1.rac_required) = true];
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     if (!this_._internal_prompt().empty()) {
       const ::std::string& _s = this_._internal_prompt();
@@ -3898,7 +3902,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     }
   }
 
-  // int32 width = 3;
+  // int32 width = 3 [(.runanywhere.v1.rac_default) = "0"];
   if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_width() != 0) {
       target =
@@ -3907,7 +3911,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     }
   }
 
-  // int32 height = 4;
+  // int32 height = 4 [(.runanywhere.v1.rac_default) = "0"];
   if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_height() != 0) {
       target =
@@ -3916,16 +3920,16 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     }
   }
 
-  // int32 num_inference_steps = 5;
+  // int32 steps = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 50];
   if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_num_inference_steps() != 0) {
+    if (this_._internal_steps() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
-              stream, this_._internal_num_inference_steps(), target);
+              stream, this_._internal_steps(), target);
     }
   }
 
-  // float guidance_scale = 6;
+  // float guidance_scale = 6 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 20];
   if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_guidance_scale()) != 0) {
       target = stream->EnsureSpace(target);
@@ -3934,7 +3938,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     }
   }
 
-  // int64 seed = 7;
+  // int64 seed = 7 [(.runanywhere.v1.rac_default) = "-1"];
   if (CheckHasBit(cached_has_bits, 0x00000400U)) {
     if (this_._internal_seed() != 0) {
       target =
@@ -3973,7 +3977,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     target = stream->WriteBytesMaybeAliased(11, _s, target);
   }
 
-  // float denoise_strength = 12;
+  // float denoise_strength = 12 [(.runanywhere.v1.rac_default) = "0.75", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   if (CheckHasBit(cached_has_bits, 0x00002000U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_denoise_strength()) != 0) {
       target = stream->EnsureSpace(target);
@@ -4078,7 +4082,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    // string prompt = 1;
+    // string prompt = 1 [(.runanywhere.v1.rac_required) = true];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_prompt().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -4112,14 +4116,14 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
       total_size += 2 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_mask_image_media_type());
     }
-    // int32 width = 3;
+    // int32 width = 3 [(.runanywhere.v1.rac_default) = "0"];
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_width() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_width());
       }
     }
-    // int32 height = 4;
+    // int32 height = 4 [(.runanywhere.v1.rac_default) = "0"];
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_height() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
@@ -4128,20 +4132,20 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    // int32 num_inference_steps = 5;
+    // int32 steps = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0, (.runanywhere.v1.rac_max) = 50];
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_num_inference_steps() != 0) {
+      if (this_._internal_steps() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_num_inference_steps());
+            this_._internal_steps());
       }
     }
-    // float guidance_scale = 6;
+    // float guidance_scale = 6 [(.runanywhere.v1.rac_default) = "0.0", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 20];
     if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_guidance_scale()) != 0) {
         total_size += 5;
       }
     }
-    // int64 seed = 7;
+    // int64 seed = 7 [(.runanywhere.v1.rac_default) = "-1"];
     if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (this_._internal_seed() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
@@ -4162,7 +4166,7 @@ PROTOBUF_NOINLINE void DiffusionGenerationOptions::Clear() {
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_mode());
       }
     }
-    // float denoise_strength = 12;
+    // float denoise_strength = 12 [(.runanywhere.v1.rac_default) = "0.75", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
     if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_denoise_strength()) != 0) {
         total_size += 5;
@@ -4272,8 +4276,8 @@ void DiffusionGenerationOptions::MergeImpl(::google::protobuf::MessageLite& to_m
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (from._internal_num_inference_steps() != 0) {
-        _this->_impl_.num_inference_steps_ = from._impl_.num_inference_steps_;
+      if (from._internal_steps() != 0) {
+        _this->_impl_.steps_ = from._impl_.steps_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000200U)) {

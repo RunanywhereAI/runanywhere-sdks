@@ -31,6 +31,7 @@
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -513,8 +514,9 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationImage final : public ::
     kWidthFieldNumber = 2,
     kHeightFieldNumber = 3,
     kPixelFormatFieldNumber = 4,
+    kStrideBytesFieldNumber = 5,
   };
-  // bytes data = 1;
+  // bytes data = 1 [(.runanywhere.v1.rac_required) = true];
   void clear_data() ;
   [[nodiscard]] const ::std::string& data() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -529,7 +531,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationImage final : public ::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_data();
 
   public:
-  // uint32 width = 2;
+  // uint32 width = 2 [(.runanywhere.v1.rac_required) = true];
   void clear_width() ;
   [[nodiscard]] ::uint32_t width() const;
   void set_width(::uint32_t value);
@@ -539,7 +541,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationImage final : public ::
   void _internal_set_width(::uint32_t value);
 
   public:
-  // uint32 height = 3;
+  // uint32 height = 3 [(.runanywhere.v1.rac_required) = true];
   void clear_height() ;
   [[nodiscard]] ::uint32_t height() const;
   void set_height(::uint32_t value);
@@ -549,7 +551,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationImage final : public ::
   void _internal_set_height(::uint32_t value);
 
   public:
-  // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4;
+  // .runanywhere.v1.SegmentationPixelFormat pixel_format = 4 [(.runanywhere.v1.rac_required) = true];
   void clear_pixel_format() ;
   [[nodiscard]] ::runanywhere::v1::SegmentationPixelFormat pixel_format() const;
   void set_pixel_format(::runanywhere::v1::SegmentationPixelFormat value);
@@ -559,11 +561,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationImage final : public ::
   void _internal_set_pixel_format(::runanywhere::v1::SegmentationPixelFormat value);
 
   public:
+  // uint32 stride_bytes = 5 [(.runanywhere.v1.rac_default) = "0"];
+  void clear_stride_bytes() ;
+  [[nodiscard]] ::uint32_t stride_bytes() const;
+  void set_stride_bytes(::uint32_t value);
+
+  private:
+  ::uint32_t _internal_stride_bytes() const;
+  void _internal_set_stride_bytes(::uint32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.SegmentationImage)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 4,
+      ::google::protobuf::internal::TcParseTable<3, 5,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -596,6 +608,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationImage final : public ::
     ::uint32_t width_;
     ::uint32_t height_;
     int pixel_format_;
+    ::uint32_t stride_bytes_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1386,7 +1399,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SegmentationRequest final : public 
 
 // SegmentationImage
 
-// bytes data = 1;
+// bytes data = 1 [(.runanywhere.v1.rac_required) = true];
 inline void SegmentationImage::clear_data() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.data_.ClearToEmpty();
@@ -1450,7 +1463,7 @@ inline void SegmentationImage::set_allocated_data(::std::string* PROTOBUF_NULLAB
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SegmentationImage.data)
 }
 
-// uint32 width = 2;
+// uint32 width = 2 [(.runanywhere.v1.rac_required) = true];
 inline void SegmentationImage::clear_width() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.width_ = 0u;
@@ -1474,7 +1487,7 @@ inline void SegmentationImage::_internal_set_width(::uint32_t value) {
   _impl_.width_ = value;
 }
 
-// uint32 height = 3;
+// uint32 height = 3 [(.runanywhere.v1.rac_required) = true];
 inline void SegmentationImage::clear_height() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.height_ = 0u;
@@ -1498,7 +1511,7 @@ inline void SegmentationImage::_internal_set_height(::uint32_t value) {
   _impl_.height_ = value;
 }
 
-// .runanywhere.v1.SegmentationPixelFormat pixel_format = 4;
+// .runanywhere.v1.SegmentationPixelFormat pixel_format = 4 [(.runanywhere.v1.rac_required) = true];
 inline void SegmentationImage::clear_pixel_format() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.pixel_format_ = 0;
@@ -1520,6 +1533,30 @@ inline ::runanywhere::v1::SegmentationPixelFormat SegmentationImage::_internal_p
 inline void SegmentationImage::_internal_set_pixel_format(::runanywhere::v1::SegmentationPixelFormat value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.pixel_format_ = value;
+}
+
+// uint32 stride_bytes = 5 [(.runanywhere.v1.rac_default) = "0"];
+inline void SegmentationImage::clear_stride_bytes() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.stride_bytes_ = 0u;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
+inline ::uint32_t SegmentationImage::stride_bytes() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SegmentationImage.stride_bytes)
+  return _internal_stride_bytes();
+}
+inline void SegmentationImage::set_stride_bytes(::uint32_t value) {
+  _internal_set_stride_bytes(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SegmentationImage.stride_bytes)
+}
+inline ::uint32_t SegmentationImage::_internal_stride_bytes() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.stride_bytes_;
+}
+inline void SegmentationImage::_internal_set_stride_bytes(::uint32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.stride_bytes_ = value;
 }
 
 // -------------------------------------------------------------------

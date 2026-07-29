@@ -36,6 +36,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "rac_options.pb.h"
+#include "llm_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -685,374 +686,6 @@ class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryRequest_MetadataEntry_DoNotU
       const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
       ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   static constexpr auto InternalNewImpl_();
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.RAGQueryOptions) */ {
- public:
-  inline RAGQueryOptions() : RAGQueryOptions(nullptr) {}
-  ~RAGQueryOptions() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(RAGQueryOptions* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(RAGQueryOptions));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr RAGQueryOptions(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline RAGQueryOptions(const RAGQueryOptions& from) : RAGQueryOptions(nullptr, from) {}
-  inline RAGQueryOptions(RAGQueryOptions&& from) noexcept : RAGQueryOptions(nullptr, ::std::move(from)) {}
-  inline RAGQueryOptions& operator=(const RAGQueryOptions& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline RAGQueryOptions& operator=(RAGQueryOptions&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const RAGQueryOptions& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RAGQueryOptions>(&RAGQueryOptions_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 5;
-  friend void swap(RAGQueryOptions& a, RAGQueryOptions& b) { a.Swap(&b); }
-  inline void Swap(RAGQueryOptions* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(RAGQueryOptions* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] RAGQueryOptions* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<RAGQueryOptions>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const RAGQueryOptions& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const RAGQueryOptions& from) { RAGQueryOptions::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(RAGQueryOptions* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.RAGQueryOptions"; }
-
-  explicit RAGQueryOptions(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  RAGQueryOptions(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const RAGQueryOptions& from);
-  RAGQueryOptions(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, RAGQueryOptions&& from) noexcept
-      : RAGQueryOptions(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kQuestionFieldNumber = 1,
-    kSystemPromptFieldNumber = 2,
-    kScopePrefixFieldNumber = 13,
-    kMaxTokensFieldNumber = 3,
-    kTemperatureFieldNumber = 4,
-    kTopPFieldNumber = 5,
-    kTopKFieldNumber = 6,
-    kRetrievalTopKFieldNumber = 7,
-    kSimilarityThresholdFieldNumber = 8,
-    kStreamFieldNumber = 9,
-    kDisableThinkingFieldNumber = 10,
-    kEnableMultiQueryFieldNumber = 11,
-    kMultiQueryCountFieldNumber = 12,
-  };
-  // string question = 1;
-  void clear_question() ;
-  [[nodiscard]] const ::std::string& question() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_question(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_question();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_question();
-  void set_allocated_question(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_question() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_question(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_question();
-
-  public:
-  // optional string system_prompt = 2;
-  [[nodiscard]] bool has_system_prompt()
-      const;
-  void clear_system_prompt() ;
-  [[nodiscard]] const ::std::string& system_prompt() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_system_prompt(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_system_prompt();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_system_prompt();
-  void set_allocated_system_prompt(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_system_prompt() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_system_prompt(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_system_prompt();
-
-  public:
-  // optional string scope_prefix = 13;
-  [[nodiscard]] bool has_scope_prefix()
-      const;
-  void clear_scope_prefix() ;
-  [[nodiscard]] const ::std::string& scope_prefix() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_scope_prefix(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_scope_prefix();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_scope_prefix();
-  void set_allocated_scope_prefix(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_scope_prefix() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_scope_prefix(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_scope_prefix();
-
-  public:
-  // int32 max_tokens = 3 [(.runanywhere.v1.rac_default) = "512"];
-  void clear_max_tokens() ;
-  [[nodiscard]] ::int32_t max_tokens() const;
-  void set_max_tokens(::int32_t value);
-
-  private:
-  ::int32_t _internal_max_tokens() const;
-  void _internal_set_max_tokens(::int32_t value);
-
-  public:
-  // float temperature = 4 [(.runanywhere.v1.rac_default) = "0.7"];
-  void clear_temperature() ;
-  [[nodiscard]] float temperature() const;
-  void set_temperature(float value);
-
-  private:
-  float _internal_temperature() const;
-  void _internal_set_temperature(float value);
-
-  public:
-  // float top_p = 5 [(.runanywhere.v1.rac_default) = "1.0"];
-  void clear_top_p() ;
-  [[nodiscard]] float top_p() const;
-  void set_top_p(float value);
-
-  private:
-  float _internal_top_p() const;
-  void _internal_set_top_p(float value);
-
-  public:
-  // int32 top_k = 6;
-  void clear_top_k() ;
-  [[nodiscard]] ::int32_t top_k() const;
-  void set_top_k(::int32_t value);
-
-  private:
-  ::int32_t _internal_top_k() const;
-  void _internal_set_top_k(::int32_t value);
-
-  public:
-  // int32 retrieval_top_k = 7;
-  void clear_retrieval_top_k() ;
-  [[nodiscard]] ::int32_t retrieval_top_k() const;
-  void set_retrieval_top_k(::int32_t value);
-
-  private:
-  ::int32_t _internal_retrieval_top_k() const;
-  void _internal_set_retrieval_top_k(::int32_t value);
-
-  public:
-  // optional float similarity_threshold = 8;
-  [[nodiscard]] bool has_similarity_threshold()
-      const;
-  void clear_similarity_threshold() ;
-  [[nodiscard]] float similarity_threshold() const;
-  void set_similarity_threshold(float value);
-
-  private:
-  float _internal_similarity_threshold() const;
-  void _internal_set_similarity_threshold(float value);
-
-  public:
-  // bool stream = 9;
-  void clear_stream() ;
-  [[nodiscard]] bool stream() const;
-  void set_stream(bool value);
-
-  private:
-  bool _internal_stream() const;
-  void _internal_set_stream(bool value);
-
-  public:
-  // bool disable_thinking = 10;
-  void clear_disable_thinking() ;
-  [[nodiscard]] bool disable_thinking() const;
-  void set_disable_thinking(bool value);
-
-  private:
-  bool _internal_disable_thinking() const;
-  void _internal_set_disable_thinking(bool value);
-
-  public:
-  // bool enable_multi_query = 11;
-  void clear_enable_multi_query() ;
-  [[nodiscard]] bool enable_multi_query() const;
-  void set_enable_multi_query(bool value);
-
-  private:
-  bool _internal_enable_multi_query() const;
-  void _internal_set_enable_multi_query(bool value);
-
-  public:
-  // optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
-  [[nodiscard]] bool has_multi_query_count()
-      const;
-  void clear_multi_query_count() ;
-  [[nodiscard]] ::int32_t multi_query_count() const;
-  void set_multi_query_count(::int32_t value);
-
-  private:
-  ::int32_t _internal_multi_query_count() const;
-  void _internal_set_multi_query_count(::int32_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.RAGQueryOptions)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 13,
-                          0, 80,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const RAGQueryOptions& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr question_;
-    ::google::protobuf::internal::ArenaStringPtr system_prompt_;
-    ::google::protobuf::internal::ArenaStringPtr scope_prefix_;
-    ::int32_t max_tokens_;
-    float temperature_;
-    float top_p_;
-    ::int32_t top_k_;
-    ::int32_t retrieval_top_k_;
-    float similarity_threshold_;
-    bool stream_;
-    bool disable_thinking_;
-    bool enable_multi_query_;
-    ::int32_t multi_query_count_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_rag_2eproto;
 };
 // -------------------------------------------------------------------
 
@@ -2186,248 +1819,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGSearchResult final : public ::go
     ::int32_t end_offset_;
     ::int32_t token_count_;
     ::google::protobuf::internal::MapField<RAGSearchResult_MetadataEntry_DoNotUse, ::std::string, ::std::string> metadata_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_rag_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryRequest final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.RAGQueryRequest) */ {
- public:
-  inline RAGQueryRequest() : RAGQueryRequest(nullptr) {}
-  ~RAGQueryRequest() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(RAGQueryRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(RAGQueryRequest));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr RAGQueryRequest(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline RAGQueryRequest(const RAGQueryRequest& from) : RAGQueryRequest(nullptr, from) {}
-  inline RAGQueryRequest(RAGQueryRequest&& from) noexcept : RAGQueryRequest(nullptr, ::std::move(from)) {}
-  inline RAGQueryRequest& operator=(const RAGQueryRequest& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline RAGQueryRequest& operator=(RAGQueryRequest&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const RAGQueryRequest& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RAGQueryRequest>(&RAGQueryRequest_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 7;
-  friend void swap(RAGQueryRequest& a, RAGQueryRequest& b) { a.Swap(&b); }
-  inline void Swap(RAGQueryRequest* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(RAGQueryRequest* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] RAGQueryRequest* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<RAGQueryRequest>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const RAGQueryRequest& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const RAGQueryRequest& from) { RAGQueryRequest::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(RAGQueryRequest* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.RAGQueryRequest"; }
-
-  explicit RAGQueryRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  RAGQueryRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const RAGQueryRequest& from);
-  RAGQueryRequest(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, RAGQueryRequest&& from) noexcept
-      : RAGQueryRequest(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kRequestIdFieldNumber = 1,
-    kOptionsFieldNumber = 2,
-    kMetadataFieldNumber = 3,
-  };
-  // string request_id = 1;
-  void clear_request_id() ;
-  [[nodiscard]] const ::std::string& request_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_request_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_request_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
-  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_request_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
-
-  public:
-  // optional .runanywhere.v1.RAGQueryOptions options = 2;
-  [[nodiscard]] bool has_options()
-      const;
-  void clear_options() ;
-  [[nodiscard]] const ::runanywhere::v1::RAGQueryOptions& options() const;
-  [[nodiscard]] ::runanywhere::v1::RAGQueryOptions* PROTOBUF_NULLABLE release_options();
-  ::runanywhere::v1::RAGQueryOptions* PROTOBUF_NONNULL mutable_options();
-  void set_allocated_options(::runanywhere::v1::RAGQueryOptions* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_options(::runanywhere::v1::RAGQueryOptions* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::RAGQueryOptions* PROTOBUF_NULLABLE unsafe_arena_release_options();
-
-  private:
-  const ::runanywhere::v1::RAGQueryOptions& _internal_options() const;
-  ::runanywhere::v1::RAGQueryOptions* PROTOBUF_NONNULL _internal_mutable_options();
-
-  public:
-  // map<string, string> metadata = 3;
-  [[nodiscard]] int metadata_size()
-      const;
-  private:
-  int _internal_metadata_size() const;
-
-  public:
-  void clear_metadata() ;
-  [[nodiscard]] const ::google::protobuf::Map<::std::string, ::std::string>& metadata() const;
-  [[nodiscard]] ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL mutable_metadata();
-
-  private:
-  const ::google::protobuf::Map<::std::string, ::std::string>& _internal_metadata() const;
-  ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL _internal_mutable_metadata();
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.RAGQueryRequest)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<1, 3,
-                          2, 57,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const RAGQueryRequest& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr request_id_;
-    ::runanywhere::v1::RAGQueryOptions* PROTOBUF_NULLABLE options_;
-    ::google::protobuf::internal::MapField<RAGQueryRequest_MetadataEntry_DoNotUse, ::std::string, ::std::string> metadata_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -3992,6 +3383,555 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGStreamEvent final : public ::goo
   union { Impl_ _impl_; };
   friend struct ::TableStruct_rag_2eproto;
 };
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.RAGQueryOptions) */ {
+ public:
+  inline RAGQueryOptions() : RAGQueryOptions(nullptr) {}
+  ~RAGQueryOptions() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(RAGQueryOptions* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(RAGQueryOptions));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr RAGQueryOptions(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline RAGQueryOptions(const RAGQueryOptions& from) : RAGQueryOptions(nullptr, from) {}
+  inline RAGQueryOptions(RAGQueryOptions&& from) noexcept : RAGQueryOptions(nullptr, ::std::move(from)) {}
+  inline RAGQueryOptions& operator=(const RAGQueryOptions& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline RAGQueryOptions& operator=(RAGQueryOptions&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const RAGQueryOptions& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RAGQueryOptions>(&RAGQueryOptions_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 5;
+  friend void swap(RAGQueryOptions& a, RAGQueryOptions& b) { a.Swap(&b); }
+  inline void Swap(RAGQueryOptions* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(RAGQueryOptions* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] RAGQueryOptions* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<RAGQueryOptions>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const RAGQueryOptions& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const RAGQueryOptions& from) { RAGQueryOptions::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(RAGQueryOptions* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.RAGQueryOptions"; }
+
+  explicit RAGQueryOptions(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  RAGQueryOptions(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const RAGQueryOptions& from);
+  RAGQueryOptions(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, RAGQueryOptions&& from) noexcept
+      : RAGQueryOptions(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kQuestionFieldNumber = 1,
+    kScopePrefixFieldNumber = 13,
+    kGenerationFieldNumber = 14,
+    kRetrievalTopKFieldNumber = 7,
+    kSimilarityThresholdFieldNumber = 8,
+    kStreamFieldNumber = 9,
+    kEnableMultiQueryFieldNumber = 11,
+    kMultiQueryCountFieldNumber = 12,
+  };
+  // string question = 1 [(.runanywhere.v1.rac_required) = true];
+  void clear_question() ;
+  [[nodiscard]] const ::std::string& question() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_question(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_question();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_question();
+  void set_allocated_question(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_question() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_question(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_question();
+
+  public:
+  // optional string scope_prefix = 13;
+  [[nodiscard]] bool has_scope_prefix()
+      const;
+  void clear_scope_prefix() ;
+  [[nodiscard]] const ::std::string& scope_prefix() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_scope_prefix(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_scope_prefix();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_scope_prefix();
+  void set_allocated_scope_prefix(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_scope_prefix() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_scope_prefix(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_scope_prefix();
+
+  public:
+  // optional .runanywhere.v1.LLMGenerationOptions generation = 14;
+  [[nodiscard]] bool has_generation()
+      const;
+  void clear_generation() ;
+  [[nodiscard]] const ::runanywhere::v1::LLMGenerationOptions& generation() const;
+  [[nodiscard]] ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE release_generation();
+  ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NONNULL mutable_generation();
+  void set_allocated_generation(::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_generation(::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE unsafe_arena_release_generation();
+
+  private:
+  const ::runanywhere::v1::LLMGenerationOptions& _internal_generation() const;
+  ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NONNULL _internal_mutable_generation();
+
+  public:
+  // int32 retrieval_top_k = 7;
+  void clear_retrieval_top_k() ;
+  [[nodiscard]] ::int32_t retrieval_top_k() const;
+  void set_retrieval_top_k(::int32_t value);
+
+  private:
+  ::int32_t _internal_retrieval_top_k() const;
+  void _internal_set_retrieval_top_k(::int32_t value);
+
+  public:
+  // optional float similarity_threshold = 8;
+  [[nodiscard]] bool has_similarity_threshold()
+      const;
+  void clear_similarity_threshold() ;
+  [[nodiscard]] float similarity_threshold() const;
+  void set_similarity_threshold(float value);
+
+  private:
+  float _internal_similarity_threshold() const;
+  void _internal_set_similarity_threshold(float value);
+
+  public:
+  // bool stream = 9;
+  void clear_stream() ;
+  [[nodiscard]] bool stream() const;
+  void set_stream(bool value);
+
+  private:
+  bool _internal_stream() const;
+  void _internal_set_stream(bool value);
+
+  public:
+  // bool enable_multi_query = 11;
+  void clear_enable_multi_query() ;
+  [[nodiscard]] bool enable_multi_query() const;
+  void set_enable_multi_query(bool value);
+
+  private:
+  bool _internal_enable_multi_query() const;
+  void _internal_set_enable_multi_query(bool value);
+
+  public:
+  // optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
+  [[nodiscard]] bool has_multi_query_count()
+      const;
+  void clear_multi_query_count() ;
+  [[nodiscard]] ::int32_t multi_query_count() const;
+  void set_multi_query_count(::int32_t value);
+
+  private:
+  ::int32_t _internal_multi_query_count() const;
+  void _internal_set_multi_query_count(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.RAGQueryOptions)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<4, 8,
+                          1, 67,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const RAGQueryOptions& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr question_;
+    ::google::protobuf::internal::ArenaStringPtr scope_prefix_;
+    ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE generation_;
+    ::int32_t retrieval_top_k_;
+    float similarity_threshold_;
+    bool stream_;
+    bool enable_multi_query_;
+    ::int32_t multi_query_count_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_rag_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.RAGQueryRequest) */ {
+ public:
+  inline RAGQueryRequest() : RAGQueryRequest(nullptr) {}
+  ~RAGQueryRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(RAGQueryRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(RAGQueryRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr RAGQueryRequest(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline RAGQueryRequest(const RAGQueryRequest& from) : RAGQueryRequest(nullptr, from) {}
+  inline RAGQueryRequest(RAGQueryRequest&& from) noexcept : RAGQueryRequest(nullptr, ::std::move(from)) {}
+  inline RAGQueryRequest& operator=(const RAGQueryRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline RAGQueryRequest& operator=(RAGQueryRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const RAGQueryRequest& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RAGQueryRequest>(&RAGQueryRequest_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 7;
+  friend void swap(RAGQueryRequest& a, RAGQueryRequest& b) { a.Swap(&b); }
+  inline void Swap(RAGQueryRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(RAGQueryRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] RAGQueryRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<RAGQueryRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const RAGQueryRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const RAGQueryRequest& from) { RAGQueryRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(RAGQueryRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.RAGQueryRequest"; }
+
+  explicit RAGQueryRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  RAGQueryRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const RAGQueryRequest& from);
+  RAGQueryRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, RAGQueryRequest&& from) noexcept
+      : RAGQueryRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kRequestIdFieldNumber = 1,
+    kOptionsFieldNumber = 2,
+    kMetadataFieldNumber = 3,
+  };
+  // string request_id = 1;
+  void clear_request_id() ;
+  [[nodiscard]] const ::std::string& request_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_request_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_request_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
+  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_request_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
+
+  public:
+  // optional .runanywhere.v1.RAGQueryOptions options = 2;
+  [[nodiscard]] bool has_options()
+      const;
+  void clear_options() ;
+  [[nodiscard]] const ::runanywhere::v1::RAGQueryOptions& options() const;
+  [[nodiscard]] ::runanywhere::v1::RAGQueryOptions* PROTOBUF_NULLABLE release_options();
+  ::runanywhere::v1::RAGQueryOptions* PROTOBUF_NONNULL mutable_options();
+  void set_allocated_options(::runanywhere::v1::RAGQueryOptions* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_options(::runanywhere::v1::RAGQueryOptions* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::RAGQueryOptions* PROTOBUF_NULLABLE unsafe_arena_release_options();
+
+  private:
+  const ::runanywhere::v1::RAGQueryOptions& _internal_options() const;
+  ::runanywhere::v1::RAGQueryOptions* PROTOBUF_NONNULL _internal_mutable_options();
+
+  public:
+  // map<string, string> metadata = 3;
+  [[nodiscard]] int metadata_size()
+      const;
+  private:
+  int _internal_metadata_size() const;
+
+  public:
+  void clear_metadata() ;
+  [[nodiscard]] const ::google::protobuf::Map<::std::string, ::std::string>& metadata() const;
+  [[nodiscard]] ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL mutable_metadata();
+
+  private:
+  const ::google::protobuf::Map<::std::string, ::std::string>& _internal_metadata() const;
+  ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL _internal_mutable_metadata();
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.RAGQueryRequest)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<1, 3,
+                          2, 57,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const RAGQueryRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr request_id_;
+    ::runanywhere::v1::RAGQueryOptions* PROTOBUF_NULLABLE options_;
+    ::google::protobuf::internal::MapField<RAGQueryRequest_MetadataEntry_DoNotUse, ::std::string, ::std::string> metadata_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_rag_2eproto;
+};
 
 // ===================================================================
 
@@ -5270,7 +5210,7 @@ inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL R
 
 // RAGQueryOptions
 
-// string question = 1;
+// string question = 1 [(.runanywhere.v1.rac_required) = true];
 inline void RAGQueryOptions::clear_question() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.question_.ClearToEmpty();
@@ -5334,175 +5274,104 @@ inline void RAGQueryOptions::set_allocated_question(::std::string* PROTOBUF_NULL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGQueryOptions.question)
 }
 
-// optional string system_prompt = 2;
-inline bool RAGQueryOptions::has_system_prompt() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+// optional .runanywhere.v1.LLMGenerationOptions generation = 14;
+inline bool RAGQueryOptions::has_generation() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  PROTOBUF_ASSUME(!value || _impl_.generation_ != nullptr);
   return value;
 }
-inline void RAGQueryOptions::clear_system_prompt() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.system_prompt_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& RAGQueryOptions::system_prompt() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.system_prompt)
-  return _internal_system_prompt();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void RAGQueryOptions::set_system_prompt(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.system_prompt_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.system_prompt)
-}
-inline ::std::string* PROTOBUF_NONNULL RAGQueryOptions::mutable_system_prompt()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_system_prompt();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGQueryOptions.system_prompt)
-  return _s;
-}
-inline const ::std::string& RAGQueryOptions::_internal_system_prompt() const {
+inline const ::runanywhere::v1::LLMGenerationOptions& RAGQueryOptions::_internal_generation() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.system_prompt_.Get();
+  const ::runanywhere::v1::LLMGenerationOptions* p = _impl_.generation_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::LLMGenerationOptions>(&::runanywhere::v1::LLMGenerationOptions_globals_);
 }
-inline void RAGQueryOptions::_internal_set_system_prompt(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.system_prompt_.Set(value, GetArena());
+inline const ::runanywhere::v1::LLMGenerationOptions& RAGQueryOptions::generation() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.generation)
+  return _internal_generation();
 }
-inline ::std::string* PROTOBUF_NONNULL RAGQueryOptions::_internal_mutable_system_prompt() {
+inline void RAGQueryOptions::unsafe_arena_set_allocated_generation(
+    ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.system_prompt_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE RAGQueryOptions::release_system_prompt() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.RAGQueryOptions.system_prompt)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.generation_);
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.system_prompt_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.system_prompt_.Set("", GetArena());
+  _impl_.generation_ = reinterpret_cast<::runanywhere::v1::LLMGenerationOptions*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.RAGQueryOptions.generation)
+}
+inline ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE RAGQueryOptions::release_generation() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::runanywhere::v1::LLMGenerationOptions* released = _impl_.generation_;
+  _impl_.generation_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
   }
   return released;
 }
-inline void RAGQueryOptions::set_allocated_system_prompt(::std::string* PROTOBUF_NULLABLE value) {
+inline ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE RAGQueryOptions::unsafe_arena_release_generation() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.RAGQueryOptions.generation)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::runanywhere::v1::LLMGenerationOptions* temp = _impl_.generation_;
+  _impl_.generation_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NONNULL RAGQueryOptions::_internal_mutable_generation() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.generation_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::LLMGenerationOptions>(GetArena());
+    _impl_.generation_ = reinterpret_cast<::runanywhere::v1::LLMGenerationOptions*>(p);
+  }
+  return _impl_.generation_;
+}
+inline ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NONNULL RAGQueryOptions::mutable_generation()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::runanywhere::v1::LLMGenerationOptions* _msg = _internal_mutable_generation();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGQueryOptions.generation)
+  return _msg;
+}
+inline void RAGQueryOptions::set_allocated_generation(::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.generation_);
+  }
+
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
-  _impl_.system_prompt_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.system_prompt_.IsDefault()) {
-    _impl_.system_prompt_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGQueryOptions.system_prompt)
-}
 
-// int32 max_tokens = 3 [(.runanywhere.v1.rac_default) = "512"];
-inline void RAGQueryOptions::clear_max_tokens() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_tokens_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline ::int32_t RAGQueryOptions::max_tokens() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.max_tokens)
-  return _internal_max_tokens();
-}
-inline void RAGQueryOptions::set_max_tokens(::int32_t value) {
-  _internal_set_max_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.max_tokens)
-}
-inline ::int32_t RAGQueryOptions::_internal_max_tokens() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.max_tokens_;
-}
-inline void RAGQueryOptions::_internal_set_max_tokens(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.max_tokens_ = value;
-}
-
-// float temperature = 4 [(.runanywhere.v1.rac_default) = "0.7"];
-inline void RAGQueryOptions::clear_temperature() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.temperature_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline float RAGQueryOptions::temperature() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.temperature)
-  return _internal_temperature();
-}
-inline void RAGQueryOptions::set_temperature(float value) {
-  _internal_set_temperature(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.temperature)
-}
-inline float RAGQueryOptions::_internal_temperature() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.temperature_;
-}
-inline void RAGQueryOptions::_internal_set_temperature(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.temperature_ = value;
-}
-
-// float top_p = 5 [(.runanywhere.v1.rac_default) = "1.0"];
-inline void RAGQueryOptions::clear_top_p() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.top_p_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
-}
-inline float RAGQueryOptions::top_p() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.top_p)
-  return _internal_top_p();
-}
-inline void RAGQueryOptions::set_top_p(float value) {
-  _internal_set_top_p(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.top_p)
-}
-inline float RAGQueryOptions::_internal_top_p() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.top_p_;
-}
-inline void RAGQueryOptions::_internal_set_top_p(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.top_p_ = value;
-}
-
-// int32 top_k = 6;
-inline void RAGQueryOptions::clear_top_k() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.top_k_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
-}
-inline ::int32_t RAGQueryOptions::top_k() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.top_k)
-  return _internal_top_k();
-}
-inline void RAGQueryOptions::set_top_k(::int32_t value) {
-  _internal_set_top_k(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.top_k)
-}
-inline ::int32_t RAGQueryOptions::_internal_top_k() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.top_k_;
-}
-inline void RAGQueryOptions::_internal_set_top_k(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.top_k_ = value;
+  _impl_.generation_ = reinterpret_cast<::runanywhere::v1::LLMGenerationOptions*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGQueryOptions.generation)
 }
 
 // int32 retrieval_top_k = 7;
 inline void RAGQueryOptions::clear_retrieval_top_k() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.retrieval_top_k_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline ::int32_t RAGQueryOptions::retrieval_top_k() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.retrieval_top_k)
@@ -5510,7 +5379,7 @@ inline ::int32_t RAGQueryOptions::retrieval_top_k() const {
 }
 inline void RAGQueryOptions::set_retrieval_top_k(::int32_t value) {
   _internal_set_retrieval_top_k(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.retrieval_top_k)
 }
 inline ::int32_t RAGQueryOptions::_internal_retrieval_top_k() const {
@@ -5524,13 +5393,13 @@ inline void RAGQueryOptions::_internal_set_retrieval_top_k(::int32_t value) {
 
 // optional float similarity_threshold = 8;
 inline bool RAGQueryOptions::has_similarity_threshold() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
   return value;
 }
 inline void RAGQueryOptions::clear_similarity_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.similarity_threshold_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline float RAGQueryOptions::similarity_threshold() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.similarity_threshold)
@@ -5538,7 +5407,7 @@ inline float RAGQueryOptions::similarity_threshold() const {
 }
 inline void RAGQueryOptions::set_similarity_threshold(float value) {
   _internal_set_similarity_threshold(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.similarity_threshold)
 }
 inline float RAGQueryOptions::_internal_similarity_threshold() const {
@@ -5554,7 +5423,7 @@ inline void RAGQueryOptions::_internal_set_similarity_threshold(float value) {
 inline void RAGQueryOptions::clear_stream() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.stream_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline bool RAGQueryOptions::stream() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.stream)
@@ -5562,7 +5431,7 @@ inline bool RAGQueryOptions::stream() const {
 }
 inline void RAGQueryOptions::set_stream(bool value) {
   _internal_set_stream(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.stream)
 }
 inline bool RAGQueryOptions::_internal_stream() const {
@@ -5574,35 +5443,11 @@ inline void RAGQueryOptions::_internal_set_stream(bool value) {
   _impl_.stream_ = value;
 }
 
-// bool disable_thinking = 10;
-inline void RAGQueryOptions::clear_disable_thinking() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.disable_thinking_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
-}
-inline bool RAGQueryOptions::disable_thinking() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.disable_thinking)
-  return _internal_disable_thinking();
-}
-inline void RAGQueryOptions::set_disable_thinking(bool value) {
-  _internal_set_disable_thinking(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.disable_thinking)
-}
-inline bool RAGQueryOptions::_internal_disable_thinking() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.disable_thinking_;
-}
-inline void RAGQueryOptions::_internal_set_disable_thinking(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.disable_thinking_ = value;
-}
-
 // bool enable_multi_query = 11;
 inline void RAGQueryOptions::clear_enable_multi_query() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_multi_query_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline bool RAGQueryOptions::enable_multi_query() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.enable_multi_query)
@@ -5610,7 +5455,7 @@ inline bool RAGQueryOptions::enable_multi_query() const {
 }
 inline void RAGQueryOptions::set_enable_multi_query(bool value) {
   _internal_set_enable_multi_query(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.enable_multi_query)
 }
 inline bool RAGQueryOptions::_internal_enable_multi_query() const {
@@ -5624,13 +5469,13 @@ inline void RAGQueryOptions::_internal_set_enable_multi_query(bool value) {
 
 // optional int32 multi_query_count = 12 [(.runanywhere.v1.rac_default) = "3", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8];
 inline bool RAGQueryOptions::has_multi_query_count() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00001000U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
   return value;
 }
 inline void RAGQueryOptions::clear_multi_query_count() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.multi_query_count_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline ::int32_t RAGQueryOptions::multi_query_count() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.RAGQueryOptions.multi_query_count)
@@ -5638,7 +5483,7 @@ inline ::int32_t RAGQueryOptions::multi_query_count() const {
 }
 inline void RAGQueryOptions::set_multi_query_count(::int32_t value) {
   _internal_set_multi_query_count(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.multi_query_count)
 }
 inline ::int32_t RAGQueryOptions::_internal_multi_query_count() const {
@@ -5652,13 +5497,13 @@ inline void RAGQueryOptions::_internal_set_multi_query_count(::int32_t value) {
 
 // optional string scope_prefix = 13;
 inline bool RAGQueryOptions::has_scope_prefix() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   return value;
 }
 inline void RAGQueryOptions::clear_scope_prefix() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.scope_prefix_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline const ::std::string& RAGQueryOptions::scope_prefix() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -5668,13 +5513,13 @@ inline const ::std::string& RAGQueryOptions::scope_prefix() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void RAGQueryOptions::set_scope_prefix(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   _impl_.scope_prefix_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.RAGQueryOptions.scope_prefix)
 }
 inline ::std::string* PROTOBUF_NONNULL RAGQueryOptions::mutable_scope_prefix()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::std::string* _s = _internal_mutable_scope_prefix();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGQueryOptions.scope_prefix)
   return _s;
@@ -5694,10 +5539,10 @@ inline ::std::string* PROTOBUF_NONNULL RAGQueryOptions::_internal_mutable_scope_
 inline ::std::string* PROTOBUF_NULLABLE RAGQueryOptions::release_scope_prefix() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.RAGQueryOptions.scope_prefix)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   auto* released = _impl_.scope_prefix_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.scope_prefix_.Set("", GetArena());
@@ -5707,9 +5552,9 @@ inline ::std::string* PROTOBUF_NULLABLE RAGQueryOptions::release_scope_prefix() 
 inline void RAGQueryOptions::set_allocated_scope_prefix(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
   _impl_.scope_prefix_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.scope_prefix_.IsDefault()) {

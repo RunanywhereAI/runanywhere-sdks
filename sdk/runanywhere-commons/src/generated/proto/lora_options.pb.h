@@ -34,6 +34,7 @@
 #include "google/protobuf/map_entry.h"
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -2799,7 +2800,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoraAdapterCatalogEntry final : pub
   void _internal_set_size_bytes(::int64_t value);
 
   public:
-  // float default_scale = 9;
+  // float default_scale = 9 [(.runanywhere.v1.rac_default) = "1.0"];
   void clear_default_scale() ;
   [[nodiscard]] float default_scale() const;
   void set_default_scale(float value);
@@ -3646,7 +3647,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoRAAdapterConfig final : public ::
   ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_target_modules();
 
   public:
-  // string adapter_path = 1;
+  // string adapter_path = 1 [(.runanywhere.v1.rac_required) = true];
   void clear_adapter_path() ;
   [[nodiscard]] const ::std::string& adapter_path() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -3678,7 +3679,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoRAAdapterConfig final : public ::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_adapter_id();
 
   public:
-  // float scale = 2;
+  // float scale = 2 [(.runanywhere.v1.rac_default) = "1.0"];
   void clear_scale() ;
   [[nodiscard]] float scale() const;
   void set_scale(float value);
@@ -5033,7 +5034,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LoRAApplyRequest final : public ::g
 
 // LoRAAdapterConfig
 
-// string adapter_path = 1;
+// string adapter_path = 1 [(.runanywhere.v1.rac_required) = true];
 inline void LoRAAdapterConfig::clear_adapter_path() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.adapter_path_.ClearToEmpty();
@@ -5097,7 +5098,7 @@ inline void LoRAAdapterConfig::set_allocated_adapter_path(::std::string* PROTOBU
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LoRAAdapterConfig.adapter_path)
 }
 
-// float scale = 2;
+// float scale = 2 [(.runanywhere.v1.rac_default) = "1.0"];
 inline void LoRAAdapterConfig::clear_scale() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.scale_ = 0;
@@ -6078,7 +6079,7 @@ inline void LoraAdapterCatalogEntry::set_allocated_author(::std::string* PROTOBU
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.LoraAdapterCatalogEntry.author)
 }
 
-// float default_scale = 9;
+// float default_scale = 9 [(.runanywhere.v1.rac_default) = "1.0"];
 inline void LoraAdapterCatalogEntry::clear_default_scale() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.default_scale_ = 0;

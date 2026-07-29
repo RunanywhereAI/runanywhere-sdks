@@ -39,6 +39,8 @@
 #include "voice_events.pb.h"
 #include "tts_options.pb.h"
 #include "stt_options.pb.h"
+#include "vad_options.pb.h"
+#include "llm_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -2453,9 +2455,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComposeConfig final : pub
     kDefaultLanguageCodeFieldNumber = 23,
     kSessionConfigFieldNumber = 20,
     kAudioPipelineConfigFieldNumber = 21,
-    kVadSampleRateFieldNumber = 10,
-    kVadFrameLengthFieldNumber = 11,
-    kVadEnergyThresholdFieldNumber = 12,
+    kVadConfigFieldNumber = 24,
+    kLlmGenerationFieldNumber = 25,
   };
   // optional string stt_model_path = 1;
   [[nodiscard]] bool has_stt_model_path()
@@ -2676,42 +2677,44 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComposeConfig final : pub
   ::runanywhere::v1::AudioPipelineConfig* PROTOBUF_NONNULL _internal_mutable_audio_pipeline_config();
 
   public:
-  // int32 vad_sample_rate = 10;
-  void clear_vad_sample_rate() ;
-  [[nodiscard]] ::int32_t vad_sample_rate() const;
-  void set_vad_sample_rate(::int32_t value);
+  // optional .runanywhere.v1.VADConfiguration vad_config = 24;
+  [[nodiscard]] bool has_vad_config()
+      const;
+  void clear_vad_config() ;
+  [[nodiscard]] const ::runanywhere::v1::VADConfiguration& vad_config() const;
+  [[nodiscard]] ::runanywhere::v1::VADConfiguration* PROTOBUF_NULLABLE release_vad_config();
+  ::runanywhere::v1::VADConfiguration* PROTOBUF_NONNULL mutable_vad_config();
+  void set_allocated_vad_config(::runanywhere::v1::VADConfiguration* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_vad_config(::runanywhere::v1::VADConfiguration* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::VADConfiguration* PROTOBUF_NULLABLE unsafe_arena_release_vad_config();
 
   private:
-  ::int32_t _internal_vad_sample_rate() const;
-  void _internal_set_vad_sample_rate(::int32_t value);
+  const ::runanywhere::v1::VADConfiguration& _internal_vad_config() const;
+  ::runanywhere::v1::VADConfiguration* PROTOBUF_NONNULL _internal_mutable_vad_config();
 
   public:
-  // float vad_frame_length = 11;
-  void clear_vad_frame_length() ;
-  [[nodiscard]] float vad_frame_length() const;
-  void set_vad_frame_length(float value);
+  // optional .runanywhere.v1.LLMGenerationOptions llm_generation = 25;
+  [[nodiscard]] bool has_llm_generation()
+      const;
+  void clear_llm_generation() ;
+  [[nodiscard]] const ::runanywhere::v1::LLMGenerationOptions& llm_generation() const;
+  [[nodiscard]] ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE release_llm_generation();
+  ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NONNULL mutable_llm_generation();
+  void set_allocated_llm_generation(::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_llm_generation(::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE unsafe_arena_release_llm_generation();
 
   private:
-  float _internal_vad_frame_length() const;
-  void _internal_set_vad_frame_length(float value);
-
-  public:
-  // float vad_energy_threshold = 12;
-  void clear_vad_energy_threshold() ;
-  [[nodiscard]] float vad_energy_threshold() const;
-  void set_vad_energy_threshold(float value);
-
-  private:
-  float _internal_vad_energy_threshold() const;
-  void _internal_set_vad_energy_threshold(float value);
+  const ::runanywhere::v1::LLMGenerationOptions& _internal_llm_generation() const;
+  ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NONNULL _internal_mutable_llm_generation();
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VoiceAgentComposeConfig)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<5, 16,
-                          2, 214,
+      ::google::protobuf::internal::TcParseTable<4, 15,
+                          4, 206,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2752,9 +2755,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComposeConfig final : pub
     ::google::protobuf::internal::ArenaStringPtr default_language_code_;
     ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE session_config_;
     ::runanywhere::v1::AudioPipelineConfig* PROTOBUF_NULLABLE audio_pipeline_config_;
-    ::int32_t vad_sample_rate_;
-    float vad_frame_length_;
-    float vad_energy_threshold_;
+    ::runanywhere::v1::VADConfiguration* PROTOBUF_NULLABLE vad_config_;
+    ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE llm_generation_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -5208,76 +5210,190 @@ inline void VoiceAgentComposeConfig::set_allocated_tts_voice_name(::std::string*
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentComposeConfig.tts_voice_name)
 }
 
-// int32 vad_sample_rate = 10;
-inline void VoiceAgentComposeConfig::clear_vad_sample_rate() {
+// optional .runanywhere.v1.VADConfiguration vad_config = 24;
+inline bool VoiceAgentComposeConfig::has_vad_config() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00002000U);
+  PROTOBUF_ASSUME(!value || _impl_.vad_config_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::VADConfiguration& VoiceAgentComposeConfig::_internal_vad_config() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::VADConfiguration* p = _impl_.vad_config_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::VADConfiguration>(&::runanywhere::v1::VADConfiguration_globals_);
+}
+inline const ::runanywhere::v1::VADConfiguration& VoiceAgentComposeConfig::vad_config() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.vad_config)
+  return _internal_vad_config();
+}
+inline void VoiceAgentComposeConfig::unsafe_arena_set_allocated_vad_config(
+    ::runanywhere::v1::VADConfiguration* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.vad_sample_rate_ = 0;
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.vad_config_);
+  }
+  _impl_.vad_config_ = reinterpret_cast<::runanywhere::v1::VADConfiguration*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00002000U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VoiceAgentComposeConfig.vad_config)
+}
+inline ::runanywhere::v1::VADConfiguration* PROTOBUF_NULLABLE VoiceAgentComposeConfig::release_vad_config() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
   ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
+  ::runanywhere::v1::VADConfiguration* released = _impl_.vad_config_;
+  _impl_.vad_config_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
 }
-inline ::int32_t VoiceAgentComposeConfig::vad_sample_rate() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.vad_sample_rate)
-  return _internal_vad_sample_rate();
+inline ::runanywhere::v1::VADConfiguration* PROTOBUF_NULLABLE VoiceAgentComposeConfig::unsafe_arena_release_vad_config() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentComposeConfig.vad_config)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
+  ::runanywhere::v1::VADConfiguration* temp = _impl_.vad_config_;
+  _impl_.vad_config_ = nullptr;
+  return temp;
 }
-inline void VoiceAgentComposeConfig::set_vad_sample_rate(::int32_t value) {
-  _internal_set_vad_sample_rate(value);
+inline ::runanywhere::v1::VADConfiguration* PROTOBUF_NONNULL VoiceAgentComposeConfig::_internal_mutable_vad_config() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.vad_config_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::VADConfiguration>(GetArena());
+    _impl_.vad_config_ = reinterpret_cast<::runanywhere::v1::VADConfiguration*>(p);
+  }
+  return _impl_.vad_config_;
+}
+inline ::runanywhere::v1::VADConfiguration* PROTOBUF_NONNULL VoiceAgentComposeConfig::mutable_vad_config()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00002000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComposeConfig.vad_sample_rate)
+  ::runanywhere::v1::VADConfiguration* _msg = _internal_mutable_vad_config();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentComposeConfig.vad_config)
+  return _msg;
 }
-inline ::int32_t VoiceAgentComposeConfig::_internal_vad_sample_rate() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.vad_sample_rate_;
-}
-inline void VoiceAgentComposeConfig::_internal_set_vad_sample_rate(::int32_t value) {
+inline void VoiceAgentComposeConfig::set_allocated_vad_config(::runanywhere::v1::VADConfiguration* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.vad_sample_rate_ = value;
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.vad_config_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00002000U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
+  }
+
+  _impl_.vad_config_ = reinterpret_cast<::runanywhere::v1::VADConfiguration*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentComposeConfig.vad_config)
 }
 
-// float vad_frame_length = 11;
-inline void VoiceAgentComposeConfig::clear_vad_frame_length() {
+// optional .runanywhere.v1.LLMGenerationOptions llm_generation = 25;
+inline bool VoiceAgentComposeConfig::has_llm_generation() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00004000U);
+  PROTOBUF_ASSUME(!value || _impl_.llm_generation_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::LLMGenerationOptions& VoiceAgentComposeConfig::_internal_llm_generation() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::LLMGenerationOptions* p = _impl_.llm_generation_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::LLMGenerationOptions>(&::runanywhere::v1::LLMGenerationOptions_globals_);
+}
+inline const ::runanywhere::v1::LLMGenerationOptions& VoiceAgentComposeConfig::llm_generation() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.llm_generation)
+  return _internal_llm_generation();
+}
+inline void VoiceAgentComposeConfig::unsafe_arena_set_allocated_llm_generation(
+    ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.vad_frame_length_ = 0;
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.llm_generation_);
+  }
+  _impl_.llm_generation_ = reinterpret_cast<::runanywhere::v1::LLMGenerationOptions*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VoiceAgentComposeConfig.llm_generation)
+}
+inline ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE VoiceAgentComposeConfig::release_llm_generation() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
   ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+  ::runanywhere::v1::LLMGenerationOptions* released = _impl_.llm_generation_;
+  _impl_.llm_generation_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
 }
-inline float VoiceAgentComposeConfig::vad_frame_length() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.vad_frame_length)
-  return _internal_vad_frame_length();
-}
-inline void VoiceAgentComposeConfig::set_vad_frame_length(float value) {
-  _internal_set_vad_frame_length(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComposeConfig.vad_frame_length)
-}
-inline float VoiceAgentComposeConfig::_internal_vad_frame_length() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.vad_frame_length_;
-}
-inline void VoiceAgentComposeConfig::_internal_set_vad_frame_length(float value) {
+inline ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE VoiceAgentComposeConfig::unsafe_arena_release_llm_generation() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.vad_frame_length_ = value;
-}
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentComposeConfig.llm_generation)
 
-// float vad_energy_threshold = 12;
-inline void VoiceAgentComposeConfig::clear_vad_energy_threshold() {
+  ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+  ::runanywhere::v1::LLMGenerationOptions* temp = _impl_.llm_generation_;
+  _impl_.llm_generation_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NONNULL VoiceAgentComposeConfig::_internal_mutable_llm_generation() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.vad_energy_threshold_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+  if (_impl_.llm_generation_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::LLMGenerationOptions>(GetArena());
+    _impl_.llm_generation_ = reinterpret_cast<::runanywhere::v1::LLMGenerationOptions*>(p);
+  }
+  return _impl_.llm_generation_;
 }
-inline float VoiceAgentComposeConfig::vad_energy_threshold() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.vad_energy_threshold)
-  return _internal_vad_energy_threshold();
+inline ::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NONNULL VoiceAgentComposeConfig::mutable_llm_generation()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  ::runanywhere::v1::LLMGenerationOptions* _msg = _internal_mutable_llm_generation();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentComposeConfig.llm_generation)
+  return _msg;
 }
-inline void VoiceAgentComposeConfig::set_vad_energy_threshold(float value) {
-  _internal_set_vad_energy_threshold(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComposeConfig.vad_energy_threshold)
-}
-inline float VoiceAgentComposeConfig::_internal_vad_energy_threshold() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.vad_energy_threshold_;
-}
-inline void VoiceAgentComposeConfig::_internal_set_vad_energy_threshold(float value) {
+inline void VoiceAgentComposeConfig::set_allocated_llm_generation(::runanywhere::v1::LLMGenerationOptions* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.vad_energy_threshold_ = value;
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.llm_generation_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+  }
+
+  _impl_.llm_generation_ = reinterpret_cast<::runanywhere::v1::LLMGenerationOptions*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentComposeConfig.llm_generation)
 }
 
 // optional .runanywhere.v1.VoiceSessionConfig session_config = 20;

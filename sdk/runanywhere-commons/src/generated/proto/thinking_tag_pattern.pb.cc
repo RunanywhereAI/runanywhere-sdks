@@ -31,6 +31,8 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
     file_reflection_data[] = {
         // ::runanywhere::v1::ThinkingTagPattern
         {&::_pbi::kDescriptorMethods, &::descriptor_table_thinking_5ftag_5fpattern_2eproto, /* tracker*/ nullptr,},
+        // ::runanywhere::v1::ReasoningOptions
+        {&::_pbi::kDescriptorMethods, &::descriptor_table_thinking_5ftag_5fpattern_2eproto, /* tracker*/ nullptr,},
 };
 }  // namespace
 #endif
@@ -192,10 +194,172 @@ const ::_pbi::ClassData* ThinkingTagPattern_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class ReasoningOptions::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<ReasoningOptions>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_._has_bits_);
+};
+
+constexpr ReasoningOptions::ParseTableT_ ReasoningOptions::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_._has_bits_),
+      0, // no _extensions_
+      3, 24,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967288,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      3,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::ReasoningOptions>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.ReasoningMode mode = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ReasoningOptions, _impl_.mode_), 1>(),
+       {8, 1, 0,
+        PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_.mode_)}},
+      // bool include_in_output = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ReasoningOptions, _impl_.include_in_output_), 2>(),
+       {16, 2, 0,
+        PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_.include_in_output_)}},
+      // optional .runanywhere.v1.ThinkingTagPattern pattern = 3;
+      {::_pbi::TcParser::FastMtS1,
+       {26, 0, 0,
+        PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_.pattern_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // .runanywhere.v1.ReasoningMode mode = 1;
+      {PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_.mode_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // bool include_in_output = 2;
+      {PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_.include_in_output_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // optional .runanywhere.v1.ThinkingTagPattern pattern = 3;
+      {PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_.pattern_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::ThinkingTagPattern>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ThinkingTagPattern_globals_},
+        #endif
+    }},
+    {{
+    }},
+  };
+}
+
+
+inline constexpr ReasoningOptions::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        pattern_{nullptr},
+        mode_{static_cast< ::runanywhere::v1::ReasoningMode >(0)},
+        include_in_output_{false} {}
+
+template <typename>
+constexpr ReasoningOptions::ReasoningOptions(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL ReasoningOptions::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ReasoningOptions(arena);
+}
+constexpr auto ReasoningOptions::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(ReasoningOptions), alignof(ReasoningOptions));
+}
+constexpr auto ReasoningOptions::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &ReasoningOptions::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ReasoningOptions>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ReasoningOptions::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ReasoningOptions>(), &ReasoningOptions::ByteSizeLong,
+              &ReasoningOptions::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[1],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_thinking_5ftag_5fpattern_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct ReasoningOptionsGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr ReasoningOptionsGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 ReasoningOptions_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(ReasoningOptions::InternalGenerateClassData_(
+            _default, &ReasoningOptions_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<ReasoningOptions>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~ReasoningOptionsGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) ReasoningOptions _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<ReasoningOptions>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(ReasoningOptionsGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ReasoningOptionsGlobalsTypeInternal ReasoningOptions_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* ReasoningOptions_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return ReasoningOptions_globals_.GetClassData();
+#else
+  return ReasoningOptions_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 }  // namespace v1
 }  // namespace runanywhere
-static constexpr const ::_pb::EnumDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
-    file_level_enum_descriptors_thinking_5ftag_5fpattern_2eproto = nullptr;
+static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
+    file_level_enum_descriptors_thinking_5ftag_5fpattern_2eproto[1];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_thinking_5ftag_5fpattern_2eproto = nullptr;
 const ::uint32_t
@@ -208,37 +372,54 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ThinkingTagPattern, _impl_.close_tag_),
         0,
         1,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ReasoningOptions, _impl_._has_bits_),
+        6, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ReasoningOptions, _impl_.mode_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ReasoningOptions, _impl_.include_in_output_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ReasoningOptions, _impl_.pattern_),
+        1,
+        2,
+        0,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::ThinkingTagPattern)},
+        {7, sizeof(::runanywhere::v1::ReasoningOptions)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
         &::runanywhere::v1::ThinkingTagPattern_globals_,
+        &::runanywhere::v1::ReasoningOptions_globals_,
 };
 const char descriptor_table_protodef_thinking_5ftag_5fpattern_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\032thinking_tag_pattern.proto\022\016runanywher"
     "e.v1\"9\n\022ThinkingTagPattern\022\020\n\010open_tag\030\001"
-    " \001(\t\022\021\n\tclose_tag\030\002 \001(\tB\222\001\n\027ai.runanywhe"
-    "re.proto.v1B\027ThinkingTagPatternProtoP\001Z<"
-    "github.com/runanywhere/runanywhere-sdks/"
-    "idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanyw"
-    "here.V1\272\002\002RAb\006proto3"
+    " \001(\t\022\021\n\tclose_tag\030\002 \001(\t\"\240\001\n\020ReasoningOpt"
+    "ions\022+\n\004mode\030\001 \001(\0162\035.runanywhere.v1.Reas"
+    "oningMode\022\031\n\021include_in_output\030\002 \001(\010\0228\n\007"
+    "pattern\030\003 \001(\0132\".runanywhere.v1.ThinkingT"
+    "agPatternH\000\210\001\001B\n\n\010_pattern*^\n\rReasoningM"
+    "ode\022\036\n\032REASONING_MODE_UNSPECIFIED\020\000\022\026\n\022R"
+    "EASONING_MODE_OFF\020\001\022\025\n\021REASONING_MODE_ON"
+    "\020\002B\222\001\n\027ai.runanywhere.proto.v1B\027Thinking"
+    "TagPatternProtoP\001Z<github.com/runanywher"
+    "e/runanywhere-sdks/idl/v1;runanywherev1\370"
+    "\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_thinking_5ftag_5fpattern_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_thinking_5ftag_5fpattern_2eproto = {
     false,
     false,
-    260,
+    519,
     descriptor_table_protodef_thinking_5ftag_5fpattern_2eproto,
     "thinking_tag_pattern.proto",
     &descriptor_table_thinking_5ftag_5fpattern_2eproto_once,
     nullptr,
     0,
-    1,
+    2,
     schemas,
     file_message_globals,
     TableStruct_thinking_5ftag_5fpattern_2eproto::offsets,
@@ -247,6 +428,13 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_thinking_5ftag
 };
 namespace runanywhere {
 namespace v1 {
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+ReasoningMode_descriptor() {
+  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_thinking_5ftag_5fpattern_2eproto);
+  return file_level_enum_descriptors_thinking_5ftag_5fpattern_2eproto[0];
+}
+PROTOBUF_CONSTINIT const uint32_t ReasoningMode_internal_data_[] = {
+    196608u, 0u, };
 // ===================================================================
 
 ThinkingTagPattern::ThinkingTagPattern(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
@@ -497,6 +685,283 @@ void ThinkingTagPattern::InternalSwap(ThinkingTagPattern* PROTOBUF_RESTRICT PROT
 }
 
 ::google::protobuf::Metadata ThinkingTagPattern::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+ReasoningOptions::ReasoningOptions(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, ReasoningOptions_get_class_data()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.ReasoningOptions)
+}
+PROTOBUF_NDEBUG_INLINE ReasoningOptions::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::ReasoningOptions& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0} {}
+
+ReasoningOptions::ReasoningOptions(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const ReasoningOptions& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, ReasoningOptions_get_class_data()) {
+
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  ReasoningOptions* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.pattern_ = (CheckHasBit(cached_has_bits, 0x00000001U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.pattern_)
+                : nullptr;
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, mode_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, mode_),
+           offsetof(Impl_, include_in_output_) -
+               offsetof(Impl_, mode_) +
+               sizeof(Impl_::include_in_output_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ReasoningOptions)
+}
+PROTOBUF_NDEBUG_INLINE ReasoningOptions::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0} {}
+
+inline void ReasoningOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, pattern_),
+           0,
+           offsetof(Impl_, include_in_output_) -
+               offsetof(Impl_, pattern_) +
+               sizeof(Impl_::include_in_output_));
+}
+ReasoningOptions::~ReasoningOptions() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.ReasoningOptions)
+  SharedDtor(*this);
+}
+inline void ReasoningOptions::SharedDtor(MessageLite& self) {
+  ReasoningOptions& this_ = static_cast<ReasoningOptions&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  delete this_._impl_.pattern_;
+  this_._impl_.~Impl_();
+}
+
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull ReasoningOptions_class_data_ =
+        ReasoningOptions::InternalGenerateClassData_(ReasoningOptions_globals_._default);
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+ReasoningOptions::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&ReasoningOptions_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(ReasoningOptions_class_data_.tc_table);
+  return ReasoningOptions_class_data_.base();
+}
+#else
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+ReasoningOptions::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&ReasoningOptions_globals_);
+  ::google::protobuf::internal::PrefetchToLocalCache(
+      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&ReasoningOptions_globals_));
+  return ReasoningOptions_globals_.GetClassData();
+}
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_CONSTINIT
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const ReasoningOptions::ParseTableT_
+    ReasoningOptions::_table_ =
+        ReasoningOptions::InternalGenerateParseTable_(ReasoningOptions_class_data_.base());
+#endif  // !PROTOBUF_MESSAGE_GLOBALS
+PROTOBUF_NOINLINE void ReasoningOptions::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.ReasoningOptions)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    ABSL_DCHECK(_impl_.pattern_ != nullptr);
+    _impl_.pattern_->Clear();
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000006U)) {
+    ::memset(&_impl_.mode_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.include_in_output_) -
+        reinterpret_cast<char*>(&_impl_.mode_)) + sizeof(_impl_.include_in_output_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL ReasoningOptions::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const ReasoningOptions& this_ = static_cast<const ReasoningOptions&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL ReasoningOptions::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const ReasoningOptions& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.ReasoningOptions)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // .runanywhere.v1.ReasoningMode mode = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_mode() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          1, this_._internal_mode(), target);
+    }
+  }
+
+  // bool include_in_output = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_include_in_output() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          2, this_._internal_include_in_output(), target);
+    }
+  }
+
+  // optional .runanywhere.v1.ThinkingTagPattern pattern = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        3, *this_._impl_.pattern_, this_._impl_.pattern_->GetCachedSize(), target,
+        stream);
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.ReasoningOptions)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t ReasoningOptions::ByteSizeLong(const MessageLite& base) {
+  const ReasoningOptions& this_ = static_cast<const ReasoningOptions&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t ReasoningOptions::ByteSizeLong() const {
+  const ReasoningOptions& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.ReasoningOptions)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    // optional .runanywhere.v1.ThinkingTagPattern pattern = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.pattern_);
+    }
+    // .runanywhere.v1.ReasoningMode mode = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_mode() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_mode());
+      }
+    }
+    // bool include_in_output = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_include_in_output() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void ReasoningOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                      const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this = static_cast<ReasoningOptions*>(&to_msg);
+  auto& from = static_cast<const ReasoningOptions&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  ::google::protobuf::Arena* arena = _this->GetArena();
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.ReasoningOptions)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      ABSL_DCHECK(from._impl_.pattern_ != nullptr);
+      if (_this->_impl_.pattern_ == nullptr) {
+        _this->_impl_.pattern_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.pattern_);
+      } else {
+        _this->_impl_.pattern_->MergeFrom(*from._impl_.pattern_);
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_mode() != 0) {
+        _this->_impl_.mode_ = from._impl_.mode_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_include_in_output() != 0) {
+        _this->_impl_.include_in_output_ = from._impl_.include_in_output_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void ReasoningOptions::CopyFrom(const ReasoningOptions& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.ReasoningOptions)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void ReasoningOptions::InternalSwap(ReasoningOptions* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_.include_in_output_)
+      + sizeof(ReasoningOptions::_impl_.include_in_output_)
+      - PROTOBUF_FIELD_OFFSET(ReasoningOptions, _impl_.pattern_)>(
+          reinterpret_cast<char*>(&_impl_.pattern_),
+          reinterpret_cast<char*>(&other->_impl_.pattern_));
+}
+
+::google::protobuf::Metadata ReasoningOptions::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

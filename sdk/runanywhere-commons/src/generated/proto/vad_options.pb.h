@@ -1096,23 +1096,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
 
   // accessors -------------------------------------------------------
   enum : int {
-    kThresholdFieldNumber = 1,
     kMinSpeechDurationMsFieldNumber = 2,
     kMinSilenceDurationMsFieldNumber = 3,
     kMaxSpeechDurationMsFieldNumber = 4,
     kIncludeStatisticsFieldNumber = 5,
+    kActivationThresholdFieldNumber = 6,
+    kPrefixPaddingMsFieldNumber = 7,
   };
-  // float threshold = 1;
-  void clear_threshold() ;
-  [[nodiscard]] float threshold() const;
-  void set_threshold(float value);
-
-  private:
-  float _internal_threshold() const;
-  void _internal_set_threshold(float value);
-
-  public:
-  // int32 min_speech_duration_ms = 2;
+  // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "100"];
   void clear_min_speech_duration_ms() ;
   [[nodiscard]] ::int32_t min_speech_duration_ms() const;
   void set_min_speech_duration_ms(::int32_t value);
@@ -1122,7 +1113,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
   void _internal_set_min_speech_duration_ms(::int32_t value);
 
   public:
-  // int32 min_silence_duration_ms = 3;
+  // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "300"];
   void clear_min_silence_duration_ms() ;
   [[nodiscard]] ::int32_t min_silence_duration_ms() const;
   void set_min_silence_duration_ms(::int32_t value);
@@ -1132,7 +1123,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
   void _internal_set_min_silence_duration_ms(::int32_t value);
 
   public:
-  // int32 max_speech_duration_ms = 4;
+  // int32 max_speech_duration_ms = 4 [(.runanywhere.v1.rac_default) = "0"];
   void clear_max_speech_duration_ms() ;
   [[nodiscard]] ::int32_t max_speech_duration_ms() const;
   void set_max_speech_duration_ms(::int32_t value);
@@ -1152,11 +1143,31 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
   void _internal_set_include_statistics(bool value);
 
   public:
+  // float activation_threshold = 6 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  void clear_activation_threshold() ;
+  [[nodiscard]] float activation_threshold() const;
+  void set_activation_threshold(float value);
+
+  private:
+  float _internal_activation_threshold() const;
+  void _internal_set_activation_threshold(float value);
+
+  public:
+  // int32 prefix_padding_ms = 7 [(.runanywhere.v1.rac_default) = "0"];
+  void clear_prefix_padding_ms() ;
+  [[nodiscard]] ::int32_t prefix_padding_ms() const;
+  void set_prefix_padding_ms(::int32_t value);
+
+  private:
+  ::int32_t _internal_prefix_padding_ms() const;
+  void _internal_set_prefix_padding_ms(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VADOptions)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 5,
+      ::google::protobuf::internal::TcParseTable<3, 6,
                           0, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -1185,11 +1196,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADOptions final : public ::google:
         const VADOptions& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    float threshold_;
     ::int32_t min_speech_duration_ms_;
     ::int32_t min_silence_duration_ms_;
     ::int32_t max_speech_duration_ms_;
     bool include_statistics_;
+    float activation_threshold_;
+    ::int32_t prefix_padding_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1349,7 +1361,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
     kModelPathFieldNumber = 8,
     kSampleRateFieldNumber = 2,
     kFrameLengthMsFieldNumber = 3,
-    kThresholdFieldNumber = 4,
+    kActivationThresholdFieldNumber = 4,
     kEnableAutoCalibrationFieldNumber = 5,
     kCalibrationMultiplierFieldNumber = 6,
     kPreferredFrameworkFieldNumber = 7,
@@ -1408,14 +1420,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   void _internal_set_frame_length_ms(::int32_t value);
 
   public:
-  // float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
-  void clear_threshold() ;
-  [[nodiscard]] float threshold() const;
-  void set_threshold(float value);
+  // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  void clear_activation_threshold() ;
+  [[nodiscard]] float activation_threshold() const;
+  void set_activation_threshold(float value);
 
   private:
-  float _internal_threshold() const;
-  void _internal_set_threshold(float value);
+  float _internal_activation_threshold() const;
+  void _internal_set_activation_threshold(float value);
 
   public:
   // bool enable_auto_calibration = 5;
@@ -1507,7 +1519,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
     ::google::protobuf::internal::ArenaStringPtr model_path_;
     ::int32_t sample_rate_;
     ::int32_t frame_length_ms_;
-    float threshold_;
+    float activation_threshold_;
     bool enable_auto_calibration_;
     float calibration_multiplier_;
     int preferred_framework_;
@@ -3121,28 +3133,28 @@ inline void VADConfiguration::_internal_set_frame_length_ms(::int32_t value) {
   _impl_.frame_length_ms_ = value;
 }
 
-// float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
-inline void VADConfiguration::clear_threshold() {
+// float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+inline void VADConfiguration::clear_activation_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.threshold_ = 0;
+  _impl_.activation_threshold_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
-inline float VADConfiguration::threshold() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.threshold)
-  return _internal_threshold();
+inline float VADConfiguration::activation_threshold() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADConfiguration.activation_threshold)
+  return _internal_activation_threshold();
 }
-inline void VADConfiguration::set_threshold(float value) {
-  _internal_set_threshold(value);
+inline void VADConfiguration::set_activation_threshold(float value) {
+  _internal_set_activation_threshold(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.threshold)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADConfiguration.activation_threshold)
 }
-inline float VADConfiguration::_internal_threshold() const {
+inline float VADConfiguration::_internal_activation_threshold() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.threshold_;
+  return _impl_.activation_threshold_;
 }
-inline void VADConfiguration::_internal_set_threshold(float value) {
+inline void VADConfiguration::_internal_set_activation_threshold(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.threshold_ = value;
+  _impl_.activation_threshold_ = value;
 }
 
 // bool enable_auto_calibration = 5;
@@ -3341,35 +3353,35 @@ inline void VADConfiguration::_internal_set_max_speech_duration_ms(::int32_t val
 
 // VADOptions
 
-// float threshold = 1;
-inline void VADOptions::clear_threshold() {
+// float activation_threshold = 6 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+inline void VADOptions::clear_activation_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.threshold_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.activation_threshold_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
-inline float VADOptions::threshold() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.threshold)
-  return _internal_threshold();
+inline float VADOptions::activation_threshold() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.activation_threshold)
+  return _internal_activation_threshold();
 }
-inline void VADOptions::set_threshold(float value) {
-  _internal_set_threshold(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.threshold)
+inline void VADOptions::set_activation_threshold(float value) {
+  _internal_set_activation_threshold(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.activation_threshold)
 }
-inline float VADOptions::_internal_threshold() const {
+inline float VADOptions::_internal_activation_threshold() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.threshold_;
+  return _impl_.activation_threshold_;
 }
-inline void VADOptions::_internal_set_threshold(float value) {
+inline void VADOptions::_internal_set_activation_threshold(float value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.threshold_ = value;
+  _impl_.activation_threshold_ = value;
 }
 
-// int32 min_speech_duration_ms = 2;
+// int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "100"];
 inline void VADOptions::clear_min_speech_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.min_speech_duration_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
 inline ::int32_t VADOptions::min_speech_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.min_speech_duration_ms)
@@ -3377,7 +3389,7 @@ inline ::int32_t VADOptions::min_speech_duration_ms() const {
 }
 inline void VADOptions::set_min_speech_duration_ms(::int32_t value) {
   _internal_set_min_speech_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.min_speech_duration_ms)
 }
 inline ::int32_t VADOptions::_internal_min_speech_duration_ms() const {
@@ -3389,11 +3401,11 @@ inline void VADOptions::_internal_set_min_speech_duration_ms(::int32_t value) {
   _impl_.min_speech_duration_ms_ = value;
 }
 
-// int32 min_silence_duration_ms = 3;
+// int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "300"];
 inline void VADOptions::clear_min_silence_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.min_silence_duration_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline ::int32_t VADOptions::min_silence_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.min_silence_duration_ms)
@@ -3401,7 +3413,7 @@ inline ::int32_t VADOptions::min_silence_duration_ms() const {
 }
 inline void VADOptions::set_min_silence_duration_ms(::int32_t value) {
   _internal_set_min_silence_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.min_silence_duration_ms)
 }
 inline ::int32_t VADOptions::_internal_min_silence_duration_ms() const {
@@ -3413,11 +3425,11 @@ inline void VADOptions::_internal_set_min_silence_duration_ms(::int32_t value) {
   _impl_.min_silence_duration_ms_ = value;
 }
 
-// int32 max_speech_duration_ms = 4;
+// int32 max_speech_duration_ms = 4 [(.runanywhere.v1.rac_default) = "0"];
 inline void VADOptions::clear_max_speech_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_speech_duration_ms_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline ::int32_t VADOptions::max_speech_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.max_speech_duration_ms)
@@ -3425,7 +3437,7 @@ inline ::int32_t VADOptions::max_speech_duration_ms() const {
 }
 inline void VADOptions::set_max_speech_duration_ms(::int32_t value) {
   _internal_set_max_speech_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.max_speech_duration_ms)
 }
 inline ::int32_t VADOptions::_internal_max_speech_duration_ms() const {
@@ -3437,11 +3449,35 @@ inline void VADOptions::_internal_set_max_speech_duration_ms(::int32_t value) {
   _impl_.max_speech_duration_ms_ = value;
 }
 
+// int32 prefix_padding_ms = 7 [(.runanywhere.v1.rac_default) = "0"];
+inline void VADOptions::clear_prefix_padding_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.prefix_padding_ms_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+}
+inline ::int32_t VADOptions::prefix_padding_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.prefix_padding_ms)
+  return _internal_prefix_padding_ms();
+}
+inline void VADOptions::set_prefix_padding_ms(::int32_t value) {
+  _internal_set_prefix_padding_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.prefix_padding_ms)
+}
+inline ::int32_t VADOptions::_internal_prefix_padding_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.prefix_padding_ms_;
+}
+inline void VADOptions::_internal_set_prefix_padding_ms(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.prefix_padding_ms_ = value;
+}
+
 // bool include_statistics = 5;
 inline void VADOptions::clear_include_statistics() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.include_statistics_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 inline bool VADOptions::include_statistics() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADOptions.include_statistics)
@@ -3449,7 +3485,7 @@ inline bool VADOptions::include_statistics() const {
 }
 inline void VADOptions::set_include_statistics(bool value) {
   _internal_set_include_statistics(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADOptions.include_statistics)
 }
 inline bool VADOptions::_internal_include_statistics() const {

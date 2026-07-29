@@ -286,14 +286,14 @@ constexpr VLMResult::ParseTableT_ VLMResult::InternalGenerateParseTable_(const :
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.text_)}},
-      // int32 prompt_tokens = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.prompt_tokens_), 4>(),
+      // int32 input_tokens = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.input_tokens_), 4>(),
        {16, 4, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.prompt_tokens_)}},
-      // int32 completion_tokens = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.completion_tokens_), 5>(),
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.input_tokens_)}},
+      // int32 output_tokens = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.output_tokens_), 5>(),
        {24, 5, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.completion_tokens_)}},
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.output_tokens_)}},
       // int64 total_tokens = 4;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMResult, _impl_.total_tokens_), 6>(),
        {32, 6, 0,
@@ -344,10 +344,10 @@ constexpr VLMResult::ParseTableT_ VLMResult::InternalGenerateParseTable_(const :
     }}, {{
       // string text = 1;
       {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.text_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 prompt_tokens = 2;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.prompt_tokens_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 completion_tokens = 3;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.completion_tokens_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 input_tokens = 2;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.input_tokens_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 output_tokens = 3;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.output_tokens_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int64 total_tokens = 4;
       {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.total_tokens_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // int64 processing_time_ms = 5;
@@ -400,8 +400,8 @@ inline constexpr VLMResult::Impl_::Impl_(
         finish_reason_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        prompt_tokens_{0},
-        completion_tokens_{0},
+        input_tokens_{0},
+        output_tokens_{0},
         total_tokens_{::int64_t{0}},
         processing_time_ms_{::int64_t{0}},
         tokens_per_second_{0},
@@ -1598,12 +1598,12 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
     {
       PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_._has_bits_),
       0, // no _extensions_
-      18, 248,  // max_field_number, fast_idx_mask
+      19, 248,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294705152,  // skipmap
+      4294443072,  // skipmap
       offsetof(ParseTableT_, field_entries),
       18,  // num_field_entries
-      1,  // num_aux_entries
+      2,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -1617,49 +1617,46 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
       {::_pbi::TcParser::FastUS1,
        {10, 1, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.prompt_)}},
-      // int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.max_tokens_), 5>(),
-       {16, 5, 0,
-        PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.max_tokens_)}},
+      // int32 max_output_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.max_output_tokens_), 6>(),
+       {16, 6, 0,
+        PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.max_output_tokens_)}},
       // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
       {::_pbi::TcParser::FastF32S1,
-       {29, 6, 0,
+       {29, 7, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.temperature_)}},
       // float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
-       {37, 7, 0,
+       {37, 8, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.top_p_)}},
       // int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.top_k_), 8>(),
-       {40, 8, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.top_k_), 9>(),
+       {40, 9, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.top_k_)}},
       // repeated string stop_sequences = 6;
       {::_pbi::TcParser::FastUR1,
        {50, 0, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.stop_sequences_)}},
-      // bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMGenerationOptions, _impl_.streaming_enabled_), 12>(),
-       {56, 12, 0,
-        PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.streaming_enabled_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // optional string system_prompt = 8;
       {::_pbi::TcParser::FastUS1,
        {66, 2, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.system_prompt_)}},
       // int32 max_image_size = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.max_image_size_), 9>(),
-       {72, 9, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.max_image_size_), 10>(),
+       {72, 10, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.max_image_size_)}},
       // int32 n_threads = 10;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.n_threads_), 10>(),
-       {80, 10, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.n_threads_), 11>(),
+       {80, 11, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.n_threads_)}},
       // bool use_gpu = 11 [(.runanywhere.v1.rac_default) = "true"];
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMGenerationOptions, _impl_.use_gpu_), 13>(),
        {88, 13, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.use_gpu_)}},
       // .runanywhere.v1.VLMModelFamily model_family = 12;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.model_family_), 11>(),
-       {96, 11, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMGenerationOptions, _impl_.model_family_), 12>(),
+       {96, 12, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.model_family_)}},
       // optional .runanywhere.v1.VLMChatTemplate custom_chat_template = 13;
       {::_pbi::TcParser::FastMtS1,
@@ -1677,7 +1674,7 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
       {::_pbi::TcParser::FastF32S2,
        {389, 16, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.repetition_penalty_)}},
-      // float min_p = 17;
+      // float min_p = 17 [(.runanywhere.v1.rac_default) = "0.0"];
       {::_pbi::TcParser::FastF32S2,
        {397, 17, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.min_p_)}},
@@ -1685,7 +1682,10 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
       {::_pbi::TcParser::FastV8S2,
        {400, 14, 0,
         PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.emit_image_embeddings_)}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // optional .runanywhere.v1.ReasoningOptions reasoning = 19;
+      {::_pbi::TcParser::FastMtS2,
+       {410, 5, 1,
+        PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.reasoning_)}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
@@ -1703,28 +1703,26 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
     }}, {{
       // string prompt = 1;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.prompt_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
-      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.max_tokens_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 max_output_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
+      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.max_output_tokens_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
-      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.temperature_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.temperature_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
-      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.top_p_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.top_p_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
-      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.top_k_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.top_k_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // repeated string stop_sequences = 6;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.stop_sequences_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
-      // bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
-      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.streaming_enabled_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // optional string system_prompt = 8;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.system_prompt_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int32 max_image_size = 9;
-      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.max_image_size_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.max_image_size_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 n_threads = 10;
-      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.n_threads_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.n_threads_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // bool use_gpu = 11 [(.runanywhere.v1.rac_default) = "true"];
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.use_gpu_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // .runanywhere.v1.VLMModelFamily model_family = 12;
-      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.model_family_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.model_family_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional .runanywhere.v1.VLMChatTemplate custom_chat_template = 13;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.custom_chat_template_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // optional string image_marker_override = 14;
@@ -1733,10 +1731,12 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.seed_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // float repetition_penalty = 16 [(.runanywhere.v1.rac_default) = "1.1", (.runanywhere.v1.rac_min_float) = 0];
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.repetition_penalty_), _Internal::kHasBitsOffset + 16, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // float min_p = 17;
+      // float min_p = 17 [(.runanywhere.v1.rac_default) = "0.0"];
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.min_p_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // bool emit_image_embeddings = 18;
       {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.emit_image_embeddings_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // optional .runanywhere.v1.ReasoningOptions reasoning = 19;
+      {PROTOBUF_FIELD_OFFSET(VLMGenerationOptions, _impl_.reasoning_), _Internal::kHasBitsOffset + 5, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -1744,9 +1744,14 @@ constexpr VLMGenerationOptions::ParseTableT_ VLMGenerationOptions::InternalGener
         #else
         {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::VLMChatTemplate_globals_},
         #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::ReasoningOptions>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ReasoningOptions_globals_},
+        #endif
     }},
     {{
-      "\43\6\0\0\0\0\16\0\15\0\0\0\0\0\25\0\0\0\0\0\0\0\0\0"
+      "\43\6\0\0\0\0\16\15\0\0\0\0\0\25\0\0\0\0\0\0\0\0\0\0"
       "runanywhere.v1.VLMGenerationOptions"
       "prompt"
       "stop_sequences"
@@ -1776,14 +1781,14 @@ inline constexpr VLMGenerationOptions::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         custom_chat_template_{nullptr},
-        max_tokens_{0},
+        reasoning_{nullptr},
+        max_output_tokens_{0},
         temperature_{0},
         top_p_{0},
         top_k_{0},
         max_image_size_{0},
         n_threads_{0},
         model_family_{static_cast< ::runanywhere::v1::VLMModelFamily >(0)},
-        streaming_enabled_{false},
         use_gpu_{false},
         emit_image_embeddings_{false},
         seed_{::int64_t{0}},
@@ -2152,12 +2157,11 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_._has_bits_),
         21, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.prompt_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.max_tokens_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.max_output_tokens_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.temperature_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.top_p_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.top_k_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.stop_sequences_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.streaming_enabled_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.system_prompt_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.max_image_size_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.n_threads_),
@@ -2169,24 +2173,25 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.repetition_penalty_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.min_p_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.emit_image_embeddings_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationOptions, _impl_.reasoning_),
         1,
-        5,
         6,
         7,
         8,
-        0,
-        12,
-        2,
         9,
+        0,
+        2,
         10,
-        13,
         11,
+        13,
+        12,
         4,
         3,
         15,
         16,
         17,
         14,
+        5,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMGenerationRequest_MetadataEntry_DoNotUse, _impl_._has_bits_),
         5, // hasbit index offset
@@ -2211,8 +2216,8 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_._has_bits_),
         17, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.text_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.prompt_tokens_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.completion_tokens_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.input_tokens_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.output_tokens_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.total_tokens_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.processing_time_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.tokens_per_second_),
@@ -2313,55 +2318,57 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_vlm_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\021vlm_options.proto\022\016runanywhere.v1\032\021mod"
-    "el_types.proto\032\021rac_options.proto\"\222\001\n\017VL"
-    "MChatTemplate\022\025\n\rtemplate_text\030\001 \001(\t\022\031\n\014"
-    "image_marker\030\002 \001(\tH\000\210\001\001\022\"\n\025default_syste"
-    "m_prompt\030\003 \001(\tH\001\210\001\001B\017\n\r_image_markerB\030\n\026"
-    "_default_system_prompt\"\363\002\n\010VLMImage\022\023\n\tf"
-    "ile_path\030\001 \001(\tH\000\022\021\n\007encoded\030\002 \001(\014H\000\022\021\n\007r"
-    "aw_rgb\030\003 \001(\014H\000\022\020\n\006base64\030\004 \001(\tH\000\022\r\n\005widt"
-    "h\030\005 \001(\005\022\016\n\006height\030\006 \001(\005\022.\n\006format\030\007 \001(\0162"
-    "\036.runanywhere.v1.VLMImageFormat\022\027\n\nmedia"
-    "_type\030\010 \001(\tH\001\210\001\001\022\021\n\004name\030\t \001(\tH\002\210\001\001\022\022\n\ns"
-    "ize_bytes\030\n \001(\003\0228\n\010metadata\030\013 \003(\0132&.runa"
-    "nywhere.v1.VLMImage.MetadataEntry\032/\n\rMet"
-    "adataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\002"
-    "8\001B\010\n\006sourceB\r\n\013_media_typeB\007\n\005_name\"\247\002\n"
-    "\020VLMConfiguration\022\020\n\010model_id\030\001 \001(\t\022\031\n\021m"
-    "ax_image_size_px\030\002 \001(\005\022\022\n\nmax_tokens\030\003 \001"
-    "(\005\022\026\n\016context_length\030\004 \001(\005\022\023\n\013temperatur"
-    "e\030\005 \001(\002\022\032\n\rsystem_prompt\030\006 \001(\tH\000\210\001\001\022\031\n\021s"
-    "treaming_enabled\030\007 \001(\010\022D\n\023preferred_fram"
-    "ework\030\010 \001(\0162\".runanywhere.v1.InferenceFr"
-    "ameworkH\001\210\001\001B\020\n\016_system_promptB\026\n\024_prefe"
-    "rred_framework\"\262\005\n\024VLMGenerationOptions\022"
-    "\016\n\006prompt\030\001 \001(\t\022 \n\nmax_tokens\030\002 \001(\005B\014\212\265\030"
-    "\0042048\240\265\030\000\0222\n\013temperature\030\003 \001(\002B\035\212\265\030\0030.7\261"
-    "\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\000@\022,\n\005top_p\030\004 \001(\002B\035\212\265"
-    "\030\0030.9\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\030\n\005top_k\030\005 \001"
-    "(\005B\t\212\265\030\0010\240\265\030\000\022\026\n\016stop_sequences\030\006 \003(\t\022#\n"
-    "\021streaming_enabled\030\007 \001(\010B\010\212\265\030\004true\022\032\n\rsy"
-    "stem_prompt\030\010 \001(\tH\000\210\001\001\022\026\n\016max_image_size"
-    "\030\t \001(\005\022\021\n\tn_threads\030\n \001(\005\022\031\n\007use_gpu\030\013 \001"
-    "(\010B\010\212\265\030\004true\0224\n\014model_family\030\014 \001(\0162\036.run"
-    "anywhere.v1.VLMModelFamily\022B\n\024custom_cha"
-    "t_template\030\r \001(\0132\037.runanywhere.v1.VLMCha"
-    "tTemplateH\001\210\001\001\022\"\n\025image_marker_override\030"
-    "\016 \001(\tH\002\210\001\001\022\014\n\004seed\030\017 \001(\003\022.\n\022repetition_p"
-    "enalty\030\020 \001(\002B\022\212\265\030\0031.1\261\265\030\000\000\000\000\000\000\000\000\022\r\n\005min_"
-    "p\030\021 \001(\002\022\035\n\025emit_image_embeddings\030\022 \001(\010B\020"
-    "\n\016_system_promptB\027\n\025_custom_chat_templat"
-    "eB\030\n\026_image_marker_override\"\267\002\n\024VLMGener"
-    "ationRequest\022\022\n\nrequest_id\030\001 \001(\t\022(\n\006imag"
-    "es\030\002 \003(\0132\030.runanywhere.v1.VLMImage\022:\n\007op"
-    "tions\030\003 \001(\0132$.runanywhere.v1.VLMGenerati"
-    "onOptionsH\000\210\001\001\022\025\n\010model_id\030\004 \001(\tH\001\210\001\001\022D\n"
-    "\010metadata\030\005 \003(\01322.runanywhere.v1.VLMGene"
-    "rationRequest.MetadataEntry\032/\n\rMetadataE"
-    "ntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\n\n\010"
-    "_optionsB\013\n\t_model_id\"\215\003\n\tVLMResult\022\014\n\004t"
-    "ext\030\001 \001(\t\022\025\n\rprompt_tokens\030\002 \001(\005\022\031\n\021comp"
-    "letion_tokens\030\003 \001(\005\022\024\n\014total_tokens\030\004 \001("
+    "el_types.proto\032\021rac_options.proto\032\032think"
+    "ing_tag_pattern.proto\"\222\001\n\017VLMChatTemplat"
+    "e\022\025\n\rtemplate_text\030\001 \001(\t\022\031\n\014image_marker"
+    "\030\002 \001(\tH\000\210\001\001\022\"\n\025default_system_prompt\030\003 \001"
+    "(\tH\001\210\001\001B\017\n\r_image_markerB\030\n\026_default_sys"
+    "tem_prompt\"\363\002\n\010VLMImage\022\023\n\tfile_path\030\001 \001"
+    "(\tH\000\022\021\n\007encoded\030\002 \001(\014H\000\022\021\n\007raw_rgb\030\003 \001(\014"
+    "H\000\022\020\n\006base64\030\004 \001(\tH\000\022\r\n\005width\030\005 \001(\005\022\016\n\006h"
+    "eight\030\006 \001(\005\022.\n\006format\030\007 \001(\0162\036.runanywher"
+    "e.v1.VLMImageFormat\022\027\n\nmedia_type\030\010 \001(\tH"
+    "\001\210\001\001\022\021\n\004name\030\t \001(\tH\002\210\001\001\022\022\n\nsize_bytes\030\n "
+    "\001(\003\0228\n\010metadata\030\013 \003(\0132&.runanywhere.v1.V"
+    "LMImage.MetadataEntry\032/\n\rMetadataEntry\022\013"
+    "\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\010\n\006source"
+    "B\r\n\013_media_typeB\007\n\005_name\"\247\002\n\020VLMConfigur"
+    "ation\022\020\n\010model_id\030\001 \001(\t\022\031\n\021max_image_siz"
+    "e_px\030\002 \001(\005\022\022\n\nmax_tokens\030\003 \001(\005\022\026\n\016contex"
+    "t_length\030\004 \001(\005\022\023\n\013temperature\030\005 \001(\002\022\032\n\rs"
+    "ystem_prompt\030\006 \001(\tH\000\210\001\001\022\031\n\021streaming_ena"
+    "bled\030\007 \001(\010\022D\n\023preferred_framework\030\010 \001(\0162"
+    "\".runanywhere.v1.InferenceFrameworkH\001\210\001\001"
+    "B\020\n\016_system_promptB\026\n\024_preferred_framewo"
+    "rk\"\353\005\n\024VLMGenerationOptions\022\016\n\006prompt\030\001 "
+    "\001(\t\022\'\n\021max_output_tokens\030\002 \001(\005B\014\212\265\030\0042048"
+    "\240\265\030\000\0222\n\013temperature\030\003 \001(\002B\035\212\265\030\0030.7\261\265\030\000\000\000"
+    "\000\000\000\000\000\271\265\030\000\000\000\000\000\000\000@\022,\n\005top_p\030\004 \001(\002B\035\212\265\030\0030.9"
+    "\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\030\n\005top_k\030\005 \001(\005B\t\212"
+    "\265\030\0010\240\265\030\000\022\026\n\016stop_sequences\030\006 \003(\t\022\032\n\rsyst"
+    "em_prompt\030\010 \001(\tH\000\210\001\001\022\026\n\016max_image_size\030\t"
+    " \001(\005\022\021\n\tn_threads\030\n \001(\005\022\031\n\007use_gpu\030\013 \001(\010"
+    "B\010\212\265\030\004true\0224\n\014model_family\030\014 \001(\0162\036.runan"
+    "ywhere.v1.VLMModelFamily\022B\n\024custom_chat_"
+    "template\030\r \001(\0132\037.runanywhere.v1.VLMChatT"
+    "emplateH\001\210\001\001\022\"\n\025image_marker_override\030\016 "
+    "\001(\tH\002\210\001\001\022\014\n\004seed\030\017 \001(\003\022.\n\022repetition_pen"
+    "alty\030\020 \001(\002B\022\212\265\030\0031.1\261\265\030\000\000\000\000\000\000\000\000\022\026\n\005min_p\030"
+    "\021 \001(\002B\007\212\265\030\0030.0\022\035\n\025emit_image_embeddings\030"
+    "\022 \001(\010\0228\n\treasoning\030\023 \001(\0132 .runanywhere.v"
+    "1.ReasoningOptionsH\003\210\001\001B\020\n\016_system_promp"
+    "tB\027\n\025_custom_chat_templateB\030\n\026_image_mar"
+    "ker_overrideB\014\n\n_reasoningJ\004\010\007\020\010\"\267\002\n\024VLM"
+    "GenerationRequest\022\022\n\nrequest_id\030\001 \001(\t\022(\n"
+    "\006images\030\002 \003(\0132\030.runanywhere.v1.VLMImage\022"
+    ":\n\007options\030\003 \001(\0132$.runanywhere.v1.VLMGen"
+    "erationOptionsH\000\210\001\001\022\025\n\010model_id\030\004 \001(\tH\001\210"
+    "\001\001\022D\n\010metadata\030\005 \003(\01322.runanywhere.v1.VL"
+    "MGenerationRequest.MetadataEntry\032/\n\rMeta"
+    "dataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028"
+    "\001B\n\n\010_optionsB\013\n\t_model_id\"\210\003\n\tVLMResult"
+    "\022\014\n\004text\030\001 \001(\t\022\024\n\014input_tokens\030\002 \001(\005\022\025\n\r"
+    "output_tokens\030\003 \001(\005\022\024\n\014total_tokens\030\004 \001("
     "\003\022\032\n\022processing_time_ms\030\005 \001(\003\022\031\n\021tokens_"
     "per_second\030\006 \001(\002\022\024\n\014image_tokens\030\007 \001(\005\022\036"
     "\n\026time_to_first_token_ms\030\010 \001(\003\022\034\n\024image_"
@@ -2413,20 +2420,21 @@ const char descriptor_table_protodef_vlm_5foptions_2eproto[] ABSL_ATTRIBUTE_SECT
     "V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_vlm_5foptions_2eproto_deps[2] = {
+    descriptor_table_vlm_5foptions_2eproto_deps[3] = {
         &::descriptor_table_model_5ftypes_2eproto,
         &::descriptor_table_rac_5foptions_2eproto,
+        &::descriptor_table_thinking_5ftag_5fpattern_2eproto,
 };
 static ::absl::once_flag descriptor_table_vlm_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_vlm_5foptions_2eproto = {
     false,
     false,
-    3935,
+    4015,
     descriptor_table_protodef_vlm_5foptions_2eproto,
     "vlm_options.proto",
     &descriptor_table_vlm_5foptions_2eproto_once,
     descriptor_table_vlm_5foptions_2eproto_deps,
-    2,
+    3,
     10,
     schemas,
     file_message_globals,
@@ -3706,6 +3714,11 @@ void VLMConfiguration::InternalSwap(VLMConfiguration* PROTOBUF_RESTRICT PROTOBUF
 }
 // ===================================================================
 
+void VLMGenerationOptions::clear_reasoning() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.reasoning_ != nullptr) _impl_.reasoning_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+}
 VLMGenerationOptions::VLMGenerationOptions(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, VLMGenerationOptions_get_class_data()) {
@@ -3750,12 +3763,15 @@ VLMGenerationOptions::VLMGenerationOptions(
   _impl_.custom_chat_template_ = (CheckHasBit(cached_has_bits, 0x00000010U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.custom_chat_template_)
                 : nullptr;
+  _impl_.reasoning_ = (CheckHasBit(cached_has_bits, 0x00000020U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.reasoning_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, max_tokens_),
+               offsetof(Impl_, max_output_tokens_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, max_tokens_),
+               offsetof(Impl_, max_output_tokens_),
            offsetof(Impl_, min_p_) -
-               offsetof(Impl_, max_tokens_) +
+               offsetof(Impl_, max_output_tokens_) +
                sizeof(Impl_::min_p_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VLMGenerationOptions)
@@ -3797,6 +3813,7 @@ inline void VLMGenerationOptions::SharedDtor(MessageLite& self) {
   this_._impl_.system_prompt_.Destroy();
   this_._impl_.image_marker_override_.Destroy();
   delete this_._impl_.custom_chat_template_;
+  delete this_._impl_.reasoning_;
   this_._impl_.~Impl_();
 }
 
@@ -3834,7 +3851,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.stop_sequences_.Clear();
     }
@@ -3851,16 +3868,20 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
       ABSL_DCHECK(_impl_.custom_chat_template_ != nullptr);
       _impl_.custom_chat_template_->Clear();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      ABSL_DCHECK(_impl_.reasoning_ != nullptr);
+      _impl_.reasoning_->Clear();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
-    ::memset(&_impl_.max_tokens_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.top_p_) -
-        reinterpret_cast<char*>(&_impl_.max_tokens_)) + sizeof(_impl_.top_p_));
+  if (BatchCheckHasBit(cached_has_bits, 0x000000c0U)) {
+    ::memset(&_impl_.max_output_tokens_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.temperature_) -
+        reinterpret_cast<char*>(&_impl_.max_output_tokens_)) + sizeof(_impl_.temperature_));
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    ::memset(&_impl_.top_k_, 0, static_cast<::size_t>(
+    ::memset(&_impl_.top_p_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.seed_) -
-        reinterpret_cast<char*>(&_impl_.top_k_)) + sizeof(_impl_.seed_));
+        reinterpret_cast<char*>(&_impl_.top_p_)) + sizeof(_impl_.seed_));
   }
   if (BatchCheckHasBit(cached_has_bits, 0x00030000U)) {
     ::memset(&_impl_.repetition_penalty_, 0, static_cast<::size_t>(
@@ -3900,17 +3921,17 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
 
-  // int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_max_tokens() != 0) {
+  // int32 max_output_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (this_._internal_max_output_tokens() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
-              stream, this_._internal_max_tokens(), target);
+              stream, this_._internal_max_output_tokens(), target);
     }
   }
 
   // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -3919,7 +3940,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
   }
 
   // float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_top_p()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -3928,7 +3949,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
   }
 
   // int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (this_._internal_top_k() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
@@ -3946,15 +3967,6 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
 
-  // bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-    if (this_._internal_streaming_enabled() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          7, this_._internal_streaming_enabled(), target);
-    }
-  }
-
   // optional string system_prompt = 8;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     const ::std::string& _s = this_._internal_system_prompt();
@@ -3964,7 +3976,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
   }
 
   // int32 max_image_size = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
     if (this_._internal_max_image_size() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<9>(
@@ -3973,7 +3985,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
   }
 
   // int32 n_threads = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     if (this_._internal_n_threads() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<10>(
@@ -3991,7 +4003,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
   }
 
   // .runanywhere.v1.VLMModelFamily model_family = 12;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
     if (this_._internal_model_family() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -4032,7 +4044,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
     }
   }
 
-  // float min_p = 17;
+  // float min_p = 17 [(.runanywhere.v1.rac_default) = "0.0"];
   if (CheckHasBit(cached_has_bits, 0x00020000U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_min_p()) != 0) {
       target = stream->EnsureSpace(target);
@@ -4048,6 +4060,13 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
           18, this_._internal_emit_image_embeddings(), target);
     }
+  }
+
+  // optional .runanywhere.v1.ReasoningOptions reasoning = 19;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        19, *this_._impl_.reasoning_, this_._impl_.reasoning_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -4107,59 +4126,58 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.custom_chat_template_);
     }
-    // int32 max_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
+    // optional .runanywhere.v1.ReasoningOptions reasoning = 19;
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_max_tokens() != 0) {
+      total_size += 2 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.reasoning_);
+    }
+    // int32 max_output_tokens = 2 [(.runanywhere.v1.rac_default) = "2048", (.runanywhere.v1.rac_min) = 0];
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (this_._internal_max_output_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_max_tokens());
+            this_._internal_max_output_tokens());
       }
     }
     // float temperature = 3 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 2];
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
-        total_size += 5;
-      }
-    }
-    // float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_top_p()) != 0) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_temperature()) != 0) {
         total_size += 5;
       }
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    // int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
+    // float top_p = 4 [(.runanywhere.v1.rac_default) = "0.9", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_top_p()) != 0) {
+        total_size += 5;
+      }
+    }
+    // int32 top_k = 5 [(.runanywhere.v1.rac_default) = "0", (.runanywhere.v1.rac_min) = 0];
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (this_._internal_top_k() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_top_k());
       }
     }
     // int32 max_image_size = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (this_._internal_max_image_size() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_max_image_size());
       }
     }
     // int32 n_threads = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (this_._internal_n_threads() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_n_threads());
       }
     }
     // .runanywhere.v1.VLMModelFamily model_family = 12;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (this_._internal_model_family() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_model_family());
-      }
-    }
-    // bool streaming_enabled = 7 [(.runanywhere.v1.rac_default) = "true"];
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (this_._internal_streaming_enabled() != 0) {
-        total_size += 2;
       }
     }
     // bool use_gpu = 11 [(.runanywhere.v1.rac_default) = "true"];
@@ -4189,7 +4207,7 @@ PROTOBUF_NOINLINE void VLMGenerationOptions::Clear() {
         total_size += 6;
       }
     }
-    // float min_p = 17;
+    // float min_p = 17 [(.runanywhere.v1.rac_default) = "0.0"];
     if (CheckHasBit(cached_has_bits, 0x00020000U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_min_p()) != 0) {
         total_size += 6;
@@ -4244,45 +4262,48 @@ void VLMGenerationOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_max_tokens() != 0) {
-        _this->_impl_.max_tokens_ = from._impl_.max_tokens_;
+      ABSL_DCHECK(from._impl_.reasoning_ != nullptr);
+      if (_this->_impl_.reasoning_ == nullptr) {
+        _this->_impl_.reasoning_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.reasoning_);
+      } else {
+        _this->_impl_.reasoning_->MergeFrom(*from._impl_.reasoning_);
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_temperature()) != 0) {
-        _this->_impl_.temperature_ = from._impl_.temperature_;
+      if (from._internal_max_output_tokens() != 0) {
+        _this->_impl_.max_output_tokens_ = from._impl_.max_output_tokens_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_top_p()) != 0) {
-        _this->_impl_.top_p_ = from._impl_.top_p_;
+      if (::absl::bit_cast<::uint32_t>(from._internal_temperature()) != 0) {
+        _this->_impl_.temperature_ = from._impl_.temperature_;
       }
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_top_p()) != 0) {
+        _this->_impl_.top_p_ = from._impl_.top_p_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (from._internal_top_k() != 0) {
         _this->_impl_.top_k_ = from._impl_.top_k_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (from._internal_max_image_size() != 0) {
         _this->_impl_.max_image_size_ = from._impl_.max_image_size_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (from._internal_n_threads() != 0) {
         _this->_impl_.n_threads_ = from._impl_.n_threads_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (from._internal_model_family() != 0) {
         _this->_impl_.model_family_ = from._impl_.model_family_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (from._internal_streaming_enabled() != 0) {
-        _this->_impl_.streaming_enabled_ = from._impl_.streaming_enabled_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00002000U)) {
@@ -4801,11 +4822,11 @@ VLMResult::VLMResult(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, prompt_tokens_),
+               offsetof(Impl_, input_tokens_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, prompt_tokens_),
+               offsetof(Impl_, input_tokens_),
            offsetof(Impl_, images_processed_) -
-               offsetof(Impl_, prompt_tokens_) +
+               offsetof(Impl_, input_tokens_) +
                sizeof(Impl_::images_processed_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VLMResult)
@@ -4822,10 +4843,10 @@ PROTOBUF_NDEBUG_INLINE VLMResult::Impl_::Impl_(
 inline void VLMResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, prompt_tokens_),
+               offsetof(Impl_, input_tokens_),
            0,
            offsetof(Impl_, images_processed_) -
-               offsetof(Impl_, prompt_tokens_) +
+               offsetof(Impl_, input_tokens_) +
                sizeof(Impl_::images_processed_));
 }
 VLMResult::~VLMResult() {
@@ -4895,9 +4916,9 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x000000f0U)) {
-    ::memset(&_impl_.prompt_tokens_, 0, static_cast<::size_t>(
+    ::memset(&_impl_.input_tokens_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.processing_time_ms_) -
-        reinterpret_cast<char*>(&_impl_.prompt_tokens_)) + sizeof(_impl_.processing_time_ms_));
+        reinterpret_cast<char*>(&_impl_.input_tokens_)) + sizeof(_impl_.processing_time_ms_));
   }
   if (BatchCheckHasBit(cached_has_bits, 0x00003f00U)) {
     ::memset(&_impl_.tokens_per_second_, 0, static_cast<::size_t>(
@@ -4937,21 +4958,21 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
     }
   }
 
-  // int32 prompt_tokens = 2;
+  // int32 input_tokens = 2;
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_prompt_tokens() != 0) {
+    if (this_._internal_input_tokens() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
-              stream, this_._internal_prompt_tokens(), target);
+              stream, this_._internal_input_tokens(), target);
     }
   }
 
-  // int32 completion_tokens = 3;
+  // int32 output_tokens = 3;
   if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_completion_tokens() != 0) {
+    if (this_._internal_output_tokens() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
-              stream, this_._internal_completion_tokens(), target);
+              stream, this_._internal_output_tokens(), target);
     }
   }
 
@@ -5103,18 +5124,18 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
                                         this_._internal_finish_reason());
       }
     }
-    // int32 prompt_tokens = 2;
+    // int32 input_tokens = 2;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_prompt_tokens() != 0) {
+      if (this_._internal_input_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_prompt_tokens());
+            this_._internal_input_tokens());
       }
     }
-    // int32 completion_tokens = 3;
+    // int32 output_tokens = 3;
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_completion_tokens() != 0) {
+      if (this_._internal_output_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_completion_tokens());
+            this_._internal_output_tokens());
       }
     }
     // int64 total_tokens = 4;
@@ -5218,13 +5239,13 @@ void VLMResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_prompt_tokens() != 0) {
-        _this->_impl_.prompt_tokens_ = from._impl_.prompt_tokens_;
+      if (from._internal_input_tokens() != 0) {
+        _this->_impl_.input_tokens_ = from._impl_.input_tokens_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_completion_tokens() != 0) {
-        _this->_impl_.completion_tokens_ = from._impl_.completion_tokens_;
+      if (from._internal_output_tokens() != 0) {
+        _this->_impl_.output_tokens_ = from._impl_.output_tokens_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
@@ -5296,9 +5317,9 @@ void VLMResult::InternalSwap(VLMResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.images_processed_)
       + sizeof(VLMResult::_impl_.images_processed_)
-      - PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.prompt_tokens_)>(
-          reinterpret_cast<char*>(&_impl_.prompt_tokens_),
-          reinterpret_cast<char*>(&other->_impl_.prompt_tokens_));
+      - PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.input_tokens_)>(
+          reinterpret_cast<char*>(&_impl_.input_tokens_),
+          reinterpret_cast<char*>(&other->_impl_.input_tokens_));
 }
 
 ::google::protobuf::Metadata VLMResult::GetMetadata() const {

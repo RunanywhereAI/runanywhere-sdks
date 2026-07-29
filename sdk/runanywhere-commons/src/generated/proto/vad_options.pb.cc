@@ -605,11 +605,11 @@ constexpr VADOptions::ParseTableT_ VADOptions::InternalGenerateParseTable_(const
     {
       PROTOBUF_FIELD_OFFSET(VADOptions, _impl_._has_bits_),
       0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
+      7, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
+      4294967169,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
+      6,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -620,41 +620,46 @@ constexpr VADOptions::ParseTableT_ VADOptions::InternalGenerateParseTable_(const
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      // float threshold = 1;
-      {::_pbi::TcParser::FastF32S1,
-       {13, 0, 0,
-        PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.threshold_)}},
-      // int32 min_speech_duration_ms = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.min_speech_duration_ms_), 1>(),
-       {16, 1, 0,
+      {::_pbi::TcParser::MiniParse, {}},
+      // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "100"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.min_speech_duration_ms_), 0>(),
+       {16, 0, 0,
         PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_speech_duration_ms_)}},
-      // int32 min_silence_duration_ms = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.min_silence_duration_ms_), 2>(),
-       {24, 2, 0,
+      // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "300"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.min_silence_duration_ms_), 1>(),
+       {24, 1, 0,
         PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_silence_duration_ms_)}},
-      // int32 max_speech_duration_ms = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.max_speech_duration_ms_), 3>(),
-       {32, 3, 0,
+      // int32 max_speech_duration_ms = 4 [(.runanywhere.v1.rac_default) = "0"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.max_speech_duration_ms_), 2>(),
+       {32, 2, 0,
         PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.max_speech_duration_ms_)}},
       // bool include_statistics = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADOptions, _impl_.include_statistics_), 4>(),
-       {40, 4, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADOptions, _impl_.include_statistics_), 3>(),
+       {40, 3, 0,
         PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.include_statistics_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // float activation_threshold = 6 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      {::_pbi::TcParser::FastF32S1,
+       {53, 4, 0,
+        PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.activation_threshold_)}},
+      // int32 prefix_padding_ms = 7 [(.runanywhere.v1.rac_default) = "0"];
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADOptions, _impl_.prefix_padding_ms_), 5>(),
+       {56, 5, 0,
+        PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.prefix_padding_ms_)}},
     }}, {{
       65535, 65535
     }}, {{
-      // float threshold = 1;
-      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.threshold_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int32 min_speech_duration_ms = 2;
-      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_speech_duration_ms_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 min_silence_duration_ms = 3;
-      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_silence_duration_ms_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 max_speech_duration_ms = 4;
-      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.max_speech_duration_ms_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "100"];
+      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_speech_duration_ms_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "300"];
+      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_silence_duration_ms_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 max_speech_duration_ms = 4 [(.runanywhere.v1.rac_default) = "0"];
+      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.max_speech_duration_ms_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // bool include_statistics = 5;
-      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.include_statistics_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.include_statistics_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // float activation_threshold = 6 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.activation_threshold_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // int32 prefix_padding_ms = 7 [(.runanywhere.v1.rac_default) = "0"];
+      {PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.prefix_padding_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     }},
     // no aux_entries
     {{
@@ -667,11 +672,12 @@ inline constexpr VADOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
-        threshold_{0},
         min_speech_duration_ms_{0},
         min_silence_duration_ms_{0},
         max_speech_duration_ms_{0},
-        include_statistics_{false} {}
+        include_statistics_{false},
+        activation_threshold_{0},
+        prefix_padding_ms_{0} {}
 
 template <typename>
 constexpr VADOptions::VADOptions(::_pbi::ConstantInitialized,
@@ -804,10 +810,10 @@ constexpr VADConfiguration::ParseTableT_ VADConfiguration::InternalGenerateParse
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADConfiguration, _impl_.frame_length_ms_), 3>(),
        {24, 3, 0,
         PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.frame_length_ms_)}},
-      // float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
       {::_pbi::TcParser::FastF32S1,
        {37, 4, 0,
-        PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.threshold_)}},
+        PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.activation_threshold_)}},
       // bool enable_auto_calibration = 5;
       {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VADConfiguration, _impl_.enable_auto_calibration_), 5>(),
        {40, 5, 0,
@@ -846,8 +852,8 @@ constexpr VADConfiguration::ParseTableT_ VADConfiguration::InternalGenerateParse
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.sample_rate_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1000];
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.frame_length_ms_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
-      {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.threshold_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+      {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.activation_threshold_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // bool enable_auto_calibration = 5;
       {PROTOBUF_FIELD_OFFSET(VADConfiguration, _impl_.enable_auto_calibration_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
@@ -884,7 +890,7 @@ inline constexpr VADConfiguration::Impl_::Impl_(
             ::_pbi::ConstantInitialized()),
         sample_rate_{0},
         frame_length_ms_{0},
-        threshold_{0},
+        activation_threshold_{0},
         enable_auto_calibration_{false},
         calibration_multiplier_{0},
         preferred_framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)},
@@ -1991,7 +1997,7 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.sample_rate_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.frame_length_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.threshold_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.activation_threshold_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.enable_auto_calibration_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.calibration_multiplier_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADConfiguration, _impl_.preferred_framework_),
@@ -2010,17 +2016,19 @@ const ::uint32_t
         9,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_._has_bits_),
-        8, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.threshold_),
+        9, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.activation_threshold_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.min_speech_duration_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.min_silence_duration_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.max_speech_duration_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.prefix_padding_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADOptions, _impl_.include_statistics_),
+        4,
         0,
         1,
         2,
+        5,
         3,
-        4,
         0x085, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_._has_bits_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADAudioSource, _impl_._oneof_case_[0]),
@@ -2161,14 +2169,14 @@ static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::VADConfiguration)},
         {23, sizeof(::runanywhere::v1::VADOptions)},
-        {36, sizeof(::runanywhere::v1::VADAudioSource)},
-        {53, sizeof(::runanywhere::v1::VADProcessRequest_MetadataEntry_DoNotUse)},
-        {60, sizeof(::runanywhere::v1::VADProcessRequest)},
-        {71, sizeof(::runanywhere::v1::VADResult)},
-        {94, sizeof(::runanywhere::v1::VADStatistics)},
-        {115, sizeof(::runanywhere::v1::SpeechActivityEvent)},
-        {130, sizeof(::runanywhere::v1::VADStreamEvent)},
-        {151, sizeof(::runanywhere::v1::VADServiceState)},
+        {38, sizeof(::runanywhere::v1::VADAudioSource)},
+        {55, sizeof(::runanywhere::v1::VADProcessRequest_MetadataEntry_DoNotUse)},
+        {62, sizeof(::runanywhere::v1::VADProcessRequest)},
+        {73, sizeof(::runanywhere::v1::VADResult)},
+        {96, sizeof(::runanywhere::v1::VADStatistics)},
+        {117, sizeof(::runanywhere::v1::SpeechActivityEvent)},
+        {132, sizeof(::runanywhere::v1::VADStreamEvent)},
+        {153, sizeof(::runanywhere::v1::VADServiceState)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -2186,94 +2194,96 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_vad_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\021vad_options.proto\022\016runanywhere.v1\032\021mod"
-    "el_types.proto\032\021rac_options.proto\"\320\003\n\020VA"
+    "el_types.proto\032\021rac_options.proto\"\333\003\n\020VA"
     "DConfiguration\022\020\n\010model_id\030\001 \001(\t\022(\n\013samp"
     "le_rate\030\002 \001(\005B\023\212\265\030\00516000\240\265\030\001\250\265\030\200\367\002\022)\n\017fr"
-    "ame_length_ms\030\003 \001(\005B\020\212\265\030\003100\240\265\030\001\250\265\030\350\007\0222\n"
-    "\tthreshold\030\004 \001(\002B\037\212\265\030\0050.015\261\265\030\000\000\000\000\000\000\000\000\271\265"
-    "\030\000\000\000\000\000\000\360\?\022\037\n\027enable_auto_calibration\030\005 \001"
-    "(\010\022=\n\026calibration_multiplier\030\006 \001(\002B\035\212\265\030\003"
-    "2.0\261\265\030\000\000\000\000\000\000\370\?\271\265\030\000\000\000\000\000\000\020@\022D\n\023preferred_f"
-    "ramework\030\007 \001(\0162\".runanywhere.v1.Inferenc"
-    "eFrameworkH\000\210\001\001\022\027\n\nmodel_path\030\010 \001(\tH\001\210\001\001"
-    "\022\033\n\023window_size_samples\030\t \001(\005\022\036\n\026max_spe"
-    "ech_duration_ms\030\n \001(\005B\026\n\024_preferred_fram"
-    "eworkB\r\n\013_model_path\"\234\001\n\nVADOptions\022\021\n\tt"
-    "hreshold\030\001 \001(\002\022\036\n\026min_speech_duration_ms"
-    "\030\002 \001(\005\022\037\n\027min_silence_duration_ms\030\003 \001(\005\022"
-    "\036\n\026max_speech_duration_ms\030\004 \001(\005\022\032\n\022inclu"
-    "de_statistics\030\005 \001(\010\"\276\001\n\016VADAudioSource\022\024"
-    "\n\naudio_data\030\001 \001(\014H\000\022\030\n\016adapter_handle\030\002"
-    " \001(\tH\000\0222\n\010encoding\030\003 \001(\0162 .runanywhere.v"
-    "1.VADAudioEncoding\022\023\n\013sample_rate\030\004 \001(\005\022"
-    "\020\n\010channels\030\005 \001(\005\022\027\n\017frame_offset_ms\030\006 \001"
-    "(\003B\010\n\006source\"\227\002\n\021VADProcessRequest\022\022\n\nre"
-    "quest_id\030\001 \001(\t\0222\n\005audio\030\002 \001(\0132\036.runanywh"
-    "ere.v1.VADAudioSourceH\000\210\001\001\0220\n\007options\030\003 "
-    "\001(\0132\032.runanywhere.v1.VADOptionsH\001\210\001\001\022A\n\010"
-    "metadata\030\004 \003(\0132/.runanywhere.v1.VADProce"
-    "ssRequest.MetadataEntry\032/\n\rMetadataEntry"
-    "\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\010\n\006_aud"
-    "ioB\n\n\010_options\"\242\002\n\tVADResult\022\021\n\tis_speec"
-    "h\030\001 \001(\010\022\022\n\nconfidence\030\002 \001(\002\022\016\n\006energy\030\003 "
-    "\001(\002\022\023\n\013duration_ms\030\004 \001(\005\022\024\n\014timestamp_ms"
-    "\030\005 \001(\003\022\025\n\rstart_time_ms\030\006 \001(\003\022\023\n\013end_tim"
-    "e_ms\030\007 \001(\003\0226\n\nstatistics\030\010 \001(\0132\035.runanyw"
-    "here.v1.VADStatisticsH\000\210\001\001\022\032\n\rerror_mess"
-    "age\030\t \001(\tH\001\210\001\001\022\022\n\nerror_code\030\n \001(\005B\r\n\013_s"
-    "tatisticsB\020\n\016_error_message\"\357\001\n\rVADStati"
-    "stics\022\026\n\016current_energy\030\001 \001(\002\022\031\n\021current"
-    "_threshold\030\002 \001(\002\022\025\n\rambient_level\030\003 \001(\002\022"
-    "\022\n\nrecent_avg\030\004 \001(\002\022\022\n\nrecent_max\030\005 \001(\002\022"
-    "\035\n\025total_speech_segments\030\006 \001(\005\022 \n\030total_"
-    "speech_duration_ms\030\007 \001(\003\022\026\n\016average_ener"
-    "gy\030\010 \001(\002\022\023\n\013peak_energy\030\t \001(\002\"\357\001\n\023Speech"
-    "ActivityEvent\0226\n\nevent_type\030\001 \001(\0162\".runa"
-    "nywhere.v1.SpeechActivityKind\022\024\n\014timesta"
-    "mp_ms\030\002 \001(\003\022\023\n\013duration_ms\030\003 \001(\005\022\022\n\nconf"
-    "idence\030\004 \001(\002\022.\n\006result\030\005 \001(\0132\031.runanywhe"
-    "re.v1.VADResultH\000\210\001\001\022\027\n\nsegment_id\030\006 \001(\t"
-    "H\001\210\001\001B\t\n\007_resultB\r\n\013_segment_id\"\206\003\n\016VADS"
-    "treamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us\030"
-    "\002 \001(\003\022\022\n\nrequest_id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162"
-    "\".runanywhere.v1.VADStreamEventKind\022.\n\006r"
-    "esult\030\005 \001(\0132\031.runanywhere.v1.VADResultH\000"
-    "\210\001\001\022:\n\010activity\030\006 \001(\0132#.runanywhere.v1.S"
-    "peechActivityEventH\001\210\001\001\0226\n\nstatistics\030\007 "
-    "\001(\0132\035.runanywhere.v1.VADStatisticsH\002\210\001\001\022"
-    "\032\n\rerror_message\030\010 \001(\tH\003\210\001\001\022\022\n\nerror_cod"
-    "e\030\t \001(\005B\t\n\007_resultB\013\n\t_activityB\r\n\013_stat"
-    "isticsB\020\n\016_error_message\"\365\001\n\017VADServiceS"
-    "tate\022\020\n\010is_ready\030\001 \001(\010\022\030\n\020is_speech_acti"
-    "ve\030\002 \001(\010\022\030\n\020energy_threshold\030\003 \001(\002\022\023\n\013sa"
-    "mple_rate\030\004 \001(\005\022\027\n\017frame_length_ms\030\005 \001(\005"
-    "\022\032\n\rcurrent_model\030\006 \001(\tH\000\210\001\001\022\032\n\rerror_me"
-    "ssage\030\007 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\010 \001(\005B\020\n\016"
-    "_current_modelB\020\n\016_error_message*\254\001\n\022Spe"
-    "echActivityKind\022$\n SPEECH_ACTIVITY_KIND_"
-    "UNSPECIFIED\020\000\022\'\n#SPEECH_ACTIVITY_KIND_SP"
-    "EECH_STARTED\020\001\022%\n!SPEECH_ACTIVITY_KIND_S"
-    "PEECH_ENDED\020\002\022 \n\034SPEECH_ACTIVITY_KIND_ON"
-    "GOING\020\003*|\n\020VADAudioEncoding\022\"\n\036VAD_AUDIO"
-    "_ENCODING_UNSPECIFIED\020\000\022!\n\035VAD_AUDIO_ENC"
-    "ODING_PCM_F32_LE\020\001\022!\n\035VAD_AUDIO_ENCODING"
-    "_PCM_S16_LE\020\002*\270\002\n\022VADStreamEventKind\022%\n!"
-    "VAD_STREAM_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035V"
-    "AD_STREAM_EVENT_KIND_STARTED\020\001\022\037\n\033VAD_ST"
-    "REAM_EVENT_KIND_FRAME\020\002\022)\n%VAD_STREAM_EV"
-    "ENT_KIND_SPEECH_ACTIVITY\020\003\022$\n VAD_STREAM"
-    "_EVENT_KIND_STATISTICS\020\004\022!\n\035VAD_STREAM_E"
-    "VENT_KIND_STOPPED\020\005\022\037\n\033VAD_STREAM_EVENT_"
-    "KIND_ERROR\020\006\022\"\n\036VAD_STREAM_EVENT_KIND_BA"
-    "RGE_IN\020\0072\242\001\n\003VAD\022L\n\014ProcessFrame\022!.runan"
-    "ywhere.v1.VADProcessRequest\032\031.runanywher"
-    "e.v1.VADResult\022M\n\006Stream\022!.runanywhere.v"
-    "1.VADProcessRequest\032\036.runanywhere.v1.VAD"
-    "StreamEvent0\001B\212\001\n\027ai.runanywhere.proto.v"
-    "1B\017VadOptionsProtoP\001Z<github.com/runanyw"
-    "here/runanywhere-sdks/idl/v1;runanywhere"
-    "v1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006prot"
-    "o3"
+    "ame_length_ms\030\003 \001(\005B\020\212\265\030\003100\240\265\030\001\250\265\030\350\007\022=\n"
+    "\024activation_threshold\030\004 \001(\002B\037\212\265\030\0050.015\261\265"
+    "\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\037\n\027enable_auto_cali"
+    "bration\030\005 \001(\010\022=\n\026calibration_multiplier\030"
+    "\006 \001(\002B\035\212\265\030\0032.0\261\265\030\000\000\000\000\000\000\370\?\271\265\030\000\000\000\000\000\000\020@\022D\n\023"
+    "preferred_framework\030\007 \001(\0162\".runanywhere."
+    "v1.InferenceFrameworkH\000\210\001\001\022\027\n\nmodel_path"
+    "\030\010 \001(\tH\001\210\001\001\022\033\n\023window_size_samples\030\t \001(\005"
+    "\022\036\n\026max_speech_duration_ms\030\n \001(\005B\026\n\024_pre"
+    "ferred_frameworkB\r\n\013_model_path\"\200\002\n\nVADO"
+    "ptions\0224\n\024activation_threshold\030\006 \001(\002B\026\261\265"
+    "\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\'\n\026min_speech_durat"
+    "ion_ms\030\002 \001(\005B\007\212\265\030\003100\022(\n\027min_silence_dur"
+    "ation_ms\030\003 \001(\005B\007\212\265\030\003300\022%\n\026max_speech_du"
+    "ration_ms\030\004 \001(\005B\005\212\265\030\0010\022 \n\021prefix_padding"
+    "_ms\030\007 \001(\005B\005\212\265\030\0010\022\032\n\022include_statistics\030\005"
+    " \001(\010J\004\010\001\020\002\"\276\001\n\016VADAudioSource\022\024\n\naudio_d"
+    "ata\030\001 \001(\014H\000\022\030\n\016adapter_handle\030\002 \001(\tH\000\0222\n"
+    "\010encoding\030\003 \001(\0162 .runanywhere.v1.VADAudi"
+    "oEncoding\022\023\n\013sample_rate\030\004 \001(\005\022\020\n\010channe"
+    "ls\030\005 \001(\005\022\027\n\017frame_offset_ms\030\006 \001(\003B\010\n\006sou"
+    "rce\"\227\002\n\021VADProcessRequest\022\022\n\nrequest_id\030"
+    "\001 \001(\t\0222\n\005audio\030\002 \001(\0132\036.runanywhere.v1.VA"
+    "DAudioSourceH\000\210\001\001\0220\n\007options\030\003 \001(\0132\032.run"
+    "anywhere.v1.VADOptionsH\001\210\001\001\022A\n\010metadata\030"
+    "\004 \003(\0132/.runanywhere.v1.VADProcessRequest"
+    ".MetadataEntry\032/\n\rMetadataEntry\022\013\n\003key\030\001"
+    " \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\010\n\006_audioB\n\n\010_op"
+    "tions\"\242\002\n\tVADResult\022\021\n\tis_speech\030\001 \001(\010\022\022"
+    "\n\nconfidence\030\002 \001(\002\022\016\n\006energy\030\003 \001(\002\022\023\n\013du"
+    "ration_ms\030\004 \001(\005\022\024\n\014timestamp_ms\030\005 \001(\003\022\025\n"
+    "\rstart_time_ms\030\006 \001(\003\022\023\n\013end_time_ms\030\007 \001("
+    "\003\0226\n\nstatistics\030\010 \001(\0132\035.runanywhere.v1.V"
+    "ADStatisticsH\000\210\001\001\022\032\n\rerror_message\030\t \001(\t"
+    "H\001\210\001\001\022\022\n\nerror_code\030\n \001(\005B\r\n\013_statistics"
+    "B\020\n\016_error_message\"\357\001\n\rVADStatistics\022\026\n\016"
+    "current_energy\030\001 \001(\002\022\031\n\021current_threshol"
+    "d\030\002 \001(\002\022\025\n\rambient_level\030\003 \001(\002\022\022\n\nrecent"
+    "_avg\030\004 \001(\002\022\022\n\nrecent_max\030\005 \001(\002\022\035\n\025total_"
+    "speech_segments\030\006 \001(\005\022 \n\030total_speech_du"
+    "ration_ms\030\007 \001(\003\022\026\n\016average_energy\030\010 \001(\002\022"
+    "\023\n\013peak_energy\030\t \001(\002\"\357\001\n\023SpeechActivityE"
+    "vent\0226\n\nevent_type\030\001 \001(\0162\".runanywhere.v"
+    "1.SpeechActivityKind\022\024\n\014timestamp_ms\030\002 \001"
+    "(\003\022\023\n\013duration_ms\030\003 \001(\005\022\022\n\nconfidence\030\004 "
+    "\001(\002\022.\n\006result\030\005 \001(\0132\031.runanywhere.v1.VAD"
+    "ResultH\000\210\001\001\022\027\n\nsegment_id\030\006 \001(\tH\001\210\001\001B\t\n\007"
+    "_resultB\r\n\013_segment_id\"\206\003\n\016VADStreamEven"
+    "t\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\n"
+    "request_id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162\".runanyw"
+    "here.v1.VADStreamEventKind\022.\n\006result\030\005 \001"
+    "(\0132\031.runanywhere.v1.VADResultH\000\210\001\001\022:\n\010ac"
+    "tivity\030\006 \001(\0132#.runanywhere.v1.SpeechActi"
+    "vityEventH\001\210\001\001\0226\n\nstatistics\030\007 \001(\0132\035.run"
+    "anywhere.v1.VADStatisticsH\002\210\001\001\022\032\n\rerror_"
+    "message\030\010 \001(\tH\003\210\001\001\022\022\n\nerror_code\030\t \001(\005B\t"
+    "\n\007_resultB\013\n\t_activityB\r\n\013_statisticsB\020\n"
+    "\016_error_message\"\365\001\n\017VADServiceState\022\020\n\010i"
+    "s_ready\030\001 \001(\010\022\030\n\020is_speech_active\030\002 \001(\010\022"
+    "\030\n\020energy_threshold\030\003 \001(\002\022\023\n\013sample_rate"
+    "\030\004 \001(\005\022\027\n\017frame_length_ms\030\005 \001(\005\022\032\n\rcurre"
+    "nt_model\030\006 \001(\tH\000\210\001\001\022\032\n\rerror_message\030\007 \001"
+    "(\tH\001\210\001\001\022\022\n\nerror_code\030\010 \001(\005B\020\n\016_current_"
+    "modelB\020\n\016_error_message*\254\001\n\022SpeechActivi"
+    "tyKind\022$\n SPEECH_ACTIVITY_KIND_UNSPECIFI"
+    "ED\020\000\022\'\n#SPEECH_ACTIVITY_KIND_SPEECH_STAR"
+    "TED\020\001\022%\n!SPEECH_ACTIVITY_KIND_SPEECH_END"
+    "ED\020\002\022 \n\034SPEECH_ACTIVITY_KIND_ONGOING\020\003*|"
+    "\n\020VADAudioEncoding\022\"\n\036VAD_AUDIO_ENCODING"
+    "_UNSPECIFIED\020\000\022!\n\035VAD_AUDIO_ENCODING_PCM"
+    "_F32_LE\020\001\022!\n\035VAD_AUDIO_ENCODING_PCM_S16_"
+    "LE\020\002*\270\002\n\022VADStreamEventKind\022%\n!VAD_STREA"
+    "M_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035VAD_STREAM"
+    "_EVENT_KIND_STARTED\020\001\022\037\n\033VAD_STREAM_EVEN"
+    "T_KIND_FRAME\020\002\022)\n%VAD_STREAM_EVENT_KIND_"
+    "SPEECH_ACTIVITY\020\003\022$\n VAD_STREAM_EVENT_KI"
+    "ND_STATISTICS\020\004\022!\n\035VAD_STREAM_EVENT_KIND"
+    "_STOPPED\020\005\022\037\n\033VAD_STREAM_EVENT_KIND_ERRO"
+    "R\020\006\022\"\n\036VAD_STREAM_EVENT_KIND_BARGE_IN\020\0072"
+    "\242\001\n\003VAD\022L\n\014ProcessFrame\022!.runanywhere.v1"
+    ".VADProcessRequest\032\031.runanywhere.v1.VADR"
+    "esult\022M\n\006Stream\022!.runanywhere.v1.VADProc"
+    "essRequest\032\036.runanywhere.v1.VADStreamEve"
+    "nt0\001B\212\001\n\027ai.runanywhere.proto.v1B\017VadOpt"
+    "ionsProtoP\001Z<github.com/runanywhere/runa"
+    "nywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004R"
+    "AV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_vad_5foptions_2eproto_deps[2] = {
@@ -2284,7 +2294,7 @@ static ::absl::once_flag descriptor_table_vad_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_vad_5foptions_2eproto = {
     false,
     false,
-    3522,
+    3633,
     descriptor_table_protodef_vad_5foptions_2eproto,
     "vad_options.proto",
     &descriptor_table_vad_5foptions_2eproto_once,
@@ -2499,12 +2509,12 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
     }
   }
 
-  // float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_threshold()) != 0) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_activation_threshold()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          4, this_._internal_threshold(), target);
+          4, this_._internal_activation_threshold(), target);
     }
   }
 
@@ -2611,9 +2621,9 @@ PROTOBUF_NOINLINE void VADConfiguration::Clear() {
             this_._internal_frame_length_ms());
       }
     }
-    // float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+    // float activation_threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_threshold()) != 0) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_activation_threshold()) != 0) {
         total_size += 5;
       }
     }
@@ -2692,8 +2702,8 @@ void VADConfiguration::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_threshold()) != 0) {
-        _this->_impl_.threshold_ = from._impl_.threshold_;
+      if (::absl::bit_cast<::uint32_t>(from._internal_activation_threshold()) != 0) {
+        _this->_impl_.activation_threshold_ = from._impl_.activation_threshold_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
@@ -2784,11 +2794,11 @@ PROTOBUF_NDEBUG_INLINE VADOptions::Impl_::Impl_(
 inline void VADOptions::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, threshold_),
+               offsetof(Impl_, min_speech_duration_ms_),
            0,
-           offsetof(Impl_, include_statistics_) -
-               offsetof(Impl_, threshold_) +
-               sizeof(Impl_::include_statistics_));
+           offsetof(Impl_, prefix_padding_ms_) -
+               offsetof(Impl_, min_speech_duration_ms_) +
+               sizeof(Impl_::prefix_padding_ms_));
 }
 VADOptions::~VADOptions() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VADOptions)
@@ -2838,10 +2848,10 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    ::memset(&_impl_.threshold_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.include_statistics_) -
-        reinterpret_cast<char*>(&_impl_.threshold_)) + sizeof(_impl_.include_statistics_));
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    ::memset(&_impl_.min_speech_duration_ms_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.prefix_padding_ms_) -
+        reinterpret_cast<char*>(&_impl_.min_speech_duration_ms_)) + sizeof(_impl_.prefix_padding_ms_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -2866,17 +2876,8 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // float threshold = 1;
+  // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "100"];
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_threshold()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          1, this_._internal_threshold(), target);
-    }
-  }
-
-  // int32 min_speech_duration_ms = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_min_speech_duration_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
@@ -2884,8 +2885,8 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
     }
   }
 
-  // int32 min_silence_duration_ms = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "300"];
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_min_silence_duration_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
@@ -2893,8 +2894,8 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
     }
   }
 
-  // int32 max_speech_duration_ms = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  // int32 max_speech_duration_ms = 4 [(.runanywhere.v1.rac_default) = "0"];
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_max_speech_duration_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
@@ -2903,11 +2904,29 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
   }
 
   // bool include_statistics = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_include_statistics() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
           5, this_._internal_include_statistics(), target);
+    }
+  }
+
+  // float activation_threshold = 6 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_activation_threshold()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteFloatToArray(
+          6, this_._internal_activation_threshold(), target);
+    }
+  }
+
+  // int32 prefix_padding_ms = 7 [(.runanywhere.v1.rac_default) = "0"];
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_prefix_padding_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
+              stream, this_._internal_prefix_padding_ms(), target);
     }
   }
 
@@ -2936,38 +2955,45 @@ PROTOBUF_NOINLINE void VADOptions::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    // float threshold = 1;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    // int32 min_speech_duration_ms = 2 [(.runanywhere.v1.rac_default) = "100"];
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_threshold()) != 0) {
-        total_size += 5;
-      }
-    }
-    // int32 min_speech_duration_ms = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_min_speech_duration_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_min_speech_duration_ms());
       }
     }
-    // int32 min_silence_duration_ms = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    // int32 min_silence_duration_ms = 3 [(.runanywhere.v1.rac_default) = "300"];
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_min_silence_duration_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_min_silence_duration_ms());
       }
     }
-    // int32 max_speech_duration_ms = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    // int32 max_speech_duration_ms = 4 [(.runanywhere.v1.rac_default) = "0"];
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_max_speech_duration_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_max_speech_duration_ms());
       }
     }
     // bool include_statistics = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_include_statistics() != 0) {
         total_size += 2;
+      }
+    }
+    // float activation_threshold = 6 [(.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_activation_threshold()) != 0) {
+        total_size += 5;
+      }
+    }
+    // int32 prefix_padding_ms = 7 [(.runanywhere.v1.rac_default) = "0"];
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_prefix_padding_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_prefix_padding_ms());
       }
     }
   }
@@ -2988,30 +3014,35 @@ void VADOptions::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_threshold()) != 0) {
-        _this->_impl_.threshold_ = from._impl_.threshold_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (from._internal_min_speech_duration_ms() != 0) {
         _this->_impl_.min_speech_duration_ms_ = from._impl_.min_speech_duration_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (from._internal_min_silence_duration_ms() != 0) {
         _this->_impl_.min_silence_duration_ms_ = from._impl_.min_silence_duration_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_max_speech_duration_ms() != 0) {
         _this->_impl_.max_speech_duration_ms_ = from._impl_.max_speech_duration_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_include_statistics() != 0) {
         _this->_impl_.include_statistics_ = from._impl_.include_statistics_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_activation_threshold()) != 0) {
+        _this->_impl_.activation_threshold_ = from._impl_.activation_threshold_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_prefix_padding_ms() != 0) {
+        _this->_impl_.prefix_padding_ms_ = from._impl_.prefix_padding_ms_;
       }
     }
   }
@@ -3033,11 +3064,11 @@ void VADOptions::InternalSwap(VADOptions* PROTOBUF_RESTRICT PROTOBUF_NONNULL oth
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.include_statistics_)
-      + sizeof(VADOptions::_impl_.include_statistics_)
-      - PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.threshold_)>(
-          reinterpret_cast<char*>(&_impl_.threshold_),
-          reinterpret_cast<char*>(&other->_impl_.threshold_));
+      PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.prefix_padding_ms_)
+      + sizeof(VADOptions::_impl_.prefix_padding_ms_)
+      - PROTOBUF_FIELD_OFFSET(VADOptions, _impl_.min_speech_duration_ms_)>(
+          reinterpret_cast<char*>(&_impl_.min_speech_duration_ms_),
+          reinterpret_cast<char*>(&other->_impl_.min_speech_duration_ms_));
 }
 
 ::google::protobuf::Metadata VADOptions::GetMetadata() const {
