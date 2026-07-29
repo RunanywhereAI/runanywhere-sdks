@@ -438,12 +438,11 @@ for ABI in "${ABIS[@]}"; do
         CMAKE_CONFIGURE_ARGS+=("-DRAC_BACKEND_QHEXRT=OFF" "-UQHEXRT_ROOT")
     fi
     cmake "${CMAKE_CONFIGURE_ARGS[@]}"
-    # Use CMake's generator-agnostic --parallel, CAPPED (repo resource
-    # discipline: a bare --parallel spawns one heavy compiler per core and
-    # has OOM-crashed dev laptops). Override with RAC_BUILD_JOBS if needed.
-    # (Ninja rejects a bare `-j`,
-    # while Make accepts it). Lets CMake pick a sensible default job count.
-    cmake --build --preset "${PRESET}" --parallel "${RAC_BUILD_JOBS:-2}"
+    # Full host parallelism by default (repo resource discipline: builds use
+    # full local capacity; scale down with RAC_BUILD_JOBS only under real
+    # memory/thermal pressure).
+    DEFAULT_JOBS="$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)"
+    cmake --build --preset "${PRESET}" --parallel "${RAC_BUILD_JOBS:-${DEFAULT_JOBS}}"
 
     BUILD_DIR="${REPO_ROOT}/build/${PRESET}"
     KOTLIN_DEST="${KOTLIN_JNI_DEST}/${ABI}"

@@ -15,6 +15,8 @@ fi
 
 have() { command -v "$1" >/dev/null 2>&1; }
 
+jobs_count() { nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4; }
+
 show_help() {
     cat <<EOF
 
@@ -191,9 +193,9 @@ cmd_example_android() {
     local stage="${ANDROID_EXAMPLE_DIR}/scripts/stage-sdk-aars.sh"
     case "${1:-}" in
         stage)    bash "${stage}" release ;;
-        build)    bash "${stage}" release && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew --max-workers=2 :app:assembleDebug) ;;
+        build)    bash "${stage}" release && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew --max-workers="$(jobs_count)" :app:assembleDebug) ;;
         install)  bash "${stage}" release \
-                    && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew --max-workers=2 :app:installDebug) \
+                    && (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew --max-workers="$(jobs_count)" :app:installDebug) \
                     && adb shell am start -n com.runanywhere.runanywhereai/com.runanywhere.runanywhereai.MainActivity ;;
         lint)     (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew :app:ktlintCheck :app:detekt) ;;
         clean)    (cd "${ANDROID_EXAMPLE_DIR}" && ./gradlew clean) ;;
