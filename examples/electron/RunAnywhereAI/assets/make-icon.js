@@ -5,7 +5,7 @@
 // that exact SVG instead of drawing our own glyph. Electron does the rasterizing
 // (already a devDependency of the SDK); the ICO container is written by hand.
 //
-//   npm run icon        (from apps/desktop)
+//   npm run icon        (from examples/electron/RunAnywhereAI)
 const fs = require('fs');
 const path = require('path');
 
