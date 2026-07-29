@@ -36,7 +36,7 @@ test('two-phase init exposes ready-state and emits lifecycle + telemetry events'
     let genResult = null;
     const off2 = RunAnywhere.events.on((e) => { if (e.type === 'generation') genResult = e.result; });
     // eslint-disable-next-line no-unused-vars
-    for await (const _e of llm.generateStream('Say hi in one short sentence.', { maxTokens: 16 })) {
+    for await (const _e of llm.generateStream('Say hi in one short sentence.', { maxOutputTokens: 16 })) {
       /* drain the stream */
     }
     off2();

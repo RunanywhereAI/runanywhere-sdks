@@ -27,17 +27,10 @@ import { SDKException } from './errors';
 import { bus } from './events';
 import type { EventBus } from './events';
 
-/** Per-request generation controls (all optional). */
-export interface GenerateOptions {
-  maxTokens?: number;
-  temperature?: number;
-  topP?: number;
-  topK?: number;
-  /** System instruction passed to the backend for this request. */
-  systemPrompt?: string;
-  /** Raw GBNF grammar to constrain decoding (advanced; see generateObject). */
-  grammar?: string;
-}
+import { toNativeGenerateOptions } from './options';
+import type { GenerateOptions } from './options';
+
+export type { GenerateOptions } from './options';
 
 /** Options for schema-constrained structured generation. */
 export interface GenerateObjectOptions extends GenerateOptions {
@@ -78,7 +71,8 @@ export class LLMModel {
   constructor(private readonly handle: number) {}
   /** Stream the completion token-by-token. */
   generate(prompt: string, options: GenerateOptions = {}): AsyncIterableIterator<string> {
-    return toAsyncIterable((onToken) => addon.generate(this.handle, prompt, options, onToken));
+    const native = toNativeGenerateOptions(options);
+    return toAsyncIterable((onToken) => addon.generate(this.handle, prompt, native, onToken));
   }
   /**
    * Stream generation as events with metrics (mirrors the other SDKs'
@@ -222,8 +216,8 @@ export class TTSVoice {
 }
 
 export interface VadOptions {
-  /** Energy threshold in [0,1] for the built-in energy VAD (default ~0.015). */
-  threshold?: number;
+  /** Energy activation threshold in [0,1] for the built-in energy VAD (default ~0.015). */
+  activationThreshold?: number;
 }
 
 /**
@@ -240,9 +234,9 @@ export class Vad {
   isSpeechActive(): boolean {
     return addon.vadIsActive(this.handle);
   }
-  /** Adjust the energy threshold. */
-  setThreshold(threshold: number): void {
-    addon.vadSetThreshold(this.handle, threshold);
+  /** Adjust the energy activation threshold. */
+  setActivationThreshold(activationThreshold: number): void {
+    addon.vadSetThreshold(this.handle, activationThreshold);
   }
   /** Reset detector state (e.g. between utterances). */
   reset(): void {
@@ -380,7 +374,7 @@ export const RunAnywhere = {
 
   /** Create a voice activity detector (built-in energy VAD; requires initialize()). */
   createVad(opts: VadOptions = {}): Vad {
-    return new Vad(addon.createVad(opts.threshold));
+    return new Vad(addon.createVad(opts.activationThreshold));
   },
 
   /**

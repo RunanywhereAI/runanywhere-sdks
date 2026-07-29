@@ -71,9 +71,9 @@ test('RagSession accepts full doc/query objects verbatim', async () => {
   const b = fakeBridge();
   const s = await RagSession.create(b, { embeddingModelId: 'minilm' });
   await s.ingest({ text: 'body', id: 'doc1', sourceUri: 'file://x' });
-  await s.query({ question: 'q', maxTokens: 128, retrievalTopK: 4 });
+  await s.query({ question: 'q', generation: { maxOutputTokens: 128 }, retrievalTopK: 4 });
   assert.deepEqual(b.calls[1][2], { text: 'body', id: 'doc1', sourceUri: 'file://x' });
-  assert.deepEqual(b.calls[2][2], { question: 'q', maxTokens: 128, retrievalTopK: 4 });
+  assert.deepEqual(b.calls[2][2], { question: 'q', generation: { maxOutputTokens: 128 }, retrievalTopK: 4 });
 });
 
 test('RagSession.close is idempotent and blocks further use', async () => {
@@ -109,10 +109,12 @@ test('vendored proto codec round-trips RAGConfiguration', () => {
 
 test('vendored proto codec round-trips RAGQueryOptions + RAGResult', () => {
   const q = RAGQueryOptions.decode(
-    RAGQueryOptions.encode(RAGQueryOptions.fromPartial({ question: 'capital of France?', maxTokens: 64 })).finish()
+    RAGQueryOptions.encode(
+      RAGQueryOptions.fromPartial({ question: 'capital of France?', generation: { maxOutputTokens: 64 } })
+    ).finish()
   );
   assert.equal(q.question, 'capital of France?');
-  assert.equal(q.maxTokens, 64);
+  assert.equal(q.generation.maxOutputTokens, 64);
 
   const r = RAGResult.decode(
     RAGResult.encode(RAGResult.fromPartial({ answer: 'Paris.', retrievedChunks: [{ chunkId: 'c1', text: 'France…', similarityScore: 0.9 }] })).finish()

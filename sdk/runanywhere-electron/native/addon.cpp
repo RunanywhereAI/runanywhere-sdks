@@ -22,7 +22,11 @@
 #include <unordered_map>
 #include <vector>
 
+#ifdef _WIN32
 #include "win32_platform_adapter.h"
+#else
+#include "posix_platform_adapter.h"
+#endif
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_types.h"
@@ -194,7 +198,11 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
     std::string base =
         (info.Length() > 1 && info[1].IsString()) ? info[1].As<Napi::String>().Utf8Value() : secure;
 
+#ifdef _WIN32
     rac_electron_fill_win32_adapter(&g_adapter, secure.c_str());
+#else
+    rac_electron_fill_posix_adapter(&g_adapter, secure.c_str());
+#endif
 
     rac_config_t cfg;
     std::memset(&cfg, 0, sizeof(cfg));

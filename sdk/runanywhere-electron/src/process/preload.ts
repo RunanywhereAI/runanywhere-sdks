@@ -21,6 +21,8 @@ import type { RagConfig, RagDoc, RagQuery, RagResult, RagStats } from '../rag';
 import type { JsonSchema } from '../grammar';
 import { toolCallSchema, toolCallPrompt, parseStructured } from '../structured';
 import type { ToolSpec } from '../structured';
+import { toNativeGenerateOptions } from '../options';
+import type { GenerateOptions } from '../options';
 import { toAsyncIterable, streamWithMetrics } from '../stream';
 import type { LLMStreamEvent } from '../stream';
 import { bus } from '../events';
@@ -136,22 +138,27 @@ contextBridge.exposeInMainWorld('runanywhere', {
   generate: (
     handle: number,
     prompt: string,
-    optionsOrOnToken: Record<string, unknown> | ((t: string) => void),
+    optionsOrOnToken: GenerateOptions | ((t: string) => void),
     onToken?: (t: string) => void
   ) =>
     typeof optionsOrOnToken === 'function'
       ? send('generate', [handle, prompt], optionsOrOnToken as (t: unknown) => void)
-      : send('generate', [handle, prompt, optionsOrOnToken], onToken as (t: unknown) => void),
+      : send(
+          'generate',
+          [handle, prompt, toNativeGenerateOptions(optionsOrOnToken)],
+          onToken as (t: unknown) => void
+        ),
   // Stream generation as events with metrics (token per event; final event
   // carries the aggregated result and fires a 'generation' telemetry event).
   generateStream: async (
     handle: number,
     prompt: string,
-    options: Record<string, unknown>,
+    options: GenerateOptions,
     onEvent: (e: LLMStreamEvent) => void
   ): Promise<void> => {
+    const native = toNativeGenerateOptions(options);
     const source = toAsyncIterable((onToken) =>
-      send('generate', [handle, prompt, options], onToken as (t: unknown) => void) as Promise<void>
+      send('generate', [handle, prompt, native], onToken as (t: unknown) => void) as Promise<void>
     );
     for await (const event of streamWithMetrics(source)) {
       if (event.isFinal && event.result) bus.emit({ type: 'generation', result: event.result });
@@ -162,11 +169,11 @@ contextBridge.exposeInMainWorld('runanywhere', {
     handle: number,
     prompt: string,
     schema: JsonSchema,
-    options: Record<string, unknown> = {}
+    options: GenerateOptions = {}
   ): Promise<unknown> => {
     const grammar = jsonSchemaToGrammar(schema);
     let out = '';
-    await send('generate', [handle, prompt, { ...options, grammar }], (t) => {
+    await send('generate', [handle, prompt, toNativeGenerateOptions({ ...options, grammar })], (t) => {
       out += t as string;
     });
     return parseStructured(out, 'generateStructured');
@@ -176,11 +183,11 @@ contextBridge.exposeInMainWorld('runanywhere', {
     handle: number,
     prompt: string,
     schema: JsonSchema,
-    options: Record<string, unknown> = {}
+    options: GenerateOptions = {}
   ): Promise<unknown> => {
     const grammar = jsonSchemaToGrammar(schema);
     let out = '';
-    await send('generate', [handle, prompt, { ...options, grammar }], (t) => {
+    await send('generate', [handle, prompt, toNativeGenerateOptions({ ...options, grammar })], (t) => {
       out += t as string;
     });
     return parseStructured(out, 'generateStructured');
@@ -189,7 +196,7 @@ contextBridge.exposeInMainWorld('runanywhere', {
     handle: number,
     prompt: string,
     tools: ToolSpec[],
-    options: Record<string, unknown> = {}
+    options: GenerateOptions = {}
   ): Promise<unknown> => {
     if (!tools || !tools.length) {
       throw SDKException.validationFailed({
@@ -199,9 +206,13 @@ contextBridge.exposeInMainWorld('runanywhere', {
     }
     const grammar = jsonSchemaToGrammar(toolCallSchema(tools));
     let out = '';
-    await send('generate', [handle, toolCallPrompt(prompt, tools), { ...options, grammar }], (t) => {
-      out += t as string;
-    });
+    await send(
+      'generate',
+      [handle, toolCallPrompt(prompt, tools), toNativeGenerateOptions({ ...options, grammar })],
+      (t) => {
+        out += t as string;
+      }
+    );
     return parseStructured(out, 'generateToolCall');
   },
   unloadLLM: (handle: number) =>
@@ -280,7 +291,7 @@ contextBridge.exposeInMainWorld('runanywhere', {
   secureGet: (key: string) => send('secureGet', [key]),
   secureDelete: (key: string) => send('secureDelete', [key]),
 
-  createVad: (threshold?: number) => send('createVad', [threshold]),
+  createVad: (activationThreshold?: number) => send('createVad', [activationThreshold]),
   vadProcess: (handle: number, samples: Float32Array) => send('vadProcess', [handle, samples]),
   vadIsActive: (handle: number) => send('vadIsActive', [handle]),
   vadSetThreshold: (handle: number, threshold: number) => send('vadSetThreshold', [handle, threshold]),

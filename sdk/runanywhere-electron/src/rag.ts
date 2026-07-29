@@ -38,14 +38,20 @@ export interface RagDoc {
   sourceUri?: string;
 }
 
-/** Per-query overrides. `question` is required. */
-export interface RagQuery {
-  question: string;
-  systemPrompt?: string;
-  maxTokens?: number;
+/** Answer-generation knobs for a RAG query (subset of LLMGenerationOptions). */
+export interface RagGenerationOptions {
+  maxOutputTokens?: number;
   temperature?: number;
   topP?: number;
   topK?: number;
+  systemPrompt?: string;
+}
+
+/** Per-query overrides. `question` is required. */
+export interface RagQuery {
+  question: string;
+  /** Sampling/system-prompt overrides. Unset = RAG pipeline defaults. */
+  generation?: RagGenerationOptions;
   /** Retrieval count for this query (overrides the session default). */
   retrievalTopK?: number;
   similarityThreshold?: number;

@@ -77,6 +77,7 @@ export type {
   RagConfig,
   RagDoc,
   RagQuery,
+  RagGenerationOptions,
   RagResult,
   RagChunk,
   RagStats,

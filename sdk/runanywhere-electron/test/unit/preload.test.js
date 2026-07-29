@@ -294,7 +294,7 @@ test('generateStream yields token events then a final event with metrics', { ski
   const { exposed, state } = freshPreload();
   const port = connect(state);
   const events = [];
-  const p = exposed.runanywhere.generateStream(3, 'hi', { maxTokens: 8 }, (e) => events.push(e));
+  const p = exposed.runanywhere.generateStream(3, 'hi', { maxOutputTokens: 8 }, (e) => events.push(e));
   await tick();
   const msg = port.last();
   assert.equal(msg.method, 'generate');
@@ -338,11 +338,11 @@ test('onEvent subscribes to lifecycle events and returns an unsubscribe', { skip
 test('generate forwards a generation-options object before the callback', { skip: SKIP }, async () => {
   const { exposed, state } = freshPreload();
   const port = connect(state);
-  const p = exposed.runanywhere.generate(3, 'hi', { grammar: 'root ::= "x"', maxTokens: 8 }, () => {});
+  const p = exposed.runanywhere.generate(3, 'hi', { grammar: 'root ::= "x"', maxOutputTokens: 8 }, () => {});
   await tick();
   const msg = port.last();
   assert.equal(msg.method, 'generate');
-  assert.deepEqual(msg.args, [3, 'hi', { grammar: 'root ::= "x"', maxTokens: 8 }]);
+  assert.deepEqual(msg.args, [3, 'hi', { maxTokens: 8, grammar: 'root ::= "x"' }]);
   port.onmessage({ data: { id: msg.id, done: true } });
   await p;
 });
