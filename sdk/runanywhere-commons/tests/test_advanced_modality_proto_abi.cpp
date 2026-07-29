@@ -497,7 +497,7 @@ int test_vlm_process_stream_events() {
     image.set_format(runanywhere::v1::VLM_IMAGE_FORMAT_FILE_PATH);
     runanywhere::v1::VLMGenerationOptions options;
     options.set_prompt("describe");
-    options.set_max_tokens(16);
+    options.set_max_output_tokens(16);
     rac_proto_buffer_t out;
     rac_result_t rc = RAC_SUCCESS;
 
@@ -668,7 +668,6 @@ int test_embeddings_mocked_result() {
     runanywhere::v1::EmbeddingsRequest request;
     request.add_texts("alpha");
     request.add_texts("beta");
-    request.mutable_options()->set_normalize(true);
     std::vector<uint8_t> bytes;
     CHECK(serialize(request, &bytes), "EmbeddingsRequest serializes");
 
@@ -693,7 +692,6 @@ int test_embeddings_mocked_result() {
 
 int test_embeddings_options_mapping() {
     runanywhere::v1::EmbeddingsOptions options;
-    options.set_normalize(false);
     options.set_normalize_mode(runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_L2);
     options.set_pooling(runanywhere::v1::EMBEDDINGS_POOLING_STRATEGY_CLS);
     options.set_n_threads(6);
@@ -704,14 +702,13 @@ int test_embeddings_options_mapping() {
     CHECK(rac::foundation::rac_embeddings_options_from_proto(options, &raw),
           "EmbeddingsOptions maps to the C ABI");
     CHECK(raw.normalize == RAC_EMBEDDINGS_NORMALIZE_L2,
-          "normalize_mode overrides the legacy normalize bool");
+          "normalize_mode maps exactly");
     CHECK(raw.pooling == RAC_EMBEDDINGS_POOLING_CLS, "embedding pooling maps exactly");
     CHECK(raw.n_threads == 6, "embedding thread override maps exactly");
     CHECK(raw.truncate == 0, "explicit truncate=false maps exactly");
     CHECK(raw.batch_size == 32, "embedding batch size maps exactly");
 
     runanywhere::v1::EmbeddingsOptions defaults;
-    defaults.set_normalize(true);
     raw = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
     CHECK(rac::foundation::rac_embeddings_options_from_proto(defaults, &raw),
           "default EmbeddingsOptions maps");
@@ -747,7 +744,7 @@ int test_diffusion_progress_cancel_and_unsupported() {
     options.set_prompt("a test image");
     options.set_width(32);
     options.set_height(32);
-    options.set_num_inference_steps(2);
+    options.set_steps(2);
     options.set_seed(123);
     std::vector<uint8_t> bytes;
     CHECK(serialize(options, &bytes), "DiffusionGenerationOptions serializes");
@@ -872,9 +869,9 @@ int test_rag_ingest_query_mocked_path() {
 
     runanywhere::v1::RAGQueryOptions query;
     query.set_question("Where does RAG live?");
-    query.set_max_tokens(32);
-    query.set_temperature(0.0f);
-    query.set_disable_thinking(true);
+    query.mutable_generation()->set_max_output_tokens(32);
+    query.mutable_generation()->set_temperature(0.0f);
+    query.mutable_generation()->mutable_reasoning()->set_mode(runanywhere::v1::REASONING_MODE_OFF);
     std::vector<uint8_t> query_bytes;
     CHECK(serialize(query, &query_bytes), "RAGQueryOptions serializes");
     rac_proto_buffer_init(&out);

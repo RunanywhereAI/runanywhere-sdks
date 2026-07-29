@@ -65,6 +65,7 @@
 #if defined(RAC_HAVE_PROTOBUF)
 #include "model_types.pb.h"
 #include "tool_calling.pb.h"
+#include "llm_service.pb.h"
 #endif
 
 namespace {
@@ -333,12 +334,13 @@ runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string&
                                                               uint32_t max_tool_calls = 0) {
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(prompt);
-    request.set_max_tokens(64);
-    request.set_temperature(0.5f);
-    *request.add_tools() = make_weather_tool();
-    request.set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    request.mutable_generation()->set_max_output_tokens(64);
+    request.mutable_generation()->set_temperature(0.5f);
+    *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_weather_tool();
+    request.mutable_generation()->mutable_tool_calling()->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    request.mutable_generation()->mutable_tool_calling()->set_auto_execute(true);
     if (max_tool_calls > 0)
-        request.set_max_tool_calls(max_tool_calls);
+        request.mutable_generation()->mutable_tool_calling()->set_max_tool_calls(max_tool_calls);
     return request;
 }
 

@@ -55,16 +55,16 @@ namespace {
 
 // Verifies the returned proto bytes parse to the canonical default values
 // from Swift's RATTSConfiguration.defaults():
-//   model_id              = ""
-//   voice                 = "default"
-//   language_code         = "en-US"
-//   speaking_rate         = 1.0
-//   pitch                 = 1.0
-//   volume                = 1.0
-//   audio_format          = AUDIO_FORMAT_PCM
-//   sample_rate           = 22050
-//   enable_neural_voice   = true
-//   enable_ssml           = false
+//   model_id                       = ""
+//   default_options.voice          = "default"
+//   default_options.language_code  = "en-US"
+//   default_options.speed          = 1.0
+//   default_options.pitch          = 1.0
+//   default_options.volume         = 1.0
+//   default_options.audio_format   = AUDIO_FORMAT_PCM
+//   default_options.sample_rate    = 22050
+//   enable_neural_voice            = true
+//   default_options.enable_ssml    = false
 int test_tts_configuration_defaults_match_swift() {
     rac_proto_buffer_t buffer;
     rac_proto_buffer_init(&buffer);
@@ -77,15 +77,16 @@ int test_tts_configuration_defaults_match_swift() {
     ASSERT_TRUE(cfg.ParseFromArray(buffer.data, static_cast<int>(buffer.size)));
 
     ASSERT_EQ(cfg.model_id(), std::string(""));
-    ASSERT_EQ(cfg.voice(), std::string("default"));
-    ASSERT_EQ(cfg.language_code(), std::string("en-US"));
-    ASSERT_FLOAT_EQ(cfg.speaking_rate(), 1.0f);
-    ASSERT_FLOAT_EQ(cfg.pitch(), 1.0f);
-    ASSERT_FLOAT_EQ(cfg.volume(), 1.0f);
-    ASSERT_EQ(cfg.audio_format(), runanywhere::v1::AUDIO_FORMAT_PCM);
-    ASSERT_EQ(cfg.sample_rate(), 22050);
+    ASSERT_TRUE(cfg.has_default_options());
+    ASSERT_EQ(cfg.default_options().voice(), std::string("default"));
+    ASSERT_EQ(cfg.default_options().language_code(), std::string("en-US"));
+    ASSERT_FLOAT_EQ(cfg.default_options().speed(), 1.0f);
+    ASSERT_FLOAT_EQ(cfg.default_options().pitch(), 1.0f);
+    ASSERT_FLOAT_EQ(cfg.default_options().volume(), 1.0f);
+    ASSERT_EQ(cfg.default_options().audio_format(), runanywhere::v1::AUDIO_FORMAT_PCM);
+    ASSERT_EQ(cfg.default_options().sample_rate(), 22050);
     ASSERT_EQ(cfg.enable_neural_voice(), true);
-    ASSERT_EQ(cfg.enable_ssml(), false);
+    ASSERT_EQ(cfg.default_options().enable_ssml(), false);
 
     rac_proto_buffer_free(&buffer);
     return 0;

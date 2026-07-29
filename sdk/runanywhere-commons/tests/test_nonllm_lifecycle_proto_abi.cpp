@@ -397,7 +397,7 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     stt_audio->set_encoding(runanywhere::v1::STT_AUDIO_ENCODING_PCM_S16_LE);
     stt_audio->set_audio_format(runanywhere::v1::AUDIO_FORMAT_PCM);
     stt_audio->set_sample_rate(16000);
-    stt_request.mutable_options()->set_language_code("en-US");
+    stt_request.mutable_options()->set_language("en-US");
     std::vector<uint8_t> bytes;
     CHECK(serialize(stt_request, &bytes), "STT lifecycle request serializes");
     rac_proto_buffer_t out;
@@ -481,7 +481,7 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     vad_audio->set_encoding(runanywhere::v1::VAD_AUDIO_ENCODING_PCM_F32_LE);
     vad_audio->set_sample_rate(16000);
     vad_audio->set_channels(1);
-    vad_request.mutable_options()->set_threshold(0.1f);
+    vad_request.mutable_options()->set_activation_threshold(0.1f);
     CHECK(serialize(vad_request, &bytes), "VAD lifecycle request serializes");
     rac_proto_buffer_init(&out);
     rc = rac_vad_process_lifecycle_proto(bytes.data(), bytes.size(), &out);
@@ -497,7 +497,6 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     embeddings_request.set_model_id("lifecycle.embeddings");
     embeddings_request.add_texts("alpha");
     embeddings_request.add_texts("beta");
-    embeddings_request.mutable_options()->set_normalize(true);
     CHECK(serialize(embeddings_request, &bytes), "embeddings lifecycle request serializes");
     rac_proto_buffer_init(&out);
     rc = rac_embeddings_embed_batch_lifecycle_proto(bytes.data(), bytes.size(), &out);
@@ -532,7 +531,7 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     diffusion_options->set_prompt("a lifecycle image");
     diffusion_options->set_width(4);
     diffusion_options->set_height(2);
-    diffusion_options->set_num_inference_steps(1);
+    diffusion_options->set_steps(1);
     diffusion_options->set_seed(123);
     CHECK(serialize(diffusion_request, &bytes), "diffusion lifecycle request serializes");
     rac_proto_buffer_init(&out);

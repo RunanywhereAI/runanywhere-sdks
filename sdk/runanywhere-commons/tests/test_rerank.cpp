@@ -242,17 +242,17 @@ int main() {
         check(result.items_size() == 3, "all three candidates returned, ranked");
         if (result.items_size() == 3) {
             // Expected descending order: b (30) > c (10) > a (5).
-            check(result.items(0).id() == "b" && result.items(0).original_index() == 1 &&
+            check(result.items(0).id() == "b" && result.items(0).index() == 1 &&
                       result.items(0).rank() == 0,
                   "rank 0 is candidate b (longest)");
-            check(result.items(1).id() == "c" && result.items(1).original_index() == 2 &&
+            check(result.items(1).id() == "c" && result.items(1).index() == 2 &&
                       result.items(1).rank() == 1,
                   "rank 1 is candidate c");
-            check(result.items(2).id() == "a" && result.items(2).original_index() == 0 &&
+            check(result.items(2).id() == "a" && result.items(2).index() == 0 &&
                       result.items(2).rank() == 2,
                   "rank 2 is candidate a (shortest)");
-            check(result.items(0).score() >= result.items(1).score() &&
-                      result.items(1).score() >= result.items(2).score(),
+            check(result.items(0).relevance_score() >= result.items(1).relevance_score() &&
+                      result.items(1).relevance_score() >= result.items(2).relevance_score(),
                   "scores are monotonically non-increasing");
         }
         // The backend echoed the load path ("/tmp/fake-reranker"); commons must
@@ -380,14 +380,14 @@ int main() {
         runanywhere::v1::RerankResult result;
         auto* item = result.add_items();
         item->set_id("x");
-        item->set_score(1.5f);
-        item->set_original_index(0);
+        item->set_relevance_score(1.5f);
+        item->set_index(0);
         item->set_rank(0);
         result.set_model_id("m");
         std::string result_bytes = result.SerializeAsString();
         runanywhere::v1::RerankResult reparsed;
         check(reparsed.ParseFromString(result_bytes) && reparsed.items_size() == 1 &&
-                  reparsed.items(0).id() == "x" && reparsed.items(0).score() == 1.5f,
+                  reparsed.items(0).id() == "x" && reparsed.items(0).relevance_score() == 1.5f,
               "RerankResult proto round-trips");
     }
 

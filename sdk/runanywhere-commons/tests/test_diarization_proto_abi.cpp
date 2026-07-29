@@ -584,7 +584,7 @@ int main() {
 
     request.Clear();
     request.set_audio_data(f32le(0.1f) + f32le(0.2f));
-    request.mutable_options()->set_channel_count(2);
+    request.mutable_options()->set_channels(2);
     (void)request.SerializeToString(&request_bytes);
     CHECK(rac_diarization_component_diarize_proto(
               component, reinterpret_cast<const uint8_t*>(request_bytes.data()),
@@ -621,19 +621,19 @@ int main() {
     };
     {
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_sample_rate_hz(4000);
+        opts.set_sample_rate(4000);
         CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
               "sample_rate_hz below 8000 is rejected");
     }
     {
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_sample_rate_hz(96000);
+        opts.set_sample_rate(96000);
         CHECK(diarize_options_rc(opts) == RAC_ERROR_INVALID_PARAMETER,
               "sample_rate_hz above 48000 is rejected");
     }
     {
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_sample_rate_hz(16000);
+        opts.set_sample_rate(16000);
         CHECK(diarize_options_rc(opts) == RAC_SUCCESS,
               "sample_rate_hz 16000 (the model's fixed rate) is accepted");
     }
@@ -642,7 +642,7 @@ int main() {
         // not resample, so the boundary rate is rejected rather than silently
         // producing wrong features/timestamps.
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_sample_rate_hz(48000);
+        opts.set_sample_rate(48000);
         CHECK(diarize_options_rc(opts) == RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED,
               "in-range sample_rate_hz other than 16000 is rejected (16 kHz-only frontend)");
     }

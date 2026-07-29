@@ -279,7 +279,7 @@ std::vector<uint8_t> generate_request_bytes(const char* prompt) {
     runanywhere::v1::LLMGenerateRequest request;
     request.set_prompt(prompt);
     auto* options = request.mutable_options();
-    options->set_max_tokens(12);
+    options->set_max_output_tokens(12);
     options->set_temperature(0.2f);
     options->set_top_p(0.9f);
     std::vector<uint8_t> bytes;
@@ -349,7 +349,7 @@ int test_mocked_generation(rac_model_registry_handle_t registry) {
     CHECK(result.text() == "final {\"ok\":true}", "generate strips thinking from text");
     CHECK(result.thinking_content() == "plan", "generate extracts thinking content");
     CHECK(result.model_used() == "lifecycle.llm", "generate reports lifecycle model id");
-    CHECK(result.tokens_generated() == 12, "generate reports completion tokens");
+    CHECK(result.output_tokens() == 12, "generate reports completion tokens");
     CHECK(result.thinking_tokens() > 0, "generate splits thinking tokens");
     CHECK(result.response_tokens() > 0, "generate splits response tokens");
     CHECK(result.has_json_output() && result.json_output() == "{\"ok\":true}",
@@ -398,7 +398,7 @@ int test_stream_thinking_envelope(rac_model_registry_handle_t registry) {
 
     runanywhere::v1::LLMGenerateRequest request;
     request.set_prompt("thinking-stream");
-    request.set_emit_thoughts(true);
+    request.mutable_options()->mutable_reasoning()->set_include_in_output(true);
     request.set_request_id("think-req");
     std::vector<uint8_t> bytes;
     CHECK(serialize(request, &bytes), "thinking stream request serializes");
@@ -448,8 +448,8 @@ int test_hidden_thinking_counts_toward_length(rac_model_registry_handle_t regist
 
     runanywhere::v1::LLMGenerateRequest request;
     request.set_prompt("hidden-thinking-stream");
-    request.mutable_options()->set_max_tokens(3);
-    request.set_emit_thoughts(false);
+    request.mutable_options()->set_max_output_tokens(3);
+    request.mutable_options()->mutable_reasoning()->set_include_in_output(false);
     std::vector<uint8_t> bytes;
     CHECK(serialize(request, &bytes), "hidden thinking stream request serializes");
 
@@ -475,7 +475,7 @@ int test_hidden_thinking_counts_toward_length(rac_model_registry_handle_t regist
         CHECK(event.result().text().empty(), "hidden thinking terminal has no answer text");
         CHECK(event.result().thinking_content() == "alphabetagamma",
               "hidden thinking terminal preserves reasoning content");
-        CHECK(event.result().completion_tokens() == 3,
+        CHECK(event.result().output_tokens() == 3,
               "hidden thinking terminal counts suppressed completion segments");
     }
     CHECK(non_terminal_events == 0, "hidden thinking emits no thought events");

@@ -214,8 +214,8 @@ std::string run_rag_case(const std::string& embed_id, const std::string& llm_id,
 
     runanywhere::v1::RAGQueryOptions q;
     q.set_question(question);
-    q.set_max_tokens(160);
-    q.set_temperature(0.0f);
+    q.mutable_generation()->set_max_output_tokens(160);
+    q.mutable_generation()->set_temperature(0.0f);
     if (multi_query)
         q.set_enable_multi_query(true);
     const std::string q_bytes = q.SerializeAsString();
@@ -322,8 +322,8 @@ void run_threshold_override_case(const std::string& embed_id, const std::string&
     auto query_chunks = [&](bool set_override) -> int {
         runanywhere::v1::RAGQueryOptions q;
         q.set_question(probe);
-        q.set_max_tokens(64);
-        q.set_temperature(0.0f);
+        q.mutable_generation()->set_max_output_tokens(64);
+        q.mutable_generation()->set_temperature(0.0f);
         if (set_override)
             q.set_similarity_threshold(0.0f);  // explicit accept-all
         const std::string qb = q.SerializeAsString();
@@ -387,8 +387,8 @@ void run_scoping_case(const std::string& embed_id, const std::string& llm_id,
 
     runanywhere::v1::RAGQueryOptions q;
     q.set_question("Summarize the document.");
-    q.set_max_tokens(96);
-    q.set_temperature(0.0f);
+    q.mutable_generation()->set_max_output_tokens(96);
+    q.mutable_generation()->set_temperature(0.0f);
     q.set_scope_prefix("kelp:");
     const std::string qb = q.SerializeAsString();
 

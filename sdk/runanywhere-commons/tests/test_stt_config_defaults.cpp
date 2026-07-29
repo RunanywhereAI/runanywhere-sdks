@@ -46,7 +46,7 @@ namespace {
 // Verifies the returned proto bytes parse to the canonical default values
 // from Swift's RASTTConfiguration.defaults():
 //   model_id      = ""
-//   language      = STT_LANGUAGE_EN
+//   language      = "en"
 //   sample_rate   = 16000
 //   enable_vad    = false
 int test_stt_configuration_defaults_match_swift() {
@@ -61,7 +61,7 @@ int test_stt_configuration_defaults_match_swift() {
     ASSERT_TRUE(cfg.ParseFromArray(buffer.data, static_cast<int>(buffer.size)));
 
     ASSERT_EQ(cfg.model_id(), std::string(""));
-    ASSERT_EQ(cfg.language(), runanywhere::v1::STT_LANGUAGE_EN);
+    ASSERT_EQ(cfg.language(), std::string("en"));
     ASSERT_EQ(cfg.sample_rate(), 16000);
     ASSERT_EQ(cfg.enable_vad(), false);
 

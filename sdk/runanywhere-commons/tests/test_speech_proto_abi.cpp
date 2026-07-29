@@ -614,7 +614,7 @@ int test_mocked_stt() {
 
     const int16_t audio[] = {0, 1, 2, 3};
     runanywhere::v1::STTOptions options;
-    options.set_language(runanywhere::v1::STT_LANGUAGE_EN);
+    options.set_language("en");
     std::vector<uint8_t> bytes;
     CHECK(serialize(options, &bytes), "STTOptions serializes");
 
@@ -723,7 +723,7 @@ int test_mocked_vad_and_activity() {
           "VAD start routes to the model backend");
 
     runanywhere::v1::VADOptions options;
-    options.set_threshold(0.1f);
+    options.set_activation_threshold(0.1f);
     std::vector<uint8_t> bytes;
     CHECK(serialize(options, &bytes), "VADOptions serializes");
     const float speech[] = {0.3f, 0.4f, 0.5f, 0.6f};
@@ -771,7 +771,7 @@ int test_mocked_vad_and_activity() {
     runanywhere::v1::VADConfiguration config;
     config.set_sample_rate(16000);
     config.set_frame_length_ms(100);
-    config.set_threshold(0.01f);
+    config.set_activation_threshold(0.01f);
     std::vector<uint8_t> config_bytes;
     CHECK(serialize(config, &config_bytes), "VADConfiguration serializes");
     CHECK(rac_vad_component_configure_proto(energy_vad, config_bytes.data(), config_bytes.size()) ==
