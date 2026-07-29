@@ -43,7 +43,8 @@ import okio.ByteString
  */
 public class CloudSttBackendConfig(
   /**
-   * HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam".
+   * HTTP provider implementation. Empty defaults to "runanywhere", the
+   * RunAnywhere backend proxy and the only supported provider.
    */
   @field:WireField(
     tag = 1,

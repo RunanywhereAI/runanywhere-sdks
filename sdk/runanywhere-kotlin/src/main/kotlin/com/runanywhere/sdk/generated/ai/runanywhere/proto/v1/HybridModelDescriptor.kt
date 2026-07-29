@@ -60,8 +60,8 @@ public class HybridModelDescriptor(
   public val backend: HybridBackendKind = HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED,
   /**
    * Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-   * "sarvam"). The cloud_stt engine reads it from config_json\["provider"\];
-   * empty defaults to "sarvam". Ignored for non-cloud backends.
+   * "runanywhere"). The cloud_stt engine reads it from config_json\["provider"\];
+   * empty defaults to "runanywhere". Ignored for non-cloud backends.
    */
   @field:WireField(
     tag = 4,

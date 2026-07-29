@@ -331,6 +331,10 @@ class ErrorCode extends $pb.ProtobufEnum {
       ErrorCode._(321, _omitEnumNames ? '' : 'ERROR_CODE_UNAUTHORIZED');
   static const ErrorCode ERROR_CODE_FORBIDDEN =
       ErrorCode._(322, _omitEnumNames ? '' : 'ERROR_CODE_FORBIDDEN');
+  static const ErrorCode ERROR_CODE_FEATURE_NOT_ENABLED =
+      ErrorCode._(323, _omitEnumNames ? '' : 'ERROR_CODE_FEATURE_NOT_ENABLED');
+  static const ErrorCode ERROR_CODE_QUOTA_EXCEEDED =
+      ErrorCode._(324, _omitEnumNames ? '' : 'ERROR_CODE_QUOTA_EXCEEDED');
 
   /// -- Security (-330..-349) ----------------------------------------------
   static const ErrorCode ERROR_CODE_KEYCHAIN_ERROR =
@@ -537,6 +541,8 @@ class ErrorCode extends $pb.ProtobufEnum {
     ERROR_CODE_AUTHENTICATION_FAILED,
     ERROR_CODE_UNAUTHORIZED,
     ERROR_CODE_FORBIDDEN,
+    ERROR_CODE_FEATURE_NOT_ENABLED,
+    ERROR_CODE_QUOTA_EXCEEDED,
     ERROR_CODE_KEYCHAIN_ERROR,
     ERROR_CODE_ENCODING_ERROR,
     ERROR_CODE_DECODING_ERROR,

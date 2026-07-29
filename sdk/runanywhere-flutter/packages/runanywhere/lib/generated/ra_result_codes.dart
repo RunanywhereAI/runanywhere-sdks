@@ -91,6 +91,8 @@ abstract final class RacResultCodes {
   static const int errorAuthenticationFailed         = -320;  // ERROR_CODE_AUTHENTICATION_FAILED
   static const int errorUnauthorized                 = -321;  // ERROR_CODE_UNAUTHORIZED
   static const int errorForbidden                    = -322;  // ERROR_CODE_FORBIDDEN
+  static const int errorFeatureNotEnabled            = -323;  // ERROR_CODE_FEATURE_NOT_ENABLED
+  static const int errorQuotaExceeded                = -324;  // ERROR_CODE_QUOTA_EXCEEDED
   static const int errorKeychainError                = -330;  // ERROR_CODE_KEYCHAIN_ERROR
   static const int errorEncodingError                = -331;  // ERROR_CODE_ENCODING_ERROR
   static const int errorDecodingError                = -332;  // ERROR_CODE_DECODING_ERROR
@@ -311,6 +313,10 @@ abstract final class RacResultCodes {
         return 'Unauthorized';
       case errorForbidden:
         return 'Forbidden';
+      case errorFeatureNotEnabled:
+        return 'Feature not enabled';
+      case errorQuotaExceeded:
+        return 'Quota exceeded';
       case errorKeychainError:
         return 'Keychain error';
       case errorEncodingError:

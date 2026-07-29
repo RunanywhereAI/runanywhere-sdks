@@ -570,8 +570,8 @@ class HybridModelDescriptor extends $pb.GeneratedMessage {
   void clearBackend() => $_clearField(3);
 
   /// Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-  /// "sarvam"). The cloud_stt engine reads it from config_json["provider"];
-  /// empty defaults to "sarvam". Ignored for non-cloud backends.
+  /// "runanywhere"). The cloud_stt engine reads it from config_json["provider"];
+  /// empty defaults to "runanywhere". Ignored for non-cloud backends.
   @$pb.TagNumber(4)
   $core.String get provider => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -835,7 +835,8 @@ class CloudSttBackendConfig extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<CloudSttBackendConfig>(create);
   static CloudSttBackendConfig? _defaultInstance;
 
-  /// HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam".
+  /// HTTP provider implementation. Empty defaults to "runanywhere", the
+  /// RunAnywhere backend proxy and the only supported provider.
   @$pb.TagNumber(1)
   $core.String get provider => $_getSZ(0);
   @$pb.TagNumber(1)

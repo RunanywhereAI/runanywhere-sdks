@@ -12,7 +12,7 @@
 //
 // Per-request routing between an on-device (offline) backend and a cloud
 // (online) backend. Wired today for STT: sherpa-onnx offline ↔ cloud STT
-// (provider=sarvam) online. The schema is capability-agnostic; cascade/filter/
+// (provider=runanywhere) online. The schema is capability-agnostic; cascade/filter/
 // rank semantics are identical across capabilities.
 //
 // Schema is consumed by Square Wire (Kotlin) and protobuf (C++/Swift) via
@@ -92,7 +92,7 @@ public nonisolated enum RAHybridCapability: SwiftProtobuf.Enum, Swift.CaseIterab
 /// ---------------------------------------------------------------------------
 /// Backend identity. Matches the engines/ directory entry that registers
 /// the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
-/// ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
+/// ("cloud_stt"); the concrete HTTP provider ("runanywhere") is selected from
 /// the descriptor's `provider` field, not from a distinct enum kind.
 /// ---------------------------------------------------------------------------
 public nonisolated enum RAHybridBackendKind: SwiftProtobuf.Enum, Swift.CaseIterable {
@@ -418,8 +418,8 @@ public nonisolated struct RAHybridModelDescriptor: Sendable {
   public var backend: RAHybridBackendKind = .hybridBackendUnspecified
 
   /// Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-  /// "sarvam"). The cloud_stt engine reads it from config_json["provider"];
-  /// empty defaults to "sarvam". Ignored for non-cloud backends.
+  /// "runanywhere"). The cloud_stt engine reads it from config_json["provider"];
+  /// empty defaults to "runanywhere". Ignored for non-cloud backends.
   public var provider: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -493,7 +493,8 @@ public nonisolated struct RACloudSttBackendConfig: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam".
+  /// HTTP provider implementation. Empty defaults to "runanywhere", the
+  /// RunAnywhere backend proxy and the only supported provider.
   public var provider: String = String()
 
   /// Provider-side model id (e.g. "saarika:v2").

@@ -20,7 +20,7 @@ import kotlin.Suppress
  * ---------------------------------------------------------------------------
  * Backend identity. Matches the engines/ directory entry that registers
  * the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
- * ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
+ * ("cloud_stt"); the concrete HTTP provider ("runanywhere") is selected from
  * the descriptor's `provider` field, not from a distinct enum kind.
  * ---------------------------------------------------------------------------
  */

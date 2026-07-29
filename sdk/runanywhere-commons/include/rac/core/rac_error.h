@@ -286,6 +286,10 @@ extern "C" {
 #define RAC_ERROR_UNAUTHORIZED ((rac_result_t) - 321)
 /** Access forbidden */
 #define RAC_ERROR_FORBIDDEN ((rac_result_t) - 322)
+/** Feature not enabled for this API key (toggle it in the Console) */
+#define RAC_ERROR_FEATURE_NOT_ENABLED ((rac_result_t) - 323)
+/** Metered feature quota exhausted for the current period */
+#define RAC_ERROR_QUOTA_EXCEEDED ((rac_result_t) - 324)
 
 // =============================================================================
 // SECURITY ERRORS (-330 to -349)

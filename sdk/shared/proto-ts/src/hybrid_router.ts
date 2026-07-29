@@ -75,7 +75,7 @@ export function hybridCapabilityToJSON(object: HybridCapability): string {
  * ---------------------------------------------------------------------------
  * Backend identity. Matches the engines/ directory entry that registers
  * the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
- * ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
+ * ("cloud_stt"); the concrete HTTP provider ("runanywhere") is selected from
  * the descriptor's `provider` field, not from a distinct enum kind.
  * ---------------------------------------------------------------------------
  */
@@ -311,8 +311,8 @@ export interface HybridModelDescriptor {
   backend: HybridBackendKind;
   /**
    * Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-   * "sarvam"). The cloud_stt engine reads it from config_json["provider"];
-   * empty defaults to "sarvam". Ignored for non-cloud backends.
+   * "runanywhere"). The cloud_stt engine reads it from config_json["provider"];
+   * empty defaults to "runanywhere". Ignored for non-cloud backends.
    */
   provider: string;
 }
@@ -370,7 +370,10 @@ export interface HybridRoutingContext {
  * ---------------------------------------------------------------------------
  */
 export interface CloudSttBackendConfig {
-  /** HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam". */
+  /**
+   * HTTP provider implementation. Empty defaults to "runanywhere", the
+   * RunAnywhere backend proxy and the only supported provider.
+   */
   provider: string;
   /** Provider-side model id (e.g. "saarika:v2"). */
   model: string;

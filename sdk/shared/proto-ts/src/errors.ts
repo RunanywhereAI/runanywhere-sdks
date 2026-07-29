@@ -375,6 +375,10 @@ export enum ErrorCode {
   ERROR_CODE_UNAUTHORIZED = 321,
   /** ERROR_CODE_FORBIDDEN - RAC_ERROR_FORBIDDEN */
   ERROR_CODE_FORBIDDEN = 322,
+  /** ERROR_CODE_FEATURE_NOT_ENABLED - RAC_ERROR_FEATURE_NOT_ENABLED */
+  ERROR_CODE_FEATURE_NOT_ENABLED = 323,
+  /** ERROR_CODE_QUOTA_EXCEEDED - RAC_ERROR_QUOTA_EXCEEDED */
+  ERROR_CODE_QUOTA_EXCEEDED = 324,
   /** ERROR_CODE_KEYCHAIN_ERROR - -- Security (-330..-349) ---------------------------------------------- */
   ERROR_CODE_KEYCHAIN_ERROR = 330,
   /** ERROR_CODE_ENCODING_ERROR - RAC_ERROR_ENCODING_ERROR */
@@ -727,6 +731,12 @@ export function errorCodeFromJSON(object: any): ErrorCode {
     case 322:
     case "ERROR_CODE_FORBIDDEN":
       return ErrorCode.ERROR_CODE_FORBIDDEN;
+    case 323:
+    case "ERROR_CODE_FEATURE_NOT_ENABLED":
+      return ErrorCode.ERROR_CODE_FEATURE_NOT_ENABLED;
+    case 324:
+    case "ERROR_CODE_QUOTA_EXCEEDED":
+      return ErrorCode.ERROR_CODE_QUOTA_EXCEEDED;
     case 330:
     case "ERROR_CODE_KEYCHAIN_ERROR":
       return ErrorCode.ERROR_CODE_KEYCHAIN_ERROR;
@@ -1043,6 +1053,10 @@ export function errorCodeToJSON(object: ErrorCode): string {
       return "ERROR_CODE_UNAUTHORIZED";
     case ErrorCode.ERROR_CODE_FORBIDDEN:
       return "ERROR_CODE_FORBIDDEN";
+    case ErrorCode.ERROR_CODE_FEATURE_NOT_ENABLED:
+      return "ERROR_CODE_FEATURE_NOT_ENABLED";
+    case ErrorCode.ERROR_CODE_QUOTA_EXCEEDED:
+      return "ERROR_CODE_QUOTA_EXCEEDED";
     case ErrorCode.ERROR_CODE_KEYCHAIN_ERROR:
       return "ERROR_CODE_KEYCHAIN_ERROR";
     case ErrorCode.ERROR_CODE_ENCODING_ERROR:

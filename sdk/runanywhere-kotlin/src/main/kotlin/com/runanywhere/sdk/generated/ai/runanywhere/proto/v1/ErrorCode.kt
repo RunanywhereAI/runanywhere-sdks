@@ -391,6 +391,14 @@ public enum class ErrorCode(
    */
   ERROR_CODE_FORBIDDEN(322),
   /**
+   * RAC_ERROR_FEATURE_NOT_ENABLED
+   */
+  ERROR_CODE_FEATURE_NOT_ENABLED(323),
+  /**
+   * RAC_ERROR_QUOTA_EXCEEDED
+   */
+  ERROR_CODE_QUOTA_EXCEEDED(324),
+  /**
    * -- Security (-330..-349) ----------------------------------------------
    * RAC_ERROR_KEYCHAIN_ERROR
    */
@@ -681,6 +689,8 @@ public enum class ErrorCode(
       320 -> ERROR_CODE_AUTHENTICATION_FAILED
       321 -> ERROR_CODE_UNAUTHORIZED
       322 -> ERROR_CODE_FORBIDDEN
+      323 -> ERROR_CODE_FEATURE_NOT_ENABLED
+      324 -> ERROR_CODE_QUOTA_EXCEEDED
       330 -> ERROR_CODE_KEYCHAIN_ERROR
       331 -> ERROR_CODE_ENCODING_ERROR
       332 -> ERROR_CODE_DECODING_ERROR
