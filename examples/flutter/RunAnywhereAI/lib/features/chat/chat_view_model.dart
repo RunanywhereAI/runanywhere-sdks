@@ -104,6 +104,7 @@ class ChatViewModel extends ChangeNotifier {
   String? _loadedModelName;
   sdk.InferenceFramework? _loadedFramework;
   bool _loadedModelSupportsThinking = false;
+  sdk.ThinkingTagPattern? _loadedModelThinkingPattern;
   bool _loadedModelSupportsLora = false;
 
   String? get loadedModelName => _loadedModelName;
@@ -183,6 +184,9 @@ class ChatViewModel extends ChangeNotifier {
     _loadedModelName = model?.name;
     _loadedFramework = model?.framework;
     _loadedModelSupportsThinking = model?.supportsThinking ?? false;
+    _loadedModelThinkingPattern = (model != null && model.hasThinkingPattern())
+        ? model.thinkingPattern
+        : null;
     _loadedModelSupportsLora = model?.supportsLora ?? false;
     notifyListeners();
 
@@ -237,11 +241,16 @@ class ChatViewModel extends ChangeNotifier {
           prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
       final thinkingModeEnabled =
           prefs.getBool(PreferenceKeys.thinkingModeEnabled) ?? true;
-      final disableThinking =
-          _loadedModelSupportsThinking && !thinkingModeEnabled;
 
       debugPrint(
-        '[PARAMS] App sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)',
+        '[PARAMS] App sendMessage: temperature=$temperature, maxOutputTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)',
+      );
+
+      final options = sdk.LLMGenerationOptions(
+        maxOutputTokens: maxTokens,
+        temperature: temperature,
+        systemPrompt: systemPrompt,
+        reasoning: _reasoningOptions(thinkingModeEnabled),
       );
 
       final toolSettings = ToolSettingsViewModel.shared;
@@ -250,26 +259,11 @@ class ChatViewModel extends ChangeNotifier {
           toolSettings.registeredTools.isNotEmpty;
 
       if (useToolCalling) {
-        await _generateWithToolCalling(
-          userMessage,
-          maxTokens,
-          temperature,
-          systemPrompt,
-          disableThinking,
-        );
+        await _generateWithToolCalling(userMessage, options);
+      } else if (_useStreaming) {
+        await _generateStreaming(userMessage, options);
       } else {
-        final options = sdk.LLMGenerationOptions(
-          maxTokens: maxTokens,
-          temperature: temperature,
-          systemPrompt: systemPrompt,
-          disableThinking: disableThinking,
-        );
-
-        if (_useStreaming) {
-          await _generateStreaming(userMessage, options);
-        } else {
-          await _generateNonStreaming(userMessage, options);
-        }
+        await _generateNonStreaming(userMessage, options);
       }
     } catch (e) {
       _errorMessage = 'Generation failed: $e';
@@ -332,12 +326,24 @@ class ChatViewModel extends ChangeNotifier {
     return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
   }
 
+  /// Only thinking-capable models get a reasoning config — the runtime's
+  /// no-think prefill leaks as literal text on non-thinking models. Thought
+  /// tokens only emit when includeInOutput is set, so the "show thinking"
+  /// toggle maps to it (Android/iOS example parity).
+  sdk.ReasoningOptions? _reasoningOptions(bool thinkingModeEnabled) {
+    if (!_loadedModelSupportsThinking) return null;
+    if (!thinkingModeEnabled) {
+      return sdk.ReasoningOptions(mode: sdk.ReasoningMode.REASONING_MODE_OFF);
+    }
+    return sdk.ReasoningOptions(
+      includeInOutput: true,
+      pattern: _loadedModelThinkingPattern,
+    );
+  }
+
   Future<void> _generateWithToolCalling(
     String prompt,
-    int maxTokens,
-    double temperature,
-    String systemPrompt,
-    bool disableThinking,
+    sdk.LLMGenerationOptions options,
   ) async {
     final modelName = _loadedModelName;
     final format = _detectToolCallFormat(modelName);
@@ -351,14 +357,11 @@ class ChatViewModel extends ChangeNotifier {
     try {
       final result = await sdk.RunAnywhere.tools.generateWithTools(
         prompt,
+        llmOptions: options,
         options: ToolCallingOptions(
           maxToolCalls: 3,
           autoExecute: true,
           format: format,
-          maxTokens: maxTokens,
-          temperature: temperature,
-          systemPrompt: systemPrompt,
-          disableThinking: disableThinking,
         ),
       );
 
@@ -443,7 +446,7 @@ class ChatViewModel extends ChangeNotifier {
         modelName: modelName,
         timeToFirstToken: _timeToFirstToken,
         totalGenerationTime: _elapsedGenerationSeconds(),
-        outputTokens: result.tokensGenerated,
+        outputTokens: result.outputTokens,
         tokensPerSecond: result.tokensPerSecond,
         wasThinkingMode: result.thinkingContent.isNotEmpty,
       );
@@ -480,7 +483,7 @@ class ChatViewModel extends ChangeNotifier {
         messageId: DateTime.now().millisecondsSinceEpoch.toString(),
         modelName: modelName,
         totalGenerationTime: _elapsedGenerationSeconds(),
-        outputTokens: result.tokensGenerated,
+        outputTokens: result.outputTokens,
         tokensPerSecond: result.tokensPerSecond,
         wasThinkingMode: result.thinkingContent.isNotEmpty,
       );

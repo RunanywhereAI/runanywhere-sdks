@@ -99,7 +99,7 @@ class VLMViewModel extends ChangeNotifier {
       final events = sdk.RunAnywhere.vlm.processImageStream(
         image,
         prompt: promptText,
-        options: sdk.VLMGenerationOptions(maxTokens: 300),
+        options: sdk.VLMGenerationOptions(maxOutputTokens: 300),
       );
 
       final buffer = StringBuffer();

@@ -57,7 +57,7 @@ class LLMBenchmarkProvider implements BenchmarkScenarioProvider {
       final warmupStopwatch = Stopwatch()..start();
       final warmupEvents = sdk.RunAnywhere.llm.generateStream(
         'Hello',
-        sdk.LLMGenerationOptions(maxTokens: 5, temperature: 0.0),
+        sdk.LLMGenerationOptions(maxOutputTokens: 5, temperature: 0.0),
       );
       await for (final event in warmupEvents) {
         if (event.isFinal) break;
@@ -83,7 +83,7 @@ class LLMBenchmarkProvider implements BenchmarkScenarioProvider {
         events: sdk.RunAnywhere.llm.generateStream(
           prompt,
           sdk.LLMGenerationOptions(
-            maxTokens: maxTokens,
+            maxOutputTokens: maxTokens,
             temperature: 0.0,
             systemPrompt: systemPrompt,
           ),
@@ -103,12 +103,12 @@ class LLMBenchmarkProvider implements BenchmarkScenarioProvider {
           result.tokensPerSecond > 0 ? result.tokensPerSecond : null;
       metrics.inputTokens = result.inputTokens > 0 ? result.inputTokens : null;
       metrics.outputTokens =
-          result.tokensGenerated > 0 ? result.tokensGenerated : null;
+          result.outputTokens > 0 ? result.outputTokens : null;
 
       final decodeTimeMs = result.decodeTimeMs.toInt();
-      if (decodeTimeMs > 0 && result.tokensGenerated > 0) {
+      if (decodeTimeMs > 0 && result.outputTokens > 0) {
         metrics.decodeTokensPerSecond =
-            result.tokensGenerated / (decodeTimeMs / 1000.0);
+            result.outputTokens / (decodeTimeMs / 1000.0);
       }
       final promptEvalTimeMs = result.promptEvalTimeMs.toInt();
       if (promptEvalTimeMs > 0 && result.inputTokens > 0) {

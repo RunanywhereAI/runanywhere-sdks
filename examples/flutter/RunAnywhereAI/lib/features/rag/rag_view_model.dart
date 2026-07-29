@@ -164,10 +164,19 @@ class RAGViewModel extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final thinkingModeEnabled =
           prefs.getBool(PreferenceKeys.thinkingModeEnabled) ?? true;
+      // RAG answers never render thinking, so a thinking-capable model with
+      // the toggle off gets reasoning explicitly switched off; otherwise the
+      // pipeline defaults apply (thoughts stripped from the answer).
       final result = await RunAnywhere.rag.query(
         question,
         options: RAGQueryOptions(
-          disableThinking: _llmSupportsThinking && !thinkingModeEnabled,
+          generation: _llmSupportsThinking && !thinkingModeEnabled
+              ? proto.LLMGenerationOptions(
+                  reasoning: proto.ReasoningOptions(
+                    mode: proto.ReasoningMode.REASONING_MODE_OFF,
+                  ),
+                )
+              : null,
           enableMultiQuery: _multiQueryEnabled,
         ),
       );

@@ -54,15 +54,10 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
         audioData = _sineWaveAudio(durationSeconds: audioDuration);
       }
 
-      // Transcribe raw PCM Int16 mono @ 16 kHz.
+      // Transcribe raw PCM Int16 mono @ 16 kHz. Audio properties live on the
+      // SDK-built STTAudioSource; the SDK detects the encoding from the bytes.
       final benchStopwatch = Stopwatch()..start();
-      final result = await sdk.RunAnywhere.stt.transcribe(
-        audioData,
-        sdk.STTOptions(
-          audioFormat: sdk.AudioFormat.AUDIO_FORMAT_PCM,
-          sampleRate: _sampleRate,
-        ),
-      );
+      final result = await sdk.RunAnywhere.stt.transcribe(audioData);
       metrics.endToEndLatencyMs = benchStopwatch.elapsedMicroseconds / 1000.0;
 
       metrics.audioLengthSeconds = audioDuration;

@@ -143,7 +143,7 @@ class TTSViewModel extends VoiceComponentViewModelBase {
       }
 
       final options = sdk.TTSOptions(
-        speakingRate: _speechRate,
+        speed: _speechRate,
         pitch: pitch,
         volume: 1.0,
       );
