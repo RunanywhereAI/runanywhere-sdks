@@ -6,7 +6,6 @@ import android.app.Application
 import com.runanywhere.runanywhereai.data.BackendAvailability
 import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.data.benchmark.BenchmarkStore
-import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
 import com.runanywhere.runanywhereai.data.conversation.ConversationRepository
 import com.runanywhere.runanywhereai.data.settings.SettingsRepository
 import com.runanywhere.runanywhereai.state.GlobalState
@@ -40,7 +39,6 @@ class RunAnywhereApplication : Application() {
         GlobalState.warmUp()
         ConversationRepository.initialize(applicationContext)
         SettingsRepository.initialize(applicationContext)
-        CloudProviderRepository.initialize(applicationContext)
         BenchmarkStore.initialize(applicationContext)
         appScope.launch(Dispatchers.IO) { ConversationRepository.refresh() }
         // Match iOS startup: initialize immediately with the full diagnostics
@@ -141,7 +139,6 @@ class RunAnywhereApplication : Application() {
         // the user-provisioned token in protected app storage — never embedded in the APK.
         SettingsRepository.settings.hfToken.takeIf { it.isNotBlank() }?.let { RunAnywhere.setHfToken(it) }
         ModelBootstrap.setupModels()
-        CloudProviderRepository.registerAll()
         BuiltInTools.register(applicationContext)
         val initTime = System.currentTimeMillis() - startTime
         RACLog.i("SDK setup completed in ${initTime}ms")

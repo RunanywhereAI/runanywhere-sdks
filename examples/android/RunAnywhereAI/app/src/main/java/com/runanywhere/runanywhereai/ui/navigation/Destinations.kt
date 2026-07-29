@@ -56,9 +56,6 @@ data object Documents
 data object Solutions
 
 @Serializable
-data object CloudProviders
-
-@Serializable
 data object Benchmarks
 
 @Serializable

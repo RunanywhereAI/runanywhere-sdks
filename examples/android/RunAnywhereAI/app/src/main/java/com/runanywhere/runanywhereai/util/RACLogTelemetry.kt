@@ -187,7 +187,6 @@ internal object TelemetryDiagnosticPolicy {
 
     private val sourceCodes = mapOf(
         "ChatViewModel" to "chat",
-        "CloudProviderRepository" to "cloud_provider",
         "ConversationRepository" to "conversation",
         "ConversationStore" to "conversation_store",
         "ModelBootstrap" to "model_bootstrap",

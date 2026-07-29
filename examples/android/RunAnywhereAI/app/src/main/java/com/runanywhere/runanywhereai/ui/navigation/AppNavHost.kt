@@ -16,7 +16,6 @@ import com.runanywhere.runanywhereai.ui.screens.chat.ChatScreen
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatViewModel
 import com.runanywhere.runanywhereai.ui.screens.benchmark.BenchmarkDetailScreen
 import com.runanywhere.runanywhereai.ui.screens.benchmark.BenchmarkScreen
-import com.runanywhere.runanywhereai.ui.screens.cloud.CloudProvidersScreen
 import com.runanywhere.runanywhereai.ui.screens.diarization.DiarizationScreen
 import com.runanywhere.runanywhereai.ui.screens.more.MoreScreen
 import com.runanywhere.runanywhereai.ui.screens.ocr.OcrScreen
@@ -93,7 +92,6 @@ fun AppNavHost(
         composable<Diarization> { DiarizationScreen() }
         composable<Documents> { RagScreen() }
         composable<Solutions> { SolutionsScreen() }
-        composable<CloudProviders> { CloudProvidersScreen() }
         composable<Benchmarks> {
             BenchmarkScreen(
                 onOpenDetail = { navController.navigate(BenchmarkDetail(it)) },

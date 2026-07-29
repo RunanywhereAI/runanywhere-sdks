@@ -7,11 +7,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
 import com.runanywhere.runanywhereai.ui.HybridBetaCopy
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
+import com.runanywhere.sdk.hybrid.Cloud
 import com.runanywhere.sdk.hybrid.HybridCascade
 import com.runanywhere.sdk.hybrid.HybridFilter
 import com.runanywhere.sdk.hybrid.HybridModel
@@ -46,6 +46,8 @@ data class SttMetrics(
     val words: Int,
 )
 
+private const val HYBRID_ONLINE_ID = "hybrid-stt"
+
 class SttViewModel : ViewModel() {
 
     var mode by mutableStateOf(SttMode.BATCH)
@@ -74,16 +76,10 @@ class SttViewModel : ViewModel() {
     var preferLocalFirst by mutableStateOf(true)
         private set
 
-    // Registry id of the cloud backend used for the online side of the hybrid
-    // router. Providers are configured by the user in Cloud Providers.
-    var onlineProviderId by mutableStateOf(CloudProviderRepository.defaultProviderId)
-        private set
-
-    fun selectOnlineProvider(id: String) {
-        if (id == onlineProviderId || id.isBlank()) return
-        onlineProviderId = id
-        invalidateRouter()
-    }
+    // Online side of the hybrid router: the RunAnywhere backend proxy.
+    // Zero config — the SDK authenticates with the device session and the
+    // backend enforces the per-key hybrid_stt entitlement.
+    val onlineProviderId: String = HYBRID_ONLINE_ID
 
     private val recorder = AudioRecorder()
     private val buffer = ByteArrayOutputStream()
@@ -283,11 +279,8 @@ class SttViewModel : ViewModel() {
     }
 
     private suspend fun runHybrid(audio: ByteArray) {
-        val onlineId = resolveOnlineProviderId()
-        if (onlineId.isNullOrBlank()) {
-            error = HybridBetaCopy.CLOUD_PROVIDER_REQUIRED
-            return
-        }
+        Cloud.register(id = HYBRID_ONLINE_ID)
+        val onlineId = HYBRID_ONLINE_ID
         try {
             val offlineId = RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT).id
             val started = System.currentTimeMillis()
@@ -322,15 +315,6 @@ class SttViewModel : ViewModel() {
         }
     }
 
-    private fun resolveOnlineProviderId(): String? {
-        val selected = onlineProviderId?.takeIf { id -> CloudProviderRepository.providers.any { it.id == id } }
-        val resolved = selected ?: CloudProviderRepository.defaultProviderId
-        if (resolved != onlineProviderId) {
-            onlineProviderId = resolved
-            invalidateRouter()
-        }
-        return resolved
-    }
 
     private fun ensureRouter(offlineId: String, onlineId: String): HybridSTTRouter {
         router?.let { if (routerOfflineId == offlineId && routerOnlineId == onlineId) return it else it.close() }

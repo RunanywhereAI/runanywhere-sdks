@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import com.runanywhere.runanywhereai.ui.navigation.Benchmarks
 import com.runanywhere.runanywhereai.ui.HybridBetaCopy
-import com.runanywhere.runanywhereai.ui.navigation.CloudProviders
 import com.runanywhere.runanywhereai.ui.navigation.Diarization
 import com.runanywhere.runanywhereai.ui.navigation.Diffusion
 import com.runanywhere.runanywhereai.ui.navigation.Documents
@@ -69,7 +68,6 @@ fun MoreScreen(onNavigate: (Any) -> Unit) {
         AdvancedEntry("Voice activity", "Tune speech detection infrastructure", RACIcons.Outline.Activity, AdvancedGroup.SPEECH, Vad),
         AdvancedEntry("Web & tools", "Inspect and control assistant tools", RACIcons.Outline.Tool, AdvancedGroup.DEVELOPER, Tools),
         AdvancedEntry("Solutions", "Run YAML-driven SDK pipelines", RACIcons.Outline.Stack, AdvancedGroup.DEVELOPER, Solutions),
-        AdvancedEntry("Cloud providers", HybridBetaCopy.CLOUD_PROVIDERS_ENTRY_DESCRIPTION, RACIcons.Outline.Cloud, AdvancedGroup.DEVELOPER, CloudProviders),
         AdvancedEntry("Benchmarks", "Measure speed, memory, and device behavior", RACIcons.Outline.Cpu, AdvancedGroup.DEVELOPER, Benchmarks),
     )
 

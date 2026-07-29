@@ -11,7 +11,6 @@ import androidx.navigation.NavDestination.Companion.hasRoute
 import com.runanywhere.runanywhereai.ui.navigation.BenchmarkDetail
 import com.runanywhere.runanywhereai.ui.navigation.Benchmarks
 import com.runanywhere.runanywhereai.ui.navigation.Chat
-import com.runanywhere.runanywhereai.ui.navigation.CloudProviders
 import com.runanywhere.runanywhereai.ui.navigation.Documents
 import com.runanywhere.runanywhereai.ui.navigation.More
 import com.runanywhere.runanywhereai.ui.navigation.Settings
@@ -71,7 +70,6 @@ fun AppTopBar(
         destination.hasRoute<Vision>() -> StandardTopBar("Images & live", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Documents>() -> StandardTopBar("Documents", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Solutions>() -> StandardTopBar("Solutions", showMenu, onMenu, canNavigateBack, onNavigateBack)
-        destination.hasRoute<CloudProviders>() -> StandardTopBar("Cloud providers", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<Benchmarks>() -> StandardTopBar("Benchmarks", showMenu, onMenu, canNavigateBack, onNavigateBack)
         destination.hasRoute<BenchmarkDetail>() -> StandardTopBar("Run details", showMenu, onMenu, canNavigateBack, onNavigateBack)
         else -> Unit

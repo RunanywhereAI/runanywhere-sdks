@@ -49,7 +49,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.sdk.hybrid.HybridRoutedMetadata
-import com.runanywhere.runanywhereai.data.cloud.CloudProviderRepository
 import com.runanywhere.runanywhereai.ui.screens.models.BackendBadge
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
@@ -73,7 +72,6 @@ fun SttScreen() {
     val modelVm: ModelSelectionViewModel =
         viewModel(factory = ModelSelectionViewModel.Factory(ModelSelectionContext.STT))
     var showSheet by remember { mutableStateOf(false) }
-    var showProviderPicker by remember { mutableStateOf(false) }
     var permissionDenied by remember { mutableStateOf(false) }
 
     DisposableEffect(sttVm) {
@@ -94,7 +92,7 @@ fun SttScreen() {
 
     val model = modelVm.state.models.firstOrNull { it.id == modelVm.state.currentModelId }
     val busy = sttVm.isRecording || sttVm.isTranscribing
-    val onlineLabel = CloudProviderRepository.labelFor(sttVm.onlineProviderId) ?: "Add a cloud provider"
+    val onlineLabel = "RunAnywhere cloud"
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -125,7 +123,7 @@ fun SttScreen() {
 
         if (sttVm.mode == SttMode.HYBRID) {
             ModelCard("On-device model", model, null, RACIcons.Outline.Brain) { showSheet = true }
-            ModelCard("Cloud model", null, onlineLabel, RACIcons.Outline.Cloud) { showProviderPicker = true }
+            ModelCard("Cloud model", null, onlineLabel, RACIcons.Outline.Cloud, onClick = null)
             PolicyCard(sttVm)
         } else {
             ModelCard("Model", model, null, RACIcons.Outline.Brain) { showSheet = true }
@@ -175,86 +173,8 @@ fun SttScreen() {
         ModelSelectionSheet(viewModel = modelVm, onDismiss = { showSheet = false })
     }
 
-    if (showProviderPicker) {
-        CloudProviderPicker(
-            selectedId = sttVm.onlineProviderId,
-            onSelect = {
-                sttVm.selectOnlineProvider(it)
-                showProviderPicker = false
-            },
-            onDismiss = { showProviderPicker = false },
-        )
-    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CloudProviderPicker(
-    selectedId: String?,
-    onSelect: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val dimens = LocalDimens.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val options = CloudProviderRepository.providers.map { it.id to "${it.label} · ${it.preset.label}" }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = dimens.radiusLg, topEnd = dimens.radiusLg),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        contentWindowInsets = { WindowInsets.systemBars },
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = dimens.spacingLg)
-                .padding(bottom = dimens.spacingXl),
-            verticalArrangement = Arrangement.spacedBy(dimens.spacingSm),
-        ) {
-            Text(
-                "Cloud backend",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(vertical = dimens.spacingMd),
-            )
-            if (options.isEmpty()) {
-                Text(
-                    HybridBetaCopy.CLOUD_PROVIDER_PICKER_EMPTY,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = dimens.spacingSm),
-                )
-            }
-            options.forEach { (id, label) ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(dimens.radiusMd))
-                        .clickable { onSelect(id) }
-                        .padding(dimens.spacingMd),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(dimens.spacingMd),
-                ) {
-                    Icon(
-                        RACIcons.Outline.Cloud,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(dimens.iconMd),
-                    )
-                    Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    if (id == selectedId) {
-                        Icon(
-                            RACIcons.Outline.Check,
-                            contentDescription = "Selected",
-                            tint = primaryGreen,
-                            modifier = Modifier.size(dimens.iconSm),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun Header(mode: SttMode) {
