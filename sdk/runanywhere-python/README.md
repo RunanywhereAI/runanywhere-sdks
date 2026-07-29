@@ -36,7 +36,7 @@ Load by catalog id (downloaded on first use) or by a local `.gguf` path:
 ```python
 with RunAnywhere() as ra:
     llm = ra.load_llm("/path/to/model.gguf")
-    for token in llm.generate("Write a haiku.", max_tokens=64):
+    for token in llm.generate("Write a haiku.", max_output_tokens=64):
         print(token, end="", flush=True)
 ```
 
@@ -53,7 +53,7 @@ ra = RunAnywhere(
 
 ```python
 # Full text
-answer = llm.generate_text("What is the capital of France?", max_tokens=32)
+answer = llm.generate_text("What is the capital of France?", max_output_tokens=32)
 
 # Streaming with metrics
 for event in llm.generate_stream("Describe a sunset."):

@@ -375,10 +375,10 @@ class RunAnywhere:
         """Compose loaded STT + LLM + TTS models into a voice-turn pipeline."""
         return VoiceAgent(stt, llm, tts, system_prompt)
 
-    def create_vad(self, threshold: float | None = None) -> Vad:
+    def create_vad(self, activation_threshold: float | None = None) -> Vad:
         """Create a voice-activity detector (built-in energy VAD; requires initialize())."""
         core = self._require_core()
-        handle = core.create_vad(threshold)
+        handle = core.create_vad(activation_threshold)
         vad = Vad(core, handle)
         self._register(vad)
         return vad

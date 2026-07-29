@@ -21,7 +21,13 @@ def _default_now() -> float:
 
 
 def _final_event(
-    answer: str, thinking: str, count: int, start: float, first_at: float, end: float
+    answer: str,
+    thinking: str,
+    count: int,
+    start: float,
+    first_at: float,
+    end: float,
+    include_thoughts: bool,
 ) -> LLMStreamEvent:
     gen_ms = 0.0 if first_at < 0 else end - first_at
     return LLMStreamEvent(
@@ -33,7 +39,7 @@ def _final_event(
             time_to_first_token_ms=0.0 if first_at < 0 else first_at - start,
             tokens_per_second=(count / (gen_ms / 1000.0)) if gen_ms > 0 else 0.0,
             total_time_ms=end - start,
-            thinking_content=thinking or None,
+            thinking_content=(thinking or None) if include_thoughts else None,
         ),
     )
 
@@ -41,13 +47,16 @@ def _final_event(
 def stream_with_metrics(
     source: Iterable[str],
     now: Callable[[], float] | None = None,
+    include_thoughts: bool = True,
 ) -> Iterator[LLMStreamEvent]:
     """Wrap a sync token iterable as a stream of LLMStreamEvent with timing metrics + thinking split.
 
     Non-final events carry a ``token`` (``is_thinking`` distinguishes reasoning from answer); the
     final event carries ``is_final=True`` and the aggregated ``LLMGenerationResult`` (answer text,
-    ``thinking_content``, time-to-first-token, tokens/second, total time). ``now`` returns
-    milliseconds and is injectable for deterministic tests.
+    ``thinking_content``, time-to-first-token, tokens/second, total time). With
+    ``include_thoughts=False`` (the v2 contract's ``reasoning.include_in_output`` unset) thinking
+    is stripped: no thought-token events, ``thinking_content`` is None, the answer stays clean.
+    ``now`` returns milliseconds and is injectable for deterministic tests.
     """
     clock = now if now is not None else _default_now
     start = clock()
@@ -65,19 +74,24 @@ def stream_with_metrics(
                 thinking += text
             else:
                 answer += text
+            if is_thinking and not include_thoughts:
+                continue
             yield LLMStreamEvent(token=text, is_final=False, is_thinking=is_thinking)
     for text, is_thinking in splitter.flush():
         if is_thinking:
             thinking += text
         else:
             answer += text
+        if is_thinking and not include_thoughts:
+            continue
         yield LLMStreamEvent(token=text, is_final=False, is_thinking=is_thinking)
-    yield _final_event(answer, thinking, count, start, first_at, clock())
+    yield _final_event(answer, thinking, count, start, first_at, clock(), include_thoughts)
 
 
 async def astream_with_metrics(
     source: AsyncIterable[str],
     now: Callable[[], float] | None = None,
+    include_thoughts: bool = True,
 ) -> AsyncIterator[LLMStreamEvent]:
     """Async twin of :func:`stream_with_metrics` over an async token iterable."""
     clock = now if now is not None else _default_now
@@ -96,11 +110,15 @@ async def astream_with_metrics(
                 thinking += text
             else:
                 answer += text
+            if is_thinking and not include_thoughts:
+                continue
             yield LLMStreamEvent(token=text, is_final=False, is_thinking=is_thinking)
     for text, is_thinking in splitter.flush():
         if is_thinking:
             thinking += text
         else:
             answer += text
+        if is_thinking and not include_thoughts:
+            continue
         yield LLMStreamEvent(token=text, is_final=False, is_thinking=is_thinking)
-    yield _final_event(answer, thinking, count, start, first_at, clock())
+    yield _final_event(answer, thinking, count, start, first_at, clock(), include_thoughts)

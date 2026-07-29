@@ -83,6 +83,8 @@ _EXPECTED = [
     # options
     "InitOptions",
     "GenerateOptions",
+    "ReasoningMode",
+    "ReasoningOptions",
     "LoadOptions",
     "DownloadOptions",
     "VadOptions",

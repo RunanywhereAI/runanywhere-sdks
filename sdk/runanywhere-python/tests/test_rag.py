@@ -15,6 +15,7 @@ pytest.importorskip("google.protobuf", reason="RAG tests need the [rag] extra (p
 import runanywhere
 from runanywhere import rag as ragmod
 from runanywhere.errors import ErrorCode, SDKException
+from runanywhere.options import ReasoningMode, ReasoningOptions
 from runanywhere.rag import RagDocument, RagResult, RagSearchResult, RagSession, RagStatistics
 from runanywhere.results import ResolvedModel
 from runanywhere._proto import rag_pb2 as pb
@@ -139,13 +140,16 @@ def test_ingest_and_query():
     sess = _session(core)
     stats = sess.ingest("Paris is the capital of France.")
     assert isinstance(stats, RagStatistics) and stats.indexed_documents == 1
-    res = sess.query("Capital of France?", top_k=4, disable_thinking=True)
+    res = sess.query(
+        "Capital of France?", top_k=4, reasoning=ReasoningOptions(mode=ReasoningMode.OFF)
+    )
     assert isinstance(res, RagResult) and res.answer == "Paris"
     assert res.retrieved_chunks and isinstance(res.retrieved_chunks[0], RagSearchResult)
     assert res.retrieved_chunks[0].similarity_score == pytest.approx(0.9)
-    # options actually reached the native RAGQueryOptions
+    # options actually reached the native RAGQueryOptions (generation carries sampling)
     assert core.last_query.question == "Capital of France?"
-    assert core.last_query.disable_thinking is True and core.last_query.top_k == 4
+    assert core.last_query.generation.top_k == 4
+    assert core.last_query.generation.reasoning.mode == int(ReasoningMode.OFF)
 
 
 def test_ingest_ragdocument_carries_metadata():

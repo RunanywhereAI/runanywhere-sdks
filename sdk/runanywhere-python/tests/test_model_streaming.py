@@ -16,6 +16,7 @@ import pytest
 import runanywhere._native as _native
 from runanywhere.errors import ErrorCode, SDKException
 from runanywhere.models import LLMModel
+from runanywhere.options import ReasoningMode, ReasoningOptions
 
 
 class FakeCore:
@@ -73,7 +74,12 @@ def test_generate_stream_final_event(make_llm) -> None:
 
 def test_generate_forwards_options_to_native(make_llm) -> None:
     m, core = make_llm(["x"])
-    m.generate_text("hi", max_tokens=7, temperature=0.0, disable_thinking=True)
+    m.generate_text(
+        "hi",
+        max_output_tokens=7,
+        temperature=0.0,
+        reasoning=ReasoningOptions(mode=ReasoningMode.OFF),
+    )
     assert core.last_kwargs["max_tokens"] == 7
     assert core.last_kwargs["temperature"] == 0.0
     assert core.last_kwargs["disable_thinking"] is True

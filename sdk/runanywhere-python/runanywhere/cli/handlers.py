@@ -15,6 +15,7 @@ from ..audio import decode_wav, downsample, encode_wav, pcm16_bytes
 from ..catalog import CATALOG
 from ..download import model_status, models_root, resolve_model
 from ..errors import SDKException
+from ..options import ReasoningMode, ReasoningOptions
 from . import output
 
 DEFAULT_LLM = "qwen2.5-0.5b"
@@ -95,9 +96,15 @@ def _gen_opts(args: argparse.Namespace) -> dict:
     if getattr(args, "temperature", None) is not None:
         opts["temperature"] = args.temperature
     if getattr(args, "max_tokens", None) is not None:
-        opts["max_tokens"] = args.max_tokens
+        opts["max_output_tokens"] = args.max_tokens
     if getattr(args, "system", None):
         opts["system_prompt"] = args.system
+    # --no-think suppresses the thinking phase at the source; otherwise thoughts are
+    # requested in the output so the CLI can render them dimmed.
+    if getattr(args, "no_think", False):
+        opts["reasoning"] = ReasoningOptions(mode=ReasoningMode.OFF)
+    else:
+        opts["reasoning"] = ReasoningOptions(include_in_output=True)
     return opts
 
 

@@ -11,7 +11,7 @@ import numpy as np
 from . import events
 from ._streaming import aiter_tokens, iter_tokens
 from .errors import SDKException
-from .options import generate_kwargs
+from .options import generate_kwargs, include_thoughts
 from .results import LLMStreamEvent, Synthesis
 from .stream_metrics import astream_with_metrics, stream_with_metrics
 from .structured import (
@@ -166,15 +166,23 @@ class LLMModel:
     # -- stream (events + metrics) -------------------------------------------
     def generate_stream(self, prompt: str, **opts: Any) -> Iterator[LLMStreamEvent]:
         """Stream generation as :class:`LLMStreamEvent`; the final event carries the
-        aggregated metrics and is also published as a ``GenerationEvent`` on the bus."""
-        for event in stream_with_metrics(self.generate(prompt, **opts)):
+        aggregated metrics and is also published as a ``GenerationEvent`` on the bus.
+
+        Thought tokens / ``thinking_content`` are emitted only when
+        ``reasoning.include_in_output`` is set (v2 contract) — otherwise thinking is
+        stripped and only answer tokens stream."""
+        for event in stream_with_metrics(
+            self.generate(prompt, **opts), include_thoughts=include_thoughts(**opts)
+        ):
             if event.is_final and event.result is not None:
                 events.bus.emit(events.GenerationEvent(result=event.result))
             yield event
 
     async def agenerate_stream(self, prompt: str, **opts: Any) -> AsyncIterator[LLMStreamEvent]:
         """Async twin of :meth:`generate_stream`."""
-        async for event in astream_with_metrics(self.agenerate(prompt, **opts)):
+        async for event in astream_with_metrics(
+            self.agenerate(prompt, **opts), include_thoughts=include_thoughts(**opts)
+        ):
             if event.is_final and event.result is not None:
                 events.bus.emit(events.GenerationEvent(result=event.result))
             yield event

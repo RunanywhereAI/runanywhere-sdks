@@ -79,7 +79,7 @@ def test_async_repeated_generations() -> None:
         async def run() -> list[str]:
             out = []
             for q in ("Capital of France? One word.", "2+2? One number.", "Sky color? One word."):
-                out.append(await llm.agenerate_text(q, max_tokens=16))
+                out.append(await llm.agenerate_text(q, max_output_tokens=16))
             return out
 
         results = asyncio.run(run())
@@ -91,16 +91,16 @@ def test_single_in_flight_guard_blocks_concurrent_generate() -> None:
     """A second generation on the SAME model while one is live raises invalid_state."""
     with RunAnywhere() as ra:
         llm = ra.load_llm(LLM_ID)
-        live = llm.generate("Count to a hundred slowly.", max_tokens=128)
+        live = llm.generate("Count to a hundred slowly.", max_output_tokens=128)
         next(live)  # start it -> acquires the per-model guard (held until close/exhaust)
         try:
             with pytest.raises(SDKException) as error:
-                list(llm.generate("A concurrent prompt.", max_tokens=8))
+                list(llm.generate("A concurrent prompt.", max_output_tokens=8))
             assert error.value.code == ErrorCode.INVALID_STATE
         finally:
             live.close()  # release the guard; stop the worker
         # After releasing, a fresh generation works again.
-        assert llm.generate_text("Capital of France? One word.", max_tokens=8).strip()
+        assert llm.generate_text("Capital of France? One word.", max_output_tokens=8).strip()
 
 
 @requires_native
@@ -115,8 +115,8 @@ def test_generate_after_unload_fails_cleanly() -> None:
     """Using a model after unload() must raise at the Python layer, never crash the process."""
     with RunAnywhere() as ra:
         llm = ra.load_llm(LLM_ID)
-        assert isinstance(llm.generate_text("Hi.", max_tokens=4), str)
+        assert isinstance(llm.generate_text("Hi.", max_output_tokens=4), str)
         llm.unload()
         with pytest.raises(SDKException) as error:
-            list(llm.generate("Should fail after unload.", max_tokens=4))
+            list(llm.generate("Should fail after unload.", max_output_tokens=4))
         assert error.value.code == ErrorCode.INVALID_STATE

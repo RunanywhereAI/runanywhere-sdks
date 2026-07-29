@@ -60,7 +60,7 @@ def _gen_opts(req: Any) -> dict[str, Any]:
     opts: dict[str, Any] = {}
     max_tokens = getattr(req, "max_completion_tokens", None) or getattr(req, "max_tokens", None)
     if max_tokens is not None:
-        opts["max_tokens"] = max_tokens
+        opts["max_output_tokens"] = max_tokens
     if getattr(req, "temperature", None) is not None:
         opts["temperature"] = req.temperature
     if getattr(req, "top_p", None) is not None:

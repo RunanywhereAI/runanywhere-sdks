@@ -10,8 +10,11 @@ from runanywhere.options import (
     GenerateOptions,
     InitOptions,
     LoadOptions,
+    ReasoningMode,
+    ReasoningOptions,
     VadOptions,
     generate_kwargs,
+    include_thoughts,
 )
 from runanywhere.results import (
     DownloadProgress,
@@ -29,17 +32,17 @@ from runanywhere.results import (
 
 def test_generate_kwargs_drops_none() -> None:
     assert generate_kwargs() == {}
-    assert generate_kwargs(max_tokens=None, temperature=None) == {}
+    assert generate_kwargs(max_output_tokens=None, temperature=None) == {}
 
 
 def test_generate_kwargs_keeps_set_keys() -> None:
-    out = generate_kwargs(max_tokens=64, temperature=0.7, grammar="root ::= x")
+    out = generate_kwargs(max_output_tokens=64, temperature=0.7, grammar="root ::= x")
     assert out == {"max_tokens": 64, "temperature": 0.7, "grammar": "root ::= x"}
 
 
 def test_generate_kwargs_mixed_none_and_set() -> None:
     out = generate_kwargs(
-        max_tokens=32,
+        max_output_tokens=32,
         temperature=None,
         top_p=0.9,
         top_k=None,
@@ -51,12 +54,13 @@ def test_generate_kwargs_mixed_none_and_set() -> None:
 
 def test_generate_kwargs_all_keys() -> None:
     out = generate_kwargs(
-        max_tokens=1,
+        max_output_tokens=1,
         temperature=0.0,
         top_p=0.1,
         top_k=5,
         system_prompt="s",
         grammar="g",
+        reasoning=ReasoningOptions(mode=ReasoningMode.OFF),
     )
     assert out == {
         "max_tokens": 1,
@@ -65,11 +69,28 @@ def test_generate_kwargs_all_keys() -> None:
         "top_k": 5,
         "system_prompt": "s",
         "grammar": "g",
+        "disable_thinking": True,
     }
 
 
+def test_generate_kwargs_reasoning_mapping() -> None:
+    # OFF maps to the bridge's disable_thinking; ON / unset leave the backend default.
+    assert generate_kwargs(reasoning=ReasoningOptions(mode=ReasoningMode.OFF)) == {
+        "disable_thinking": True
+    }
+    assert generate_kwargs(reasoning=ReasoningOptions(mode=ReasoningMode.ON)) == {}
+    assert generate_kwargs(reasoning=ReasoningOptions()) == {}
+    assert generate_kwargs(reasoning=None) == {}
+
+
+def test_include_thoughts_follows_reasoning() -> None:
+    assert include_thoughts() is False
+    assert include_thoughts(reasoning=ReasoningOptions()) is False
+    assert include_thoughts(reasoning=ReasoningOptions(include_in_output=True)) is True
+
+
 def test_generate_kwargs_ignores_unknown_keys() -> None:
-    out = generate_kwargs(max_tokens=8, unknown="x", schema={"type": "object"})
+    out = generate_kwargs(max_output_tokens=8, unknown="x", schema={"type": "object"})
     assert out == {"max_tokens": 8}
 
 
@@ -80,7 +101,7 @@ def test_generate_kwargs_keeps_falsy_non_none() -> None:
 
 
 def test_generate_options_dataclass_feeds_generate_kwargs() -> None:
-    opts = GenerateOptions(max_tokens=16, temperature=0.5)
+    opts = GenerateOptions(max_output_tokens=16, temperature=0.5)
     out = generate_kwargs(**vars(opts))
     assert out == {"max_tokens": 16, "temperature": 0.5}
 
@@ -99,16 +120,16 @@ def test_init_options_defaults() -> None:
 
 def test_generate_options_defaults() -> None:
     o = GenerateOptions()
-    assert (o.max_tokens, o.temperature, o.top_p, o.top_k) == (None, None, None, None)
+    assert (o.max_output_tokens, o.temperature, o.top_p, o.top_k) == (None, None, None, None)
     assert o.system_prompt is None
-    assert o.grammar is None
+    assert o.reasoning is None
 
 
 def test_load_download_vad_chat_options_defaults() -> None:
     assert LoadOptions() == LoadOptions(id=None, name=None)
     d = DownloadOptions()
     assert d.dir is None and d.on_progress is None
-    assert VadOptions().threshold is None
+    assert VadOptions().activation_threshold is None
     assert ChatOptions().system is None
 
 

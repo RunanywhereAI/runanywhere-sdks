@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Iterator
 
 from ._streaming import aiter_tokens, iter_tokens
 from .errors import ErrorCode, SDKException
+from .options import ReasoningOptions
 
 if TYPE_CHECKING:
     from .results import ResolvedModel
@@ -230,26 +231,34 @@ def _stats_from_bytes(raw: bytes) -> RagStatistics:
     return _parse_stats(pb)
 
 
-# Query-option keys accepted by ingest/query kwargs and mapped onto RAGQueryOptions.
-_QUERY_INT = ("max_tokens", "top_k", "retrieval_top_k")
-_QUERY_FLOAT = ("temperature", "top_p", "similarity_threshold")
+# Generation kwargs mapped onto RAGQueryOptions.generation (LLMGenerationOptions);
+# retrieval knobs (retrieval_top_k / similarity_threshold / scope_prefix) stay on the
+# query message itself.
+_GEN_INT = ("max_output_tokens", "top_k")
+_GEN_FLOAT = ("temperature", "top_p")
 
 
 def _build_query(question: str, opts: dict, *, stream: bool) -> Any:
     """Assemble a RAGQueryOptions from a question + generation kwargs."""
     q = _pb.RAGQueryOptions(question=question)
-    for key in _QUERY_INT:
+    for key in _GEN_INT:
         if opts.get(key) is not None:
-            setattr(q, key, int(opts[key]))
-    for key in _QUERY_FLOAT:
+            setattr(q.generation, key, int(opts[key]))
+    for key in _GEN_FLOAT:
         if opts.get(key) is not None:
-            setattr(q, key, float(opts[key]))
+            setattr(q.generation, key, float(opts[key]))
     if opts.get("system_prompt") is not None:
-        q.system_prompt = str(opts["system_prompt"])
+        q.generation.system_prompt = str(opts["system_prompt"])
+    reasoning = opts.get("reasoning")
+    if isinstance(reasoning, ReasoningOptions):
+        q.generation.reasoning.mode = int(reasoning.mode)
+        q.generation.reasoning.include_in_output = reasoning.include_in_output
+    if opts.get("retrieval_top_k") is not None:
+        q.retrieval_top_k = int(opts["retrieval_top_k"])
+    if opts.get("similarity_threshold") is not None:
+        q.similarity_threshold = float(opts["similarity_threshold"])
     if opts.get("scope_prefix") is not None:
         q.scope_prefix = str(opts["scope_prefix"])
-    if opts.get("disable_thinking") is not None:
-        q.disable_thinking = bool(opts["disable_thinking"])
     q.stream = stream
     return q
 
@@ -308,8 +317,9 @@ class RagSession:
     def query(self, question: str, **opts: Any) -> RagResult:
         """Retrieve relevant chunks and generate a grounded answer.
 
-        Accepts ``max_tokens`` / ``temperature`` / ``top_p`` / ``top_k`` / ``system_prompt`` /
-        ``retrieval_top_k`` / ``similarity_threshold`` / ``disable_thinking`` / ``scope_prefix``.
+        Accepts generation kwargs (``max_output_tokens`` / ``temperature`` / ``top_p`` /
+        ``top_k`` / ``system_prompt`` / ``reasoning``) plus retrieval knobs
+        (``retrieval_top_k`` / ``similarity_threshold`` / ``scope_prefix``).
         """
         core = self._live()
         q = _build_query(question, opts, stream=False)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import Callable
 
 from .results import DownloadProgress
@@ -17,19 +18,42 @@ class InitOptions:
     environment: str = "production"
 
 
+class ReasoningMode(IntEnum):
+    """Reasoning/thinking control mode (mirrors runanywhere.v1.ReasoningMode)."""
+
+    UNSPECIFIED = 0
+    OFF = 1
+    ON = 2
+
+
+@dataclass
+class ReasoningOptions:
+    """Reasoning/thinking control (mirrors runanywhere.v1.ReasoningOptions).
+
+    ``mode=OFF`` suppresses the model's thinking phase (commons prepends the model's
+    no-think directive). ``include_in_output`` governs whether thought tokens and
+    ``thinking_content`` are emitted by the stream helpers — when False (the default)
+    thinking is stripped from the output.
+    """
+
+    mode: ReasoningMode = ReasoningMode.UNSPECIFIED
+    include_in_output: bool = False
+
+
 @dataclass
 class GenerateOptions:
-    """Per-request generation controls (all optional)."""
+    """Per-request generation controls (all optional).
 
-    max_tokens: int | None = None
+    Output constraints (JSON schema / grammar) have no loose knob here — use
+    ``generate_structured`` / ``generate_tool_call``, the structured-output surface.
+    """
+
+    max_output_tokens: int | None = None
     temperature: float | None = None
     top_p: float | None = None
     top_k: int | None = None
     system_prompt: str | None = None
-    grammar: str | None = None
-    #: Suppress the model's ``<think>`` reasoning phase for this call (commons prepends the
-    #: model's no-think directive). Mirrors Swift/Web ``disableThinking``.
-    disable_thinking: bool | None = None
+    reasoning: ReasoningOptions | None = None
 
 
 @dataclass
@@ -50,9 +74,9 @@ class DownloadOptions:
 
 @dataclass
 class VadOptions:
-    """Energy threshold in [0,1] for the built-in energy VAD."""
+    """Activation threshold in [0,1] for the built-in energy VAD."""
 
-    threshold: float | None = None
+    activation_threshold: float | None = None
 
 
 @dataclass
@@ -62,24 +86,42 @@ class ChatOptions:
     system: str | None = None
 
 
-# The only keys forwarded to the native ``_core.generate`` call. A value of None
-# means "unset" and is dropped so the backend applies its own default.
-_GENERATE_KEYS = (
-    "max_tokens",
+# Keys forwarded verbatim to the native ``_core.generate`` call. A value of None means
+# "unset" and is dropped so the backend applies its own default. ``grammar`` stays a
+# bridge-level key (the C struct ABI's constrained-decoding slot) — it is how
+# ``generate_structured``/``generate_tool_call`` implement structured output, not a
+# public option.
+_PASSTHROUGH_KEYS = (
     "temperature",
     "top_p",
     "top_k",
     "system_prompt",
     "grammar",
-    "disable_thinking",
 )
 
 
 def generate_kwargs(**opts: object) -> dict:
-    """Build the ``_core.generate`` kwargs, keeping only known keys with non-None values.
+    """Build the ``_core.generate`` kwargs from facade options.
 
-    Unknown keys are ignored; any of ``max_tokens``/``temperature``/``top_p``/``top_k``/
-    ``system_prompt``/``grammar``/``disable_thinking`` whose value is None is dropped
+    Maps the v2 option names onto the C-struct bridge: ``max_output_tokens`` →
+    ``max_tokens`` (the ``rac_llm_options_t`` field), ``reasoning.mode == OFF`` →
+    ``disable_thinking=True``. Unknown keys are ignored; None values are dropped
     (backend default applies).
     """
-    return {k: opts[k] for k in _GENERATE_KEYS if opts.get(k) is not None}
+    out = {k: opts[k] for k in _PASSTHROUGH_KEYS if opts.get(k) is not None}
+    if opts.get("max_output_tokens") is not None:
+        out["max_tokens"] = opts["max_output_tokens"]
+    reasoning = opts.get("reasoning")
+    if isinstance(reasoning, ReasoningOptions) and reasoning.mode == ReasoningMode.OFF:
+        out["disable_thinking"] = True
+    return out
+
+
+def include_thoughts(**opts: object) -> bool:
+    """Whether the stream helpers should emit thought tokens / ``thinking_content``.
+
+    Per the v2 contract, thoughts are emitted only when
+    ``reasoning.include_in_output`` is True; unset reasoning strips thinking.
+    """
+    reasoning = opts.get("reasoning")
+    return isinstance(reasoning, ReasoningOptions) and reasoning.include_in_output

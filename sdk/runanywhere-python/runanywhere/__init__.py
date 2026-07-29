@@ -55,6 +55,8 @@ from .options import (
     GenerateOptions,
     InitOptions,
     LoadOptions,
+    ReasoningMode,
+    ReasoningOptions,
     VadOptions,
 )
 # RAG value types. `rag` guards its optional protobuf import internally, so importing it here
@@ -116,6 +118,8 @@ __all__ = [
     # options
     "InitOptions",
     "GenerateOptions",
+    "ReasoningMode",
+    "ReasoningOptions",
     "LoadOptions",
     "DownloadOptions",
     "VadOptions",

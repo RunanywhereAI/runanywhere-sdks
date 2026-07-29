@@ -220,11 +220,16 @@ the GIL held.
 
 ### Options → native kwargs
 
-`options.py` defines the `*Options` dataclasses. Only a fixed key set
-(`max_tokens`, `temperature`, `top_p`, `top_k`, `system_prompt`, `grammar`) is forwarded to
-`core.generate`; `generate_kwargs` keeps only those known keys whose value is non-`None`
-(a `None` means "unset" so the backend applies its own default). Generation options are
-passed as loose `**opts` kwargs through the handle methods.
+`options.py` defines the `*Options` dataclasses using the v2 IDL names
+(`max_output_tokens`, `reasoning: ReasoningOptions`, VAD `activation_threshold`).
+`generate_kwargs` maps them onto the C-struct bridge kwargs: `max_output_tokens` →
+`max_tokens`, `reasoning.mode == OFF` → `disable_thinking=True`; `temperature` / `top_p` /
+`top_k` / `system_prompt` / `grammar` pass through verbatim (`grammar` is bridge-level only —
+`generate_structured` / `generate_tool_call` are the public structured-output surface). Keys
+whose value is `None` are dropped ("unset" — the backend applies its own default). Thought
+tokens / `thinking_content` are emitted by the stream helpers only when
+`reasoning.include_in_output` is set (`include_thoughts`). Generation options are passed as
+loose `**opts` kwargs through the handle methods.
 
 ### Structured output, grammar & tools
 
