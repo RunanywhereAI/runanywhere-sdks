@@ -262,7 +262,7 @@ bool llm_generate(int32_t max_tokens, bool system_prompt, v1::LLMGenerationResul
     v1::LLMGenerateRequest request;
     request.set_prompt(kLlmPrompt);
     v1::LLMGenerationOptions* gen = request.mutable_options();
-    gen->set_max_tokens(max_tokens);
+    gen->set_max_output_tokens(max_tokens);
     gen->set_temperature(0.0f);
     if (system_prompt) {
         gen->set_system_prompt(kLlmSystemPrompt);
@@ -290,8 +290,7 @@ bool stt_transcribe(const std::string& pcm, v1::STTOutput* out, std::string* err
     audio->set_channels(1);
     audio->set_bits_per_sample(16);
     v1::STTOptions* opts = request.mutable_options();
-    opts->set_language(v1::STT_LANGUAGE_EN);
-    opts->set_sample_rate(16000);
+    opts->set_language("en");
     const std::string bytes = proto::serialize(request);
     rac_proto_buffer_t buf;
     rac_proto_buffer_init(&buf);
@@ -332,7 +331,7 @@ bool vlm_process(const std::string& image_path, int32_t max_tokens, v1::VLMResul
     image->set_file_path(image_path);
     v1::VLMGenerationOptions* gen = request.mutable_options();
     gen->set_prompt(kVlmPrompt);
-    gen->set_max_tokens(max_tokens);
+    gen->set_max_output_tokens(max_tokens);
     gen->set_temperature(0.0f);
     const std::string bytes = proto::serialize(request);
     rac_proto_buffer_t buf;
@@ -382,7 +381,7 @@ bool llm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    const int32_t out_tokens = r.tokens_generated();
+    const int32_t out_tokens = r.output_tokens();
     if (out_tokens <= 0) {
         *err = "no output tokens";
         return false;
@@ -485,7 +484,7 @@ bool vlm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    const int32_t out_tokens = r.completion_tokens();
+    const int32_t out_tokens = r.output_tokens();
     m->end_to_end_ms = r.processing_time_ms() > 0 ? static_cast<double>(r.processing_time_ms())
                                                   : measured_e2e;
     m->tokens_per_second = r.tokens_per_second();

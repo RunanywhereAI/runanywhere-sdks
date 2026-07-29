@@ -218,7 +218,7 @@ int run_image_generate(const GlobalOptions& options, const ImageParams& params) 
         gen->set_negative_prompt(params.negative_prompt);
     }
     if (params.steps > 0) {
-        gen->set_num_inference_steps(params.steps);
+        gen->set_steps(params.steps);
     }
     if (params.guidance > 0.0f) {
         gen->set_guidance_scale(params.guidance);

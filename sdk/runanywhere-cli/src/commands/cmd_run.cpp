@@ -162,17 +162,19 @@ int generate_once(const GlobalOptions& options, const std::string& model_id,
                   const std::string& prompt, const RunParams& params) {
     v1::LLMGenerateRequest request;
     request.set_prompt(prompt);
-    request.set_emit_thoughts(!params.no_think);
     v1::LLMGenerationOptions* gen = request.mutable_options();
-    gen->set_max_tokens(params.max_tokens);
+    gen->set_max_output_tokens(params.max_tokens);
     if (params.temperature > 0.0f) {
         gen->set_temperature(params.temperature);
     }
     if (!params.system_prompt.empty()) {
         gen->set_system_prompt(params.system_prompt);
     }
+    v1::ReasoningOptions* reasoning = gen->mutable_reasoning();
     if (params.no_think) {
-        gen->set_disable_thinking(true);
+        reasoning->set_mode(v1::REASONING_MODE_OFF);
+    } else {
+        reasoning->set_include_in_output(true);
     }
     (void)model_id;  // lifecycle-owned state knows the loaded model
 
@@ -274,7 +276,7 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
     image->set_file_path(image_path);
     v1::VLMGenerationOptions* gen = request.mutable_options();
     gen->set_prompt(prompt.empty() ? "Describe this image." : prompt);
-    gen->set_max_tokens(params.max_tokens);
+    gen->set_max_output_tokens(params.max_tokens);
     if (params.temperature > 0.0f) {
         gen->set_temperature(params.temperature);
     }
@@ -463,7 +465,8 @@ void register_run(CLI::App& app, GlobalOptions& options) {
     cmd->add_option("--engine", params->engine,
                     "Engine/framework hint for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
     cmd->add_option("--temp,--temperature", params->temperature, "Sampling temperature");
-    cmd->add_option("--max-tokens", params->max_tokens, "Max tokens to generate (default 1024)");
+    cmd->add_option("--max-output-tokens,--max-tokens", params->max_tokens,
+                    "Max tokens to generate (default 1024)");
     cmd->add_flag("--no-think", params->no_think, "Disable the model's thinking phase");
     cmd->callback([&options, ref, prompt, image, params]() {
         const int exit_code = run_run(options, *ref, *prompt, *image, *params);

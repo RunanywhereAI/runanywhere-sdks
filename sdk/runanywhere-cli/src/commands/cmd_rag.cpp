@@ -143,10 +143,10 @@ int run_rag_query(const GlobalOptions& options, const std::string& llm_model,
     v1::RAGQueryOptions query;
     query.set_question(question);
     if (max_tokens > 0) {
-        query.set_max_tokens(max_tokens);
+        query.mutable_generation()->set_max_output_tokens(max_tokens);
     }
     if (temperature >= 0.0f) {
-        query.set_temperature(temperature);
+        query.mutable_generation()->set_temperature(temperature);
     }
     if (top_k > 0) {
         query.set_retrieval_top_k(top_k);
@@ -221,7 +221,7 @@ void register_rag(CLI::App& app, GlobalOptions& options) {
                           "Embedding model id (default: " + std::string(kDefaultRagEmbed) + ")")
         ->default_val(kDefaultRagEmbed);
     query_cmd->add_option("--top-k", *top_k, "Number of chunks to retrieve");
-    query_cmd->add_option("--max-tokens", *max_tokens, "Max answer tokens");
+    query_cmd->add_option("--max-output-tokens,--max-tokens", *max_tokens, "Max answer tokens");
     query_cmd->add_option("--temperature", *temperature, "Sampling temperature");
 
     query_cmd->callback([&options, question, docs, files, llm_model, embed_model, top_k, max_tokens,
