@@ -169,6 +169,14 @@ int64_t http_head_content_length(const std::string& url, int32_t* out_http_statu
     req.url = url.c_str();
     req.timeout_ms = 15000;
     req.follow_redirects = RAC_TRUE;
+    // Without an explicit Accept-Encoding, platform transports (OkHttp,
+    // URLSession) negotiate gzip transparently and then STRIP Content-Length
+    // from the decoded response — a compressible file (vocab.txt, *.json)
+    // probes as size-unknown and trips the fail-closed storage gate. Identity
+    // keeps the true byte count on the wire.
+    rac_http_header_kv_t accept_identity{"Accept-Encoding", "identity"};
+    req.headers = &accept_identity;
+    req.header_count = 1;
     rac_http_response_t resp{};
     int64_t len = -1;
     rac_result_t rc = rac_http_request_send(client, &req, &resp);
