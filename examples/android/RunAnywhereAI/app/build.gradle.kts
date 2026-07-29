@@ -163,11 +163,36 @@ android {
     }
 }
 
+// Default: published Maven Central AARs (0.20.11+). For monorepo / CI builds that
+// exercise unreleased SDK changes, stage into libs/ then pass
+// -Prunanywhere.useLocalSdkAars=true (see scripts/stage-sdk-aars.sh).
+val useLocalSdkAars = providers.gradleProperty("runanywhere.useLocalSdkAars")
+    .map { it.toBoolean() }
+    .orElse(false)
+    .get()
+
 dependencies {
-    implementation(files("../libs/runanywhere-sdk.aar"))
-    implementation(files("../libs/runanywhere-llamacpp.aar"))
-    implementation(files("../libs/runanywhere-onnx.aar"))
-    implementation(files("../libs/runanywhere-qhexrt.aar"))
+    if (useLocalSdkAars) {
+        val localSdk = rootProject.file("libs/runanywhere-sdk.aar")
+        val localLlama = rootProject.file("libs/runanywhere-llamacpp.aar")
+        val localOnnx = rootProject.file("libs/runanywhere-onnx.aar")
+        val localQhexrt = rootProject.file("libs/runanywhere-qhexrt.aar")
+        listOf(localSdk, localLlama, localOnnx, localQhexrt).forEach { aar ->
+            require(aar.isFile) {
+                "Missing ${aar.name}. Run ./scripts/stage-sdk-aars.sh or omit " +
+                    "-Prunanywhere.useLocalSdkAars to resolve from Maven Central."
+            }
+        }
+        implementation(files(localSdk))
+        implementation(files(localLlama))
+        implementation(files(localOnnx))
+        implementation(files(localQhexrt))
+    } else {
+        implementation(libs.runanywhere.sdk)
+        implementation(libs.runanywhere.llamacpp)
+        implementation(libs.runanywhere.onnx)
+        implementation(libs.runanywhere.qhexrt)
+    }
     implementation(libs.okhttp)
     implementation(libs.pdfbox.android)
 
@@ -249,8 +274,8 @@ val verifyPlayRelease = tasks.register("verifyPlayRelease") {
 val localSdkVersion = providers.environmentVariable("SDK_VERSION").orNull
     ?.removePrefix("v")
     ?.takeIf { it.isNotBlank() }
-    ?: "0.1.12-SNAPSHOT"
-val localSdkAars = fileTree("../libs") { include("*.aar") }
+    ?: providers.gradleProperty("runanywhere.sdkVersion").orElse("0.20.11").get()
+val localSdkAars = fileTree(rootProject.file("libs")) { include("*.aar") }
 
 val generateReleaseSbom = tasks.register("generateReleaseSbom") {
     group = "verification"

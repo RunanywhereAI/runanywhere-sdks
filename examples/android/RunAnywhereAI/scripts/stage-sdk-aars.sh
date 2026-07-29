@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Build the four Kotlin SDK AARs from local natives and copy them into libs/.
+# The example app defaults to Maven Central; after staging, build with:
+#   ./gradlew -Prunanywhere.useLocalSdkAars=true :app:assembleDebug
 set -euo pipefail
 
 EXAMPLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -67,3 +70,6 @@ cp "${QHEXRT_AAR}" "${LIBS_DIR}/runanywhere-qhexrt.aar"
 
 echo "Staged AARs into ${LIBS_DIR}:"
 ls -lh "${LIBS_DIR}"/*.aar
+echo
+echo "Build the example against these local AARs with:"
+echo "  ./gradlew -Prunanywhere.useLocalSdkAars=true :app:assembleDebug"

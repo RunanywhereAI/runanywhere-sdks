@@ -531,7 +531,8 @@ jobs:
         run: ./scripts/stage-sdk-aars.sh debug
       - name: Android example unit tests + debug assembly
         working-directory: examples/android/RunAnywhereAI
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon --max-workers=2
+        # Consume the just-built monorepo AARs (default app path is Maven Central).
+        run: ./gradlew testDebugUnitTest lintDebug assembleDebug --no-daemon --max-workers=2 -Prunanywhere.useLocalSdkAars=true
       - name: ktlintCheck + detekt (lint lane)
         working-directory: sdk/runanywhere-kotlin
         run: ./gradlew ktlintCheck detekt --no-daemon

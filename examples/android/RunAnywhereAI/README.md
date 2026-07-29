@@ -38,7 +38,7 @@ Export `ANDROID_HOME` and `ANDROID_NDK_HOME` before building native libraries.
 
 ## Setup
 
-> **Important:** This sample consumes four local AARs from `libs/` (core, LlamaCPP, ONNX, QHexRT). A clean clone must build native libraries and stage SDK artifacts before the app will compile.
+> **Default:** the app resolves SDK packages from **Maven Central** (`io.github.sanchitmonga22:runanywhere-*:0.20.11`). No local native build is required for a clean clone.
 
 ### 1. Clone and open the example
 
@@ -47,43 +47,37 @@ git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
 cd runanywhere-sdks/examples/android/RunAnywhereAI
 ```
 
-### 2. Build native libraries (repo root)
+### 2. Configure Android SDK
 
-From the example directory, build the Android native core for your target ABI:
+Copy `local.properties.example` → `local.properties` and set `sdk.dir`, or export `ANDROID_HOME`.
 
-```bash
-../../../scripts/build/build-core-android.sh arm64-v8a
-```
+Optional: set `runanywhere.baseUrl` / `runanywhere.apiKey` for production control-plane features. HNPU model downloads need a Hugging Face token entered in **Settings → Downloads** (private `runanywhere/*_HNPU` repos).
 
-This produces the JNI libraries the Kotlin SDK packages expect. Re-run this step after any change to the C++ layer in `runanywhere-commons`.
-
-### 3. Stage SDK AARs into `libs/`
-
-```bash
-./scripts/stage-sdk-aars.sh debug
-```
-
-This builds the four Kotlin SDK modules (core, LlamaCPP, ONNX, QHexRT) against the staged natives and copies deterministic AAR names into `libs/`. Run again after SDK or native changes.
-
-### 4. Verify and run
+### 3. Verify and run
 
 ```bash
 ./scripts/verify.sh
-```
-
-Or open the project in Android Studio and run the **app** configuration, or install from the command line:
-
-```bash
+# or
 ./gradlew :app:installDebug
 ```
 
-### After modifying the SDK
+Open the project in Android Studio and run the **app** configuration on an arm64 device (Snapdragon with Hexagon V75/V79/V81 for QHexRT).
+
+### Optional: build against local monorepo AARs
+
+Use this when iterating on unreleased SDK / native changes:
+
+```bash
+../../../scripts/build/build-core-android.sh arm64-v8a
+./scripts/stage-sdk-aars.sh debug
+./gradlew -Prunanywhere.useLocalSdkAars=true :app:assembleDebug
+```
 
 | Change | Action |
 |--------|--------|
-| C++ / commons | Re-run `build-core-android.sh`, then `stage-sdk-aars.sh` |
-| Kotlin SDK | Re-run `stage-sdk-aars.sh` |
-| App UI only | Rebuild in Android Studio or `./gradlew :app:assembleDebug` |
+| Published SDK only | Bump `runanywhere` in `gradle/libs.versions.toml`, refresh locks |
+| Local C++ / commons | `build-core-android.sh`, then `stage-sdk-aars.sh` + `-Prunanywhere.useLocalSdkAars=true` |
+| App UI only | `./gradlew :app:assembleDebug` |
 
 ---
 
@@ -106,7 +100,7 @@ Or open the project in Android Studio and run the **app** configuration, or inst
 
 ## NPU / QHexRT (Snapdragon devices)
 
-On supported Qualcomm Hexagon NPU hardware, the app can register the QHexRT backend for accelerated inference. The QHexRT AAR is included in the standard four-AAR staging flow.
+On supported Qualcomm Hexagon NPU hardware, the app registers the QHexRT backend from Maven Central (`runanywhere-qhexrt-android`). That AAR is **binary-only** (engine `.so` + QAIRT host libs + DSP skels + a thin Kotlin registration API). Engine C++ source is not published.
 
 To test private `runanywhere/*_HNPU` model bundles:
 
@@ -115,7 +109,16 @@ To test private `runanywhere/*_HNPU` model bundles:
 3. Download and load an HNPU model from the model picker. The SDK resolves the correct Hexagon architecture natively.
 4. Tap **Clear** to return to public, no-auth downloads.
 
-The token is passed through the SDK at runtime; it is not stored in source, assets, or logs. Private QHexRT release and device-suite workflows live in a separate checkout—see your internal QHexRT documentation if you maintain that stack.
+The token is passed through the SDK at runtime; it is not stored in source, assets, or logs.
+
+Device acceptance (catalog sweep) lives in the sibling QHexRT checkout:
+
+```bash
+# From the neurun/QHexRT tree — uses Maven Central by default when the app is not
+# forced onto local AARs:
+QHexRT/device_suites/run_android_e2e.sh --serial <adb> --token "$HF_TOKEN" --arch v75 --build \
+  lfm2_5_230m
+```
 
 ---
 
@@ -129,15 +132,15 @@ RunAnywhereAI/
 │   ├── ui/navigation/               # Compose navigation
 │   ├── ui/theme/                    # Material 3 theming (#FF6900 brand)
 │   └── data/                        # Model catalog, settings repositories
-├── libs/                            # Staged SDK AARs (not committed on clean clone)
+├── libs/                            # Optional local AARs (gitignored; monorepo override)
 ├── scripts/
-│   ├── stage-sdk-aars.sh            # Build and copy AARs into libs/
-│   ├── verify.sh                    # Strict debug APK build gate
+│   ├── stage-sdk-aars.sh            # Optional: build/copy local AARs into libs/
+│   ├── verify.sh                    # Strict debug APK build gate (Maven by default)
 │   └── smoke.sh                     # Fast SDK API coverage check
 └── README.md
 ```
 
-The app depends on local AARs rather than Maven coordinates so SDK changes in the monorepo are immediately testable.
+Default dependency path is Maven Central. Pass `-Prunanywhere.useLocalSdkAars=true` after `stage-sdk-aars.sh` to test unreleased SDK changes from the monorepo.
 
 ---
 
@@ -145,11 +148,11 @@ The app depends on local AARs rather than Maven coordinates so SDK changes in th
 
 | Symptom | Fix |
 |---------|-----|
-| Missing `libs/*.aar` | Run `./scripts/stage-sdk-aars.sh debug` |
-| Native link errors after commons changes | Re-run `../../../scripts/build/build-core-android.sh arm64-v8a`, then restage AARs |
-| Gradle dependency verification failures | Ensure all four AARs are present; run `./scripts/verify.sh` for the exact gate |
-| QHexRT / NPU models unavailable | Confirm device support and that the QHexRT AAR was staged; HNPU bundles require a saved HF token |
-| Out of memory during native build | Close other Gradle daemons; the repo recommends limited workers for SDK builds |
+| Cannot resolve `io.github.sanchitmonga22:runanywhere-*` | Check network / Maven Central; confirm version in `gradle/libs.versions.toml` |
+| Missing `libs/*.aar` with local override | Run `./scripts/stage-sdk-aars.sh debug` and keep `-Prunanywhere.useLocalSdkAars=true` |
+| Native link errors after local commons changes | Re-run `build-core-android.sh`, restage AARs, build with the local override |
+| QHexRT / NPU models unavailable | Need Hexagon V75/V79/V81 hardware; HNPU bundles require a saved HF token |
+| Out of memory during local native build | Close other Gradle daemons; limit workers for SDK builds |
 
 For a quick static check without a full compile:
 

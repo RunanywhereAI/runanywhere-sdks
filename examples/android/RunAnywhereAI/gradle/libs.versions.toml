@@ -44,6 +44,10 @@ pdfbox = "2.0.27.0"
 # CameraX (Vision live mode)
 camerax = "1.4.2"
 
+# RunAnywhere SDK (Maven Central). Override only when building against monorepo
+# AARs via -Prunanywhere.useLocalSdkAars=true + scripts/stage-sdk-aars.sh.
+runanywhere = "0.20.11"
+
 
 [libraries]
 # AndroidX core / lifecycle / activity
@@ -83,6 +87,12 @@ androidx-camera-core = { group = "androidx.camera", name = "camera-core", versio
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+
+# RunAnywhere SDK modules (Maven Central coordinates)
+runanywhere-sdk = { group = "io.github.sanchitmonga22", name = "runanywhere-sdk", version.ref = "runanywhere" }
+runanywhere-llamacpp = { group = "io.github.sanchitmonga22", name = "runanywhere-llamacpp", version.ref = "runanywhere" }
+runanywhere-onnx = { group = "io.github.sanchitmonga22", name = "runanywhere-onnx", version.ref = "runanywhere" }
+runanywhere-qhexrt = { group = "io.github.sanchitmonga22", name = "runanywhere-qhexrt-android", version.ref = "runanywhere" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }
