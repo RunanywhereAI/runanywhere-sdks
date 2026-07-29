@@ -305,16 +305,16 @@ private struct MLXLLMOptionsSnapshot: Sendable {
             // No options from the C layer: take the commons defaults rather than
             // a private table. These fallbacks had drifted to their own values
             // (max_tokens 1024) while every other layer said otherwise.
-            let d = RAC_LLM_OPTIONS_DEFAULT
-            maxTokens = d.max_tokens
-            temperature = d.temperature
-            topP = d.top_p
-            topK = d.top_k
-            minP = d.min_p
-            repetitionPenalty = d.repetition_penalty
-            presencePenalty = d.presence_penalty
-            frequencyPenalty = d.frequency_penalty
-            seed = d.seed
+            let defaults = RAC_LLM_OPTIONS_DEFAULT
+            maxTokens = defaults.max_tokens
+            temperature = defaults.temperature
+            topP = defaults.top_p
+            topK = defaults.top_k
+            minP = defaults.min_p
+            repetitionPenalty = defaults.repetition_penalty
+            presencePenalty = defaults.presence_penalty
+            frequencyPenalty = defaults.frequency_penalty
+            seed = defaults.seed
             disableThinking = false
             systemPrompt = nil
             history = []
@@ -360,14 +360,14 @@ private struct MLXVLMOptionsSnapshot: Sendable {
     init(_ options: UnsafePointer<rac_vlm_options_t>?) {
         guard let options = options?.pointee else {
             // See MLXLLMOptionsSnapshot: commons owns the defaults.
-            let d: rac_vlm_options_t = RAC_VLM_OPTIONS_DEFAULT
-            maxTokens = d.max_tokens
-            temperature = d.temperature
-            topP = d.top_p
-            topK = d.top_k
-            minP = d.min_p
-            repetitionPenalty = d.repetition_penalty
-            seed = d.seed
+            let defaults: rac_vlm_options_t = RAC_VLM_OPTIONS_DEFAULT
+            maxTokens = defaults.max_tokens
+            temperature = defaults.temperature
+            topP = defaults.top_p
+            topK = defaults.top_k
+            minP = defaults.min_p
+            repetitionPenalty = defaults.repetition_penalty
+            seed = defaults.seed
             systemPrompt = nil
             return
         }

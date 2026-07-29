@@ -128,6 +128,10 @@ done
 
 bad_archive="RACommons-android-arm64-v8a-v${VERSION}.zip"
 printf '%064d  %s\n' 0 "${bad_archive}" > "${release_dir}/${bad_archive}.sha256"
+# downloadNativeLibs skips network/verify when build/jniLibs already matches
+# coreVersion. Wipe the cache so the corrupted sidecar is actually exercised.
+rm -rf "${FLUTTER_PACKAGES}/runanywhere/android/build/jniLibs"
+rm -f "${FLUTTER_PACKAGES}/runanywhere/android/build"/racommons-*.zip
 negative_log="${FIXTURE}/checksum-negative.log"
 if "${gradle[@]}" :runanywhere:downloadNativeLibs --rerun-tasks >"${negative_log}" 2>&1; then
     echo "error: corrupted Flutter release checksum was accepted" >&2

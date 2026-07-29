@@ -38,7 +38,7 @@ def _load_validator():
 
 V = _load_validator()
 
-VERSION = "0.20.11"
+VERSION = "0.20.12"
 WHEEL_NAME = f"runanywhere-{VERSION}-cp312-cp312-win_amd64.whl"
 SDIST_NAME = f"runanywhere-{VERSION}.tar.gz"
 
