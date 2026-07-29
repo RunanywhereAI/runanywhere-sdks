@@ -22,7 +22,7 @@ export { HybridBackendKind, HybridModelType };
 export type { HybridRoutedMetadata };
 
 /** Default cloud STT provider when a caller omits one. */
-export const DEFAULT_CLOUD_PROVIDER = 'sarvam';
+export const DEFAULT_CLOUD_PROVIDER = 'runanywhere';
 
 /**
  * One side of the hybrid pair. `id` is the resolution key:

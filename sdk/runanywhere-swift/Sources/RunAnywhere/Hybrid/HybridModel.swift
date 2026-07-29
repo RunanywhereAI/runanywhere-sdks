@@ -71,7 +71,7 @@ public struct HybridModel: Sendable {
     }
 
     /// Convenience for a cloud model (registered via `Cloud.register`).
-    /// `provider` defaults to `Cloud.defaultProvider` ("sarvam") and is
+    /// `provider` defaults to `Cloud.defaultProvider` ("runanywhere") and is
     /// carried in the descriptor so the cloud engine picks the HTTP backend.
     public static func onlineCloud(
         _ id: String,

@@ -47,7 +47,7 @@ object Cloud {
     private val logger = SDKLogger("Cloud")
 
     /** Default cloud STT provider when a caller omits one. */
-    const val DEFAULT_PROVIDER = "sarvam"
+    const val DEFAULT_PROVIDER = "runanywhere"
 
     // Plugin registration
 
@@ -102,41 +102,39 @@ object Cloud {
      * Register a cloud-STT model under [id] so the router can refer to it by
      * id from [HybridModel.onlineCloud]:
      *
-     *     Cloud.register(
-     *         id = "saaras",
-     *         model = "saaras:v3",
-     *         apiKey = "...",
-     *         provider = "sarvam",   // default; selects the cloud HTTP provider
-     *         languageCode = null,   // null = let the provider auto-detect
-     *     )
+     *     Cloud.register(id = "hybrid-stt")   // RunAnywhere backend proxy
+     *
+     * The default (and only) provider is "runanywhere": audio goes to the
+     * RunAnywhere backend, authenticated with the SDK's own device session,
+     * and the backend holds the upstream speech credentials. No apiKey or
+     * model is needed — the backend enforces the per-key hybrid_stt
+     * entitlement and chooses the served model.
      *
      * @param id           App-chosen registry id (becomes the online HybridModel.id).
-     * @param provider     Concrete cloud STT provider ("sarvam" by default).
-     *                     Carried into the config JSON as `"provider"` so the
-     *                     cloud engine selects the right HTTP backend.
-     * @param model        Provider model id (e.g. "saaras:v3" for Sarvam).
-     * @param apiKey       Provider API subscription key. Sensitive; never logged.
-     * @param languageCode Optional BCP-47 hint ("en-IN", …). `null` = auto-detect
-     *                     (the engine omits the language_code field).
-     * @param baseUrl      Optional endpoint override.
+     * @param provider     Cloud STT provider. Only "runanywhere" is supported;
+     *                     the engine rejects anything else.
+     * @param model        Optional wire model hint; the backend ignores it today.
+     * @param apiKey       Not used by the "runanywhere" provider (the device
+     *                     session token authenticates the request).
+     * @param languageCode Optional BCP-47 hint ("en-IN", …). `null` = auto-detect.
+     * @param baseUrl      Optional endpoint override for tests; production
+     *                     resolves the SDK's configured backend automatically.
      * @param timeoutMs    Optional request timeout (milliseconds).
-     * @throws IllegalArgumentException if any required field is blank.
+     * @throws IllegalArgumentException if [id] or [provider] is blank.
      */
     @JvmStatic
     @JvmOverloads
     fun register(
         id: String,
         provider: String = DEFAULT_PROVIDER,
-        model: String,
-        apiKey: String,
+        model: String = "",
+        apiKey: String = "",
         languageCode: String? = null,
         baseUrl: String? = null,
         timeoutMs: Int? = null,
     ) {
         require(id.isNotBlank()) { "Cloud registry id must be non-blank" }
         require(provider.isNotBlank()) { "Cloud provider must be non-blank" }
-        require(model.isNotBlank()) { "Cloud model string must be non-blank" }
-        require(apiKey.isNotBlank()) { "Cloud apiKey must be non-blank" }
         registry[id] =
             CloudModelEntry(
                 provider = provider,
@@ -164,64 +162,6 @@ object Cloud {
     @JvmStatic
     fun clear() {
         registry.clear()
-    }
-
-    // Developer-defined providers
-
-    // Kept by name so re-registration and [unregisterProvider] are
-    // well-defined. The native side holds the authoritative GlobalRef; this
-    // map mirrors it for lifecycle clarity.
-    private val providerHandlers = ConcurrentHashMap<String, NativeCloudSttProvider>()
-
-    /**
-     * Register (or replace) a developer-defined cloud STT provider under
-     * [name]. The [handler] performs the whole request host-side (build +
-     * HTTP + parse), so any vendor works without a native adapter. Tie a
-     * model to it by calling [register] with the same `provider` string:
-     *
-     *     Cloud.registerProvider("deepgram") { req ->
-     *         // build + POST with OkHttp, parse the JSON …
-     *         CloudSttResult(text = transcript, confidence = score)
-     *     }
-     *     Cloud.register(
-     *         id = "dg-nova2", provider = "deepgram", model = "nova-2",
-     *         apiKey = "…", baseUrl = "https://api.deepgram.com",
-     *     )
-     *
-     * The handler is invoked on the router's request thread and may block on
-     * network. Built-in providers (e.g. "sarvam") cannot be shadowed — a
-     * static adapter always wins over a host callback of the same name.
-     *
-     * @throws SDKException if [name] is blank or native registration fails.
-     */
-    @JvmStatic
-    fun registerProvider(
-        name: String,
-        handler: CloudSttProvider,
-    ) {
-        if (name.isBlank()) {
-            throw SDKException.invalidArgument("Cloud provider name must be non-blank")
-        }
-        register()
-        val native = NativeCloudSttProvider(handler)
-        val rc = RunAnywhereBridge.racCloudRegisterSttProvider(name, native)
-        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
-            throw SDKException.operation("Failed to register cloud provider '$name' (rc=$rc)")
-        }
-        providerHandlers[name] = native
-    }
-
-    /**
-     * Remove a developer-defined provider previously registered via
-     * [registerProvider]. Idempotent for unknown names.
-     */
-    @JvmStatic
-    fun unregisterProvider(name: String) {
-        if (name.isBlank()) {
-            return
-        }
-        RunAnywhereBridge.racCloudUnregisterSttProvider(name)
-        providerHandlers.remove(name)
     }
 
     // Config JSON

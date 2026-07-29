@@ -17,7 +17,6 @@ package com.runanywhere.sdk.native.bridge
 import ai.runanywhere.proto.v1.ErrorCode
 import com.runanywhere.sdk.hybrid.CustomFilterPredicate
 import com.runanywhere.sdk.hybrid.HybridDeviceStateProvider
-import com.runanywhere.sdk.hybrid.NativeCloudSttProvider
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 
@@ -1969,21 +1968,6 @@ object RunAnywhereBridge {
     // invoking [provider].invoke(configJson, audio, audioFormat) to perform the
     // whole request host-side. JNI looks the object up by the exact signature
     // `invoke(Ljava/lang/String;[BI)Ljava/lang/String;`.
-
-    /**
-     * Register (or replace) the cloud STT provider published under [name].
-     * Returns rac_result_t (0 = success).
-     */
-    @JvmStatic external fun racCloudRegisterSttProvider(
-        name: String,
-        provider: NativeCloudSttProvider,
-    ): Int
-
-    /**
-     * Remove the cloud STT provider previously registered under [name].
-     * Idempotent for unknown names. Returns rac_result_t.
-     */
-    @JvmStatic external fun racCloudUnregisterSttProvider(name: String): Int
 
     // STT HYBRID ROUTER (rac_stt_hybrid_router.h)
 

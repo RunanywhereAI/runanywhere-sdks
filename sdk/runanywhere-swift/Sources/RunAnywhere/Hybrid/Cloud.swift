@@ -30,7 +30,7 @@ public enum Cloud {
     private static let logger = SDKLogger(category: "Cloud")
 
     /// Default cloud STT provider when a caller omits one.
-    public static let defaultProvider = "sarvam"
+    public static let defaultProvider = "runanywhere"
 
     /// cloud engine module version (binding side).
     public static let version = "2.0.0"

@@ -54,7 +54,7 @@ export { HybridRoutedMetadata };
 
 /** Default cloud STT provider when a caller omits one. Mirrors
  * `Cloud.defaultProvider` (Swift) / `BACKEND.DEFAULT_PROVIDER` (Kotlin). */
-export const DEFAULT_CLOUD_PROVIDER = 'sarvam';
+export const DEFAULT_CLOUD_PROVIDER = 'runanywhere';
 
 /** Suggested default confidence threshold for an STT confidence cascade.
  * Mirrors `RAC_HYBRID_STT_CONFIDENCE_THRESHOLD` in rac_hybrid_types.h — the

@@ -76,7 +76,7 @@ data class HybridModel(
 
         /**
          * Convenience for a cloud model (registered via [Cloud.register]).
-         * [provider] defaults to [Cloud.DEFAULT_PROVIDER] ("sarvam") and is
+         * [provider] defaults to [Cloud.DEFAULT_PROVIDER] ("runanywhere") and is
          * carried in the descriptor so the cloud engine picks the HTTP backend.
          */
         @JvmStatic

@@ -16,7 +16,7 @@ import 'package:runanywhere/generated/hybrid_router.pbenum.dart'
 /// Default cloud STT provider when a caller omits one. Carried into the
 /// descriptor's `provider` field + the create config so the cloud engine
 /// selects the right HTTP backend.
-const String kHybridDefaultCloudProvider = 'sarvam';
+const String kHybridDefaultCloudProvider = 'runanywhere';
 
 /// Whether a candidate runs on-device or in the cloud. Convenience mirror of
 /// `ROUTER.OFFLINE` / `ROUTER.ONLINE` in the Kotlin SDK; wire values match
