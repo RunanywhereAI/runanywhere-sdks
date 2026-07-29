@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { splitThinking, stripThinking, isThinking } = require('../../dist/thinking');
+const { splitThinking, stripThinking, stripAllThinking, isThinking } = require('../../dist/thinking');
 
 test('splitThinking: <think> block is separated from the answer', () => {
   const { response, thinking } = splitThinking('<think>let me count</think>The answer is 4.');
@@ -55,4 +55,31 @@ test('isThinking is true mid-stream (open, not yet closed) and false once closed
   assert.equal(isThinking('<think>reasoning so far'), true);
   assert.equal(isThinking('<think>reasoning</think>answer'), false);
   assert.equal(isThinking('plain streaming text'), false);
+});
+
+test('stripAllThinking removes every block, not just the first', () => {
+  assert.equal(
+    stripAllThinking('<think>a</think>One<thinking>b</thinking>Two<think>c</think>'),
+    'OneTwo'
+  );
+});
+
+test('stripAllThinking drops an unterminated trailing block', () => {
+  assert.equal(stripAllThinking('Answer<think>still going'), 'Answer');
+  assert.equal(stripAllThinking('<think>only thinking'), '');
+});
+
+test('stripAllThinking leaves text with no reasoning untouched', () => {
+  assert.equal(stripAllThinking('just an answer'), 'just an answer');
+  assert.equal(stripAllThinking(''), '');
+});
+
+test('stripAllThinking is linear on adversarial input (no ReDoS)', () => {
+  // CodeQL js/polynomial-redos: a regex with a backreference backtracks
+  // polynomially on many repeated '<think>' openers. Model output is untrusted.
+  const evil = '<think>'.repeat(60000);
+  const started = process.hrtime.bigint();
+  stripAllThinking(evil);
+  const ms = Number(process.hrtime.bigint() - started) / 1e6;
+  assert.ok(ms < 2000, `stripAllThinking took ${ms.toFixed(0)}ms on 60k repeats`);
 });
