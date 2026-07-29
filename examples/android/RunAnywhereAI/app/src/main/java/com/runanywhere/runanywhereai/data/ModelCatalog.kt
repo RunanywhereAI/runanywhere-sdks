@@ -683,15 +683,20 @@ internal object ModelCatalog {
             "All MiniLM L6 v2 (Embedding)",
             ONNX,
             ModelCategory.MODEL_CATEGORY_EMBEDDING,
-            25_500_000,
+            memoryBytes = 25_500_000,
+            downloadBytes = 23_203_878,
             files = listOf(
+                // Quantized variant — the fp32 onnx/model.onnx is 90.4 MB; the
+                // declared sizes previously pointed at the wrong artifact.
                 ModelFile(
-                    "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx",
-                    "model.onnx"
+                    "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model_quantized.onnx",
+                    "model.onnx",
+                    22_972_370,
                 ),
                 ModelFile(
                     "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt",
-                    "vocab.txt"
+                    "vocab.txt",
+                    231_508,
                 ),
             ),
         ),
