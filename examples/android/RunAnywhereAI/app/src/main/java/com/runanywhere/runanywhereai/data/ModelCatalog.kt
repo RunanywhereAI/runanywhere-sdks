@@ -34,10 +34,9 @@ internal object ModelCatalog {
     }
 
     /**
-     * Logical HNPU catalog. These app-owned URLs, display fields, and validated
-     * definitions are passed to QHexRT; native code owns the per-model
-     * architecture and HF-auth policy, selects the device folder, and decides
-     * which rows register.
+     * App-owned HNPU examples. Every entry is a dedicated model artifact URL
+     * registered unchanged through the core SDK; QHexRT does not select models
+     * or rewrite URLs.
      */
     val npuCatalog: List<SingleFileModel> = listOf(
         SingleFileModel("lfm2_5_230m", "LFM2.5 230M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json", QHEXRT, LANGUAGE, 538_771_163L, contextLength = 512),
