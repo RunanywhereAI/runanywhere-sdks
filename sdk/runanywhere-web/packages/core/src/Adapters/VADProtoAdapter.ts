@@ -192,29 +192,37 @@ export class VADProtoAdapter {
     handle: number,
     samples: Float32Array,
     options: ProtoVADOptions,
+    sampleRate = audioCaptureDefaults.micSampleRateHz,
   ): ProtoVADResult | null {
     if (!ensureExports(this.module, 'vad.process', ['_rac_vad_component_process_proto'])) {
       return null;
     }
-    const sampleBytes = new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
-    const optionsBytes = VADOptions.encode(options).finish();
-    const bridge = this.bridge();
-    return bridge.withHeapBytes(sampleBytes, (samplesPtr) => (
-      bridge.withHeapBytes(optionsBytes, (optionsPtr, optionsSize) => (
-        bridge.callResultProto(
-          VADResult,
-          (outResult) => this.module._rac_vad_component_process_proto!(
-            handle,
-            samplesPtr,
-            samples.length,
-            optionsPtr,
-            optionsSize,
-            outResult,
-          ),
-          'rac_vad_component_process_proto',
+    const request = VADProcessRequest.create({
+      requestId: lifecycleRequestId(),
+      audio: {
+        audioData: float32ToLittleEndianBytes(samples),
+        encoding: VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE,
+        sampleRate,
+        channels: 1,
+        frameOffsetMs: 0,
+      },
+      options,
+      metadata: {},
+    });
+    return this.bridge().withEncodedRequest(
+      request,
+      VADProcessRequest,
+      VADResult,
+      (requestPtr, requestSize, outResult) => (
+        this.module._rac_vad_component_process_proto!(
+          handle,
+          requestPtr,
+          requestSize,
+          outResult,
         )
-      ))
-    ));
+      ),
+      'rac_vad_component_process_proto',
+    );
   }
 
   /**

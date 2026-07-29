@@ -15,6 +15,7 @@ exports.vLMStreamEventKindToJSON = vLMStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const model_types_1 = require("./model_types");
+const thinking_tag_pattern_1 = require("./thinking_tag_pattern");
 exports.protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -848,12 +849,11 @@ exports.VLMConfiguration = {
 function createBaseVLMGenerationOptions() {
     return {
         prompt: "",
-        maxTokens: 0,
+        maxOutputTokens: 0,
         temperature: 0,
         topP: 0,
         topK: 0,
         stopSequences: [],
-        streamingEnabled: false,
         systemPrompt: undefined,
         maxImageSize: 0,
         nThreads: 0,
@@ -865,6 +865,7 @@ function createBaseVLMGenerationOptions() {
         repetitionPenalty: 0,
         minP: 0,
         emitImageEmbeddings: false,
+        reasoning: undefined,
     };
 }
 exports.VLMGenerationOptions = {
@@ -872,8 +873,8 @@ exports.VLMGenerationOptions = {
         if (message.prompt !== "") {
             writer.uint32(10).string(message.prompt);
         }
-        if (message.maxTokens !== 0) {
-            writer.uint32(16).int32(message.maxTokens);
+        if (message.maxOutputTokens !== 0) {
+            writer.uint32(16).int32(message.maxOutputTokens);
         }
         if (message.temperature !== 0) {
             writer.uint32(29).float(message.temperature);
@@ -886,9 +887,6 @@ exports.VLMGenerationOptions = {
         }
         for (const v of message.stopSequences) {
             writer.uint32(50).string(v);
-        }
-        if (message.streamingEnabled !== false) {
-            writer.uint32(56).bool(message.streamingEnabled);
         }
         if (message.systemPrompt !== undefined) {
             writer.uint32(66).string(message.systemPrompt);
@@ -923,6 +921,9 @@ exports.VLMGenerationOptions = {
         if (message.emitImageEmbeddings !== false) {
             writer.uint32(144).bool(message.emitImageEmbeddings);
         }
+        if (message.reasoning !== undefined) {
+            thinking_tag_pattern_1.ReasoningOptions.encode(message.reasoning, writer.uint32(154).fork()).join();
+        }
         return writer;
     },
     decode(input, length) {
@@ -943,7 +944,7 @@ exports.VLMGenerationOptions = {
                     if (tag !== 16) {
                         break;
                     }
-                    message.maxTokens = reader.int32();
+                    message.maxOutputTokens = reader.int32();
                     continue;
                 }
                 case 3: {
@@ -972,13 +973,6 @@ exports.VLMGenerationOptions = {
                         break;
                     }
                     message.stopSequences.push(reader.string());
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.streamingEnabled = reader.bool();
                     continue;
                 }
                 case 8: {
@@ -1058,6 +1052,13 @@ exports.VLMGenerationOptions = {
                     message.emitImageEmbeddings = reader.bool();
                     continue;
                 }
+                case 19: {
+                    if (tag !== 154) {
+                        break;
+                    }
+                    message.reasoning = thinking_tag_pattern_1.ReasoningOptions.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1069,10 +1070,10 @@ exports.VLMGenerationOptions = {
     fromJSON(object) {
         return {
             prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
-            maxTokens: isSet(object.maxTokens)
-                ? globalThis.Number(object.maxTokens)
-                : isSet(object.max_tokens)
-                    ? globalThis.Number(object.max_tokens)
+            maxOutputTokens: isSet(object.maxOutputTokens)
+                ? globalThis.Number(object.maxOutputTokens)
+                : isSet(object.max_output_tokens)
+                    ? globalThis.Number(object.max_output_tokens)
                     : 0,
             temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
             topP: isSet(object.topP)
@@ -1090,11 +1091,6 @@ exports.VLMGenerationOptions = {
                 : globalThis.Array.isArray(object?.stop_sequences)
                     ? object.stop_sequences.map((e) => globalThis.String(e))
                     : [],
-            streamingEnabled: isSet(object.streamingEnabled)
-                ? globalThis.Boolean(object.streamingEnabled)
-                : isSet(object.streaming_enabled)
-                    ? globalThis.Boolean(object.streaming_enabled)
-                    : false,
             systemPrompt: isSet(object.systemPrompt)
                 ? globalThis.String(object.systemPrompt)
                 : isSet(object.system_prompt)
@@ -1146,6 +1142,7 @@ exports.VLMGenerationOptions = {
                 : isSet(object.emit_image_embeddings)
                     ? globalThis.Boolean(object.emit_image_embeddings)
                     : false,
+            reasoning: isSet(object.reasoning) ? thinking_tag_pattern_1.ReasoningOptions.fromJSON(object.reasoning) : undefined,
         };
     },
     toJSON(message) {
@@ -1153,8 +1150,8 @@ exports.VLMGenerationOptions = {
         if (message.prompt !== "") {
             obj.prompt = message.prompt;
         }
-        if (message.maxTokens !== 0) {
-            obj.maxTokens = Math.round(message.maxTokens);
+        if (message.maxOutputTokens !== 0) {
+            obj.maxOutputTokens = Math.round(message.maxOutputTokens);
         }
         if (message.temperature !== 0) {
             obj.temperature = message.temperature;
@@ -1167,9 +1164,6 @@ exports.VLMGenerationOptions = {
         }
         if (message.stopSequences?.length) {
             obj.stopSequences = message.stopSequences;
-        }
-        if (message.streamingEnabled !== false) {
-            obj.streamingEnabled = message.streamingEnabled;
         }
         if (message.systemPrompt !== undefined) {
             obj.systemPrompt = message.systemPrompt;
@@ -1204,6 +1198,9 @@ exports.VLMGenerationOptions = {
         if (message.emitImageEmbeddings !== false) {
             obj.emitImageEmbeddings = message.emitImageEmbeddings;
         }
+        if (message.reasoning !== undefined) {
+            obj.reasoning = thinking_tag_pattern_1.ReasoningOptions.toJSON(message.reasoning);
+        }
         return obj;
     },
     create(base) {
@@ -1212,12 +1209,11 @@ exports.VLMGenerationOptions = {
     fromPartial(object) {
         const message = createBaseVLMGenerationOptions();
         message.prompt = object.prompt ?? "";
-        message.maxTokens = object.maxTokens ?? 0;
+        message.maxOutputTokens = object.maxOutputTokens ?? 0;
         message.temperature = object.temperature ?? 0;
         message.topP = object.topP ?? 0;
         message.topK = object.topK ?? 0;
         message.stopSequences = object.stopSequences?.map((e) => e) || [];
-        message.streamingEnabled = object.streamingEnabled ?? false;
         message.systemPrompt = object.systemPrompt ?? undefined;
         message.maxImageSize = object.maxImageSize ?? 0;
         message.nThreads = object.nThreads ?? 0;
@@ -1231,6 +1227,9 @@ exports.VLMGenerationOptions = {
         message.repetitionPenalty = object.repetitionPenalty ?? 0;
         message.minP = object.minP ?? 0;
         message.emitImageEmbeddings = object.emitImageEmbeddings ?? false;
+        message.reasoning = (object.reasoning !== undefined && object.reasoning !== null)
+            ? thinking_tag_pattern_1.ReasoningOptions.fromPartial(object.reasoning)
+            : undefined;
         return message;
     },
 };
@@ -1447,8 +1446,8 @@ exports.VLMGenerationRequest_MetadataEntry = {
 function createBaseVLMResult() {
     return {
         text: "",
-        promptTokens: 0,
-        completionTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
         totalTokens: 0,
         processingTimeMs: 0,
         tokensPerSecond: 0,
@@ -1467,11 +1466,11 @@ exports.VLMResult = {
         if (message.text !== "") {
             writer.uint32(10).string(message.text);
         }
-        if (message.promptTokens !== 0) {
-            writer.uint32(16).int32(message.promptTokens);
+        if (message.inputTokens !== 0) {
+            writer.uint32(16).int32(message.inputTokens);
         }
-        if (message.completionTokens !== 0) {
-            writer.uint32(24).int32(message.completionTokens);
+        if (message.outputTokens !== 0) {
+            writer.uint32(24).int32(message.outputTokens);
         }
         if (message.totalTokens !== 0) {
             writer.uint32(32).int64(message.totalTokens);
@@ -1526,14 +1525,14 @@ exports.VLMResult = {
                     if (tag !== 16) {
                         break;
                     }
-                    message.promptTokens = reader.int32();
+                    message.inputTokens = reader.int32();
                     continue;
                 }
                 case 3: {
                     if (tag !== 24) {
                         break;
                     }
-                    message.completionTokens = reader.int32();
+                    message.outputTokens = reader.int32();
                     continue;
                 }
                 case 4: {
@@ -1624,15 +1623,15 @@ exports.VLMResult = {
     fromJSON(object) {
         return {
             text: isSet(object.text) ? globalThis.String(object.text) : "",
-            promptTokens: isSet(object.promptTokens)
-                ? globalThis.Number(object.promptTokens)
-                : isSet(object.prompt_tokens)
-                    ? globalThis.Number(object.prompt_tokens)
+            inputTokens: isSet(object.inputTokens)
+                ? globalThis.Number(object.inputTokens)
+                : isSet(object.input_tokens)
+                    ? globalThis.Number(object.input_tokens)
                     : 0,
-            completionTokens: isSet(object.completionTokens)
-                ? globalThis.Number(object.completionTokens)
-                : isSet(object.completion_tokens)
-                    ? globalThis.Number(object.completion_tokens)
+            outputTokens: isSet(object.outputTokens)
+                ? globalThis.Number(object.outputTokens)
+                : isSet(object.output_tokens)
+                    ? globalThis.Number(object.output_tokens)
                     : 0,
             totalTokens: isSet(object.totalTokens)
                 ? globalThis.Number(object.totalTokens)
@@ -1696,11 +1695,11 @@ exports.VLMResult = {
         if (message.text !== "") {
             obj.text = message.text;
         }
-        if (message.promptTokens !== 0) {
-            obj.promptTokens = Math.round(message.promptTokens);
+        if (message.inputTokens !== 0) {
+            obj.inputTokens = Math.round(message.inputTokens);
         }
-        if (message.completionTokens !== 0) {
-            obj.completionTokens = Math.round(message.completionTokens);
+        if (message.outputTokens !== 0) {
+            obj.outputTokens = Math.round(message.outputTokens);
         }
         if (message.totalTokens !== 0) {
             obj.totalTokens = Math.round(message.totalTokens);
@@ -1743,8 +1742,8 @@ exports.VLMResult = {
     fromPartial(object) {
         const message = createBaseVLMResult();
         message.text = object.text ?? "";
-        message.promptTokens = object.promptTokens ?? 0;
-        message.completionTokens = object.completionTokens ?? 0;
+        message.inputTokens = object.inputTokens ?? 0;
+        message.outputTokens = object.outputTokens ?? 0;
         message.totalTokens = object.totalTokens ?? 0;
         message.processingTimeMs = object.processingTimeMs ?? 0;
         message.tokensPerSecond = object.tokensPerSecond ?? 0;

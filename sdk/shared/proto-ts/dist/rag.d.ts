@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { LLMGenerationOptions } from "./llm_options";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum RAGStreamEventKind {
     RAG_STREAM_EVENT_KIND_UNSPECIFIED = 0,
@@ -137,16 +138,13 @@ export interface RAGIngestRequest_MetadataEntry {
 export interface RAGQueryOptions {
     /** The user question to answer. Required (empty = no-op). */
     question: string;
-    /** Optional system prompt override. Unset uses the pipeline default. */
-    systemPrompt?: string | undefined;
-    /** Maximum tokens to generate in the answer. */
-    maxTokens: number;
-    /** Sampling temperature. 0.0 = greedy, higher = more random. */
-    temperature: number;
-    /** Nucleus (top-p) sampling parameter. 1.0 = disabled. */
-    topP: number;
-    /** Top-k sampling parameter. 0 = disabled. */
-    topK: number;
+    /**
+     * Answer-generation knobs (sampling, system prompt, reasoning). Unset =
+     * pipeline defaults. RAG-appropriate defaults (e.g. max_output_tokens
+     * 512, temperature 0.7) are applied by the pipeline when unset, not
+     * re-declared here.
+     */
+    generation?: LLMGenerationOptions | undefined;
     /** Retrieval overrides. 0/unset = use RAGConfiguration defaults. */
     retrievalTopK: number;
     /**
@@ -156,12 +154,6 @@ export interface RAGQueryOptions {
      */
     similarityThreshold?: number | undefined;
     stream: boolean;
-    /**
-     * When true, suppress the answer model's thinking phase (maps to
-     * LLMGenerationOptions.disable_thinking so commons prepends the no-think
-     * directive instead of the app injecting "/no_think"). Default false.
-     */
-    disableThinking: boolean;
     /**
      * Multi-query expansion: when true, the answer LLM rewrites the question
      * into `multi_query_count` variants; retrieval runs for the original plus

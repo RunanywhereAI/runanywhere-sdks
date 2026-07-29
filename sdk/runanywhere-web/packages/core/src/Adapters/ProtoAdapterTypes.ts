@@ -39,18 +39,14 @@ export interface ModalityProtoModule extends ProtoWasmModule {
 
   _rac_stt_component_transcribe_proto?(
     handle: number,
-    audioData: number,
-    audioSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+    requestBytes: number,
+    requestSize: number,
     outResult: number,
   ): number;
   _rac_stt_component_transcribe_stream_proto?(
     handle: number,
-    audioData: number,
-    audioSize: number,
-    optionsBytes: number,
-    optionsSize: number,
+    requestBytes: number,
+    requestSize: number,
     callbackPtr: number,
     userData: number,
   ): number;
@@ -65,6 +61,7 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     callbackPtr: number,
     userData: number,
   ): number;
+  _rac_stt_state_lifecycle_proto?(outResult: number): number;
 
   _rac_tts_component_list_voices_proto?(
     handle: number,
@@ -99,6 +96,7 @@ export interface ModalityProtoModule extends ProtoWasmModule {
   ): number;
   _rac_tts_stop_lifecycle_proto?(outResult: number): number;
   _rac_tts_list_voices_lifecycle_proto?(outResult: number): number;
+  _rac_tts_state_lifecycle_proto?(outResult: number): number;
 
   _rac_vad_component_configure_proto?(
     handle: number,
@@ -107,10 +105,8 @@ export interface ModalityProtoModule extends ProtoWasmModule {
   ): number;
   _rac_vad_component_process_proto?(
     handle: number,
-    samples: number,
-    numSamples: number,
-    optionsBytes: number,
-    optionsSize: number,
+    requestBytes: number,
+    requestSize: number,
     outResult: number,
   ): number;
   _rac_vad_component_get_statistics_proto?(

@@ -189,6 +189,19 @@ export class TTSProtoAdapter {
     );
   }
 
+  stateLifecycle(): ProtoTTSServiceState | null {
+    if (!ensureExports(this.module, 'tts.stateLifecycle', [
+      '_rac_tts_state_lifecycle_proto',
+    ])) {
+      return null;
+    }
+    return this.bridge().callResultProto(
+      TTSServiceState,
+      (outResult) => this.module._rac_tts_state_lifecycle_proto!(outResult),
+      'rac_tts_state_lifecycle_proto',
+    );
+  }
+
   listVoices(handle: number): ProtoTTSVoiceInfo[] | null {
     if (!ensureExports(this.module, 'tts.listVoices', ['_rac_tts_component_list_voices_proto'])) {
       return null;

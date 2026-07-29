@@ -41,7 +41,7 @@ export declare function tTSStreamEventKindToJSON(object: TTSStreamEventKind): st
  * Defaults (for documentation; proto3 zero-values apply on the wire):
  *   voice              = "default"  (Kotlin) / "com.apple.ttsbundle..." (Swift)
  *   language_code      = "en-US"
- *   speaking_rate      = 1.0   (range 0.5 – 2.0)
+ *   speed              = 1.0   (range 0.5 – 2.0)
  *   pitch              = 1.0   (range 0.5 – 2.0)
  *   volume             = 1.0   (range 0.0 – 1.0)
  *   audio_format       = AUDIO_FORMAT_PCM
@@ -57,35 +57,15 @@ export interface TTSConfiguration {
      * require a model file.
      */
     modelId: string;
-    /**
-     * Voice identifier to use for synthesis. For platform engines this is the
-     * engine-specific voice id (e.g. "com.apple.ttsbundle.siri_female_en-US_compact").
-     */
-    voice: string;
-    /** Language for synthesis (BCP-47, e.g. "en-US"). */
-    languageCode: string;
-    /** Speaking rate (0.5 – 2.0; 1.0 is normal). */
-    speakingRate: number;
-    /** Speech pitch (0.5 – 2.0; 1.0 is normal). */
-    pitch: number;
-    /** Speech volume (0.0 – 1.0). */
-    volume: number;
-    /** Output audio format. */
-    audioFormat: AudioFormat;
-    /**
-     * Sample rate for output audio in Hz. 0 = engine default
-     * (RAC_TTS_DEFAULT_SAMPLE_RATE = 22050).
-     */
-    sampleRate: number;
     /** Whether to use neural / premium voice if available. */
     enableNeuralVoice: boolean;
-    /** Whether to enable SSML markup support. */
-    enableSsml: boolean;
-    /**
-     * Preferred framework for the component. Absent = auto. Mirrors the C
-     * ABI rac_tts_config_t preferred_framework field.
-     */
+    /** Preferred framework for the component. Absent = auto. */
     preferredFramework?: InferenceFramework | undefined;
+    /**
+     * Component-level defaults applied when a per-call TTSOptions is absent
+     * or leaves a field unset.
+     */
+    defaultOptions?: TTSOptions | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -105,12 +85,11 @@ export interface TTSOptions {
     /** Language override (BCP-47). Empty = use component default. */
     languageCode: string;
     /**
-     * Speech rate (0.0 – 2.0; 1.0 is normal). Note Swift/Kotlin use the name
-     * `rate`, Dart uses `rate`, RN uses `rate`. C ABI field is `rate`. We
-     * canonicalize on `speaking_rate` to match TTSConfiguration; bindings
-     * alias to `rate` where appropriate.
+     * Speech speed multiplier (1.0 = normal). Industry name (OpenAI
+     * /audio/speech `speed`); replaces the rate/speaking_rate/speakingRate
+     * split across the C ABI and SDKs.
      */
-    speakingRate: number;
+    speed: number;
     /** Speech pitch (0.5 – 2.0; 1.0 is normal). */
     pitch: number;
     /** Speech volume (0.0 – 1.0). */

@@ -1,44 +1,6 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { AudioFormat, InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * STT language hint. Sources pre-IDL:
- *   Swift  STTConfiguration default = "en-US", STTOptions default = "en"
- *   Kotlin STTConfiguration default = "en-US", STTOptions default = "en"
- *   Dart   STTOptions language nullable; auto-detect when null
- *   RN     STTOptions.language?: string (free-form)
- *   Web    STTTranscribeOptions.language?: string (free-form)
- *   C ABI  RAC_STT_DEFAULT_LANGUAGE = "en"
- * Free-form BCP-47 strings are collapsed to base language codes here.
- * AUTO is the explicit "detect from audio" sentinel; UNSPECIFIED falls
- * back to the backend default (typically "en").
- * ---------------------------------------------------------------------------
- * `rac_wire_string` annotations expose the BCP-47 base code for each value via
- * the codegen-generated `wireString` accessor (see idl/rac_options.proto and
- * idl/codegen/generate_swift_convenience.py). Swift SDK `bcp47Code` is sourced
- * from this annotation; the unspecified case falls back to "" by default.
- */
-export declare enum STTLanguage {
-    STT_LANGUAGE_UNSPECIFIED = 0,
-    /** STT_LANGUAGE_AUTO - Auto-detect from audio */
-    STT_LANGUAGE_AUTO = 1,
-    STT_LANGUAGE_EN = 2,
-    STT_LANGUAGE_ES = 3,
-    STT_LANGUAGE_FR = 4,
-    STT_LANGUAGE_DE = 5,
-    STT_LANGUAGE_ZH = 6,
-    STT_LANGUAGE_JA = 7,
-    STT_LANGUAGE_KO = 8,
-    STT_LANGUAGE_IT = 9,
-    STT_LANGUAGE_PT = 10,
-    STT_LANGUAGE_AR = 11,
-    STT_LANGUAGE_RU = 12,
-    STT_LANGUAGE_HI = 13,
-    UNRECOGNIZED = -1
-}
-export declare function sTTLanguageFromJSON(object: any): STTLanguage;
-export declare function sTTLanguageToJSON(object: STTLanguage): string;
 export declare enum STTAudioEncoding {
     STT_AUDIO_ENCODING_UNSPECIFIED = 0,
     STT_AUDIO_ENCODING_PCM_S16_LE = 1,
@@ -79,7 +41,8 @@ export declare function sTTStreamEventKindToJSON(object: STTStreamEventKind): st
  */
 export interface STTConfiguration {
     modelId: string;
-    language: STTLanguage;
+    /** Default input language, BCP-47 / ISO-639-1. Unset/empty = auto-detect. */
+    language?: string | undefined;
     sampleRate: number;
     enableVad: boolean;
     audioFormat: AudioFormat;
@@ -95,11 +58,6 @@ export interface STTConfiguration {
     enableWordTimestamps: boolean;
     /** Preferred framework for the component. Absent = auto. */
     preferredFramework?: InferenceFramework | undefined;
-    /**
-     * Free-form BCP-47 language tag ("en-US", "pt-BR", etc.) for callers
-     * that cannot be represented by STTLanguage's base-code enum.
-     */
-    languageCode?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -120,29 +78,20 @@ export interface STTConfiguration {
  * ---------------------------------------------------------------------------
  */
 export interface STTOptions {
-    language: STTLanguage;
+    /**
+     * Input language as a BCP-47 / ISO-639-1 tag ("en", "en-US", "hi").
+     * Unset or empty = auto-detect. Matches the industry `language` param.
+     */
+    language?: string | undefined;
     enablePunctuation: boolean;
     enableDiarization: boolean;
-    /** 0 = auto / unset */
+    /** 0 = auto */
     maxSpeakers: number;
     /** Custom vocabulary bias */
     vocabularyList: string[];
     enableWordTimestamps: boolean;
     /** 0 = backend default */
     beamSize: number;
-    /**
-     * Free-form BCP-47 language tag. When set, consumers should prefer this
-     * over the base-language enum above.
-     */
-    languageCode?: string | undefined;
-    /**
-     * Explicit language auto-detection flag for C ABI parity. Equivalent to
-     * language == STT_LANGUAGE_AUTO for generated-only consumers.
-     */
-    detectLanguage: boolean;
-    /** Per-call input audio hints mirrored from rac_stt_options_t. */
-    audioFormat: AudioFormat;
-    sampleRate: number;
     /** Maximum number of alternatives to return. 0 = backend/default. */
     maxAlternatives: number;
     /** Streaming/endpointer controls. 0 = backend/default. */
@@ -253,13 +202,12 @@ export interface TranscriptionMetadata {
  */
 export interface STTOutput {
     text: string;
-    language: STTLanguage;
     confidence: number;
+    /** Detected language, BCP-47 (preserves regional variants). Empty = unknown. */
+    language?: string | undefined;
     words: WordTimestamp[];
     alternatives: TranscriptionAlternative[];
     metadata?: TranscriptionMetadata | undefined;
-    /** Free-form detected language tag, preserving regional variants. */
-    languageCode?: string | undefined;
     /** Wall-clock output timestamp in milliseconds since Unix epoch. */
     timestampMs: number;
     /**
@@ -296,10 +244,9 @@ export interface STTPartialResult {
     stability: number;
     /** Additional partial-hypothesis fields carried by Dart/RN live streams. */
     confidence: number;
-    language: STTLanguage;
+    language?: string | undefined;
     timestampMs: number;
     alternatives: TranscriptionAlternative[];
-    languageCode?: string | undefined;
     /** Streaming correlation and endpointing metadata. */
     requestId: string;
     segmentIndex: number;
@@ -326,8 +273,8 @@ export interface STTServiceState {
     errorCode: number;
 }
 export interface STTLanguageDetectionResult {
-    language: STTLanguage;
-    languageCode?: string | undefined;
+    /** Detected language, BCP-47. */
+    language: string;
     confidence: number;
     alternatives: string[];
 }

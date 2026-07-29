@@ -109,9 +109,7 @@ function createBaseEmbeddingsConfiguration() {
         modelId: "",
         embeddingDimension: 0,
         maxSequenceLength: 0,
-        normalize: undefined,
         preferredFramework: undefined,
-        maxTokens: 0,
         normalizeMode: 0,
         pooling: 0,
         configJson: undefined,
@@ -128,14 +126,8 @@ exports.EmbeddingsConfiguration = {
         if (message.maxSequenceLength !== 0) {
             writer.uint32(24).int32(message.maxSequenceLength);
         }
-        if (message.normalize !== undefined) {
-            writer.uint32(32).bool(message.normalize);
-        }
         if (message.preferredFramework !== undefined) {
             writer.uint32(40).int32(message.preferredFramework);
-        }
-        if (message.maxTokens !== 0) {
-            writer.uint32(48).int32(message.maxTokens);
         }
         if (message.normalizeMode !== 0) {
             writer.uint32(56).int32(message.normalizeMode);
@@ -176,25 +168,11 @@ exports.EmbeddingsConfiguration = {
                     message.maxSequenceLength = reader.int32();
                     continue;
                 }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.normalize = reader.bool();
-                    continue;
-                }
                 case 5: {
                     if (tag !== 40) {
                         break;
                     }
                     message.preferredFramework = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.maxTokens = reader.int32();
                     continue;
                 }
                 case 7: {
@@ -243,17 +221,11 @@ exports.EmbeddingsConfiguration = {
                 : isSet(object.max_sequence_length)
                     ? globalThis.Number(object.max_sequence_length)
                     : 0,
-            normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : undefined,
             preferredFramework: isSet(object.preferredFramework)
                 ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferredFramework)
                 : isSet(object.preferred_framework)
                     ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferred_framework)
                     : undefined,
-            maxTokens: isSet(object.maxTokens)
-                ? globalThis.Number(object.maxTokens)
-                : isSet(object.max_tokens)
-                    ? globalThis.Number(object.max_tokens)
-                    : 0,
             normalizeMode: isSet(object.normalizeMode)
                 ? embeddingsNormalizeModeFromJSON(object.normalizeMode)
                 : isSet(object.normalize_mode)
@@ -278,14 +250,8 @@ exports.EmbeddingsConfiguration = {
         if (message.maxSequenceLength !== 0) {
             obj.maxSequenceLength = Math.round(message.maxSequenceLength);
         }
-        if (message.normalize !== undefined) {
-            obj.normalize = message.normalize;
-        }
         if (message.preferredFramework !== undefined) {
             obj.preferredFramework = (0, model_types_1.inferenceFrameworkToJSON)(message.preferredFramework);
-        }
-        if (message.maxTokens !== 0) {
-            obj.maxTokens = Math.round(message.maxTokens);
         }
         if (message.normalizeMode !== 0) {
             obj.normalizeMode = embeddingsNormalizeModeToJSON(message.normalizeMode);
@@ -306,9 +272,7 @@ exports.EmbeddingsConfiguration = {
         message.modelId = object.modelId ?? "";
         message.embeddingDimension = object.embeddingDimension ?? 0;
         message.maxSequenceLength = object.maxSequenceLength ?? 0;
-        message.normalize = object.normalize ?? undefined;
         message.preferredFramework = object.preferredFramework ?? undefined;
-        message.maxTokens = object.maxTokens ?? 0;
         message.normalizeMode = object.normalizeMode ?? 0;
         message.pooling = object.pooling ?? 0;
         message.configJson = object.configJson ?? undefined;
@@ -316,13 +280,10 @@ exports.EmbeddingsConfiguration = {
     },
 };
 function createBaseEmbeddingsOptions() {
-    return { normalize: false, truncate: undefined, batchSize: undefined, normalizeMode: 0, pooling: 0, nThreads: 0 };
+    return { truncate: undefined, batchSize: undefined, normalizeMode: 0, pooling: 0, nThreads: 0 };
 }
 exports.EmbeddingsOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.normalize !== false) {
-            writer.uint32(8).bool(message.normalize);
-        }
         if (message.truncate !== undefined) {
             writer.uint32(16).bool(message.truncate);
         }
@@ -347,13 +308,6 @@ exports.EmbeddingsOptions = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.normalize = reader.bool();
-                    continue;
-                }
                 case 2: {
                     if (tag !== 16) {
                         break;
@@ -399,7 +353,6 @@ exports.EmbeddingsOptions = {
     },
     fromJSON(object) {
         return {
-            normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : false,
             truncate: isSet(object.truncate) ? globalThis.Boolean(object.truncate) : undefined,
             batchSize: isSet(object.batchSize)
                 ? globalThis.Number(object.batchSize)
@@ -421,9 +374,6 @@ exports.EmbeddingsOptions = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.normalize !== false) {
-            obj.normalize = message.normalize;
-        }
         if (message.truncate !== undefined) {
             obj.truncate = message.truncate;
         }
@@ -446,7 +396,6 @@ exports.EmbeddingsOptions = {
     },
     fromPartial(object) {
         const message = createBaseEmbeddingsOptions();
-        message.normalize = object.normalize ?? false;
         message.truncate = object.truncate ?? undefined;
         message.batchSize = object.batchSize ?? undefined;
         message.normalizeMode = object.normalizeMode ?? 0;

@@ -14,7 +14,6 @@ export declare const protobufPackage = "runanywhere.v1";
 export interface LoRAAdapterConfig {
     /** path on disk to the GGUF file */
     adapterPath: string;
-    /** default 1.0 (set by codegen layer) */
     scale: number;
     /** optional link to catalog entry id */
     adapterId?: string | undefined;

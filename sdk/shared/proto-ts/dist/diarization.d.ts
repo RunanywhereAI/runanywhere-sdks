@@ -25,8 +25,8 @@ export declare enum DiarizationStreamEventKind {
 export declare function diarizationStreamEventKindFromJSON(object: any): DiarizationStreamEventKind;
 export declare function diarizationStreamEventKindToJSON(object: DiarizationStreamEventKind): string;
 export interface DiarizationOptions {
-    sampleRateHz?: number | undefined;
-    channelCount?: number | undefined;
+    sampleRate?: number | undefined;
+    channels?: number | undefined;
     encoding?: DiarizationAudioEncoding | undefined;
     threshold?: number | undefined;
     minimumDurationMs: number;

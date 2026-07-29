@@ -86,10 +86,10 @@ export interface VADConfiguration {
      */
     frameLengthMs: number;
     /**
-     * Energy threshold in [0.0, 1.0] for voice detection.
-     * Recommended range 0.01–0.05; default 0.015 across SDKs.
+     * Activation (energy) threshold in [0.0, 1.0] for voice detection.
+     * Recommended range 0.01–0.05.
      */
-    threshold: number;
+    activationThreshold: number;
     /**
      * When true, the VAD performs ambient-noise calibration and uses the
      * result as a multiplier on the threshold (see calibration_multiplier
@@ -135,30 +135,29 @@ export interface VADConfiguration {
  *   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
  * Surfacing them as fields lets callers tune debouncing without a rebuild.
  * ---------------------------------------------------------------------------
+ * Field vocabulary follows the industry VAD naming (LiveKit/Silero):
+ * activation_threshold + min/max duration knobs + prefix padding.
  */
 export interface VADOptions {
     /**
-     * Per-call energy threshold override. Use 0 (default) to keep the
-     * configured threshold. Mirrors rac_vad_input_t::energy_threshold_override
-     * (which uses -1 as the sentinel; on the wire we use 0 for proto3
-     * default semantics — generators emit -1 when this is unset).
+     * Per-call activation threshold override in [0.0, 1.0]. Unset/0 = keep
+     * the configured threshold.
      */
-    threshold: number;
-    /**
-     * Minimum continuous speech duration (ms) before SPEECH_STARTED fires.
-     * Default 100 (RAC_VAD_MIN_SPEECH_DURATION_MS).
-     */
+    activationThreshold: number;
+    /** Minimum continuous speech duration (ms) before SPEECH_STARTED fires. */
     minSpeechDurationMs: number;
-    /**
-     * Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
-     * Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
-     */
+    /** Minimum continuous silence duration (ms) before SPEECH_ENDED fires. */
     minSilenceDurationMs: number;
     /**
      * Maximum continuous speech duration (ms) before forcing a segment split.
      * 0 = backend/default.
      */
     maxSpeechDurationMs: number;
+    /**
+     * Audio retained before SPEECH_STARTED so segments don't clip the first
+     * syllable. 0 = backend/default.
+     */
+    prefixPaddingMs: number;
     /** Whether to include VADStatistics in stream events when available. */
     includeStatistics: boolean;
 }

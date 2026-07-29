@@ -1,5 +1,6 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { InferenceFramework } from "./model_types";
+import { ReasoningOptions } from "./thinking_tag_pattern";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -191,13 +192,12 @@ export interface VLMConfiguration {
  */
 export interface VLMGenerationOptions {
     prompt: string;
-    maxTokens: number;
+    maxOutputTokens: number;
     temperature: number;
     topP: number;
     topK: number;
     /** Full rac_vlm_options_t coverage. */
     stopSequences: string[];
-    streamingEnabled: boolean;
     systemPrompt?: string | undefined;
     maxImageSize: number;
     nThreads: number;
@@ -210,6 +210,8 @@ export interface VLMGenerationOptions {
     repetitionPenalty: number;
     minP: number;
     emitImageEmbeddings: boolean;
+    /** Reasoning/thinking control — same message as LLMGenerationOptions. */
+    reasoning?: ReasoningOptions | undefined;
 }
 export interface VLMGenerationRequest {
     requestId: string;
@@ -255,8 +257,8 @@ export interface VLMGenerationRequest_MetadataEntry {
  */
 export interface VLMResult {
     text: string;
-    promptTokens: number;
-    completionTokens: number;
+    inputTokens: number;
+    outputTokens: number;
     totalTokens: number;
     /** Kotlin/C ABI total_time_ms; */
     processingTimeMs: number;

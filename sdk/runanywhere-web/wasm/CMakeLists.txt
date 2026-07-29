@@ -1048,12 +1048,14 @@ set(RAC_EXPORTED_FUNCTIONS_ONNX
     # by ModelLifecycle and must only ship with the ONNX/Sherpa speech target.
     "_rac_stt_transcribe_lifecycle_proto"
     "_rac_stt_transcribe_stream_lifecycle_proto"
+    "_rac_stt_state_lifecycle_proto"
     # Lifecycle-owned TTS. Avoid temporary component loads replacing the
     # canonical voice in RACommons' latest-load-wins lifecycle map.
     "_rac_tts_synthesize_lifecycle_proto"
     "_rac_tts_synthesize_stream_lifecycle_proto"
     "_rac_tts_stop_lifecycle_proto"
     "_rac_tts_list_voices_lifecycle_proto"
+    "_rac_tts_state_lifecycle_proto"
     # Lifecycle-owned VAD. Reuse the loaded detector and its recurrent state
     # instead of allocating a second Sherpa/ORT session for microphone input.
     "_rac_vad_process_lifecycle_proto"

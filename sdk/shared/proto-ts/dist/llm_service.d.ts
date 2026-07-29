@@ -1,7 +1,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ChatMessage } from "./chat";
 import { LLMGenerationOptions } from "./llm_options";
-import { ToolCall, ToolResult } from "./tool_calling";
+import { ToolCall, ToolCallingResult, ToolResult } from "./tool_calling";
 import { TokenKind } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum LLMStreamEventKind {
@@ -23,8 +23,6 @@ export declare function lLMStreamEventKindToJSON(object: LLMStreamEventKind): st
  */
 export interface LLMGenerateRequest {
     prompt: string;
-    /** chain-of-thought tokens emit as TokenKind.THOUGHT */
-    emitThoughts: boolean;
     requestId: string;
     modelId: string;
     conversationId: string;
@@ -58,8 +56,8 @@ export interface LLMGenerateRequest_MetadataEntry {
 export interface LLMStreamFinalResult {
     text: string;
     thinkingContent?: string | undefined;
-    promptTokens: number;
-    completionTokens: number;
+    inputTokens: number;
+    outputTokens: number;
     totalTokens: number;
     totalTimeMs: number;
     timeToFirstTokenMs: number;
@@ -150,10 +148,67 @@ export interface LLMStreamEvent {
      */
     toolCall?: ToolCall | undefined;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * Tool-calling session / run-loop envelopes. They live here (not in
+ * tool_calling.proto) because they carry an LLMGenerationOptions and
+ * llm_options.proto already imports tool_calling.proto — the reverse import
+ * would be a cycle. Moving them ended the inline re-declaration of sampling
+ * knobs the old ToolCallingSessionCreateRequest carried.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolCallingSessionCreateRequest {
+    /** The live user turn. */
+    prompt: string;
+    /**
+     * Sampling, reasoning, system prompt — the same canonical knobs as any
+     * other generation. tools/tool_choice policy travels in
+     * generation.tool_calling.
+     */
+    generation?: LLMGenerationOptions | undefined;
+    /**
+     * proto3 `optional` enables presence detection. When unset, commons
+     * defaults to validate_calls=true so unknown tool calls short-circuit
+     * before host execution. Callers that delegate validation to their
+     * executor must explicitly set false.
+     */
+    validateCalls?: boolean | undefined;
+    /**
+     * Prior conversation turns (excluding `prompt`), same contract as
+     * LLMGenerateRequest.history.
+     */
+    history: ChatMessage[];
+}
+export interface ToolCallingSessionCreateResult {
+    sessionHandle: number;
+}
+export interface ToolCallingSessionEvent {
+    /** serialized LLMStreamEvent proto */
+    llmStreamEventBytes?: Uint8Array | undefined;
+    toolCall?: ToolCall | undefined;
+    finalResult?: ToolCallingResult | undefined;
+    /** serialized SDKError proto */
+    errorBytes?: Uint8Array | undefined;
+    seq: number;
+}
+export interface ToolCallingSessionStepWithResultRequest {
+    sessionHandle: number;
+    toolCallId: string;
+    resultJson: string;
+    error?: string | undefined;
+}
+export interface ToolCallingSessionDestroyRequest {
+    sessionHandle: number;
+}
 export declare const LLMGenerateRequest: MessageFns<LLMGenerateRequest>;
 export declare const LLMGenerateRequest_MetadataEntry: MessageFns<LLMGenerateRequest_MetadataEntry>;
 export declare const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult>;
 export declare const LLMStreamEvent: MessageFns<LLMStreamEvent>;
+export declare const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreateRequest>;
+export declare const ToolCallingSessionCreateResult: MessageFns<ToolCallingSessionCreateResult>;
+export declare const ToolCallingSessionEvent: MessageFns<ToolCallingSessionEvent>;
+export declare const ToolCallingSessionStepWithResultRequest: MessageFns<ToolCallingSessionStepWithResultRequest>;
+export declare const ToolCallingSessionDestroyRequest: MessageFns<ToolCallingSessionDestroyRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

@@ -30,12 +30,14 @@ export type {
   STTOptions,
   STTOutput,
   STTPartialResult,
+  STTServiceState,
   TranscribeOptions,
 } from './Public/Extensions/RunAnywhere+STT.js';
 export type {
   SynthesizeOptions,
   TTSOptions,
   TTSOutput,
+  TTSServiceState,
   TTSVoiceInfo,
 } from './Public/Extensions/RunAnywhere+TTS.js';
 export type {

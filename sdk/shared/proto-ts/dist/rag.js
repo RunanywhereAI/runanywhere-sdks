@@ -10,6 +10,7 @@ exports.rAGStreamEventKindFromJSON = rAGStreamEventKindFromJSON;
 exports.rAGStreamEventKindToJSON = rAGStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const llm_options_1 = require("./llm_options");
 exports.protobufPackage = "runanywhere.v1";
 var RAGStreamEventKind;
 (function (RAGStreamEventKind) {
@@ -863,15 +864,10 @@ exports.RAGIngestRequest_MetadataEntry = {
 function createBaseRAGQueryOptions() {
     return {
         question: "",
-        systemPrompt: undefined,
-        maxTokens: 0,
-        temperature: 0,
-        topP: 0,
-        topK: 0,
+        generation: undefined,
         retrievalTopK: 0,
         similarityThreshold: undefined,
         stream: false,
-        disableThinking: false,
         enableMultiQuery: false,
         multiQueryCount: undefined,
         scopePrefix: undefined,
@@ -882,20 +878,8 @@ exports.RAGQueryOptions = {
         if (message.question !== "") {
             writer.uint32(10).string(message.question);
         }
-        if (message.systemPrompt !== undefined) {
-            writer.uint32(18).string(message.systemPrompt);
-        }
-        if (message.maxTokens !== 0) {
-            writer.uint32(24).int32(message.maxTokens);
-        }
-        if (message.temperature !== 0) {
-            writer.uint32(37).float(message.temperature);
-        }
-        if (message.topP !== 0) {
-            writer.uint32(45).float(message.topP);
-        }
-        if (message.topK !== 0) {
-            writer.uint32(48).int32(message.topK);
+        if (message.generation !== undefined) {
+            llm_options_1.LLMGenerationOptions.encode(message.generation, writer.uint32(114).fork()).join();
         }
         if (message.retrievalTopK !== 0) {
             writer.uint32(56).int32(message.retrievalTopK);
@@ -905,9 +889,6 @@ exports.RAGQueryOptions = {
         }
         if (message.stream !== false) {
             writer.uint32(72).bool(message.stream);
-        }
-        if (message.disableThinking !== false) {
-            writer.uint32(80).bool(message.disableThinking);
         }
         if (message.enableMultiQuery !== false) {
             writer.uint32(88).bool(message.enableMultiQuery);
@@ -934,39 +915,11 @@ exports.RAGQueryOptions = {
                     message.question = reader.string();
                     continue;
                 }
-                case 2: {
-                    if (tag !== 18) {
+                case 14: {
+                    if (tag !== 114) {
                         break;
                     }
-                    message.systemPrompt = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.maxTokens = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 37) {
-                        break;
-                    }
-                    message.temperature = reader.float();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 45) {
-                        break;
-                    }
-                    message.topP = reader.float();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.topK = reader.int32();
+                    message.generation = llm_options_1.LLMGenerationOptions.decode(reader, reader.uint32());
                     continue;
                 }
                 case 7: {
@@ -988,13 +941,6 @@ exports.RAGQueryOptions = {
                         break;
                     }
                     message.stream = reader.bool();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.disableThinking = reader.bool();
                     continue;
                 }
                 case 11: {
@@ -1029,27 +975,7 @@ exports.RAGQueryOptions = {
     fromJSON(object) {
         return {
             question: isSet(object.question) ? globalThis.String(object.question) : "",
-            systemPrompt: isSet(object.systemPrompt)
-                ? globalThis.String(object.systemPrompt)
-                : isSet(object.system_prompt)
-                    ? globalThis.String(object.system_prompt)
-                    : undefined,
-            maxTokens: isSet(object.maxTokens)
-                ? globalThis.Number(object.maxTokens)
-                : isSet(object.max_tokens)
-                    ? globalThis.Number(object.max_tokens)
-                    : 0,
-            temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
-            topP: isSet(object.topP)
-                ? globalThis.Number(object.topP)
-                : isSet(object.top_p)
-                    ? globalThis.Number(object.top_p)
-                    : 0,
-            topK: isSet(object.topK)
-                ? globalThis.Number(object.topK)
-                : isSet(object.top_k)
-                    ? globalThis.Number(object.top_k)
-                    : 0,
+            generation: isSet(object.generation) ? llm_options_1.LLMGenerationOptions.fromJSON(object.generation) : undefined,
             retrievalTopK: isSet(object.retrievalTopK)
                 ? globalThis.Number(object.retrievalTopK)
                 : isSet(object.retrieval_top_k)
@@ -1061,11 +987,6 @@ exports.RAGQueryOptions = {
                     ? globalThis.Number(object.similarity_threshold)
                     : undefined,
             stream: isSet(object.stream) ? globalThis.Boolean(object.stream) : false,
-            disableThinking: isSet(object.disableThinking)
-                ? globalThis.Boolean(object.disableThinking)
-                : isSet(object.disable_thinking)
-                    ? globalThis.Boolean(object.disable_thinking)
-                    : false,
             enableMultiQuery: isSet(object.enableMultiQuery)
                 ? globalThis.Boolean(object.enableMultiQuery)
                 : isSet(object.enable_multi_query)
@@ -1088,20 +1009,8 @@ exports.RAGQueryOptions = {
         if (message.question !== "") {
             obj.question = message.question;
         }
-        if (message.systemPrompt !== undefined) {
-            obj.systemPrompt = message.systemPrompt;
-        }
-        if (message.maxTokens !== 0) {
-            obj.maxTokens = Math.round(message.maxTokens);
-        }
-        if (message.temperature !== 0) {
-            obj.temperature = message.temperature;
-        }
-        if (message.topP !== 0) {
-            obj.topP = message.topP;
-        }
-        if (message.topK !== 0) {
-            obj.topK = Math.round(message.topK);
+        if (message.generation !== undefined) {
+            obj.generation = llm_options_1.LLMGenerationOptions.toJSON(message.generation);
         }
         if (message.retrievalTopK !== 0) {
             obj.retrievalTopK = Math.round(message.retrievalTopK);
@@ -1111,9 +1020,6 @@ exports.RAGQueryOptions = {
         }
         if (message.stream !== false) {
             obj.stream = message.stream;
-        }
-        if (message.disableThinking !== false) {
-            obj.disableThinking = message.disableThinking;
         }
         if (message.enableMultiQuery !== false) {
             obj.enableMultiQuery = message.enableMultiQuery;
@@ -1132,15 +1038,12 @@ exports.RAGQueryOptions = {
     fromPartial(object) {
         const message = createBaseRAGQueryOptions();
         message.question = object.question ?? "";
-        message.systemPrompt = object.systemPrompt ?? undefined;
-        message.maxTokens = object.maxTokens ?? 0;
-        message.temperature = object.temperature ?? 0;
-        message.topP = object.topP ?? 0;
-        message.topK = object.topK ?? 0;
+        message.generation = (object.generation !== undefined && object.generation !== null)
+            ? llm_options_1.LLMGenerationOptions.fromPartial(object.generation)
+            : undefined;
         message.retrievalTopK = object.retrievalTopK ?? 0;
         message.similarityThreshold = object.similarityThreshold ?? undefined;
         message.stream = object.stream ?? false;
-        message.disableThinking = object.disableThinking ?? false;
         message.enableMultiQuery = object.enableMultiQuery ?? false;
         message.multiQueryCount = object.multiQueryCount ?? undefined;
         message.scopePrefix = object.scopePrefix ?? undefined;

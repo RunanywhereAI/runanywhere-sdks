@@ -222,18 +222,18 @@ exports.RerankRequest = {
     },
 };
 function createBaseRerankScoredItem() {
-    return { id: "", score: 0, originalIndex: 0, rank: 0 };
+    return { id: "", relevanceScore: 0, index: 0, rank: 0 };
 }
 exports.RerankScoredItem = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.id !== "") {
             writer.uint32(10).string(message.id);
         }
-        if (message.score !== 0) {
-            writer.uint32(21).float(message.score);
+        if (message.relevanceScore !== 0) {
+            writer.uint32(21).float(message.relevanceScore);
         }
-        if (message.originalIndex !== 0) {
-            writer.uint32(24).uint32(message.originalIndex);
+        if (message.index !== 0) {
+            writer.uint32(24).uint32(message.index);
         }
         if (message.rank !== 0) {
             writer.uint32(32).uint32(message.rank);
@@ -258,14 +258,14 @@ exports.RerankScoredItem = {
                     if (tag !== 21) {
                         break;
                     }
-                    message.score = reader.float();
+                    message.relevanceScore = reader.float();
                     continue;
                 }
                 case 3: {
                     if (tag !== 24) {
                         break;
                     }
-                    message.originalIndex = reader.uint32();
+                    message.index = reader.uint32();
                     continue;
                 }
                 case 4: {
@@ -286,12 +286,12 @@ exports.RerankScoredItem = {
     fromJSON(object) {
         return {
             id: isSet(object.id) ? globalThis.String(object.id) : "",
-            score: isSet(object.score) ? globalThis.Number(object.score) : 0,
-            originalIndex: isSet(object.originalIndex)
-                ? globalThis.Number(object.originalIndex)
-                : isSet(object.original_index)
-                    ? globalThis.Number(object.original_index)
+            relevanceScore: isSet(object.relevanceScore)
+                ? globalThis.Number(object.relevanceScore)
+                : isSet(object.relevance_score)
+                    ? globalThis.Number(object.relevance_score)
                     : 0,
+            index: isSet(object.index) ? globalThis.Number(object.index) : 0,
             rank: isSet(object.rank) ? globalThis.Number(object.rank) : 0,
         };
     },
@@ -300,11 +300,11 @@ exports.RerankScoredItem = {
         if (message.id !== "") {
             obj.id = message.id;
         }
-        if (message.score !== 0) {
-            obj.score = message.score;
+        if (message.relevanceScore !== 0) {
+            obj.relevanceScore = message.relevanceScore;
         }
-        if (message.originalIndex !== 0) {
-            obj.originalIndex = Math.round(message.originalIndex);
+        if (message.index !== 0) {
+            obj.index = Math.round(message.index);
         }
         if (message.rank !== 0) {
             obj.rank = Math.round(message.rank);
@@ -317,8 +317,8 @@ exports.RerankScoredItem = {
     fromPartial(object) {
         const message = createBaseRerankScoredItem();
         message.id = object.id ?? "";
-        message.score = object.score ?? 0;
-        message.originalIndex = object.originalIndex ?? 0;
+        message.relevanceScore = object.relevanceScore ?? 0;
+        message.index = object.index ?? 0;
         message.rank = object.rank ?? 0;
         return message;
     },

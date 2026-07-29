@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { LLMGenerationOptions } from "./llm_options";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -116,14 +117,10 @@ export interface VoiceAgentConfig {
     enableBargeIn?: boolean | undefined;
     /** default 200 */
     bargeInThresholdMs: number;
-    /** LLM behavior. */
-    systemPrompt: string;
+    generation?: LLMGenerationOptions | undefined;
     maxContextTokens: number;
-    temperature: number;
     /** Emit partial transcripts as UserSaidEvent{is_final=false}. */
     emitPartials: boolean;
-    /** Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens. */
-    emitThoughts: boolean;
     /**
      * Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
      * oneof arm; provided so callers that pass this message standalone (or

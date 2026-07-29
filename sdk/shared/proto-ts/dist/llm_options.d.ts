@@ -1,7 +1,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { InferenceFramework } from "./model_types";
 import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
-import { ThinkingTagPattern } from "./thinking_tag_pattern";
+import { ReasoningOptions } from "./thinking_tag_pattern";
 import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum LLMGenerationState {
@@ -47,7 +47,7 @@ export interface LLMGenerationOptions {
      * Maximum number of tokens to generate. 0 (default) = unset → engine
      * default (typically 100).
      */
-    maxTokens: number;
+    maxOutputTokens: number;
     /** Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding. */
     temperature: number;
     /** Nucleus sampling (top-p). 1.0 = no nucleus truncation. */
@@ -61,39 +61,25 @@ export interface LLMGenerationOptions {
      * the output stream.
      */
     stopSequences: string[];
-    /** Whether to stream tokens vs return result at end (Swift field). */
-    streamingEnabled: boolean;
     /** Preferred inference framework. UNSPECIFIED = pick automatically. */
     preferredFramework: InferenceFramework;
     /** System prompt to define AI behavior and formatting rules. */
     systemPrompt?: string | undefined;
     /**
-     * Optional structured-output mode (JSON schema). Engine returns text
-     * that conforms to this schema. Swift wraps this in a StructuredOutputConfig
-     * struct with the Generatable.Type — proto carries just the schema string.
+     * Reasoning/thinking control (mode, emission, tag pattern). Unset =
+     * model default with thinking stripped from output.
      */
-    jsonSchema?: string | undefined;
-    /**
-     * Optional thinking-tag pattern for extracting reasoning content from
-     * models like Qwen3 / LFM2 that emit <think>...</think> blocks.
-     */
-    thinkingPattern?: ThinkingTagPattern | undefined;
+    reasoning?: ReasoningOptions | undefined;
     /**
      * Routing hint: where this generation should run (on-device, cloud, or
      * SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
      */
     executionTarget?: ExecutionTarget | undefined;
     /**
-     * Optional structured-output configuration. Detailed message lives in
-     * structured_output.proto so the schema/format details aren't duplicated
-     * here. When set, supersedes the simpler `json_schema` string above.
+     * The ONE output-constraint surface (typed or raw JSON schema, grammar,
+     * regex — see structured_output.proto).
      */
     structuredOutput?: StructuredOutputOptions | undefined;
-    /**
-     * Enable per-token/cost dashboard tracking for SDKs that surface live
-     * generation telemetry. No-op for backends without a telemetry sink.
-     */
-    enableRealTimeTracking: boolean;
     /** Deterministic sampling seed. 0 = backend/default random seed. */
     seed: number;
     /** OpenAI-compatible sampling penalties. 0.0 = disabled. */
@@ -103,27 +89,16 @@ export interface LLMGenerationOptions {
     repeatLastN: number;
     /** Minimum probability sampling. 0.0 = disabled. */
     minP: number;
-    /** Grammar or constrained-decoding rule text (GBNF/regex/backend-specific). */
-    grammar?: string | undefined;
-    /** Caller-visible format hint: "text", "json_object", "json_schema", etc. */
-    responseFormat?: string | undefined;
     /** Include prompt text in the result/stream when the backend supports echo. */
     echoPrompt: boolean;
     /** Per-request backend thread hint. 0 = backend/runtime default. */
     nThreads: number;
     /**
-     * Tool-calling contract for this generation. The SDK owns executor
-     * functions; proto carries only definitions and parser options.
+     * Tool-calling contract for this generation: pure tool configuration
+     * (definitions, choice policy, loop limits). Sampling and reasoning come
+     * from THIS message — ToolCallingOptions carries none of its own.
      */
     toolCalling?: ToolCallingOptions | undefined;
-    /**
-     * When true, suppress the model's thinking/reasoning phase for this
-     * generation (e.g. Qwen3 / LFM2 <think> blocks). Commons applies the
-     * model's no-think directive at the prompt level, so no app prepends
-     * "/no_think" by hand. Default false = the model's normal thinking
-     * behavior.
-     */
-    disableThinking: boolean;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -137,8 +112,8 @@ export interface LLMGenerationResult {
     thinkingContent?: string | undefined;
     /** Number of input/prompt tokens (from tokenizer). */
     inputTokens: number;
-    /** Number of tokens used (output / completion tokens). */
-    tokensGenerated: number;
+    /** Number of output/completion tokens. */
+    outputTokens: number;
     /** Model used for generation. */
     modelUsed: string;
     /** Total wall-clock generation time in milliseconds. */
@@ -203,25 +178,6 @@ export interface LLMGenerationResult {
     /** Tool results incorporated during auto-execute loops. */
     toolResults: ToolResult[];
 }
-/**
- * Request envelope for one non-streaming LLM generation call. This is the
- * proto-owned DTO SDKs can use instead of parallel prompt/options tuples.
- */
-export interface LLMGenerationRequest {
-    requestId: string;
-    modelId: string;
-    prompt: string;
-    options?: LLMGenerationOptions | undefined;
-    contextChunks: string[];
-    metadata: {
-        [key: string]: string;
-    };
-    conversationId?: string | undefined;
-}
-export interface LLMGenerationRequest_MetadataEntry {
-    key: string;
-    value: string;
-}
 export interface LLMGenerationStatus {
     requestId: string;
     state: LLMGenerationState;
@@ -243,14 +199,6 @@ export interface LLMGenerationStatus {
 export interface LLMConfiguration {
     /** Model context window length in tokens. 0 = use model default. */
     contextLength: number;
-    /** Default sampling temperature applied when a per-call value is unset. */
-    temperature: number;
-    /** Default max output tokens applied when a per-call value is unset. */
-    maxTokens: number;
-    /** Default system prompt baked into the component. Empty = no default. */
-    systemPrompt?: string | undefined;
-    /** Whether streaming generation is enabled by default for this component. */
-    streaming: boolean;
     /**
      * Model identifier/path resolved by the component loader. Present in the
      * C ABI rac_llm_config_t and needed for generated-proto service handles.
@@ -261,24 +209,11 @@ export interface LLMConfiguration {
      * means "auto".
      */
     preferredFramework?: InferenceFramework | undefined;
-}
-/**
- * ---------------------------------------------------------------------------
- * Per-prompt generation hints (Swift GenerationHints in LLMTypes.swift:550).
- * Carried alongside a prompt as a "soft" override of LLMConfiguration
- * defaults when the engine has no explicit LLMGenerationOptions to use.
- * ---------------------------------------------------------------------------
- */
-export interface GenerationHints {
-    /** Suggested sampling temperature. */
-    temperature: number;
-    /** Suggested max output tokens. */
-    maxTokens: number;
     /**
-     * Suggested role to use for the system prompt (e.g. "system", "developer").
-     * Empty = engine default ("system").
+     * Component-level defaults applied when a per-call options message is
+     * absent or leaves a field unset.
      */
-    systemRole?: string | undefined;
+    defaultOptions?: LLMGenerationOptions | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -308,18 +243,15 @@ export interface PerformanceMetrics {
     memoryBytes: number;
     /** Decode throughput in tokens/second. */
     throughputTokensPerSec: number;
-    /** Prompt (input) token count. */
-    promptTokens: number;
-    /** Completion (output) token count. */
-    completionTokens: number;
+    /** Input (prompt) token count. */
+    inputTokens: number;
+    /** Output (completion) token count. */
+    outputTokens: number;
 }
 export declare const LLMGenerationOptions: MessageFns<LLMGenerationOptions>;
 export declare const LLMGenerationResult: MessageFns<LLMGenerationResult>;
-export declare const LLMGenerationRequest: MessageFns<LLMGenerationRequest>;
-export declare const LLMGenerationRequest_MetadataEntry: MessageFns<LLMGenerationRequest_MetadataEntry>;
 export declare const LLMGenerationStatus: MessageFns<LLMGenerationStatus>;
 export declare const LLMConfiguration: MessageFns<LLMConfiguration>;
-export declare const GenerationHints: MessageFns<GenerationHints>;
 export declare const StreamToken: MessageFns<StreamToken>;
 export declare const PerformanceMetrics: MessageFns<PerformanceMetrics>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

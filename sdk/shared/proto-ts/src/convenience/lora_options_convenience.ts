@@ -20,7 +20,7 @@ import { ValidationError } from './_errors';
 export const loRAAdapterConfigDefaults = (): LoRAAdapterConfig => ({
   adapterPath: '',
   scale: 1.0,
-  metadata: [],
+  metadata: {},
   targetModules: [],
 });
 
@@ -43,5 +43,5 @@ export const loraAdapterCatalogEntryDefaults = (): LoraAdapterCatalogEntry => ({
   sizeBytes: 0,
   defaultScale: 1.0,
   tags: [],
-  metadata: [],
+  metadata: {},
 });

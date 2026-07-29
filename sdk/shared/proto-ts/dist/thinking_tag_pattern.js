@@ -5,10 +5,66 @@
 //   protoc               v7.35.1
 // source: thinking_tag_pattern.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ThinkingTagPattern = exports.protobufPackage = void 0;
+exports.ReasoningOptions = exports.ThinkingTagPattern = exports.ReasoningMode = exports.protobufPackage = void 0;
+exports.reasoningModeFromJSON = reasoningModeFromJSON;
+exports.reasoningModeToJSON = reasoningModeToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
+/**
+ * ---------------------------------------------------------------------------
+ * The single home for reasoning/thinking control. Replaces the retired
+ * per-message toggles (LLMGenerationOptions.disable_thinking,
+ * ToolCallingOptions.disable_thinking, RAGQueryOptions.disable_thinking,
+ * ToolCallingSessionCreateRequest.disable_thinking,
+ * LLMGenerateRequest.emit_thoughts). Referenced from LLM and VLM generation
+ * options; every composed surface (tool calling, RAG, voice agent) inherits
+ * it through the embedded LLMGenerationOptions.
+ * ---------------------------------------------------------------------------
+ */
+var ReasoningMode;
+(function (ReasoningMode) {
+    /** REASONING_MODE_UNSPECIFIED - Model default: reasoning-capable models think, others don't. */
+    ReasoningMode[ReasoningMode["REASONING_MODE_UNSPECIFIED"] = 0] = "REASONING_MODE_UNSPECIFIED";
+    /**
+     * REASONING_MODE_OFF - Suppress the thinking phase (commons applies the model's no-think
+     * directive at the prompt level).
+     */
+    ReasoningMode[ReasoningMode["REASONING_MODE_OFF"] = 1] = "REASONING_MODE_OFF";
+    /** REASONING_MODE_ON - Request the thinking phase on models where it is optional. */
+    ReasoningMode[ReasoningMode["REASONING_MODE_ON"] = 2] = "REASONING_MODE_ON";
+    ReasoningMode[ReasoningMode["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(ReasoningMode || (exports.ReasoningMode = ReasoningMode = {}));
+function reasoningModeFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "REASONING_MODE_UNSPECIFIED":
+            return ReasoningMode.REASONING_MODE_UNSPECIFIED;
+        case 1:
+        case "REASONING_MODE_OFF":
+            return ReasoningMode.REASONING_MODE_OFF;
+        case 2:
+        case "REASONING_MODE_ON":
+            return ReasoningMode.REASONING_MODE_ON;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return ReasoningMode.UNRECOGNIZED;
+    }
+}
+function reasoningModeToJSON(object) {
+    switch (object) {
+        case ReasoningMode.REASONING_MODE_UNSPECIFIED:
+            return "REASONING_MODE_UNSPECIFIED";
+        case ReasoningMode.REASONING_MODE_OFF:
+            return "REASONING_MODE_OFF";
+        case ReasoningMode.REASONING_MODE_ON:
+            return "REASONING_MODE_ON";
+        case ReasoningMode.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 function createBaseThinkingTagPattern() {
     return { openTag: "", closeTag: "" };
 }
@@ -82,6 +138,95 @@ exports.ThinkingTagPattern = {
         const message = createBaseThinkingTagPattern();
         message.openTag = object.openTag ?? "";
         message.closeTag = object.closeTag ?? "";
+        return message;
+    },
+};
+function createBaseReasoningOptions() {
+    return { mode: 0, includeInOutput: false, pattern: undefined };
+}
+exports.ReasoningOptions = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.mode !== 0) {
+            writer.uint32(8).int32(message.mode);
+        }
+        if (message.includeInOutput !== false) {
+            writer.uint32(16).bool(message.includeInOutput);
+        }
+        if (message.pattern !== undefined) {
+            exports.ThinkingTagPattern.encode(message.pattern, writer.uint32(26).fork()).join();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseReasoningOptions();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.mode = reader.int32();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.includeInOutput = reader.bool();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.pattern = exports.ThinkingTagPattern.decode(reader, reader.uint32());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            mode: isSet(object.mode) ? reasoningModeFromJSON(object.mode) : 0,
+            includeInOutput: isSet(object.includeInOutput)
+                ? globalThis.Boolean(object.includeInOutput)
+                : isSet(object.include_in_output)
+                    ? globalThis.Boolean(object.include_in_output)
+                    : false,
+            pattern: isSet(object.pattern) ? exports.ThinkingTagPattern.fromJSON(object.pattern) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.mode !== 0) {
+            obj.mode = reasoningModeToJSON(message.mode);
+        }
+        if (message.includeInOutput !== false) {
+            obj.includeInOutput = message.includeInOutput;
+        }
+        if (message.pattern !== undefined) {
+            obj.pattern = exports.ThinkingTagPattern.toJSON(message.pattern);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.ReasoningOptions.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseReasoningOptions();
+        message.mode = object.mode ?? 0;
+        message.includeInOutput = object.includeInOutput ?? false;
+        message.pattern = (object.pattern !== undefined && object.pattern !== null)
+            ? exports.ThinkingTagPattern.fromPartial(object.pattern)
+            : undefined;
         return message;
     },
 };

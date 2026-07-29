@@ -5,12 +5,14 @@
 //   protoc               v7.35.1
 // source: voice_agent_service.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.VoiceAgentSynthesizeSpeechProtoRequest = exports.VoiceAgentTranscribeProtoRequest = exports.VoiceAgentComposeConfig = exports.AudioPipelineConfig = exports.VoiceSessionConfig = exports.VoiceAgentTurnRequest_MetadataEntry = exports.VoiceAgentTurnRequest = exports.VoiceAgentResult = exports.VoiceAgentRequest = exports.protobufPackage = void 0;
+exports.VoiceAgentSynthesizeSpeechProtoRequest = exports.VoiceAgentTranscribeProtoRequest = exports.VoiceAgentComposeConfig = exports.AudioPipelineConfig = exports.VoiceSessionConfig = exports.VoiceAgentAudioFrame = exports.VoiceAgentTurnRequest_MetadataEntry = exports.VoiceAgentTurnRequest = exports.VoiceAgentResult = exports.VoiceAgentRequest = exports.protobufPackage = void 0;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const component_types_1 = require("./component_types");
 const errors_1 = require("./errors");
+const llm_options_1 = require("./llm_options");
 const tts_options_1 = require("./tts_options");
+const vad_options_1 = require("./vad_options");
 const voice_events_1 = require("./voice_events");
 exports.protobufPackage = "runanywhere.v1";
 function createBaseVoiceAgentRequest() {
@@ -825,6 +827,131 @@ exports.VoiceAgentTurnRequest_MetadataEntry = {
         return message;
     },
 };
+function createBaseVoiceAgentAudioFrame() {
+    return { audioData: new Uint8Array(0), sampleRate: 0, channels: 0, encoding: 0, isFinal: false };
+}
+exports.VoiceAgentAudioFrame = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.audioData.length !== 0) {
+            writer.uint32(10).bytes(message.audioData);
+        }
+        if (message.sampleRate !== 0) {
+            writer.uint32(16).int32(message.sampleRate);
+        }
+        if (message.channels !== 0) {
+            writer.uint32(24).int32(message.channels);
+        }
+        if (message.encoding !== 0) {
+            writer.uint32(32).int32(message.encoding);
+        }
+        if (message.isFinal !== false) {
+            writer.uint32(40).bool(message.isFinal);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVoiceAgentAudioFrame();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.audioData = reader.bytes();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.sampleRate = reader.int32();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.channels = reader.int32();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.encoding = reader.int32();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.isFinal = reader.bool();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            audioData: isSet(object.audioData)
+                ? bytesFromBase64(object.audioData)
+                : isSet(object.audio_data)
+                    ? bytesFromBase64(object.audio_data)
+                    : new Uint8Array(0),
+            sampleRate: isSet(object.sampleRate)
+                ? globalThis.Number(object.sampleRate)
+                : isSet(object.sample_rate)
+                    ? globalThis.Number(object.sample_rate)
+                    : 0,
+            channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
+            encoding: isSet(object.encoding) ? (0, voice_events_1.audioEncodingFromJSON)(object.encoding) : 0,
+            isFinal: isSet(object.isFinal)
+                ? globalThis.Boolean(object.isFinal)
+                : isSet(object.is_final)
+                    ? globalThis.Boolean(object.is_final)
+                    : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.audioData.length !== 0) {
+            obj.audioData = base64FromBytes(message.audioData);
+        }
+        if (message.sampleRate !== 0) {
+            obj.sampleRate = Math.round(message.sampleRate);
+        }
+        if (message.channels !== 0) {
+            obj.channels = Math.round(message.channels);
+        }
+        if (message.encoding !== 0) {
+            obj.encoding = (0, voice_events_1.audioEncodingToJSON)(message.encoding);
+        }
+        if (message.isFinal !== false) {
+            obj.isFinal = message.isFinal;
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.VoiceAgentAudioFrame.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVoiceAgentAudioFrame();
+        message.audioData = object.audioData ?? new Uint8Array(0);
+        message.sampleRate = object.sampleRate ?? 0;
+        message.channels = object.channels ?? 0;
+        message.encoding = object.encoding ?? 0;
+        message.isFinal = object.isFinal ?? false;
+        return message;
+    },
+};
 function createBaseVoiceSessionConfig() {
     return {
         silenceDurationMs: 0,
@@ -1150,9 +1277,8 @@ function createBaseVoiceAgentComposeConfig() {
         ttsVoicePath: undefined,
         ttsVoiceId: undefined,
         ttsVoiceName: undefined,
-        vadSampleRate: 0,
-        vadFrameLength: 0,
-        vadEnergyThreshold: 0,
+        vadConfig: undefined,
+        llmGeneration: undefined,
         sessionConfig: undefined,
         audioPipelineConfig: undefined,
         sessionId: undefined,
@@ -1188,14 +1314,11 @@ exports.VoiceAgentComposeConfig = {
         if (message.ttsVoiceName !== undefined) {
             writer.uint32(74).string(message.ttsVoiceName);
         }
-        if (message.vadSampleRate !== 0) {
-            writer.uint32(80).int32(message.vadSampleRate);
+        if (message.vadConfig !== undefined) {
+            vad_options_1.VADConfiguration.encode(message.vadConfig, writer.uint32(194).fork()).join();
         }
-        if (message.vadFrameLength !== 0) {
-            writer.uint32(93).float(message.vadFrameLength);
-        }
-        if (message.vadEnergyThreshold !== 0) {
-            writer.uint32(101).float(message.vadEnergyThreshold);
+        if (message.llmGeneration !== undefined) {
+            llm_options_1.LLMGenerationOptions.encode(message.llmGeneration, writer.uint32(202).fork()).join();
         }
         if (message.sessionConfig !== undefined) {
             exports.VoiceSessionConfig.encode(message.sessionConfig, writer.uint32(162).fork()).join();
@@ -1281,25 +1404,18 @@ exports.VoiceAgentComposeConfig = {
                     message.ttsVoiceName = reader.string();
                     continue;
                 }
-                case 10: {
-                    if (tag !== 80) {
+                case 24: {
+                    if (tag !== 194) {
                         break;
                     }
-                    message.vadSampleRate = reader.int32();
+                    message.vadConfig = vad_options_1.VADConfiguration.decode(reader, reader.uint32());
                     continue;
                 }
-                case 11: {
-                    if (tag !== 93) {
+                case 25: {
+                    if (tag !== 202) {
                         break;
                     }
-                    message.vadFrameLength = reader.float();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 101) {
-                        break;
-                    }
-                    message.vadEnergyThreshold = reader.float();
+                    message.llmGeneration = llm_options_1.LLMGenerationOptions.decode(reader, reader.uint32());
                     continue;
                 }
                 case 20: {
@@ -1385,21 +1501,16 @@ exports.VoiceAgentComposeConfig = {
                 : isSet(object.tts_voice_name)
                     ? globalThis.String(object.tts_voice_name)
                     : undefined,
-            vadSampleRate: isSet(object.vadSampleRate)
-                ? globalThis.Number(object.vadSampleRate)
-                : isSet(object.vad_sample_rate)
-                    ? globalThis.Number(object.vad_sample_rate)
-                    : 0,
-            vadFrameLength: isSet(object.vadFrameLength)
-                ? globalThis.Number(object.vadFrameLength)
-                : isSet(object.vad_frame_length)
-                    ? globalThis.Number(object.vad_frame_length)
-                    : 0,
-            vadEnergyThreshold: isSet(object.vadEnergyThreshold)
-                ? globalThis.Number(object.vadEnergyThreshold)
-                : isSet(object.vad_energy_threshold)
-                    ? globalThis.Number(object.vad_energy_threshold)
-                    : 0,
+            vadConfig: isSet(object.vadConfig)
+                ? vad_options_1.VADConfiguration.fromJSON(object.vadConfig)
+                : isSet(object.vad_config)
+                    ? vad_options_1.VADConfiguration.fromJSON(object.vad_config)
+                    : undefined,
+            llmGeneration: isSet(object.llmGeneration)
+                ? llm_options_1.LLMGenerationOptions.fromJSON(object.llmGeneration)
+                : isSet(object.llm_generation)
+                    ? llm_options_1.LLMGenerationOptions.fromJSON(object.llm_generation)
+                    : undefined,
             sessionConfig: isSet(object.sessionConfig)
                 ? exports.VoiceSessionConfig.fromJSON(object.sessionConfig)
                 : isSet(object.session_config)
@@ -1451,14 +1562,11 @@ exports.VoiceAgentComposeConfig = {
         if (message.ttsVoiceName !== undefined) {
             obj.ttsVoiceName = message.ttsVoiceName;
         }
-        if (message.vadSampleRate !== 0) {
-            obj.vadSampleRate = Math.round(message.vadSampleRate);
+        if (message.vadConfig !== undefined) {
+            obj.vadConfig = vad_options_1.VADConfiguration.toJSON(message.vadConfig);
         }
-        if (message.vadFrameLength !== 0) {
-            obj.vadFrameLength = message.vadFrameLength;
-        }
-        if (message.vadEnergyThreshold !== 0) {
-            obj.vadEnergyThreshold = message.vadEnergyThreshold;
+        if (message.llmGeneration !== undefined) {
+            obj.llmGeneration = llm_options_1.LLMGenerationOptions.toJSON(message.llmGeneration);
         }
         if (message.sessionConfig !== undefined) {
             obj.sessionConfig = exports.VoiceSessionConfig.toJSON(message.sessionConfig);
@@ -1488,9 +1596,12 @@ exports.VoiceAgentComposeConfig = {
         message.ttsVoicePath = object.ttsVoicePath ?? undefined;
         message.ttsVoiceId = object.ttsVoiceId ?? undefined;
         message.ttsVoiceName = object.ttsVoiceName ?? undefined;
-        message.vadSampleRate = object.vadSampleRate ?? 0;
-        message.vadFrameLength = object.vadFrameLength ?? 0;
-        message.vadEnergyThreshold = object.vadEnergyThreshold ?? 0;
+        message.vadConfig = (object.vadConfig !== undefined && object.vadConfig !== null)
+            ? vad_options_1.VADConfiguration.fromPartial(object.vadConfig)
+            : undefined;
+        message.llmGeneration = (object.llmGeneration !== undefined && object.llmGeneration !== null)
+            ? llm_options_1.LLMGenerationOptions.fromPartial(object.llmGeneration)
+            : undefined;
         message.sessionConfig = (object.sessionConfig !== undefined && object.sessionConfig !== null)
             ? exports.VoiceSessionConfig.fromPartial(object.sessionConfig)
             : undefined;

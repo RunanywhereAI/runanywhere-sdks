@@ -13,6 +13,7 @@ export interface RerankOptions {
     /**
      * When > 0, only the top_n highest-scoring candidates are returned (every
      * candidate is still scored). 0 = return all candidates, ranked.
+     * Industry name (Cohere rerank `top_n`).
      */
     topN: number;
 }
@@ -25,12 +26,16 @@ export interface RerankScoredItem {
     /** Echo of RerankCandidate.id for correlation. */
     id: string;
     /**
-     * Raw relevance score from the reranker (higher = more relevant). Not
+     * Relevance score from the reranker (higher = more relevant). Not
      * normalized to a fixed range; comparable only within one result set.
+     * Industry name (Cohere/Voyage `relevance_score`).
      */
-    score: number;
-    /** Index of this candidate in the original RerankRequest.candidates list. */
-    originalIndex: number;
+    relevanceScore: number;
+    /**
+     * Index of this candidate in the original RerankRequest.candidates list.
+     * Industry name (`index`).
+     */
+    index: number;
     /** 0-based position after sorting by score descending (0 = most relevant). */
     rank: number;
 }

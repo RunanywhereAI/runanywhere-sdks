@@ -48,21 +48,11 @@ export interface EmbeddingsConfiguration {
      * when an input exceeds this length. C ABI default: 512.
      */
     maxSequenceLength: number;
-    /**
-     * Default L2 normalization for produced vectors. When unset the backend
-     * applies its default (RAC_EMBEDDINGS_NORMALIZE_L2 in the C ABI).
-     */
-    normalize?: boolean | undefined;
     /** Preferred framework for the component. Absent = auto. */
     preferredFramework?: InferenceFramework | undefined;
     /**
-     * C ABI name for max_sequence_length. 0 = use max_sequence_length or
-     * backend default.
-     */
-    maxTokens: number;
-    /**
-     * Exact C ABI normalization/pooling modes for backends that need more
-     * than the bool normalize flag.
+     * Vector normalization mode for the component. UNSPECIFIED = L2
+     * (the C ABI default).
      */
     normalizeMode: EmbeddingsNormalizeMode;
     pooling: EmbeddingsPoolingStrategy;
@@ -77,12 +67,6 @@ export interface EmbeddingsConfiguration {
  */
 export interface EmbeddingsOptions {
     /**
-     * Apply L2 normalization to the produced vectors. Required so the wire
-     * form is unambiguous on the most common knob; backends may still defer
-     * to model defaults at load time.
-     */
-    normalize: boolean;
-    /**
      * Truncate inputs longer than max_sequence_length instead of erroring.
      * Unset = backend default (currently truncate-on-overflow for ONNX,
      * sliding-window for llama.cpp).
@@ -93,7 +77,10 @@ export interface EmbeddingsOptions {
      * (RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE = 512, capped at 8192).
      */
     batchSize?: number | undefined;
-    /** Exact C ABI per-call overrides. UNSPECIFIED = use component config. */
+    /**
+     * Vector normalization mode. UNSPECIFIED = use component config
+     * (default L2).
+     */
     normalizeMode: EmbeddingsNormalizeMode;
     pooling: EmbeddingsPoolingStrategy;
     /** 0 = auto */

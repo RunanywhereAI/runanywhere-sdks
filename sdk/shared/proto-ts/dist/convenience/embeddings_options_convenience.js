@@ -13,16 +13,16 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.embeddingsOptionsDefaults = exports.validateEmbeddingsConfiguration = exports.embeddingsConfigurationDefaults = void 0;
+exports.validateEmbeddingsOptions = exports.embeddingsOptionsDefaults = exports.validateEmbeddingsConfiguration = exports.embeddingsConfigurationDefaults = void 0;
+/* eslint-disable */
+const embeddings_options_1 = require("../embeddings_options");
 const _errors_1 = require("./_errors");
 const embeddingsConfigurationDefaults = () => ({
     modelId: '',
     embeddingDimension: 384,
     maxSequenceLength: 512,
-    normalize: true,
-    maxTokens: 0,
-    normalizeMode: 0,
-    pooling: 0,
+    normalizeMode: embeddings_options_1.EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2,
+    pooling: embeddings_options_1.EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN,
 });
 exports.embeddingsConfigurationDefaults = embeddingsConfigurationDefaults;
 const validateEmbeddingsConfiguration = (m) => {
@@ -47,9 +47,17 @@ const validateEmbeddingsConfiguration = (m) => {
 };
 exports.validateEmbeddingsConfiguration = validateEmbeddingsConfiguration;
 const embeddingsOptionsDefaults = () => ({
-    normalize: true,
-    normalizeMode: 0,
+    normalizeMode: embeddings_options_1.EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED,
     pooling: 0,
     nThreads: 0,
 });
 exports.embeddingsOptionsDefaults = embeddingsOptionsDefaults;
+const validateEmbeddingsOptions = (m) => {
+    if (m.batchSize !== undefined && (m.batchSize < 1 || m.batchSize > 8192)) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'EmbeddingsOptions.batch_size',
+            message: `batch_size must be in 1...8192 (got ${m.batchSize})`,
+        });
+    }
+};
+exports.validateEmbeddingsOptions = validateEmbeddingsOptions;

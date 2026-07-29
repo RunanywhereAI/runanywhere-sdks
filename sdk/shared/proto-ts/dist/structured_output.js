@@ -1071,11 +1071,10 @@ exports.JSONSchema_DefinitionsEntry = {
 };
 function createBaseStructuredOutputOptions() {
     return {
-        schema: undefined,
         includeSchemaInPrompt: false,
         strictMode: undefined,
+        schema: undefined,
         jsonSchema: undefined,
-        typeName: undefined,
         name: undefined,
         mode: 0,
         regexPattern: undefined,
@@ -1086,20 +1085,17 @@ function createBaseStructuredOutputOptions() {
 }
 exports.StructuredOutputOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.schema !== undefined) {
-            exports.JSONSchema.encode(message.schema, writer.uint32(10).fork()).join();
-        }
         if (message.includeSchemaInPrompt !== false) {
             writer.uint32(16).bool(message.includeSchemaInPrompt);
         }
         if (message.strictMode !== undefined) {
             writer.uint32(24).bool(message.strictMode);
         }
+        if (message.schema !== undefined) {
+            exports.JSONSchema.encode(message.schema, writer.uint32(10).fork()).join();
+        }
         if (message.jsonSchema !== undefined) {
             writer.uint32(34).string(message.jsonSchema);
-        }
-        if (message.typeName !== undefined) {
-            writer.uint32(42).string(message.typeName);
         }
         if (message.name !== undefined) {
             writer.uint32(50).string(message.name);
@@ -1128,13 +1124,6 @@ exports.StructuredOutputOptions = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.schema = exports.JSONSchema.decode(reader, reader.uint32());
-                    continue;
-                }
                 case 2: {
                     if (tag !== 16) {
                         break;
@@ -1149,18 +1138,18 @@ exports.StructuredOutputOptions = {
                     message.strictMode = reader.bool();
                     continue;
                 }
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.schema = exports.JSONSchema.decode(reader, reader.uint32());
+                    continue;
+                }
                 case 4: {
                     if (tag !== 34) {
                         break;
                     }
                     message.jsonSchema = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.typeName = reader.string();
                     continue;
                 }
                 case 6: {
@@ -1215,7 +1204,6 @@ exports.StructuredOutputOptions = {
     },
     fromJSON(object) {
         return {
-            schema: isSet(object.schema) ? exports.JSONSchema.fromJSON(object.schema) : undefined,
             includeSchemaInPrompt: isSet(object.includeSchemaInPrompt)
                 ? globalThis.Boolean(object.includeSchemaInPrompt)
                 : isSet(object.include_schema_in_prompt)
@@ -1226,15 +1214,11 @@ exports.StructuredOutputOptions = {
                 : isSet(object.strict_mode)
                     ? globalThis.Boolean(object.strict_mode)
                     : undefined,
+            schema: isSet(object.schema) ? exports.JSONSchema.fromJSON(object.schema) : undefined,
             jsonSchema: isSet(object.jsonSchema)
                 ? globalThis.String(object.jsonSchema)
                 : isSet(object.json_schema)
                     ? globalThis.String(object.json_schema)
-                    : undefined,
-            typeName: isSet(object.typeName)
-                ? globalThis.String(object.typeName)
-                : isSet(object.type_name)
-                    ? globalThis.String(object.type_name)
                     : undefined,
             name: isSet(object.name) ? globalThis.String(object.name) : undefined,
             mode: isSet(object.mode) ? structuredOutputModeFromJSON(object.mode) : 0,
@@ -1258,20 +1242,17 @@ exports.StructuredOutputOptions = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.schema !== undefined) {
-            obj.schema = exports.JSONSchema.toJSON(message.schema);
-        }
         if (message.includeSchemaInPrompt !== false) {
             obj.includeSchemaInPrompt = message.includeSchemaInPrompt;
         }
         if (message.strictMode !== undefined) {
             obj.strictMode = message.strictMode;
         }
+        if (message.schema !== undefined) {
+            obj.schema = exports.JSONSchema.toJSON(message.schema);
+        }
         if (message.jsonSchema !== undefined) {
             obj.jsonSchema = message.jsonSchema;
-        }
-        if (message.typeName !== undefined) {
-            obj.typeName = message.typeName;
         }
         if (message.name !== undefined) {
             obj.name = message.name;
@@ -1298,13 +1279,12 @@ exports.StructuredOutputOptions = {
     },
     fromPartial(object) {
         const message = createBaseStructuredOutputOptions();
+        message.includeSchemaInPrompt = object.includeSchemaInPrompt ?? false;
+        message.strictMode = object.strictMode ?? undefined;
         message.schema = (object.schema !== undefined && object.schema !== null)
             ? exports.JSONSchema.fromPartial(object.schema)
             : undefined;
-        message.includeSchemaInPrompt = object.includeSchemaInPrompt ?? false;
-        message.strictMode = object.strictMode ?? undefined;
         message.jsonSchema = object.jsonSchema ?? undefined;
-        message.typeName = object.typeName ?? undefined;
         message.name = object.name ?? undefined;
         message.mode = object.mode ?? 0;
         message.regexPattern = object.regexPattern ?? undefined;

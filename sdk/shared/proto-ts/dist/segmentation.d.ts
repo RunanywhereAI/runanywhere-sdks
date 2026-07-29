@@ -18,6 +18,12 @@ export interface SegmentationImage {
     width: number;
     height: number;
     pixelFormat: SegmentationPixelFormat;
+    /**
+     * Bytes per row. 0 = tightly packed (width * bytes-per-pixel). Was a
+     * C-struct-only field (rac_segmentation_image_t.stride_bytes) with no
+     * wire counterpart.
+     */
+    strideBytes: number;
 }
 export interface SegmentationOptions {
     /**

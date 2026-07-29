@@ -22,7 +22,10 @@ import {
   type VADStatistics,
   type SpeechActivityEvent,
 } from '@runanywhere/proto-ts/vad_options';
-import { vADConfigurationDefaults } from '@runanywhere/proto-ts/convenience/vad_options_convenience';
+import {
+  vADConfigurationDefaults,
+  vADOptionsDefaults,
+} from '@runanywhere/proto-ts/convenience/vad_options_convenience';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
 import { ProtoWasmBridge } from '../../runtime/ProtoWasm.js';
@@ -86,11 +89,7 @@ function defaultVADConfig(overrides?: Partial<VADConfiguration>): VADConfigurati
 
 function defaultVADOptions(overrides?: Partial<VADOptions>): VADOptions {
   return {
-    threshold: 0,
-    minSpeechDurationMs: 100,
-    minSilenceDurationMs: 300,
-    maxSpeechDurationMs: 0,
-    includeStatistics: false,
+    ...vADOptionsDefaults(),
     ...(overrides ?? {}),
   };
 }
@@ -196,20 +195,29 @@ function lifecycleVADAdapter(feature: string): VADProtoAdapter {
   return adapter;
 }
 
-function callOptions(options?: DetectVoiceOptions, threshold = options?.threshold ?? 0): VADOptions {
-  return defaultVADOptions({
-    threshold,
-    minSpeechDurationMs: options?.minSpeechDurationMs ?? 100,
-    minSilenceDurationMs: options?.minSilenceDurationMs ?? 300,
-    maxSpeechDurationMs: options?.maxSpeechDurationMs ?? 0,
-    includeStatistics: options?.includeStatistics ?? false,
-  });
+function callOptions(
+  options?: DetectVoiceOptions,
+  activationThreshold = options?.activationThreshold ?? 0,
+): VADOptions {
+  const defaults = vADOptionsDefaults();
+  return {
+    ...defaults,
+    activationThreshold,
+    minSpeechDurationMs: options?.minSpeechDurationMs ?? defaults.minSpeechDurationMs,
+    minSilenceDurationMs: options?.minSilenceDurationMs ?? defaults.minSilenceDurationMs,
+    maxSpeechDurationMs: options?.maxSpeechDurationMs ?? defaults.maxSpeechDurationMs,
+    prefixPaddingMs: options?.prefixPaddingMs ?? defaults.prefixPaddingMs,
+    includeStatistics: options?.includeStatistics ?? defaults.includeStatistics,
+  };
 }
 
 function lifecycleConfiguration(options?: DetectVoiceOptions): VADConfiguration {
   const config = defaultVADConfig(options?.config);
-  if (options?.config?.threshold === undefined && options?.threshold !== undefined) {
-    return { ...config, threshold: options.threshold };
+  if (
+    options?.config?.activationThreshold === undefined
+    && options?.activationThreshold !== undefined
+  ) {
+    return { ...config, activationThreshold: options.activationThreshold };
   }
   return config;
 }

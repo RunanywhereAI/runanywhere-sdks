@@ -82,7 +82,7 @@ async function processImageStream(
       'The active Web vision-language provider does not expose streaming.',
     );
   }
-  return active.processImageStream(image, normalizeVLMGenerationOptions(options, true));
+  return active.processImageStream(image, normalizeVLMGenerationOptions(options));
 }
 
 export const VisionLanguage = {
@@ -135,7 +135,7 @@ export const VisionLanguage = {
   processImage(image: VLMImage, options: VLMGenerationOptions): Promise<VLMResult> {
     return requireProvider('visionLanguage.processImage').processImage(
       image,
-      normalizeVLMGenerationOptions(options, false),
+      normalizeVLMGenerationOptions(options),
     );
   },
 
@@ -155,7 +155,6 @@ export type VisionLanguageCapability = typeof VisionLanguage;
 
 function normalizeVLMGenerationOptions(
   options: VLMGenerationOptions,
-  streamingEnabled: boolean,
 ): VLMGenerationOptions {
   // Defaults mirror Swift `RAVLMGenerationOptions.defaults()`
   // Normalize only when unset/<=0. Defaults come from the rac_default
@@ -165,12 +164,11 @@ function normalizeVLMGenerationOptions(
   const d = vLMGenerationOptionsDefaults();
   return {
     prompt: options.prompt ?? '',
-    maxTokens: options.maxTokens > 0 ? options.maxTokens : d.maxTokens,
+    maxOutputTokens: options.maxOutputTokens > 0 ? options.maxOutputTokens : d.maxOutputTokens,
     temperature: options.temperature > 0 ? options.temperature : d.temperature,
     topP: options.topP > 0 ? options.topP : d.topP,
     topK: options.topK > 0 ? options.topK : d.topK,
     stopSequences: options.stopSequences ?? [],
-    streamingEnabled,
     systemPrompt: options.systemPrompt,
     maxImageSize: options.maxImageSize ?? 0,
     nThreads: options.nThreads ?? 0,
@@ -183,5 +181,6 @@ function normalizeVLMGenerationOptions(
       options.repetitionPenalty > 0 ? options.repetitionPenalty : d.repetitionPenalty,
     minP: options.minP ?? 0,
     emitImageEmbeddings: options.emitImageEmbeddings ?? false,
+    reasoning: options.reasoning,
   };
 }

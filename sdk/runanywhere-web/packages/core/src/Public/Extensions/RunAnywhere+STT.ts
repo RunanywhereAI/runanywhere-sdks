@@ -20,6 +20,7 @@ import {
   STTStreamEventKind,
   type STTOptions,
   type STTOutput,
+  type STTServiceState,
 } from '@runanywhere/proto-ts/stt_options';
 import { sTTOptionsDefaults } from '@runanywhere/proto-ts/convenience/stt_options_convenience';
 import { SDKException } from '../../Foundation/SDKException.js';
@@ -35,7 +36,7 @@ import {
 } from '../../runtime/SpeechBackendExports.js';
 import { STTProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
 
-export type { STTOptions, STTOutput, STTPartialResult };
+export type { STTOptions, STTOutput, STTPartialResult, STTServiceState };
 
 const logger = new SDKLogger('STT');
 
@@ -288,6 +289,22 @@ export const STT = {
     module._rac_stt_component_destroy(handle);
   },
 };
+
+/**
+ * Snapshot of the lifecycle-owned STT service state.
+ */
+export async function sttState(): Promise<STTServiceState> {
+  requireSTTModule('RunAnywhere.sttState');
+  const adapter = STTProtoAdapter.tryDefault();
+  const state = adapter?.stateLifecycle();
+  if (!state) {
+    throw SDKException.backendNotAvailable(
+      'RunAnywhere.sttState',
+      'Loaded WASM module does not export rac_stt_state_lifecycle_proto.',
+    );
+  }
+  return state;
+}
 
 /**
  * Top-level ergonomic shortcut. Commons resolves and retains the STT model

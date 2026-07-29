@@ -13,13 +13,13 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateVADConfiguration = exports.vADConfigurationDefaults = void 0;
+exports.validateVADOptions = exports.vADOptionsDefaults = exports.validateVADConfiguration = exports.vADConfigurationDefaults = void 0;
 const _errors_1 = require("./_errors");
 const vADConfigurationDefaults = () => ({
     modelId: '',
     sampleRate: 16000,
     frameLengthMs: 100,
-    threshold: 0.015,
+    activationThreshold: 0.015,
     enableAutoCalibration: false,
     calibrationMultiplier: 2.0,
     windowSizeSamples: 0,
@@ -39,10 +39,10 @@ const validateVADConfiguration = (m) => {
             message: `frame_length_ms must be in 1...1000 (got ${m.frameLengthMs})`,
         });
     }
-    if (!Number.isFinite(m.threshold) || m.threshold < 0.0 || m.threshold > 1.0) {
+    if (!Number.isFinite(m.activationThreshold) || m.activationThreshold < 0.0 || m.activationThreshold > 1.0) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'VADConfiguration.threshold',
-            message: `threshold must be in 0.0...1.0 (got ${m.threshold})`,
+            fieldPath: 'VADConfiguration.activation_threshold',
+            message: `activation_threshold must be in 0.0...1.0 (got ${m.activationThreshold})`,
         });
     }
     if (!Number.isFinite(m.calibrationMultiplier) || m.calibrationMultiplier < 1.5 || m.calibrationMultiplier > 4.0) {
@@ -53,3 +53,21 @@ const validateVADConfiguration = (m) => {
     }
 };
 exports.validateVADConfiguration = validateVADConfiguration;
+const vADOptionsDefaults = () => ({
+    activationThreshold: 0,
+    minSpeechDurationMs: 100,
+    minSilenceDurationMs: 300,
+    maxSpeechDurationMs: 0,
+    prefixPaddingMs: 0,
+    includeStatistics: false,
+});
+exports.vADOptionsDefaults = vADOptionsDefaults;
+const validateVADOptions = (m) => {
+    if (!Number.isFinite(m.activationThreshold) || m.activationThreshold < 0.0 || m.activationThreshold > 1.0) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'VADOptions.activation_threshold',
+            message: `activation_threshold must be in 0.0...1.0 (got ${m.activationThreshold})`,
+        });
+    }
+};
+exports.validateVADOptions = validateVADOptions;

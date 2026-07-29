@@ -188,6 +188,9 @@ export interface ToolResult {
  * ---------------------------------------------------------------------------
  * Options for tool-enabled generation.
  * ---------------------------------------------------------------------------
+ * Pure tool configuration. Sampling, system prompt, and reasoning control
+ * come from the enclosing LLMGenerationOptions — this message deliberately
+ * carries none of its own (fields 4-6 and 17 are retired duplicates).
  */
 export interface ToolCallingOptions {
     /**
@@ -195,14 +198,11 @@ export interface ToolCallingOptions {
      * its registered tools (per-SDK convention).
      */
     tools: ToolDefinition[];
-    /** Whether to auto-execute tools or hand them back to the caller. */
-    autoExecute: boolean;
-    /** Sampling temperature override (Swift: optional Float). */
-    temperature?: number | undefined;
-    /** Maximum tokens override. */
-    maxTokens?: number | undefined;
-    /** System prompt to use during tool-enabled generation. */
-    systemPrompt?: string | undefined;
+    /**
+     * Whether to auto-execute tools or hand them back to the caller.
+     * Unset = true (the pre-v2 session default).
+     */
+    autoExecute?: boolean | undefined;
     /**
      * If true, replaces the system prompt entirely (no auto-injected
      * tool instructions).
@@ -216,20 +216,13 @@ export interface ToolCallingOptions {
     /** Typed tool-call format. Unset lets commons select the model default. */
     format?: ToolCallFormatName | undefined;
     /**
-     * Maximum tool calls in one conversation turn. Unset/0 = SDK default
-     * (typically 5).
+     * Maximum tool calls in one conversation turn. Unset = default (5) —
+     * the single declaration; SDKs must not hardcode their own copy.
      */
     maxToolCalls?: number | undefined;
     toolChoice: ToolChoiceMode;
     forcedToolName?: string | undefined;
     requireJsonArguments: boolean;
-    /**
-     * When true, suppress the model's thinking/reasoning phase during
-     * tool-enabled generation (commons prepends the model no-think directive
-     * at the prompt level — same contract as
-     * LLMGenerationOptions.disable_thinking). Default false.
-     */
-    disableThinking?: boolean | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -320,78 +313,6 @@ export interface ToolRegistrySnapshot {
     tools: ToolDefinition[];
     updatedAtMs: number;
 }
-export interface ToolCallingSessionCreateRequest {
-    /** Prompt + LLM generation options inline (avoids cross-proto import cycle). */
-    prompt: string;
-    maxTokens: number;
-    temperature: number;
-    topP: number;
-    systemPrompt: string;
-    tools: ToolDefinition[];
-    format: ToolCallFormatName;
-    maxToolCalls: number;
-    keepToolsAvailable: boolean;
-    /**
-     * proto3 `optional` enables presence detection (has_validate_calls()).
-     * When unset, commons defaults to validate_calls=true so unknown tool
-     * calls short-circuit before host execution.
-     * Callers that delegate validation/authorization to their executor or
-     * use dynamic tool registries must explicitly set validate_calls=false.
-     */
-    validateCalls?: boolean | undefined;
-    /**
-     * OpenAI-style tool_choice override surfaced through the high-level
-     * run-loop / session APIs. The same fields exist on ToolCallingOptions
-     * (fields 13/14); we re-publish them here so the canonical request
-     * envelope can carry the policy without forcing callers to pass an
-     * inline ToolCallingOptions. commons honors these on every
-     * format/validate primitive via build_options_snapshot.
-     */
-    toolChoice?: ToolChoiceMode | undefined;
-    forcedToolName?: string | undefined;
-    /**
-     * When true, suppress the model's thinking phase for every generate in
-     * the loop/session (maps from ToolCallingOptions.disable_thinking; same
-     * contract as LLMGenerationOptions.disable_thinking). Default false.
-     */
-    disableThinking: boolean;
-    /**
-     * Default true when absent. False returns the parsed ToolCall without
-     * invoking the host executor.
-     */
-    autoExecute?: boolean | undefined;
-    replaceSystemPrompt: boolean;
-    requireJsonArguments: boolean;
-    /**
-     * Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
-     * EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
-     * in the loop so multi-turn tool use keeps context. Same contract as the standard path's
-     * ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
-     * cross-proto import cycle.
-     */
-    history: string[];
-}
-export interface ToolCallingSessionCreateResult {
-    sessionHandle: number;
-}
-export interface ToolCallingSessionEvent {
-    /** serialized LLMStreamEvent proto */
-    llmStreamEventBytes?: Uint8Array | undefined;
-    toolCall?: ToolCall | undefined;
-    finalResult?: ToolCallingResult | undefined;
-    /** serialized SDKError proto */
-    errorBytes?: Uint8Array | undefined;
-    seq: number;
-}
-export interface ToolCallingSessionStepWithResultRequest {
-    sessionHandle: number;
-    toolCallId: string;
-    resultJson: string;
-    error?: string | undefined;
-}
-export interface ToolCallingSessionDestroyRequest {
-    sessionHandle: number;
-}
 export declare const ToolValue: MessageFns<ToolValue>;
 export declare const ToolValueArray: MessageFns<ToolValueArray>;
 export declare const ToolValueObject: MessageFns<ToolValueObject>;
@@ -412,11 +333,6 @@ export declare const ToolCallValidationRequest: MessageFns<ToolCallValidationReq
 export declare const ToolCallValidationResult: MessageFns<ToolCallValidationResult>;
 export declare const ToolCallingStreamEvent: MessageFns<ToolCallingStreamEvent>;
 export declare const ToolRegistrySnapshot: MessageFns<ToolRegistrySnapshot>;
-export declare const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreateRequest>;
-export declare const ToolCallingSessionCreateResult: MessageFns<ToolCallingSessionCreateResult>;
-export declare const ToolCallingSessionEvent: MessageFns<ToolCallingSessionEvent>;
-export declare const ToolCallingSessionStepWithResultRequest: MessageFns<ToolCallingSessionStepWithResultRequest>;
-export declare const ToolCallingSessionDestroyRequest: MessageFns<ToolCallingSessionDestroyRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

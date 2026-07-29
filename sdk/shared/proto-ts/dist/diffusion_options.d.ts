@@ -247,13 +247,14 @@ export interface DiffusionGenerationOptions {
     /** Output image height in pixels.  0 = use variant default. */
     height: number;
     /**
-     * Number of denoising steps. Range 1–50 (variant-dependent: SDXS=1,
-     * SDXL_Turbo / LCM=4, SD*=20–28). 0 = use variant default.
+     * Number of denoising steps (industry short name `steps`). Range 1–50
+     * (variant-dependent: SDXS=1, SDXL_Turbo / LCM=4, SD*=20–28). 0 = use
+     * variant default. Was `num_inference_steps`.
      */
-    numInferenceSteps: number;
+    steps: number;
     /**
      * Classifier-free guidance scale. 0.0 = no CFG (required for SDXS /
-     * SDXL_Turbo). Typical SD range 1.0–20.0; default 7.5.
+     * SDXL_Turbo). Typical SD range 1.0–20.0.
      */
     guidanceScale: number;
     /** RNG seed for reproducibility. -1 = pick a random seed. */

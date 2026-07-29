@@ -16,7 +16,7 @@ import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
 
 /** Read the "tokens generated" count from a proto LLMGenerationResult. */
 export function tokensUsed(r: LLMGenerationResult): number {
-  return r.tokensGenerated;
+  return r.outputTokens;
 }
 
 /** Read the "generation time" from a proto LLMGenerationResult, in ms. */

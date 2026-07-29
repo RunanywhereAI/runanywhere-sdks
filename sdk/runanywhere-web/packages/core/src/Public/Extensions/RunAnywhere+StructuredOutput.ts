@@ -69,7 +69,6 @@ type StructuredOutputSchema<T = unknown> = Omit<JSONSchemaDescriptor, 'parse'> &
   StructuredOutputOptions,
   | 'includeSchemaInPrompt'
   | 'strictMode'
-  | 'typeName'
   | 'name'
   | 'mode'
   | 'regexPattern'

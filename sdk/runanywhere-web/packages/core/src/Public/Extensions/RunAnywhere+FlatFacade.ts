@@ -37,8 +37,13 @@ import {
   generateWithStructuredOutput as generateWithStructuredOutputImpl,
 } from './RunAnywhere+StructuredOutput.js';
 import { ToolCalling as ToolCallingCapability } from './RunAnywhere+ToolCalling.js';
-import { STT as STTCapability } from './RunAnywhere+STT.js';
-import { TTS as TTSCapability, stopTTSPlayback as stopTTSPlaybackImpl } from './RunAnywhere+TTS.js';
+import { STT as STTCapability, sttState as sttStateImpl, type STTServiceState } from './RunAnywhere+STT.js';
+import {
+  TTS as TTSCapability,
+  stopTTSPlayback as stopTTSPlaybackImpl,
+  ttsState as ttsStateImpl,
+  type TTSServiceState,
+} from './RunAnywhere+TTS.js';
 import { VAD as VADCapability } from './RunAnywhere+VAD.js';
 import {
   ragAddDocumentsBatch as ragAddDocumentsBatchImpl,
@@ -270,6 +275,11 @@ export const flatFacade = {
     return STTCapability.transcribeAuto(audio, options);
   },
 
+  /** Snapshot of the lifecycle-owned STT service state. */
+  sttState(): Promise<STTServiceState> {
+    return sttStateImpl();
+  },
+
   // -------------------------------------------------------------------------
   // TTS — entry-guard delegates
   // -------------------------------------------------------------------------
@@ -302,6 +312,11 @@ export const flatFacade = {
   stopSpeaking(): boolean {
     stopTTSPlaybackImpl();
     return TTSCapability.stopLoaded();
+  },
+
+  /** Snapshot of the lifecycle-owned TTS service state. */
+  ttsState(): Promise<TTSServiceState> {
+    return ttsStateImpl();
   },
 
   // -------------------------------------------------------------------------

@@ -812,14 +812,10 @@ class CrossWasmRAGProvider implements RAGProvider {
 
     const generationStarted = nowMs();
     const generated = await TextGeneration.generate({
+      ...(queryOptions.generation ?? {}),
       prompt,
-      systemPrompt: queryOptions.systemPrompt
+      systemPrompt: queryOptions.generation?.systemPrompt
         ?? 'Answer the question using only the supplied context. If the context does not contain the answer, say so.',
-      maxTokens: queryOptions.maxTokens,
-      temperature: queryOptions.temperature,
-      topP: queryOptions.topP,
-      topK: queryOptions.topK,
-      disableThinking: queryOptions.disableThinking,
       conversationId: 'web-cross-wasm-rag',
     });
     this.assertCurrent(version, 'RAG.query');
@@ -834,8 +830,8 @@ class CrossWasmRAGProvider implements RAGProvider {
       generationTimeMs,
       totalTimeMs,
       promptTokens: generated.inputTokens,
-      completionTokens: generated.tokensGenerated,
-      totalTokens: generated.inputTokens + generated.tokensGenerated,
+      completionTokens: generated.outputTokens,
+      totalTokens: generated.inputTokens + generated.outputTokens,
       errorCode: 0,
       requestId: createId('rag-query'),
       thinkingContent: generated.thinkingContent,
@@ -1225,28 +1221,19 @@ function makeRAGQuery(
   config: RAGConfiguration,
   options: RAGQueryOverrides,
 ): RAGQueryOptions {
-  // Seed with the proto-generated canonical defaults (maxTokens 512 /
-  // temperature 0.7 / topP 1.0 from idl/rag.proto rac_default) so Web matches
-  // Swift's `RARAGQueryOptions.defaults(question:)` (RAGProto+Helpers.swift:72).
-  //
   // Per rag.proto: `retrievalTopK = 0` and `similarityThreshold = 0` mean
   // "use the RAGConfiguration default" so falling back to 0 when neither the
   // per-query override nor the pipeline config supplies a value is the
-  // correct way to defer to commons.
+  // correct way to defer to commons. Answer-generation knobs travel in
+  // `generation`; unset = RAG-appropriate pipeline defaults applied by commons.
   const defaults = rAGQueryOptionsDefaults();
   return {
     ...defaults,
     question,
-    systemPrompt: options.systemPrompt,
-    maxTokens: options.maxTokens ?? defaults.maxTokens,
-    temperature: options.temperature ?? defaults.temperature,
-    topP: options.topP ?? defaults.topP,
-    topK: options.topK ?? defaults.topK,
+    generation: options.generation,
     retrievalTopK: options.retrievalTopK ?? config.topK ?? 0,
     similarityThreshold: options.similarityThreshold ?? config.similarityThreshold ?? 0,
     stream: options.stream ?? false,
-    // Structured flag — commons prepends the model's no-think directive.
-    disableThinking: options.disableThinking ?? false,
     enableMultiQuery: options.enableMultiQuery ?? defaults.enableMultiQuery,
     multiQueryCount: options.multiQueryCount ?? defaults.multiQueryCount,
     scopePrefix: options.scopePrefix ?? defaults.scopePrefix,

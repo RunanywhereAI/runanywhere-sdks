@@ -14,6 +14,7 @@ import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
   type TTSOptions,
   type TTSOutput,
+  type TTSServiceState,
   type TTSVoiceInfo,
 } from '@runanywhere/proto-ts/tts_options';
 import { tTSOptionsDefaults } from '@runanywhere/proto-ts/convenience/tts_options_convenience';
@@ -32,7 +33,22 @@ import { TTSProtoAdapter } from '../../Adapters/ModalityProtoAdapter.js';
 import { WebModelLifecycle } from './RunAnywhere+ModelLifecycle.js';
 import { AudioPlayback } from '../../Infrastructure/AudioPlayback.js';
 
-export type { TTSOptions, TTSOutput, TTSVoiceInfo };
+export type { TTSOptions, TTSOutput, TTSServiceState, TTSVoiceInfo };
+
+/**
+ * Snapshot of the lifecycle-owned TTS service state.
+ */
+export async function ttsState(): Promise<TTSServiceState> {
+  const adapter = TTSProtoAdapter.tryDefault();
+  const state = adapter?.stateLifecycle();
+  if (!state) {
+    throw SDKException.backendNotAvailable(
+      'RunAnywhere.ttsState',
+      'Loaded WASM module does not export rac_tts_state_lifecycle_proto.',
+    );
+  }
+  return state;
+}
 
 const logger = new SDKLogger('TTS');
 

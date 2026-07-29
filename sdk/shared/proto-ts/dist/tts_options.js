@@ -127,54 +127,21 @@ function tTSStreamEventKindToJSON(object) {
     }
 }
 function createBaseTTSConfiguration() {
-    return {
-        modelId: "",
-        voice: "",
-        languageCode: "",
-        speakingRate: 0,
-        pitch: 0,
-        volume: 0,
-        audioFormat: 0,
-        sampleRate: 0,
-        enableNeuralVoice: false,
-        enableSsml: false,
-        preferredFramework: undefined,
-    };
+    return { modelId: "", enableNeuralVoice: false, preferredFramework: undefined, defaultOptions: undefined };
 }
 exports.TTSConfiguration = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.modelId !== "") {
             writer.uint32(10).string(message.modelId);
         }
-        if (message.voice !== "") {
-            writer.uint32(18).string(message.voice);
-        }
-        if (message.languageCode !== "") {
-            writer.uint32(26).string(message.languageCode);
-        }
-        if (message.speakingRate !== 0) {
-            writer.uint32(37).float(message.speakingRate);
-        }
-        if (message.pitch !== 0) {
-            writer.uint32(45).float(message.pitch);
-        }
-        if (message.volume !== 0) {
-            writer.uint32(53).float(message.volume);
-        }
-        if (message.audioFormat !== 0) {
-            writer.uint32(56).int32(message.audioFormat);
-        }
-        if (message.sampleRate !== 0) {
-            writer.uint32(64).int32(message.sampleRate);
-        }
         if (message.enableNeuralVoice !== false) {
             writer.uint32(72).bool(message.enableNeuralVoice);
         }
-        if (message.enableSsml !== false) {
-            writer.uint32(80).bool(message.enableSsml);
-        }
         if (message.preferredFramework !== undefined) {
             writer.uint32(88).int32(message.preferredFramework);
+        }
+        if (message.defaultOptions !== undefined) {
+            exports.TTSOptions.encode(message.defaultOptions, writer.uint32(98).fork()).join();
         }
         return writer;
     },
@@ -192,55 +159,6 @@ exports.TTSConfiguration = {
                     message.modelId = reader.string();
                     continue;
                 }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.voice = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.languageCode = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 37) {
-                        break;
-                    }
-                    message.speakingRate = reader.float();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 45) {
-                        break;
-                    }
-                    message.pitch = reader.float();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 53) {
-                        break;
-                    }
-                    message.volume = reader.float();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.audioFormat = reader.int32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.sampleRate = reader.int32();
-                    continue;
-                }
                 case 9: {
                     if (tag !== 72) {
                         break;
@@ -248,18 +166,18 @@ exports.TTSConfiguration = {
                     message.enableNeuralVoice = reader.bool();
                     continue;
                 }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.enableSsml = reader.bool();
-                    continue;
-                }
                 case 11: {
                     if (tag !== 88) {
                         break;
                     }
                     message.preferredFramework = reader.int32();
+                    continue;
+                }
+                case 12: {
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.defaultOptions = exports.TTSOptions.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -277,43 +195,20 @@ exports.TTSConfiguration = {
                 : isSet(object.model_id)
                     ? globalThis.String(object.model_id)
                     : "",
-            voice: isSet(object.voice) ? globalThis.String(object.voice) : "",
-            languageCode: isSet(object.languageCode)
-                ? globalThis.String(object.languageCode)
-                : isSet(object.language_code)
-                    ? globalThis.String(object.language_code)
-                    : "",
-            speakingRate: isSet(object.speakingRate)
-                ? globalThis.Number(object.speakingRate)
-                : isSet(object.speaking_rate)
-                    ? globalThis.Number(object.speaking_rate)
-                    : 0,
-            pitch: isSet(object.pitch) ? globalThis.Number(object.pitch) : 0,
-            volume: isSet(object.volume) ? globalThis.Number(object.volume) : 0,
-            audioFormat: isSet(object.audioFormat)
-                ? (0, model_types_1.audioFormatFromJSON)(object.audioFormat)
-                : isSet(object.audio_format)
-                    ? (0, model_types_1.audioFormatFromJSON)(object.audio_format)
-                    : 0,
-            sampleRate: isSet(object.sampleRate)
-                ? globalThis.Number(object.sampleRate)
-                : isSet(object.sample_rate)
-                    ? globalThis.Number(object.sample_rate)
-                    : 0,
             enableNeuralVoice: isSet(object.enableNeuralVoice)
                 ? globalThis.Boolean(object.enableNeuralVoice)
                 : isSet(object.enable_neural_voice)
                     ? globalThis.Boolean(object.enable_neural_voice)
                     : false,
-            enableSsml: isSet(object.enableSsml)
-                ? globalThis.Boolean(object.enableSsml)
-                : isSet(object.enable_ssml)
-                    ? globalThis.Boolean(object.enable_ssml)
-                    : false,
             preferredFramework: isSet(object.preferredFramework)
                 ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferredFramework)
                 : isSet(object.preferred_framework)
                     ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferred_framework)
+                    : undefined,
+            defaultOptions: isSet(object.defaultOptions)
+                ? exports.TTSOptions.fromJSON(object.defaultOptions)
+                : isSet(object.default_options)
+                    ? exports.TTSOptions.fromJSON(object.default_options)
                     : undefined,
         };
     },
@@ -322,35 +217,14 @@ exports.TTSConfiguration = {
         if (message.modelId !== "") {
             obj.modelId = message.modelId;
         }
-        if (message.voice !== "") {
-            obj.voice = message.voice;
-        }
-        if (message.languageCode !== "") {
-            obj.languageCode = message.languageCode;
-        }
-        if (message.speakingRate !== 0) {
-            obj.speakingRate = message.speakingRate;
-        }
-        if (message.pitch !== 0) {
-            obj.pitch = message.pitch;
-        }
-        if (message.volume !== 0) {
-            obj.volume = message.volume;
-        }
-        if (message.audioFormat !== 0) {
-            obj.audioFormat = (0, model_types_1.audioFormatToJSON)(message.audioFormat);
-        }
-        if (message.sampleRate !== 0) {
-            obj.sampleRate = Math.round(message.sampleRate);
-        }
         if (message.enableNeuralVoice !== false) {
             obj.enableNeuralVoice = message.enableNeuralVoice;
         }
-        if (message.enableSsml !== false) {
-            obj.enableSsml = message.enableSsml;
-        }
         if (message.preferredFramework !== undefined) {
             obj.preferredFramework = (0, model_types_1.inferenceFrameworkToJSON)(message.preferredFramework);
+        }
+        if (message.defaultOptions !== undefined) {
+            obj.defaultOptions = exports.TTSOptions.toJSON(message.defaultOptions);
         }
         return obj;
     },
@@ -360,16 +234,11 @@ exports.TTSConfiguration = {
     fromPartial(object) {
         const message = createBaseTTSConfiguration();
         message.modelId = object.modelId ?? "";
-        message.voice = object.voice ?? "";
-        message.languageCode = object.languageCode ?? "";
-        message.speakingRate = object.speakingRate ?? 0;
-        message.pitch = object.pitch ?? 0;
-        message.volume = object.volume ?? 0;
-        message.audioFormat = object.audioFormat ?? 0;
-        message.sampleRate = object.sampleRate ?? 0;
         message.enableNeuralVoice = object.enableNeuralVoice ?? false;
-        message.enableSsml = object.enableSsml ?? false;
         message.preferredFramework = object.preferredFramework ?? undefined;
+        message.defaultOptions = (object.defaultOptions !== undefined && object.defaultOptions !== null)
+            ? exports.TTSOptions.fromPartial(object.defaultOptions)
+            : undefined;
         return message;
     },
 };
@@ -377,7 +246,7 @@ function createBaseTTSOptions() {
     return {
         voice: "",
         languageCode: "",
-        speakingRate: 0,
+        speed: 0,
         pitch: 0,
         volume: 0,
         enableSsml: false,
@@ -395,8 +264,8 @@ exports.TTSOptions = {
         if (message.languageCode !== "") {
             writer.uint32(18).string(message.languageCode);
         }
-        if (message.speakingRate !== 0) {
-            writer.uint32(29).float(message.speakingRate);
+        if (message.speed !== 0) {
+            writer.uint32(29).float(message.speed);
         }
         if (message.pitch !== 0) {
             writer.uint32(37).float(message.pitch);
@@ -446,7 +315,7 @@ exports.TTSOptions = {
                     if (tag !== 29) {
                         break;
                     }
-                    message.speakingRate = reader.float();
+                    message.speed = reader.float();
                     continue;
                 }
                 case 4: {
@@ -514,11 +383,7 @@ exports.TTSOptions = {
                 : isSet(object.language_code)
                     ? globalThis.String(object.language_code)
                     : "",
-            speakingRate: isSet(object.speakingRate)
-                ? globalThis.Number(object.speakingRate)
-                : isSet(object.speaking_rate)
-                    ? globalThis.Number(object.speaking_rate)
-                    : 0,
+            speed: isSet(object.speed) ? globalThis.Number(object.speed) : 0,
             pitch: isSet(object.pitch) ? globalThis.Number(object.pitch) : 0,
             volume: isSet(object.volume) ? globalThis.Number(object.volume) : 0,
             enableSsml: isSet(object.enableSsml)
@@ -552,8 +417,8 @@ exports.TTSOptions = {
         if (message.languageCode !== "") {
             obj.languageCode = message.languageCode;
         }
-        if (message.speakingRate !== 0) {
-            obj.speakingRate = message.speakingRate;
+        if (message.speed !== 0) {
+            obj.speed = message.speed;
         }
         if (message.pitch !== 0) {
             obj.pitch = message.pitch;
@@ -585,7 +450,7 @@ exports.TTSOptions = {
         const message = createBaseTTSOptions();
         message.voice = object.voice ?? "";
         message.languageCode = object.languageCode ?? "";
-        message.speakingRate = object.speakingRate ?? 0;
+        message.speed = object.speed ?? 0;
         message.pitch = object.pitch ?? 0;
         message.volume = object.volume ?? 0;
         message.enableSsml = object.enableSsml ?? false;

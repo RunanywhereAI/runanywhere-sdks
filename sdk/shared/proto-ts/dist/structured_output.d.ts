@@ -168,21 +168,19 @@ export interface JSONSchema_DefinitionsEntry {
  *   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
  *   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
  * ---------------------------------------------------------------------------
+ * The ONE output-constraint surface. The retired loose fields on
+ * LLMGenerationOptions (json_schema, grammar, response_format) all fold in
+ * here: schema-shaped output via `schema_source`, low-level constrained
+ * decoding via `grammar`/`regex_pattern`.
  */
 export interface StructuredOutputOptions {
-    /** Schema describing the desired output shape. */
-    schema?: JSONSchema | undefined;
     /** Whether to embed the schema text in the LLM prompt. */
     includeSchemaInPrompt: boolean;
     /** Strict schema adherence — rejects outputs that don't fully validate. */
     strictMode?: boolean | undefined;
-    /**
-     * Raw JSON Schema string for C ABI and SDKs that already carry schema as
-     * serialized JSON instead of the typed JSONSchema tree.
-     */
+    schema?: JSONSchema | undefined;
     jsonSchema?: string | undefined;
-    /** Optional generated type/name hints used by Swift/Kotlin/Dart wrappers. */
-    typeName?: string | undefined;
+    /** Name for the schema/output type (OpenAI json_schema.name). */
     name?: string | undefined;
     mode: StructuredOutputMode;
     regexPattern?: string | undefined;

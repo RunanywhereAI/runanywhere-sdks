@@ -188,7 +188,7 @@ function createBaseVADConfiguration() {
         modelId: "",
         sampleRate: 0,
         frameLengthMs: 0,
-        threshold: 0,
+        activationThreshold: 0,
         enableAutoCalibration: false,
         calibrationMultiplier: 0,
         preferredFramework: undefined,
@@ -208,8 +208,8 @@ exports.VADConfiguration = {
         if (message.frameLengthMs !== 0) {
             writer.uint32(24).int32(message.frameLengthMs);
         }
-        if (message.threshold !== 0) {
-            writer.uint32(37).float(message.threshold);
+        if (message.activationThreshold !== 0) {
+            writer.uint32(37).float(message.activationThreshold);
         }
         if (message.enableAutoCalibration !== false) {
             writer.uint32(40).bool(message.enableAutoCalibration);
@@ -263,7 +263,7 @@ exports.VADConfiguration = {
                     if (tag !== 37) {
                         break;
                     }
-                    message.threshold = reader.float();
+                    message.activationThreshold = reader.float();
                     continue;
                 }
                 case 5: {
@@ -333,7 +333,11 @@ exports.VADConfiguration = {
                 : isSet(object.frame_length_ms)
                     ? globalThis.Number(object.frame_length_ms)
                     : 0,
-            threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
+            activationThreshold: isSet(object.activationThreshold)
+                ? globalThis.Number(object.activationThreshold)
+                : isSet(object.activation_threshold)
+                    ? globalThis.Number(object.activation_threshold)
+                    : 0,
             enableAutoCalibration: isSet(object.enableAutoCalibration)
                 ? globalThis.Boolean(object.enableAutoCalibration)
                 : isSet(object.enable_auto_calibration)
@@ -377,8 +381,8 @@ exports.VADConfiguration = {
         if (message.frameLengthMs !== 0) {
             obj.frameLengthMs = Math.round(message.frameLengthMs);
         }
-        if (message.threshold !== 0) {
-            obj.threshold = message.threshold;
+        if (message.activationThreshold !== 0) {
+            obj.activationThreshold = message.activationThreshold;
         }
         if (message.enableAutoCalibration !== false) {
             obj.enableAutoCalibration = message.enableAutoCalibration;
@@ -408,7 +412,7 @@ exports.VADConfiguration = {
         message.modelId = object.modelId ?? "";
         message.sampleRate = object.sampleRate ?? 0;
         message.frameLengthMs = object.frameLengthMs ?? 0;
-        message.threshold = object.threshold ?? 0;
+        message.activationThreshold = object.activationThreshold ?? 0;
         message.enableAutoCalibration = object.enableAutoCalibration ?? false;
         message.calibrationMultiplier = object.calibrationMultiplier ?? 0;
         message.preferredFramework = object.preferredFramework ?? undefined;
@@ -420,17 +424,18 @@ exports.VADConfiguration = {
 };
 function createBaseVADOptions() {
     return {
-        threshold: 0,
+        activationThreshold: 0,
         minSpeechDurationMs: 0,
         minSilenceDurationMs: 0,
         maxSpeechDurationMs: 0,
+        prefixPaddingMs: 0,
         includeStatistics: false,
     };
 }
 exports.VADOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.threshold !== 0) {
-            writer.uint32(13).float(message.threshold);
+        if (message.activationThreshold !== 0) {
+            writer.uint32(53).float(message.activationThreshold);
         }
         if (message.minSpeechDurationMs !== 0) {
             writer.uint32(16).int32(message.minSpeechDurationMs);
@@ -440,6 +445,9 @@ exports.VADOptions = {
         }
         if (message.maxSpeechDurationMs !== 0) {
             writer.uint32(32).int32(message.maxSpeechDurationMs);
+        }
+        if (message.prefixPaddingMs !== 0) {
+            writer.uint32(56).int32(message.prefixPaddingMs);
         }
         if (message.includeStatistics !== false) {
             writer.uint32(40).bool(message.includeStatistics);
@@ -453,11 +461,11 @@ exports.VADOptions = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 13) {
+                case 6: {
+                    if (tag !== 53) {
                         break;
                     }
-                    message.threshold = reader.float();
+                    message.activationThreshold = reader.float();
                     continue;
                 }
                 case 2: {
@@ -481,6 +489,13 @@ exports.VADOptions = {
                     message.maxSpeechDurationMs = reader.int32();
                     continue;
                 }
+                case 7: {
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.prefixPaddingMs = reader.int32();
+                    continue;
+                }
                 case 5: {
                     if (tag !== 40) {
                         break;
@@ -498,7 +513,11 @@ exports.VADOptions = {
     },
     fromJSON(object) {
         return {
-            threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
+            activationThreshold: isSet(object.activationThreshold)
+                ? globalThis.Number(object.activationThreshold)
+                : isSet(object.activation_threshold)
+                    ? globalThis.Number(object.activation_threshold)
+                    : 0,
             minSpeechDurationMs: isSet(object.minSpeechDurationMs)
                 ? globalThis.Number(object.minSpeechDurationMs)
                 : isSet(object.min_speech_duration_ms)
@@ -514,6 +533,11 @@ exports.VADOptions = {
                 : isSet(object.max_speech_duration_ms)
                     ? globalThis.Number(object.max_speech_duration_ms)
                     : 0,
+            prefixPaddingMs: isSet(object.prefixPaddingMs)
+                ? globalThis.Number(object.prefixPaddingMs)
+                : isSet(object.prefix_padding_ms)
+                    ? globalThis.Number(object.prefix_padding_ms)
+                    : 0,
             includeStatistics: isSet(object.includeStatistics)
                 ? globalThis.Boolean(object.includeStatistics)
                 : isSet(object.include_statistics)
@@ -523,8 +547,8 @@ exports.VADOptions = {
     },
     toJSON(message) {
         const obj = {};
-        if (message.threshold !== 0) {
-            obj.threshold = message.threshold;
+        if (message.activationThreshold !== 0) {
+            obj.activationThreshold = message.activationThreshold;
         }
         if (message.minSpeechDurationMs !== 0) {
             obj.minSpeechDurationMs = Math.round(message.minSpeechDurationMs);
@@ -534,6 +558,9 @@ exports.VADOptions = {
         }
         if (message.maxSpeechDurationMs !== 0) {
             obj.maxSpeechDurationMs = Math.round(message.maxSpeechDurationMs);
+        }
+        if (message.prefixPaddingMs !== 0) {
+            obj.prefixPaddingMs = Math.round(message.prefixPaddingMs);
         }
         if (message.includeStatistics !== false) {
             obj.includeStatistics = message.includeStatistics;
@@ -545,10 +572,11 @@ exports.VADOptions = {
     },
     fromPartial(object) {
         const message = createBaseVADOptions();
-        message.threshold = object.threshold ?? 0;
+        message.activationThreshold = object.activationThreshold ?? 0;
         message.minSpeechDurationMs = object.minSpeechDurationMs ?? 0;
         message.minSilenceDurationMs = object.minSilenceDurationMs ?? 0;
         message.maxSpeechDurationMs = object.maxSpeechDurationMs ?? 0;
+        message.prefixPaddingMs = object.prefixPaddingMs ?? 0;
         message.includeStatistics = object.includeStatistics ?? false;
         return message;
     },

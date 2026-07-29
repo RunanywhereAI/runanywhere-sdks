@@ -13,33 +13,30 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateLLMGenerationOptions = exports.lLMGenerationOptionsDefaults = void 0;
+exports.lLMConfigurationDefaults = exports.validateLLMGenerationOptions = exports.lLMGenerationOptionsDefaults = void 0;
 const _errors_1 = require("./_errors");
 const lLMGenerationOptionsDefaults = () => ({
-    maxTokens: 100,
+    maxOutputTokens: 100,
     temperature: 0.8,
     topP: 1.0,
     topK: 0,
     repetitionPenalty: 1.0,
     stopSequences: [],
-    streamingEnabled: false,
     preferredFramework: 0,
-    enableRealTimeTracking: false,
     seed: 0,
-    frequencyPenalty: 0,
-    presencePenalty: 0,
+    frequencyPenalty: 0.0,
+    presencePenalty: 0.0,
     repeatLastN: 0,
-    minP: 0,
+    minP: 0.0,
     echoPrompt: false,
     nThreads: 0,
-    disableThinking: false,
 });
 exports.lLMGenerationOptionsDefaults = lLMGenerationOptionsDefaults;
 const validateLLMGenerationOptions = (m) => {
-    if (m.maxTokens < 0) {
+    if (m.maxOutputTokens < 0) {
         throw new _errors_1.ValidationError({
-            fieldPath: 'LLMGenerationOptions.max_tokens',
-            message: `max_tokens must be >= 0 (got ${m.maxTokens})`,
+            fieldPath: 'LLMGenerationOptions.max_output_tokens',
+            message: `max_output_tokens must be >= 0 (got ${m.maxOutputTokens})`,
         });
     }
     if (!Number.isFinite(m.temperature) || m.temperature < 0.0 || m.temperature > 2.0) {
@@ -68,3 +65,7 @@ const validateLLMGenerationOptions = (m) => {
     }
 };
 exports.validateLLMGenerationOptions = validateLLMGenerationOptions;
+const lLMConfigurationDefaults = () => ({
+    contextLength: 2048,
+});
+exports.lLMConfigurationDefaults = lLMConfigurationDefaults;

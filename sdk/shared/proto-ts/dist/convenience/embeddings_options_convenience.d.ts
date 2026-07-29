@@ -2,3 +2,4 @@ import { EmbeddingsConfiguration, EmbeddingsOptions } from '../embeddings_option
 export declare const embeddingsConfigurationDefaults: () => EmbeddingsConfiguration;
 export declare const validateEmbeddingsConfiguration: (m: EmbeddingsConfiguration) => void;
 export declare const embeddingsOptionsDefaults: () => EmbeddingsOptions;
+export declare const validateEmbeddingsOptions: (m: EmbeddingsOptions) => void;

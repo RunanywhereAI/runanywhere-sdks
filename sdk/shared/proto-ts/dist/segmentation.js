@@ -59,7 +59,7 @@ function segmentationPixelFormatToJSON(object) {
     }
 }
 function createBaseSegmentationImage() {
-    return { data: new Uint8Array(0), width: 0, height: 0, pixelFormat: 0 };
+    return { data: new Uint8Array(0), width: 0, height: 0, pixelFormat: 0, strideBytes: 0 };
 }
 exports.SegmentationImage = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -74,6 +74,9 @@ exports.SegmentationImage = {
         }
         if (message.pixelFormat !== 0) {
             writer.uint32(32).int32(message.pixelFormat);
+        }
+        if (message.strideBytes !== 0) {
+            writer.uint32(40).uint32(message.strideBytes);
         }
         return writer;
     },
@@ -112,6 +115,13 @@ exports.SegmentationImage = {
                     message.pixelFormat = reader.int32();
                     continue;
                 }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.strideBytes = reader.uint32();
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -130,6 +140,11 @@ exports.SegmentationImage = {
                 : isSet(object.pixel_format)
                     ? segmentationPixelFormatFromJSON(object.pixel_format)
                     : 0,
+            strideBytes: isSet(object.strideBytes)
+                ? globalThis.Number(object.strideBytes)
+                : isSet(object.stride_bytes)
+                    ? globalThis.Number(object.stride_bytes)
+                    : 0,
         };
     },
     toJSON(message) {
@@ -146,6 +161,9 @@ exports.SegmentationImage = {
         if (message.pixelFormat !== 0) {
             obj.pixelFormat = segmentationPixelFormatToJSON(message.pixelFormat);
         }
+        if (message.strideBytes !== 0) {
+            obj.strideBytes = Math.round(message.strideBytes);
+        }
         return obj;
     },
     create(base) {
@@ -157,6 +175,7 @@ exports.SegmentationImage = {
         message.width = object.width ?? 0;
         message.height = object.height ?? 0;
         message.pixelFormat = object.pixelFormat ?? 0;
+        message.strideBytes = object.strideBytes ?? 0;
         return message;
     },
 };

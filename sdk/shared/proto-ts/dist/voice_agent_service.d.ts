@@ -1,7 +1,9 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { EventCategory } from "./component_types";
 import { ErrorSeverity } from "./errors";
+import { LLMGenerationOptions } from "./llm_options";
 import { TTSOptions } from "./tts_options";
+import { VADConfiguration } from "./vad_options";
 import { AudioEncoding, VoiceAgentComponentStates } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -94,6 +96,18 @@ export interface VoiceAgentTurnRequest_MetadataEntry {
     value: string;
 }
 /**
+ * One audio frame fed into a live voice-agent session. Replaces the
+ * seven-scalar rac_voice_agent_feed_audio_proto signature.
+ */
+export interface VoiceAgentAudioFrame {
+    audioData: Uint8Array;
+    sampleRate: number;
+    channels: number;
+    encoding: AudioEncoding;
+    /** Marks the end of the utterance (flush). */
+    isFinal: boolean;
+}
+/**
  * ---------------------------------------------------------------------------
  * Voice session behavior configuration.
  *
@@ -184,16 +198,12 @@ export interface VoiceAgentComposeConfig {
     ttsVoicePath?: string | undefined;
     ttsVoiceId?: string | undefined;
     ttsVoiceName?: string | undefined;
+    vadConfig?: VADConfiguration | undefined;
     /**
-     * -------------------------------------------------------------------
-     * VAD sub-config (mirrors rac_voice_agent_vad_config_t).
-     * -------------------------------------------------------------------
+     * LLM generation knobs for the response model (sampling, system prompt,
+     * reasoning). Unset = voice-agent defaults from the generated pool.
      */
-    vadSampleRate: number;
-    /** default 0.1 */
-    vadFrameLength: number;
-    /** default 0.005 */
-    vadEnergyThreshold: number;
+    llmGeneration?: LLMGenerationOptions | undefined;
     /**
      * -------------------------------------------------------------------
      * Session-behavior sub-config. Optional so the C ABI can be invoked
@@ -228,6 +238,7 @@ export declare const VoiceAgentRequest: MessageFns<VoiceAgentRequest>;
 export declare const VoiceAgentResult: MessageFns<VoiceAgentResult>;
 export declare const VoiceAgentTurnRequest: MessageFns<VoiceAgentTurnRequest>;
 export declare const VoiceAgentTurnRequest_MetadataEntry: MessageFns<VoiceAgentTurnRequest_MetadataEntry>;
+export declare const VoiceAgentAudioFrame: MessageFns<VoiceAgentAudioFrame>;
 export declare const VoiceSessionConfig: MessageFns<VoiceSessionConfig>;
 export declare const AudioPipelineConfig: MessageFns<AudioPipelineConfig>;
 export declare const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig>;

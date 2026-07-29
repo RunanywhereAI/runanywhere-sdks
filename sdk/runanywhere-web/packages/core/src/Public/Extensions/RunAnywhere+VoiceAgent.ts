@@ -60,6 +60,11 @@ import { getActiveBackendWorkerHost } from '../../runtime/BackendWorkerHost.js';
 import { hasBackendWorkerOwnedModels } from '../../runtime/BackendWorkerModelOwnership.js';
 import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
+import { vADConfigurationDefaults } from '@runanywhere/proto-ts/convenience/vad_options_convenience';
+import {
+  ReasoningMode,
+  type ReasoningOptions,
+} from '@runanywhere/proto-ts/thinking_tag_pattern';
 
 const logger = new SDKLogger('VoiceAgent');
 const VOICE_SYSTEM_PROMPT =
@@ -76,6 +81,15 @@ const VOICE_TEMPERATURE = voiceAgentDefaults.temperature;
 const VOICE_MAX_HISTORY_ENTRIES = 20;
 const DEFAULT_VAD_ENERGY_THRESHOLD = voiceAgentDefaults.speechRmsThreshold;
 const MODEL_VAD_PROBABILITY_THRESHOLD = 0.5;
+
+function voiceReasoning(thinkingModeEnabled: boolean): ReasoningOptions {
+  return {
+    mode: thinkingModeEnabled
+      ? ReasoningMode.REASONING_MODE_ON
+      : ReasoningMode.REASONING_MODE_OFF,
+    includeInOutput: false,
+  };
+}
 
 export type VoiceAgentAvailabilitySource =
   | 'provider'
@@ -625,7 +639,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
       );
       const sttStarted = performance.now();
       const stt = await transcribe(audio, {
-        languageCode: config.sessionConfig?.languageCode ?? config.defaultLanguageCode,
+        language: config.sessionConfig?.languageCode ?? config.defaultLanguageCode,
       });
       this.assertCurrent(lifecycleVersion);
       sttTimeMs = performance.now() - sttStarted;
@@ -676,7 +690,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
           confidence: stt.confidence,
           audioStartUs: 0,
           audioEndUs: Math.max(0, Math.round(stt.durationMs * 1000)),
-          languageCode: stt.languageCode ?? '',
+          languageCode: stt.language ?? '',
           segmentIndex: stt.segmentIndex,
         },
       }));
@@ -692,12 +706,12 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
       const configuredMaxTokens = config.sessionConfig?.maxTokens ?? 0;
       const llm = await TextGeneration.generate({
         prompt: transcription,
-        maxTokens: configuredMaxTokens > 0 ? configuredMaxTokens : VOICE_MAX_TOKENS,
+        maxOutputTokens: configuredMaxTokens > 0 ? configuredMaxTokens : VOICE_MAX_TOKENS,
         temperature: VOICE_TEMPERATURE,
         systemPrompt: VOICE_SYSTEM_PROMPT,
         history: voiceHistoryMessages(this.conversationHistory),
         conversationId: sessionId,
-        disableThinking: !(config.sessionConfig?.thinkingModeEnabled ?? false),
+        reasoning: voiceReasoning(config.sessionConfig?.thinkingModeEnabled ?? false),
       });
       this.assertCurrent(lifecycleVersion);
       llmTimeMs = performance.now() - llmStarted;
@@ -818,12 +832,12 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     const configuredMaxTokens = this.config.sessionConfig?.maxTokens ?? 0;
     return (await TextGeneration.generate({
       prompt,
-      maxTokens: configuredMaxTokens > 0 ? configuredMaxTokens : VOICE_MAX_TOKENS,
+      maxOutputTokens: configuredMaxTokens > 0 ? configuredMaxTokens : VOICE_MAX_TOKENS,
       temperature: VOICE_TEMPERATURE,
       systemPrompt: VOICE_SYSTEM_PROMPT,
       history: voiceHistoryMessages(this.conversationHistory),
       conversationId: this.config.sessionId ?? 'web-voice-agent',
-      disableThinking: !(this.config.sessionConfig?.thinkingModeEnabled ?? false),
+      reasoning: voiceReasoning(this.config.sessionConfig?.thinkingModeEnabled ?? false),
     })).text;
   }
 
@@ -854,8 +868,9 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     audio: Float32Array | Uint8Array,
   ): Promise<TurnVADVerdict> {
     const samples = toFloat32Audio(audio);
-    const durationMs = (samples.length / (this.config.vadSampleRate || 16_000)) * 1000;
-    const energyThreshold = this.config.vadEnergyThreshold || DEFAULT_VAD_ENERGY_THRESHOLD;
+    const durationMs = (samples.length / (this.config.vadConfig?.sampleRate || 16_000)) * 1000;
+    const energyThreshold =
+      this.config.vadConfig?.activationThreshold || DEFAULT_VAD_ENERGY_THRESHOLD;
     const currentVAD = WebModelLifecycle.currentModel({
       category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       includeModelMetadata: false,
@@ -868,13 +883,14 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
           minSilenceDurationMs: this.config.sessionConfig?.silenceDurationMs || 800,
           maxSpeechDurationMs: this.config.sessionConfig?.maxRecordingDurationMs || 0,
           config: {
-            sampleRate: this.config.vadSampleRate || 16_000,
-            frameLengthMs: Math.round((this.config.vadFrameLength || 0.1) * 1000),
-            // `vadEnergyThreshold` is an RMS amplitude threshold for the
-            // fallback detector. Model-backed Silero expects a posterior
-            // probability instead; forwarding 0.005 makes Sherpa reject its
-            // configuration because model thresholds must be at least 0.01.
-            threshold: MODEL_VAD_PROBABILITY_THRESHOLD,
+            sampleRate: this.config.vadConfig?.sampleRate || 16_000,
+            frameLengthMs: this.config.vadConfig?.frameLengthMs || 100,
+            // The compose config's activation threshold is an RMS amplitude
+            // threshold for the fallback detector. Model-backed Silero expects
+            // a posterior probability instead; forwarding 0.005 makes Sherpa
+            // reject its configuration because model thresholds must be at
+            // least 0.01.
+            activationThreshold: MODEL_VAD_PROBABILITY_THRESHOLD,
           },
         });
         return {
@@ -1142,9 +1158,12 @@ function modelNotLoadedException(message: string): SDKException {
 
 function defaultVoiceAgentComposeConfig(ttsVoiceID?: string): VoiceAgentComposeConfig {
   return {
-    vadSampleRate: audioCaptureDefaults.micSampleRateHz,
-    vadFrameLength: 0.1,
-    vadEnergyThreshold: DEFAULT_VAD_ENERGY_THRESHOLD,
+    vadConfig: {
+      ...vADConfigurationDefaults(),
+      sampleRate: audioCaptureDefaults.micSampleRateHz,
+      frameLengthMs: 100,
+      activationThreshold: DEFAULT_VAD_ENERGY_THRESHOLD,
+    },
     sessionId: 'web-voice-agent',
     ...(ttsVoiceID ? { ttsVoiceId: ttsVoiceID } : {}),
   };

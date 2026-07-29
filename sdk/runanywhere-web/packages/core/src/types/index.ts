@@ -16,9 +16,10 @@ export type {
   LLMGenerationOptions,
   LLMGenerationResult,
   LLMConfiguration,
-  GenerationHints,
   StreamToken,
 } from '@runanywhere/proto-ts/llm_options';
+export type { ReasoningOptions } from '@runanywhere/proto-ts/thinking_tag_pattern';
+export { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 export { ExecutionTarget } from '@runanywhere/proto-ts/llm_options';
 
 // Web-only LLM streaming types (browser AsyncIterable + cancel handle).
@@ -57,17 +58,15 @@ export type LLMStreamErrorCallback = (error: Error) => void;
  * options object.
  */
 export const LLM_GENERATION_DEFAULTS = Object.freeze({
-  maxTokens: lLMGenerationOptionsDefaults().maxTokens,
+  maxOutputTokens: lLMGenerationOptionsDefaults().maxOutputTokens,
   temperature: lLMGenerationOptionsDefaults().temperature,
   topP: lLMGenerationOptionsDefaults().topP,
   stopSequences: [] as readonly string[],
-  streamingEnabled: false,
 }) as Readonly<{
-  maxTokens: number;
+  maxOutputTokens: number;
   temperature: number;
   topP: number;
   stopSequences: readonly string[];
-  streamingEnabled: boolean;
 }>;
 
 /**
@@ -79,11 +78,10 @@ export function applyLLMGenerationDefaults(
 ): Partial<ProtoLLMGenerationOptions> {
   return {
     ...options,
-    maxTokens: options.maxTokens ?? LLM_GENERATION_DEFAULTS.maxTokens,
+    maxOutputTokens: options.maxOutputTokens ?? LLM_GENERATION_DEFAULTS.maxOutputTokens,
     temperature: options.temperature ?? LLM_GENERATION_DEFAULTS.temperature,
     topP: options.topP ?? LLM_GENERATION_DEFAULTS.topP,
     stopSequences: options.stopSequences ?? [...LLM_GENERATION_DEFAULTS.stopSequences],
-    streamingEnabled: options.streamingEnabled ?? LLM_GENERATION_DEFAULTS.streamingEnabled,
   };
 }
 
@@ -124,14 +122,12 @@ export type {
   TranscriptionAlternative,
   TranscriptionMetadata,
 } from '@runanywhere/proto-ts/stt_options';
-export { STTLanguage } from '@runanywhere/proto-ts/stt_options';
 import type { STTOptions } from '@runanywhere/proto-ts/stt_options';
 
 // Raw browser PCM buffers do not carry sample rate, so the Web adapter accepts
 // that one transport hint alongside canonical STTOptions.
 export type STTTranscribeOptions =
-  Partial<Omit<STTOptions, 'language'>> & {
-    language?: STTOptions['language'] | string;
+  Partial<STTOptions> & {
     sampleRate?: number;
   };
 

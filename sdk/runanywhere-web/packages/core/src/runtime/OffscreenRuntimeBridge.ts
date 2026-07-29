@@ -80,8 +80,7 @@ export type BridgeStreamRequest =
   | {
       kind: 'stream.stt.transcribe';
       handle: number;
-      audioBytes: Uint8Array;
-      optionsBytes: Uint8Array;
+      requestBytes: Uint8Array;
     }
   | {
       kind: 'stream.tts.synthesize';
@@ -498,8 +497,7 @@ function toWorkerRequest(req: BridgeStreamRequest, requestId: string): WorkerReq
         type: 'stream.stt.transcribe',
         requestId,
         handle: req.handle,
-        audioBytes: req.audioBytes,
-        optionsBytes: req.optionsBytes,
+        requestBytes: req.requestBytes,
       };
     case 'stream.tts.synthesize':
       return {

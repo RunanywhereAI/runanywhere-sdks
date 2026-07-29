@@ -428,9 +428,17 @@ def _emit_message_defaults(
     msg_name = msg_desc.name
     has_any_default = False
     field_lines: list[str] = []
+    map_entry_names = {
+        nt.name for nt in msg_desc.nested_type if nt.options.map_entry
+    }
 
     for field in msg_desc.field:
         ts_field = _proto_field_to_ts_camel(field.name)
+        is_map_field = (
+            field.type == TYPE_MESSAGE
+            and field.label == LABEL_REPEATED
+            and field.type_name.split(".")[-1] in map_entry_names
+        )
         rac_default: str | None = None
         if field.HasField("options"):
             rac_default = _opt_string(field.options, RAC_DEFAULT_FIELD_NUM)
@@ -462,7 +470,8 @@ def _emit_message_defaults(
             continue
 
         # Required field — must initialise to satisfy the interface.
-        field_lines.append(f"  {ts_field}: {_ts_zero_literal(field)},")
+        literal = "{}" if is_map_field else _ts_zero_literal(field)
+        field_lines.append(f"  {ts_field}: {literal},")
 
     if not has_any_default:
         # Per the design: only emit defaults() when at least one rac_default

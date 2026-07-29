@@ -91,7 +91,7 @@ export class VLMProtoAdapter {
     const requestBytes = VLMGenerationRequest.encode(
       VLMGenerationRequest.fromPartial({
         images: [image],
-        options: { ...options, streamingEnabled: true },
+        options,
       }),
     ).finish();
     if (mustUseLlamaBackendWorker()) {
