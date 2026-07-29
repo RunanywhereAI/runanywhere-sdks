@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai.ui.screens.models
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -122,8 +121,7 @@ fun RAModelInfo.isDocumentOcrModel(): Boolean =
 
 fun RAModelInfo.requiresHfAuth(): Boolean {
     val tags = metadata?.tags.orEmpty().map { it.lowercase() }
-    return (framework == InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT &&
-        QHexRT.modelRequiresHfAuth(id)) || tags.any { it in privateHfTags }
+    return tags.any { it in privateHfTags }
 }
 
 // Effective on-disk / in-memory footprint used for sizing and consumer tags.
