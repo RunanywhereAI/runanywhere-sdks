@@ -59,14 +59,15 @@ let package = Package(
         // -------------------------------------------------------------------
         .library(
             name: "RunAnywhere",
+            type: .static,
             targets: ["RunAnywhere"]
         ),
 
         // Individual backend products (used by the example apps that only
         // want to link a subset of the runtimes).
-        .library(name: "RunAnywhereLlamaCPP", targets: ["LlamaCPPRuntime"]),
-        .library(name: "RunAnywhereONNX", targets: ["ONNXRuntime"]),
-        .library(name: "RunAnywhereMLX", targets: ["MLXRuntime"]),
+        .library(name: "RunAnywhereLlamaCPP", type: .static, targets: ["LlamaCPPRuntime"]),
+        .library(name: "RunAnywhereONNX", type: .static, targets: ["ONNXRuntime"]),
+        .library(name: "RunAnywhereMLX", type: .static, targets: ["MLXRuntime"]),
     ],
     dependencies: [
         // SPM deps use `.upToNextMinor` (not open-ended `from:`) so a

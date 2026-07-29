@@ -57,8 +57,12 @@ def test_import_runanywhere_without_native() -> None:
 
 def test_version_string() -> None:
     import runanywhere
+    from importlib.metadata import version
 
-    assert runanywhere.__version__ == "0.20.11"
+    # Hermetic CI copies only tests/ into a temp dir, so do not read the monorepo
+    # VERSION file here. Match the installed wheel metadata instead (that metadata
+    # is already gated against VERSION in the validate_public_packages step).
+    assert runanywhere.__version__ == version("runanywhere")
 
 
 # The full public surface promised by __all__ / the Electron index.ts.

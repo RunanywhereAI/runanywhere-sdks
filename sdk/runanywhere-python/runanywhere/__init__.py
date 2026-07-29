@@ -88,7 +88,7 @@ from .structured import (
 )
 from .voice_agent import VoiceAgent
 
-__version__ = "0.20.11"
+__version__ = "0.20.12"
 
 __all__ = [
     "__version__",

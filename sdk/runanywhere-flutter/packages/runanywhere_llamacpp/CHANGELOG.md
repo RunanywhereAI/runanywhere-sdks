@@ -5,6 +5,10 @@ All notable changes to the RunAnywhere LlamaCpp Backend will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.12] - 2026-07-28
+
+- Suite version bump; Kotlin/QHexRT Maven release.
+
 ## [0.20.11] - 2026-07-16
 
 - Version-aligned release with benchmark aggregation, variance reporting, and updated model catalogs.

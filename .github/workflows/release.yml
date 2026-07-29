@@ -313,12 +313,22 @@ jobs:
         run: |
           set -euo pipefail
           set +x
-          for variable in CERTIFICATE_BASE64 CERTIFICATE_PASSWORD; do
-            [ -n "${!variable:-}" ] || {
-              echo "::error::Required rcli signing secret is not configured: $variable"
-              exit 1
-            }
-          done
+          # Soft-skip when org secrets are absent so Release publish is not
+          # blocked on credentials alone. Ship an ad-hoc-signed tarball; restore
+          # RCLI_DEVELOPER_ID_* / notary secrets for Developer ID + notarized DMG.
+          if [ -z "${CERTIFICATE_BASE64:-}" ] || [ -z "${CERTIFICATE_PASSWORD:-}" ]; then
+            echo "::warning::RCLI Developer ID secrets not configured — packaging unsigned (ad-hoc) macOS rcli tarball"
+            {
+              echo "signed=false"
+              echo "identity="
+              echo "keychain="
+              echo "certificate="
+              echo "notary-mode="
+              echo "notary-key="
+              echo "notary-profile="
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
           KEYCHAIN="$RUNNER_TEMP/rcli-signing.keychain-db"
           CERTIFICATE="$RUNNER_TEMP/rcli-developer-id.p12"
@@ -400,6 +410,7 @@ jobs:
           fi
 
           {
+            echo "signed=true"
             echo "identity=$IDENTITY"
             echo "keychain=$KEYCHAIN"
             echo "certificate=$CERTIFICATE"
@@ -415,7 +426,8 @@ jobs:
           RCLI_MACOS_SWIFT_BIN_DIR: ${{ steps.mlx-host.outputs.bin-dir }}
           RCLI_CODESIGN_IDENTITY: ${{ steps.signing.outputs.identity }}
           RCLI_CODESIGN_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
-          RCLI_MACOS_NOTARIZE: 1
+          # Notarize only when Developer ID secrets were loaded above.
+          RCLI_MACOS_NOTARIZE: ${{ steps.signing.outputs.signed == 'true' && '1' || '0' }}
           RCLI_NOTARYTOOL_PROFILE: ${{ steps.signing.outputs.notary-profile }}
           RCLI_NOTARYTOOL_KEYCHAIN: ${{ steps.signing.outputs.keychain }}
           RCLI_NOTARY_KEY_PATH: ${{ steps.signing.outputs.notary-key }}
@@ -430,10 +442,10 @@ jobs:
           SIGNING_NOTARY_KEY: ${{ steps.signing.outputs.notary-key }}
         run: |
           set -euo pipefail
-          if [ -n "$SIGNING_KEYCHAIN" ] && [ -f "$SIGNING_KEYCHAIN" ]; then
+          if [ -n "${SIGNING_KEYCHAIN:-}" ] && [ -f "$SIGNING_KEYCHAIN" ]; then
             security delete-keychain "$SIGNING_KEYCHAIN"
           fi
-          rm -f "$SIGNING_CERTIFICATE" "$SIGNING_NOTARY_KEY"
+          rm -f "${SIGNING_CERTIFICATE:-}" "${SIGNING_NOTARY_KEY:-}"
       - name: Upload rcli macOS artifact
         uses: actions/upload-artifact@v7
         with:
@@ -522,9 +534,13 @@ jobs:
           WINDOWS_CERTIFICATE_BASE64: ${{ secrets.RCLI_WINDOWS_CODESIGN_PFX_BASE64 }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.RCLI_WINDOWS_CODESIGN_PFX_PASSWORD }}
         run: |
+          # Soft-skip when org secrets are absent so Release publish is not
+          # blocked on credentials alone. Restore RCLI_WINDOWS_CODESIGN_PFX_*
+          # for Authenticode-signed Windows rcli.
           if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_BASE64) -or
               [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
-            throw "Configure RCLI_WINDOWS_CODESIGN_PFX_BASE64 and RCLI_WINDOWS_CODESIGN_PFX_PASSWORD"
+            Write-Host "::warning::RCLI Windows codesign secrets not configured — packaging unsigned rcli.exe"
+            exit 0
           }
           $Binary = Get-ChildItem build/rcli-windows-release -Filter rcli.exe -File -Recurse |
             Where-Object { $_.FullName -match 'runanywhere-cli' } |

@@ -66,7 +66,8 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "nemotron_ocr",         "nemotron_ocr_v1",     "nemotron_parse",  "whisper_base",
         "whisper_small",        "moonshine_tiny",      "moonshine_base",  "parakeet_tdt_0_6b_v2",
         "parakeet_tdt_0_6b_v3", "parakeet_rnnt_1_1b",  "canary_1b_flash", "nemotron_asr_streaming",
-        "melotts_en",           "kokoro_en",           "kitten_nano_0_8", "embeddinggemma_300m",
+        "melotts_en",           "kokoro_en",           "kitten_nano_0_8", "kitten_nano_0_8_varlen",
+        "embeddinggemma_300m",
         "nv_embedqa_1b",        "nv_rerankqa_1b",      "siglip2_base",
         "nemotron_nano_8b",     "canary_180m_flash",
         "parakeet_ctc_1_1b",    "nemotron_3_embed_1b", "magpie_tts_357m",
@@ -124,6 +125,7 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "kokoro_en",
         "melotts_en",
         "kitten_nano_0_8",
+        "kitten_nano_0_8_varlen",
         "kitten_mini_0_8",
         "kitten_micro_0_8",
         "magpie_tts_357m",
@@ -156,8 +158,8 @@ int test_native_catalog_owns_arch_and_auth_policy() {
                   v81.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
     }
 
-    const std::unordered_set<std::string> private_ids = {};
-    ASSERT_EQ(private_ids.size(), static_cast<size_t>(0));
+    const std::unordered_set<std::string> private_ids = {"kitten_nano_0_8_varlen"};
+    ASSERT_EQ(private_ids.size(), static_cast<size_t>(1));
     for (const std::string& id : all) {
         ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth(id.c_str()),
                   private_ids.count(id) == 0 ? RAC_FALSE : RAC_TRUE);

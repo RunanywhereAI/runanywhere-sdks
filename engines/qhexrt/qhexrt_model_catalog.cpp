@@ -117,6 +117,8 @@ constexpr ModelPolicy kModelPolicies[] = {
     // V79 requires model-downloaded executable .so files, which Play disallows.
     {"kokoro_en", kV75V81, false},
     {"kitten_nano_0_8", kV75V81, false},
+    // L=128 varlen Graph A (attn_mask+valid_len). HF repo is private; require token.
+    {"kitten_nano_0_8_varlen", kV75V81, true},
     {"kitten_mini_0_8", kV81, false},
     {"kitten_micro_0_8", kV81, false},
     // Magpie-TTS: published with v75/ + v81/ child dirs only (no v79 build).
