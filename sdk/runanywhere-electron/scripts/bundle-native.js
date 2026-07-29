@@ -14,25 +14,38 @@ const defaultBuild = path.join(
   'runanywhere-electron', 'native', 'Release'
 );
 const buildDir = process.env.RA_NATIVE_DIR || defaultBuild;
-const outDir = path.join(pkgRoot, 'prebuilds', `${process.platform}-${process.arch}`);
+const flavor = (process.env.RA_NATIVE_FLAVOR || '').trim();
+const outDir = path.join(
+  pkgRoot,
+  'prebuilds',
+  `${process.platform}-${process.arch}${flavor ? `-${flavor}` : ''}`
+);
 
-// The addon plus the runtime DLLs it dynamically links (onnxruntime for the ONNX
-// engine, sherpa for STT/TTS). onnxruntime_providers_shared is a 0-byte stub on
-// CPU builds but onnxruntime.dll still imports it, so it must be present.
+// The addon plus the runtime DLLs it dynamically links. The official Windows
+// Sherpa package is shared, so its C API DLL must sit beside the addon too.
+// ONNX Runtime's fetched binaries remain in the dependency source tree rather
+// than beside the addon; search all runtime locations so a normal repo build can
+// be bundled directly.
 const FILES = [
   'runanywhere_native.node',
   'onnxruntime.dll',
   'onnxruntime_providers_shared.dll',
   'sherpa-onnx-c-api.dll',
 ];
+const searchDirs = [
+  buildDir,
+  process.env.RA_ONNX_DIR,
+  path.join(pkgRoot, '..', '..', 'build', 'windows-release', '_deps', 'onnxruntime-src', 'lib'),
+  path.join(pkgRoot, '..', 'runanywhere-commons', 'third_party', 'sherpa-onnx-windows', 'lib'),
+].filter(Boolean);
 
 fs.mkdirSync(outDir, { recursive: true });
 let copied = 0;
 let bytes = 0;
 for (const f of FILES) {
-  const src = path.join(buildDir, f);
-  if (!fs.existsSync(src)) {
-    console.error('  MISSING:', src);
+  const src = searchDirs.map((dir) => path.join(dir, f)).find(fs.existsSync);
+  if (!src) {
+    console.error('  MISSING:', f, '(searched:', searchDirs.join(', '), ')');
     continue;
   }
   const size = fs.statSync(src).size;

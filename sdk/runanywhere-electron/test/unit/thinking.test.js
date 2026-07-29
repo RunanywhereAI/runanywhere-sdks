@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { splitThinking, stripThinking, isThinking } = require('../../dist/thinking');
+const { splitThinking, stripThinking, stripModelProtocol, isThinking } = require('../../dist/thinking');
 
 test('splitThinking: <think> block is separated from the answer', () => {
   const { response, thinking } = splitThinking('<think>let me count</think>The answer is 4.');
@@ -30,6 +30,28 @@ test('splitThinking: an unclosed <think> makes the rest thinking', () => {
 test('splitThinking: text before and after the block is joined with a newline (commons parity)', () => {
   const { response } = splitThinking('A<think>x</think>B');
   assert.equal(response, 'A\nB');
+});
+
+test('splitThinking removes asymmetric Gemma channel markers from the answer', () => {
+  assert.deepEqual(splitThinking('<|channel>thought\n<channel|>Hello!'), {
+    response: 'Hello!',
+    thinking: '',
+  });
+  assert.equal(splitThinking('thought\n<channel|>I am trained by Google.').response, 'I am trained by Google.');
+  assert.equal(stripModelProtocol('<|channel>thought'), '', 'a partial stream must not flash the channel label');
+});
+
+test('stripModelProtocol keeps only the final Harmony channel', () => {
+  const raw = '<|channel|>analysis<|message|>private notes' +
+    '<|channel|>final<|message|>Visible answer.<|end|>';
+  assert.equal(stripModelProtocol(raw), 'Visible answer.');
+});
+
+test('stripModelProtocol removes Gemma turn tokens but preserves think tags', () => {
+  assert.equal(
+    stripModelProtocol('<start_of_turn>model\n<think>counting</think>Four.<end_of_turn>'),
+    '<think>counting</think>Four.'
+  );
 });
 
 test('splitThinking: empty / nullish input is safe', () => {

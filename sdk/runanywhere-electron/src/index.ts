@@ -37,7 +37,7 @@ export type {
 export { jsonSchemaToGrammar } from './grammar';
 export type { JsonSchema } from './grammar';
 export { objectGrammar, toolCallSchema, toolCallPrompt } from './structured';
-export { splitThinking, stripThinking, isThinking } from './thinking';
+export { splitThinking, stripThinking, stripModelProtocol, isThinking } from './thinking';
 export type { ThinkingSplit } from './thinking';
 export { streamWithMetrics } from './stream';
 export {

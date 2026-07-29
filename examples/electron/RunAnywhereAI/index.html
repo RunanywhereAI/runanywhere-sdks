@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file:; connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com"
     />
     <title>RunAnywhere</title>
     <style>
@@ -64,8 +64,8 @@
       /* ---------------- sidebar ---------------- */
       .sidebar { width: 280px; flex: 0 0 auto; background: linear-gradient(180deg, var(--sidebar), #0a0f1c); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 16px 14px; }
       .brand { display: flex; align-items: center; gap: 11px; padding: 6px 8px 14px; }
-      .brand .logo { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(140deg, var(--accent-lift), var(--accent-2)); display: grid; place-items: center; box-shadow: 0 4px 16px var(--accent-glow); }
-      .brand .logo svg { width: 17px; height: 17px; color: #fff; }
+      .brand .logo { width: 32px; height: 32px; border-radius: 9px; background: rgba(255,255,255,.04); display: grid; place-items: center; overflow: hidden; box-shadow: 0 4px 16px var(--accent-glow); }
+      .brand .logo img { width: 32px; height: 32px; transform: scale(1.7); }
       .brand .name { font-size: 15px; font-weight: 640; letter-spacing: -.01em; }
       .brand .name small { display: block; font-size: 11px; font-weight: 500; color: var(--fg-3); letter-spacing: .01em; }
       .newchat { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 11px; margin-bottom: 14px; border-radius: 12px; border: none; color: #fff; font-weight: 600; letter-spacing: -.005em; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 6px 18px var(--accent-glow); transition: .18s var(--ease); }
@@ -144,6 +144,7 @@
       .thread { max-width: 760px; margin: 0 auto; }
       .msg { display: flex; gap: 14px; margin-bottom: 26px; animation: fadeUp .3s var(--ease); }
       .msg .av { width: 32px; height: 32px; border-radius: 10px; flex: 0 0 auto; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; margin-top: 1px; }
+      .msg .av img { width: 30px; height: 30px; transform: scale(1.55); }
       .msg.user .av { background: var(--surface-3); color: var(--fg-2); box-shadow: inset 0 0 0 1px var(--line-2); }
       .msg.assistant .av { background: linear-gradient(140deg, var(--accent-lift), var(--accent-2)); box-shadow: 0 3px 12px var(--accent-glow); }
       .msg .col { min-width: 0; flex: 1; }
@@ -163,6 +164,9 @@
       .bubble .reason > summary::-webkit-details-marker { display: none; }
       .bubble .reason[open] > summary { border-bottom: 1px solid var(--line); }
       .bubble .reasonbody { padding: 10px 13px; font-size: 13px; line-height: 1.6; color: var(--fg-2); white-space: pre-wrap; font-family: 'Cascadia Code','Consolas',monospace; }
+      .toolrun { margin: 0 0 11px; border: 1px solid rgba(255,105,0,.28); border-radius: 11px; background: rgba(255,105,0,.07); overflow: hidden; }
+      .toolrun .toolhead { display: flex; align-items: center; gap: 7px; padding: 7px 11px; color: var(--accent-lift); font-size: 12px; font-weight: 650; border-bottom: 1px solid var(--line); }
+      .toolrun .toolbody { padding: 9px 11px; color: var(--fg-2); font-size: 12px; font-family: 'Cascadia Code','Consolas',monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
       .reasontoggle { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: var(--fg-3); line-height: 1.5; cursor: pointer; }
       .reasontoggle input { margin-top: 2px; flex: 0 0 auto; }
       .reasontoggle strong { color: var(--fg-2); }
@@ -173,14 +177,18 @@
       .ragscore { color: var(--accent-lift); }
       .bubble ul { margin: 8px 0; padding-left: 20px; } .bubble li { margin: 3px 0; }
       .empty { max-width: 540px; margin: 16vh auto 0; text-align: center; animation: pop .4s var(--ease); }
-      .empty .logo { width: 60px; height: 60px; border-radius: 18px; margin: 0 auto 20px; background: linear-gradient(140deg, var(--accent-lift), var(--accent-2)); display: grid; place-items: center; box-shadow: 0 12px 40px var(--accent-glow); }
-      .empty .logo svg { width: 30px; height: 30px; color: #fff; }
+      .empty .logo { width: 60px; height: 60px; border-radius: 18px; margin: 0 auto 20px; background: rgba(255,255,255,.035); display: grid; place-items: center; overflow: hidden; box-shadow: 0 12px 40px var(--accent-glow); }
+      .empty .logo img { width: 60px; height: 60px; transform: scale(1.7); }
       .empty h3 { font-size: 24px; font-weight: 680; letter-spacing: -.025em; margin: 0 0 8px; }
       .empty p { color: var(--fg-2); margin: 0 0 24px; font-size: 14.5px; }
       .chips { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; }
       .chip { background: var(--surface); border: 1px solid var(--line-2); color: var(--fg-2); border-radius: 12px; padding: 9px 14px; font-size: 13px; transition: .15s var(--ease); }
       .chip:hover { border-color: var(--accent); color: var(--fg); background: var(--surface-2); transform: translateY(-1px); }
       .composer { flex: 0 0 auto; padding: 12px 24px 22px; }
+      .chat-options { max-width: 760px; margin: 0 auto 8px; display: flex; justify-content: flex-end; }
+      .tooltoggle { display: inline-flex; align-items: center; gap: 7px; color: var(--fg-3); font-size: 12px; cursor: pointer; }
+      .tooltoggle input { accent-color: var(--accent); }
+      .tooltoggle strong { color: var(--fg-2); font-weight: 600; }
       .composer .box { max-width: 760px; margin: 0 auto; display: flex; gap: 10px; align-items: center; background: rgba(30,38,56,.7); backdrop-filter: blur(16px); border: 1px solid var(--line-2); border-radius: 20px; padding: 8px 8px 8px 18px; box-shadow: var(--shadow-2); transition: .18s var(--ease); }
       .composer .box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-2); }
       .composer input { flex: 1; background: none; border: none; padding: 9px 0; outline: none; font-size: 14.5px; }
@@ -209,13 +217,23 @@
       @media (max-width: 720px) { .addgrid { grid-template-columns: 1fr; } }
       .bar { height: 6px; background: var(--surface-3); border-radius: 4px; overflow: hidden; margin-top: 13px; }
       .bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-lift)); width: 0%; transition: width .25s var(--ease); box-shadow: 0 0 10px var(--accent-glow); }
+      .camera-card { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+      .camera-stage { display: grid; place-items: center; min-height: 220px; border-radius: 12px; overflow: hidden; background: #070b16; border: 1px solid var(--line); }
+      .camera-stage video, .camera-stage img { display: none; width: 100%; max-height: 360px; object-fit: contain; background: #070b16; }
+      .camera-stage video.active, .camera-stage img.active { display: block; }
+      .camera-placeholder { color: var(--fg-3); font-size: 13px; }
+      .camera-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 12px; align-items: center; }
+      .camera-actions .btn { padding: 8px 14px; font-size: 13px; }
+      .camera-picker { display: flex; align-items: center; gap: 8px; color: var(--fg-3); font-size: 12px; }
+      .camera-picker select { min-width: 190px; max-width: 280px; padding: 8px 30px 8px 10px; font-size: 13px; }
+      .camera-actions #camerastatus { flex: 1 1 220px; }
     </style>
   </head>
   <body>
     <div class="shell">
       <aside class="sidebar">
         <div class="brand">
-          <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 7v10l8 5 8-5V7z"/><path d="m8 12 3 3 5-6"/></svg></span>
+          <span class="logo"><img src="../../logo.svg" alt="" /></span>
           <span class="name">RunAnywhere<small>on-device AI</small></span>
         </div>
         <button class="newchat" id="newchat"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> New chat</button>
@@ -226,7 +244,7 @@
           <div class="grouplabel">Workbenches</div>
           <button data-tab="structured"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/></svg> Structured</button>
           <button data-tab="tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.2 5.2L3 18v3h3l6.5-6.5a4 4 0 0 0 5.2-5.2l-2.7 2.7-2-2z"/></svg> Tools</button>
-          <button data-tab="vision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> Vision</button>
+          <button data-tab="vision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> Vision + audio</button>
           <button data-tab="embeddings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7 6h10M6 8l5 8M18 9l-5 7"/></svg> Embeddings</button>
           <button data-tab="rag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> Knowledge</button>
           <button data-tab="voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Voice</button>
@@ -236,16 +254,16 @@
           <div class="grouplabel">Recent</div>
           <div id="convlist"></div>
         </div>
-        <div class="sidefoot"><svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 100% on-device · private</div>
+        <div class="sidefoot"><svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> AI on-device · tools opt-in</div>
       </aside>
 
       <main class="main">
         <div class="topbar">
           <h2 id="sectiontitle">Chat</h2>
           <div class="spacer"></div>
-          <span class="pill" id="devicepill" title="Inference runs on the CPU in this build.">
+          <span class="pill" id="devicepill" title="AI runs locally on this device.">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></svg>
-            <select id="device"><option value="cpu">CPU</option><option value="gpu" disabled>GPU · needs build</option></select>
+            <span>On-device</span>
           </span>
           <span class="status" id="statuswrap"><span class="dot"></span><span id="status">starting…</span></span>
         </div>
@@ -254,6 +272,13 @@
           <section class="panel active" id="chat">
             <div id="chatlog"></div>
             <div class="composer">
+              <div class="chat-options">
+                <label class="tooltoggle" title="Let the model call the allowlisted demo tools. Weather uses Open-Meteo.">
+                  <input id="chattools" type="checkbox" />
+                  <strong>Tools in chat</strong>
+                  <span id="chattoolsstate">off</span>
+                </label>
+              </div>
               <div class="box">
                 <input id="chatinput" type="text" placeholder="Message RunAnywhere…" autocomplete="off" />
                 <button class="btn send" id="chatsend" title="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg></button>
@@ -284,7 +309,7 @@
                 </div>
                 <button class="btn" id="addgo" style="height:44px">Add</button>
               </div>
-              <p class="muted" id="addhint" style="margin:11px 0 0; font-size:12px">Examples: <code>unsloth/gemma-3-1b-it-GGUF</code> · <code>https://huggingface.co/owner/repo</code> (paste the page URL) · <code>https://…/model.gguf</code> · <code>C:\models\model.gguf</code>. GGUF + mmproj are auto-resolved for vision models.</p>
+              <p class="muted" id="addhint" style="margin:11px 0 0; font-size:12px">Examples: <code>ggml-org/gemma-4-E4B-it-GGUF</code> · <code>https://huggingface.co/owner/repo</code> (paste the page URL) · <code>https://…/model.gguf</code> · <code>C:\models\model.gguf</code>. GGUF shards + multimodal projectors are resolved automatically.</p>
             </div>
             <div id="modellist"></div>
           </div></section>
@@ -303,12 +328,21 @@
               <div style="margin-top:18px"><button class="btn" id="setsave">Save settings</button> <span id="setstatus" class="muted"></span></div>
             </div>
             <div class="card">
-              <div class="label" style="margin-top:0">API key <span class="muted">— stored encrypted (Windows DPAPI)</span></div>
-              <div class="row" style="align-items:center"><input id="setapikey" type="text" placeholder="sk-…" style="flex:1" /><button class="btn ghost" id="setapisave" style="flex:0 0 auto">Save key</button></div>
+              <div class="label" style="margin-top:0">Secure credential <span class="muted">— encrypted on this device</span></div>
+              <div class="row" style="align-items:center">
+                <input id="setapikey" type="password" placeholder="Enter a value…" style="flex:1" />
+                <button class="btn ghost" id="setapisave" style="flex:0 0 auto">Save</button>
+                <button class="btn ghost" id="setapicheck" style="flex:0 0 auto">Check</button>
+                <button class="btn ghost" id="setapidelete" style="flex:0 0 auto">Delete</button>
+              </div>
+              <div id="setapistatus" class="muted" style="margin-top:10px"></div>
             </div>
             <div class="card">
-              <div class="label" style="margin-top:0">Compute device</div>
-              <p class="muted" style="margin:2px 0 0" id="devicenote">Inference runs on the <b style="color:var(--fg)">CPU</b> in this build. A CUDA (NVIDIA GPU) build is available — launch with <code>run-demo-gpu.cmd</code>.</p>
+              <div class="label" style="margin-top:0">SDK runtime</div>
+              <p class="muted" id="sdkinfo" style="margin:2px 0 12px">Connecting…</p>
+              <div class="label">Recent SDK events</div>
+              <div id="eventlog" class="out" style="min-height:64px;max-height:150px;overflow:auto">No events yet.</div>
+              <button class="btn ghost" id="eventclear" style="margin-top:10px">Clear events</button>
             </div>
           </div></section>
 
@@ -329,14 +363,34 @@
           </div></section>
 
           <section class="panel" id="vision"><div class="wrap">
-            <h2 class="lead">Vision</h2>
-            <p class="hint">Describe an image with the vision-language model.</p>
+            <h2 class="lead">Vision + audio</h2>
+            <p class="hint">Understand an image, camera frame, or audio clip locally with Gemma 4.</p>
             <div class="filepick">
-              <label class="btn ghost" for="visionfile"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> Choose image</label>
-              <input id="visionfile" type="file" accept="image/*" />
-              <span class="fname" id="visionfname">No image selected</span>
+              <label class="btn ghost" for="visionfile"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> Choose media</label>
+              <input id="visionfile" type="file" accept="image/*,audio/wav,.wav,.mp3,.flac,.m4a,.ogg" />
+              <span class="fname" id="visionfname">No media selected</span>
             </div>
-            <div style="margin-top:14px"><button class="btn" id="visiongo" disabled>Caption</button></div>
+            <div class="camera-card">
+              <div class="label" style="margin:0 0 9px">Live camera</div>
+              <div class="camera-stage">
+                <span class="camera-placeholder" id="cameraplaceholder">Camera is off</span>
+                <video id="visioncamera" autoplay playsinline muted></video>
+                <img id="visionpreview" alt="Captured camera frame" />
+                <canvas id="visioncanvas" hidden></canvas>
+              </div>
+              <div class="camera-actions">
+                <label class="camera-picker">Camera
+                  <select id="cameraselect" aria-label="Choose camera">
+                    <option value="">Default camera</option>
+                  </select>
+                </label>
+                <button class="btn ghost" id="camerastart">Start camera</button>
+                <button class="btn" id="cameracapture" disabled>Capture frame</button>
+                <button class="btn ghost" id="camerastop" disabled>Stop camera</button>
+                <span class="muted" id="camerastatus">Uses your selected Windows camera.</span>
+              </div>
+            </div>
+            <div style="margin-top:14px"><button class="btn" id="visiongo" disabled>Analyze</button></div>
             <div id="visionout" class="out"></div>
           </div></section>
 
@@ -383,7 +437,10 @@
             <p class="hint">Built-in energy VAD. Hold and speak — the first ~2s calibrate ambient noise.</p>
             <div class="label">Threshold · <span id="vadthval">0.015</span></div>
             <input id="vadth" type="range" min="0.005" max="0.2" step="0.005" value="0.015" style="max-width:340px" />
-            <div style="margin-top:14px"><button class="btn" id="vadbtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-7 4 16 3-11 2 5 3-3h3"/></svg> Hold + speak</button></div>
+            <div style="margin-top:14px">
+              <button class="btn" id="vadbtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-7 4 16 3-11 2 5 3-3h3"/></svg> Hold + speak</button>
+              <button class="btn ghost" id="vadreset">Reset detector</button>
+            </div>
             <div class="label">Detection</div>
             <div id="vadout" class="out">—</div>
           </div></section>

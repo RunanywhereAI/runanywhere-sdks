@@ -15,12 +15,20 @@ const fmtSize = (b) => (b > 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b > 1e6 ? (b / 
 const fmtMB = (mb) => (mb >= 1000 ? (mb / 1000).toFixed(1) + ' GB' : mb + ' MB');
 
 const TOOLS = [
-  { name: 'get_weather', description: 'Get the current weather for a city', parameters: { type: 'object', properties: { city: { type: 'string' }, unit: { type: 'string', enum: ['celsius', 'fahrenheit'] } }, required: ['city', 'unit'] } },
-  { name: 'set_timer', description: 'Start a countdown timer', parameters: { type: 'object', properties: { seconds: { type: 'integer' }, label: { type: 'string' } }, required: ['seconds', 'label'] } },
+  { name: 'get_weather', description: 'Get live current weather for a city. Use only for weather requests.', parameters: { type: 'object', properties: { city: { type: 'string' }, unit: { type: 'string', enum: ['celsius', 'fahrenheit'] } }, required: ['city', 'unit'] } },
+  { name: 'set_timer', description: 'Start a real local countdown timer. Use only when the user asks for a timer.', parameters: { type: 'object', properties: { seconds: { type: 'integer' }, label: { type: 'string' } }, required: ['seconds', 'label'] } },
+];
+const CHAT_TOOLS = [
+  ...TOOLS,
+  {
+    name: 'respond_directly',
+    description: 'Use when no weather lookup or timer is required. Do not force a tool for ordinary questions.',
+    parameters: { type: 'object', properties: { reason: { type: 'string' } }, required: ['reason'] },
+  },
 ];
 
 // ---- settings + conversations + custom models (persisted via demoStore) ----
-let settings = { systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7, maxTokens: 256, reasoning: false };
+let settings = { systemPrompt: 'You are a concise, helpful assistant.', temperature: 0.7, maxTokens: 256, reasoning: false, toolsEnabled: false };
 let conversations = [];
 let activeId = null;
 let nextConvId = 1;
@@ -29,7 +37,8 @@ let customModels = []; // [{ id, source, type, label, downloaded }]
 // ---- lazily-loaded model handles ----
 const handles = {};
 const ensure = (k, fn) => (handles[k] ??= fn());
-const DEFAULT_LLM = 'qwen2.5-0.5b';
+const DEFAULT_LLM = 'gemma-4-12b';
+const DEFAULT_VLM = 'gemma-4-e4b';
 // The chat's active LLM. Loading another LLM from the Models tab replaces it (the
 // backend keeps one loaded at a time), so we track it in loadedById/loadedType too
 // to keep the Models badges coherent — exactly one LLM ever shows "loaded".
@@ -39,7 +48,7 @@ const llm = () => ensure('llm', async () => {
   return h;
 });
 const embedder = () => ensure('embedder', () => ra.loadEmbedder('minilm'));
-const vlm = () => ensure('vlm', () => ra.loadVLM('smolvlm-256m'));
+const vlm = () => ensure('vlm', () => ra.loadVLM(DEFAULT_VLM));
 const stt = () => ensure('stt', () => ra.loadSTT('whisper-tiny'));
 const tts = () => ensure('tts', () => ra.loadTTS('piper-lessac'));
 
@@ -83,6 +92,15 @@ function assistantHtml(raw, streaming) {
   out += md(response || (streaming ? '…' : ''));
   return out;
 }
+function toolRunHtml(tool) {
+  if (!tool) return '';
+  const call = `${tool.name}(${JSON.stringify(tool.arguments || {})})`;
+  const result = typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2);
+  return `<div class="toolrun"><div class="toolhead">Tool call · ${escapeHtml(tool.name)}</div><div class="toolbody">${escapeHtml(call)}\n${escapeHtml(result || '')}</div></div>`;
+}
+function assistantBodyHtml(message, streaming = false) {
+  return toolRunHtml(message.tool) + assistantHtml(message.content || '', streaming);
+}
 
 // ---- conversations ----
 const activeConv = () => conversations.find((c) => c.id === activeId);
@@ -109,9 +127,9 @@ function renderSidebar() {
   }
 }
 function bubbleHtml(m) {
-  const body = m.role === 'assistant' ? assistantHtml(m.content || '…') : escapeHtml(m.content);
+  const body = m.role === 'assistant' ? assistantBodyHtml(m) : escapeHtml(m.content);
   const metrics = m.metrics ? `<div class="metrics">⚡ ${m.metrics.tokens} tokens · ${m.metrics.tps.toFixed(1)} tok/s · TTFT ${Math.round(m.metrics.ttft)}ms</div>` : '';
-  const av = m.role === 'assistant' ? '✦' : 'U';
+  const av = m.role === 'assistant' ? '<img src="../../logo.svg" alt="" />' : 'U';
   const who = m.role === 'assistant' ? 'RunAnywhere' : 'You';
   return `<div class="msg ${m.role}"><div class="av">${av}</div><div class="col"><div class="who">${who}</div><div class="bubble">${body}</div>${metrics}</div></div>`;
 }
@@ -123,9 +141,9 @@ const SUGGESTIONS = [
 function emptyStateHtml() {
   const chips = SUGGESTIONS.map(([l, q], i) => `<button class="chip" data-i="${i}">${escapeHtml(l)}</button>`).join('');
   return `<div class="empty">
-    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 7v10l8 5 8-5V7z"/><path d="m8 12 3 3 5-6"/></svg></div>
+    <div class="logo"><img src="../../logo.svg" alt="" /></div>
     <h3>On-device AI, privately</h3>
-    <p>Ask anything — everything runs locally on your machine, nothing leaves your device.</p>
+    <p>AI runs locally. When enabled, a tool may contact its named data provider.</p>
     <div class="chips">${chips}</div>
   </div>`;
 }
@@ -148,8 +166,77 @@ function buildPrompt(priorMessages, userText) {
   // splitThinking (mirrored by assistantHtml) peels that back out for display.
   if (settings.reasoning) sys += '\n\nThink step by step inside <think></think> tags, then give your final answer after the closing tag.';
   let p = sys + '\n\n';
-  for (const m of priorMessages) p += (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content + '\n';
+  for (const m of priorMessages) {
+    const content = m.role === 'assistant' ? ra.splitThinking(m.content).response : m.content;
+    p += (m.role === 'user' ? 'User: ' : 'Assistant: ') + content + '\n';
+  }
   return p + 'User: ' + userText + '\nAssistant:';
+}
+async function fetchJson(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+const WEATHER_CODE = {
+  0: 'clear sky', 1: 'mainly clear', 2: 'partly cloudy', 3: 'overcast',
+  45: 'fog', 48: 'rime fog', 51: 'light drizzle', 53: 'drizzle', 55: 'heavy drizzle',
+  61: 'light rain', 63: 'rain', 65: 'heavy rain', 71: 'light snow', 73: 'snow',
+  75: 'heavy snow', 80: 'rain showers', 81: 'rain showers', 82: 'heavy rain showers',
+  95: 'thunderstorm', 96: 'thunderstorm with hail', 99: 'thunderstorm with heavy hail',
+};
+async function executeToolCall(call) {
+  if (call.name === 'get_weather') {
+    const city = String(call.arguments?.city || '').trim();
+    const unit = call.arguments?.unit === 'fahrenheit' ? 'fahrenheit' : 'celsius';
+    if (!city) throw new Error('get_weather requires a city');
+    const placeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`;
+    const placeData = await fetchJson(placeUrl);
+    const place = placeData.results?.[0];
+    if (!place) throw new Error(`No location found for ${city}`);
+    const weatherUrl = new URL('https://api.open-meteo.com/v1/forecast');
+    weatherUrl.searchParams.set('latitude', String(place.latitude));
+    weatherUrl.searchParams.set('longitude', String(place.longitude));
+    weatherUrl.searchParams.set('current', 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m');
+    weatherUrl.searchParams.set('temperature_unit', unit);
+    weatherUrl.searchParams.set('wind_speed_unit', 'kmh');
+    weatherUrl.searchParams.set('timezone', 'auto');
+    const data = await fetchJson(weatherUrl.toString());
+    const current = data.current;
+    if (!current) throw new Error('Weather provider returned no current conditions');
+    return {
+      location: [place.name, place.admin1, place.country].filter(Boolean).join(', '),
+      conditions: WEATHER_CODE[current.weather_code] || `weather code ${current.weather_code}`,
+      temperature: `${current.temperature_2m} ${data.current_units?.temperature_2m || (unit === 'fahrenheit' ? '°F' : '°C')}`,
+      apparentTemperature: `${current.apparent_temperature} ${data.current_units?.apparent_temperature || (unit === 'fahrenheit' ? '°F' : '°C')}`,
+      wind: `${current.wind_speed_10m} ${data.current_units?.wind_speed_10m || 'km/h'}`,
+      observedAt: current.time,
+    };
+  }
+  if (call.name === 'set_timer') {
+    const seconds = Math.round(Number(call.arguments?.seconds));
+    const label = String(call.arguments?.label || 'Timer').trim() || 'Timer';
+    if (!Number.isFinite(seconds) || seconds < 1 || seconds > 86400) {
+      throw new Error('Timer duration must be between 1 second and 24 hours');
+    }
+    setTimeout(() => {
+      try { new Notification('Timer finished', { body: label }); } catch { /* OS notification is best-effort */ }
+    }, seconds * 1000);
+    return { status: 'scheduled', label, seconds };
+  }
+  throw new Error(`Unsupported tool: ${call.name}`);
+}
+async function chooseChatTool(text) {
+  const prompt =
+    'Decide whether this user request needs one of the available tools. ' +
+    'Choose respond_directly for ordinary conversation or questions that do not require live weather or a timer.\n\n' +
+    `User request: ${text}`;
+  return ra.generateToolCall(await llm(), prompt, CHAT_TOOLS, { maxTokens: 192, temperature: 0 });
 }
 let generating = false;
 async function sendChat() {
@@ -173,12 +260,31 @@ async function sendChat() {
   setStatus('generating…');
   try {
     let result = null;
+    let generationText = text;
+    if (settings.toolsEnabled) {
+      setStatus('choosing tool…');
+      const call = await chooseChatTool(text);
+      if (call.name !== 'respond_directly') {
+        setStatus(`running ${call.name}…`);
+        let toolResult;
+        try { toolResult = await executeToolCall(call); }
+        catch (error) { toolResult = { error: error.message }; }
+        asst.tool = { name: call.name, arguments: call.arguments, result: toolResult };
+        bubble.innerHTML = assistantBodyHtml(asst, true);
+        generationText =
+          `${text}\n\nThe application executed this tool:\n` +
+          `${call.name}(${JSON.stringify(call.arguments)})\n` +
+          `Tool result: ${JSON.stringify(toolResult)}\n\n` +
+          'Answer the user naturally using the tool result. Do not invent values that are not in the result.';
+      }
+    }
+    setStatus('generating…');
     const runGen = async () => {
       asst.content = '';
       const h = await llm();
-      await ra.generateStream(h, buildPrompt(prior, text), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
+      await ra.generateStream(h, buildPrompt(prior, generationText), { temperature: settings.temperature, maxTokens: settings.maxTokens }, (e) => {
         if (e.isFinal) { result = e.result; }
-        else { asst.content += e.token; bubble.innerHTML = assistantHtml(asst.content, true); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
+        else { asst.content += e.token; bubble.innerHTML = assistantBodyHtml(asst, true); $('chatlog').scrollTop = $('chatlog').scrollHeight; }
       });
     };
     try {
@@ -193,7 +299,10 @@ async function sendChat() {
         await runGen();
       } else throw e;
     }
-    asst.content = asst.content.trim();
+    const clean = ra.splitThinking(asst.content);
+    asst.content = settings.reasoning && clean.thinking
+      ? `<think>${clean.thinking}</think>${clean.response}`
+      : clean.response;
     if (result) asst.metrics = { tokens: result.tokenCount, tps: result.tokensPerSecond, ttft: result.timeToFirstTokenMs };
     bubble.classList.remove('streaming');
     renderChat();
@@ -239,9 +348,26 @@ function buildCard(o) {
     const dl = mkbtn('Download', async () => {
       dl.disabled = true; dl.textContent = 'Downloading…';
       const bar = div.querySelector('.bar'); bar.style.display = 'block';
+      bar.firstElementChild.style.width = '0%';
+      const oldError = div.querySelector('.dlerror');
+      if (oldError) oldError.remove();
       let resolved;
       try { resolved = await ra.downloadModel(o.source, (p) => { bar.firstElementChild.style.width = (p.percent || 0) + '%'; }); }
-      catch (e) { dl.textContent = 'Failed'; dl.disabled = false; console.error(e); return; }
+      catch (e) {
+        const message = (e && e.message) ? e.message : String(e);
+        dl.textContent = 'Retry';
+        dl.disabled = false;
+        bar.style.display = 'none';
+        const error = document.createElement('div');
+        error.className = 'dlerror';
+        error.textContent = message;
+        error.title = message;
+        error.style.cssText = 'margin-top:9px;color:#fda4af;font-size:12px;line-height:1.4;overflow-wrap:anywhere';
+        div.appendChild(error);
+        setStatus('download failed');
+        console.error(e);
+        return;
+      }
       // Persist the resolved primary path so downloaded state is later recomputed
       // from disk (via ra.exists), not trusted from a stale flag.
       if (o.custom) { const c = customModels.find((m) => m.id === o.key); if (c) { c.primary = resolved && resolved.primary; persistCustom(); } }
@@ -302,7 +428,7 @@ async function renderModels() {
       if (st.downloaded) bits.push(fmtSize(st.sizeBytes));
       else if (entry.sizeMB) bits.push('~' + fmtMB(entry.sizeMB));
       let sub = bits.join(' · ');
-      if (entry.heavy) sub += ' <span class="badge heavy">heavy · CPU</span>';
+      if (entry.heavy) sub += ' <span class="badge heavy">large download</span>';
       el.appendChild(buildCard({ key: id, type: entry.type, label: entry.label || id, sub, source: id, downloaded: st.downloaded, custom: false }));
     }
   }
@@ -333,19 +459,6 @@ function deriveLabel(source) {
 function looksRemote(source) {
   if (/^https?:\/\//i.test(source)) return true;
   return /^[A-Za-z0-9][\w.-]*\/[A-Za-z0-9][\w.-]*$/.test(source) && !source.includes('\\') && !/^[A-Za-z]:/.test(source);
-}
-// Reflect the actual compute device (passed by main.js from the addon path).
-function applyDeviceUi() {
-  const device = new URLSearchParams(location.search).get('device') || 'cpu';
-  if (device !== 'gpu') return;
-  const sel = $('device');
-  const gpuOpt = sel && sel.querySelector('option[value="gpu"]');
-  if (gpuOpt) { gpuOpt.disabled = false; gpuOpt.textContent = 'GPU · CUDA'; }
-  if (sel) sel.value = 'gpu';
-  const pill = $('devicepill');
-  if (pill) pill.title = 'Inference runs on the NVIDIA GPU (CUDA) — all model layers are offloaded.';
-  const note = $('devicenote');
-  if (note) note.innerHTML = 'Inference runs on the <b style="color:var(--fg)">NVIDIA GPU (CUDA)</b> — llama.cpp offloads all model layers to the GPU.';
 }
 function wireModels() {
   const hintEl = $('addhint');
@@ -380,9 +493,17 @@ function applySettingsToUi() {
   $('settemp').value = settings.temperature; $('settempval').textContent = settings.temperature;
   $('setmax').value = settings.maxTokens;
   if ($('setreason')) $('setreason').checked = !!settings.reasoning;
+  $('chattools').checked = !!settings.toolsEnabled;
+  $('chattoolsstate').textContent = settings.toolsEnabled ? 'on' : 'off';
 }
 async function saveSettings() {
-  settings = { systemPrompt: $('setsystem').value, temperature: parseFloat($('settemp').value), maxTokens: parseInt($('setmax').value, 10) || 256, reasoning: !!($('setreason') && $('setreason').checked) };
+  settings = {
+    systemPrompt: $('setsystem').value,
+    temperature: parseFloat($('settemp').value),
+    maxTokens: parseInt($('setmax').value, 10) || 256,
+    reasoning: !!($('setreason') && $('setreason').checked),
+    toolsEnabled: !!$('chattools').checked,
+  };
   try { await store.saveSettings(settings); } catch { /* optional */ }
   $('setstatus').textContent = 'saved'; setTimeout(() => ($('setstatus').textContent = ''), 1500);
 }
@@ -393,9 +514,15 @@ async function runStructured(text) {
     type: 'object',
     properties: { name: { type: 'string' }, age: { type: 'integer' }, interests: { type: 'array', items: { type: 'string' }, maxItems: 5 } },
     required: ['name', 'age', 'interests'],
-  });
+  }, { maxTokens: 192, temperature: 0 });
 }
-async function runTools(text) { return ra.generateToolCall(await llm(), text, TOOLS); }
+async function runTools(text) {
+  return ra.generateToolCall(await llm(), text, TOOLS, { maxTokens: 192, temperature: 0 });
+}
+async function runAndExecuteTool(text) {
+  const call = await runTools(text);
+  return { ...call, result: await executeToolCall(call) };
+}
 async function runEmbeddings(a, b) {
   const h = await embedder();
   const [ea, eb] = await Promise.all([ra.embed(h, a), ra.embed(h, b)]);
@@ -440,9 +567,16 @@ function renderRagSources(chunks) {
 }
 
 async function runVision(imagePath, onToken) {
-  let caption = '';
-  await ra.generateVlm(await vlm(), imagePath, 'Describe this image in one sentence.', (t) => { caption += t; onToken?.(t); });
-  return caption.trim();
+  let raw = '';
+  const audio = /\.(wav|mp3|flac|m4a|ogg)$/i.test(imagePath);
+  const prompt = audio
+    ? 'Transcribe the speech, identify important sounds, and summarize this audio.'
+    : 'Describe this image in one sentence.';
+  await ra.generateVlm(await vlm(), imagePath, prompt, (t) => {
+    raw += t;
+    onToken?.(ra.splitThinking(raw).response);
+  });
+  return ra.splitThinking(raw).response;
 }
 async function runSecure(key, value) { await ra.secureSet(key, value); const got = await ra.secureGet(key); await ra.secureDelete(key); return got; }
 async function runVad() {
@@ -455,9 +589,163 @@ async function runVad() {
   await ra.unloadVad(handle);
   return detected;
 }
+let stopLiveCamera = () => {};
+function wireVision() {
+  const vf = $('visionfile');
+  const video = $('visioncamera');
+  const preview = $('visionpreview');
+  const canvas = $('visioncanvas');
+  const placeholder = $('cameraplaceholder');
+  const cameraSelect = $('cameraselect');
+  const start = $('camerastart');
+  const capture = $('cameracapture');
+  const stop = $('camerastop');
+  let cameraStream = null;
+  let cameraCapturePath = null;
+
+  const refreshCameraList = async (preferredId = cameraSelect.value) => {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter((device) => device.kind === 'videoinput');
+    cameraSelect.innerHTML = '<option value="">Default camera</option>';
+    cameras.forEach((camera, index) => {
+      const option = document.createElement('option');
+      option.value = camera.deviceId;
+      option.textContent = camera.label || `Camera ${index + 1}`;
+      cameraSelect.appendChild(option);
+    });
+    cameraSelect.value = cameras.some((camera) => camera.deviceId === preferredId) ? preferredId : '';
+  };
+
+  const stopCamera = () => {
+    const stream = cameraStream;
+    cameraStream = null;
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+    video.srcObject = null;
+    video.classList.remove('active');
+    capture.disabled = true;
+    stop.disabled = true;
+    start.disabled = false;
+    if (preview.src) {
+      preview.classList.add('active');
+      placeholder.style.display = 'none';
+    } else {
+      placeholder.style.display = '';
+    }
+  };
+  stopLiveCamera = stopCamera;
+
+  const startCamera = async () => {
+    if (cameraStream) return;
+    $('camerastatus').textContent = 'Requesting camera access…';
+    start.disabled = true;
+    cameraSelect.disabled = true;
+    try {
+      const selectedDeviceId = cameraSelect.value;
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          ...(selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : {}),
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+      const videoTrack = cameraStream.getVideoTracks()[0];
+      const activeDeviceId = videoTrack?.getSettings().deviceId || selectedDeviceId;
+      preview.classList.remove('active');
+      video.srcObject = cameraStream;
+      video.classList.add('active');
+      placeholder.style.display = 'none';
+      await video.play();
+      await refreshCameraList(activeDeviceId).catch(() => {});
+      videoTrack?.addEventListener('ended', () => {
+        if (!cameraStream) return;
+        stopCamera();
+        $('camerastatus').textContent = 'Camera disconnected. Choose another camera.';
+        refreshCameraList().catch(() => {});
+      }, { once: true });
+      start.disabled = true;
+      capture.disabled = false;
+      stop.disabled = false;
+      $('camerastatus').textContent = 'Camera is live. Capture a frame to analyze it.';
+    } catch (error) {
+      stopCamera();
+      $('camerastatus').textContent = 'error: ' + error.message;
+      refreshCameraList().catch(() => {});
+    } finally {
+      cameraSelect.disabled = false;
+    }
+  };
+
+  vf.addEventListener('change', () => {
+    stopCamera();
+    cameraCapturePath = null;
+    preview.src = '';
+    preview.classList.remove('active');
+    placeholder.style.display = '';
+    $('visiongo').disabled = !vf.files.length;
+    $('visionfname').textContent = vf.files[0] ? vf.files[0].name : 'No media selected';
+  });
+  start.addEventListener('click', startCamera);
+  cameraSelect.addEventListener('change', async () => {
+    if (!cameraStream) return;
+    stopCamera();
+    await startCamera();
+  });
+  refreshCameraList().catch(() => {});
+  navigator.mediaDevices?.addEventListener?.('devicechange', () => refreshCameraList().catch(() => {}));
+  capture.addEventListener('click', async () => {
+    if (!cameraStream || !video.videoWidth || !video.videoHeight) return;
+    capture.disabled = true;
+    $('camerastatus').textContent = 'Capturing frame…';
+    try {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((value) => value ? resolve(value) : reject(new Error('Camera capture failed')), 'image/png');
+      });
+      cameraCapturePath = await store.saveCameraFrame(new Uint8Array(await blob.arrayBuffer()));
+      vf.value = '';
+      preview.src = canvas.toDataURL('image/png');
+      preview.classList.add('active');
+      video.classList.remove('active');
+      $('visionfname').textContent = 'Live camera frame';
+      $('visiongo').disabled = false;
+      $('camerastatus').textContent = 'Frame captured. Press Analyze or capture another frame.';
+    } catch (error) {
+      $('camerastatus').textContent = 'error: ' + error.message;
+    } finally {
+      capture.disabled = !cameraStream;
+    }
+  });
+  stop.addEventListener('click', stopCamera);
+  window.addEventListener('beforeunload', stopCamera);
+
+  $('visiongo').addEventListener('click', async () => {
+    const file = vf.files[0];
+    let mediaPath = cameraCapturePath;
+    if (file) {
+      // Electron removed File.path; resolve the on-disk path via webUtils.
+      mediaPath = file.path;
+      try { if (!mediaPath && store && store.getPathForFile) mediaPath = store.getPathForFile(file); } catch (_) { /* ignore */ }
+    }
+    if (!mediaPath) { $('visionout').textContent = 'error: choose media or capture a camera frame first'; return; }
+    $('visiongo').disabled = true;
+    setStatus('analyzing…'); $('visionout').textContent = '…';
+    let cap = '';
+    try { cap = await runVision(mediaPath, (text) => { cap = text; $('visionout').textContent = cap || '…'; }); }
+    catch (e) { $('visionout').textContent = 'error: ' + e.message; }
+    finally {
+      $('visiongo').disabled = !(vf.files.length || cameraCapturePath);
+      setStatus('ready');
+    }
+  });
+}
 
 // ---- tabs ----
 function showTab(name) {
+  if (name !== 'vision') stopLiveCamera();
   document.querySelectorAll('.nav button').forEach((x) => x.classList.toggle('active', x.dataset.tab === name));
   document.querySelectorAll('.panel').forEach((x) => x.classList.toggle('active', x.id === name));
   const btn = document.querySelector(`.nav button[data-tab="${name}"]`);
@@ -469,24 +757,52 @@ document.querySelectorAll('.nav button').forEach((b) => b.addEventListener('clic
 // ---- UI wiring ----
 function wireUi() {
   applySettingsToUi();
-  applyDeviceUi();
   renderSidebar(); renderChat();
   wireModels();
+  const sdkEvents = [];
+  const renderEvents = () => {
+    $('eventlog').textContent = sdkEvents.length
+      ? sdkEvents.map((e) => `${e.type}${e.modality ? ` · ${e.modality}` : ''}${e.id ? ` · ${e.id}` : ''}`).join('\n')
+      : 'No events yet.';
+    $('eventlog').scrollTop = $('eventlog').scrollHeight;
+  };
+  ra.onEvent((event) => { sdkEvents.push(event); if (sdkEvents.length > 20) sdkEvents.shift(); renderEvents(); });
+  ra.version()
+    .then((version) => { $('sdkinfo').textContent = `RunAnywhere ${version} · local runtime ready`; })
+    .catch((e) => { $('sdkinfo').textContent = 'Runtime error: ' + e.message; });
+  $('eventclear').addEventListener('click', () => { sdkEvents.length = 0; renderEvents(); });
+
   $('newchat').addEventListener('click', () => { newConversation(); showTab('chat'); $('chatinput').focus(); });
   $('chatsend').addEventListener('click', sendChat);
   $('chatinput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+  $('chattools').addEventListener('change', async () => {
+    settings.toolsEnabled = $('chattools').checked;
+    $('chattoolsstate').textContent = settings.toolsEnabled ? 'on' : 'off';
+    try { await store.saveSettings(settings); } catch { /* optional */ }
+  });
 
   $('settemp').addEventListener('input', () => ($('settempval').textContent = $('settemp').value));
   $('setsave').addEventListener('click', saveSettings);
   $('setapisave').addEventListener('click', async () => {
     const v = $('setapikey').value.trim(); if (!v) return;
-    try { await ra.secureSet('api-key', v); $('setstatus').textContent = 'API key stored (encrypted)'; $('setapikey').value = ''; }
-    catch (e) { $('setstatus').textContent = 'error: ' + e.message; }
+    try { await ra.secureSet('api-key', v); $('setapistatus').textContent = 'Credential saved securely.'; $('setapikey').value = ''; }
+    catch (e) { $('setapistatus').textContent = 'error: ' + e.message; }
+  });
+  $('setapicheck').addEventListener('click', async () => {
+    try { $('setapistatus').textContent = (await ra.secureGet('api-key')) == null ? 'No credential is stored.' : 'A credential is stored.'; }
+    catch (e) { $('setapistatus').textContent = 'error: ' + e.message; }
+  });
+  $('setapidelete').addEventListener('click', async () => {
+    try { await ra.secureDelete('api-key'); $('setapistatus').textContent = 'Stored credential deleted.'; $('setapikey').value = ''; }
+    catch (e) { $('setapistatus').textContent = 'error: ' + e.message; }
   });
 
   const out = (id, fn) => async () => { setStatus('working…'); $(id).textContent = '…'; try { $(id).textContent = await fn(); } catch (e) { $(id).textContent = 'error: ' + e.message; } setStatus('ready'); };
   $('structgo').addEventListener('click', out('structout', async () => JSON.stringify(await runStructured($('structtext').value), null, 2)));
-  $('toolsgo').addEventListener('click', out('toolsout', async () => { const c = await runTools($('toolstext').value); return `${c.name}(${JSON.stringify(c.arguments)})`; }));
+  $('toolsgo').addEventListener('click', out('toolsout', async () => {
+    const run = await runAndExecuteTool($('toolstext').value);
+    return `${run.name}(${JSON.stringify(run.arguments)})\n${JSON.stringify(run.result, null, 2)}`;
+  }));
   $('embgo').addEventListener('click', out('embout', async () => 'cosine similarity: ' + (await runEmbeddings($('emba').value, $('embb').value)).toFixed(3)));
 
   $('ragadd').addEventListener('click', async () => {
@@ -530,24 +846,7 @@ function wireUi() {
   $('ragask').addEventListener('click', askRag);
   $('ragq').addEventListener('keydown', (e) => { if (e.key === 'Enter') askRag(); });
 
-  const vf = $('visionfile');
-  vf.addEventListener('change', () => {
-    $('visiongo').disabled = !vf.files.length;
-    $('visionfname').textContent = vf.files[0] ? vf.files[0].name : 'No image selected';
-  });
-  $('visiongo').addEventListener('click', async () => {
-    const file = vf.files[0];
-    if (!file) return;
-    // Electron removed File.path; resolve the on-disk path via webUtils.
-    let imagePath = file.path;
-    try { if (!imagePath && store && store.getPathForFile) imagePath = store.getPathForFile(file); } catch (_) { /* ignore */ }
-    if (!imagePath) { $('visionout').textContent = 'error: could not resolve the image path'; return; }
-    setStatus('captioning…'); $('visionout').textContent = '…';
-    let cap = '';
-    try { await runVision(imagePath, (t) => { cap += t; $('visionout').textContent = cap; }); }
-    catch (e) { $('visionout').textContent = 'error: ' + e.message; }
-    setStatus('ready');
-  });
+  wireVision();
 
   wireVoice();
   wireVad();
@@ -558,6 +857,7 @@ function captureController() {
   let cap = null;
   return {
     async start() {
+      if (cap) return;
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
       const ctx = new AudioContext();
       const src = ctx.createMediaStreamSource(stream);
@@ -577,42 +877,102 @@ function toPcm16At16k(samples, rate) {
   return new Uint8Array(pcm.buffer);
 }
 function wireVoice() {
-  const btn = $('voicebtn'); const cc = captureController();
-  const begin = async () => { setStatus('listening…'); await cc.start(); };
-  const end = async () => {
-    const rec = cc.stop(); if (!rec) return;
-    setStatus('thinking…');
-    const heard = await ra.transcribe(await stt(), toPcm16At16k(rec.samples, rec.rate));
-    $('voiceheard').textContent = heard;
-    let reply = ''; $('voicereply').textContent = '';
-    await ra.generate(await llm(), `You are concise. Reply in one sentence.\n\n${heard}`, (t) => { reply += t; $('voicereply').textContent = reply; });
-    const audio = await ra.synthesize(await tts(), reply.trim());
-    setStatus('speaking…');
-    const pctx = new AudioContext(); const buf = pctx.createBuffer(1, audio.samples.length, audio.sampleRate); buf.getChannelData(0).set(audio.samples);
-    const s = pctx.createBufferSource(); s.buffer = buf; s.connect(pctx.destination);
-    await new Promise((r) => { s.onended = () => { pctx.close(); r(); }; s.start(); });
-    setStatus('ready');
+  const btn = $('voicebtn'); const cc = captureController(); let recording = false;
+  const begin = async (event) => {
+    if (recording || (event && event.button !== 0)) return;
+    recording = true;
+    btn.classList.add('recording');
+    try {
+      if (event && btn.setPointerCapture) btn.setPointerCapture(event.pointerId);
+      setStatus('listening…');
+      await cc.start();
+    } catch (e) {
+      recording = false;
+      btn.classList.remove('recording');
+      $('voiceheard').textContent = 'error: ' + e.message;
+      setStatus('ready');
+    }
   };
-  btn.addEventListener('mousedown', begin); btn.addEventListener('mouseup', end); btn.addEventListener('mouseleave', end);
+  const end = async () => {
+    if (!recording) return;
+    recording = false;
+    btn.classList.remove('recording');
+    const rec = cc.stop(); if (!rec) return;
+    try {
+      setStatus('transcribing…');
+      const heard = await ra.transcribe(await stt(), toPcm16At16k(rec.samples, rec.rate));
+      $('voiceheard').textContent = heard || '(No speech recognized)';
+      if (!heard || !heard.trim()) return;
+      let rawReply = ''; $('voicereply').textContent = '';
+      setStatus('thinking…');
+      await ra.generate(await llm(), `You are concise. Reply in one sentence.\n\n${heard}`, (t) => {
+        rawReply += t;
+        $('voicereply').textContent = ra.splitThinking(rawReply).response || '…';
+      });
+      const reply = ra.splitThinking(rawReply).response;
+      if (!reply) throw new Error('The model returned an empty reply.');
+      $('voicereply').textContent = reply;
+      const audio = await ra.synthesize(await tts(), reply);
+      setStatus('speaking…');
+      const pctx = new AudioContext(); const buf = pctx.createBuffer(1, audio.samples.length, audio.sampleRate); buf.getChannelData(0).set(audio.samples);
+      const s = pctx.createBufferSource(); s.buffer = buf; s.connect(pctx.destination);
+      await new Promise((r) => { s.onended = () => { pctx.close(); r(); }; s.start(); });
+    } catch (e) {
+      $('voicereply').textContent = 'error: ' + e.message;
+    } finally {
+      setStatus('ready');
+    }
+  };
+  btn.addEventListener('pointerdown', begin);
+  btn.addEventListener('pointerup', end);
+  btn.addEventListener('pointercancel', end);
 }
 function wireVad() {
-  const btn = $('vadbtn'); const cc = captureController(); let vadHandle = null; let frames = 0, speech = 0;
+  const btn = $('vadbtn'); const cc = captureController(); let vadHandle = null; let frames = 0, speech = 0; let frameQueue = Promise.resolve();
   $('vadth').addEventListener('input', async () => { $('vadthval').textContent = $('vadth').value; if (vadHandle != null) await ra.vadSetThreshold(vadHandle, parseFloat($('vadth').value)); });
-  const begin = async () => {
-    setStatus('listening…'); frames = 0; speech = 0; $('vadout').textContent = 'calibrating…';
-    vadHandle = await ra.createVad(parseFloat($('vadth').value));
-    await cc.start();
-    cc.onFrame(async (f, rate) => {
-      if (vadHandle == null) return;
-      const ratio = rate / 16000, outLen = Math.floor(f.length / ratio), frame = new Float32Array(outLen);
-      for (let i = 0; i < outLen; i++) frame[i] = f[Math.floor(i * ratio)];
-      const isSpeech = await ra.vadProcess(vadHandle, frame);
-      frames++; if (isSpeech) speech++;
-      $('vadout').textContent = (frames < 20 ? 'calibrating… ' : (isSpeech ? '🎤 SPEECH ' : '· silence ')) + `(${speech}/${frames} speech frames)`;
-    });
+  const begin = async (event) => {
+    if (vadHandle != null || (event && event.button !== 0)) return;
+    try {
+      if (event && btn.setPointerCapture) btn.setPointerCapture(event.pointerId);
+      setStatus('listening…'); frames = 0; speech = 0; frameQueue = Promise.resolve(); $('vadout').textContent = 'calibrating…';
+      vadHandle = await ra.createVad(parseFloat($('vadth').value));
+      await cc.start();
+      cc.onFrame((f, rate) => {
+        const handle = vadHandle;
+        if (handle == null) return;
+        frameQueue = frameQueue.then(async () => {
+          const ratio = rate / 16000, outLen = Math.floor(f.length / ratio), frame = new Float32Array(outLen);
+          for (let i = 0; i < outLen; i++) frame[i] = f[Math.floor(i * ratio)];
+          const isSpeech = await ra.vadProcess(handle, frame);
+          const active = await ra.vadIsActive(handle);
+          frames++; if (isSpeech) speech++;
+          $('vadout').textContent = (frames < 20 ? 'calibrating… ' : (active ? '🎤 SPEECH ' : '· silence ')) + `(${speech}/${frames} speech frames)`;
+        }).catch((e) => { $('vadout').textContent = 'error: ' + e.message; });
+      });
+    } catch (e) {
+      $('vadout').textContent = 'error: ' + e.message;
+      if (vadHandle != null) { try { await ra.unloadVad(vadHandle); } catch (_) { /* ignore */ } vadHandle = null; }
+      setStatus('ready');
+    }
   };
-  const end = async () => { cc.stop(); if (vadHandle != null) { await ra.unloadVad(vadHandle); vadHandle = null; } setStatus('ready'); };
-  btn.addEventListener('mousedown', begin); btn.addEventListener('mouseup', end); btn.addEventListener('mouseleave', end);
+  const end = async () => {
+    cc.stop();
+    const handle = vadHandle;
+    vadHandle = null;
+    if (handle != null) {
+      try { await frameQueue; await ra.unloadVad(handle); }
+      catch (e) { $('vadout').textContent = 'error: ' + e.message; }
+    }
+    setStatus('ready');
+  };
+  $('vadreset').addEventListener('click', async () => {
+    if (vadHandle == null) { $('vadout').textContent = 'Start listening, then reset the live detector.'; return; }
+    try { await frameQueue; await ra.vadReset(vadHandle); frames = 0; speech = 0; $('vadout').textContent = 'detector reset'; }
+    catch (e) { $('vadout').textContent = 'error: ' + e.message; }
+  });
+  btn.addEventListener('pointerdown', begin);
+  btn.addEventListener('pointerup', end);
+  btn.addEventListener('pointercancel', end);
 }
 
 // ---- headless self-test ----
@@ -625,8 +985,10 @@ async function selfTest() {
     conv.messages.pop();
     let reply = '';
     await ra.generateStream(await llm(), buildPrompt([], 'Say hello in one short sentence.'), { maxTokens: 24 }, (e) => { if (!e.isFinal) reply += e.token; });
-    if (!reply.trim()) throw new Error('empty chat reply');
-    log('[selftest] chat OK: ' + JSON.stringify(reply.trim().slice(0, 70)));
+    const visibleReply = ra.splitThinking(reply).response;
+    if (!visibleReply) throw new Error('empty chat reply');
+    if (/channel|^thought\b/i.test(visibleReply)) throw new Error('chat protocol markers leaked');
+    log('[selftest] chat OK: ' + JSON.stringify(visibleReply.slice(0, 70)));
 
     const obj = await runStructured('Marie Curie was a 66 year old Polish physicist who loved chemistry.');
     if (typeof obj.name !== 'string' || typeof obj.age !== 'number' || !Array.isArray(obj.interests)) throw new Error('structured shape wrong');
@@ -642,17 +1004,34 @@ async function selfTest() {
     log(`[selftest] embeddings OK: close=${close.toFixed(3)} far=${far.toFixed(3)}`);
 
     const cat = await ra.catalog();
-    if (!cat['qwen2.5-0.5b']) throw new Error('catalog missing');
+    if (!cat[DEFAULT_LLM] || !cat[DEFAULT_VLM]) throw new Error('Gemma catalog entries missing');
     const status = await ra.modelStatus();
-    log('[selftest] models OK: ' + Object.keys(cat).length + ' catalog entries, qwen downloaded=' + status['qwen2.5-0.5b'].downloaded);
+    log('[selftest] models OK: ' + Object.keys(cat).length + ' catalog entries, Gemma 12B downloaded=' + status[DEFAULT_LLM].downloaded);
 
     const image = new URLSearchParams(location.search).get('image');
     if (image) { const c = await runVision(image); if (!c || c.length < 3) throw new Error('empty caption'); log('[selftest] vision OK: ' + JSON.stringify(c.slice(0, 70))); }
     else log('[selftest] vision SKIPPED (no image)');
 
+    const logoResponse = await fetch('runanywhere-logo.png');
+    if (!logoResponse.ok) throw new Error('app logo could not be loaded');
+    const cameraPath = await store.saveCameraFrame(new Uint8Array(await logoResponse.arrayBuffer()));
+    if (!/latest-capture\.png$/i.test(cameraPath || '')) throw new Error('camera capture IPC returned an invalid path');
+    log('[selftest] camera capture IPC OK');
+    if (!navigator.mediaDevices?.enumerateDevices) throw new Error('camera enumeration API unavailable');
+    const cameraDevices = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput');
+    log(`[selftest] camera selection API OK: ${cameraDevices.length} video input(s) visible`);
+
     const secret = 'sk-demo-secret-12345';
     if ((await runSecure('demo-selftest-key', secret)) !== secret) throw new Error('secure store failed');
     log('[selftest] secure store OK (encrypted round-trip)');
+
+    const spoken = await ra.synthesize(await tts(), 'Hello from RunAnywhere on Windows.');
+    if (!spoken || spoken.sampleRate < 8000 || !spoken.samples || spoken.samples.length < spoken.sampleRate / 2) {
+      throw new Error('tts returned invalid audio');
+    }
+    const heard = await ra.transcribe(await stt(), toPcm16At16k(spoken.samples, spoken.sampleRate));
+    if (!heard || !heard.trim()) throw new Error('stt returned an empty transcript');
+    log(`[selftest] speech OK: ${(spoken.samples.length / spoken.sampleRate).toFixed(2)}s TTS -> ${JSON.stringify(heard.trim())}`);
 
     if (!(await runVad())) throw new Error('vad did not detect speech');
     log('[selftest] vad OK (speech detected)');

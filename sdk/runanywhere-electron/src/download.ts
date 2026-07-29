@@ -33,6 +33,39 @@ export interface ResolvedModel {
 // slow-but-steady download.
 const DOWNLOAD_IDLE_MS = 60_000;
 const JSON_IDLE_MS = 30_000;
+const MAX_DOWNLOAD_ATTEMPTS = 4;
+
+let cachedHfToken: string | undefined;
+function hfToken(): string {
+  if (cachedHfToken !== undefined) return cachedHfToken;
+  const fromEnv = process.env.HF_TOKEN?.trim();
+  if (fromEnv) return (cachedHfToken = fromEnv);
+  try {
+    cachedHfToken = fs.readFileSync(path.join(os.homedir(), '.cache', 'huggingface', 'token'), 'utf8').trim();
+  } catch {
+    cachedHfToken = '';
+  }
+  return cachedHfToken;
+}
+
+// Never forward a Hugging Face bearer token to a redirected CDN/Xet host.
+function requestHeaders(u: string, accept?: string): Record<string, string> {
+  const headers: Record<string, string> = {
+    'User-Agent': 'runanywhere-electron',
+    'Accept-Encoding': 'identity',
+  };
+  if (accept) headers.Accept = accept;
+  try {
+    const host = new URL(u).hostname.toLowerCase();
+    if (host === 'huggingface.co' || host.endsWith('.huggingface.co')) {
+      const token = hfToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    /* URL validation happens at the request site */
+  }
+  return headers;
+}
 
 export function modelsRoot(): string {
   return path.join(os.homedir(), '.runanywhere', 'models');
@@ -95,7 +128,7 @@ export function modelStatus(root: string = modelsRoot()): Record<string, { downl
  * complete). A failed attempt LEAVES the `.part` so the next call can resume — a
  * `.part` is only ever renamed after a completeness check, never loaded directly.
  */
-export function downloadFile(
+function downloadFileAttempt(
   url: string,
   dest: string,
   onProgress?: (p: DownloadProgress) => void
@@ -118,7 +151,7 @@ export function downloadFile(
         return;
       }
       const lib = new URL(u).protocol === 'http:' ? http : https;
-      const headers: Record<string, string> = { 'User-Agent': 'runanywhere-electron' };
+      const headers = requestHeaders(u);
       if (startAt > 0) headers.Range = `bytes=${startAt}-`;
       const req = lib.get(u, { headers }, (res) => {
         const code = res.statusCode ?? 0;
@@ -153,6 +186,13 @@ export function downloadFile(
         }
         if (code !== 200 && code !== 206) {
           res.resume();
+          if ((code === 401 || code === 403) && /(^|\.)huggingface\.co$/i.test(new URL(u).hostname)) {
+            reject(new Error(
+              `Hugging Face denied this download (HTTP ${code}). ` +
+              'For a gated/private model, accept its license and set HF_TOKEN, then retry.'
+            ));
+            return;
+          }
           reject(new Error(`HTTP ${code} for ${u}`));
           return;
         }
@@ -206,6 +246,33 @@ export function downloadFile(
     };
     get(url);
   });
+}
+
+function retryableDownloadError(e: unknown): boolean {
+  const message = e instanceof Error ? e.message : String(e);
+  return /ECONNRESET|ETIMEDOUT|EAI_AGAIN|connection aborted|download timed out|incomplete download|HTTP (403|408|425|429|500|502|503|504)\b/i.test(message);
+}
+
+/** Download with automatic resume/retry for transient network and Xet CDN failures. */
+export async function downloadFile(
+  url: string,
+  dest: string,
+  onProgress?: (p: DownloadProgress) => void
+): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt++) {
+    try {
+      await downloadFileAttempt(url, dest, onProgress);
+      return;
+    } catch (e) {
+      lastError = e;
+      if (attempt === MAX_DOWNLOAD_ATTEMPTS || !retryableDownloadError(e)) throw e;
+      // The next attempt re-reads the current .part length and obtains a fresh
+      // Hugging Face signed URL, then resumes instead of discarding good bytes.
+      await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+    }
+  }
+  throw lastError;
 }
 
 function extractTarBz2(archive: string, destDir: string): void {
@@ -283,13 +350,22 @@ function httpText(url: string): Promise<{ headers: http.IncomingHttpHeaders; bod
     const get = (u: string, redirects = 0): void => {
       if (redirects > 6) return reject(new Error('too many redirects: ' + u));
       const lib = new URL(u).protocol === 'http:' ? http : https;
-      const req = lib.get(u, { headers: { 'User-Agent': 'runanywhere-electron', Accept: 'application/json' } }, (res) => {
+      const req = lib.get(u, { headers: requestHeaders(u, 'application/json') }, (res) => {
         const code = res.statusCode ?? 0;
         if (code >= 300 && code < 400 && res.headers.location) {
           res.resume();
           return get(new URL(res.headers.location, u).toString(), redirects + 1);
         }
-        if (code !== 200) { res.resume(); return reject(new Error(`HTTP ${code} for ${u}`)); }
+        if (code !== 200) {
+          res.resume();
+          if (code === 401 || code === 403) {
+            return reject(new Error(
+              `Hugging Face denied access to ${u} (HTTP ${code}). ` +
+              'Accept the model license and set HF_TOKEN if the repository is gated.'
+            ));
+          }
+          return reject(new Error(`HTTP ${code} for ${u}`));
+        }
         let data = '';
         res.setEncoding('utf8');
         res.on('data', (c) => (data += c));

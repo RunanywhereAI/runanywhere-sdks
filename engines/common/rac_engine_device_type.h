@@ -7,7 +7,7 @@
  * Returned by each backend's `get_device_type()` method to report which
  * compute unit the backend is currently running on. Union of values needed
  * across active engines (llamacpp, sherpa) — NEURAL_ENGINE is reserved for
- * Sherpa-style Apple/NPU integrations; METAL/CUDA/WEBGPU are llamacpp's
+ * Sherpa-style Apple/NPU integrations; METAL/CUDA/VULKAN/WEBGPU are llamacpp's
  * GGML backend build flavors.
  *
  * Internal to the engines/ tree. Not part of the stable rac_* C ABI.
@@ -21,6 +21,7 @@ enum class DeviceType {
     METAL = 3,
     CUDA = 4,
     WEBGPU = 5,
+    VULKAN = 6,
 };
 
 }  // namespace runanywhere

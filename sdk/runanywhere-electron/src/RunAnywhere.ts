@@ -162,10 +162,10 @@ export class LLMModel {
   }
 }
 
-/** A loaded vision-language model. */
+/** A loaded multimodal model (image/audio input, text output when supported). */
 export class VLMModel {
   constructor(private readonly handle: number) {}
-  /** Stream a caption/answer over an image (JPEG/PNG path) + prompt. */
+  /** Stream an answer over a supported image/audio media path + prompt. */
   caption(imagePath: string, prompt: string): AsyncIterableIterator<string> {
     return toAsyncIterable((onToken) =>
       addon.generateVlm(this.handle, imagePath, prompt, onToken)

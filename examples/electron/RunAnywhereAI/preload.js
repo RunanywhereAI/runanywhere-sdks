@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('demoStore', {
   saveSettings: (data) => ipcRenderer.invoke('demo:settings:save', data),
   loadCustomModels: () => ipcRenderer.invoke('demo:models:load'),
   saveCustomModels: (data) => ipcRenderer.invoke('demo:models:save', data),
+  saveCameraFrame: (bytes) => ipcRenderer.invoke('demo:camera:save', bytes),
   // Modern Electron removed File.path; webUtils.getPathForFile is the replacement.
   getPathForFile: (file) => webUtils.getPathForFile(file),
 });

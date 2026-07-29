@@ -14,6 +14,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <mutex>
@@ -199,7 +200,11 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
     rac_config_t cfg;
     std::memset(&cfg, 0, sizeof(cfg));
     cfg.platform_adapter = &g_adapter;
-    cfg.log_level = RAC_LOG_WARNING;
+    // Keep production output quiet, but allow demos/diagnostics to surface the
+    // selected llama.cpp device and GPU layer offload decisions.
+    const char* log_level = std::getenv("RUNANYWHERE_LOG_LEVEL");
+    cfg.log_level =
+        (log_level && std::strcmp(log_level, "info") == 0) ? RAC_LOG_INFO : RAC_LOG_WARNING;
     cfg.log_tag = "electron";
 
     rac_model_paths_set_base_dir(base.c_str());

@@ -23,7 +23,7 @@
 | **OS** | Windows 10/11 (x64) |
 | **Node.js** | 22.12+ recommended (for `npx electron`) |
 | **Repo checkout** | Full monorepo clone |
-| **Optional GPU build** | CUDA prebuild at `prebuilds/win32-x64-cuda/` (see SDK README) |
+| **Accelerated build** | Vulkan prebuild at `prebuilds/win32-x64-vulkan/` |
 
 ---
 
@@ -48,22 +48,22 @@ examples\electron\RunAnywhereAI\run-demo.cmd
 The script:
 
 - Clears `ELECTRON_RUN_AS_NODE` (required for a visible window)
-- Sets `RUNANYWHERE_NATIVE_PATH` to the **CPU prebuild**:
+- Sets `RUNANYWHERE_NATIVE_PATH` to the **Vulkan prebuild**:
 
   ```
-  sdk\runanywhere-electron\prebuilds\win32-x64\runanywhere_native.node
+  sdk\runanywhere-electron\prebuilds\win32-x64-vulkan\runanywhere_native.node
   ```
 
 - Launches `npx electron examples/electron/RunAnywhereAI` from the repo root
 
-**GPU variant:** If you built the CUDA prebuild, use `run-demo-gpu.cmd` instead (points at `prebuilds/win32-x64-cuda/`).
+`run-demo-gpu.cmd` remains as a compatibility alias for the same accelerated prebuild.
 
 ### 3. Manual launch (PowerShell)
 
 ```powershell
 cd runanywhere-sdks
 $env:ELECTRON_RUN_AS_NODE = $null
-$env:RUNANYWHERE_NATIVE_PATH = "$PWD\sdk\runanywhere-electron\prebuilds\win32-x64\runanywhere_native.node"
+$env:RUNANYWHERE_NATIVE_PATH = "$PWD\sdk\runanywhere-electron\prebuilds\win32-x64-vulkan\runanywhere_native.node"
 npx electron examples/electron/RunAnywhereAI
 ```
 
@@ -82,17 +82,18 @@ Then point `RUNANYWHERE_NATIVE_PATH` at your built `runanywhere_native.node` or 
 
 | Tab | SDK surface |
 |-----|-------------|
-| **Chat** | `generateStream` with conversation history, markdown, per-message metrics |
+| **Chat** | `generateStream` with conversation history, markdown, per-message metrics, and an opt-in tool toggle |
 | **Structured** | `generateStructured` (grammar-constrained JSON) |
-| **Tools** | `generateToolCall` with demo tool selection |
-| **Vision** | `loadVLM` / `generateVlm` on a picked image |
+| **Tools** | `generateToolCall` with real allowlisted weather/timer execution |
+| **Vision + audio** | `loadVLM` / `generateVlm` on picked media or a captured frame from a selectable live camera |
 | **Embeddings** | `loadEmbedder` / `embed` with cosine similarity |
+| **Knowledge** | Catalog-backed RAG ingest, grounded query, sources, and clear |
 | **Voice** | Hold-to-talk: `transcribe` → `generate` → `synthesize` |
 | **VAD** | `createVad` / `vadProcess` with threshold slider |
 | **Models** | Catalog, download progress, load/unload |
 | **Settings** | System prompt, temperature, max tokens, DPAPI-encrypted API key |
 
-Default catalog models (`qwen2.5-0.5b`, `smolvlm-256m`, `minilm`, `whisper-tiny`, `piper-lessac`) auto-download on first use. Conversation history and settings persist to Electron `userData`.
+Default catalog models (`gemma-4-12b`, `gemma-4-e4b`, `minilm`, `whisper-tiny`, `piper-lessac`) auto-download on first use. Conversation history and settings persist to Electron `userData`.
 
 ---
 
@@ -104,8 +105,9 @@ RunAnywhereAI/
 ├── preload.js        # Renderer bridge (contextIsolation)
 ├── renderer.js       # UI logic and SDK calls
 ├── index.html        # Workbench layout
-├── run-demo.cmd      # CPU launch script (happy path)
-├── run-demo-gpu.cmd  # CUDA prebuild launch script
+├── runanywhere-logo.png # Windows app/window icon
+├── run-demo.cmd      # Accelerated launch script (happy path)
+├── run-demo-gpu.cmd  # Compatibility alias
 └── README.md
 ```
 
@@ -117,7 +119,7 @@ For CI-style verification without opening a window:
 
 ```powershell
 $env:RA_SELFTEST = '1'
-$env:RUNANYWHERE_NATIVE_PATH = '<repo>\sdk\runanywhere-electron\prebuilds\win32-x64\runanywhere_native.node'
+$env:RUNANYWHERE_NATIVE_PATH = '<repo>\sdk\runanywhere-electron\prebuilds\win32-x64-vulkan\runanywhere_native.node'
 npx electron examples/electron/RunAnywhereAI
 # Prints [selftest] ... ALL PASS and exits 0 on success
 ```
@@ -130,7 +132,7 @@ npx electron examples/electron/RunAnywhereAI
 |---------|-----|
 | Window does not appear | Unset `ELECTRON_RUN_AS_NODE`; use `run-demo.cmd` |
 | Native addon not found | Confirm prebuild path; rebuild SDK with `npm run build` in `sdk/runanywhere-electron` |
-| GPU script fails | Build CUDA prebuild first, or fall back to `run-demo.cmd` |
+| Accelerated script fails | Build and bundle the Vulkan prebuild first |
 | Model download errors | Check network; models fetch on first use |
 
 ---

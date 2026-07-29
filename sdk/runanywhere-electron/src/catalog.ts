@@ -64,6 +64,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
   'llama-3.2-1b': llm('bartowski/Llama-3.2-1B-Instruct-GGUF', 'Llama-3.2-1B-Instruct-Q4_K_M.gguf', 'Llama 3.2 1B', '1B', 770),
   'llama-3.2-3b': llm('bartowski/Llama-3.2-3B-Instruct-GGUF', 'Llama-3.2-3B-Instruct-Q4_K_M.gguf', 'Llama 3.2 3B', '3B', 1926, true),
   'gemma-2-2b': llm('bartowski/gemma-2-2b-it-GGUF', 'gemma-2-2b-it-Q4_K_M.gguf', 'Gemma 2 2B', '2B', 1629, true),
+  'gemma-4-12b': llm('ggml-org/gemma-4-12B-it-GGUF', 'gemma-4-12B-it-Q4_0.gguf', 'Gemma 4 12B · best quality', '12B', 7220, true),
   'phi-3.5-mini': llm('bartowski/Phi-3.5-mini-instruct-GGUF', 'Phi-3.5-mini-instruct-Q4_K_M.gguf', 'Phi 3.5 mini', '3.8B', 2283, true),
 
   // ---- VLMs (GGUF + mmproj, llama.cpp mtmd) ----
@@ -72,6 +73,8 @@ export const CATALOG: Record<string, CatalogEntry> = {
   'smolvlm-2.2b': vlm('ggml-org/SmolVLM-Instruct-GGUF', 'SmolVLM-Instruct-Q8_0.gguf', 'mmproj-SmolVLM-Instruct-Q8_0.gguf', 'SmolVLM 2.2B', '2.2B', 2402, true),
   'smolvlm2-500m': vlm('ggml-org/SmolVLM2-500M-Video-Instruct-GGUF', 'SmolVLM2-500M-Video-Instruct-Q8_0.gguf', 'mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf', 'SmolVLM2 500M (video)', '500M', 521),
   'qwen2-vl-2b': vlm('ggml-org/Qwen2-VL-2B-Instruct-GGUF', 'Qwen2-VL-2B-Instruct-Q8_0.gguf', 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf', 'Qwen2-VL 2B', '2B', 2247, true),
+  'gemma-4-e2b': vlm('ggml-org/gemma-4-E2B-it-GGUF', 'gemma-4-E2B-it-Q4_0.gguf', 'mmproj-gemma-4-E2B-it-Q8_0.gguf', 'Gemma 4 E2B · fast multimodal', 'E2B / 5.1B total', 3399, true),
+  'gemma-4-e4b': vlm('ggml-org/gemma-4-E4B-it-GGUF', 'gemma-4-E4B-it-Q4_0.gguf', 'mmproj-gemma-4-E4B-it-Q8_0.gguf', 'Gemma 4 E4B · balanced multimodal', 'E4B / 8B total', 5151, true),
 
   // ---- Embeddings (ONNX) ----
   minilm: {

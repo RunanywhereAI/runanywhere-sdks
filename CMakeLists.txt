@@ -82,6 +82,7 @@ option(RAC_BUILD_ELECTRON_ADDON "Build the runanywhere-electron N-API .node addo
 option(RAC_BUILD_PYTHON_MODULE "Build the runanywhere-python pybind11 _core module" OFF)
 option(RAC_DESKTOP_ADAPTER    "Build the desktop (macOS/Linux/Windows) platform adapter + libcurl HTTP transport" OFF)
 option(RAC_GPU_CUDA           "Build llama.cpp with the CUDA GPU backend (NVIDIA; requires the CUDA toolkit + MSVC)" OFF)
+option(RAC_GPU_VULKAN         "Build llama.cpp with the Vulkan GPU backend (AMD/Intel/NVIDIA; requires the Vulkan SDK)" OFF)
 
 # Protobuf is a private implementation detail of the serialized-byte C ABI.
 # Keep its C++ namespace private too: static ML runtimes such as ONNX Runtime
