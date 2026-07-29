@@ -60,7 +60,16 @@ function rejectAllPending(err: Error): void {
   pending.clear();
 }
 
+// The args of the last successful initialize(), replayed onto a REPLACEMENT host.
+// The native addon's initialised state is per-process, so a re-forked host starts
+// uninitialised: without this, one host crash leaves the app alive but every
+// feature failing "not initialized" until the user restarts it.
+let initArgs: [string | undefined, string | undefined] | null = null;
+let sawFirstPort = false;
+
 ipcRenderer.on('runanywhere-port', (event) => {
+  const isReplacement = sawFirstPort;
+  sawFirstPort = true;
   port = event.ports[0];
   port.onmessage = (ev: MessageEvent) => {
     const m = ev.data as RpcMessage;
@@ -77,6 +86,21 @@ ipcRenderer.on('runanywhere-port', (event) => {
   };
   port.onmessageerror = () => { /* ignore an undeserializable message rather than wedge the port */ };
   port.start();
+  if (isReplacement && initArgs) {
+    // Re-initialise BEFORE opening the gate, so calls queued behind `ready` do not
+    // race the init and fail. If it fails there is nothing further we can do here;
+    // the next call surfaces the error.
+    const [secureDir, baseDir] = initArgs;
+    new Promise<void>((resolve, reject) => {
+      const id = nextId++;
+      pending.set(id, { resolve: () => resolve(), reject });
+      port!.postMessage({ id, method: 'initialize', args: [secureDir, baseDir] });
+    })
+      .then(() => bus.emit({ type: 'initialized' }))
+      .catch(() => { /* surfaced by the caller's next request */ })
+      .finally(() => markReady());
+    return;
+  }
   markReady();
 });
 
@@ -115,7 +139,11 @@ contextBridge.exposeInMainWorld('runanywhere', {
   ready: (): Promise<void> => ready,
   version: () => send('version', []),
   initialize: (secureDir?: string, baseDir?: string) =>
-    emitAfter(send('initialize', [secureDir, baseDir]), () => bus.emit({ type: 'initialized' })),
+    emitAfter(send('initialize', [secureDir, baseDir]), () => {
+      // Remembered so a re-forked host is initialised automatically (see above).
+      initArgs = [secureDir, baseDir];
+      bus.emit({ type: 'initialized' });
+    }),
 
   // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
   onEvent: (listener: EventListener) => bus.on(listener),
