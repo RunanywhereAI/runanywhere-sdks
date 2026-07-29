@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { LLMGenerationOptions } from "./llm_options";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -237,14 +238,10 @@ export interface VoiceAgentConfig {
     | undefined;
   /** default 200 */
   bargeInThresholdMs: number;
-  /** LLM behavior. */
-  systemPrompt: string;
+  generation?: LLMGenerationOptions | undefined;
   maxContextTokens: number;
-  temperature: number;
   /** Emit partial transcripts as UserSaidEvent{is_final=false}. */
   emitPartials: boolean;
-  /** Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens. */
-  emitThoughts: boolean;
   /**
    * Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
    * oneof arm; provided so callers that pass this message standalone (or
@@ -582,11 +579,9 @@ function createBaseVoiceAgentConfig(): VoiceAgentConfig {
     audioFilePath: "",
     enableBargeIn: undefined,
     bargeInThresholdMs: 0,
-    systemPrompt: "",
+    generation: undefined,
     maxContextTokens: 0,
-    temperature: 0,
     emitPartials: false,
-    emitThoughts: false,
     typeKind: undefined,
   };
 }
@@ -626,20 +621,14 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
     if (message.bargeInThresholdMs !== 0) {
       writer.uint32(72).int32(message.bargeInThresholdMs);
     }
-    if (message.systemPrompt !== "") {
-      writer.uint32(82).string(message.systemPrompt);
+    if (message.generation !== undefined) {
+      LLMGenerationOptions.encode(message.generation, writer.uint32(146).fork()).join();
     }
     if (message.maxContextTokens !== 0) {
       writer.uint32(88).int32(message.maxContextTokens);
     }
-    if (message.temperature !== 0) {
-      writer.uint32(101).float(message.temperature);
-    }
     if (message.emitPartials !== false) {
       writer.uint32(104).bool(message.emitPartials);
-    }
-    if (message.emitThoughts !== false) {
-      writer.uint32(112).bool(message.emitThoughts);
     }
     if (message.typeKind !== undefined) {
       writer.uint32(128).int32(message.typeKind);
@@ -742,12 +731,12 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
           message.bargeInThresholdMs = reader.int32();
           continue;
         }
-        case 10: {
-          if (tag !== 82) {
+        case 18: {
+          if (tag !== 146) {
             break;
           }
 
-          message.systemPrompt = reader.string();
+          message.generation = LLMGenerationOptions.decode(reader, reader.uint32());
           continue;
         }
         case 11: {
@@ -758,28 +747,12 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
           message.maxContextTokens = reader.int32();
           continue;
         }
-        case 12: {
-          if (tag !== 101) {
-            break;
-          }
-
-          message.temperature = reader.float();
-          continue;
-        }
         case 13: {
           if (tag !== 104) {
             break;
           }
 
           message.emitPartials = reader.bool();
-          continue;
-        }
-        case 14: {
-          if (tag !== 112) {
-            break;
-          }
-
-          message.emitThoughts = reader.bool();
           continue;
         }
         case 16: {
@@ -856,26 +829,16 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
         : isSet(object.barge_in_threshold_ms)
         ? globalThis.Number(object.barge_in_threshold_ms)
         : 0,
-      systemPrompt: isSet(object.systemPrompt)
-        ? globalThis.String(object.systemPrompt)
-        : isSet(object.system_prompt)
-        ? globalThis.String(object.system_prompt)
-        : "",
+      generation: isSet(object.generation) ? LLMGenerationOptions.fromJSON(object.generation) : undefined,
       maxContextTokens: isSet(object.maxContextTokens)
         ? globalThis.Number(object.maxContextTokens)
         : isSet(object.max_context_tokens)
         ? globalThis.Number(object.max_context_tokens)
         : 0,
-      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
       emitPartials: isSet(object.emitPartials)
         ? globalThis.Boolean(object.emitPartials)
         : isSet(object.emit_partials)
         ? globalThis.Boolean(object.emit_partials)
-        : false,
-      emitThoughts: isSet(object.emitThoughts)
-        ? globalThis.Boolean(object.emitThoughts)
-        : isSet(object.emit_thoughts)
-        ? globalThis.Boolean(object.emit_thoughts)
         : false,
       typeKind: isSet(object.typeKind)
         ? solutionTypeFromJSON(object.typeKind)
@@ -920,20 +883,14 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
     if (message.bargeInThresholdMs !== 0) {
       obj.bargeInThresholdMs = Math.round(message.bargeInThresholdMs);
     }
-    if (message.systemPrompt !== "") {
-      obj.systemPrompt = message.systemPrompt;
+    if (message.generation !== undefined) {
+      obj.generation = LLMGenerationOptions.toJSON(message.generation);
     }
     if (message.maxContextTokens !== 0) {
       obj.maxContextTokens = Math.round(message.maxContextTokens);
     }
-    if (message.temperature !== 0) {
-      obj.temperature = message.temperature;
-    }
     if (message.emitPartials !== false) {
       obj.emitPartials = message.emitPartials;
-    }
-    if (message.emitThoughts !== false) {
-      obj.emitThoughts = message.emitThoughts;
     }
     if (message.typeKind !== undefined) {
       obj.typeKind = solutionTypeToJSON(message.typeKind);
@@ -957,11 +914,11 @@ export const VoiceAgentConfig: MessageFns<VoiceAgentConfig> = {
     message.audioFilePath = object.audioFilePath ?? "";
     message.enableBargeIn = object.enableBargeIn ?? undefined;
     message.bargeInThresholdMs = object.bargeInThresholdMs ?? 0;
-    message.systemPrompt = object.systemPrompt ?? "";
+    message.generation = (object.generation !== undefined && object.generation !== null)
+      ? LLMGenerationOptions.fromPartial(object.generation)
+      : undefined;
     message.maxContextTokens = object.maxContextTokens ?? 0;
-    message.temperature = object.temperature ?? 0;
     message.emitPartials = object.emitPartials ?? false;
-    message.emitThoughts = object.emitThoughts ?? false;
     message.typeKind = object.typeKind ?? undefined;
     return message;
   },

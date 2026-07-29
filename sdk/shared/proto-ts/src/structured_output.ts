@@ -373,27 +373,21 @@ export interface JSONSchema_DefinitionsEntry {
  *   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
  *   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
  * ---------------------------------------------------------------------------
+ * The ONE output-constraint surface. The retired loose fields on
+ * LLMGenerationOptions (json_schema, grammar, response_format) all fold in
+ * here: schema-shaped output via `schema_source`, low-level constrained
+ * decoding via `grammar`/`regex_pattern`.
  */
 export interface StructuredOutputOptions {
-  /** Schema describing the desired output shape. */
-  schema?:
-    | JSONSchema
-    | undefined;
   /** Whether to embed the schema text in the LLM prompt. */
   includeSchemaInPrompt: boolean;
   /** Strict schema adherence — rejects outputs that don't fully validate. */
-  strictMode?:
-    | boolean
-    | undefined;
-  /**
-   * Raw JSON Schema string for C ABI and SDKs that already carry schema as
-   * serialized JSON instead of the typed JSONSchema tree.
-   */
+  strictMode?: boolean | undefined;
+  schema?: JSONSchema | undefined;
   jsonSchema?:
     | string
     | undefined;
-  /** Optional generated type/name hints used by Swift/Kotlin/Dart wrappers. */
-  typeName?: string | undefined;
+  /** Name for the schema/output type (OpenAI json_schema.name). */
   name?: string | undefined;
   mode: StructuredOutputMode;
   regexPattern?: string | undefined;
@@ -1489,11 +1483,10 @@ export const JSONSchema_DefinitionsEntry: MessageFns<JSONSchema_DefinitionsEntry
 
 function createBaseStructuredOutputOptions(): StructuredOutputOptions {
   return {
-    schema: undefined,
     includeSchemaInPrompt: false,
     strictMode: undefined,
+    schema: undefined,
     jsonSchema: undefined,
-    typeName: undefined,
     name: undefined,
     mode: 0,
     regexPattern: undefined,
@@ -1505,20 +1498,17 @@ function createBaseStructuredOutputOptions(): StructuredOutputOptions {
 
 export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
   encode(message: StructuredOutputOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.schema !== undefined) {
-      JSONSchema.encode(message.schema, writer.uint32(10).fork()).join();
-    }
     if (message.includeSchemaInPrompt !== false) {
       writer.uint32(16).bool(message.includeSchemaInPrompt);
     }
     if (message.strictMode !== undefined) {
       writer.uint32(24).bool(message.strictMode);
     }
+    if (message.schema !== undefined) {
+      JSONSchema.encode(message.schema, writer.uint32(10).fork()).join();
+    }
     if (message.jsonSchema !== undefined) {
       writer.uint32(34).string(message.jsonSchema);
-    }
-    if (message.typeName !== undefined) {
-      writer.uint32(42).string(message.typeName);
     }
     if (message.name !== undefined) {
       writer.uint32(50).string(message.name);
@@ -1548,14 +1538,6 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.schema = JSONSchema.decode(reader, reader.uint32());
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -1572,20 +1554,20 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
           message.strictMode = reader.bool();
           continue;
         }
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.schema = JSONSchema.decode(reader, reader.uint32());
+          continue;
+        }
         case 4: {
           if (tag !== 34) {
             break;
           }
 
           message.jsonSchema = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.typeName = reader.string();
           continue;
         }
         case 6: {
@@ -1647,7 +1629,6 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
 
   fromJSON(object: any): StructuredOutputOptions {
     return {
-      schema: isSet(object.schema) ? JSONSchema.fromJSON(object.schema) : undefined,
       includeSchemaInPrompt: isSet(object.includeSchemaInPrompt)
         ? globalThis.Boolean(object.includeSchemaInPrompt)
         : isSet(object.include_schema_in_prompt)
@@ -1658,15 +1639,11 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
         : isSet(object.strict_mode)
         ? globalThis.Boolean(object.strict_mode)
         : undefined,
+      schema: isSet(object.schema) ? JSONSchema.fromJSON(object.schema) : undefined,
       jsonSchema: isSet(object.jsonSchema)
         ? globalThis.String(object.jsonSchema)
         : isSet(object.json_schema)
         ? globalThis.String(object.json_schema)
-        : undefined,
-      typeName: isSet(object.typeName)
-        ? globalThis.String(object.typeName)
-        : isSet(object.type_name)
-        ? globalThis.String(object.type_name)
         : undefined,
       name: isSet(object.name) ? globalThis.String(object.name) : undefined,
       mode: isSet(object.mode) ? structuredOutputModeFromJSON(object.mode) : 0,
@@ -1691,20 +1668,17 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
 
   toJSON(message: StructuredOutputOptions): unknown {
     const obj: any = {};
-    if (message.schema !== undefined) {
-      obj.schema = JSONSchema.toJSON(message.schema);
-    }
     if (message.includeSchemaInPrompt !== false) {
       obj.includeSchemaInPrompt = message.includeSchemaInPrompt;
     }
     if (message.strictMode !== undefined) {
       obj.strictMode = message.strictMode;
     }
+    if (message.schema !== undefined) {
+      obj.schema = JSONSchema.toJSON(message.schema);
+    }
     if (message.jsonSchema !== undefined) {
       obj.jsonSchema = message.jsonSchema;
-    }
-    if (message.typeName !== undefined) {
-      obj.typeName = message.typeName;
     }
     if (message.name !== undefined) {
       obj.name = message.name;
@@ -1732,13 +1706,12 @@ export const StructuredOutputOptions: MessageFns<StructuredOutputOptions> = {
   },
   fromPartial<I extends Exact<DeepPartial<StructuredOutputOptions>, I>>(object: I): StructuredOutputOptions {
     const message = createBaseStructuredOutputOptions();
+    message.includeSchemaInPrompt = object.includeSchemaInPrompt ?? false;
+    message.strictMode = object.strictMode ?? undefined;
     message.schema = (object.schema !== undefined && object.schema !== null)
       ? JSONSchema.fromPartial(object.schema)
       : undefined;
-    message.includeSchemaInPrompt = object.includeSchemaInPrompt ?? false;
-    message.strictMode = object.strictMode ?? undefined;
     message.jsonSchema = object.jsonSchema ?? undefined;
-    message.typeName = object.typeName ?? undefined;
     message.name = object.name ?? undefined;
     message.mode = object.mode ?? 0;
     message.regexPattern = object.regexPattern ?? undefined;

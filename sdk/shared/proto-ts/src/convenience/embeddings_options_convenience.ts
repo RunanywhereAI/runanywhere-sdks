@@ -14,17 +14,15 @@
 
 /* eslint-disable */
 
-import { EmbeddingsConfiguration, EmbeddingsOptions } from '../embeddings_options';
+import { EmbeddingsConfiguration, EmbeddingsNormalizeMode, EmbeddingsOptions, EmbeddingsPoolingStrategy } from '../embeddings_options';
 import { ValidationError } from './_errors';
 
 export const embeddingsConfigurationDefaults = (): EmbeddingsConfiguration => ({
   modelId: '',
   embeddingDimension: 384,
   maxSequenceLength: 512,
-  normalize: true,
-  maxTokens: 0,
-  normalizeMode: 0,
-  pooling: 0,
+  normalizeMode: EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2,
+  pooling: EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN,
 });
 
 export const validateEmbeddingsConfiguration = (m: EmbeddingsConfiguration): void => {
@@ -49,8 +47,16 @@ export const validateEmbeddingsConfiguration = (m: EmbeddingsConfiguration): voi
 };
 
 export const embeddingsOptionsDefaults = (): EmbeddingsOptions => ({
-  normalize: true,
-  normalizeMode: 0,
+  normalizeMode: EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED,
   pooling: 0,
   nThreads: 0,
 });
+
+export const validateEmbeddingsOptions = (m: EmbeddingsOptions): void => {
+  if (m.batchSize !== undefined && (m.batchSize < 1 || m.batchSize > 8192)) {
+    throw new ValidationError({
+      fieldPath: 'EmbeddingsOptions.batch_size',
+      message: `batch_size must be in 1...8192 (got ${m.batchSize})`,
+    });
+  }
+};

@@ -18,8 +18,8 @@ import { DiarizationAudioEncoding, DiarizationOptions } from '../diarization';
 import { ValidationError } from './_errors';
 
 export const diarizationOptionsDefaults = (): DiarizationOptions => ({
-  sampleRateHz: 16000,
-  channelCount: 1,
+  sampleRate: 16000,
+  channels: 1,
   encoding: DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE,
   threshold: 0.5,
   minimumDurationMs: 0,
@@ -27,16 +27,16 @@ export const diarizationOptionsDefaults = (): DiarizationOptions => ({
 });
 
 export const validateDiarizationOptions = (m: DiarizationOptions): void => {
-  if (m.sampleRateHz !== undefined && (m.sampleRateHz < 8000 || m.sampleRateHz > 48000)) {
+  if (m.sampleRate !== undefined && (m.sampleRate < 8000 || m.sampleRate > 48000)) {
     throw new ValidationError({
-      fieldPath: 'DiarizationOptions.sample_rate_hz',
-      message: `sample_rate_hz must be in 8000...48000 (got ${m.sampleRateHz})`,
+      fieldPath: 'DiarizationOptions.sample_rate',
+      message: `sample_rate must be in 8000...48000 (got ${m.sampleRate})`,
     });
   }
-  if (m.channelCount !== undefined && (m.channelCount < 1 || m.channelCount > 1)) {
+  if (m.channels !== undefined && (m.channels < 1 || m.channels > 1)) {
     throw new ValidationError({
-      fieldPath: 'DiarizationOptions.channel_count',
-      message: `channel_count must be in 1...1 (got ${m.channelCount})`,
+      fieldPath: 'DiarizationOptions.channels',
+      message: `channels must be in 1...1 (got ${m.channels})`,
     });
   }
   if (m.threshold !== undefined && (!Number.isFinite(m.threshold) || m.threshold < 0.0 || m.threshold > 1.0)) {

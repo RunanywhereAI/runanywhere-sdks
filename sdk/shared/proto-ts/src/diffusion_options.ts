@@ -508,13 +508,14 @@ export interface DiffusionGenerationOptions {
   /** Output image height in pixels.  0 = use variant default. */
   height: number;
   /**
-   * Number of denoising steps. Range 1–50 (variant-dependent: SDXS=1,
-   * SDXL_Turbo / LCM=4, SD*=20–28). 0 = use variant default.
+   * Number of denoising steps (industry short name `steps`). Range 1–50
+   * (variant-dependent: SDXS=1, SDXL_Turbo / LCM=4, SD*=20–28). 0 = use
+   * variant default. Was `num_inference_steps`.
    */
-  numInferenceSteps: number;
+  steps: number;
   /**
    * Classifier-free guidance scale. 0.0 = no CFG (required for SDXS /
-   * SDXL_Turbo). Typical SD range 1.0–20.0; default 7.5.
+   * SDXL_Turbo). Typical SD range 1.0–20.0.
    */
   guidanceScale: number;
   /** RNG seed for reproducibility. -1 = pick a random seed. */
@@ -1126,7 +1127,7 @@ function createBaseDiffusionGenerationOptions(): DiffusionGenerationOptions {
     negativePrompt: "",
     width: 0,
     height: 0,
-    numInferenceSteps: 0,
+    steps: 0,
     guidanceScale: 0,
     seed: 0,
     scheduler: 0,
@@ -1159,8 +1160,8 @@ export const DiffusionGenerationOptions: MessageFns<DiffusionGenerationOptions> 
     if (message.height !== 0) {
       writer.uint32(32).int32(message.height);
     }
-    if (message.numInferenceSteps !== 0) {
-      writer.uint32(40).int32(message.numInferenceSteps);
+    if (message.steps !== 0) {
+      writer.uint32(40).int32(message.steps);
     }
     if (message.guidanceScale !== 0) {
       writer.uint32(53).float(message.guidanceScale);
@@ -1254,7 +1255,7 @@ export const DiffusionGenerationOptions: MessageFns<DiffusionGenerationOptions> 
             break;
           }
 
-          message.numInferenceSteps = reader.int32();
+          message.steps = reader.int32();
           continue;
         }
         case 6: {
@@ -1396,11 +1397,7 @@ export const DiffusionGenerationOptions: MessageFns<DiffusionGenerationOptions> 
         : "",
       width: isSet(object.width) ? globalThis.Number(object.width) : 0,
       height: isSet(object.height) ? globalThis.Number(object.height) : 0,
-      numInferenceSteps: isSet(object.numInferenceSteps)
-        ? globalThis.Number(object.numInferenceSteps)
-        : isSet(object.num_inference_steps)
-        ? globalThis.Number(object.num_inference_steps)
-        : 0,
+      steps: isSet(object.steps) ? globalThis.Number(object.steps) : 0,
       guidanceScale: isSet(object.guidanceScale)
         ? globalThis.Number(object.guidanceScale)
         : isSet(object.guidance_scale)
@@ -1481,8 +1478,8 @@ export const DiffusionGenerationOptions: MessageFns<DiffusionGenerationOptions> 
     if (message.height !== 0) {
       obj.height = Math.round(message.height);
     }
-    if (message.numInferenceSteps !== 0) {
-      obj.numInferenceSteps = Math.round(message.numInferenceSteps);
+    if (message.steps !== 0) {
+      obj.steps = Math.round(message.steps);
     }
     if (message.guidanceScale !== 0) {
       obj.guidanceScale = message.guidanceScale;
@@ -1541,7 +1538,7 @@ export const DiffusionGenerationOptions: MessageFns<DiffusionGenerationOptions> 
     message.negativePrompt = object.negativePrompt ?? "";
     message.width = object.width ?? 0;
     message.height = object.height ?? 0;
-    message.numInferenceSteps = object.numInferenceSteps ?? 0;
+    message.steps = object.steps ?? 0;
     message.guidanceScale = object.guidanceScale ?? 0;
     message.seed = object.seed ?? 0;
     message.scheduler = object.scheduler ?? 0;

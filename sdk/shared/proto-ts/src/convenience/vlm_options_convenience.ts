@@ -19,27 +19,26 @@ import { ValidationError } from './_errors';
 
 export const vLMGenerationOptionsDefaults = (): VLMGenerationOptions => ({
   prompt: '',
-  maxTokens: 2048,
+  maxOutputTokens: 2048,
   temperature: 0.7,
   topP: 0.9,
   topK: 0,
   stopSequences: [],
-  streamingEnabled: true,
   maxImageSize: 0,
   nThreads: 0,
   useGpu: true,
   modelFamily: 0,
   seed: 0,
   repetitionPenalty: 1.1,
-  minP: 0,
+  minP: 0.0,
   emitImageEmbeddings: false,
 });
 
 export const validateVLMGenerationOptions = (m: VLMGenerationOptions): void => {
-  if (m.maxTokens < 0) {
+  if (m.maxOutputTokens < 0) {
     throw new ValidationError({
-      fieldPath: 'VLMGenerationOptions.max_tokens',
-      message: `max_tokens must be >= 0 (got ${m.maxTokens})`,
+      fieldPath: 'VLMGenerationOptions.max_output_tokens',
+      message: `max_output_tokens must be >= 0 (got ${m.maxOutputTokens})`,
     });
   }
   if (!Number.isFinite(m.temperature) || m.temperature < 0.0 || m.temperature > 2.0) {

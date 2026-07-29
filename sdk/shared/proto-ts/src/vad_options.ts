@@ -218,10 +218,10 @@ export interface VADConfiguration {
    */
   frameLengthMs: number;
   /**
-   * Energy threshold in [0.0, 1.0] for voice detection.
-   * Recommended range 0.01–0.05; default 0.015 across SDKs.
+   * Activation (energy) threshold in [0.0, 1.0] for voice detection.
+   * Recommended range 0.01–0.05.
    */
-  threshold: number;
+  activationThreshold: number;
   /**
    * When true, the VAD performs ambient-noise calibration and uses the
    * result as a multiplier on the threshold (see calibration_multiplier
@@ -272,30 +272,29 @@ export interface VADConfiguration {
  *   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
  * Surfacing them as fields lets callers tune debouncing without a rebuild.
  * ---------------------------------------------------------------------------
+ * Field vocabulary follows the industry VAD naming (LiveKit/Silero):
+ * activation_threshold + min/max duration knobs + prefix padding.
  */
 export interface VADOptions {
   /**
-   * Per-call energy threshold override. Use 0 (default) to keep the
-   * configured threshold. Mirrors rac_vad_input_t::energy_threshold_override
-   * (which uses -1 as the sentinel; on the wire we use 0 for proto3
-   * default semantics — generators emit -1 when this is unset).
+   * Per-call activation threshold override in [0.0, 1.0]. Unset/0 = keep
+   * the configured threshold.
    */
-  threshold: number;
-  /**
-   * Minimum continuous speech duration (ms) before SPEECH_STARTED fires.
-   * Default 100 (RAC_VAD_MIN_SPEECH_DURATION_MS).
-   */
+  activationThreshold: number;
+  /** Minimum continuous speech duration (ms) before SPEECH_STARTED fires. */
   minSpeechDurationMs: number;
-  /**
-   * Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
-   * Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
-   */
+  /** Minimum continuous silence duration (ms) before SPEECH_ENDED fires. */
   minSilenceDurationMs: number;
   /**
    * Maximum continuous speech duration (ms) before forcing a segment split.
    * 0 = backend/default.
    */
   maxSpeechDurationMs: number;
+  /**
+   * Audio retained before SPEECH_STARTED so segments don't clip the first
+   * syllable. 0 = backend/default.
+   */
+  prefixPaddingMs: number;
   /** Whether to include VADStatistics in stream events when available. */
   includeStatistics: boolean;
 }
@@ -480,7 +479,7 @@ function createBaseVADConfiguration(): VADConfiguration {
     modelId: "",
     sampleRate: 0,
     frameLengthMs: 0,
-    threshold: 0,
+    activationThreshold: 0,
     enableAutoCalibration: false,
     calibrationMultiplier: 0,
     preferredFramework: undefined,
@@ -501,8 +500,8 @@ export const VADConfiguration: MessageFns<VADConfiguration> = {
     if (message.frameLengthMs !== 0) {
       writer.uint32(24).int32(message.frameLengthMs);
     }
-    if (message.threshold !== 0) {
-      writer.uint32(37).float(message.threshold);
+    if (message.activationThreshold !== 0) {
+      writer.uint32(37).float(message.activationThreshold);
     }
     if (message.enableAutoCalibration !== false) {
       writer.uint32(40).bool(message.enableAutoCalibration);
@@ -561,7 +560,7 @@ export const VADConfiguration: MessageFns<VADConfiguration> = {
             break;
           }
 
-          message.threshold = reader.float();
+          message.activationThreshold = reader.float();
           continue;
         }
         case 5: {
@@ -638,7 +637,11 @@ export const VADConfiguration: MessageFns<VADConfiguration> = {
         : isSet(object.frame_length_ms)
         ? globalThis.Number(object.frame_length_ms)
         : 0,
-      threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
+      activationThreshold: isSet(object.activationThreshold)
+        ? globalThis.Number(object.activationThreshold)
+        : isSet(object.activation_threshold)
+        ? globalThis.Number(object.activation_threshold)
+        : 0,
       enableAutoCalibration: isSet(object.enableAutoCalibration)
         ? globalThis.Boolean(object.enableAutoCalibration)
         : isSet(object.enable_auto_calibration)
@@ -683,8 +686,8 @@ export const VADConfiguration: MessageFns<VADConfiguration> = {
     if (message.frameLengthMs !== 0) {
       obj.frameLengthMs = Math.round(message.frameLengthMs);
     }
-    if (message.threshold !== 0) {
-      obj.threshold = message.threshold;
+    if (message.activationThreshold !== 0) {
+      obj.activationThreshold = message.activationThreshold;
     }
     if (message.enableAutoCalibration !== false) {
       obj.enableAutoCalibration = message.enableAutoCalibration;
@@ -715,7 +718,7 @@ export const VADConfiguration: MessageFns<VADConfiguration> = {
     message.modelId = object.modelId ?? "";
     message.sampleRate = object.sampleRate ?? 0;
     message.frameLengthMs = object.frameLengthMs ?? 0;
-    message.threshold = object.threshold ?? 0;
+    message.activationThreshold = object.activationThreshold ?? 0;
     message.enableAutoCalibration = object.enableAutoCalibration ?? false;
     message.calibrationMultiplier = object.calibrationMultiplier ?? 0;
     message.preferredFramework = object.preferredFramework ?? undefined;
@@ -728,18 +731,19 @@ export const VADConfiguration: MessageFns<VADConfiguration> = {
 
 function createBaseVADOptions(): VADOptions {
   return {
-    threshold: 0,
+    activationThreshold: 0,
     minSpeechDurationMs: 0,
     minSilenceDurationMs: 0,
     maxSpeechDurationMs: 0,
+    prefixPaddingMs: 0,
     includeStatistics: false,
   };
 }
 
 export const VADOptions: MessageFns<VADOptions> = {
   encode(message: VADOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.threshold !== 0) {
-      writer.uint32(13).float(message.threshold);
+    if (message.activationThreshold !== 0) {
+      writer.uint32(53).float(message.activationThreshold);
     }
     if (message.minSpeechDurationMs !== 0) {
       writer.uint32(16).int32(message.minSpeechDurationMs);
@@ -749,6 +753,9 @@ export const VADOptions: MessageFns<VADOptions> = {
     }
     if (message.maxSpeechDurationMs !== 0) {
       writer.uint32(32).int32(message.maxSpeechDurationMs);
+    }
+    if (message.prefixPaddingMs !== 0) {
+      writer.uint32(56).int32(message.prefixPaddingMs);
     }
     if (message.includeStatistics !== false) {
       writer.uint32(40).bool(message.includeStatistics);
@@ -763,12 +770,12 @@ export const VADOptions: MessageFns<VADOptions> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 13) {
+        case 6: {
+          if (tag !== 53) {
             break;
           }
 
-          message.threshold = reader.float();
+          message.activationThreshold = reader.float();
           continue;
         }
         case 2: {
@@ -795,6 +802,14 @@ export const VADOptions: MessageFns<VADOptions> = {
           message.maxSpeechDurationMs = reader.int32();
           continue;
         }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.prefixPaddingMs = reader.int32();
+          continue;
+        }
         case 5: {
           if (tag !== 40) {
             break;
@@ -814,7 +829,11 @@ export const VADOptions: MessageFns<VADOptions> = {
 
   fromJSON(object: any): VADOptions {
     return {
-      threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
+      activationThreshold: isSet(object.activationThreshold)
+        ? globalThis.Number(object.activationThreshold)
+        : isSet(object.activation_threshold)
+        ? globalThis.Number(object.activation_threshold)
+        : 0,
       minSpeechDurationMs: isSet(object.minSpeechDurationMs)
         ? globalThis.Number(object.minSpeechDurationMs)
         : isSet(object.min_speech_duration_ms)
@@ -830,6 +849,11 @@ export const VADOptions: MessageFns<VADOptions> = {
         : isSet(object.max_speech_duration_ms)
         ? globalThis.Number(object.max_speech_duration_ms)
         : 0,
+      prefixPaddingMs: isSet(object.prefixPaddingMs)
+        ? globalThis.Number(object.prefixPaddingMs)
+        : isSet(object.prefix_padding_ms)
+        ? globalThis.Number(object.prefix_padding_ms)
+        : 0,
       includeStatistics: isSet(object.includeStatistics)
         ? globalThis.Boolean(object.includeStatistics)
         : isSet(object.include_statistics)
@@ -840,8 +864,8 @@ export const VADOptions: MessageFns<VADOptions> = {
 
   toJSON(message: VADOptions): unknown {
     const obj: any = {};
-    if (message.threshold !== 0) {
-      obj.threshold = message.threshold;
+    if (message.activationThreshold !== 0) {
+      obj.activationThreshold = message.activationThreshold;
     }
     if (message.minSpeechDurationMs !== 0) {
       obj.minSpeechDurationMs = Math.round(message.minSpeechDurationMs);
@@ -851,6 +875,9 @@ export const VADOptions: MessageFns<VADOptions> = {
     }
     if (message.maxSpeechDurationMs !== 0) {
       obj.maxSpeechDurationMs = Math.round(message.maxSpeechDurationMs);
+    }
+    if (message.prefixPaddingMs !== 0) {
+      obj.prefixPaddingMs = Math.round(message.prefixPaddingMs);
     }
     if (message.includeStatistics !== false) {
       obj.includeStatistics = message.includeStatistics;
@@ -863,10 +890,11 @@ export const VADOptions: MessageFns<VADOptions> = {
   },
   fromPartial<I extends Exact<DeepPartial<VADOptions>, I>>(object: I): VADOptions {
     const message = createBaseVADOptions();
-    message.threshold = object.threshold ?? 0;
+    message.activationThreshold = object.activationThreshold ?? 0;
     message.minSpeechDurationMs = object.minSpeechDurationMs ?? 0;
     message.minSilenceDurationMs = object.minSilenceDurationMs ?? 0;
     message.maxSpeechDurationMs = object.maxSpeechDurationMs ?? 0;
+    message.prefixPaddingMs = object.prefixPaddingMs ?? 0;
     message.includeStatistics = object.includeStatistics ?? false;
     return message;
   },

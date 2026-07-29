@@ -144,7 +144,7 @@ export function tTSStreamEventKindToJSON(object: TTSStreamEventKind): string {
  * Defaults (for documentation; proto3 zero-values apply on the wire):
  *   voice              = "default"  (Kotlin) / "com.apple.ttsbundle..." (Swift)
  *   language_code      = "en-US"
- *   speaking_rate      = 1.0   (range 0.5 – 2.0)
+ *   speed              = 1.0   (range 0.5 – 2.0)
  *   pitch              = 1.0   (range 0.5 – 2.0)
  *   volume             = 1.0   (range 0.0 – 1.0)
  *   audio_format       = AUDIO_FORMAT_PCM
@@ -160,35 +160,17 @@ export interface TTSConfiguration {
    * require a model file.
    */
   modelId: string;
-  /**
-   * Voice identifier to use for synthesis. For platform engines this is the
-   * engine-specific voice id (e.g. "com.apple.ttsbundle.siri_female_en-US_compact").
-   */
-  voice: string;
-  /** Language for synthesis (BCP-47, e.g. "en-US"). */
-  languageCode: string;
-  /** Speaking rate (0.5 – 2.0; 1.0 is normal). */
-  speakingRate: number;
-  /** Speech pitch (0.5 – 2.0; 1.0 is normal). */
-  pitch: number;
-  /** Speech volume (0.0 – 1.0). */
-  volume: number;
-  /** Output audio format. */
-  audioFormat: AudioFormat;
-  /**
-   * Sample rate for output audio in Hz. 0 = engine default
-   * (RAC_TTS_DEFAULT_SAMPLE_RATE = 22050).
-   */
-  sampleRate: number;
   /** Whether to use neural / premium voice if available. */
   enableNeuralVoice: boolean;
-  /** Whether to enable SSML markup support. */
-  enableSsml: boolean;
+  /** Preferred framework for the component. Absent = auto. */
+  preferredFramework?:
+    | InferenceFramework
+    | undefined;
   /**
-   * Preferred framework for the component. Absent = auto. Mirrors the C
-   * ABI rac_tts_config_t preferred_framework field.
+   * Component-level defaults applied when a per-call TTSOptions is absent
+   * or leaves a field unset.
    */
-  preferredFramework?: InferenceFramework | undefined;
+  defaultOptions?: TTSOptions | undefined;
 }
 
 /**
@@ -209,12 +191,11 @@ export interface TTSOptions {
   /** Language override (BCP-47). Empty = use component default. */
   languageCode: string;
   /**
-   * Speech rate (0.0 – 2.0; 1.0 is normal). Note Swift/Kotlin use the name
-   * `rate`, Dart uses `rate`, RN uses `rate`. C ABI field is `rate`. We
-   * canonicalize on `speaking_rate` to match TTSConfiguration; bindings
-   * alias to `rate` where appropriate.
+   * Speech speed multiplier (1.0 = normal). Industry name (OpenAI
+   * /audio/speech `speed`); replaces the rate/speaking_rate/speakingRate
+   * split across the C ABI and SDKs.
    */
-  speakingRate: number;
+  speed: number;
   /** Speech pitch (0.5 – 2.0; 1.0 is normal). */
   pitch: number;
   /** Speech volume (0.0 – 1.0). */
@@ -455,19 +436,7 @@ export interface TTSServiceState {
 }
 
 function createBaseTTSConfiguration(): TTSConfiguration {
-  return {
-    modelId: "",
-    voice: "",
-    languageCode: "",
-    speakingRate: 0,
-    pitch: 0,
-    volume: 0,
-    audioFormat: 0,
-    sampleRate: 0,
-    enableNeuralVoice: false,
-    enableSsml: false,
-    preferredFramework: undefined,
-  };
+  return { modelId: "", enableNeuralVoice: false, preferredFramework: undefined, defaultOptions: undefined };
 }
 
 export const TTSConfiguration: MessageFns<TTSConfiguration> = {
@@ -475,35 +444,14 @@ export const TTSConfiguration: MessageFns<TTSConfiguration> = {
     if (message.modelId !== "") {
       writer.uint32(10).string(message.modelId);
     }
-    if (message.voice !== "") {
-      writer.uint32(18).string(message.voice);
-    }
-    if (message.languageCode !== "") {
-      writer.uint32(26).string(message.languageCode);
-    }
-    if (message.speakingRate !== 0) {
-      writer.uint32(37).float(message.speakingRate);
-    }
-    if (message.pitch !== 0) {
-      writer.uint32(45).float(message.pitch);
-    }
-    if (message.volume !== 0) {
-      writer.uint32(53).float(message.volume);
-    }
-    if (message.audioFormat !== 0) {
-      writer.uint32(56).int32(message.audioFormat);
-    }
-    if (message.sampleRate !== 0) {
-      writer.uint32(64).int32(message.sampleRate);
-    }
     if (message.enableNeuralVoice !== false) {
       writer.uint32(72).bool(message.enableNeuralVoice);
     }
-    if (message.enableSsml !== false) {
-      writer.uint32(80).bool(message.enableSsml);
-    }
     if (message.preferredFramework !== undefined) {
       writer.uint32(88).int32(message.preferredFramework);
+    }
+    if (message.defaultOptions !== undefined) {
+      TTSOptions.encode(message.defaultOptions, writer.uint32(98).fork()).join();
     }
     return writer;
   },
@@ -523,62 +471,6 @@ export const TTSConfiguration: MessageFns<TTSConfiguration> = {
           message.modelId = reader.string();
           continue;
         }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.voice = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.languageCode = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 37) {
-            break;
-          }
-
-          message.speakingRate = reader.float();
-          continue;
-        }
-        case 5: {
-          if (tag !== 45) {
-            break;
-          }
-
-          message.pitch = reader.float();
-          continue;
-        }
-        case 6: {
-          if (tag !== 53) {
-            break;
-          }
-
-          message.volume = reader.float();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.audioFormat = reader.int32() as any;
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.sampleRate = reader.int32();
-          continue;
-        }
         case 9: {
           if (tag !== 72) {
             break;
@@ -587,20 +479,20 @@ export const TTSConfiguration: MessageFns<TTSConfiguration> = {
           message.enableNeuralVoice = reader.bool();
           continue;
         }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.enableSsml = reader.bool();
-          continue;
-        }
         case 11: {
           if (tag !== 88) {
             break;
           }
 
           message.preferredFramework = reader.int32() as any;
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.defaultOptions = TTSOptions.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -619,43 +511,20 @@ export const TTSConfiguration: MessageFns<TTSConfiguration> = {
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : "",
-      voice: isSet(object.voice) ? globalThis.String(object.voice) : "",
-      languageCode: isSet(object.languageCode)
-        ? globalThis.String(object.languageCode)
-        : isSet(object.language_code)
-        ? globalThis.String(object.language_code)
-        : "",
-      speakingRate: isSet(object.speakingRate)
-        ? globalThis.Number(object.speakingRate)
-        : isSet(object.speaking_rate)
-        ? globalThis.Number(object.speaking_rate)
-        : 0,
-      pitch: isSet(object.pitch) ? globalThis.Number(object.pitch) : 0,
-      volume: isSet(object.volume) ? globalThis.Number(object.volume) : 0,
-      audioFormat: isSet(object.audioFormat)
-        ? audioFormatFromJSON(object.audioFormat)
-        : isSet(object.audio_format)
-        ? audioFormatFromJSON(object.audio_format)
-        : 0,
-      sampleRate: isSet(object.sampleRate)
-        ? globalThis.Number(object.sampleRate)
-        : isSet(object.sample_rate)
-        ? globalThis.Number(object.sample_rate)
-        : 0,
       enableNeuralVoice: isSet(object.enableNeuralVoice)
         ? globalThis.Boolean(object.enableNeuralVoice)
         : isSet(object.enable_neural_voice)
         ? globalThis.Boolean(object.enable_neural_voice)
         : false,
-      enableSsml: isSet(object.enableSsml)
-        ? globalThis.Boolean(object.enableSsml)
-        : isSet(object.enable_ssml)
-        ? globalThis.Boolean(object.enable_ssml)
-        : false,
       preferredFramework: isSet(object.preferredFramework)
         ? inferenceFrameworkFromJSON(object.preferredFramework)
         : isSet(object.preferred_framework)
         ? inferenceFrameworkFromJSON(object.preferred_framework)
+        : undefined,
+      defaultOptions: isSet(object.defaultOptions)
+        ? TTSOptions.fromJSON(object.defaultOptions)
+        : isSet(object.default_options)
+        ? TTSOptions.fromJSON(object.default_options)
         : undefined,
     };
   },
@@ -665,35 +534,14 @@ export const TTSConfiguration: MessageFns<TTSConfiguration> = {
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
-    if (message.voice !== "") {
-      obj.voice = message.voice;
-    }
-    if (message.languageCode !== "") {
-      obj.languageCode = message.languageCode;
-    }
-    if (message.speakingRate !== 0) {
-      obj.speakingRate = message.speakingRate;
-    }
-    if (message.pitch !== 0) {
-      obj.pitch = message.pitch;
-    }
-    if (message.volume !== 0) {
-      obj.volume = message.volume;
-    }
-    if (message.audioFormat !== 0) {
-      obj.audioFormat = audioFormatToJSON(message.audioFormat);
-    }
-    if (message.sampleRate !== 0) {
-      obj.sampleRate = Math.round(message.sampleRate);
-    }
     if (message.enableNeuralVoice !== false) {
       obj.enableNeuralVoice = message.enableNeuralVoice;
     }
-    if (message.enableSsml !== false) {
-      obj.enableSsml = message.enableSsml;
-    }
     if (message.preferredFramework !== undefined) {
       obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+    }
+    if (message.defaultOptions !== undefined) {
+      obj.defaultOptions = TTSOptions.toJSON(message.defaultOptions);
     }
     return obj;
   },
@@ -704,16 +552,11 @@ export const TTSConfiguration: MessageFns<TTSConfiguration> = {
   fromPartial<I extends Exact<DeepPartial<TTSConfiguration>, I>>(object: I): TTSConfiguration {
     const message = createBaseTTSConfiguration();
     message.modelId = object.modelId ?? "";
-    message.voice = object.voice ?? "";
-    message.languageCode = object.languageCode ?? "";
-    message.speakingRate = object.speakingRate ?? 0;
-    message.pitch = object.pitch ?? 0;
-    message.volume = object.volume ?? 0;
-    message.audioFormat = object.audioFormat ?? 0;
-    message.sampleRate = object.sampleRate ?? 0;
     message.enableNeuralVoice = object.enableNeuralVoice ?? false;
-    message.enableSsml = object.enableSsml ?? false;
     message.preferredFramework = object.preferredFramework ?? undefined;
+    message.defaultOptions = (object.defaultOptions !== undefined && object.defaultOptions !== null)
+      ? TTSOptions.fromPartial(object.defaultOptions)
+      : undefined;
     return message;
   },
 };
@@ -722,7 +565,7 @@ function createBaseTTSOptions(): TTSOptions {
   return {
     voice: "",
     languageCode: "",
-    speakingRate: 0,
+    speed: 0,
     pitch: 0,
     volume: 0,
     enableSsml: false,
@@ -741,8 +584,8 @@ export const TTSOptions: MessageFns<TTSOptions> = {
     if (message.languageCode !== "") {
       writer.uint32(18).string(message.languageCode);
     }
-    if (message.speakingRate !== 0) {
-      writer.uint32(29).float(message.speakingRate);
+    if (message.speed !== 0) {
+      writer.uint32(29).float(message.speed);
     }
     if (message.pitch !== 0) {
       writer.uint32(37).float(message.pitch);
@@ -796,7 +639,7 @@ export const TTSOptions: MessageFns<TTSOptions> = {
             break;
           }
 
-          message.speakingRate = reader.float();
+          message.speed = reader.float();
           continue;
         }
         case 4: {
@@ -872,11 +715,7 @@ export const TTSOptions: MessageFns<TTSOptions> = {
         : isSet(object.language_code)
         ? globalThis.String(object.language_code)
         : "",
-      speakingRate: isSet(object.speakingRate)
-        ? globalThis.Number(object.speakingRate)
-        : isSet(object.speaking_rate)
-        ? globalThis.Number(object.speaking_rate)
-        : 0,
+      speed: isSet(object.speed) ? globalThis.Number(object.speed) : 0,
       pitch: isSet(object.pitch) ? globalThis.Number(object.pitch) : 0,
       volume: isSet(object.volume) ? globalThis.Number(object.volume) : 0,
       enableSsml: isSet(object.enableSsml)
@@ -911,8 +750,8 @@ export const TTSOptions: MessageFns<TTSOptions> = {
     if (message.languageCode !== "") {
       obj.languageCode = message.languageCode;
     }
-    if (message.speakingRate !== 0) {
-      obj.speakingRate = message.speakingRate;
+    if (message.speed !== 0) {
+      obj.speed = message.speed;
     }
     if (message.pitch !== 0) {
       obj.pitch = message.pitch;
@@ -945,7 +784,7 @@ export const TTSOptions: MessageFns<TTSOptions> = {
     const message = createBaseTTSOptions();
     message.voice = object.voice ?? "";
     message.languageCode = object.languageCode ?? "";
-    message.speakingRate = object.speakingRate ?? 0;
+    message.speed = object.speed ?? 0;
     message.pitch = object.pitch ?? 0;
     message.volume = object.volume ?? 0;
     message.enableSsml = object.enableSsml ?? false;

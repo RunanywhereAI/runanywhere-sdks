@@ -23,6 +23,7 @@ export interface RerankOptions {
   /**
    * When > 0, only the top_n highest-scoring candidates are returned (every
    * candidate is still scored). 0 = return all candidates, ranked.
+   * Industry name (Cohere rerank `top_n`).
    */
   topN: number;
 }
@@ -37,12 +38,16 @@ export interface RerankScoredItem {
   /** Echo of RerankCandidate.id for correlation. */
   id: string;
   /**
-   * Raw relevance score from the reranker (higher = more relevant). Not
+   * Relevance score from the reranker (higher = more relevant). Not
    * normalized to a fixed range; comparable only within one result set.
+   * Industry name (Cohere/Voyage `relevance_score`).
    */
-  score: number;
-  /** Index of this candidate in the original RerankRequest.candidates list. */
-  originalIndex: number;
+  relevanceScore: number;
+  /**
+   * Index of this candidate in the original RerankRequest.candidates list.
+   * Industry name (`index`).
+   */
+  index: number;
   /** 0-based position after sorting by score descending (0 = most relevant). */
   rank: number;
 }
@@ -294,7 +299,7 @@ export const RerankRequest: MessageFns<RerankRequest> = {
 };
 
 function createBaseRerankScoredItem(): RerankScoredItem {
-  return { id: "", score: 0, originalIndex: 0, rank: 0 };
+  return { id: "", relevanceScore: 0, index: 0, rank: 0 };
 }
 
 export const RerankScoredItem: MessageFns<RerankScoredItem> = {
@@ -302,11 +307,11 @@ export const RerankScoredItem: MessageFns<RerankScoredItem> = {
     if (message.id !== "") {
       writer.uint32(10).string(message.id);
     }
-    if (message.score !== 0) {
-      writer.uint32(21).float(message.score);
+    if (message.relevanceScore !== 0) {
+      writer.uint32(21).float(message.relevanceScore);
     }
-    if (message.originalIndex !== 0) {
-      writer.uint32(24).uint32(message.originalIndex);
+    if (message.index !== 0) {
+      writer.uint32(24).uint32(message.index);
     }
     if (message.rank !== 0) {
       writer.uint32(32).uint32(message.rank);
@@ -334,7 +339,7 @@ export const RerankScoredItem: MessageFns<RerankScoredItem> = {
             break;
           }
 
-          message.score = reader.float();
+          message.relevanceScore = reader.float();
           continue;
         }
         case 3: {
@@ -342,7 +347,7 @@ export const RerankScoredItem: MessageFns<RerankScoredItem> = {
             break;
           }
 
-          message.originalIndex = reader.uint32();
+          message.index = reader.uint32();
           continue;
         }
         case 4: {
@@ -365,12 +370,12 @@ export const RerankScoredItem: MessageFns<RerankScoredItem> = {
   fromJSON(object: any): RerankScoredItem {
     return {
       id: isSet(object.id) ? globalThis.String(object.id) : "",
-      score: isSet(object.score) ? globalThis.Number(object.score) : 0,
-      originalIndex: isSet(object.originalIndex)
-        ? globalThis.Number(object.originalIndex)
-        : isSet(object.original_index)
-        ? globalThis.Number(object.original_index)
+      relevanceScore: isSet(object.relevanceScore)
+        ? globalThis.Number(object.relevanceScore)
+        : isSet(object.relevance_score)
+        ? globalThis.Number(object.relevance_score)
         : 0,
+      index: isSet(object.index) ? globalThis.Number(object.index) : 0,
       rank: isSet(object.rank) ? globalThis.Number(object.rank) : 0,
     };
   },
@@ -380,11 +385,11 @@ export const RerankScoredItem: MessageFns<RerankScoredItem> = {
     if (message.id !== "") {
       obj.id = message.id;
     }
-    if (message.score !== 0) {
-      obj.score = message.score;
+    if (message.relevanceScore !== 0) {
+      obj.relevanceScore = message.relevanceScore;
     }
-    if (message.originalIndex !== 0) {
-      obj.originalIndex = Math.round(message.originalIndex);
+    if (message.index !== 0) {
+      obj.index = Math.round(message.index);
     }
     if (message.rank !== 0) {
       obj.rank = Math.round(message.rank);
@@ -398,8 +403,8 @@ export const RerankScoredItem: MessageFns<RerankScoredItem> = {
   fromPartial<I extends Exact<DeepPartial<RerankScoredItem>, I>>(object: I): RerankScoredItem {
     const message = createBaseRerankScoredItem();
     message.id = object.id ?? "";
-    message.score = object.score ?? 0;
-    message.originalIndex = object.originalIndex ?? 0;
+    message.relevanceScore = object.relevanceScore ?? 0;
+    message.index = object.index ?? 0;
     message.rank = object.rank ?? 0;
     return message;
   },

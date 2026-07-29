@@ -8,7 +8,9 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { EventCategory, eventCategoryFromJSON, eventCategoryToJSON } from "./component_types";
 import { ErrorSeverity, errorSeverityFromJSON, errorSeverityToJSON } from "./errors";
+import { LLMGenerationOptions } from "./llm_options";
 import { TTSOptions } from "./tts_options";
+import { VADConfiguration } from "./vad_options";
 import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON, VoiceAgentComponentStates } from "./voice_events";
 
 export const protobufPackage = "runanywhere.v1";
@@ -210,19 +212,17 @@ export interface VoiceAgentComposeConfig {
    */
   ttsVoicePath?: string | undefined;
   ttsVoiceId?: string | undefined;
-  ttsVoiceName?:
-    | string
+  ttsVoiceName?: string | undefined;
+  vadConfig?:
+    | VADConfiguration
     | undefined;
   /**
-   * -------------------------------------------------------------------
-   * VAD sub-config (mirrors rac_voice_agent_vad_config_t).
-   * -------------------------------------------------------------------
+   * LLM generation knobs for the response model (sampling, system prompt,
+   * reasoning). Unset = voice-agent defaults from the generated pool.
    */
-  vadSampleRate: number;
-  /** default 0.1 */
-  vadFrameLength: number;
-  /** default 0.005 */
-  vadEnergyThreshold: number;
+  llmGeneration?:
+    | LLMGenerationOptions
+    | undefined;
   /**
    * -------------------------------------------------------------------
    * Session-behavior sub-config. Optional so the C ABI can be invoked
@@ -1491,9 +1491,8 @@ function createBaseVoiceAgentComposeConfig(): VoiceAgentComposeConfig {
     ttsVoicePath: undefined,
     ttsVoiceId: undefined,
     ttsVoiceName: undefined,
-    vadSampleRate: 0,
-    vadFrameLength: 0,
-    vadEnergyThreshold: 0,
+    vadConfig: undefined,
+    llmGeneration: undefined,
     sessionConfig: undefined,
     audioPipelineConfig: undefined,
     sessionId: undefined,
@@ -1530,14 +1529,11 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
     if (message.ttsVoiceName !== undefined) {
       writer.uint32(74).string(message.ttsVoiceName);
     }
-    if (message.vadSampleRate !== 0) {
-      writer.uint32(80).int32(message.vadSampleRate);
+    if (message.vadConfig !== undefined) {
+      VADConfiguration.encode(message.vadConfig, writer.uint32(194).fork()).join();
     }
-    if (message.vadFrameLength !== 0) {
-      writer.uint32(93).float(message.vadFrameLength);
-    }
-    if (message.vadEnergyThreshold !== 0) {
-      writer.uint32(101).float(message.vadEnergyThreshold);
+    if (message.llmGeneration !== undefined) {
+      LLMGenerationOptions.encode(message.llmGeneration, writer.uint32(202).fork()).join();
     }
     if (message.sessionConfig !== undefined) {
       VoiceSessionConfig.encode(message.sessionConfig, writer.uint32(162).fork()).join();
@@ -1633,28 +1629,20 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
           message.ttsVoiceName = reader.string();
           continue;
         }
-        case 10: {
-          if (tag !== 80) {
+        case 24: {
+          if (tag !== 194) {
             break;
           }
 
-          message.vadSampleRate = reader.int32();
+          message.vadConfig = VADConfiguration.decode(reader, reader.uint32());
           continue;
         }
-        case 11: {
-          if (tag !== 93) {
+        case 25: {
+          if (tag !== 202) {
             break;
           }
 
-          message.vadFrameLength = reader.float();
-          continue;
-        }
-        case 12: {
-          if (tag !== 101) {
-            break;
-          }
-
-          message.vadEnergyThreshold = reader.float();
+          message.llmGeneration = LLMGenerationOptions.decode(reader, reader.uint32());
           continue;
         }
         case 20: {
@@ -1745,21 +1733,16 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
         : isSet(object.tts_voice_name)
         ? globalThis.String(object.tts_voice_name)
         : undefined,
-      vadSampleRate: isSet(object.vadSampleRate)
-        ? globalThis.Number(object.vadSampleRate)
-        : isSet(object.vad_sample_rate)
-        ? globalThis.Number(object.vad_sample_rate)
-        : 0,
-      vadFrameLength: isSet(object.vadFrameLength)
-        ? globalThis.Number(object.vadFrameLength)
-        : isSet(object.vad_frame_length)
-        ? globalThis.Number(object.vad_frame_length)
-        : 0,
-      vadEnergyThreshold: isSet(object.vadEnergyThreshold)
-        ? globalThis.Number(object.vadEnergyThreshold)
-        : isSet(object.vad_energy_threshold)
-        ? globalThis.Number(object.vad_energy_threshold)
-        : 0,
+      vadConfig: isSet(object.vadConfig)
+        ? VADConfiguration.fromJSON(object.vadConfig)
+        : isSet(object.vad_config)
+        ? VADConfiguration.fromJSON(object.vad_config)
+        : undefined,
+      llmGeneration: isSet(object.llmGeneration)
+        ? LLMGenerationOptions.fromJSON(object.llmGeneration)
+        : isSet(object.llm_generation)
+        ? LLMGenerationOptions.fromJSON(object.llm_generation)
+        : undefined,
       sessionConfig: isSet(object.sessionConfig)
         ? VoiceSessionConfig.fromJSON(object.sessionConfig)
         : isSet(object.session_config)
@@ -1812,14 +1795,11 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
     if (message.ttsVoiceName !== undefined) {
       obj.ttsVoiceName = message.ttsVoiceName;
     }
-    if (message.vadSampleRate !== 0) {
-      obj.vadSampleRate = Math.round(message.vadSampleRate);
+    if (message.vadConfig !== undefined) {
+      obj.vadConfig = VADConfiguration.toJSON(message.vadConfig);
     }
-    if (message.vadFrameLength !== 0) {
-      obj.vadFrameLength = message.vadFrameLength;
-    }
-    if (message.vadEnergyThreshold !== 0) {
-      obj.vadEnergyThreshold = message.vadEnergyThreshold;
+    if (message.llmGeneration !== undefined) {
+      obj.llmGeneration = LLMGenerationOptions.toJSON(message.llmGeneration);
     }
     if (message.sessionConfig !== undefined) {
       obj.sessionConfig = VoiceSessionConfig.toJSON(message.sessionConfig);
@@ -1850,9 +1830,12 @@ export const VoiceAgentComposeConfig: MessageFns<VoiceAgentComposeConfig> = {
     message.ttsVoicePath = object.ttsVoicePath ?? undefined;
     message.ttsVoiceId = object.ttsVoiceId ?? undefined;
     message.ttsVoiceName = object.ttsVoiceName ?? undefined;
-    message.vadSampleRate = object.vadSampleRate ?? 0;
-    message.vadFrameLength = object.vadFrameLength ?? 0;
-    message.vadEnergyThreshold = object.vadEnergyThreshold ?? 0;
+    message.vadConfig = (object.vadConfig !== undefined && object.vadConfig !== null)
+      ? VADConfiguration.fromPartial(object.vadConfig)
+      : undefined;
+    message.llmGeneration = (object.llmGeneration !== undefined && object.llmGeneration !== null)
+      ? LLMGenerationOptions.fromPartial(object.llmGeneration)
+      : undefined;
     message.sessionConfig = (object.sessionConfig !== undefined && object.sessionConfig !== null)
       ? VoiceSessionConfig.fromPartial(object.sessionConfig)
       : undefined;

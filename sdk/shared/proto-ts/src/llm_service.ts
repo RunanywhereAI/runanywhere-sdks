@@ -8,7 +8,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ChatMessage } from "./chat";
 import { LLMGenerationOptions } from "./llm_options";
-import { ToolCall, ToolResult } from "./tool_calling";
+import { ToolCall, ToolCallingResult, ToolResult } from "./tool_calling";
 import { TokenKind, tokenKindFromJSON, tokenKindToJSON } from "./voice_events";
 
 export const protobufPackage = "runanywhere.v1";
@@ -88,8 +88,6 @@ export function lLMStreamEventKindToJSON(object: LLMStreamEventKind): string {
  */
 export interface LLMGenerateRequest {
   prompt: string;
-  /** chain-of-thought tokens emit as TokenKind.THOUGHT */
-  emitThoughts: boolean;
   requestId: string;
   modelId: string;
   conversationId: string;
@@ -125,8 +123,8 @@ export interface LLMGenerateRequest_MetadataEntry {
 export interface LLMStreamFinalResult {
   text: string;
   thinkingContent?: string | undefined;
-  promptTokens: number;
-  completionTokens: number;
+  inputTokens: number;
+  outputTokens: number;
   totalTokens: number;
   totalTimeMs: number;
   timeToFirstTokenMs: number;
@@ -221,26 +219,77 @@ export interface LLMStreamEvent {
   toolCall?: ToolCall | undefined;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * Tool-calling session / run-loop envelopes. They live here (not in
+ * tool_calling.proto) because they carry an LLMGenerationOptions and
+ * llm_options.proto already imports tool_calling.proto — the reverse import
+ * would be a cycle. Moving them ended the inline re-declaration of sampling
+ * knobs the old ToolCallingSessionCreateRequest carried.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolCallingSessionCreateRequest {
+  /** The live user turn. */
+  prompt: string;
+  /**
+   * Sampling, reasoning, system prompt — the same canonical knobs as any
+   * other generation. tools/tool_choice policy travels in
+   * generation.tool_calling.
+   */
+  generation?:
+    | LLMGenerationOptions
+    | undefined;
+  /**
+   * proto3 `optional` enables presence detection. When unset, commons
+   * defaults to validate_calls=true so unknown tool calls short-circuit
+   * before host execution. Callers that delegate validation to their
+   * executor must explicitly set false.
+   */
+  validateCalls?:
+    | boolean
+    | undefined;
+  /**
+   * Prior conversation turns (excluding `prompt`), same contract as
+   * LLMGenerateRequest.history.
+   */
+  history: ChatMessage[];
+}
+
+export interface ToolCallingSessionCreateResult {
+  sessionHandle: number;
+}
+
+export interface ToolCallingSessionEvent {
+  /** serialized LLMStreamEvent proto */
+  llmStreamEventBytes?: Uint8Array | undefined;
+  toolCall?: ToolCall | undefined;
+  finalResult?:
+    | ToolCallingResult
+    | undefined;
+  /** serialized SDKError proto */
+  errorBytes?: Uint8Array | undefined;
+  seq: number;
+}
+
+export interface ToolCallingSessionStepWithResultRequest {
+  sessionHandle: number;
+  toolCallId: string;
+  resultJson: string;
+  error?: string | undefined;
+}
+
+export interface ToolCallingSessionDestroyRequest {
+  sessionHandle: number;
+}
+
 function createBaseLLMGenerateRequest(): LLMGenerateRequest {
-  return {
-    prompt: "",
-    emitThoughts: false,
-    requestId: "",
-    modelId: "",
-    conversationId: "",
-    metadata: {},
-    options: undefined,
-    history: [],
-  };
+  return { prompt: "", requestId: "", modelId: "", conversationId: "", metadata: {}, options: undefined, history: [] };
 }
 
 export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
   encode(message: LLMGenerateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.prompt !== "") {
       writer.uint32(10).string(message.prompt);
-    }
-    if (message.emitThoughts !== false) {
-      writer.uint32(56).bool(message.emitThoughts);
     }
     if (message.requestId !== "") {
       writer.uint32(114).string(message.requestId);
@@ -276,14 +325,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
           }
 
           message.prompt = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.emitThoughts = reader.bool();
           continue;
         }
         case 14: {
@@ -349,11 +390,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
   fromJSON(object: any): LLMGenerateRequest {
     return {
       prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
-      emitThoughts: isSet(object.emitThoughts)
-        ? globalThis.Boolean(object.emitThoughts)
-        : isSet(object.emit_thoughts)
-        ? globalThis.Boolean(object.emit_thoughts)
-        : false,
       requestId: isSet(object.requestId)
         ? globalThis.String(object.requestId)
         : isSet(object.request_id)
@@ -390,9 +426,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
     if (message.prompt !== "") {
       obj.prompt = message.prompt;
     }
-    if (message.emitThoughts !== false) {
-      obj.emitThoughts = message.emitThoughts;
-    }
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
     }
@@ -426,7 +459,6 @@ export const LLMGenerateRequest: MessageFns<LLMGenerateRequest> = {
   fromPartial<I extends Exact<DeepPartial<LLMGenerateRequest>, I>>(object: I): LLMGenerateRequest {
     const message = createBaseLLMGenerateRequest();
     message.prompt = object.prompt ?? "";
-    message.emitThoughts = object.emitThoughts ?? false;
     message.requestId = object.requestId ?? "";
     message.modelId = object.modelId ?? "";
     message.conversationId = object.conversationId ?? "";
@@ -531,8 +563,8 @@ function createBaseLLMStreamFinalResult(): LLMStreamFinalResult {
   return {
     text: "",
     thinkingContent: undefined,
-    promptTokens: 0,
-    completionTokens: 0,
+    inputTokens: 0,
+    outputTokens: 0,
     totalTokens: 0,
     totalTimeMs: 0,
     timeToFirstTokenMs: 0,
@@ -555,11 +587,11 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
     if (message.thinkingContent !== undefined) {
       writer.uint32(18).string(message.thinkingContent);
     }
-    if (message.promptTokens !== 0) {
-      writer.uint32(24).int32(message.promptTokens);
+    if (message.inputTokens !== 0) {
+      writer.uint32(24).int32(message.inputTokens);
     }
-    if (message.completionTokens !== 0) {
-      writer.uint32(32).int32(message.completionTokens);
+    if (message.outputTokens !== 0) {
+      writer.uint32(32).int32(message.outputTokens);
     }
     if (message.totalTokens !== 0) {
       writer.uint32(40).int32(message.totalTokens);
@@ -625,7 +657,7 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
             break;
           }
 
-          message.promptTokens = reader.int32();
+          message.inputTokens = reader.int32();
           continue;
         }
         case 4: {
@@ -633,7 +665,7 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
             break;
           }
 
-          message.completionTokens = reader.int32();
+          message.outputTokens = reader.int32();
           continue;
         }
         case 5: {
@@ -741,15 +773,15 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
         : isSet(object.thinking_content)
         ? globalThis.String(object.thinking_content)
         : undefined,
-      promptTokens: isSet(object.promptTokens)
-        ? globalThis.Number(object.promptTokens)
-        : isSet(object.prompt_tokens)
-        ? globalThis.Number(object.prompt_tokens)
+      inputTokens: isSet(object.inputTokens)
+        ? globalThis.Number(object.inputTokens)
+        : isSet(object.input_tokens)
+        ? globalThis.Number(object.input_tokens)
         : 0,
-      completionTokens: isSet(object.completionTokens)
-        ? globalThis.Number(object.completionTokens)
-        : isSet(object.completion_tokens)
-        ? globalThis.Number(object.completion_tokens)
+      outputTokens: isSet(object.outputTokens)
+        ? globalThis.Number(object.outputTokens)
+        : isSet(object.output_tokens)
+        ? globalThis.Number(object.output_tokens)
         : 0,
       totalTokens: isSet(object.totalTokens)
         ? globalThis.Number(object.totalTokens)
@@ -817,11 +849,11 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
     if (message.thinkingContent !== undefined) {
       obj.thinkingContent = message.thinkingContent;
     }
-    if (message.promptTokens !== 0) {
-      obj.promptTokens = Math.round(message.promptTokens);
+    if (message.inputTokens !== 0) {
+      obj.inputTokens = Math.round(message.inputTokens);
     }
-    if (message.completionTokens !== 0) {
-      obj.completionTokens = Math.round(message.completionTokens);
+    if (message.outputTokens !== 0) {
+      obj.outputTokens = Math.round(message.outputTokens);
     }
     if (message.totalTokens !== 0) {
       obj.totalTokens = Math.round(message.totalTokens);
@@ -866,8 +898,8 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
     const message = createBaseLLMStreamFinalResult();
     message.text = object.text ?? "";
     message.thinkingContent = object.thinkingContent ?? undefined;
-    message.promptTokens = object.promptTokens ?? 0;
-    message.completionTokens = object.completionTokens ?? 0;
+    message.inputTokens = object.inputTokens ?? 0;
+    message.outputTokens = object.outputTokens ?? 0;
     message.totalTokens = object.totalTokens ?? 0;
     message.totalTimeMs = object.totalTimeMs ?? 0;
     message.timeToFirstTokenMs = object.timeToFirstTokenMs ?? 0;
@@ -1289,6 +1321,541 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     return message;
   },
 };
+
+function createBaseToolCallingSessionCreateRequest(): ToolCallingSessionCreateRequest {
+  return { prompt: "", generation: undefined, validateCalls: undefined, history: [] };
+}
+
+export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreateRequest> = {
+  encode(message: ToolCallingSessionCreateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.prompt !== "") {
+      writer.uint32(10).string(message.prompt);
+    }
+    if (message.generation !== undefined) {
+      LLMGenerationOptions.encode(message.generation, writer.uint32(18).fork()).join();
+    }
+    if (message.validateCalls !== undefined) {
+      writer.uint32(24).bool(message.validateCalls);
+    }
+    for (const v of message.history) {
+      ChatMessage.encode(v!, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionCreateRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingSessionCreateRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.prompt = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.generation = LLMGenerationOptions.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.validateCalls = reader.bool();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.history.push(ChatMessage.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingSessionCreateRequest {
+    return {
+      prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
+      generation: isSet(object.generation) ? LLMGenerationOptions.fromJSON(object.generation) : undefined,
+      validateCalls: isSet(object.validateCalls)
+        ? globalThis.Boolean(object.validateCalls)
+        : isSet(object.validate_calls)
+        ? globalThis.Boolean(object.validate_calls)
+        : undefined,
+      history: globalThis.Array.isArray(object?.history) ? object.history.map((e: any) => ChatMessage.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: ToolCallingSessionCreateRequest): unknown {
+    const obj: any = {};
+    if (message.prompt !== "") {
+      obj.prompt = message.prompt;
+    }
+    if (message.generation !== undefined) {
+      obj.generation = LLMGenerationOptions.toJSON(message.generation);
+    }
+    if (message.validateCalls !== undefined) {
+      obj.validateCalls = message.validateCalls;
+    }
+    if (message.history?.length) {
+      obj.history = message.history.map((e) => ChatMessage.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingSessionCreateRequest>, I>>(base?: I): ToolCallingSessionCreateRequest {
+    return ToolCallingSessionCreateRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateRequest>, I>>(
+    object: I,
+  ): ToolCallingSessionCreateRequest {
+    const message = createBaseToolCallingSessionCreateRequest();
+    message.prompt = object.prompt ?? "";
+    message.generation = (object.generation !== undefined && object.generation !== null)
+      ? LLMGenerationOptions.fromPartial(object.generation)
+      : undefined;
+    message.validateCalls = object.validateCalls ?? undefined;
+    message.history = object.history?.map((e) => ChatMessage.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseToolCallingSessionCreateResult(): ToolCallingSessionCreateResult {
+  return { sessionHandle: 0 };
+}
+
+export const ToolCallingSessionCreateResult: MessageFns<ToolCallingSessionCreateResult> = {
+  encode(message: ToolCallingSessionCreateResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionHandle !== 0) {
+      writer.uint32(8).uint64(message.sessionHandle);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionCreateResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingSessionCreateResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sessionHandle = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingSessionCreateResult {
+    return {
+      sessionHandle: isSet(object.sessionHandle)
+        ? globalThis.Number(object.sessionHandle)
+        : isSet(object.session_handle)
+        ? globalThis.Number(object.session_handle)
+        : 0,
+    };
+  },
+
+  toJSON(message: ToolCallingSessionCreateResult): unknown {
+    const obj: any = {};
+    if (message.sessionHandle !== 0) {
+      obj.sessionHandle = Math.round(message.sessionHandle);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(base?: I): ToolCallingSessionCreateResult {
+    return ToolCallingSessionCreateResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(
+    object: I,
+  ): ToolCallingSessionCreateResult {
+    const message = createBaseToolCallingSessionCreateResult();
+    message.sessionHandle = object.sessionHandle ?? 0;
+    return message;
+  },
+};
+
+function createBaseToolCallingSessionEvent(): ToolCallingSessionEvent {
+  return { llmStreamEventBytes: undefined, toolCall: undefined, finalResult: undefined, errorBytes: undefined, seq: 0 };
+}
+
+export const ToolCallingSessionEvent: MessageFns<ToolCallingSessionEvent> = {
+  encode(message: ToolCallingSessionEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.llmStreamEventBytes !== undefined) {
+      writer.uint32(10).bytes(message.llmStreamEventBytes);
+    }
+    if (message.toolCall !== undefined) {
+      ToolCall.encode(message.toolCall, writer.uint32(18).fork()).join();
+    }
+    if (message.finalResult !== undefined) {
+      ToolCallingResult.encode(message.finalResult, writer.uint32(26).fork()).join();
+    }
+    if (message.errorBytes !== undefined) {
+      writer.uint32(34).bytes(message.errorBytes);
+    }
+    if (message.seq !== 0) {
+      writer.uint32(40).uint64(message.seq);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingSessionEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.llmStreamEventBytes = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.toolCall = ToolCall.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.finalResult = ToolCallingResult.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.errorBytes = reader.bytes();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.seq = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingSessionEvent {
+    return {
+      llmStreamEventBytes: isSet(object.llmStreamEventBytes)
+        ? bytesFromBase64(object.llmStreamEventBytes)
+        : isSet(object.llm_stream_event_bytes)
+        ? bytesFromBase64(object.llm_stream_event_bytes)
+        : undefined,
+      toolCall: isSet(object.toolCall)
+        ? ToolCall.fromJSON(object.toolCall)
+        : isSet(object.tool_call)
+        ? ToolCall.fromJSON(object.tool_call)
+        : undefined,
+      finalResult: isSet(object.finalResult)
+        ? ToolCallingResult.fromJSON(object.finalResult)
+        : isSet(object.final_result)
+        ? ToolCallingResult.fromJSON(object.final_result)
+        : undefined,
+      errorBytes: isSet(object.errorBytes)
+        ? bytesFromBase64(object.errorBytes)
+        : isSet(object.error_bytes)
+        ? bytesFromBase64(object.error_bytes)
+        : undefined,
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
+    };
+  },
+
+  toJSON(message: ToolCallingSessionEvent): unknown {
+    const obj: any = {};
+    if (message.llmStreamEventBytes !== undefined) {
+      obj.llmStreamEventBytes = base64FromBytes(message.llmStreamEventBytes);
+    }
+    if (message.toolCall !== undefined) {
+      obj.toolCall = ToolCall.toJSON(message.toolCall);
+    }
+    if (message.finalResult !== undefined) {
+      obj.finalResult = ToolCallingResult.toJSON(message.finalResult);
+    }
+    if (message.errorBytes !== undefined) {
+      obj.errorBytes = base64FromBytes(message.errorBytes);
+    }
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingSessionEvent>, I>>(base?: I): ToolCallingSessionEvent {
+    return ToolCallingSessionEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionEvent>, I>>(object: I): ToolCallingSessionEvent {
+    const message = createBaseToolCallingSessionEvent();
+    message.llmStreamEventBytes = object.llmStreamEventBytes ?? undefined;
+    message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
+      ? ToolCall.fromPartial(object.toolCall)
+      : undefined;
+    message.finalResult = (object.finalResult !== undefined && object.finalResult !== null)
+      ? ToolCallingResult.fromPartial(object.finalResult)
+      : undefined;
+    message.errorBytes = object.errorBytes ?? undefined;
+    message.seq = object.seq ?? 0;
+    return message;
+  },
+};
+
+function createBaseToolCallingSessionStepWithResultRequest(): ToolCallingSessionStepWithResultRequest {
+  return { sessionHandle: 0, toolCallId: "", resultJson: "", error: undefined };
+}
+
+export const ToolCallingSessionStepWithResultRequest: MessageFns<ToolCallingSessionStepWithResultRequest> = {
+  encode(message: ToolCallingSessionStepWithResultRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionHandle !== 0) {
+      writer.uint32(8).uint64(message.sessionHandle);
+    }
+    if (message.toolCallId !== "") {
+      writer.uint32(18).string(message.toolCallId);
+    }
+    if (message.resultJson !== "") {
+      writer.uint32(26).string(message.resultJson);
+    }
+    if (message.error !== undefined) {
+      writer.uint32(34).string(message.error);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionStepWithResultRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingSessionStepWithResultRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sessionHandle = longToNumber(reader.uint64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.toolCallId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.resultJson = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.error = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingSessionStepWithResultRequest {
+    return {
+      sessionHandle: isSet(object.sessionHandle)
+        ? globalThis.Number(object.sessionHandle)
+        : isSet(object.session_handle)
+        ? globalThis.Number(object.session_handle)
+        : 0,
+      toolCallId: isSet(object.toolCallId)
+        ? globalThis.String(object.toolCallId)
+        : isSet(object.tool_call_id)
+        ? globalThis.String(object.tool_call_id)
+        : "",
+      resultJson: isSet(object.resultJson)
+        ? globalThis.String(object.resultJson)
+        : isSet(object.result_json)
+        ? globalThis.String(object.result_json)
+        : "",
+      error: isSet(object.error) ? globalThis.String(object.error) : undefined,
+    };
+  },
+
+  toJSON(message: ToolCallingSessionStepWithResultRequest): unknown {
+    const obj: any = {};
+    if (message.sessionHandle !== 0) {
+      obj.sessionHandle = Math.round(message.sessionHandle);
+    }
+    if (message.toolCallId !== "") {
+      obj.toolCallId = message.toolCallId;
+    }
+    if (message.resultJson !== "") {
+      obj.resultJson = message.resultJson;
+    }
+    if (message.error !== undefined) {
+      obj.error = message.error;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingSessionStepWithResultRequest>, I>>(
+    base?: I,
+  ): ToolCallingSessionStepWithResultRequest {
+    return ToolCallingSessionStepWithResultRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionStepWithResultRequest>, I>>(
+    object: I,
+  ): ToolCallingSessionStepWithResultRequest {
+    const message = createBaseToolCallingSessionStepWithResultRequest();
+    message.sessionHandle = object.sessionHandle ?? 0;
+    message.toolCallId = object.toolCallId ?? "";
+    message.resultJson = object.resultJson ?? "";
+    message.error = object.error ?? undefined;
+    return message;
+  },
+};
+
+function createBaseToolCallingSessionDestroyRequest(): ToolCallingSessionDestroyRequest {
+  return { sessionHandle: 0 };
+}
+
+export const ToolCallingSessionDestroyRequest: MessageFns<ToolCallingSessionDestroyRequest> = {
+  encode(message: ToolCallingSessionDestroyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionHandle !== 0) {
+      writer.uint32(8).uint64(message.sessionHandle);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionDestroyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingSessionDestroyRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sessionHandle = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingSessionDestroyRequest {
+    return {
+      sessionHandle: isSet(object.sessionHandle)
+        ? globalThis.Number(object.sessionHandle)
+        : isSet(object.session_handle)
+        ? globalThis.Number(object.session_handle)
+        : 0,
+    };
+  },
+
+  toJSON(message: ToolCallingSessionDestroyRequest): unknown {
+    const obj: any = {};
+    if (message.sessionHandle !== 0) {
+      obj.sessionHandle = Math.round(message.sessionHandle);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(
+    base?: I,
+  ): ToolCallingSessionDestroyRequest {
+    return ToolCallingSessionDestroyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(
+    object: I,
+  ): ToolCallingSessionDestroyRequest {
+    const message = createBaseToolCallingSessionDestroyRequest();
+    message.sessionHandle = object.sessionHandle ?? 0;
+    return message;
+  },
+};
+
+function bytesFromBase64(b64: string): Uint8Array {
+  const bin = globalThis.atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; ++i) {
+    arr[i] = bin.charCodeAt(i);
+  }
+  return arr;
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  const bin: string[] = [];
+  arr.forEach((byte) => {
+    bin.push(globalThis.String.fromCharCode(byte));
+  });
+  return globalThis.btoa(bin.join(""));
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 

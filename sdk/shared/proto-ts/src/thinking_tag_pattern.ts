@@ -11,6 +11,62 @@ export const protobufPackage = "runanywhere.v1";
 
 /**
  * ---------------------------------------------------------------------------
+ * The single home for reasoning/thinking control. Replaces the retired
+ * per-message toggles (LLMGenerationOptions.disable_thinking,
+ * ToolCallingOptions.disable_thinking, RAGQueryOptions.disable_thinking,
+ * ToolCallingSessionCreateRequest.disable_thinking,
+ * LLMGenerateRequest.emit_thoughts). Referenced from LLM and VLM generation
+ * options; every composed surface (tool calling, RAG, voice agent) inherits
+ * it through the embedded LLMGenerationOptions.
+ * ---------------------------------------------------------------------------
+ */
+export enum ReasoningMode {
+  /** REASONING_MODE_UNSPECIFIED - Model default: reasoning-capable models think, others don't. */
+  REASONING_MODE_UNSPECIFIED = 0,
+  /**
+   * REASONING_MODE_OFF - Suppress the thinking phase (commons applies the model's no-think
+   * directive at the prompt level).
+   */
+  REASONING_MODE_OFF = 1,
+  /** REASONING_MODE_ON - Request the thinking phase on models where it is optional. */
+  REASONING_MODE_ON = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function reasoningModeFromJSON(object: any): ReasoningMode {
+  switch (object) {
+    case 0:
+    case "REASONING_MODE_UNSPECIFIED":
+      return ReasoningMode.REASONING_MODE_UNSPECIFIED;
+    case 1:
+    case "REASONING_MODE_OFF":
+      return ReasoningMode.REASONING_MODE_OFF;
+    case 2:
+    case "REASONING_MODE_ON":
+      return ReasoningMode.REASONING_MODE_ON;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ReasoningMode.UNRECOGNIZED;
+  }
+}
+
+export function reasoningModeToJSON(object: ReasoningMode): string {
+  switch (object) {
+    case ReasoningMode.REASONING_MODE_UNSPECIFIED:
+      return "REASONING_MODE_UNSPECIFIED";
+    case ReasoningMode.REASONING_MODE_OFF:
+      return "REASONING_MODE_OFF";
+    case ReasoningMode.REASONING_MODE_ON:
+      return "REASONING_MODE_ON";
+    case ReasoningMode.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * ---------------------------------------------------------------------------
  * Pattern used to extract a model's "thinking" / reasoning block from its
  * raw output. Used by Qwen3 and LFM2 family models that emit
  * <think>...</think> wrappers. Shared by LLM generation options (per-call
@@ -22,6 +78,20 @@ export interface ThinkingTagPattern {
   openTag: string;
   /** Closing tag string. Default if empty: "</think>". */
   closeTag: string;
+}
+
+export interface ReasoningOptions {
+  mode: ReasoningMode;
+  /**
+   * Emit thought tokens/content to the caller (stream TokenKind.THOUGHT
+   * events and result thinking_content). False = thinking is stripped.
+   */
+  includeInOutput: boolean;
+  /**
+   * Tag override for models whose thinking markers differ from the
+   * catalog default.
+   */
+  pattern?: ThinkingTagPattern | undefined;
 }
 
 function createBaseThinkingTagPattern(): ThinkingTagPattern {
@@ -104,6 +174,104 @@ export const ThinkingTagPattern: MessageFns<ThinkingTagPattern> = {
     const message = createBaseThinkingTagPattern();
     message.openTag = object.openTag ?? "";
     message.closeTag = object.closeTag ?? "";
+    return message;
+  },
+};
+
+function createBaseReasoningOptions(): ReasoningOptions {
+  return { mode: 0, includeInOutput: false, pattern: undefined };
+}
+
+export const ReasoningOptions: MessageFns<ReasoningOptions> = {
+  encode(message: ReasoningOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.mode !== 0) {
+      writer.uint32(8).int32(message.mode);
+    }
+    if (message.includeInOutput !== false) {
+      writer.uint32(16).bool(message.includeInOutput);
+    }
+    if (message.pattern !== undefined) {
+      ThinkingTagPattern.encode(message.pattern, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ReasoningOptions {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseReasoningOptions();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.mode = reader.int32() as any;
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.includeInOutput = reader.bool();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.pattern = ThinkingTagPattern.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ReasoningOptions {
+    return {
+      mode: isSet(object.mode) ? reasoningModeFromJSON(object.mode) : 0,
+      includeInOutput: isSet(object.includeInOutput)
+        ? globalThis.Boolean(object.includeInOutput)
+        : isSet(object.include_in_output)
+        ? globalThis.Boolean(object.include_in_output)
+        : false,
+      pattern: isSet(object.pattern) ? ThinkingTagPattern.fromJSON(object.pattern) : undefined,
+    };
+  },
+
+  toJSON(message: ReasoningOptions): unknown {
+    const obj: any = {};
+    if (message.mode !== 0) {
+      obj.mode = reasoningModeToJSON(message.mode);
+    }
+    if (message.includeInOutput !== false) {
+      obj.includeInOutput = message.includeInOutput;
+    }
+    if (message.pattern !== undefined) {
+      obj.pattern = ThinkingTagPattern.toJSON(message.pattern);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ReasoningOptions>, I>>(base?: I): ReasoningOptions {
+    return ReasoningOptions.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ReasoningOptions>, I>>(object: I): ReasoningOptions {
+    const message = createBaseReasoningOptions();
+    message.mode = object.mode ?? 0;
+    message.includeInOutput = object.includeInOutput ?? false;
+    message.pattern = (object.pattern !== undefined && object.pattern !== null)
+      ? ThinkingTagPattern.fromPartial(object.pattern)
+      : undefined;
     return message;
   },
 };

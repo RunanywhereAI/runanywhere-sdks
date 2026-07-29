@@ -17,130 +17,6 @@ import {
 
 export const protobufPackage = "runanywhere.v1";
 
-/**
- * ---------------------------------------------------------------------------
- * STT language hint. Sources pre-IDL:
- *   Swift  STTConfiguration default = "en-US", STTOptions default = "en"
- *   Kotlin STTConfiguration default = "en-US", STTOptions default = "en"
- *   Dart   STTOptions language nullable; auto-detect when null
- *   RN     STTOptions.language?: string (free-form)
- *   Web    STTTranscribeOptions.language?: string (free-form)
- *   C ABI  RAC_STT_DEFAULT_LANGUAGE = "en"
- * Free-form BCP-47 strings are collapsed to base language codes here.
- * AUTO is the explicit "detect from audio" sentinel; UNSPECIFIED falls
- * back to the backend default (typically "en").
- * ---------------------------------------------------------------------------
- * `rac_wire_string` annotations expose the BCP-47 base code for each value via
- * the codegen-generated `wireString` accessor (see idl/rac_options.proto and
- * idl/codegen/generate_swift_convenience.py). Swift SDK `bcp47Code` is sourced
- * from this annotation; the unspecified case falls back to "" by default.
- */
-export enum STTLanguage {
-  STT_LANGUAGE_UNSPECIFIED = 0,
-  /** STT_LANGUAGE_AUTO - Auto-detect from audio */
-  STT_LANGUAGE_AUTO = 1,
-  STT_LANGUAGE_EN = 2,
-  STT_LANGUAGE_ES = 3,
-  STT_LANGUAGE_FR = 4,
-  STT_LANGUAGE_DE = 5,
-  STT_LANGUAGE_ZH = 6,
-  STT_LANGUAGE_JA = 7,
-  STT_LANGUAGE_KO = 8,
-  STT_LANGUAGE_IT = 9,
-  STT_LANGUAGE_PT = 10,
-  STT_LANGUAGE_AR = 11,
-  STT_LANGUAGE_RU = 12,
-  STT_LANGUAGE_HI = 13,
-  UNRECOGNIZED = -1,
-}
-
-export function sTTLanguageFromJSON(object: any): STTLanguage {
-  switch (object) {
-    case 0:
-    case "STT_LANGUAGE_UNSPECIFIED":
-      return STTLanguage.STT_LANGUAGE_UNSPECIFIED;
-    case 1:
-    case "STT_LANGUAGE_AUTO":
-      return STTLanguage.STT_LANGUAGE_AUTO;
-    case 2:
-    case "STT_LANGUAGE_EN":
-      return STTLanguage.STT_LANGUAGE_EN;
-    case 3:
-    case "STT_LANGUAGE_ES":
-      return STTLanguage.STT_LANGUAGE_ES;
-    case 4:
-    case "STT_LANGUAGE_FR":
-      return STTLanguage.STT_LANGUAGE_FR;
-    case 5:
-    case "STT_LANGUAGE_DE":
-      return STTLanguage.STT_LANGUAGE_DE;
-    case 6:
-    case "STT_LANGUAGE_ZH":
-      return STTLanguage.STT_LANGUAGE_ZH;
-    case 7:
-    case "STT_LANGUAGE_JA":
-      return STTLanguage.STT_LANGUAGE_JA;
-    case 8:
-    case "STT_LANGUAGE_KO":
-      return STTLanguage.STT_LANGUAGE_KO;
-    case 9:
-    case "STT_LANGUAGE_IT":
-      return STTLanguage.STT_LANGUAGE_IT;
-    case 10:
-    case "STT_LANGUAGE_PT":
-      return STTLanguage.STT_LANGUAGE_PT;
-    case 11:
-    case "STT_LANGUAGE_AR":
-      return STTLanguage.STT_LANGUAGE_AR;
-    case 12:
-    case "STT_LANGUAGE_RU":
-      return STTLanguage.STT_LANGUAGE_RU;
-    case 13:
-    case "STT_LANGUAGE_HI":
-      return STTLanguage.STT_LANGUAGE_HI;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return STTLanguage.UNRECOGNIZED;
-  }
-}
-
-export function sTTLanguageToJSON(object: STTLanguage): string {
-  switch (object) {
-    case STTLanguage.STT_LANGUAGE_UNSPECIFIED:
-      return "STT_LANGUAGE_UNSPECIFIED";
-    case STTLanguage.STT_LANGUAGE_AUTO:
-      return "STT_LANGUAGE_AUTO";
-    case STTLanguage.STT_LANGUAGE_EN:
-      return "STT_LANGUAGE_EN";
-    case STTLanguage.STT_LANGUAGE_ES:
-      return "STT_LANGUAGE_ES";
-    case STTLanguage.STT_LANGUAGE_FR:
-      return "STT_LANGUAGE_FR";
-    case STTLanguage.STT_LANGUAGE_DE:
-      return "STT_LANGUAGE_DE";
-    case STTLanguage.STT_LANGUAGE_ZH:
-      return "STT_LANGUAGE_ZH";
-    case STTLanguage.STT_LANGUAGE_JA:
-      return "STT_LANGUAGE_JA";
-    case STTLanguage.STT_LANGUAGE_KO:
-      return "STT_LANGUAGE_KO";
-    case STTLanguage.STT_LANGUAGE_IT:
-      return "STT_LANGUAGE_IT";
-    case STTLanguage.STT_LANGUAGE_PT:
-      return "STT_LANGUAGE_PT";
-    case STTLanguage.STT_LANGUAGE_AR:
-      return "STT_LANGUAGE_AR";
-    case STTLanguage.STT_LANGUAGE_RU:
-      return "STT_LANGUAGE_RU";
-    case STTLanguage.STT_LANGUAGE_HI:
-      return "STT_LANGUAGE_HI";
-    case STTLanguage.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
 export enum STTAudioEncoding {
   STT_AUDIO_ENCODING_UNSPECIFIED = 0,
   STT_AUDIO_ENCODING_PCM_S16_LE = 1,
@@ -263,7 +139,8 @@ export function sTTStreamEventKindToJSON(object: STTStreamEventKind): string {
  */
 export interface STTConfiguration {
   modelId: string;
-  language: STTLanguage;
+  /** Default input language, BCP-47 / ISO-639-1. Unset/empty = auto-detect. */
+  language?: string | undefined;
   sampleRate: number;
   enableVad: boolean;
   audioFormat: AudioFormat;
@@ -278,14 +155,7 @@ export interface STTConfiguration {
   maxAlternatives: number;
   enableWordTimestamps: boolean;
   /** Preferred framework for the component. Absent = auto. */
-  preferredFramework?:
-    | InferenceFramework
-    | undefined;
-  /**
-   * Free-form BCP-47 language tag ("en-US", "pt-BR", etc.) for callers
-   * that cannot be represented by STTLanguage's base-code enum.
-   */
-  languageCode?: string | undefined;
+  preferredFramework?: InferenceFramework | undefined;
 }
 
 /**
@@ -307,31 +177,20 @@ export interface STTConfiguration {
  * ---------------------------------------------------------------------------
  */
 export interface STTOptions {
-  language: STTLanguage;
+  /**
+   * Input language as a BCP-47 / ISO-639-1 tag ("en", "en-US", "hi").
+   * Unset or empty = auto-detect. Matches the industry `language` param.
+   */
+  language?: string | undefined;
   enablePunctuation: boolean;
   enableDiarization: boolean;
-  /** 0 = auto / unset */
+  /** 0 = auto */
   maxSpeakers: number;
   /** Custom vocabulary bias */
   vocabularyList: string[];
   enableWordTimestamps: boolean;
   /** 0 = backend default */
   beamSize: number;
-  /**
-   * Free-form BCP-47 language tag. When set, consumers should prefer this
-   * over the base-language enum above.
-   */
-  languageCode?:
-    | string
-    | undefined;
-  /**
-   * Explicit language auto-detection flag for C ABI parity. Equivalent to
-   * language == STT_LANGUAGE_AUTO for generated-only consumers.
-   */
-  detectLanguage: boolean;
-  /** Per-call input audio hints mirrored from rac_stt_options_t. */
-  audioFormat: AudioFormat;
-  sampleRate: number;
   /** Maximum number of alternatives to return. 0 = backend/default. */
   maxAlternatives: number;
   /** Streaming/endpointer controls. 0 = backend/default. */
@@ -447,16 +306,13 @@ export interface TranscriptionMetadata {
  */
 export interface STTOutput {
   text: string;
-  language: STTLanguage;
   confidence: number;
+  /** Detected language, BCP-47 (preserves regional variants). Empty = unknown. */
+  language?: string | undefined;
   words: WordTimestamp[];
   alternatives: TranscriptionAlternative[];
   metadata?:
     | TranscriptionMetadata
-    | undefined;
-  /** Free-form detected language tag, preserving regional variants. */
-  languageCode?:
-    | string
     | undefined;
   /** Wall-clock output timestamp in milliseconds since Unix epoch. */
   timestampMs: number;
@@ -495,12 +351,9 @@ export interface STTPartialResult {
   stability: number;
   /** Additional partial-hypothesis fields carried by Dart/RN live streams. */
   confidence: number;
-  language: STTLanguage;
+  language?: string | undefined;
   timestampMs: number;
   alternatives: TranscriptionAlternative[];
-  languageCode?:
-    | string
-    | undefined;
   /** Streaming correlation and endpointing metadata. */
   requestId: string;
   segmentIndex: number;
@@ -530,8 +383,8 @@ export interface STTServiceState {
 }
 
 export interface STTLanguageDetectionResult {
-  language: STTLanguage;
-  languageCode?: string | undefined;
+  /** Detected language, BCP-47. */
+  language: string;
   confidence: number;
   alternatives: string[];
 }
@@ -539,7 +392,7 @@ export interface STTLanguageDetectionResult {
 function createBaseSTTConfiguration(): STTConfiguration {
   return {
     modelId: "",
-    language: 0,
+    language: undefined,
     sampleRate: 0,
     enableVad: false,
     audioFormat: 0,
@@ -549,7 +402,6 @@ function createBaseSTTConfiguration(): STTConfiguration {
     maxAlternatives: 0,
     enableWordTimestamps: false,
     preferredFramework: undefined,
-    languageCode: undefined,
   };
 }
 
@@ -558,8 +410,8 @@ export const STTConfiguration: MessageFns<STTConfiguration> = {
     if (message.modelId !== "") {
       writer.uint32(10).string(message.modelId);
     }
-    if (message.language !== 0) {
-      writer.uint32(16).int32(message.language);
+    if (message.language !== undefined) {
+      writer.uint32(106).string(message.language);
     }
     if (message.sampleRate !== 0) {
       writer.uint32(24).int32(message.sampleRate);
@@ -588,9 +440,6 @@ export const STTConfiguration: MessageFns<STTConfiguration> = {
     if (message.preferredFramework !== undefined) {
       writer.uint32(88).int32(message.preferredFramework);
     }
-    if (message.languageCode !== undefined) {
-      writer.uint32(98).string(message.languageCode);
-    }
     return writer;
   },
 
@@ -609,12 +458,12 @@ export const STTConfiguration: MessageFns<STTConfiguration> = {
           message.modelId = reader.string();
           continue;
         }
-        case 2: {
-          if (tag !== 16) {
+        case 13: {
+          if (tag !== 106) {
             break;
           }
 
-          message.language = reader.int32() as any;
+          message.language = reader.string();
           continue;
         }
         case 3: {
@@ -689,14 +538,6 @@ export const STTConfiguration: MessageFns<STTConfiguration> = {
           message.preferredFramework = reader.int32() as any;
           continue;
         }
-        case 12: {
-          if (tag !== 98) {
-            break;
-          }
-
-          message.languageCode = reader.string();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -713,7 +554,7 @@ export const STTConfiguration: MessageFns<STTConfiguration> = {
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : "",
-      language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
+      language: isSet(object.language) ? globalThis.String(object.language) : undefined,
       sampleRate: isSet(object.sampleRate)
         ? globalThis.Number(object.sampleRate)
         : isSet(object.sample_rate)
@@ -759,11 +600,6 @@ export const STTConfiguration: MessageFns<STTConfiguration> = {
         : isSet(object.preferred_framework)
         ? inferenceFrameworkFromJSON(object.preferred_framework)
         : undefined,
-      languageCode: isSet(object.languageCode)
-        ? globalThis.String(object.languageCode)
-        : isSet(object.language_code)
-        ? globalThis.String(object.language_code)
-        : undefined,
     };
   },
 
@@ -772,8 +608,8 @@ export const STTConfiguration: MessageFns<STTConfiguration> = {
     if (message.modelId !== "") {
       obj.modelId = message.modelId;
     }
-    if (message.language !== 0) {
-      obj.language = sTTLanguageToJSON(message.language);
+    if (message.language !== undefined) {
+      obj.language = message.language;
     }
     if (message.sampleRate !== 0) {
       obj.sampleRate = Math.round(message.sampleRate);
@@ -802,9 +638,6 @@ export const STTConfiguration: MessageFns<STTConfiguration> = {
     if (message.preferredFramework !== undefined) {
       obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
     }
-    if (message.languageCode !== undefined) {
-      obj.languageCode = message.languageCode;
-    }
     return obj;
   },
 
@@ -814,7 +647,7 @@ export const STTConfiguration: MessageFns<STTConfiguration> = {
   fromPartial<I extends Exact<DeepPartial<STTConfiguration>, I>>(object: I): STTConfiguration {
     const message = createBaseSTTConfiguration();
     message.modelId = object.modelId ?? "";
-    message.language = object.language ?? 0;
+    message.language = object.language ?? undefined;
     message.sampleRate = object.sampleRate ?? 0;
     message.enableVad = object.enableVad ?? false;
     message.audioFormat = object.audioFormat ?? 0;
@@ -824,24 +657,19 @@ export const STTConfiguration: MessageFns<STTConfiguration> = {
     message.maxAlternatives = object.maxAlternatives ?? 0;
     message.enableWordTimestamps = object.enableWordTimestamps ?? false;
     message.preferredFramework = object.preferredFramework ?? undefined;
-    message.languageCode = object.languageCode ?? undefined;
     return message;
   },
 };
 
 function createBaseSTTOptions(): STTOptions {
   return {
-    language: 0,
+    language: undefined,
     enablePunctuation: false,
     enableDiarization: false,
     maxSpeakers: 0,
     vocabularyList: [],
     enableWordTimestamps: false,
     beamSize: 0,
-    languageCode: undefined,
-    detectLanguage: false,
-    audioFormat: 0,
-    sampleRate: 0,
     maxAlternatives: 0,
     chunkDurationMs: 0,
     endpointSilenceMs: 0,
@@ -852,8 +680,8 @@ function createBaseSTTOptions(): STTOptions {
 
 export const STTOptions: MessageFns<STTOptions> = {
   encode(message: STTOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.language !== 0) {
-      writer.uint32(8).int32(message.language);
+    if (message.language !== undefined) {
+      writer.uint32(138).string(message.language);
     }
     if (message.enablePunctuation !== false) {
       writer.uint32(16).bool(message.enablePunctuation);
@@ -872,18 +700,6 @@ export const STTOptions: MessageFns<STTOptions> = {
     }
     if (message.beamSize !== 0) {
       writer.uint32(56).int32(message.beamSize);
-    }
-    if (message.languageCode !== undefined) {
-      writer.uint32(66).string(message.languageCode);
-    }
-    if (message.detectLanguage !== false) {
-      writer.uint32(72).bool(message.detectLanguage);
-    }
-    if (message.audioFormat !== 0) {
-      writer.uint32(80).int32(message.audioFormat);
-    }
-    if (message.sampleRate !== 0) {
-      writer.uint32(88).int32(message.sampleRate);
     }
     if (message.maxAlternatives !== 0) {
       writer.uint32(96).int32(message.maxAlternatives);
@@ -910,12 +726,12 @@ export const STTOptions: MessageFns<STTOptions> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
+        case 17: {
+          if (tag !== 138) {
             break;
           }
 
-          message.language = reader.int32() as any;
+          message.language = reader.string();
           continue;
         }
         case 2: {
@@ -964,38 +780,6 @@ export const STTOptions: MessageFns<STTOptions> = {
           }
 
           message.beamSize = reader.int32();
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.languageCode = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.detectLanguage = reader.bool();
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.audioFormat = reader.int32() as any;
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.sampleRate = reader.int32();
           continue;
         }
         case 12: {
@@ -1049,7 +833,7 @@ export const STTOptions: MessageFns<STTOptions> = {
 
   fromJSON(object: any): STTOptions {
     return {
-      language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
+      language: isSet(object.language) ? globalThis.String(object.language) : undefined,
       enablePunctuation: isSet(object.enablePunctuation)
         ? globalThis.Boolean(object.enablePunctuation)
         : isSet(object.enable_punctuation)
@@ -1079,26 +863,6 @@ export const STTOptions: MessageFns<STTOptions> = {
         ? globalThis.Number(object.beamSize)
         : isSet(object.beam_size)
         ? globalThis.Number(object.beam_size)
-        : 0,
-      languageCode: isSet(object.languageCode)
-        ? globalThis.String(object.languageCode)
-        : isSet(object.language_code)
-        ? globalThis.String(object.language_code)
-        : undefined,
-      detectLanguage: isSet(object.detectLanguage)
-        ? globalThis.Boolean(object.detectLanguage)
-        : isSet(object.detect_language)
-        ? globalThis.Boolean(object.detect_language)
-        : false,
-      audioFormat: isSet(object.audioFormat)
-        ? audioFormatFromJSON(object.audioFormat)
-        : isSet(object.audio_format)
-        ? audioFormatFromJSON(object.audio_format)
-        : 0,
-      sampleRate: isSet(object.sampleRate)
-        ? globalThis.Number(object.sampleRate)
-        : isSet(object.sample_rate)
-        ? globalThis.Number(object.sample_rate)
         : 0,
       maxAlternatives: isSet(object.maxAlternatives)
         ? globalThis.Number(object.maxAlternatives)
@@ -1130,8 +894,8 @@ export const STTOptions: MessageFns<STTOptions> = {
 
   toJSON(message: STTOptions): unknown {
     const obj: any = {};
-    if (message.language !== 0) {
-      obj.language = sTTLanguageToJSON(message.language);
+    if (message.language !== undefined) {
+      obj.language = message.language;
     }
     if (message.enablePunctuation !== false) {
       obj.enablePunctuation = message.enablePunctuation;
@@ -1150,18 +914,6 @@ export const STTOptions: MessageFns<STTOptions> = {
     }
     if (message.beamSize !== 0) {
       obj.beamSize = Math.round(message.beamSize);
-    }
-    if (message.languageCode !== undefined) {
-      obj.languageCode = message.languageCode;
-    }
-    if (message.detectLanguage !== false) {
-      obj.detectLanguage = message.detectLanguage;
-    }
-    if (message.audioFormat !== 0) {
-      obj.audioFormat = audioFormatToJSON(message.audioFormat);
-    }
-    if (message.sampleRate !== 0) {
-      obj.sampleRate = Math.round(message.sampleRate);
     }
     if (message.maxAlternatives !== 0) {
       obj.maxAlternatives = Math.round(message.maxAlternatives);
@@ -1186,17 +938,13 @@ export const STTOptions: MessageFns<STTOptions> = {
   },
   fromPartial<I extends Exact<DeepPartial<STTOptions>, I>>(object: I): STTOptions {
     const message = createBaseSTTOptions();
-    message.language = object.language ?? 0;
+    message.language = object.language ?? undefined;
     message.enablePunctuation = object.enablePunctuation ?? false;
     message.enableDiarization = object.enableDiarization ?? false;
     message.maxSpeakers = object.maxSpeakers ?? 0;
     message.vocabularyList = object.vocabularyList?.map((e) => e) || [];
     message.enableWordTimestamps = object.enableWordTimestamps ?? false;
     message.beamSize = object.beamSize ?? 0;
-    message.languageCode = object.languageCode ?? undefined;
-    message.detectLanguage = object.detectLanguage ?? false;
-    message.audioFormat = object.audioFormat ?? 0;
-    message.sampleRate = object.sampleRate ?? 0;
     message.maxAlternatives = object.maxAlternatives ?? 0;
     message.chunkDurationMs = object.chunkDurationMs ?? 0;
     message.endpointSilenceMs = object.endpointSilenceMs ?? 0;
@@ -2008,12 +1756,11 @@ export const TranscriptionMetadata: MessageFns<TranscriptionMetadata> = {
 function createBaseSTTOutput(): STTOutput {
   return {
     text: "",
-    language: 0,
     confidence: 0,
+    language: undefined,
     words: [],
     alternatives: [],
     metadata: undefined,
-    languageCode: undefined,
     timestampMs: 0,
     durationMs: 0,
     speakerIds: [],
@@ -2028,11 +1775,11 @@ export const STTOutput: MessageFns<STTOutput> = {
     if (message.text !== "") {
       writer.uint32(10).string(message.text);
     }
-    if (message.language !== 0) {
-      writer.uint32(16).int32(message.language);
-    }
     if (message.confidence !== 0) {
       writer.uint32(29).float(message.confidence);
+    }
+    if (message.language !== undefined) {
+      writer.uint32(114).string(message.language);
     }
     for (const v of message.words) {
       WordTimestamp.encode(v!, writer.uint32(34).fork()).join();
@@ -2042,9 +1789,6 @@ export const STTOutput: MessageFns<STTOutput> = {
     }
     if (message.metadata !== undefined) {
       TranscriptionMetadata.encode(message.metadata, writer.uint32(50).fork()).join();
-    }
-    if (message.languageCode !== undefined) {
-      writer.uint32(58).string(message.languageCode);
     }
     if (message.timestampMs !== 0) {
       writer.uint32(64).int64(message.timestampMs);
@@ -2082,20 +1826,20 @@ export const STTOutput: MessageFns<STTOutput> = {
           message.text = reader.string();
           continue;
         }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.language = reader.int32() as any;
-          continue;
-        }
         case 3: {
           if (tag !== 29) {
             break;
           }
 
           message.confidence = reader.float();
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.language = reader.string();
           continue;
         }
         case 4: {
@@ -2120,14 +1864,6 @@ export const STTOutput: MessageFns<STTOutput> = {
           }
 
           message.metadata = TranscriptionMetadata.decode(reader, reader.uint32());
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.languageCode = reader.string();
           continue;
         }
         case 8: {
@@ -2190,18 +1926,13 @@ export const STTOutput: MessageFns<STTOutput> = {
   fromJSON(object: any): STTOutput {
     return {
       text: isSet(object.text) ? globalThis.String(object.text) : "",
-      language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
       confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+      language: isSet(object.language) ? globalThis.String(object.language) : undefined,
       words: globalThis.Array.isArray(object?.words) ? object.words.map((e: any) => WordTimestamp.fromJSON(e)) : [],
       alternatives: globalThis.Array.isArray(object?.alternatives)
         ? object.alternatives.map((e: any) => TranscriptionAlternative.fromJSON(e))
         : [],
       metadata: isSet(object.metadata) ? TranscriptionMetadata.fromJSON(object.metadata) : undefined,
-      languageCode: isSet(object.languageCode)
-        ? globalThis.String(object.languageCode)
-        : isSet(object.language_code)
-        ? globalThis.String(object.language_code)
-        : undefined,
       timestampMs: isSet(object.timestampMs)
         ? globalThis.Number(object.timestampMs)
         : isSet(object.timestamp_ms)
@@ -2240,11 +1971,11 @@ export const STTOutput: MessageFns<STTOutput> = {
     if (message.text !== "") {
       obj.text = message.text;
     }
-    if (message.language !== 0) {
-      obj.language = sTTLanguageToJSON(message.language);
-    }
     if (message.confidence !== 0) {
       obj.confidence = message.confidence;
+    }
+    if (message.language !== undefined) {
+      obj.language = message.language;
     }
     if (message.words?.length) {
       obj.words = message.words.map((e) => WordTimestamp.toJSON(e));
@@ -2254,9 +1985,6 @@ export const STTOutput: MessageFns<STTOutput> = {
     }
     if (message.metadata !== undefined) {
       obj.metadata = TranscriptionMetadata.toJSON(message.metadata);
-    }
-    if (message.languageCode !== undefined) {
-      obj.languageCode = message.languageCode;
     }
     if (message.timestampMs !== 0) {
       obj.timestampMs = Math.round(message.timestampMs);
@@ -2285,14 +2013,13 @@ export const STTOutput: MessageFns<STTOutput> = {
   fromPartial<I extends Exact<DeepPartial<STTOutput>, I>>(object: I): STTOutput {
     const message = createBaseSTTOutput();
     message.text = object.text ?? "";
-    message.language = object.language ?? 0;
     message.confidence = object.confidence ?? 0;
+    message.language = object.language ?? undefined;
     message.words = object.words?.map((e) => WordTimestamp.fromPartial(e)) || [];
     message.alternatives = object.alternatives?.map((e) => TranscriptionAlternative.fromPartial(e)) || [];
     message.metadata = (object.metadata !== undefined && object.metadata !== null)
       ? TranscriptionMetadata.fromPartial(object.metadata)
       : undefined;
-    message.languageCode = object.languageCode ?? undefined;
     message.timestampMs = object.timestampMs ?? 0;
     message.durationMs = object.durationMs ?? 0;
     message.speakerIds = object.speakerIds?.map((e) => e) || [];
@@ -2309,10 +2036,9 @@ function createBaseSTTPartialResult(): STTPartialResult {
     isFinal: false,
     stability: 0,
     confidence: 0,
-    language: 0,
+    language: undefined,
     timestampMs: 0,
     alternatives: [],
-    languageCode: undefined,
     requestId: "",
     segmentIndex: 0,
     audioStartMs: 0,
@@ -2335,17 +2061,14 @@ export const STTPartialResult: MessageFns<STTPartialResult> = {
     if (message.confidence !== 0) {
       writer.uint32(37).float(message.confidence);
     }
-    if (message.language !== 0) {
-      writer.uint32(40).int32(message.language);
+    if (message.language !== undefined) {
+      writer.uint32(114).string(message.language);
     }
     if (message.timestampMs !== 0) {
       writer.uint32(48).int64(message.timestampMs);
     }
     for (const v of message.alternatives) {
       TranscriptionAlternative.encode(v!, writer.uint32(58).fork()).join();
-    }
-    if (message.languageCode !== undefined) {
-      writer.uint32(66).string(message.languageCode);
     }
     if (message.requestId !== "") {
       writer.uint32(74).string(message.requestId);
@@ -2404,12 +2127,12 @@ export const STTPartialResult: MessageFns<STTPartialResult> = {
           message.confidence = reader.float();
           continue;
         }
-        case 5: {
-          if (tag !== 40) {
+        case 14: {
+          if (tag !== 114) {
             break;
           }
 
-          message.language = reader.int32() as any;
+          message.language = reader.string();
           continue;
         }
         case 6: {
@@ -2426,14 +2149,6 @@ export const STTPartialResult: MessageFns<STTPartialResult> = {
           }
 
           message.alternatives.push(TranscriptionAlternative.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.languageCode = reader.string();
           continue;
         }
         case 9: {
@@ -2495,7 +2210,7 @@ export const STTPartialResult: MessageFns<STTPartialResult> = {
         : false,
       stability: isSet(object.stability) ? globalThis.Number(object.stability) : 0,
       confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-      language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
+      language: isSet(object.language) ? globalThis.String(object.language) : undefined,
       timestampMs: isSet(object.timestampMs)
         ? globalThis.Number(object.timestampMs)
         : isSet(object.timestamp_ms)
@@ -2504,11 +2219,6 @@ export const STTPartialResult: MessageFns<STTPartialResult> = {
       alternatives: globalThis.Array.isArray(object?.alternatives)
         ? object.alternatives.map((e: any) => TranscriptionAlternative.fromJSON(e))
         : [],
-      languageCode: isSet(object.languageCode)
-        ? globalThis.String(object.languageCode)
-        : isSet(object.language_code)
-        ? globalThis.String(object.language_code)
-        : undefined,
       requestId: isSet(object.requestId)
         ? globalThis.String(object.requestId)
         : isSet(object.request_id)
@@ -2551,17 +2261,14 @@ export const STTPartialResult: MessageFns<STTPartialResult> = {
     if (message.confidence !== 0) {
       obj.confidence = message.confidence;
     }
-    if (message.language !== 0) {
-      obj.language = sTTLanguageToJSON(message.language);
+    if (message.language !== undefined) {
+      obj.language = message.language;
     }
     if (message.timestampMs !== 0) {
       obj.timestampMs = Math.round(message.timestampMs);
     }
     if (message.alternatives?.length) {
       obj.alternatives = message.alternatives.map((e) => TranscriptionAlternative.toJSON(e));
-    }
-    if (message.languageCode !== undefined) {
-      obj.languageCode = message.languageCode;
     }
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
@@ -2590,10 +2297,9 @@ export const STTPartialResult: MessageFns<STTPartialResult> = {
     message.isFinal = object.isFinal ?? false;
     message.stability = object.stability ?? 0;
     message.confidence = object.confidence ?? 0;
-    message.language = object.language ?? 0;
+    message.language = object.language ?? undefined;
     message.timestampMs = object.timestampMs ?? 0;
     message.alternatives = object.alternatives?.map((e) => TranscriptionAlternative.fromPartial(e)) || [];
-    message.languageCode = object.languageCode ?? undefined;
     message.requestId = object.requestId ?? "";
     message.segmentIndex = object.segmentIndex ?? 0;
     message.audioStartMs = object.audioStartMs ?? 0;
@@ -2982,16 +2688,13 @@ export const STTServiceState: MessageFns<STTServiceState> = {
 };
 
 function createBaseSTTLanguageDetectionResult(): STTLanguageDetectionResult {
-  return { language: 0, languageCode: undefined, confidence: 0, alternatives: [] };
+  return { language: "", confidence: 0, alternatives: [] };
 }
 
 export const STTLanguageDetectionResult: MessageFns<STTLanguageDetectionResult> = {
   encode(message: STTLanguageDetectionResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.language !== 0) {
-      writer.uint32(8).int32(message.language);
-    }
-    if (message.languageCode !== undefined) {
-      writer.uint32(18).string(message.languageCode);
+    if (message.language !== "") {
+      writer.uint32(42).string(message.language);
     }
     if (message.confidence !== 0) {
       writer.uint32(29).float(message.confidence);
@@ -3009,20 +2712,12 @@ export const STTLanguageDetectionResult: MessageFns<STTLanguageDetectionResult> 
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
-          message.language = reader.int32() as any;
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.languageCode = reader.string();
+          message.language = reader.string();
           continue;
         }
         case 3: {
@@ -3052,12 +2747,7 @@ export const STTLanguageDetectionResult: MessageFns<STTLanguageDetectionResult> 
 
   fromJSON(object: any): STTLanguageDetectionResult {
     return {
-      language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
-      languageCode: isSet(object.languageCode)
-        ? globalThis.String(object.languageCode)
-        : isSet(object.language_code)
-        ? globalThis.String(object.language_code)
-        : undefined,
+      language: isSet(object.language) ? globalThis.String(object.language) : "",
       confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
       alternatives: globalThis.Array.isArray(object?.alternatives)
         ? object.alternatives.map((e: any) => globalThis.String(e))
@@ -3067,11 +2757,8 @@ export const STTLanguageDetectionResult: MessageFns<STTLanguageDetectionResult> 
 
   toJSON(message: STTLanguageDetectionResult): unknown {
     const obj: any = {};
-    if (message.language !== 0) {
-      obj.language = sTTLanguageToJSON(message.language);
-    }
-    if (message.languageCode !== undefined) {
-      obj.languageCode = message.languageCode;
+    if (message.language !== "") {
+      obj.language = message.language;
     }
     if (message.confidence !== 0) {
       obj.confidence = message.confidence;
@@ -3087,8 +2774,7 @@ export const STTLanguageDetectionResult: MessageFns<STTLanguageDetectionResult> 
   },
   fromPartial<I extends Exact<DeepPartial<STTLanguageDetectionResult>, I>>(object: I): STTLanguageDetectionResult {
     const message = createBaseSTTLanguageDetectionResult();
-    message.language = object.language ?? 0;
-    message.languageCode = object.languageCode ?? undefined;
+    message.language = object.language ?? "";
     message.confidence = object.confidence ?? 0;
     message.alternatives = object.alternatives?.map((e) => e) || [];
     return message;

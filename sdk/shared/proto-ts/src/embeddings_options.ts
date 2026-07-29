@@ -124,25 +124,13 @@ export interface EmbeddingsConfiguration {
    * when an input exceeds this length. C ABI default: 512.
    */
   maxSequenceLength: number;
-  /**
-   * Default L2 normalization for produced vectors. When unset the backend
-   * applies its default (RAC_EMBEDDINGS_NORMALIZE_L2 in the C ABI).
-   */
-  normalize?:
-    | boolean
-    | undefined;
   /** Preferred framework for the component. Absent = auto. */
   preferredFramework?:
     | InferenceFramework
     | undefined;
   /**
-   * C ABI name for max_sequence_length. 0 = use max_sequence_length or
-   * backend default.
-   */
-  maxTokens: number;
-  /**
-   * Exact C ABI normalization/pooling modes for backends that need more
-   * than the bool normalize flag.
+   * Vector normalization mode for the component. UNSPECIFIED = L2
+   * (the C ABI default).
    */
   normalizeMode: EmbeddingsNormalizeMode;
   pooling: EmbeddingsPoolingStrategy;
@@ -158,12 +146,6 @@ export interface EmbeddingsConfiguration {
  */
 export interface EmbeddingsOptions {
   /**
-   * Apply L2 normalization to the produced vectors. Required so the wire
-   * form is unambiguous on the most common knob; backends may still defer
-   * to model defaults at load time.
-   */
-  normalize: boolean;
-  /**
    * Truncate inputs longer than max_sequence_length instead of erroring.
    * Unset = backend default (currently truncate-on-overflow for ONNX,
    * sliding-window for llama.cpp).
@@ -178,7 +160,10 @@ export interface EmbeddingsOptions {
   batchSize?:
     | number
     | undefined;
-  /** Exact C ABI per-call overrides. UNSPECIFIED = use component config. */
+  /**
+   * Vector normalization mode. UNSPECIFIED = use component config
+   * (default L2).
+   */
   normalizeMode: EmbeddingsNormalizeMode;
   pooling: EmbeddingsPoolingStrategy;
   /** 0 = auto */
@@ -335,9 +320,7 @@ function createBaseEmbeddingsConfiguration(): EmbeddingsConfiguration {
     modelId: "",
     embeddingDimension: 0,
     maxSequenceLength: 0,
-    normalize: undefined,
     preferredFramework: undefined,
-    maxTokens: 0,
     normalizeMode: 0,
     pooling: 0,
     configJson: undefined,
@@ -355,14 +338,8 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
     if (message.maxSequenceLength !== 0) {
       writer.uint32(24).int32(message.maxSequenceLength);
     }
-    if (message.normalize !== undefined) {
-      writer.uint32(32).bool(message.normalize);
-    }
     if (message.preferredFramework !== undefined) {
       writer.uint32(40).int32(message.preferredFramework);
-    }
-    if (message.maxTokens !== 0) {
-      writer.uint32(48).int32(message.maxTokens);
     }
     if (message.normalizeMode !== 0) {
       writer.uint32(56).int32(message.normalizeMode);
@@ -407,28 +384,12 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
           message.maxSequenceLength = reader.int32();
           continue;
         }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.normalize = reader.bool();
-          continue;
-        }
         case 5: {
           if (tag !== 40) {
             break;
           }
 
           message.preferredFramework = reader.int32() as any;
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.maxTokens = reader.int32();
           continue;
         }
         case 7: {
@@ -481,17 +442,11 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
         : isSet(object.max_sequence_length)
         ? globalThis.Number(object.max_sequence_length)
         : 0,
-      normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : undefined,
       preferredFramework: isSet(object.preferredFramework)
         ? inferenceFrameworkFromJSON(object.preferredFramework)
         : isSet(object.preferred_framework)
         ? inferenceFrameworkFromJSON(object.preferred_framework)
         : undefined,
-      maxTokens: isSet(object.maxTokens)
-        ? globalThis.Number(object.maxTokens)
-        : isSet(object.max_tokens)
-        ? globalThis.Number(object.max_tokens)
-        : 0,
       normalizeMode: isSet(object.normalizeMode)
         ? embeddingsNormalizeModeFromJSON(object.normalizeMode)
         : isSet(object.normalize_mode)
@@ -517,14 +472,8 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
     if (message.maxSequenceLength !== 0) {
       obj.maxSequenceLength = Math.round(message.maxSequenceLength);
     }
-    if (message.normalize !== undefined) {
-      obj.normalize = message.normalize;
-    }
     if (message.preferredFramework !== undefined) {
       obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
-    }
-    if (message.maxTokens !== 0) {
-      obj.maxTokens = Math.round(message.maxTokens);
     }
     if (message.normalizeMode !== 0) {
       obj.normalizeMode = embeddingsNormalizeModeToJSON(message.normalizeMode);
@@ -546,9 +495,7 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
     message.modelId = object.modelId ?? "";
     message.embeddingDimension = object.embeddingDimension ?? 0;
     message.maxSequenceLength = object.maxSequenceLength ?? 0;
-    message.normalize = object.normalize ?? undefined;
     message.preferredFramework = object.preferredFramework ?? undefined;
-    message.maxTokens = object.maxTokens ?? 0;
     message.normalizeMode = object.normalizeMode ?? 0;
     message.pooling = object.pooling ?? 0;
     message.configJson = object.configJson ?? undefined;
@@ -557,14 +504,11 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
 };
 
 function createBaseEmbeddingsOptions(): EmbeddingsOptions {
-  return { normalize: false, truncate: undefined, batchSize: undefined, normalizeMode: 0, pooling: 0, nThreads: 0 };
+  return { truncate: undefined, batchSize: undefined, normalizeMode: 0, pooling: 0, nThreads: 0 };
 }
 
 export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
   encode(message: EmbeddingsOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.normalize !== false) {
-      writer.uint32(8).bool(message.normalize);
-    }
     if (message.truncate !== undefined) {
       writer.uint32(16).bool(message.truncate);
     }
@@ -590,14 +534,6 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.normalize = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -649,7 +585,6 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
 
   fromJSON(object: any): EmbeddingsOptions {
     return {
-      normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : false,
       truncate: isSet(object.truncate) ? globalThis.Boolean(object.truncate) : undefined,
       batchSize: isSet(object.batchSize)
         ? globalThis.Number(object.batchSize)
@@ -672,9 +607,6 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
 
   toJSON(message: EmbeddingsOptions): unknown {
     const obj: any = {};
-    if (message.normalize !== false) {
-      obj.normalize = message.normalize;
-    }
     if (message.truncate !== undefined) {
       obj.truncate = message.truncate;
     }
@@ -698,7 +630,6 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
   },
   fromPartial<I extends Exact<DeepPartial<EmbeddingsOptions>, I>>(object: I): EmbeddingsOptions {
     const message = createBaseEmbeddingsOptions();
-    message.normalize = object.normalize ?? false;
     message.truncate = object.truncate ?? undefined;
     message.batchSize = object.batchSize ?? undefined;
     message.normalizeMode = object.normalizeMode ?? 0;

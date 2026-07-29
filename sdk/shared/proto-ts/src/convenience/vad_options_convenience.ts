@@ -14,14 +14,14 @@
 
 /* eslint-disable */
 
-import { VADConfiguration } from '../vad_options';
+import { VADConfiguration, VADOptions } from '../vad_options';
 import { ValidationError } from './_errors';
 
 export const vADConfigurationDefaults = (): VADConfiguration => ({
   modelId: '',
   sampleRate: 16000,
   frameLengthMs: 100,
-  threshold: 0.015,
+  activationThreshold: 0.015,
   enableAutoCalibration: false,
   calibrationMultiplier: 2.0,
   windowSizeSamples: 0,
@@ -41,16 +41,34 @@ export const validateVADConfiguration = (m: VADConfiguration): void => {
       message: `frame_length_ms must be in 1...1000 (got ${m.frameLengthMs})`,
     });
   }
-  if (!Number.isFinite(m.threshold) || m.threshold < 0.0 || m.threshold > 1.0) {
+  if (!Number.isFinite(m.activationThreshold) || m.activationThreshold < 0.0 || m.activationThreshold > 1.0) {
     throw new ValidationError({
-      fieldPath: 'VADConfiguration.threshold',
-      message: `threshold must be in 0.0...1.0 (got ${m.threshold})`,
+      fieldPath: 'VADConfiguration.activation_threshold',
+      message: `activation_threshold must be in 0.0...1.0 (got ${m.activationThreshold})`,
     });
   }
   if (!Number.isFinite(m.calibrationMultiplier) || m.calibrationMultiplier < 1.5 || m.calibrationMultiplier > 4.0) {
     throw new ValidationError({
       fieldPath: 'VADConfiguration.calibration_multiplier',
       message: `calibration_multiplier must be in 1.5...4.0 (got ${m.calibrationMultiplier})`,
+    });
+  }
+};
+
+export const vADOptionsDefaults = (): VADOptions => ({
+  activationThreshold: 0,
+  minSpeechDurationMs: 100,
+  minSilenceDurationMs: 300,
+  maxSpeechDurationMs: 0,
+  prefixPaddingMs: 0,
+  includeStatistics: false,
+});
+
+export const validateVADOptions = (m: VADOptions): void => {
+  if (!Number.isFinite(m.activationThreshold) || m.activationThreshold < 0.0 || m.activationThreshold > 1.0) {
+    throw new ValidationError({
+      fieldPath: 'VADOptions.activation_threshold',
+      message: `activation_threshold must be in 0.0...1.0 (got ${m.activationThreshold})`,
     });
   }
 };

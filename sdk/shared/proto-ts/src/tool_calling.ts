@@ -376,6 +376,9 @@ export interface ToolResult {
  * ---------------------------------------------------------------------------
  * Options for tool-enabled generation.
  * ---------------------------------------------------------------------------
+ * Pure tool configuration. Sampling, system prompt, and reasoning control
+ * come from the enclosing LLMGenerationOptions — this message deliberately
+ * carries none of its own (fields 4-6 and 17 are retired duplicates).
  */
 export interface ToolCallingOptions {
   /**
@@ -385,18 +388,6 @@ export interface ToolCallingOptions {
   tools: ToolDefinition[];
   /** Whether to auto-execute tools or hand them back to the caller. */
   autoExecute: boolean;
-  /** Sampling temperature override (Swift: optional Float). */
-  temperature?:
-    | number
-    | undefined;
-  /** Maximum tokens override. */
-  maxTokens?:
-    | number
-    | undefined;
-  /** System prompt to use during tool-enabled generation. */
-  systemPrompt?:
-    | string
-    | undefined;
   /**
    * If true, replaces the system prompt entirely (no auto-injected
    * tool instructions).
@@ -412,20 +403,13 @@ export interface ToolCallingOptions {
     | ToolCallFormatName
     | undefined;
   /**
-   * Maximum tool calls in one conversation turn. Unset/0 = SDK default
-   * (typically 5).
+   * Maximum tool calls in one conversation turn. Unset = default (5) —
+   * the single declaration; SDKs must not hardcode their own copy.
    */
   maxToolCalls?: number | undefined;
   toolChoice: ToolChoiceMode;
   forcedToolName?: string | undefined;
   requireJsonArguments: boolean;
-  /**
-   * When true, suppress the model's thinking/reasoning phase during
-   * tool-enabled generation (commons prepends the model no-think directive
-   * at the prompt level — same contract as
-   * LLMGenerationOptions.disable_thinking). Default false.
-   */
-  disableThinking?: boolean | undefined;
 }
 
 /**
@@ -530,89 +514,6 @@ export interface ToolCallingStreamEvent {
 export interface ToolRegistrySnapshot {
   tools: ToolDefinition[];
   updatedAtMs: number;
-}
-
-export interface ToolCallingSessionCreateRequest {
-  /** Prompt + LLM generation options inline (avoids cross-proto import cycle). */
-  prompt: string;
-  maxTokens: number;
-  temperature: number;
-  topP: number;
-  systemPrompt: string;
-  tools: ToolDefinition[];
-  format: ToolCallFormatName;
-  maxToolCalls: number;
-  keepToolsAvailable: boolean;
-  /**
-   * proto3 `optional` enables presence detection (has_validate_calls()).
-   * When unset, commons defaults to validate_calls=true so unknown tool
-   * calls short-circuit before host execution.
-   * Callers that delegate validation/authorization to their executor or
-   * use dynamic tool registries must explicitly set validate_calls=false.
-   */
-  validateCalls?:
-    | boolean
-    | undefined;
-  /**
-   * OpenAI-style tool_choice override surfaced through the high-level
-   * run-loop / session APIs. The same fields exist on ToolCallingOptions
-   * (fields 13/14); we re-publish them here so the canonical request
-   * envelope can carry the policy without forcing callers to pass an
-   * inline ToolCallingOptions. commons honors these on every
-   * format/validate primitive via build_options_snapshot.
-   */
-  toolChoice?: ToolChoiceMode | undefined;
-  forcedToolName?:
-    | string
-    | undefined;
-  /**
-   * When true, suppress the model's thinking phase for every generate in
-   * the loop/session (maps from ToolCallingOptions.disable_thinking; same
-   * contract as LLMGenerationOptions.disable_thinking). Default false.
-   */
-  disableThinking: boolean;
-  /**
-   * Default true when absent. False returns the parsed ToolCall without
-   * invoking the host executor.
-   */
-  autoExecute?: boolean | undefined;
-  replaceSystemPrompt: boolean;
-  requireJsonArguments: boolean;
-  /**
-   * Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
-   * EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
-   * in the loop so multi-turn tool use keeps context. Same contract as the standard path's
-   * ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
-   * cross-proto import cycle.
-   */
-  history: string[];
-}
-
-export interface ToolCallingSessionCreateResult {
-  sessionHandle: number;
-}
-
-export interface ToolCallingSessionEvent {
-  /** serialized LLMStreamEvent proto */
-  llmStreamEventBytes?: Uint8Array | undefined;
-  toolCall?: ToolCall | undefined;
-  finalResult?:
-    | ToolCallingResult
-    | undefined;
-  /** serialized SDKError proto */
-  errorBytes?: Uint8Array | undefined;
-  seq: number;
-}
-
-export interface ToolCallingSessionStepWithResultRequest {
-  sessionHandle: number;
-  toolCallId: string;
-  resultJson: string;
-  error?: string | undefined;
-}
-
-export interface ToolCallingSessionDestroyRequest {
-  sessionHandle: number;
 }
 
 function createBaseToolValue(): ToolValue {
@@ -1832,9 +1733,6 @@ function createBaseToolCallingOptions(): ToolCallingOptions {
   return {
     tools: [],
     autoExecute: false,
-    temperature: undefined,
-    maxTokens: undefined,
-    systemPrompt: undefined,
     replaceSystemPrompt: false,
     keepToolsAvailable: false,
     format: undefined,
@@ -1842,7 +1740,6 @@ function createBaseToolCallingOptions(): ToolCallingOptions {
     toolChoice: 0,
     forcedToolName: undefined,
     requireJsonArguments: false,
-    disableThinking: undefined,
   };
 }
 
@@ -1853,15 +1750,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     }
     if (message.autoExecute !== false) {
       writer.uint32(24).bool(message.autoExecute);
-    }
-    if (message.temperature !== undefined) {
-      writer.uint32(37).float(message.temperature);
-    }
-    if (message.maxTokens !== undefined) {
-      writer.uint32(40).int32(message.maxTokens);
-    }
-    if (message.systemPrompt !== undefined) {
-      writer.uint32(50).string(message.systemPrompt);
     }
     if (message.replaceSystemPrompt !== false) {
       writer.uint32(56).bool(message.replaceSystemPrompt);
@@ -1883,9 +1771,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     }
     if (message.requireJsonArguments !== false) {
       writer.uint32(128).bool(message.requireJsonArguments);
-    }
-    if (message.disableThinking !== undefined) {
-      writer.uint32(136).bool(message.disableThinking);
     }
     return writer;
   },
@@ -1911,30 +1796,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
           }
 
           message.autoExecute = reader.bool();
-          continue;
-        }
-        case 4: {
-          if (tag !== 37) {
-            break;
-          }
-
-          message.temperature = reader.float();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.maxTokens = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.systemPrompt = reader.string();
           continue;
         }
         case 7: {
@@ -1993,14 +1854,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
           message.requireJsonArguments = reader.bool();
           continue;
         }
-        case 17: {
-          if (tag !== 136) {
-            break;
-          }
-
-          message.disableThinking = reader.bool();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2018,17 +1871,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
         : isSet(object.auto_execute)
         ? globalThis.Boolean(object.auto_execute)
         : false,
-      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : undefined,
-      maxTokens: isSet(object.maxTokens)
-        ? globalThis.Number(object.maxTokens)
-        : isSet(object.max_tokens)
-        ? globalThis.Number(object.max_tokens)
-        : undefined,
-      systemPrompt: isSet(object.systemPrompt)
-        ? globalThis.String(object.systemPrompt)
-        : isSet(object.system_prompt)
-        ? globalThis.String(object.system_prompt)
-        : undefined,
       replaceSystemPrompt: isSet(object.replaceSystemPrompt)
         ? globalThis.Boolean(object.replaceSystemPrompt)
         : isSet(object.replace_system_prompt)
@@ -2060,11 +1902,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
         : isSet(object.require_json_arguments)
         ? globalThis.Boolean(object.require_json_arguments)
         : false,
-      disableThinking: isSet(object.disableThinking)
-        ? globalThis.Boolean(object.disableThinking)
-        : isSet(object.disable_thinking)
-        ? globalThis.Boolean(object.disable_thinking)
-        : undefined,
     };
   },
 
@@ -2075,15 +1912,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     }
     if (message.autoExecute !== false) {
       obj.autoExecute = message.autoExecute;
-    }
-    if (message.temperature !== undefined) {
-      obj.temperature = message.temperature;
-    }
-    if (message.maxTokens !== undefined) {
-      obj.maxTokens = Math.round(message.maxTokens);
-    }
-    if (message.systemPrompt !== undefined) {
-      obj.systemPrompt = message.systemPrompt;
     }
     if (message.replaceSystemPrompt !== false) {
       obj.replaceSystemPrompt = message.replaceSystemPrompt;
@@ -2106,9 +1934,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     if (message.requireJsonArguments !== false) {
       obj.requireJsonArguments = message.requireJsonArguments;
     }
-    if (message.disableThinking !== undefined) {
-      obj.disableThinking = message.disableThinking;
-    }
     return obj;
   },
 
@@ -2119,9 +1944,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     const message = createBaseToolCallingOptions();
     message.tools = object.tools?.map((e) => ToolDefinition.fromPartial(e)) || [];
     message.autoExecute = object.autoExecute ?? false;
-    message.temperature = object.temperature ?? undefined;
-    message.maxTokens = object.maxTokens ?? undefined;
-    message.systemPrompt = object.systemPrompt ?? undefined;
     message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
     message.keepToolsAvailable = object.keepToolsAvailable ?? false;
     message.format = object.format ?? undefined;
@@ -2129,7 +1951,6 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     message.toolChoice = object.toolChoice ?? 0;
     message.forcedToolName = object.forcedToolName ?? undefined;
     message.requireJsonArguments = object.requireJsonArguments ?? false;
-    message.disableThinking = object.disableThinking ?? undefined;
     return message;
   },
 };
@@ -3430,813 +3251,6 @@ export const ToolRegistrySnapshot: MessageFns<ToolRegistrySnapshot> = {
     return message;
   },
 };
-
-function createBaseToolCallingSessionCreateRequest(): ToolCallingSessionCreateRequest {
-  return {
-    prompt: "",
-    maxTokens: 0,
-    temperature: 0,
-    topP: 0,
-    systemPrompt: "",
-    tools: [],
-    format: 0,
-    maxToolCalls: 0,
-    keepToolsAvailable: false,
-    validateCalls: undefined,
-    toolChoice: undefined,
-    forcedToolName: undefined,
-    disableThinking: false,
-    autoExecute: undefined,
-    replaceSystemPrompt: false,
-    requireJsonArguments: false,
-    history: [],
-  };
-}
-
-export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreateRequest> = {
-  encode(message: ToolCallingSessionCreateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.prompt !== "") {
-      writer.uint32(10).string(message.prompt);
-    }
-    if (message.maxTokens !== 0) {
-      writer.uint32(88).int32(message.maxTokens);
-    }
-    if (message.temperature !== 0) {
-      writer.uint32(101).float(message.temperature);
-    }
-    if (message.topP !== 0) {
-      writer.uint32(109).float(message.topP);
-    }
-    if (message.systemPrompt !== "") {
-      writer.uint32(114).string(message.systemPrompt);
-    }
-    for (const v of message.tools) {
-      ToolDefinition.encode(v!, writer.uint32(18).fork()).join();
-    }
-    if (message.format !== 0) {
-      writer.uint32(24).int32(message.format);
-    }
-    if (message.maxToolCalls !== 0) {
-      writer.uint32(32).uint32(message.maxToolCalls);
-    }
-    if (message.keepToolsAvailable !== false) {
-      writer.uint32(40).bool(message.keepToolsAvailable);
-    }
-    if (message.validateCalls !== undefined) {
-      writer.uint32(48).bool(message.validateCalls);
-    }
-    if (message.toolChoice !== undefined) {
-      writer.uint32(56).int32(message.toolChoice);
-    }
-    if (message.forcedToolName !== undefined) {
-      writer.uint32(66).string(message.forcedToolName);
-    }
-    if (message.disableThinking !== false) {
-      writer.uint32(120).bool(message.disableThinking);
-    }
-    if (message.autoExecute !== undefined) {
-      writer.uint32(128).bool(message.autoExecute);
-    }
-    if (message.replaceSystemPrompt !== false) {
-      writer.uint32(136).bool(message.replaceSystemPrompt);
-    }
-    if (message.requireJsonArguments !== false) {
-      writer.uint32(144).bool(message.requireJsonArguments);
-    }
-    for (const v of message.history) {
-      writer.uint32(154).string(v!);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionCreateRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseToolCallingSessionCreateRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.prompt = reader.string();
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.maxTokens = reader.int32();
-          continue;
-        }
-        case 12: {
-          if (tag !== 101) {
-            break;
-          }
-
-          message.temperature = reader.float();
-          continue;
-        }
-        case 13: {
-          if (tag !== 109) {
-            break;
-          }
-
-          message.topP = reader.float();
-          continue;
-        }
-        case 14: {
-          if (tag !== 114) {
-            break;
-          }
-
-          message.systemPrompt = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.tools.push(ToolDefinition.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.format = reader.int32() as any;
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.maxToolCalls = reader.uint32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.keepToolsAvailable = reader.bool();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.validateCalls = reader.bool();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.toolChoice = reader.int32() as any;
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.forcedToolName = reader.string();
-          continue;
-        }
-        case 15: {
-          if (tag !== 120) {
-            break;
-          }
-
-          message.disableThinking = reader.bool();
-          continue;
-        }
-        case 16: {
-          if (tag !== 128) {
-            break;
-          }
-
-          message.autoExecute = reader.bool();
-          continue;
-        }
-        case 17: {
-          if (tag !== 136) {
-            break;
-          }
-
-          message.replaceSystemPrompt = reader.bool();
-          continue;
-        }
-        case 18: {
-          if (tag !== 144) {
-            break;
-          }
-
-          message.requireJsonArguments = reader.bool();
-          continue;
-        }
-        case 19: {
-          if (tag !== 154) {
-            break;
-          }
-
-          message.history.push(reader.string());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ToolCallingSessionCreateRequest {
-    return {
-      prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
-      maxTokens: isSet(object.maxTokens)
-        ? globalThis.Number(object.maxTokens)
-        : isSet(object.max_tokens)
-        ? globalThis.Number(object.max_tokens)
-        : 0,
-      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
-      topP: isSet(object.topP)
-        ? globalThis.Number(object.topP)
-        : isSet(object.top_p)
-        ? globalThis.Number(object.top_p)
-        : 0,
-      systemPrompt: isSet(object.systemPrompt)
-        ? globalThis.String(object.systemPrompt)
-        : isSet(object.system_prompt)
-        ? globalThis.String(object.system_prompt)
-        : "",
-      tools: globalThis.Array.isArray(object?.tools)
-        ? object.tools.map((e: any) => ToolDefinition.fromJSON(e))
-        : [],
-      format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : 0,
-      maxToolCalls: isSet(object.maxToolCalls)
-        ? globalThis.Number(object.maxToolCalls)
-        : isSet(object.max_tool_calls)
-        ? globalThis.Number(object.max_tool_calls)
-        : 0,
-      keepToolsAvailable: isSet(object.keepToolsAvailable)
-        ? globalThis.Boolean(object.keepToolsAvailable)
-        : isSet(object.keep_tools_available)
-        ? globalThis.Boolean(object.keep_tools_available)
-        : false,
-      validateCalls: isSet(object.validateCalls)
-        ? globalThis.Boolean(object.validateCalls)
-        : isSet(object.validate_calls)
-        ? globalThis.Boolean(object.validate_calls)
-        : undefined,
-      toolChoice: isSet(object.toolChoice)
-        ? toolChoiceModeFromJSON(object.toolChoice)
-        : isSet(object.tool_choice)
-        ? toolChoiceModeFromJSON(object.tool_choice)
-        : undefined,
-      forcedToolName: isSet(object.forcedToolName)
-        ? globalThis.String(object.forcedToolName)
-        : isSet(object.forced_tool_name)
-        ? globalThis.String(object.forced_tool_name)
-        : undefined,
-      disableThinking: isSet(object.disableThinking)
-        ? globalThis.Boolean(object.disableThinking)
-        : isSet(object.disable_thinking)
-        ? globalThis.Boolean(object.disable_thinking)
-        : false,
-      autoExecute: isSet(object.autoExecute)
-        ? globalThis.Boolean(object.autoExecute)
-        : isSet(object.auto_execute)
-        ? globalThis.Boolean(object.auto_execute)
-        : undefined,
-      replaceSystemPrompt: isSet(object.replaceSystemPrompt)
-        ? globalThis.Boolean(object.replaceSystemPrompt)
-        : isSet(object.replace_system_prompt)
-        ? globalThis.Boolean(object.replace_system_prompt)
-        : false,
-      requireJsonArguments: isSet(object.requireJsonArguments)
-        ? globalThis.Boolean(object.requireJsonArguments)
-        : isSet(object.require_json_arguments)
-        ? globalThis.Boolean(object.require_json_arguments)
-        : false,
-      history: globalThis.Array.isArray(object?.history)
-        ? object.history.map((e: any) => globalThis.String(e))
-        : [],
-    };
-  },
-
-  toJSON(message: ToolCallingSessionCreateRequest): unknown {
-    const obj: any = {};
-    if (message.prompt !== "") {
-      obj.prompt = message.prompt;
-    }
-    if (message.maxTokens !== 0) {
-      obj.maxTokens = Math.round(message.maxTokens);
-    }
-    if (message.temperature !== 0) {
-      obj.temperature = message.temperature;
-    }
-    if (message.topP !== 0) {
-      obj.topP = message.topP;
-    }
-    if (message.systemPrompt !== "") {
-      obj.systemPrompt = message.systemPrompt;
-    }
-    if (message.tools?.length) {
-      obj.tools = message.tools.map((e) => ToolDefinition.toJSON(e));
-    }
-    if (message.format !== 0) {
-      obj.format = toolCallFormatNameToJSON(message.format);
-    }
-    if (message.maxToolCalls !== 0) {
-      obj.maxToolCalls = Math.round(message.maxToolCalls);
-    }
-    if (message.keepToolsAvailable !== false) {
-      obj.keepToolsAvailable = message.keepToolsAvailable;
-    }
-    if (message.validateCalls !== undefined) {
-      obj.validateCalls = message.validateCalls;
-    }
-    if (message.toolChoice !== undefined) {
-      obj.toolChoice = toolChoiceModeToJSON(message.toolChoice);
-    }
-    if (message.forcedToolName !== undefined) {
-      obj.forcedToolName = message.forcedToolName;
-    }
-    if (message.disableThinking !== false) {
-      obj.disableThinking = message.disableThinking;
-    }
-    if (message.autoExecute !== undefined) {
-      obj.autoExecute = message.autoExecute;
-    }
-    if (message.replaceSystemPrompt !== false) {
-      obj.replaceSystemPrompt = message.replaceSystemPrompt;
-    }
-    if (message.requireJsonArguments !== false) {
-      obj.requireJsonArguments = message.requireJsonArguments;
-    }
-    if (message.history?.length) {
-      obj.history = message.history;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ToolCallingSessionCreateRequest>, I>>(base?: I): ToolCallingSessionCreateRequest {
-    return ToolCallingSessionCreateRequest.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateRequest>, I>>(
-    object: I,
-  ): ToolCallingSessionCreateRequest {
-    const message = createBaseToolCallingSessionCreateRequest();
-    message.prompt = object.prompt ?? "";
-    message.maxTokens = object.maxTokens ?? 0;
-    message.temperature = object.temperature ?? 0;
-    message.topP = object.topP ?? 0;
-    message.systemPrompt = object.systemPrompt ?? "";
-    message.tools = object.tools?.map((e) => ToolDefinition.fromPartial(e)) || [];
-    message.format = object.format ?? 0;
-    message.maxToolCalls = object.maxToolCalls ?? 0;
-    message.keepToolsAvailable = object.keepToolsAvailable ?? false;
-    message.validateCalls = object.validateCalls ?? undefined;
-    message.toolChoice = object.toolChoice ?? undefined;
-    message.forcedToolName = object.forcedToolName ?? undefined;
-    message.disableThinking = object.disableThinking ?? false;
-    message.autoExecute = object.autoExecute ?? undefined;
-    message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
-    message.requireJsonArguments = object.requireJsonArguments ?? false;
-    message.history = object.history?.map((e) => e) || [];
-    return message;
-  },
-};
-
-function createBaseToolCallingSessionCreateResult(): ToolCallingSessionCreateResult {
-  return { sessionHandle: 0 };
-}
-
-export const ToolCallingSessionCreateResult: MessageFns<ToolCallingSessionCreateResult> = {
-  encode(message: ToolCallingSessionCreateResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sessionHandle !== 0) {
-      writer.uint32(8).uint64(message.sessionHandle);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionCreateResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseToolCallingSessionCreateResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.sessionHandle = longToNumber(reader.uint64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ToolCallingSessionCreateResult {
-    return {
-      sessionHandle: isSet(object.sessionHandle)
-        ? globalThis.Number(object.sessionHandle)
-        : isSet(object.session_handle)
-        ? globalThis.Number(object.session_handle)
-        : 0,
-    };
-  },
-
-  toJSON(message: ToolCallingSessionCreateResult): unknown {
-    const obj: any = {};
-    if (message.sessionHandle !== 0) {
-      obj.sessionHandle = Math.round(message.sessionHandle);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(base?: I): ToolCallingSessionCreateResult {
-    return ToolCallingSessionCreateResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(
-    object: I,
-  ): ToolCallingSessionCreateResult {
-    const message = createBaseToolCallingSessionCreateResult();
-    message.sessionHandle = object.sessionHandle ?? 0;
-    return message;
-  },
-};
-
-function createBaseToolCallingSessionEvent(): ToolCallingSessionEvent {
-  return { llmStreamEventBytes: undefined, toolCall: undefined, finalResult: undefined, errorBytes: undefined, seq: 0 };
-}
-
-export const ToolCallingSessionEvent: MessageFns<ToolCallingSessionEvent> = {
-  encode(message: ToolCallingSessionEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.llmStreamEventBytes !== undefined) {
-      writer.uint32(10).bytes(message.llmStreamEventBytes);
-    }
-    if (message.toolCall !== undefined) {
-      ToolCall.encode(message.toolCall, writer.uint32(18).fork()).join();
-    }
-    if (message.finalResult !== undefined) {
-      ToolCallingResult.encode(message.finalResult, writer.uint32(26).fork()).join();
-    }
-    if (message.errorBytes !== undefined) {
-      writer.uint32(34).bytes(message.errorBytes);
-    }
-    if (message.seq !== 0) {
-      writer.uint32(40).uint64(message.seq);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionEvent {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseToolCallingSessionEvent();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.llmStreamEventBytes = reader.bytes();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.toolCall = ToolCall.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.finalResult = ToolCallingResult.decode(reader, reader.uint32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.errorBytes = reader.bytes();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.seq = longToNumber(reader.uint64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ToolCallingSessionEvent {
-    return {
-      llmStreamEventBytes: isSet(object.llmStreamEventBytes)
-        ? bytesFromBase64(object.llmStreamEventBytes)
-        : isSet(object.llm_stream_event_bytes)
-        ? bytesFromBase64(object.llm_stream_event_bytes)
-        : undefined,
-      toolCall: isSet(object.toolCall)
-        ? ToolCall.fromJSON(object.toolCall)
-        : isSet(object.tool_call)
-        ? ToolCall.fromJSON(object.tool_call)
-        : undefined,
-      finalResult: isSet(object.finalResult)
-        ? ToolCallingResult.fromJSON(object.finalResult)
-        : isSet(object.final_result)
-        ? ToolCallingResult.fromJSON(object.final_result)
-        : undefined,
-      errorBytes: isSet(object.errorBytes)
-        ? bytesFromBase64(object.errorBytes)
-        : isSet(object.error_bytes)
-        ? bytesFromBase64(object.error_bytes)
-        : undefined,
-      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
-    };
-  },
-
-  toJSON(message: ToolCallingSessionEvent): unknown {
-    const obj: any = {};
-    if (message.llmStreamEventBytes !== undefined) {
-      obj.llmStreamEventBytes = base64FromBytes(message.llmStreamEventBytes);
-    }
-    if (message.toolCall !== undefined) {
-      obj.toolCall = ToolCall.toJSON(message.toolCall);
-    }
-    if (message.finalResult !== undefined) {
-      obj.finalResult = ToolCallingResult.toJSON(message.finalResult);
-    }
-    if (message.errorBytes !== undefined) {
-      obj.errorBytes = base64FromBytes(message.errorBytes);
-    }
-    if (message.seq !== 0) {
-      obj.seq = Math.round(message.seq);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ToolCallingSessionEvent>, I>>(base?: I): ToolCallingSessionEvent {
-    return ToolCallingSessionEvent.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionEvent>, I>>(object: I): ToolCallingSessionEvent {
-    const message = createBaseToolCallingSessionEvent();
-    message.llmStreamEventBytes = object.llmStreamEventBytes ?? undefined;
-    message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
-      ? ToolCall.fromPartial(object.toolCall)
-      : undefined;
-    message.finalResult = (object.finalResult !== undefined && object.finalResult !== null)
-      ? ToolCallingResult.fromPartial(object.finalResult)
-      : undefined;
-    message.errorBytes = object.errorBytes ?? undefined;
-    message.seq = object.seq ?? 0;
-    return message;
-  },
-};
-
-function createBaseToolCallingSessionStepWithResultRequest(): ToolCallingSessionStepWithResultRequest {
-  return { sessionHandle: 0, toolCallId: "", resultJson: "", error: undefined };
-}
-
-export const ToolCallingSessionStepWithResultRequest: MessageFns<ToolCallingSessionStepWithResultRequest> = {
-  encode(message: ToolCallingSessionStepWithResultRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sessionHandle !== 0) {
-      writer.uint32(8).uint64(message.sessionHandle);
-    }
-    if (message.toolCallId !== "") {
-      writer.uint32(18).string(message.toolCallId);
-    }
-    if (message.resultJson !== "") {
-      writer.uint32(26).string(message.resultJson);
-    }
-    if (message.error !== undefined) {
-      writer.uint32(34).string(message.error);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionStepWithResultRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseToolCallingSessionStepWithResultRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.sessionHandle = longToNumber(reader.uint64());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.toolCallId = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.resultJson = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.error = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ToolCallingSessionStepWithResultRequest {
-    return {
-      sessionHandle: isSet(object.sessionHandle)
-        ? globalThis.Number(object.sessionHandle)
-        : isSet(object.session_handle)
-        ? globalThis.Number(object.session_handle)
-        : 0,
-      toolCallId: isSet(object.toolCallId)
-        ? globalThis.String(object.toolCallId)
-        : isSet(object.tool_call_id)
-        ? globalThis.String(object.tool_call_id)
-        : "",
-      resultJson: isSet(object.resultJson)
-        ? globalThis.String(object.resultJson)
-        : isSet(object.result_json)
-        ? globalThis.String(object.result_json)
-        : "",
-      error: isSet(object.error) ? globalThis.String(object.error) : undefined,
-    };
-  },
-
-  toJSON(message: ToolCallingSessionStepWithResultRequest): unknown {
-    const obj: any = {};
-    if (message.sessionHandle !== 0) {
-      obj.sessionHandle = Math.round(message.sessionHandle);
-    }
-    if (message.toolCallId !== "") {
-      obj.toolCallId = message.toolCallId;
-    }
-    if (message.resultJson !== "") {
-      obj.resultJson = message.resultJson;
-    }
-    if (message.error !== undefined) {
-      obj.error = message.error;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ToolCallingSessionStepWithResultRequest>, I>>(
-    base?: I,
-  ): ToolCallingSessionStepWithResultRequest {
-    return ToolCallingSessionStepWithResultRequest.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionStepWithResultRequest>, I>>(
-    object: I,
-  ): ToolCallingSessionStepWithResultRequest {
-    const message = createBaseToolCallingSessionStepWithResultRequest();
-    message.sessionHandle = object.sessionHandle ?? 0;
-    message.toolCallId = object.toolCallId ?? "";
-    message.resultJson = object.resultJson ?? "";
-    message.error = object.error ?? undefined;
-    return message;
-  },
-};
-
-function createBaseToolCallingSessionDestroyRequest(): ToolCallingSessionDestroyRequest {
-  return { sessionHandle: 0 };
-}
-
-export const ToolCallingSessionDestroyRequest: MessageFns<ToolCallingSessionDestroyRequest> = {
-  encode(message: ToolCallingSessionDestroyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sessionHandle !== 0) {
-      writer.uint32(8).uint64(message.sessionHandle);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionDestroyRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseToolCallingSessionDestroyRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.sessionHandle = longToNumber(reader.uint64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ToolCallingSessionDestroyRequest {
-    return {
-      sessionHandle: isSet(object.sessionHandle)
-        ? globalThis.Number(object.sessionHandle)
-        : isSet(object.session_handle)
-        ? globalThis.Number(object.session_handle)
-        : 0,
-    };
-  },
-
-  toJSON(message: ToolCallingSessionDestroyRequest): unknown {
-    const obj: any = {};
-    if (message.sessionHandle !== 0) {
-      obj.sessionHandle = Math.round(message.sessionHandle);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(
-    base?: I,
-  ): ToolCallingSessionDestroyRequest {
-    return ToolCallingSessionDestroyRequest.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(
-    object: I,
-  ): ToolCallingSessionDestroyRequest {
-    const message = createBaseToolCallingSessionDestroyRequest();
-    message.sessionHandle = object.sessionHandle ?? 0;
-    return message;
-  },
-};
-
-function bytesFromBase64(b64: string): Uint8Array {
-  const bin = globalThis.atob(b64);
-  const arr = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; ++i) {
-    arr[i] = bin.charCodeAt(i);
-  }
-  return arr;
-}
-
-function base64FromBytes(arr: Uint8Array): string {
-  const bin: string[] = [];
-  arr.forEach((byte) => {
-    bin.push(globalThis.String.fromCharCode(byte));
-  });
-  return globalThis.btoa(bin.join(""));
-}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 

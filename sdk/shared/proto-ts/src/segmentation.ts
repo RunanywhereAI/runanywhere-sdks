@@ -63,6 +63,12 @@ export interface SegmentationImage {
   width: number;
   height: number;
   pixelFormat: SegmentationPixelFormat;
+  /**
+   * Bytes per row. 0 = tightly packed (width * bytes-per-pixel). Was a
+   * C-struct-only field (rac_segmentation_image_t.stride_bytes) with no
+   * wire counterpart.
+   */
+  strideBytes: number;
 }
 
 export interface SegmentationOptions {
@@ -100,7 +106,7 @@ export interface SegmentationResult {
 }
 
 function createBaseSegmentationImage(): SegmentationImage {
-  return { data: new Uint8Array(0), width: 0, height: 0, pixelFormat: 0 };
+  return { data: new Uint8Array(0), width: 0, height: 0, pixelFormat: 0, strideBytes: 0 };
 }
 
 export const SegmentationImage: MessageFns<SegmentationImage> = {
@@ -116,6 +122,9 @@ export const SegmentationImage: MessageFns<SegmentationImage> = {
     }
     if (message.pixelFormat !== 0) {
       writer.uint32(32).int32(message.pixelFormat);
+    }
+    if (message.strideBytes !== 0) {
+      writer.uint32(40).uint32(message.strideBytes);
     }
     return writer;
   },
@@ -159,6 +168,14 @@ export const SegmentationImage: MessageFns<SegmentationImage> = {
           message.pixelFormat = reader.int32() as any;
           continue;
         }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.strideBytes = reader.uint32();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -178,6 +195,11 @@ export const SegmentationImage: MessageFns<SegmentationImage> = {
         : isSet(object.pixel_format)
         ? segmentationPixelFormatFromJSON(object.pixel_format)
         : 0,
+      strideBytes: isSet(object.strideBytes)
+        ? globalThis.Number(object.strideBytes)
+        : isSet(object.stride_bytes)
+        ? globalThis.Number(object.stride_bytes)
+        : 0,
     };
   },
 
@@ -195,6 +217,9 @@ export const SegmentationImage: MessageFns<SegmentationImage> = {
     if (message.pixelFormat !== 0) {
       obj.pixelFormat = segmentationPixelFormatToJSON(message.pixelFormat);
     }
+    if (message.strideBytes !== 0) {
+      obj.strideBytes = Math.round(message.strideBytes);
+    }
     return obj;
   },
 
@@ -207,6 +232,7 @@ export const SegmentationImage: MessageFns<SegmentationImage> = {
     message.width = object.width ?? 0;
     message.height = object.height ?? 0;
     message.pixelFormat = object.pixelFormat ?? 0;
+    message.strideBytes = object.strideBytes ?? 0;
     return message;
   },
 };

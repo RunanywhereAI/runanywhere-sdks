@@ -106,8 +106,8 @@ export function diarizationStreamEventKindToJSON(object: DiarizationStreamEventK
 }
 
 export interface DiarizationOptions {
-  sampleRateHz?: number | undefined;
-  channelCount?: number | undefined;
+  sampleRate?: number | undefined;
+  channels?: number | undefined;
   encoding?: DiarizationAudioEncoding | undefined;
   threshold?: number | undefined;
   minimumDurationMs: number;
@@ -150,8 +150,8 @@ export interface DiarizationStreamEvent {
 
 function createBaseDiarizationOptions(): DiarizationOptions {
   return {
-    sampleRateHz: undefined,
-    channelCount: undefined,
+    sampleRate: undefined,
+    channels: undefined,
     encoding: undefined,
     threshold: undefined,
     minimumDurationMs: 0,
@@ -161,11 +161,11 @@ function createBaseDiarizationOptions(): DiarizationOptions {
 
 export const DiarizationOptions: MessageFns<DiarizationOptions> = {
   encode(message: DiarizationOptions, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sampleRateHz !== undefined) {
-      writer.uint32(8).int32(message.sampleRateHz);
+    if (message.sampleRate !== undefined) {
+      writer.uint32(8).int32(message.sampleRate);
     }
-    if (message.channelCount !== undefined) {
-      writer.uint32(16).int32(message.channelCount);
+    if (message.channels !== undefined) {
+      writer.uint32(16).int32(message.channels);
     }
     if (message.encoding !== undefined) {
       writer.uint32(24).int32(message.encoding);
@@ -194,7 +194,7 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
             break;
           }
 
-          message.sampleRateHz = reader.int32();
+          message.sampleRate = reader.int32();
           continue;
         }
         case 2: {
@@ -202,7 +202,7 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
             break;
           }
 
-          message.channelCount = reader.int32();
+          message.channels = reader.int32();
           continue;
         }
         case 3: {
@@ -248,16 +248,12 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
 
   fromJSON(object: any): DiarizationOptions {
     return {
-      sampleRateHz: isSet(object.sampleRateHz)
-        ? globalThis.Number(object.sampleRateHz)
-        : isSet(object.sample_rate_hz)
-        ? globalThis.Number(object.sample_rate_hz)
+      sampleRate: isSet(object.sampleRate)
+        ? globalThis.Number(object.sampleRate)
+        : isSet(object.sample_rate)
+        ? globalThis.Number(object.sample_rate)
         : undefined,
-      channelCount: isSet(object.channelCount)
-        ? globalThis.Number(object.channelCount)
-        : isSet(object.channel_count)
-        ? globalThis.Number(object.channel_count)
-        : undefined,
+      channels: isSet(object.channels) ? globalThis.Number(object.channels) : undefined,
       encoding: isSet(object.encoding) ? diarizationAudioEncodingFromJSON(object.encoding) : undefined,
       threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : undefined,
       minimumDurationMs: isSet(object.minimumDurationMs)
@@ -275,11 +271,11 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
 
   toJSON(message: DiarizationOptions): unknown {
     const obj: any = {};
-    if (message.sampleRateHz !== undefined) {
-      obj.sampleRateHz = Math.round(message.sampleRateHz);
+    if (message.sampleRate !== undefined) {
+      obj.sampleRate = Math.round(message.sampleRate);
     }
-    if (message.channelCount !== undefined) {
-      obj.channelCount = Math.round(message.channelCount);
+    if (message.channels !== undefined) {
+      obj.channels = Math.round(message.channels);
     }
     if (message.encoding !== undefined) {
       obj.encoding = diarizationAudioEncodingToJSON(message.encoding);
@@ -301,8 +297,8 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
   },
   fromPartial<I extends Exact<DeepPartial<DiarizationOptions>, I>>(object: I): DiarizationOptions {
     const message = createBaseDiarizationOptions();
-    message.sampleRateHz = object.sampleRateHz ?? undefined;
-    message.channelCount = object.channelCount ?? undefined;
+    message.sampleRate = object.sampleRate ?? undefined;
+    message.channels = object.channels ?? undefined;
     message.encoding = object.encoding ?? undefined;
     message.threshold = object.threshold ?? undefined;
     message.minimumDurationMs = object.minimumDurationMs ?? 0;

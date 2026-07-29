@@ -57,18 +57,19 @@ export const validateRAGConfiguration = (m: RAGConfiguration): void => {
 
 export const rAGQueryOptionsDefaults = (): RAGQueryOptions => ({
   question: '',
-  maxTokens: 512,
-  temperature: 0.7,
-  topP: 1.0,
-  topK: 0,
   retrievalTopK: 0,
   stream: false,
-  disableThinking: false,
   enableMultiQuery: false,
   multiQueryCount: 3,
 });
 
 export const validateRAGQueryOptions = (m: RAGQueryOptions): void => {
+  if (m.question === '') {
+    throw new ValidationError({
+      fieldPath: 'RAGQueryOptions.question',
+      message: 'question is required',
+    });
+  }
   if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1 || m.multiQueryCount > 8)) {
     throw new ValidationError({
       fieldPath: 'RAGQueryOptions.multi_query_count',

@@ -16,24 +16,17 @@
 
 import { TTSConfiguration, TTSOptions } from '../tts_options';
 import { AudioFormat } from '../model_types';
+import { ValidationError } from './_errors';
 
 export const tTSConfigurationDefaults = (): TTSConfiguration => ({
   modelId: '',
-  voice: 'default',
-  languageCode: 'en-US',
-  speakingRate: 1.0,
-  pitch: 1.0,
-  volume: 1.0,
-  audioFormat: 0,
-  sampleRate: 22050,
   enableNeuralVoice: true,
-  enableSsml: false,
 });
 
 export const tTSOptionsDefaults = (): TTSOptions => ({
   voice: '',
   languageCode: 'en-US',
-  speakingRate: 1.0,
+  speed: 1.0,
   pitch: 1.0,
   volume: 1.0,
   enableSsml: false,
@@ -41,3 +34,12 @@ export const tTSOptionsDefaults = (): TTSOptions => ({
   sampleRate: 22050,
   speakerId: 0,
 });
+
+export const validateTTSOptions = (m: TTSOptions): void => {
+  if (!Number.isFinite(m.speed) || m.speed < 0.5 || m.speed > 2.0) {
+    throw new ValidationError({
+      fieldPath: 'TTSOptions.speed',
+      message: `speed must be in 0.5...2.0 (got ${m.speed})`,
+    });
+  }
+};
