@@ -22,7 +22,7 @@ public extension RATTSOptions {
         var options = RATTSOptions()
         options.voice = voice
         options.languageCode = language
-        options.speakingRate = rate
+        options.speed = rate
         options.pitch = pitch
         options.volume = volume
         options.audioFormat = audioFormat
@@ -32,8 +32,8 @@ public extension RATTSOptions {
     }
 
     var rate: Float {
-        get { speakingRate }
-        set { speakingRate = newValue }
+        get { speed }
+        set { speed = newValue }
     }
 
     var language: String {

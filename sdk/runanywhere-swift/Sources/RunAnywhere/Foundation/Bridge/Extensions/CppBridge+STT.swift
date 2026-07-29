@@ -16,6 +16,16 @@ import Foundation
 import os
 import SwiftProtobuf
 
+private enum STTStateProtoABI {
+    typealias State = @convention(c) (
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
+
+    static let stateName = "rac_stt_state_lifecycle_proto"
+
+    static let state = NativeProtoABI.load(stateName, as: State.self)
+}
+
 private enum STTStreamSessionABI {
     typealias Callback = @convention(c) (
         UnsafePointer<UInt8>?,
@@ -230,6 +240,24 @@ extension CppBridge {
 
         /// Get the currently loaded model ID
         public var currentModelId: String? { loadedModelId }
+
+        /// Lifecycle STT service state (readiness, current model, streaming
+        /// support, supported language codes).
+        public func stateProto() throws -> RASTTServiceState {
+            let symbol = try NativeProtoABI.require(
+                STTStateProtoABI.state,
+                named: STTStateProtoABI.stateName
+            )
+            var outBuffer = rac_proto_buffer_t()
+            defer { NativeProtoABI.free(&outBuffer) }
+            let status = symbol(&outBuffer)
+            guard status == RAC_SUCCESS else {
+                let message = outBuffer.error_message.map { String(cString: $0) }
+                    ?? "Native proto request failed: \(STTStateProtoABI.stateName) rc=\(status)"
+                throw SDKException(code: .processingFailed, message: message, category: .internal)
+            }
+            return try NativeProtoABI.decode(RASTTServiceState.self, from: outBuffer)
+        }
 
         /// Check if streaming is supported
         public var supportsStreaming: Bool {

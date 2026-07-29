@@ -30,6 +30,7 @@ public extension RunAnywhere {
         var request = RAVADProcessRequest()
         var audioSource = RAVADAudioSource()
         audioSource.audioData = audioData
+        audioSource.encoding = .pcmF32Le
         request.audio = audioSource
         if let options {
             request.options = options

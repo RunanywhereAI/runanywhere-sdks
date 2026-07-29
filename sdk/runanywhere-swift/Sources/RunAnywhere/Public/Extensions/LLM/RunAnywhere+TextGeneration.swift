@@ -21,8 +21,7 @@ public extension RunAnywhere {
         prompt: String,
         options: RALLMGenerationOptions? = nil
     ) async throws -> RALLMGenerationResult {
-        var requestOptions = options ?? .defaults()
-        requestOptions.streamingEnabled = false
+        let requestOptions = options ?? .defaults()
         let request = requestOptions.toRALLMGenerateRequest(prompt: prompt)
         return try await generate(request)
     }
@@ -35,8 +34,7 @@ public extension RunAnywhere {
         prompt: String,
         options: RALLMGenerationOptions? = nil
     ) async throws -> AsyncStream<RALLMStreamEvent> {
-        var requestOptions = options ?? .defaults()
-        requestOptions.streamingEnabled = true
+        let requestOptions = options ?? .defaults()
         let request = requestOptions.toRALLMGenerateRequest(prompt: prompt)
         return try await generateStream(request)
     }
@@ -53,8 +51,7 @@ public extension RunAnywhere {
         let systemPromptDesc = options.systemPrompt.isEmpty ? "nil" : "set(\(options.systemPrompt.count) chars)"
         SDKLogger.llm.info(
             "[PARAMS] generate: temperature=\(options.temperature), top_p=\(options.topP), "
-            + "max_tokens=\(options.maxTokens), system_prompt=\(systemPromptDesc), "
-            + "streaming=\(options.streamingEnabled)"
+            + "max_output_tokens=\(options.maxOutputTokens), system_prompt=\(systemPromptDesc)"
         )
 
         return try await CppBridge.LLM.shared.generate(request)
@@ -83,8 +80,7 @@ public extension RunAnywhere {
         let systemPromptDesc = options.systemPrompt.isEmpty ? "nil" : "set(\(options.systemPrompt.count) chars)"
         SDKLogger.llm.info(
             "[PARAMS] generateStream: temperature=\(options.temperature), top_p=\(options.topP), "
-            + "max_tokens=\(options.maxTokens), system_prompt=\(systemPromptDesc), "
-            + "streaming=\(options.streamingEnabled)"
+            + "max_output_tokens=\(options.maxOutputTokens), system_prompt=\(systemPromptDesc)"
         )
 
         return try await CppBridge.LLM.shared.generateStream(request)
@@ -192,10 +188,10 @@ public extension RunAnywhere {
         } else if !thinkingResponse.isEmpty {
             result.thinkingContent = thinkingResponse
         }
-        result.inputTokens = final.map { $0.promptTokens } ?? Int32(max(1, prompt.count / 4))
-        result.tokensGenerated = final.map { $0.completionTokens } ?? Int32(tokenCount)
-        result.responseTokens = final.map { $0.completionTokens } ?? Int32(tokenCount)
-        result.totalTokens = final.map { $0.totalTokens } ?? (result.inputTokens + result.tokensGenerated)
+        result.inputTokens = final.map { $0.inputTokens } ?? Int32(max(1, prompt.count / 4))
+        result.outputTokens = final.map { $0.outputTokens } ?? Int32(tokenCount)
+        result.responseTokens = final.map { $0.outputTokens } ?? Int32(tokenCount)
+        result.totalTokens = final.map { $0.totalTokens } ?? (result.inputTokens + result.outputTokens)
         result.modelUsed = modelID
         result.generationTimeMs = final.map { Double($0.totalTimeMs) } ?? totalLatency
         result.framework = framework

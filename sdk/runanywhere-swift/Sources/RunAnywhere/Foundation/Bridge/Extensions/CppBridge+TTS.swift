@@ -18,6 +18,16 @@ import Foundation
 import os
 import SwiftProtobuf
 
+private enum TTSStateProtoABI {
+    typealias State = @convention(c) (
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
+
+    static let stateName = "rac_tts_state_lifecycle_proto"
+
+    static let state = NativeProtoABI.load(stateName, as: State.self)
+}
+
 private enum TTSStreamSessionABI {
     typealias Callback = @convention(c) (
         UnsafePointer<UInt8>?,
@@ -227,6 +237,24 @@ extension CppBridge {
         /// Get the currently loaded voice ID
         public var currentVoiceId: String? {
             get async { await inner.currentAssetId }
+        }
+
+        /// Lifecycle TTS service state (readiness, current voice, available
+        /// voices, supported language codes).
+        public func stateProto() throws -> RATTSServiceState {
+            let symbol = try NativeProtoABI.require(
+                TTSStateProtoABI.state,
+                named: TTSStateProtoABI.stateName
+            )
+            var outBuffer = rac_proto_buffer_t()
+            defer { NativeProtoABI.free(&outBuffer) }
+            let status = symbol(&outBuffer)
+            guard status == RAC_SUCCESS else {
+                let message = outBuffer.error_message.map { String(cString: $0) }
+                    ?? "Native proto request failed: \(TTSStateProtoABI.stateName) rc=\(status)"
+                throw SDKException(code: .processingFailed, message: message, category: .internal)
+            }
+            return try NativeProtoABI.decode(RATTSServiceState.self, from: outBuffer)
         }
 
         // MARK: - Voice Lifecycle

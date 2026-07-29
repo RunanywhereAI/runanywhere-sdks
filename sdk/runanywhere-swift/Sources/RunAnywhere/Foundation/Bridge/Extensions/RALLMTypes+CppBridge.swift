@@ -17,27 +17,27 @@ public extension RALLMGenerationOptions {
     // point they happened to use.
 
     init(
-        maxTokens: Int = Int(RALLMGenerationOptions.defaults().maxTokens),
+        maxOutputTokens: Int = Int(RALLMGenerationOptions.defaults().maxOutputTokens),
         temperature: Float = RALLMGenerationOptions.defaults().temperature,
         topP: Float = RALLMGenerationOptions.defaults().topP,
         topK: Int = Int(RALLMGenerationOptions.defaults().topK),
         repetitionPenalty: Float = RALLMGenerationOptions.defaults().repetitionPenalty,
         stopSequences: [String] = [],
-        streamingEnabled: Bool = false,
         preferredFramework: RAInferenceFramework = .unspecified,
         systemPrompt: String? = nil,
+        reasoning: RAReasoningOptions? = nil,
         structuredOutput: RAStructuredOutputOptions? = nil
     ) {
         var options = RALLMGenerationOptions()
-        options.maxTokens = Int32(maxTokens)
+        options.maxOutputTokens = Int32(maxOutputTokens)
         options.temperature = temperature
         options.topP = topP
         options.topK = Int32(topK)
         options.repetitionPenalty = repetitionPenalty
         options.stopSequences = stopSequences
-        options.streamingEnabled = streamingEnabled
         options.preferredFramework = preferredFramework
         if let prompt = systemPrompt { options.systemPrompt = prompt }
+        if let reasoning { options.reasoning = reasoning }
         if let so = structuredOutput { options.structuredOutput = so }
         self = options
     }
@@ -45,13 +45,8 @@ public extension RALLMGenerationOptions {
     func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
         var request = RALLMGenerateRequest()
         request.prompt = prompt
-        // Commons already classifies streamed output into ANSWER / THOUGHT
-        // token kinds and resolves a model's thinking tags from the registry,
-        // so a request-local thinking pattern is NOT required. Surface thought
-        // events whenever thinking is enabled (i.e. not explicitly disabled) so
-        // default catalog models still stream reasoning.
-        request.emitThoughts = !disableThinking
-        // LLM generation controls have one canonical wire location.
+        // LLM generation controls have one canonical wire location; thought
+        // emission is governed by options.reasoning.includeInOutput.
         request.options = self
         return request
     }
@@ -66,7 +61,7 @@ public extension RALLMGenerationOptions {
 // path remains. Deleted per swift.md SWIFT-DUP-RACTYPES-CPPBRIDGE-DEAD.
 
 public extension RALLMGenerationResult {
-    var tokensUsed: Int { Int(tokensGenerated) }
+    var tokensUsed: Int { Int(outputTokens) }
     var latencyMs: TimeInterval { generationTimeMs }
     var timeToFirstTokenMs: Double? { hasTtftMs ? ttftMs : nil }
 }

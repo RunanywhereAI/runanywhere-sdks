@@ -38,6 +38,16 @@ public extension RunAnywhere {
         return try await CppBridge.STT.shared.transcribe(request)
     }
 
+    /// Current STT service state (readiness, current model, streaming
+    /// support, supported language codes) from the commons lifecycle.
+    static func sttState() async throws -> RASTTServiceState {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        return try await CppBridge.STT.shared.stateProto()
+    }
+
     /// Canonical stream-in / stream-out transcription.
     ///
     /// Consumes an `AsyncStream<Data>` of PCM audio chunks and yields

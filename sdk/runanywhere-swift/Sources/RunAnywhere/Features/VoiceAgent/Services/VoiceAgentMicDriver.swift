@@ -144,9 +144,9 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
                 let (status, result) = try CppBridge.VoiceAgent.feedAudioProto(
                     handle: handle.rawValue,
                     audio: chunk,
-                    sampleRateHz: Int32(MicConstants.sampleRateHz),
+                    sampleRate: Int32(MicConstants.sampleRateHz),
                     channels: 1,
-                    encoding: Int32(RAAudioEncoding.pcmS16Le.rawValue),
+                    encoding: .pcmS16Le,
                     isFinal: false
                 )
 

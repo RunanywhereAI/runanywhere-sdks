@@ -132,8 +132,8 @@ public final class SystemTTSService: NSObject {
         utterance.voice = resolveVoice(options: options)
 
         // Configure speech parameters
-        let speakingRate = options.speakingRate > 0 ? options.speakingRate : 1.0
-        utterance.rate = speakingRate * AVSpeechUtteranceDefaultSpeechRate
+        let speed = options.speed > 0 ? options.speed : 1.0
+        utterance.rate = speed * AVSpeechUtteranceDefaultSpeechRate
         utterance.pitchMultiplier = options.pitch > 0 ? options.pitch : 1.0
         utterance.volume = options.volume > 0 ? options.volume : 1.0
         utterance.preUtteranceDelay = 0.0

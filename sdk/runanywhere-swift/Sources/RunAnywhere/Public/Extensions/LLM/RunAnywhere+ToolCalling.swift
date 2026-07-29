@@ -218,10 +218,12 @@ public extension RunAnywhere {
     ///   - forcedToolName: Companion to `toolChoice=SPECIFIC` — the tool name
     ///                     the LLM is forced to invoke. Overrides
     ///                     `toolOptions.forcedToolName` when non-nil.
+    ///   - reasoning: Optional override for `options.reasoning` (mode /
+    ///                includeInOutput / tag pattern). Replaces the retired
+    ///                per-call thinking toggles.
     ///   - validateCalls: Optional override for the IDL-level
     ///                    `validate_calls` knob on
-    ///                    `ToolCallingSessionCreateRequest`
-    ///                    (idl/tool_calling.proto:404). When `nil` the field
+    ///                    `ToolCallingSessionCreateRequest`. When `nil` the field
     ///                    is left unset and commons applies its default
     ///                    (`true` — i.e. enforce schema + registry checks
     ///                    before invoking the executor). Hosts that delegate
@@ -240,18 +242,15 @@ public extension RunAnywhere {
     ///            and any executed tool results.
     ///
     /// Note: `tool_choice` / `forced_tool_name` live on the
-    /// `RAToolCallingOptions` proto (fields 13/14, idl/tool_calling.proto).
-    /// They are applied here on the effective options so future commons
-    /// support automatically picks them up; the
-    /// session-create request itself has reserved-7-10 today, so end-to-end
-    /// propagation to native parse/validate helpers is pending the commons
-    /// builder that snapshots options from the request.
+    /// `RAToolCallingOptions` proto and travel inside
+    /// `generation.toolCalling` on the session-create request.
     static func generateWithTools(
         prompt: String,
         options: RALLMGenerationOptions = .defaults(),
         toolOptions: RAToolCallingOptions? = nil,
         toolChoice: RAToolChoiceMode? = nil,
         forcedToolName: String? = nil,
+        reasoning: RAReasoningOptions? = nil,
         validateCalls: Bool? = nil,
         history: [String] = []
     ) async throws -> RAToolCallingResult {
@@ -275,6 +274,7 @@ public extension RunAnywhere {
             options: options,
             toolOptions: tcOpts,
             tools: tools,
+            reasoning: reasoning,
             validateCalls: validateCalls,
             history: history
         )
@@ -384,55 +384,35 @@ public extension RunAnywhere {
     }
 
     /// Build the `ToolCallingSessionCreateRequest` proto consumed by
-    /// `rac_tool_calling_run_loop_proto`. Applies `toolOptions`
-    /// overrides on top of the base LLM generation options and forwards the
-    /// registered tool list.
+    /// `rac_tool_calling_run_loop_proto`. Tool configuration travels inside
+    /// `generation.toolCalling`; sampling and system prompt come from the base
+    /// LLM generation options.
     private static func makeRunLoopRequest(
         prompt: String,
         options: RALLMGenerationOptions,
         toolOptions: RAToolCallingOptions,
         tools: [RAToolDefinition],
+        reasoning: RAReasoningOptions? = nil,
         validateCalls: Bool? = nil,
         // Prior conversation turns as a flat alternating list
         // `[user0, asst0, ...]`, EXCLUDING the current turn (which is `prompt`).
         // commons threads these into every generate in the loop so multi-turn
-        // tool use keeps context. Same contract as the standard path's
-        // ChatMessage history, as strings.
+        // tool use keeps context.
         history: [String] = []
     ) -> RAToolCallingSessionCreateRequest {
         var request = RAToolCallingSessionCreateRequest()
         request.prompt = prompt
 
-        let maxTokens: Int32
-        if toolOptions.hasMaxTokens, toolOptions.maxTokens > 0 {
-            maxTokens = toolOptions.maxTokens
-        } else {
-            maxTokens = options.maxTokens
-        }
-        request.maxTokens = maxTokens
+        var effectiveToolOptions = toolOptions
+        effectiveToolOptions.tools = tools
 
-        let temperature: Float
-        if toolOptions.hasTemperature {
-            temperature = toolOptions.temperature
-        } else {
-            temperature = options.temperature
+        var generation = options
+        generation.toolCalling = effectiveToolOptions
+        if let reasoning {
+            generation.reasoning = reasoning
         }
-        request.temperature = temperature
-        request.topP = options.topP
+        request.generation = generation
 
-        if toolOptions.hasSystemPrompt, !toolOptions.systemPrompt.isEmpty {
-            request.systemPrompt = toolOptions.systemPrompt
-        } else if options.hasSystemPrompt, !options.systemPrompt.isEmpty {
-            request.systemPrompt = options.systemPrompt
-        }
-
-        request.tools = tools
-        request.format = toolOptions.format
-        request.maxToolCalls = UInt32(toolOptions.maxToolCalls > 0 ? toolOptions.maxToolCalls : 5)
-        request.autoExecute = toolOptions.autoExecute
-        request.replaceSystemPrompt = toolOptions.replaceSystemPrompt
-        request.requireJsonArguments = toolOptions.requireJsonArguments
-        request.keepToolsAvailable = toolOptions.keepToolsAvailable
         // `validate_calls` is `optional bool` on the proto so
         // hosts that delegate validation/authorization to their executor (or
         // use dynamic tool registries where argument inspection happens
@@ -442,24 +422,14 @@ public extension RunAnywhere {
         if let validateCalls {
             request.validateCalls = validateCalls
         }
-        // Thread tool_choice / forced_tool_name
-        // all the way through to the commons request envelope (fields 7/8 on
-        // ToolCallingSessionCreateRequest) so the run-loop / session APIs see
-        // them — not just the inline RAToolCallingOptions snapshot.
-        if toolOptions.toolChoice != .unspecified {
-            request.toolChoice = toolOptions.toolChoice
+        // Role-tagged prior turns (alternating USER / ASSISTANT from the flat
+        // string list) so the commons run-loop keeps multi-turn context.
+        request.history = history.enumerated().map { index, content in
+            var message = RAChatMessage()
+            message.role = index.isMultiple(of: 2) ? .user : .assistant
+            message.content = content
+            return message
         }
-        if toolOptions.hasForcedToolName, !toolOptions.forcedToolName.isEmpty {
-            request.forcedToolName = toolOptions.forcedToolName
-        }
-        // Suppress thinking when either options surface asks for it.
-        request.disableThinking = toolOptions.disableThinking || options.disableThinking
-        // Prior conversation turns (flat alternating [user, asst, ...] of prior
-        // turns, excluding the current turn) so the commons run-loop keeps
-        // multi-turn context. `history` is a swift-protobuf repeated field
-        // (proto field 19), assignable directly. Empty by default — a no-op
-        // for single-turn callers.
-        request.history = history
         return request
     }
 }

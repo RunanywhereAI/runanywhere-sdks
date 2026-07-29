@@ -101,6 +101,16 @@ public extension RunAnywhere {
         await CppBridge.TTS.shared.stop()
     }
 
+    /// Current TTS service state (readiness, current voice, available
+    /// voices, supported language codes) from the commons lifecycle.
+    static func ttsState() async throws -> RATTSServiceState {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        return try await CppBridge.TTS.shared.stateProto()
+    }
+
     // MARK: - Speak (Simple API)
 
     /// Speak text aloud through the device speakers.

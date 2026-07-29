@@ -15,7 +15,7 @@ public extension RunAnywhere {
 
     /// Generate structured output from a prompt using a JSON schema (CANONICAL_API §3).
     ///
-    /// Caller-supplied `options` (maxTokens, temperature, topP, preferredFramework,
+    /// Caller-supplied `options` (maxOutputTokens, temperature, topP, preferredFramework,
     /// systemPrompt, …) are forwarded to the underlying LLM through
     /// `generateWithStructuredOutput(_:)`; the resulting raw text is then
     /// passed to `extractStructuredOutput(text:schema:)` so commons still owns
@@ -41,7 +41,7 @@ public extension RunAnywhere {
     /// Stream structured output generation using a JSON schema (CANONICAL_API §3).
     ///
     /// Caller-supplied `options` are forwarded to `generateStream(_:)` so
-    /// generation knobs (maxTokens, temperature, topP, preferredFramework,
+    /// generation knobs (maxOutputTokens, temperature, topP, preferredFramework,
     /// systemPrompt, …) take effect. Token events from the LLM are
     /// translated into `.token` `RAStructuredOutputStreamEvent`s; on the
     /// final token the accumulated text is parsed via
@@ -66,7 +66,6 @@ public extension RunAnywhere {
 
         var internalOptions = options ?? RALLMGenerationOptions.defaults()
         internalOptions.structuredOutput = .defaults(schema: schema)
-        internalOptions.streamingEnabled = true
         let request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
 
         return AsyncThrowingStream { continuation in
@@ -131,7 +130,6 @@ public extension RunAnywhere {
             }
             if prep.hasSystemPrompt { internalOptions.systemPrompt = prep.systemPrompt }
         }
-        internalOptions.streamingEnabled = false
         let request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
         return try await generate(request)
     }

@@ -27,8 +27,6 @@ import SwiftProtobuf
 private enum VADComponentProtoABI {
     typealias Process = @convention(c) (
         rac_handle_t?,
-        UnsafePointer<Float>?,
-        Int,
         UnsafePointer<UInt8>?,
         Int,
         UnsafeMutablePointer<rac_proto_buffer_t>?
@@ -64,14 +62,11 @@ private enum VoiceAgentStateProtoABI {
 
     // Streaming raw-frame ingress: the core segments utterances and runs the
     // turn pipeline, returning a VoiceAgentResult inline when one completes.
+    // Takes serialized runanywhere.v1.VoiceAgentAudioFrame bytes.
     typealias FeedAudio = @convention(c) (
         rac_voice_agent_handle_t?,
-        UnsafeRawPointer?,
+        UnsafePointer<UInt8>?,
         Int,
-        Int32,
-        Int32,
-        Int32,
-        rac_bool_t,
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
 
@@ -378,21 +373,18 @@ extension CppBridge.VAD {
             VADComponentProtoABI.process,
             named: VADComponentProtoABI.processName
         )
+        var request = RAVADProcessRequest()
+        var audioSource = RAVADAudioSource()
+        audioSource.audioData = samples.withUnsafeBufferPointer { Data(buffer: $0) }
+        audioSource.encoding = .pcmF32Le
+        request.audio = audioSource
+        request.options = options
         return try decodeBuffer(
             responseType: RAVADResult.self,
             symbolName: VADComponentProtoABI.processName
         ) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(options) { optionBytes, optionSize in
-                samples.withUnsafeBufferPointer { sampleBuffer in
-                    process(
-                        handle.rawValue,
-                        sampleBuffer.baseAddress,
-                        samples.count,
-                        optionBytes,
-                        optionSize,
-                        outBuffer
-                    )
-                }
+            try NativeProtoABI.withSerializedBytes(request) { requestBytes, requestSize in
+                process(handle.rawValue, requestBytes, requestSize, outBuffer)
             }
         }
     }
@@ -482,9 +474,9 @@ extension CppBridge.VoiceAgent {
     nonisolated static func feedAudioProto(
         handle: rac_voice_agent_handle_t,
         audio: Data,
-        sampleRateHz: Int32,
+        sampleRate: Int32,
         channels: Int32,
-        encoding: Int32,
+        encoding: RAAudioEncoding,
         isFinal: Bool
     ) throws -> (status: rac_result_t, result: RAVoiceAgentResult?) {
         let feed = try NativeProtoABI.require(
@@ -498,19 +490,16 @@ extension CppBridge.VoiceAgent {
                 category: .internal
             )
         }
+        var frame = RAVoiceAgentAudioFrame()
+        frame.audioData = audio
+        frame.sampleRate = sampleRate
+        frame.channels = channels
+        frame.encoding = encoding
+        frame.isFinal = isFinal
         var outBuffer = rac_proto_buffer_t()
         defer { NativeProtoABI.free(&outBuffer) }
-        let status = audio.withUnsafeBytes { audioBytes in
-            feed(
-                handle,
-                audioBytes.baseAddress,
-                audio.count,
-                sampleRateHz,
-                channels,
-                encoding,
-                isFinal ? RAC_TRUE : RAC_FALSE,
-                &outBuffer
-            )
+        let status = try NativeProtoABI.withSerializedBytes(frame) { frameBytes, frameSize in
+            feed(handle, frameBytes, frameSize, &outBuffer)
         }
         guard status == RAC_SUCCESS else {
             return (status, nil)
@@ -556,9 +545,7 @@ extension CppBridge.VLM {
         )
         var request = RAVLMGenerationRequest()
         request.images = [image]
-        var streamingOptions = options
-        streamingOptions.streamingEnabled = true
-        request.options = streamingOptions
+        request.options = options
         let requestData = try request.serializedData()
         return AsyncStream { continuation in
             let context = ProtoStreamContext<RAVLMStreamEvent>(
