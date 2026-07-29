@@ -451,7 +451,19 @@ function buildCard(o) {
   if (o.custom) {
     actions.appendChild(mkbtn('Remove', async () => {
       if (loadedById[o.key]) { try { await unloaders[o.type](loadedById[o.key]); } catch { /* ignore */ } forgetLoaded(o.key); delete handles[o.type]; delete handles[`${o.type}:id`]; }
-      customModels = customModels.filter((m) => m.id !== o.key); persistCustom(); renderModels();
+      customModels = customModels.filter((m) => m.id !== o.key);
+      persistCustom();
+      // The choice is persisted by id, so a removed model would otherwise leave a
+      // dangling id in settings that modelSource() cannot resolve — every later
+      // load would fail, across restarts, with no way to recover from the UI.
+      if (settings.models && settings.models[o.type] === o.key) {
+        const models = { ...settings.models };
+        delete models[o.type];
+        settings.models = models;
+        try { await store.saveSettings(settings); } catch { /* optional */ }
+        renderModelChips();
+      }
+      renderModels();
     }));
   }
   return div;
@@ -1231,9 +1243,9 @@ async function selfTest() {
     log(`[selftest] embeddings OK: close=${close.toFixed(3)} far=${far.toFixed(3)}`);
 
     const cat = await ra.catalog();
-    if (!cat['qwen2.5-0.5b']) throw new Error('catalog missing');
+    if (!cat['qwen3.5-0.8b']) throw new Error('catalog missing');
     const status = await ra.modelStatus();
-    log('[selftest] models OK: ' + Object.keys(cat).length + ' catalog entries, qwen downloaded=' + status['qwen2.5-0.5b'].downloaded);
+    log('[selftest] models OK: ' + Object.keys(cat).length + ' catalog entries, qwen downloaded=' + status['qwen3.5-0.8b'].downloaded);
 
     const image = new URLSearchParams(location.search).get('image');
     if (image) { const c = await runVision(image); if (!c || c.length < 3) throw new Error('empty caption'); log('[selftest] vision OK: ' + JSON.stringify(c.slice(0, 70))); }
