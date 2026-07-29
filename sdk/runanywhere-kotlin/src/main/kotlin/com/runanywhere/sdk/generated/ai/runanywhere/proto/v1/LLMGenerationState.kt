@@ -16,6 +16,10 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
+/**
+ * LLMGenerationRequest was deleted: LLMGenerateRequest (llm_service.proto)
+ * is the single request envelope for both unary and streaming generation.
+ */
 public enum class LLMGenerationState(
   override val `value`: Int,
 ) : WireEnum {

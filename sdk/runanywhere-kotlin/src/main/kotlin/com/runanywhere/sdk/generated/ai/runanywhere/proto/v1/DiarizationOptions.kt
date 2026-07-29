@@ -36,20 +36,19 @@ public class DiarizationOptions(
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    jsonName = "sampleRateHz",
+    jsonName = "sampleRate",
     schemaIndex = 0,
   )
-  public val sample_rate_hz: Int? = null,
+  public val sample_rate: Int? = null,
   @RacDefaultOption("1")
   @RacMinOption(1)
   @RacMaxOption(1)
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    jsonName = "channelCount",
     schemaIndex = 1,
   )
-  public val channel_count: Int? = null,
+  public val channels: Int? = null,
   @RacDefaultOption("DIARIZATION_AUDIO_ENCODING_PCM_F32_LE")
   @field:WireField(
     tag = 3,
@@ -96,8 +95,8 @@ public class DiarizationOptions(
     if (other === this) return true
     if (other !is DiarizationOptions) return false
     if (unknownFields != other.unknownFields) return false
-    if (sample_rate_hz != other.sample_rate_hz) return false
-    if (channel_count != other.channel_count) return false
+    if (sample_rate != other.sample_rate) return false
+    if (channels != other.channels) return false
     if (encoding != other.encoding) return false
     if (threshold != other.threshold) return false
     if (minimum_duration_ms != other.minimum_duration_ms) return false
@@ -109,8 +108,8 @@ public class DiarizationOptions(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + (sample_rate_hz?.hashCode() ?: 0)
-      result = result * 37 + (channel_count?.hashCode() ?: 0)
+      result = result * 37 + (sample_rate?.hashCode() ?: 0)
+      result = result * 37 + (channels?.hashCode() ?: 0)
       result = result * 37 + (encoding?.hashCode() ?: 0)
       result = result * 37 + (threshold?.hashCode() ?: 0)
       result = result * 37 + minimum_duration_ms.hashCode()
@@ -122,8 +121,8 @@ public class DiarizationOptions(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    if (sample_rate_hz != null) result += """sample_rate_hz=$sample_rate_hz"""
-    if (channel_count != null) result += """channel_count=$channel_count"""
+    if (sample_rate != null) result += """sample_rate=$sample_rate"""
+    if (channels != null) result += """channels=$channels"""
     if (encoding != null) result += """encoding=$encoding"""
     if (threshold != null) result += """threshold=$threshold"""
     result += """minimum_duration_ms=$minimum_duration_ms"""
@@ -132,14 +131,14 @@ public class DiarizationOptions(
   }
 
   public fun copy(
-    sample_rate_hz: Int? = this.sample_rate_hz,
-    channel_count: Int? = this.channel_count,
+    sample_rate: Int? = this.sample_rate,
+    channels: Int? = this.channels,
     encoding: DiarizationAudioEncoding? = this.encoding,
     threshold: Float? = this.threshold,
     minimum_duration_ms: Long = this.minimum_duration_ms,
     merge_gap_ms: Long = this.merge_gap_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): DiarizationOptions = DiarizationOptions(sample_rate_hz, channel_count, encoding, threshold, minimum_duration_ms, merge_gap_ms, unknownFields)
+  ): DiarizationOptions = DiarizationOptions(sample_rate, channels, encoding, threshold, minimum_duration_ms, merge_gap_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -154,8 +153,8 @@ public class DiarizationOptions(
     ) {
       override fun encodedSize(`value`: DiarizationOptions): Int {
         var size = value.unknownFields.size
-        size += ProtoAdapter.INT32.encodedSizeWithTag(1, value.sample_rate_hz)
-        size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.channel_count)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(1, value.sample_rate)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.channels)
         size += DiarizationAudioEncoding.ADAPTER.encodedSizeWithTag(3, value.encoding)
         size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.threshold)
         if (value.minimum_duration_ms != 0L) {
@@ -168,8 +167,8 @@ public class DiarizationOptions(
       }
 
       override fun encode(writer: ProtoWriter, `value`: DiarizationOptions) {
-        ProtoAdapter.INT32.encodeWithTag(writer, 1, value.sample_rate_hz)
-        ProtoAdapter.INT32.encodeWithTag(writer, 2, value.channel_count)
+        ProtoAdapter.INT32.encodeWithTag(writer, 1, value.sample_rate)
+        ProtoAdapter.INT32.encodeWithTag(writer, 2, value.channels)
         DiarizationAudioEncoding.ADAPTER.encodeWithTag(writer, 3, value.encoding)
         ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.threshold)
         if (value.minimum_duration_ms != 0L) {
@@ -191,21 +190,21 @@ public class DiarizationOptions(
         }
         ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.threshold)
         DiarizationAudioEncoding.ADAPTER.encodeWithTag(writer, 3, value.encoding)
-        ProtoAdapter.INT32.encodeWithTag(writer, 2, value.channel_count)
-        ProtoAdapter.INT32.encodeWithTag(writer, 1, value.sample_rate_hz)
+        ProtoAdapter.INT32.encodeWithTag(writer, 2, value.channels)
+        ProtoAdapter.INT32.encodeWithTag(writer, 1, value.sample_rate)
       }
 
       override fun decode(reader: ProtoReader): DiarizationOptions {
-        var sample_rate_hz: Int? = null
-        var channel_count: Int? = null
+        var sample_rate: Int? = null
+        var channels: Int? = null
         var encoding: DiarizationAudioEncoding? = null
         var threshold: Float? = null
         var minimum_duration_ms: Long = 0L
         var merge_gap_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> sample_rate_hz = ProtoAdapter.INT32.decode(reader)
-            2 -> channel_count = ProtoAdapter.INT32.decode(reader)
+            1 -> sample_rate = ProtoAdapter.INT32.decode(reader)
+            2 -> channels = ProtoAdapter.INT32.decode(reader)
             3 -> try {
               encoding = DiarizationAudioEncoding.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -218,8 +217,8 @@ public class DiarizationOptions(
           }
         }
         return DiarizationOptions(
-          sample_rate_hz = sample_rate_hz,
-          channel_count = channel_count,
+          sample_rate = sample_rate,
+          channels = channels,
           encoding = encoding,
           threshold = threshold,
           minimum_duration_ms = minimum_duration_ms,

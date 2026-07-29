@@ -77,10 +77,10 @@ public class VLMGenerationOptions(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxTokens",
+    jsonName = "maxOutputTokens",
     schemaIndex = 1,
   )
-  public val max_tokens: Int = 0,
+  public val max_output_tokens: Int = 0,
   @RacDefaultOption("0.7")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(2.0)
@@ -113,20 +113,11 @@ public class VLMGenerationOptions(
   )
   public val top_k: Int = 0,
   stop_sequences: List<String> = emptyList(),
-  @RacDefaultOption("true")
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "streamingEnabled",
-    schemaIndex = 6,
-  )
-  public val streaming_enabled: Boolean = false,
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "systemPrompt",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val system_prompt: String? = null,
   @field:WireField(
@@ -134,7 +125,7 @@ public class VLMGenerationOptions(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "maxImageSize",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val max_image_size: Int = 0,
   @field:WireField(
@@ -142,7 +133,7 @@ public class VLMGenerationOptions(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "nThreads",
-    schemaIndex = 9,
+    schemaIndex = 8,
   )
   public val n_threads: Int = 0,
   @RacDefaultOption("true")
@@ -151,7 +142,7 @@ public class VLMGenerationOptions(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "useGpu",
-    schemaIndex = 10,
+    schemaIndex = 9,
   )
   public val use_gpu: Boolean = false,
   @field:WireField(
@@ -159,21 +150,21 @@ public class VLMGenerationOptions(
     adapter = "ai.runanywhere.proto.v1.VLMModelFamily#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelFamily",
-    schemaIndex = 11,
+    schemaIndex = 10,
   )
   public val model_family: VLMModelFamily = VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED,
   @field:WireField(
     tag = 13,
     adapter = "ai.runanywhere.proto.v1.VLMChatTemplate#ADAPTER",
     jsonName = "customChatTemplate",
-    schemaIndex = 12,
+    schemaIndex = 11,
   )
   public val custom_chat_template: VLMChatTemplate? = null,
   @field:WireField(
     tag = 14,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "imageMarkerOverride",
-    schemaIndex = 13,
+    schemaIndex = 12,
   )
   public val image_marker_override: String? = null,
   /**
@@ -183,7 +174,7 @@ public class VLMGenerationOptions(
     tag = 15,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 14,
+    schemaIndex = 13,
   )
   public val seed: Long = 0L,
   @RacDefaultOption("1.1")
@@ -193,15 +184,16 @@ public class VLMGenerationOptions(
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "repetitionPenalty",
-    schemaIndex = 15,
+    schemaIndex = 14,
   )
   public val repetition_penalty: Float = 0f,
+  @RacDefaultOption("0.0")
   @field:WireField(
     tag = 17,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "minP",
-    schemaIndex = 16,
+    schemaIndex = 15,
   )
   public val min_p: Float = 0f,
   @field:WireField(
@@ -209,9 +201,18 @@ public class VLMGenerationOptions(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "emitImageEmbeddings",
-    schemaIndex = 17,
+    schemaIndex = 16,
   )
   public val emit_image_embeddings: Boolean = false,
+  /**
+   * Reasoning/thinking control — same message as LLMGenerationOptions.
+   */
+  @field:WireField(
+    tag = 19,
+    adapter = "ai.runanywhere.proto.v1.ReasoningOptions#ADAPTER",
+    schemaIndex = 17,
+  )
+  public val reasoning: ReasoningOptions? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMGenerationOptions, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -237,12 +238,11 @@ public class VLMGenerationOptions(
     if (other !is VLMGenerationOptions) return false
     if (unknownFields != other.unknownFields) return false
     if (prompt != other.prompt) return false
-    if (max_tokens != other.max_tokens) return false
+    if (max_output_tokens != other.max_output_tokens) return false
     if (temperature != other.temperature) return false
     if (top_p != other.top_p) return false
     if (top_k != other.top_k) return false
     if (stop_sequences != other.stop_sequences) return false
-    if (streaming_enabled != other.streaming_enabled) return false
     if (system_prompt != other.system_prompt) return false
     if (max_image_size != other.max_image_size) return false
     if (n_threads != other.n_threads) return false
@@ -254,6 +254,7 @@ public class VLMGenerationOptions(
     if (repetition_penalty != other.repetition_penalty) return false
     if (min_p != other.min_p) return false
     if (emit_image_embeddings != other.emit_image_embeddings) return false
+    if (reasoning != other.reasoning) return false
     return true
   }
 
@@ -262,12 +263,11 @@ public class VLMGenerationOptions(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + prompt.hashCode()
-      result = result * 37 + max_tokens.hashCode()
+      result = result * 37 + max_output_tokens.hashCode()
       result = result * 37 + temperature.hashCode()
       result = result * 37 + top_p.hashCode()
       result = result * 37 + top_k.hashCode()
       result = result * 37 + stop_sequences.hashCode()
-      result = result * 37 + streaming_enabled.hashCode()
       result = result * 37 + (system_prompt?.hashCode() ?: 0)
       result = result * 37 + max_image_size.hashCode()
       result = result * 37 + n_threads.hashCode()
@@ -279,6 +279,7 @@ public class VLMGenerationOptions(
       result = result * 37 + repetition_penalty.hashCode()
       result = result * 37 + min_p.hashCode()
       result = result * 37 + emit_image_embeddings.hashCode()
+      result = result * 37 + (reasoning?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -287,12 +288,11 @@ public class VLMGenerationOptions(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """prompt=${sanitize(prompt)}"""
-    result += """max_tokens=$max_tokens"""
+    result += """max_output_tokens=$max_output_tokens"""
     result += """temperature=$temperature"""
     result += """top_p=$top_p"""
     result += """top_k=$top_k"""
     if (stop_sequences.isNotEmpty()) result += """stop_sequences=${sanitize(stop_sequences)}"""
-    result += """streaming_enabled=$streaming_enabled"""
     if (system_prompt != null) result += """system_prompt=${sanitize(system_prompt)}"""
     result += """max_image_size=$max_image_size"""
     result += """n_threads=$n_threads"""
@@ -304,17 +304,17 @@ public class VLMGenerationOptions(
     result += """repetition_penalty=$repetition_penalty"""
     result += """min_p=$min_p"""
     result += """emit_image_embeddings=$emit_image_embeddings"""
+    if (reasoning != null) result += """reasoning=$reasoning"""
     return result.joinToString(prefix = "VLMGenerationOptions{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     prompt: String = this.prompt,
-    max_tokens: Int = this.max_tokens,
+    max_output_tokens: Int = this.max_output_tokens,
     temperature: Float = this.temperature,
     top_p: Float = this.top_p,
     top_k: Int = this.top_k,
     stop_sequences: List<String> = this.stop_sequences,
-    streaming_enabled: Boolean = this.streaming_enabled,
     system_prompt: String? = this.system_prompt,
     max_image_size: Int = this.max_image_size,
     n_threads: Int = this.n_threads,
@@ -326,8 +326,9 @@ public class VLMGenerationOptions(
     repetition_penalty: Float = this.repetition_penalty,
     min_p: Float = this.min_p,
     emit_image_embeddings: Boolean = this.emit_image_embeddings,
+    reasoning: ReasoningOptions? = this.reasoning,
     unknownFields: ByteString = this.unknownFields,
-  ): VLMGenerationOptions = VLMGenerationOptions(prompt, max_tokens, temperature, top_p, top_k, stop_sequences, streaming_enabled, system_prompt, max_image_size, n_threads, use_gpu, model_family, custom_chat_template, image_marker_override, seed, repetition_penalty, min_p, emit_image_embeddings, unknownFields)
+  ): VLMGenerationOptions = VLMGenerationOptions(prompt, max_output_tokens, temperature, top_p, top_k, stop_sequences, system_prompt, max_image_size, n_threads, use_gpu, model_family, custom_chat_template, image_marker_override, seed, repetition_penalty, min_p, emit_image_embeddings, reasoning, unknownFields)
 
   public companion object {
     @JvmField
@@ -345,8 +346,8 @@ public class VLMGenerationOptions(
         if (value.prompt != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.prompt)
         }
-        if (value.max_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.max_tokens)
+        if (value.max_output_tokens != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.max_output_tokens)
         }
         if (!value.temperature.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.temperature)
@@ -358,9 +359,6 @@ public class VLMGenerationOptions(
           size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.top_k)
         }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(6, value.stop_sequences)
-        if (value.streaming_enabled != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.streaming_enabled)
-        }
         size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.system_prompt)
         if (value.max_image_size != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.max_image_size)
@@ -388,6 +386,7 @@ public class VLMGenerationOptions(
         if (value.emit_image_embeddings != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(18, value.emit_image_embeddings)
         }
+        size += ReasoningOptions.ADAPTER.encodedSizeWithTag(19, value.reasoning)
         return size
       }
 
@@ -395,8 +394,8 @@ public class VLMGenerationOptions(
         if (value.prompt != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.prompt)
         }
-        if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.max_tokens)
+        if (value.max_output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.max_output_tokens)
         }
         if (!value.temperature.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.temperature)
@@ -408,9 +407,6 @@ public class VLMGenerationOptions(
           ProtoAdapter.INT32.encodeWithTag(writer, 5, value.top_k)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.stop_sequences)
-        if (value.streaming_enabled != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.streaming_enabled)
-        }
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.system_prompt)
         if (value.max_image_size != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 9, value.max_image_size)
@@ -438,11 +434,13 @@ public class VLMGenerationOptions(
         if (value.emit_image_embeddings != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 18, value.emit_image_embeddings)
         }
+        ReasoningOptions.ADAPTER.encodeWithTag(writer, 19, value.reasoning)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VLMGenerationOptions) {
         writer.writeBytes(value.unknownFields)
+        ReasoningOptions.ADAPTER.encodeWithTag(writer, 19, value.reasoning)
         if (value.emit_image_embeddings != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 18, value.emit_image_embeddings)
         }
@@ -470,9 +468,6 @@ public class VLMGenerationOptions(
           ProtoAdapter.INT32.encodeWithTag(writer, 9, value.max_image_size)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.system_prompt)
-        if (value.streaming_enabled != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.streaming_enabled)
-        }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.stop_sequences)
         if (value.top_k != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 5, value.top_k)
@@ -483,8 +478,8 @@ public class VLMGenerationOptions(
         if (!value.temperature.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.temperature)
         }
-        if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.max_tokens)
+        if (value.max_output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.max_output_tokens)
         }
         if (value.prompt != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.prompt)
@@ -493,12 +488,11 @@ public class VLMGenerationOptions(
 
       override fun decode(reader: ProtoReader): VLMGenerationOptions {
         var prompt: String = ""
-        var max_tokens: Int = 0
+        var max_output_tokens: Int = 0
         var temperature: Float = 0f
         var top_p: Float = 0f
         var top_k: Int = 0
         val stop_sequences = mutableListOf<String>()
-        var streaming_enabled: Boolean = false
         var system_prompt: String? = null
         var max_image_size: Int = 0
         var n_threads: Int = 0
@@ -510,15 +504,15 @@ public class VLMGenerationOptions(
         var repetition_penalty: Float = 0f
         var min_p: Float = 0f
         var emit_image_embeddings: Boolean = false
+        var reasoning: ReasoningOptions? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
-            2 -> max_tokens = ProtoAdapter.INT32.decode(reader)
+            2 -> max_output_tokens = ProtoAdapter.INT32.decode(reader)
             3 -> temperature = ProtoAdapter.FLOAT.decode(reader)
             4 -> top_p = ProtoAdapter.FLOAT.decode(reader)
             5 -> top_k = ProtoAdapter.INT32.decode(reader)
             6 -> stop_sequences.add(ProtoAdapter.STRING.decode(reader))
-            7 -> streaming_enabled = ProtoAdapter.BOOL.decode(reader)
             8 -> system_prompt = ProtoAdapter.STRING.decode(reader)
             9 -> max_image_size = ProtoAdapter.INT32.decode(reader)
             10 -> n_threads = ProtoAdapter.INT32.decode(reader)
@@ -534,17 +528,17 @@ public class VLMGenerationOptions(
             16 -> repetition_penalty = ProtoAdapter.FLOAT.decode(reader)
             17 -> min_p = ProtoAdapter.FLOAT.decode(reader)
             18 -> emit_image_embeddings = ProtoAdapter.BOOL.decode(reader)
+            19 -> reasoning = ReasoningOptions.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VLMGenerationOptions(
           prompt = prompt,
-          max_tokens = max_tokens,
+          max_output_tokens = max_output_tokens,
           temperature = temperature,
           top_p = top_p,
           top_k = top_k,
           stop_sequences = stop_sequences,
-          streaming_enabled = streaming_enabled,
           system_prompt = system_prompt,
           max_image_size = max_image_size,
           n_threads = n_threads,
@@ -556,12 +550,14 @@ public class VLMGenerationOptions(
           repetition_penalty = repetition_penalty,
           min_p = min_p,
           emit_image_embeddings = emit_image_embeddings,
+          reasoning = reasoning,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VLMGenerationOptions): VLMGenerationOptions = value.copy(
         custom_chat_template = value.custom_chat_template?.let(VLMChatTemplate.ADAPTER::redact),
+        reasoning = value.reasoning?.let(ReasoningOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

@@ -33,6 +33,7 @@ import kotlin.collections.List
 import okio.ByteString
 
 public class RerankRequest(
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

@@ -42,27 +42,29 @@ public class RerankScoredItem(
   )
   public val id: String = "",
   /**
-   * Raw relevance score from the reranker (higher = more relevant). Not
+   * Relevance score from the reranker (higher = more relevant). Not
    * normalized to a fixed range; comparable only within one result set.
+   * Industry name (Cohere/Voyage `relevance_score`).
    */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "relevanceScore",
     schemaIndex = 1,
   )
-  public val score: Float = 0f,
+  public val relevance_score: Float = 0f,
   /**
    * Index of this candidate in the original RerankRequest.candidates list.
+   * Industry name (`index`).
    */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "originalIndex",
     schemaIndex = 2,
   )
-  public val original_index: Int = 0,
+  public val index: Int = 0,
   /**
    * 0-based position after sorting by score descending (0 = most relevant).
    */
@@ -86,8 +88,8 @@ public class RerankScoredItem(
     if (other !is RerankScoredItem) return false
     if (unknownFields != other.unknownFields) return false
     if (id != other.id) return false
-    if (score != other.score) return false
-    if (original_index != other.original_index) return false
+    if (relevance_score != other.relevance_score) return false
+    if (index != other.index) return false
     if (rank != other.rank) return false
     return true
   }
@@ -97,8 +99,8 @@ public class RerankScoredItem(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + id.hashCode()
-      result = result * 37 + score.hashCode()
-      result = result * 37 + original_index.hashCode()
+      result = result * 37 + relevance_score.hashCode()
+      result = result * 37 + index.hashCode()
       result = result * 37 + rank.hashCode()
       super.hashCode = result
     }
@@ -108,19 +110,19 @@ public class RerankScoredItem(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """id=${sanitize(id)}"""
-    result += """score=$score"""
-    result += """original_index=$original_index"""
+    result += """relevance_score=$relevance_score"""
+    result += """index=$index"""
     result += """rank=$rank"""
     return result.joinToString(prefix = "RerankScoredItem{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     id: String = this.id,
-    score: Float = this.score,
-    original_index: Int = this.original_index,
+    relevance_score: Float = this.relevance_score,
+    index: Int = this.index,
     rank: Int = this.rank,
     unknownFields: ByteString = this.unknownFields,
-  ): RerankScoredItem = RerankScoredItem(id, score, original_index, rank, unknownFields)
+  ): RerankScoredItem = RerankScoredItem(id, relevance_score, index, rank, unknownFields)
 
   public companion object {
     @JvmField
@@ -137,11 +139,11 @@ public class RerankScoredItem(
         if (value.id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.id)
         }
-        if (!value.score.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(2, value.score)
+        if (!value.relevance_score.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(2, value.relevance_score)
         }
-        if (value.original_index != 0) {
-          size += ProtoAdapter.UINT32.encodedSizeWithTag(3, value.original_index)
+        if (value.index != 0) {
+          size += ProtoAdapter.UINT32.encodedSizeWithTag(3, value.index)
         }
         if (value.rank != 0) {
           size += ProtoAdapter.UINT32.encodedSizeWithTag(4, value.rank)
@@ -153,11 +155,11 @@ public class RerankScoredItem(
         if (value.id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.id)
         }
-        if (!value.score.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.score)
+        if (!value.relevance_score.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.relevance_score)
         }
-        if (value.original_index != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 3, value.original_index)
+        if (value.index != 0) {
+          ProtoAdapter.UINT32.encodeWithTag(writer, 3, value.index)
         }
         if (value.rank != 0) {
           ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.rank)
@@ -170,11 +172,11 @@ public class RerankScoredItem(
         if (value.rank != 0) {
           ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.rank)
         }
-        if (value.original_index != 0) {
-          ProtoAdapter.UINT32.encodeWithTag(writer, 3, value.original_index)
+        if (value.index != 0) {
+          ProtoAdapter.UINT32.encodeWithTag(writer, 3, value.index)
         }
-        if (!value.score.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.score)
+        if (!value.relevance_score.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.relevance_score)
         }
         if (value.id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.id)
@@ -183,22 +185,22 @@ public class RerankScoredItem(
 
       override fun decode(reader: ProtoReader): RerankScoredItem {
         var id: String = ""
-        var score: Float = 0f
-        var original_index: Int = 0
+        var relevance_score: Float = 0f
+        var index: Int = 0
         var rank: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
-            2 -> score = ProtoAdapter.FLOAT.decode(reader)
-            3 -> original_index = ProtoAdapter.UINT32.decode(reader)
+            2 -> relevance_score = ProtoAdapter.FLOAT.decode(reader)
+            3 -> index = ProtoAdapter.UINT32.decode(reader)
             4 -> rank = ProtoAdapter.UINT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return RerankScoredItem(
           id = id,
-          score = score,
-          original_index = original_index,
+          relevance_score = relevance_score,
+          index = index,
           rank = rank,
           unknownFields = unknownFields
         )

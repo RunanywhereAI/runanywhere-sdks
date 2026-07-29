@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -124,42 +123,24 @@ public class VoiceAgentComposeConfig(
     schemaIndex = 8,
   )
   public val tts_voice_name: String? = null,
-  /**
-   * -------------------------------------------------------------------
-   * VAD sub-config (mirrors rac_voice_agent_vad_config_t).
-   * -------------------------------------------------------------------
-   * default 16000
-   */
   @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "vadSampleRate",
+    tag = 24,
+    adapter = "ai.runanywhere.proto.v1.VADConfiguration#ADAPTER",
+    jsonName = "vadConfig",
     schemaIndex = 9,
   )
-  public val vad_sample_rate: Int = 0,
+  public val vad_config: VADConfiguration? = null,
   /**
-   * default 0.1
+   * LLM generation knobs for the response model (sampling, system prompt,
+   * reasoning). Unset = voice-agent defaults from the generated pool.
    */
   @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "vadFrameLength",
+    tag = 25,
+    adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
+    jsonName = "llmGeneration",
     schemaIndex = 10,
   )
-  public val vad_frame_length: Float = 0f,
-  /**
-   * default 0.005
-   */
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "vadEnergyThreshold",
-    schemaIndex = 11,
-  )
-  public val vad_energy_threshold: Float = 0f,
+  public val llm_generation: LLMGenerationOptions? = null,
   /**
    * -------------------------------------------------------------------
    * Session-behavior sub-config. Optional so the C ABI can be invoked
@@ -170,7 +151,7 @@ public class VoiceAgentComposeConfig(
     tag = 20,
     adapter = "ai.runanywhere.proto.v1.VoiceSessionConfig#ADAPTER",
     jsonName = "sessionConfig",
-    schemaIndex = 12,
+    schemaIndex = 11,
   )
   public val session_config: VoiceSessionConfig? = null,
   /**
@@ -181,7 +162,7 @@ public class VoiceAgentComposeConfig(
     tag = 21,
     adapter = "ai.runanywhere.proto.v1.AudioPipelineConfig#ADAPTER",
     jsonName = "audioPipelineConfig",
-    schemaIndex = 13,
+    schemaIndex = 12,
   )
   public val audio_pipeline_config: AudioPipelineConfig? = null,
   /**
@@ -191,14 +172,14 @@ public class VoiceAgentComposeConfig(
     tag = 22,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "sessionId",
-    schemaIndex = 14,
+    schemaIndex = 13,
   )
   public val session_id: String? = null,
   @field:WireField(
     tag = 23,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "defaultLanguageCode",
-    schemaIndex = 15,
+    schemaIndex = 14,
   )
   public val default_language_code: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -222,9 +203,8 @@ public class VoiceAgentComposeConfig(
     if (tts_voice_path != other.tts_voice_path) return false
     if (tts_voice_id != other.tts_voice_id) return false
     if (tts_voice_name != other.tts_voice_name) return false
-    if (vad_sample_rate != other.vad_sample_rate) return false
-    if (vad_frame_length != other.vad_frame_length) return false
-    if (vad_energy_threshold != other.vad_energy_threshold) return false
+    if (vad_config != other.vad_config) return false
+    if (llm_generation != other.llm_generation) return false
     if (session_config != other.session_config) return false
     if (audio_pipeline_config != other.audio_pipeline_config) return false
     if (session_id != other.session_id) return false
@@ -245,9 +225,8 @@ public class VoiceAgentComposeConfig(
       result = result * 37 + (tts_voice_path?.hashCode() ?: 0)
       result = result * 37 + (tts_voice_id?.hashCode() ?: 0)
       result = result * 37 + (tts_voice_name?.hashCode() ?: 0)
-      result = result * 37 + vad_sample_rate.hashCode()
-      result = result * 37 + vad_frame_length.hashCode()
-      result = result * 37 + vad_energy_threshold.hashCode()
+      result = result * 37 + (vad_config?.hashCode() ?: 0)
+      result = result * 37 + (llm_generation?.hashCode() ?: 0)
       result = result * 37 + (session_config?.hashCode() ?: 0)
       result = result * 37 + (audio_pipeline_config?.hashCode() ?: 0)
       result = result * 37 + (session_id?.hashCode() ?: 0)
@@ -268,9 +247,8 @@ public class VoiceAgentComposeConfig(
     if (tts_voice_path != null) result += """tts_voice_path=${sanitize(tts_voice_path)}"""
     if (tts_voice_id != null) result += """tts_voice_id=${sanitize(tts_voice_id)}"""
     if (tts_voice_name != null) result += """tts_voice_name=${sanitize(tts_voice_name)}"""
-    result += """vad_sample_rate=$vad_sample_rate"""
-    result += """vad_frame_length=$vad_frame_length"""
-    result += """vad_energy_threshold=$vad_energy_threshold"""
+    if (vad_config != null) result += """vad_config=$vad_config"""
+    if (llm_generation != null) result += """llm_generation=$llm_generation"""
     if (session_config != null) result += """session_config=$session_config"""
     if (audio_pipeline_config != null) result += """audio_pipeline_config=$audio_pipeline_config"""
     if (session_id != null) result += """session_id=${sanitize(session_id)}"""
@@ -288,15 +266,14 @@ public class VoiceAgentComposeConfig(
     tts_voice_path: String? = this.tts_voice_path,
     tts_voice_id: String? = this.tts_voice_id,
     tts_voice_name: String? = this.tts_voice_name,
-    vad_sample_rate: Int = this.vad_sample_rate,
-    vad_frame_length: Float = this.vad_frame_length,
-    vad_energy_threshold: Float = this.vad_energy_threshold,
+    vad_config: VADConfiguration? = this.vad_config,
+    llm_generation: LLMGenerationOptions? = this.llm_generation,
     session_config: VoiceSessionConfig? = this.session_config,
     audio_pipeline_config: AudioPipelineConfig? = this.audio_pipeline_config,
     session_id: String? = this.session_id,
     default_language_code: String? = this.default_language_code,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceAgentComposeConfig = VoiceAgentComposeConfig(stt_model_path, stt_model_id, stt_model_name, llm_model_path, llm_model_id, llm_model_name, tts_voice_path, tts_voice_id, tts_voice_name, vad_sample_rate, vad_frame_length, vad_energy_threshold, session_config, audio_pipeline_config, session_id, default_language_code, unknownFields)
+  ): VoiceAgentComposeConfig = VoiceAgentComposeConfig(stt_model_path, stt_model_id, stt_model_name, llm_model_path, llm_model_id, llm_model_name, tts_voice_path, tts_voice_id, tts_voice_name, vad_config, llm_generation, session_config, audio_pipeline_config, session_id, default_language_code, unknownFields)
 
   public companion object {
     @JvmField
@@ -320,15 +297,8 @@ public class VoiceAgentComposeConfig(
         size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.tts_voice_path)
         size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.tts_voice_id)
         size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.tts_voice_name)
-        if (value.vad_sample_rate != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.vad_sample_rate)
-        }
-        if (!value.vad_frame_length.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(11, value.vad_frame_length)
-        }
-        if (!value.vad_energy_threshold.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(12, value.vad_energy_threshold)
-        }
+        size += VADConfiguration.ADAPTER.encodedSizeWithTag(24, value.vad_config)
+        size += LLMGenerationOptions.ADAPTER.encodedSizeWithTag(25, value.llm_generation)
         size += VoiceSessionConfig.ADAPTER.encodedSizeWithTag(20, value.session_config)
         size += AudioPipelineConfig.ADAPTER.encodedSizeWithTag(21, value.audio_pipeline_config)
         size += ProtoAdapter.STRING.encodedSizeWithTag(22, value.session_id)
@@ -346,15 +316,8 @@ public class VoiceAgentComposeConfig(
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.tts_voice_path)
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.tts_voice_id)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.tts_voice_name)
-        if (value.vad_sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.vad_sample_rate)
-        }
-        if (!value.vad_frame_length.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 11, value.vad_frame_length)
-        }
-        if (!value.vad_energy_threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.vad_energy_threshold)
-        }
+        VADConfiguration.ADAPTER.encodeWithTag(writer, 24, value.vad_config)
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 25, value.llm_generation)
         VoiceSessionConfig.ADAPTER.encodeWithTag(writer, 20, value.session_config)
         AudioPipelineConfig.ADAPTER.encodeWithTag(writer, 21, value.audio_pipeline_config)
         ProtoAdapter.STRING.encodeWithTag(writer, 22, value.session_id)
@@ -368,15 +331,8 @@ public class VoiceAgentComposeConfig(
         ProtoAdapter.STRING.encodeWithTag(writer, 22, value.session_id)
         AudioPipelineConfig.ADAPTER.encodeWithTag(writer, 21, value.audio_pipeline_config)
         VoiceSessionConfig.ADAPTER.encodeWithTag(writer, 20, value.session_config)
-        if (!value.vad_energy_threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.vad_energy_threshold)
-        }
-        if (!value.vad_frame_length.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 11, value.vad_frame_length)
-        }
-        if (value.vad_sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.vad_sample_rate)
-        }
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 25, value.llm_generation)
+        VADConfiguration.ADAPTER.encodeWithTag(writer, 24, value.vad_config)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.tts_voice_name)
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.tts_voice_id)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.tts_voice_path)
@@ -398,9 +354,8 @@ public class VoiceAgentComposeConfig(
         var tts_voice_path: String? = null
         var tts_voice_id: String? = null
         var tts_voice_name: String? = null
-        var vad_sample_rate: Int = 0
-        var vad_frame_length: Float = 0f
-        var vad_energy_threshold: Float = 0f
+        var vad_config: VADConfiguration? = null
+        var llm_generation: LLMGenerationOptions? = null
         var session_config: VoiceSessionConfig? = null
         var audio_pipeline_config: AudioPipelineConfig? = null
         var session_id: String? = null
@@ -416,9 +371,8 @@ public class VoiceAgentComposeConfig(
             7 -> tts_voice_path = ProtoAdapter.STRING.decode(reader)
             8 -> tts_voice_id = ProtoAdapter.STRING.decode(reader)
             9 -> tts_voice_name = ProtoAdapter.STRING.decode(reader)
-            10 -> vad_sample_rate = ProtoAdapter.INT32.decode(reader)
-            11 -> vad_frame_length = ProtoAdapter.FLOAT.decode(reader)
-            12 -> vad_energy_threshold = ProtoAdapter.FLOAT.decode(reader)
+            24 -> vad_config = VADConfiguration.ADAPTER.decode(reader)
+            25 -> llm_generation = LLMGenerationOptions.ADAPTER.decode(reader)
             20 -> session_config = VoiceSessionConfig.ADAPTER.decode(reader)
             21 -> audio_pipeline_config = AudioPipelineConfig.ADAPTER.decode(reader)
             22 -> session_id = ProtoAdapter.STRING.decode(reader)
@@ -436,9 +390,8 @@ public class VoiceAgentComposeConfig(
           tts_voice_path = tts_voice_path,
           tts_voice_id = tts_voice_id,
           tts_voice_name = tts_voice_name,
-          vad_sample_rate = vad_sample_rate,
-          vad_frame_length = vad_frame_length,
-          vad_energy_threshold = vad_energy_threshold,
+          vad_config = vad_config,
+          llm_generation = llm_generation,
           session_config = session_config,
           audio_pipeline_config = audio_pipeline_config,
           session_id = session_id,
@@ -448,6 +401,8 @@ public class VoiceAgentComposeConfig(
       }
 
       override fun redact(`value`: VoiceAgentComposeConfig): VoiceAgentComposeConfig = value.copy(
+        vad_config = value.vad_config?.let(VADConfiguration.ADAPTER::redact),
+        llm_generation = value.llm_generation?.let(LLMGenerationOptions.ADAPTER::redact),
         session_config = value.session_config?.let(VoiceSessionConfig.ADAPTER::redact),
         audio_pipeline_config = value.audio_pipeline_config?.let(AudioPipelineConfig.ADAPTER::redact),
         unknownFields = ByteString.EMPTY

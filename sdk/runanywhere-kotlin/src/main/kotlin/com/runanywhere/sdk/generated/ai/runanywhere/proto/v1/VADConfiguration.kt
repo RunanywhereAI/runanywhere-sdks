@@ -94,8 +94,8 @@ public class VADConfiguration(
   )
   public val frame_length_ms: Int = 0,
   /**
-   * Energy threshold in \[0.0, 1.0\] for voice detection.
-   * Recommended range 0.01–0.05; default 0.015 across SDKs.
+   * Activation (energy) threshold in \[0.0, 1.0\] for voice detection.
+   * Recommended range 0.01–0.05.
    */
   @RacDefaultOption("0.015")
   @RacMinFloatOption(0.0)
@@ -104,9 +104,10 @@ public class VADConfiguration(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "activationThreshold",
     schemaIndex = 3,
   )
-  public val threshold: Float = 0f,
+  public val activation_threshold: Float = 0f,
   /**
    * When true, the VAD performs ambient-noise calibration and uses the
    * result as a multiplier on the threshold (see calibration_multiplier
@@ -194,7 +195,7 @@ public class VADConfiguration(
     if (model_id != other.model_id) return false
     if (sample_rate != other.sample_rate) return false
     if (frame_length_ms != other.frame_length_ms) return false
-    if (threshold != other.threshold) return false
+    if (activation_threshold != other.activation_threshold) return false
     if (enable_auto_calibration != other.enable_auto_calibration) return false
     if (calibration_multiplier != other.calibration_multiplier) return false
     if (preferred_framework != other.preferred_framework) return false
@@ -211,7 +212,7 @@ public class VADConfiguration(
       result = result * 37 + model_id.hashCode()
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + frame_length_ms.hashCode()
-      result = result * 37 + threshold.hashCode()
+      result = result * 37 + activation_threshold.hashCode()
       result = result * 37 + enable_auto_calibration.hashCode()
       result = result * 37 + calibration_multiplier.hashCode()
       result = result * 37 + (preferred_framework?.hashCode() ?: 0)
@@ -228,7 +229,7 @@ public class VADConfiguration(
     result += """model_id=${sanitize(model_id)}"""
     result += """sample_rate=$sample_rate"""
     result += """frame_length_ms=$frame_length_ms"""
-    result += """threshold=$threshold"""
+    result += """activation_threshold=$activation_threshold"""
     result += """enable_auto_calibration=$enable_auto_calibration"""
     result += """calibration_multiplier=$calibration_multiplier"""
     if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
@@ -242,7 +243,7 @@ public class VADConfiguration(
     model_id: String = this.model_id,
     sample_rate: Int = this.sample_rate,
     frame_length_ms: Int = this.frame_length_ms,
-    threshold: Float = this.threshold,
+    activation_threshold: Float = this.activation_threshold,
     enable_auto_calibration: Boolean = this.enable_auto_calibration,
     calibration_multiplier: Float = this.calibration_multiplier,
     preferred_framework: InferenceFramework? = this.preferred_framework,
@@ -250,7 +251,7 @@ public class VADConfiguration(
     window_size_samples: Int = this.window_size_samples,
     max_speech_duration_ms: Int = this.max_speech_duration_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): VADConfiguration = VADConfiguration(model_id, sample_rate, frame_length_ms, threshold, enable_auto_calibration, calibration_multiplier, preferred_framework, model_path, window_size_samples, max_speech_duration_ms, unknownFields)
+  ): VADConfiguration = VADConfiguration(model_id, sample_rate, frame_length_ms, activation_threshold, enable_auto_calibration, calibration_multiplier, preferred_framework, model_path, window_size_samples, max_speech_duration_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -273,8 +274,8 @@ public class VADConfiguration(
         if (value.frame_length_ms != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.frame_length_ms)
         }
-        if (!value.threshold.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.activation_threshold)
         }
         if (value.enable_auto_calibration != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.enable_auto_calibration)
@@ -303,8 +304,8 @@ public class VADConfiguration(
         if (value.frame_length_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.frame_length_ms)
         }
-        if (!value.threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.activation_threshold)
         }
         if (value.enable_auto_calibration != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.enable_auto_calibration)
@@ -339,8 +340,8 @@ public class VADConfiguration(
         if (value.enable_auto_calibration != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.enable_auto_calibration)
         }
-        if (!value.threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.activation_threshold)
         }
         if (value.frame_length_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.frame_length_ms)
@@ -357,7 +358,7 @@ public class VADConfiguration(
         var model_id: String = ""
         var sample_rate: Int = 0
         var frame_length_ms: Int = 0
-        var threshold: Float = 0f
+        var activation_threshold: Float = 0f
         var enable_auto_calibration: Boolean = false
         var calibration_multiplier: Float = 0f
         var preferred_framework: InferenceFramework? = null
@@ -369,7 +370,7 @@ public class VADConfiguration(
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             3 -> frame_length_ms = ProtoAdapter.INT32.decode(reader)
-            4 -> threshold = ProtoAdapter.FLOAT.decode(reader)
+            4 -> activation_threshold = ProtoAdapter.FLOAT.decode(reader)
             5 -> enable_auto_calibration = ProtoAdapter.BOOL.decode(reader)
             6 -> calibration_multiplier = ProtoAdapter.FLOAT.decode(reader)
             7 -> try {
@@ -387,7 +388,7 @@ public class VADConfiguration(
           model_id = model_id,
           sample_rate = sample_rate,
           frame_length_ms = frame_length_ms,
-          threshold = threshold,
+          activation_threshold = activation_threshold,
           enable_auto_calibration = enable_auto_calibration,
           calibration_multiplier = calibration_multiplier,
           preferred_framework = preferred_framework,

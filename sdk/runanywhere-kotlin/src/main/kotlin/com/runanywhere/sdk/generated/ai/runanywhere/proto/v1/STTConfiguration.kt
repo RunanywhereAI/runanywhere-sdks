@@ -57,14 +57,15 @@ public class STTConfiguration(
     schemaIndex = 0,
   )
   public val model_id: String = "",
-  @RacDefaultOption("STT_LANGUAGE_EN")
+  /**
+   * Default input language, BCP-47 / ISO-639-1. Unset/empty = auto-detect.
+   */
   @field:WireField(
-    tag = 2,
-    adapter = "ai.runanywhere.proto.v1.STTLanguage#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     schemaIndex = 1,
   )
-  public val language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+  public val language: String? = null,
   @RacDefaultOption("16000")
   @RacMinOption(8_000)
   @RacMaxOption(48_000)
@@ -144,17 +145,6 @@ public class STTConfiguration(
     schemaIndex = 10,
   )
   public val preferred_framework: InferenceFramework? = null,
-  /**
-   * Free-form BCP-47 language tag ("en-US", "pt-BR", etc.) for callers
-   * that cannot be represented by STTLanguage's base-code enum.
-   */
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "languageCode",
-    schemaIndex = 11,
-  )
-  public val language_code: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTConfiguration, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -187,7 +177,6 @@ public class STTConfiguration(
     if (max_alternatives != other.max_alternatives) return false
     if (enable_word_timestamps != other.enable_word_timestamps) return false
     if (preferred_framework != other.preferred_framework) return false
-    if (language_code != other.language_code) return false
     return true
   }
 
@@ -196,7 +185,7 @@ public class STTConfiguration(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
-      result = result * 37 + language.hashCode()
+      result = result * 37 + (language?.hashCode() ?: 0)
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + enable_vad.hashCode()
       result = result * 37 + audio_format.hashCode()
@@ -206,7 +195,6 @@ public class STTConfiguration(
       result = result * 37 + max_alternatives.hashCode()
       result = result * 37 + enable_word_timestamps.hashCode()
       result = result * 37 + (preferred_framework?.hashCode() ?: 0)
-      result = result * 37 + (language_code?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -215,7 +203,7 @@ public class STTConfiguration(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
-    result += """language=$language"""
+    if (language != null) result += """language=${sanitize(language)}"""
     result += """sample_rate=$sample_rate"""
     result += """enable_vad=$enable_vad"""
     result += """audio_format=$audio_format"""
@@ -225,13 +213,12 @@ public class STTConfiguration(
     result += """max_alternatives=$max_alternatives"""
     result += """enable_word_timestamps=$enable_word_timestamps"""
     if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
-    if (language_code != null) result += """language_code=${sanitize(language_code)}"""
     return result.joinToString(prefix = "STTConfiguration{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     model_id: String = this.model_id,
-    language: STTLanguage = this.language,
+    language: String? = this.language,
     sample_rate: Int = this.sample_rate,
     enable_vad: Boolean = this.enable_vad,
     audio_format: AudioFormat = this.audio_format,
@@ -241,9 +228,8 @@ public class STTConfiguration(
     max_alternatives: Int = this.max_alternatives,
     enable_word_timestamps: Boolean = this.enable_word_timestamps,
     preferred_framework: InferenceFramework? = this.preferred_framework,
-    language_code: String? = this.language_code,
     unknownFields: ByteString = this.unknownFields,
-  ): STTConfiguration = STTConfiguration(model_id, language, sample_rate, enable_vad, audio_format, enable_punctuation, enable_diarization, vocabulary_list, max_alternatives, enable_word_timestamps, preferred_framework, language_code, unknownFields)
+  ): STTConfiguration = STTConfiguration(model_id, language, sample_rate, enable_vad, audio_format, enable_punctuation, enable_diarization, vocabulary_list, max_alternatives, enable_word_timestamps, preferred_framework, unknownFields)
 
   public companion object {
     @JvmField
@@ -260,9 +246,7 @@ public class STTConfiguration(
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.model_id)
         }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          size += STTLanguage.ADAPTER.encodedSizeWithTag(2, value.language)
-        }
+        size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.language)
         if (value.sample_rate != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.sample_rate)
         }
@@ -286,7 +270,6 @@ public class STTConfiguration(
           size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.enable_word_timestamps)
         }
         size += InferenceFramework.ADAPTER.encodedSizeWithTag(11, value.preferred_framework)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.language_code)
         return size
       }
 
@@ -294,9 +277,7 @@ public class STTConfiguration(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 2, value.language)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.language)
         if (value.sample_rate != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.sample_rate)
         }
@@ -320,13 +301,11 @@ public class STTConfiguration(
           ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.enable_word_timestamps)
         }
         InferenceFramework.ADAPTER.encodeWithTag(writer, 11, value.preferred_framework)
-        ProtoAdapter.STRING.encodeWithTag(writer, 12, value.language_code)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTConfiguration) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 12, value.language_code)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 11, value.preferred_framework)
         if (value.enable_word_timestamps != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.enable_word_timestamps)
@@ -350,9 +329,7 @@ public class STTConfiguration(
         if (value.sample_rate != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.sample_rate)
         }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 2, value.language)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.language)
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
@@ -360,7 +337,7 @@ public class STTConfiguration(
 
       override fun decode(reader: ProtoReader): STTConfiguration {
         var model_id: String = ""
-        var language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED
+        var language: String? = null
         var sample_rate: Int = 0
         var enable_vad: Boolean = false
         var audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED
@@ -370,15 +347,10 @@ public class STTConfiguration(
         var max_alternatives: Int = 0
         var enable_word_timestamps: Boolean = false
         var preferred_framework: InferenceFramework? = null
-        var language_code: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
-            2 -> try {
-              language = STTLanguage.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
+            13 -> language = ProtoAdapter.STRING.decode(reader)
             3 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             4 -> enable_vad = ProtoAdapter.BOOL.decode(reader)
             5 -> try {
@@ -396,7 +368,6 @@ public class STTConfiguration(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            12 -> language_code = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -412,7 +383,6 @@ public class STTConfiguration(
           max_alternatives = max_alternatives,
           enable_word_timestamps = enable_word_timestamps,
           preferred_framework = preferred_framework,
-          language_code = language_code,
           unknownFields = unknownFields
         )
       }

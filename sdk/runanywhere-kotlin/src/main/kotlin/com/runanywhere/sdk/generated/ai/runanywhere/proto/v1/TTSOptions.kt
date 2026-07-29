@@ -66,20 +66,20 @@ public class TTSOptions(
   )
   public val language_code: String = "",
   /**
-   * Speech rate (0.0 – 2.0; 1.0 is normal). Note Swift/Kotlin use the name
-   * `rate`, Dart uses `rate`, RN uses `rate`. C ABI field is `rate`. We
-   * canonicalize on `speaking_rate` to match TTSConfiguration; bindings
-   * alias to `rate` where appropriate.
+   * Speech speed multiplier (1.0 = normal). Industry name (OpenAI
+   * /audio/speech `speed`); replaces the rate/speaking_rate/speakingRate
+   * split across the C ABI and SDKs.
    */
   @RacDefaultOption("1.0")
+  @RacMinFloatOption(0.5)
+  @RacMaxFloatOption(2.0)
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "speakingRate",
     schemaIndex = 2,
   )
-  public val speaking_rate: Float = 0f,
+  public val speed: Float = 0f,
   /**
    * Speech pitch (0.5 – 2.0; 1.0 is normal).
    */
@@ -175,7 +175,7 @@ public class TTSOptions(
     if (unknownFields != other.unknownFields) return false
     if (voice != other.voice) return false
     if (language_code != other.language_code) return false
-    if (speaking_rate != other.speaking_rate) return false
+    if (speed != other.speed) return false
     if (pitch != other.pitch) return false
     if (volume != other.volume) return false
     if (enable_ssml != other.enable_ssml) return false
@@ -192,7 +192,7 @@ public class TTSOptions(
       result = unknownFields.hashCode()
       result = result * 37 + voice.hashCode()
       result = result * 37 + language_code.hashCode()
-      result = result * 37 + speaking_rate.hashCode()
+      result = result * 37 + speed.hashCode()
       result = result * 37 + pitch.hashCode()
       result = result * 37 + volume.hashCode()
       result = result * 37 + enable_ssml.hashCode()
@@ -209,7 +209,7 @@ public class TTSOptions(
     val result = mutableListOf<String>()
     result += """voice=${sanitize(voice)}"""
     result += """language_code=${sanitize(language_code)}"""
-    result += """speaking_rate=$speaking_rate"""
+    result += """speed=$speed"""
     result += """pitch=$pitch"""
     result += """volume=$volume"""
     result += """enable_ssml=$enable_ssml"""
@@ -223,7 +223,7 @@ public class TTSOptions(
   public fun copy(
     voice: String = this.voice,
     language_code: String = this.language_code,
-    speaking_rate: Float = this.speaking_rate,
+    speed: Float = this.speed,
     pitch: Float = this.pitch,
     volume: Float = this.volume,
     enable_ssml: Boolean = this.enable_ssml,
@@ -232,7 +232,7 @@ public class TTSOptions(
     speaker_id: Int = this.speaker_id,
     style: String? = this.style,
     unknownFields: ByteString = this.unknownFields,
-  ): TTSOptions = TTSOptions(voice, language_code, speaking_rate, pitch, volume, enable_ssml, audio_format, sample_rate, speaker_id, style, unknownFields)
+  ): TTSOptions = TTSOptions(voice, language_code, speed, pitch, volume, enable_ssml, audio_format, sample_rate, speaker_id, style, unknownFields)
 
   public companion object {
     @JvmField
@@ -252,8 +252,8 @@ public class TTSOptions(
         if (value.language_code != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.language_code)
         }
-        if (!value.speaking_rate.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.speaking_rate)
+        if (!value.speed.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.speed)
         }
         if (!value.pitch.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.pitch)
@@ -284,8 +284,8 @@ public class TTSOptions(
         if (value.language_code != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.language_code)
         }
-        if (!value.speaking_rate.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.speaking_rate)
+        if (!value.speed.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.speed)
         }
         if (!value.pitch.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.pitch)
@@ -330,8 +330,8 @@ public class TTSOptions(
         if (!value.pitch.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.pitch)
         }
-        if (!value.speaking_rate.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.speaking_rate)
+        if (!value.speed.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.speed)
         }
         if (value.language_code != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.language_code)
@@ -344,7 +344,7 @@ public class TTSOptions(
       override fun decode(reader: ProtoReader): TTSOptions {
         var voice: String = ""
         var language_code: String = ""
-        var speaking_rate: Float = 0f
+        var speed: Float = 0f
         var pitch: Float = 0f
         var volume: Float = 0f
         var enable_ssml: Boolean = false
@@ -356,7 +356,7 @@ public class TTSOptions(
           when (tag) {
             1 -> voice = ProtoAdapter.STRING.decode(reader)
             2 -> language_code = ProtoAdapter.STRING.decode(reader)
-            3 -> speaking_rate = ProtoAdapter.FLOAT.decode(reader)
+            3 -> speed = ProtoAdapter.FLOAT.decode(reader)
             4 -> pitch = ProtoAdapter.FLOAT.decode(reader)
             5 -> volume = ProtoAdapter.FLOAT.decode(reader)
             6 -> enable_ssml = ProtoAdapter.BOOL.decode(reader)
@@ -374,7 +374,7 @@ public class TTSOptions(
         return TTSOptions(
           voice = voice,
           language_code = language_code,
-          speaking_rate = speaking_rate,
+          speed = speed,
           pitch = pitch,
           volume = volume,
           enable_ssml = enable_ssml,

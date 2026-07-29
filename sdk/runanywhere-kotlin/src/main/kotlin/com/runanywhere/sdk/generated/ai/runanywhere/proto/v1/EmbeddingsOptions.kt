@@ -36,19 +36,6 @@ import okio.ByteString
  */
 public class EmbeddingsOptions(
   /**
-   * Apply L2 normalization to the produced vectors. Required so the wire
-   * form is unambiguous on the most common knob; backends may still defer
-   * to model defaults at load time.
-   */
-  @RacDefaultOption("true")
-  @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val normalize: Boolean = false,
-  /**
    * Truncate inputs longer than max_sequence_length instead of erroring.
    * Unset = backend default (currently truncate-on-overflow for ONNX,
    * sliding-window for llama.cpp).
@@ -56,29 +43,33 @@ public class EmbeddingsOptions(
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val truncate: Boolean? = null,
   /**
    * Override batch size for embed_batch. Unset = backend chooses
    * (RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE = 512, capped at 8192).
    */
+  @RacMinOption(1)
+  @RacMaxOption(8_192)
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     jsonName = "batchSize",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val batch_size: Int? = null,
   /**
-   * Exact C ABI per-call overrides. UNSPECIFIED = use component config.
+   * Vector normalization mode. UNSPECIFIED = use component config
+   * (default L2).
    */
+  @RacDefaultOption("EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED")
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.EmbeddingsNormalizeMode#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "normalizeMode",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val normalize_mode:
       EmbeddingsNormalizeMode = EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED,
@@ -86,19 +77,20 @@ public class EmbeddingsOptions(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val pooling:
       EmbeddingsPoolingStrategy = EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED,
   /**
    * 0 = auto
    */
+  @RacDefaultOption("0")
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "nThreads",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val n_threads: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -113,7 +105,6 @@ public class EmbeddingsOptions(
     if (other === this) return true
     if (other !is EmbeddingsOptions) return false
     if (unknownFields != other.unknownFields) return false
-    if (normalize != other.normalize) return false
     if (truncate != other.truncate) return false
     if (batch_size != other.batch_size) return false
     if (normalize_mode != other.normalize_mode) return false
@@ -126,7 +117,6 @@ public class EmbeddingsOptions(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + normalize.hashCode()
       result = result * 37 + (truncate?.hashCode() ?: 0)
       result = result * 37 + (batch_size?.hashCode() ?: 0)
       result = result * 37 + normalize_mode.hashCode()
@@ -139,7 +129,6 @@ public class EmbeddingsOptions(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """normalize=$normalize"""
     if (truncate != null) result += """truncate=$truncate"""
     if (batch_size != null) result += """batch_size=$batch_size"""
     result += """normalize_mode=$normalize_mode"""
@@ -149,14 +138,13 @@ public class EmbeddingsOptions(
   }
 
   public fun copy(
-    normalize: Boolean = this.normalize,
     truncate: Boolean? = this.truncate,
     batch_size: Int? = this.batch_size,
     normalize_mode: EmbeddingsNormalizeMode = this.normalize_mode,
     pooling: EmbeddingsPoolingStrategy = this.pooling,
     n_threads: Int = this.n_threads,
     unknownFields: ByteString = this.unknownFields,
-  ): EmbeddingsOptions = EmbeddingsOptions(normalize, truncate, batch_size, normalize_mode, pooling, n_threads, unknownFields)
+  ): EmbeddingsOptions = EmbeddingsOptions(truncate, batch_size, normalize_mode, pooling, n_threads, unknownFields)
 
   public companion object {
     @JvmField
@@ -170,9 +158,6 @@ public class EmbeddingsOptions(
     ) {
       override fun encodedSize(`value`: EmbeddingsOptions): Int {
         var size = value.unknownFields.size
-        if (value.normalize != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.normalize)
-        }
         size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.truncate)
         size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.batch_size)
         if (value.normalize_mode != ai.runanywhere.proto.v1.EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED) {
@@ -188,9 +173,6 @@ public class EmbeddingsOptions(
       }
 
       override fun encode(writer: ProtoWriter, `value`: EmbeddingsOptions) {
-        if (value.normalize != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.normalize)
-        }
         ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.truncate)
         ProtoAdapter.INT32.encodeWithTag(writer, 3, value.batch_size)
         if (value.normalize_mode != ai.runanywhere.proto.v1.EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED) {
@@ -218,13 +200,9 @@ public class EmbeddingsOptions(
         }
         ProtoAdapter.INT32.encodeWithTag(writer, 3, value.batch_size)
         ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.truncate)
-        if (value.normalize != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.normalize)
-        }
       }
 
       override fun decode(reader: ProtoReader): EmbeddingsOptions {
-        var normalize: Boolean = false
         var truncate: Boolean? = null
         var batch_size: Int? = null
         var normalize_mode: EmbeddingsNormalizeMode = EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED
@@ -232,7 +210,6 @@ public class EmbeddingsOptions(
         var n_threads: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> normalize = ProtoAdapter.BOOL.decode(reader)
             2 -> truncate = ProtoAdapter.BOOL.decode(reader)
             3 -> batch_size = ProtoAdapter.INT32.decode(reader)
             4 -> try {
@@ -250,7 +227,6 @@ public class EmbeddingsOptions(
           }
         }
         return EmbeddingsOptions(
-          normalize = normalize,
           truncate = truncate,
           batch_size = batch_size,
           normalize_mode = normalize_mode,

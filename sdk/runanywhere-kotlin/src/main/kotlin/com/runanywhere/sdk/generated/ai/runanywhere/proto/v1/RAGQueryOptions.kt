@@ -39,6 +39,7 @@ public class RAGQueryOptions(
   /**
    * The user question to answer. Required (empty = no-op).
    */
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -47,61 +48,17 @@ public class RAGQueryOptions(
   )
   public val question: String = "",
   /**
-   * Optional system prompt override. Unset uses the pipeline default.
+   * Answer-generation knobs (sampling, system prompt, reasoning). Unset =
+   * pipeline defaults. RAG-appropriate defaults (e.g. max_output_tokens
+   * 512, temperature 0.7) are applied by the pipeline when unset, not
+   * re-declared here.
    */
   @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "systemPrompt",
+    tag = 14,
+    adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
     schemaIndex = 1,
   )
-  public val system_prompt: String? = null,
-  /**
-   * Maximum tokens to generate in the answer.
-   */
-  @RacDefaultOption("512")
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "maxTokens",
-    schemaIndex = 2,
-  )
-  public val max_tokens: Int = 0,
-  /**
-   * Sampling temperature. 0.0 = greedy, higher = more random.
-   */
-  @RacDefaultOption("0.7")
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
-  )
-  public val temperature: Float = 0f,
-  /**
-   * Nucleus (top-p) sampling parameter. 1.0 = disabled.
-   */
-  @RacDefaultOption("1.0")
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "topP",
-    schemaIndex = 4,
-  )
-  public val top_p: Float = 0f,
-  /**
-   * Top-k sampling parameter. 0 = disabled.
-   */
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "topK",
-    schemaIndex = 5,
-  )
-  public val top_k: Int = 0,
+  public val generation: LLMGenerationOptions? = null,
   /**
    * Retrieval overrides. 0/unset = use RAGConfiguration defaults.
    */
@@ -110,7 +67,7 @@ public class RAGQueryOptions(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "retrievalTopK",
-    schemaIndex = 6,
+    schemaIndex = 2,
   )
   public val retrieval_top_k: Int = 0,
   /**
@@ -122,29 +79,16 @@ public class RAGQueryOptions(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     jsonName = "similarityThreshold",
-    schemaIndex = 7,
+    schemaIndex = 3,
   )
   public val similarity_threshold: Float? = null,
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 8,
+    schemaIndex = 4,
   )
   public val stream: Boolean = false,
-  /**
-   * When true, suppress the answer model's thinking phase (maps to
-   * LLMGenerationOptions.disable_thinking so commons prepends the no-think
-   * directive instead of the app injecting "/no_think"). Default false.
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "disableThinking",
-    schemaIndex = 9,
-  )
-  public val disable_thinking: Boolean = false,
   /**
    * Multi-query expansion: when true, the answer LLM rewrites the question
    * into `multi_query_count` variants; retrieval runs for the original plus
@@ -156,7 +100,7 @@ public class RAGQueryOptions(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "enableMultiQuery",
-    schemaIndex = 10,
+    schemaIndex = 5,
   )
   public val enable_multi_query: Boolean = false,
   @RacDefaultOption("3")
@@ -166,7 +110,7 @@ public class RAGQueryOptions(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     jsonName = "multiQueryCount",
-    schemaIndex = 11,
+    schemaIndex = 6,
   )
   public val multi_query_count: Int? = null,
   /**
@@ -178,7 +122,7 @@ public class RAGQueryOptions(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "scopePrefix",
-    schemaIndex = 12,
+    schemaIndex = 7,
   )
   public val scope_prefix: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -194,15 +138,10 @@ public class RAGQueryOptions(
     if (other !is RAGQueryOptions) return false
     if (unknownFields != other.unknownFields) return false
     if (question != other.question) return false
-    if (system_prompt != other.system_prompt) return false
-    if (max_tokens != other.max_tokens) return false
-    if (temperature != other.temperature) return false
-    if (top_p != other.top_p) return false
-    if (top_k != other.top_k) return false
+    if (generation != other.generation) return false
     if (retrieval_top_k != other.retrieval_top_k) return false
     if (similarity_threshold != other.similarity_threshold) return false
     if (stream != other.stream) return false
-    if (disable_thinking != other.disable_thinking) return false
     if (enable_multi_query != other.enable_multi_query) return false
     if (multi_query_count != other.multi_query_count) return false
     if (scope_prefix != other.scope_prefix) return false
@@ -214,15 +153,10 @@ public class RAGQueryOptions(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + question.hashCode()
-      result = result * 37 + (system_prompt?.hashCode() ?: 0)
-      result = result * 37 + max_tokens.hashCode()
-      result = result * 37 + temperature.hashCode()
-      result = result * 37 + top_p.hashCode()
-      result = result * 37 + top_k.hashCode()
+      result = result * 37 + (generation?.hashCode() ?: 0)
       result = result * 37 + retrieval_top_k.hashCode()
       result = result * 37 + (similarity_threshold?.hashCode() ?: 0)
       result = result * 37 + stream.hashCode()
-      result = result * 37 + disable_thinking.hashCode()
       result = result * 37 + enable_multi_query.hashCode()
       result = result * 37 + (multi_query_count?.hashCode() ?: 0)
       result = result * 37 + (scope_prefix?.hashCode() ?: 0)
@@ -234,15 +168,10 @@ public class RAGQueryOptions(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """question=${sanitize(question)}"""
-    if (system_prompt != null) result += """system_prompt=${sanitize(system_prompt)}"""
-    result += """max_tokens=$max_tokens"""
-    result += """temperature=$temperature"""
-    result += """top_p=$top_p"""
-    result += """top_k=$top_k"""
+    if (generation != null) result += """generation=$generation"""
     result += """retrieval_top_k=$retrieval_top_k"""
     if (similarity_threshold != null) result += """similarity_threshold=$similarity_threshold"""
     result += """stream=$stream"""
-    result += """disable_thinking=$disable_thinking"""
     result += """enable_multi_query=$enable_multi_query"""
     if (multi_query_count != null) result += """multi_query_count=$multi_query_count"""
     if (scope_prefix != null) result += """scope_prefix=${sanitize(scope_prefix)}"""
@@ -251,20 +180,15 @@ public class RAGQueryOptions(
 
   public fun copy(
     question: String = this.question,
-    system_prompt: String? = this.system_prompt,
-    max_tokens: Int = this.max_tokens,
-    temperature: Float = this.temperature,
-    top_p: Float = this.top_p,
-    top_k: Int = this.top_k,
+    generation: LLMGenerationOptions? = this.generation,
     retrieval_top_k: Int = this.retrieval_top_k,
     similarity_threshold: Float? = this.similarity_threshold,
     stream: Boolean = this.stream,
-    disable_thinking: Boolean = this.disable_thinking,
     enable_multi_query: Boolean = this.enable_multi_query,
     multi_query_count: Int? = this.multi_query_count,
     scope_prefix: String? = this.scope_prefix,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGQueryOptions = RAGQueryOptions(question, system_prompt, max_tokens, temperature, top_p, top_k, retrieval_top_k, similarity_threshold, stream, disable_thinking, enable_multi_query, multi_query_count, scope_prefix, unknownFields)
+  ): RAGQueryOptions = RAGQueryOptions(question, generation, retrieval_top_k, similarity_threshold, stream, enable_multi_query, multi_query_count, scope_prefix, unknownFields)
 
   public companion object {
     @JvmField
@@ -281,28 +205,13 @@ public class RAGQueryOptions(
         if (value.question != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.question)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.system_prompt)
-        if (value.max_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.max_tokens)
-        }
-        if (!value.temperature.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.temperature)
-        }
-        if (!value.top_p.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.top_p)
-        }
-        if (value.top_k != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.top_k)
-        }
+        size += LLMGenerationOptions.ADAPTER.encodedSizeWithTag(14, value.generation)
         if (value.retrieval_top_k != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.retrieval_top_k)
         }
         size += ProtoAdapter.FLOAT.encodedSizeWithTag(8, value.similarity_threshold)
         if (value.stream != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.stream)
-        }
-        if (value.disable_thinking != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.disable_thinking)
         }
         if (value.enable_multi_query != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(11, value.enable_multi_query)
@@ -316,28 +225,13 @@ public class RAGQueryOptions(
         if (value.question != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.question)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.system_prompt)
-        if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.max_tokens)
-        }
-        if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.temperature)
-        }
-        if (!value.top_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.top_p)
-        }
-        if (value.top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.top_k)
-        }
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 14, value.generation)
         if (value.retrieval_top_k != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 7, value.retrieval_top_k)
         }
         ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.similarity_threshold)
         if (value.stream != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.stream)
-        }
-        if (value.disable_thinking != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.disable_thinking)
         }
         if (value.enable_multi_query != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.enable_multi_query)
@@ -354,9 +248,6 @@ public class RAGQueryOptions(
         if (value.enable_multi_query != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.enable_multi_query)
         }
-        if (value.disable_thinking != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.disable_thinking)
-        }
         if (value.stream != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.stream)
         }
@@ -364,19 +255,7 @@ public class RAGQueryOptions(
         if (value.retrieval_top_k != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 7, value.retrieval_top_k)
         }
-        if (value.top_k != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.top_k)
-        }
-        if (!value.top_p.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.top_p)
-        }
-        if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.temperature)
-        }
-        if (value.max_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.max_tokens)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.system_prompt)
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 14, value.generation)
         if (value.question != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.question)
         }
@@ -384,30 +263,20 @@ public class RAGQueryOptions(
 
       override fun decode(reader: ProtoReader): RAGQueryOptions {
         var question: String = ""
-        var system_prompt: String? = null
-        var max_tokens: Int = 0
-        var temperature: Float = 0f
-        var top_p: Float = 0f
-        var top_k: Int = 0
+        var generation: LLMGenerationOptions? = null
         var retrieval_top_k: Int = 0
         var similarity_threshold: Float? = null
         var stream: Boolean = false
-        var disable_thinking: Boolean = false
         var enable_multi_query: Boolean = false
         var multi_query_count: Int? = null
         var scope_prefix: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> question = ProtoAdapter.STRING.decode(reader)
-            2 -> system_prompt = ProtoAdapter.STRING.decode(reader)
-            3 -> max_tokens = ProtoAdapter.INT32.decode(reader)
-            4 -> temperature = ProtoAdapter.FLOAT.decode(reader)
-            5 -> top_p = ProtoAdapter.FLOAT.decode(reader)
-            6 -> top_k = ProtoAdapter.INT32.decode(reader)
+            14 -> generation = LLMGenerationOptions.ADAPTER.decode(reader)
             7 -> retrieval_top_k = ProtoAdapter.INT32.decode(reader)
             8 -> similarity_threshold = ProtoAdapter.FLOAT.decode(reader)
             9 -> stream = ProtoAdapter.BOOL.decode(reader)
-            10 -> disable_thinking = ProtoAdapter.BOOL.decode(reader)
             11 -> enable_multi_query = ProtoAdapter.BOOL.decode(reader)
             12 -> multi_query_count = ProtoAdapter.INT32.decode(reader)
             13 -> scope_prefix = ProtoAdapter.STRING.decode(reader)
@@ -416,15 +285,10 @@ public class RAGQueryOptions(
         }
         return RAGQueryOptions(
           question = question,
-          system_prompt = system_prompt,
-          max_tokens = max_tokens,
-          temperature = temperature,
-          top_p = top_p,
-          top_k = top_k,
+          generation = generation,
           retrieval_top_k = retrieval_top_k,
           similarity_threshold = similarity_threshold,
           stream = stream,
-          disable_thinking = disable_thinking,
           enable_multi_query = enable_multi_query,
           multi_query_count = multi_query_count,
           scope_prefix = scope_prefix,
@@ -433,6 +297,7 @@ public class RAGQueryOptions(
       }
 
       override fun redact(`value`: RAGQueryOptions): RAGQueryOptions = value.copy(
+        generation = value.generation?.let(LLMGenerationOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

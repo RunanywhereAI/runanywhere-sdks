@@ -56,6 +56,7 @@ public class DiffusionGenerationOptions(
   /**
    * Text prompt describing the desired image. Required.
    */
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -78,6 +79,7 @@ public class DiffusionGenerationOptions(
    * Output image width  in pixels.  0 = use variant default
    * (512 for SD 1.5 / SDXS / LCM, 768 for SD 2.1, 1024 for SDXL / Turbo).
    */
+  @RacDefaultOption("0")
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -88,6 +90,7 @@ public class DiffusionGenerationOptions(
   /**
    * Output image height in pixels.  0 = use variant default.
    */
+  @RacDefaultOption("0")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -96,21 +99,27 @@ public class DiffusionGenerationOptions(
   )
   public val height: Int = 0,
   /**
-   * Number of denoising steps. Range 1–50 (variant-dependent: SDXS=1,
-   * SDXL_Turbo / LCM=4, SD*=20–28). 0 = use variant default.
+   * Number of denoising steps (industry short name `steps`). Range 1–50
+   * (variant-dependent: SDXS=1, SDXL_Turbo / LCM=4, SD*=20–28). 0 = use
+   * variant default. Was `num_inference_steps`.
    */
+  @RacDefaultOption("0")
+  @RacMinOption(0)
+  @RacMaxOption(50)
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "numInferenceSteps",
     schemaIndex = 4,
   )
-  public val num_inference_steps: Int = 0,
+  public val steps: Int = 0,
   /**
    * Classifier-free guidance scale. 0.0 = no CFG (required for SDXS /
-   * SDXL_Turbo). Typical SD range 1.0–20.0; default 7.5.
+   * SDXL_Turbo). Typical SD range 1.0–20.0.
    */
+  @RacDefaultOption("0.0")
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(20.0)
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -122,6 +131,7 @@ public class DiffusionGenerationOptions(
   /**
    * RNG seed for reproducibility. -1 = pick a random seed.
    */
+  @RacDefaultOption("-1")
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -168,6 +178,9 @@ public class DiffusionGenerationOptions(
     schemaIndex = 10,
   )
   public val mask_image: ByteString? = null,
+  @RacDefaultOption("0.75")
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(1.0)
   @field:WireField(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -267,7 +280,7 @@ public class DiffusionGenerationOptions(
     if (negative_prompt != other.negative_prompt) return false
     if (width != other.width) return false
     if (height != other.height) return false
-    if (num_inference_steps != other.num_inference_steps) return false
+    if (steps != other.steps) return false
     if (guidance_scale != other.guidance_scale) return false
     if (seed != other.seed) return false
     if (scheduler != other.scheduler) return false
@@ -294,7 +307,7 @@ public class DiffusionGenerationOptions(
       result = result * 37 + negative_prompt.hashCode()
       result = result * 37 + width.hashCode()
       result = result * 37 + height.hashCode()
-      result = result * 37 + num_inference_steps.hashCode()
+      result = result * 37 + steps.hashCode()
       result = result * 37 + guidance_scale.hashCode()
       result = result * 37 + seed.hashCode()
       result = result * 37 + scheduler.hashCode()
@@ -321,7 +334,7 @@ public class DiffusionGenerationOptions(
     result += """negative_prompt=${sanitize(negative_prompt)}"""
     result += """width=$width"""
     result += """height=$height"""
-    result += """num_inference_steps=$num_inference_steps"""
+    result += """steps=$steps"""
     result += """guidance_scale=$guidance_scale"""
     result += """seed=$seed"""
     result += """scheduler=$scheduler"""
@@ -345,7 +358,7 @@ public class DiffusionGenerationOptions(
     negative_prompt: String = this.negative_prompt,
     width: Int = this.width,
     height: Int = this.height,
-    num_inference_steps: Int = this.num_inference_steps,
+    steps: Int = this.steps,
     guidance_scale: Float = this.guidance_scale,
     seed: Long = this.seed,
     scheduler: DiffusionScheduler = this.scheduler,
@@ -362,7 +375,7 @@ public class DiffusionGenerationOptions(
     batch_size: Int = this.batch_size,
     return_latents: Boolean = this.return_latents,
     unknownFields: ByteString = this.unknownFields,
-  ): DiffusionGenerationOptions = DiffusionGenerationOptions(prompt, negative_prompt, width, height, num_inference_steps, guidance_scale, seed, scheduler, mode, input_image, mask_image, denoise_strength, report_intermediate_images, progress_stride, input_image_width, input_image_height, input_image_media_type, mask_image_media_type, batch_size, return_latents, unknownFields)
+  ): DiffusionGenerationOptions = DiffusionGenerationOptions(prompt, negative_prompt, width, height, steps, guidance_scale, seed, scheduler, mode, input_image, mask_image, denoise_strength, report_intermediate_images, progress_stride, input_image_width, input_image_height, input_image_media_type, mask_image_media_type, batch_size, return_latents, unknownFields)
 
   public companion object {
     @JvmField
@@ -389,8 +402,8 @@ public class DiffusionGenerationOptions(
         if (value.height != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.height)
         }
-        if (value.num_inference_steps != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.num_inference_steps)
+        if (value.steps != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.steps)
         }
         if (!value.guidance_scale.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(6, value.guidance_scale)
@@ -445,8 +458,8 @@ public class DiffusionGenerationOptions(
         if (value.height != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 4, value.height)
         }
-        if (value.num_inference_steps != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.num_inference_steps)
+        if (value.steps != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.steps)
         }
         if (!value.guidance_scale.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.guidance_scale)
@@ -527,8 +540,8 @@ public class DiffusionGenerationOptions(
         if (!value.guidance_scale.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.guidance_scale)
         }
-        if (value.num_inference_steps != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.num_inference_steps)
+        if (value.steps != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.steps)
         }
         if (value.height != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 4, value.height)
@@ -549,7 +562,7 @@ public class DiffusionGenerationOptions(
         var negative_prompt: String = ""
         var width: Int = 0
         var height: Int = 0
-        var num_inference_steps: Int = 0
+        var steps: Int = 0
         var guidance_scale: Float = 0f
         var seed: Long = 0L
         var scheduler: DiffusionScheduler = DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED
@@ -571,7 +584,7 @@ public class DiffusionGenerationOptions(
             2 -> negative_prompt = ProtoAdapter.STRING.decode(reader)
             3 -> width = ProtoAdapter.INT32.decode(reader)
             4 -> height = ProtoAdapter.INT32.decode(reader)
-            5 -> num_inference_steps = ProtoAdapter.INT32.decode(reader)
+            5 -> steps = ProtoAdapter.INT32.decode(reader)
             6 -> guidance_scale = ProtoAdapter.FLOAT.decode(reader)
             7 -> seed = ProtoAdapter.INT64.decode(reader)
             8 -> try {
@@ -603,7 +616,7 @@ public class DiffusionGenerationOptions(
           negative_prompt = negative_prompt,
           width = width,
           height = height,
-          num_inference_steps = num_inference_steps,
+          steps = steps,
           guidance_scale = guidance_scale,
           seed = seed,
           scheduler = scheduler,

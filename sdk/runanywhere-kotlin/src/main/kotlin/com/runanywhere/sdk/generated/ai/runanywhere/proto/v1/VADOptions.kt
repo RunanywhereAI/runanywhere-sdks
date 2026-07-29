@@ -48,25 +48,28 @@ import okio.ByteString
  *   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
  * Surfacing them as fields lets callers tune debouncing without a rebuild.
  * ---------------------------------------------------------------------------
+ * Field vocabulary follows the industry VAD naming (LiveKit/Silero):
+ * activation_threshold + min/max duration knobs + prefix padding.
  */
 public class VADOptions(
   /**
-   * Per-call energy threshold override. Use 0 (default) to keep the
-   * configured threshold. Mirrors rac_vad_input_t::energy_threshold_override
-   * (which uses -1 as the sentinel; on the wire we use 0 for proto3
-   * default semantics — generators emit -1 when this is unset).
+   * Per-call activation threshold override in \[0.0, 1.0\]. Unset/0 = keep
+   * the configured threshold.
    */
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(1.0)
   @field:WireField(
-    tag = 1,
+    tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "activationThreshold",
     schemaIndex = 0,
   )
-  public val threshold: Float = 0f,
+  public val activation_threshold: Float = 0f,
   /**
    * Minimum continuous speech duration (ms) before SPEECH_STARTED fires.
-   * Default 100 (RAC_VAD_MIN_SPEECH_DURATION_MS).
    */
+  @RacDefaultOption("100")
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -77,8 +80,8 @@ public class VADOptions(
   public val min_speech_duration_ms: Int = 0,
   /**
    * Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
-   * Default 300 (RAC_VAD_MIN_SILENCE_DURATION_MS).
    */
+  @RacDefaultOption("300")
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -91,6 +94,7 @@ public class VADOptions(
    * Maximum continuous speech duration (ms) before forcing a segment split.
    * 0 = backend/default.
    */
+  @RacDefaultOption("0")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -100,6 +104,19 @@ public class VADOptions(
   )
   public val max_speech_duration_ms: Int = 0,
   /**
+   * Audio retained before SPEECH_STARTED so segments don't clip the first
+   * syllable. 0 = backend/default.
+   */
+  @RacDefaultOption("0")
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "prefixPaddingMs",
+    schemaIndex = 4,
+  )
+  public val prefix_padding_ms: Int = 0,
+  /**
    * Whether to include VADStatistics in stream events when available.
    */
   @field:WireField(
@@ -107,7 +124,7 @@ public class VADOptions(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "includeStatistics",
-    schemaIndex = 4,
+    schemaIndex = 5,
   )
   public val include_statistics: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -122,10 +139,11 @@ public class VADOptions(
     if (other === this) return true
     if (other !is VADOptions) return false
     if (unknownFields != other.unknownFields) return false
-    if (threshold != other.threshold) return false
+    if (activation_threshold != other.activation_threshold) return false
     if (min_speech_duration_ms != other.min_speech_duration_ms) return false
     if (min_silence_duration_ms != other.min_silence_duration_ms) return false
     if (max_speech_duration_ms != other.max_speech_duration_ms) return false
+    if (prefix_padding_ms != other.prefix_padding_ms) return false
     if (include_statistics != other.include_statistics) return false
     return true
   }
@@ -134,10 +152,11 @@ public class VADOptions(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + threshold.hashCode()
+      result = result * 37 + activation_threshold.hashCode()
       result = result * 37 + min_speech_duration_ms.hashCode()
       result = result * 37 + min_silence_duration_ms.hashCode()
       result = result * 37 + max_speech_duration_ms.hashCode()
+      result = result * 37 + prefix_padding_ms.hashCode()
       result = result * 37 + include_statistics.hashCode()
       super.hashCode = result
     }
@@ -146,22 +165,24 @@ public class VADOptions(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """threshold=$threshold"""
+    result += """activation_threshold=$activation_threshold"""
     result += """min_speech_duration_ms=$min_speech_duration_ms"""
     result += """min_silence_duration_ms=$min_silence_duration_ms"""
     result += """max_speech_duration_ms=$max_speech_duration_ms"""
+    result += """prefix_padding_ms=$prefix_padding_ms"""
     result += """include_statistics=$include_statistics"""
     return result.joinToString(prefix = "VADOptions{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    threshold: Float = this.threshold,
+    activation_threshold: Float = this.activation_threshold,
     min_speech_duration_ms: Int = this.min_speech_duration_ms,
     min_silence_duration_ms: Int = this.min_silence_duration_ms,
     max_speech_duration_ms: Int = this.max_speech_duration_ms,
+    prefix_padding_ms: Int = this.prefix_padding_ms,
     include_statistics: Boolean = this.include_statistics,
     unknownFields: ByteString = this.unknownFields,
-  ): VADOptions = VADOptions(threshold, min_speech_duration_ms, min_silence_duration_ms, max_speech_duration_ms, include_statistics, unknownFields)
+  ): VADOptions = VADOptions(activation_threshold, min_speech_duration_ms, min_silence_duration_ms, max_speech_duration_ms, prefix_padding_ms, include_statistics, unknownFields)
 
   public companion object {
     @JvmField
@@ -175,8 +196,8 @@ public class VADOptions(
     ) {
       override fun encodedSize(`value`: VADOptions): Int {
         var size = value.unknownFields.size
-        if (!value.threshold.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(1, value.threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          size += ProtoAdapter.FLOAT.encodedSizeWithTag(6, value.activation_threshold)
         }
         if (value.min_speech_duration_ms != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.min_speech_duration_ms)
@@ -187,6 +208,9 @@ public class VADOptions(
         if (value.max_speech_duration_ms != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.max_speech_duration_ms)
         }
+        if (value.prefix_padding_ms != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.prefix_padding_ms)
+        }
         if (value.include_statistics != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.include_statistics)
         }
@@ -194,8 +218,8 @@ public class VADOptions(
       }
 
       override fun encode(writer: ProtoWriter, `value`: VADOptions) {
-        if (!value.threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 1, value.threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.activation_threshold)
         }
         if (value.min_speech_duration_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 2, value.min_speech_duration_ms)
@@ -205,6 +229,9 @@ public class VADOptions(
         }
         if (value.max_speech_duration_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 4, value.max_speech_duration_ms)
+        }
+        if (value.prefix_padding_ms != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.prefix_padding_ms)
         }
         if (value.include_statistics != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.include_statistics)
@@ -217,6 +244,9 @@ public class VADOptions(
         if (value.include_statistics != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.include_statistics)
         }
+        if (value.prefix_padding_ms != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 7, value.prefix_padding_ms)
+        }
         if (value.max_speech_duration_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 4, value.max_speech_duration_ms)
         }
@@ -226,32 +256,35 @@ public class VADOptions(
         if (value.min_speech_duration_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 2, value.min_speech_duration_ms)
         }
-        if (!value.threshold.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 1, value.threshold)
+        if (!value.activation_threshold.equals(0f)) {
+          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.activation_threshold)
         }
       }
 
       override fun decode(reader: ProtoReader): VADOptions {
-        var threshold: Float = 0f
+        var activation_threshold: Float = 0f
         var min_speech_duration_ms: Int = 0
         var min_silence_duration_ms: Int = 0
         var max_speech_duration_ms: Int = 0
+        var prefix_padding_ms: Int = 0
         var include_statistics: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> threshold = ProtoAdapter.FLOAT.decode(reader)
+            6 -> activation_threshold = ProtoAdapter.FLOAT.decode(reader)
             2 -> min_speech_duration_ms = ProtoAdapter.INT32.decode(reader)
             3 -> min_silence_duration_ms = ProtoAdapter.INT32.decode(reader)
             4 -> max_speech_duration_ms = ProtoAdapter.INT32.decode(reader)
+            7 -> prefix_padding_ms = ProtoAdapter.INT32.decode(reader)
             5 -> include_statistics = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VADOptions(
-          threshold = threshold,
+          activation_threshold = activation_threshold,
           min_speech_duration_ms = min_speech_duration_ms,
           min_silence_duration_ms = min_silence_duration_ms,
           max_speech_duration_ms = max_speech_duration_ms,
+          prefix_padding_ms = prefix_padding_ms,
           include_statistics = include_statistics,
           unknownFields = unknownFields
         )

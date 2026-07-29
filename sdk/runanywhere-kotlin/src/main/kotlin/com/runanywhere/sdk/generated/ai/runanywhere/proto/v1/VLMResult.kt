@@ -71,18 +71,18 @@ public class VLMResult(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "promptTokens",
+    jsonName = "inputTokens",
     schemaIndex = 1,
   )
-  public val prompt_tokens: Int = 0,
+  public val input_tokens: Int = 0,
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "completionTokens",
+    jsonName = "outputTokens",
     schemaIndex = 2,
   )
-  public val completion_tokens: Int = 0,
+  public val output_tokens: Int = 0,
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -191,8 +191,8 @@ public class VLMResult(
     if (other !is VLMResult) return false
     if (unknownFields != other.unknownFields) return false
     if (text != other.text) return false
-    if (prompt_tokens != other.prompt_tokens) return false
-    if (completion_tokens != other.completion_tokens) return false
+    if (input_tokens != other.input_tokens) return false
+    if (output_tokens != other.output_tokens) return false
     if (total_tokens != other.total_tokens) return false
     if (processing_time_ms != other.processing_time_ms) return false
     if (tokens_per_second != other.tokens_per_second) return false
@@ -212,8 +212,8 @@ public class VLMResult(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + text.hashCode()
-      result = result * 37 + prompt_tokens.hashCode()
-      result = result * 37 + completion_tokens.hashCode()
+      result = result * 37 + input_tokens.hashCode()
+      result = result * 37 + output_tokens.hashCode()
       result = result * 37 + total_tokens.hashCode()
       result = result * 37 + processing_time_ms.hashCode()
       result = result * 37 + tokens_per_second.hashCode()
@@ -233,8 +233,8 @@ public class VLMResult(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """text=${sanitize(text)}"""
-    result += """prompt_tokens=$prompt_tokens"""
-    result += """completion_tokens=$completion_tokens"""
+    result += """input_tokens=$input_tokens"""
+    result += """output_tokens=$output_tokens"""
     result += """total_tokens=$total_tokens"""
     result += """processing_time_ms=$processing_time_ms"""
     result += """tokens_per_second=$tokens_per_second"""
@@ -251,8 +251,8 @@ public class VLMResult(
 
   public fun copy(
     text: String = this.text,
-    prompt_tokens: Int = this.prompt_tokens,
-    completion_tokens: Int = this.completion_tokens,
+    input_tokens: Int = this.input_tokens,
+    output_tokens: Int = this.output_tokens,
     total_tokens: Long = this.total_tokens,
     processing_time_ms: Long = this.processing_time_ms,
     tokens_per_second: Float = this.tokens_per_second,
@@ -265,7 +265,7 @@ public class VLMResult(
     finish_reason: String = this.finish_reason,
     images_processed: Int = this.images_processed,
     unknownFields: ByteString = this.unknownFields,
-  ): VLMResult = VLMResult(text, prompt_tokens, completion_tokens, total_tokens, processing_time_ms, tokens_per_second, image_tokens, time_to_first_token_ms, image_encode_time_ms, hardware_used, error_message, error_code, finish_reason, images_processed, unknownFields)
+  ): VLMResult = VLMResult(text, input_tokens, output_tokens, total_tokens, processing_time_ms, tokens_per_second, image_tokens, time_to_first_token_ms, image_encode_time_ms, hardware_used, error_message, error_code, finish_reason, images_processed, unknownFields)
 
   public companion object {
     @JvmField
@@ -282,11 +282,11 @@ public class VLMResult(
         if (value.text != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.text)
         }
-        if (value.prompt_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.prompt_tokens)
+        if (value.input_tokens != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.input_tokens)
         }
-        if (value.completion_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.completion_tokens)
+        if (value.output_tokens != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.output_tokens)
         }
         if (value.total_tokens != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.total_tokens)
@@ -324,11 +324,11 @@ public class VLMResult(
         if (value.text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.text)
         }
-        if (value.prompt_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.prompt_tokens)
+        if (value.input_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.input_tokens)
         }
-        if (value.completion_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.completion_tokens)
+        if (value.output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.output_tokens)
         }
         if (value.total_tokens != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.total_tokens)
@@ -393,11 +393,11 @@ public class VLMResult(
         if (value.total_tokens != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.total_tokens)
         }
-        if (value.completion_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.completion_tokens)
+        if (value.output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.output_tokens)
         }
-        if (value.prompt_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.prompt_tokens)
+        if (value.input_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 2, value.input_tokens)
         }
         if (value.text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.text)
@@ -406,8 +406,8 @@ public class VLMResult(
 
       override fun decode(reader: ProtoReader): VLMResult {
         var text: String = ""
-        var prompt_tokens: Int = 0
-        var completion_tokens: Int = 0
+        var input_tokens: Int = 0
+        var output_tokens: Int = 0
         var total_tokens: Long = 0L
         var processing_time_ms: Long = 0L
         var tokens_per_second: Float = 0f
@@ -422,8 +422,8 @@ public class VLMResult(
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
-            2 -> prompt_tokens = ProtoAdapter.INT32.decode(reader)
-            3 -> completion_tokens = ProtoAdapter.INT32.decode(reader)
+            2 -> input_tokens = ProtoAdapter.INT32.decode(reader)
+            3 -> output_tokens = ProtoAdapter.INT32.decode(reader)
             4 -> total_tokens = ProtoAdapter.INT64.decode(reader)
             5 -> processing_time_ms = ProtoAdapter.INT64.decode(reader)
             6 -> tokens_per_second = ProtoAdapter.FLOAT.decode(reader)
@@ -440,8 +440,8 @@ public class VLMResult(
         }
         return VLMResult(
           text = text,
-          prompt_tokens = prompt_tokens,
-          completion_tokens = completion_tokens,
+          input_tokens = input_tokens,
+          output_tokens = output_tokens,
           total_tokens = total_tokens,
           processing_time_ms = processing_time_ms,
           tokens_per_second = tokens_per_second,

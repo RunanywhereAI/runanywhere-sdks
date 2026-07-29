@@ -16,6 +16,10 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
+/**
+ * STTLanguage enum deleted: language is a single BCP-47 / ISO-639-1 string
+ * everywhere (options, configuration, outputs). Unset = auto-detect.
+ */
 public enum class STTAudioEncoding(
   override val `value`: Int,
 ) : WireEnum {

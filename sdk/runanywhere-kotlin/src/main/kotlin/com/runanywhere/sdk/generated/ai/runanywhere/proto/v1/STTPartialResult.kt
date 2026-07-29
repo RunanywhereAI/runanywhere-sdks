@@ -82,12 +82,11 @@ public class STTPartialResult(
   )
   public val confidence: Float = 0f,
   @field:WireField(
-    tag = 5,
-    adapter = "ai.runanywhere.proto.v1.STTLanguage#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     schemaIndex = 4,
   )
-  public val language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+  public val language: String? = null,
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -97,13 +96,6 @@ public class STTPartialResult(
   )
   public val timestamp_ms: Long = 0L,
   alternatives: List<TranscriptionAlternative> = emptyList(),
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "languageCode",
-    schemaIndex = 7,
-  )
-  public val language_code: String? = null,
   /**
    * Streaming correlation and endpointing metadata.
    */
@@ -112,7 +104,7 @@ public class STTPartialResult(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val request_id: String = "",
   @field:WireField(
@@ -120,7 +112,7 @@ public class STTPartialResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "segmentIndex",
-    schemaIndex = 9,
+    schemaIndex = 8,
   )
   public val segment_index: Int = 0,
   @field:WireField(
@@ -128,7 +120,7 @@ public class STTPartialResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "audioStartMs",
-    schemaIndex = 10,
+    schemaIndex = 9,
   )
   public val audio_start_ms: Long = 0L,
   @field:WireField(
@@ -136,14 +128,14 @@ public class STTPartialResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "audioEndMs",
-    schemaIndex = 11,
+    schemaIndex = 10,
   )
   public val audio_end_ms: Long = 0L,
   @field:WireField(
     tag = 13,
     adapter = "ai.runanywhere.proto.v1.STTOutput#ADAPTER",
     jsonName = "finalOutput",
-    schemaIndex = 12,
+    schemaIndex = 11,
   )
   public val final_output: STTOutput? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -174,7 +166,6 @@ public class STTPartialResult(
     if (language != other.language) return false
     if (timestamp_ms != other.timestamp_ms) return false
     if (alternatives != other.alternatives) return false
-    if (language_code != other.language_code) return false
     if (request_id != other.request_id) return false
     if (segment_index != other.segment_index) return false
     if (audio_start_ms != other.audio_start_ms) return false
@@ -191,10 +182,9 @@ public class STTPartialResult(
       result = result * 37 + is_final.hashCode()
       result = result * 37 + stability.hashCode()
       result = result * 37 + confidence.hashCode()
-      result = result * 37 + language.hashCode()
+      result = result * 37 + (language?.hashCode() ?: 0)
       result = result * 37 + timestamp_ms.hashCode()
       result = result * 37 + alternatives.hashCode()
-      result = result * 37 + (language_code?.hashCode() ?: 0)
       result = result * 37 + request_id.hashCode()
       result = result * 37 + segment_index.hashCode()
       result = result * 37 + audio_start_ms.hashCode()
@@ -211,10 +201,9 @@ public class STTPartialResult(
     result += """is_final=$is_final"""
     result += """stability=$stability"""
     result += """confidence=$confidence"""
-    result += """language=$language"""
+    if (language != null) result += """language=${sanitize(language)}"""
     result += """timestamp_ms=$timestamp_ms"""
     if (alternatives.isNotEmpty()) result += """alternatives=$alternatives"""
-    if (language_code != null) result += """language_code=${sanitize(language_code)}"""
     result += """request_id=${sanitize(request_id)}"""
     result += """segment_index=$segment_index"""
     result += """audio_start_ms=$audio_start_ms"""
@@ -228,17 +217,16 @@ public class STTPartialResult(
     is_final: Boolean = this.is_final,
     stability: Float = this.stability,
     confidence: Float = this.confidence,
-    language: STTLanguage = this.language,
+    language: String? = this.language,
     timestamp_ms: Long = this.timestamp_ms,
     alternatives: List<TranscriptionAlternative> = this.alternatives,
-    language_code: String? = this.language_code,
     request_id: String = this.request_id,
     segment_index: Int = this.segment_index,
     audio_start_ms: Long = this.audio_start_ms,
     audio_end_ms: Long = this.audio_end_ms,
     final_output: STTOutput? = this.final_output,
     unknownFields: ByteString = this.unknownFields,
-  ): STTPartialResult = STTPartialResult(text, is_final, stability, confidence, language, timestamp_ms, alternatives, language_code, request_id, segment_index, audio_start_ms, audio_end_ms, final_output, unknownFields)
+  ): STTPartialResult = STTPartialResult(text, is_final, stability, confidence, language, timestamp_ms, alternatives, request_id, segment_index, audio_start_ms, audio_end_ms, final_output, unknownFields)
 
   public companion object {
     @JvmField
@@ -264,14 +252,11 @@ public class STTPartialResult(
         if (!value.confidence.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.confidence)
         }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          size += STTLanguage.ADAPTER.encodedSizeWithTag(5, value.language)
-        }
+        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.language)
         if (value.timestamp_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.timestamp_ms)
         }
         size += TranscriptionAlternative.ADAPTER.asRepeated().encodedSizeWithTag(7, value.alternatives)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.language_code)
         if (value.request_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.request_id)
         }
@@ -301,14 +286,11 @@ public class STTPartialResult(
         if (!value.confidence.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.confidence)
         }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 5, value.language)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.language)
         if (value.timestamp_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 6, value.timestamp_ms)
         }
         TranscriptionAlternative.ADAPTER.asRepeated().encodeWithTag(writer, 7, value.alternatives)
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.language_code)
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.request_id)
         }
@@ -340,14 +322,11 @@ public class STTPartialResult(
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.request_id)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.language_code)
         TranscriptionAlternative.ADAPTER.asRepeated().encodeWithTag(writer, 7, value.alternatives)
         if (value.timestamp_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 6, value.timestamp_ms)
         }
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 5, value.language)
-        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.language)
         if (!value.confidence.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.confidence)
         }
@@ -367,10 +346,9 @@ public class STTPartialResult(
         var is_final: Boolean = false
         var stability: Float = 0f
         var confidence: Float = 0f
-        var language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED
+        var language: String? = null
         var timestamp_ms: Long = 0L
         val alternatives = mutableListOf<TranscriptionAlternative>()
-        var language_code: String? = null
         var request_id: String = ""
         var segment_index: Int = 0
         var audio_start_ms: Long = 0L
@@ -382,14 +360,9 @@ public class STTPartialResult(
             2 -> is_final = ProtoAdapter.BOOL.decode(reader)
             3 -> stability = ProtoAdapter.FLOAT.decode(reader)
             4 -> confidence = ProtoAdapter.FLOAT.decode(reader)
-            5 -> try {
-              language = STTLanguage.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
+            14 -> language = ProtoAdapter.STRING.decode(reader)
             6 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
             7 -> alternatives.add(TranscriptionAlternative.ADAPTER.decode(reader))
-            8 -> language_code = ProtoAdapter.STRING.decode(reader)
             9 -> request_id = ProtoAdapter.STRING.decode(reader)
             10 -> segment_index = ProtoAdapter.INT32.decode(reader)
             11 -> audio_start_ms = ProtoAdapter.INT64.decode(reader)
@@ -406,7 +379,6 @@ public class STTPartialResult(
           language = language,
           timestamp_ms = timestamp_ms,
           alternatives = alternatives,
-          language_code = language_code,
           request_id = request_id,
           segment_index = segment_index,
           audio_start_ms = audio_start_ms,

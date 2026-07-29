@@ -30,6 +30,8 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
+ * GenerationHints was deleted: it was a fourth partial copy of the sampling
+ * knobs. Use LLMConfiguration.default_options.
  * ---------------------------------------------------------------------------
  * ThinkingTagPattern moved to thinking_tag_pattern.proto.
  * The canonical message with `open_tag`/`close_tag` fields is shared between

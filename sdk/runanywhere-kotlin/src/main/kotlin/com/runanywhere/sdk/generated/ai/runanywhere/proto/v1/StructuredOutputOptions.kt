@@ -16,6 +16,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.countNonNull
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -39,18 +40,12 @@ import okio.ByteString
  *   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
  *   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
  * ---------------------------------------------------------------------------
+ * The ONE output-constraint surface. The retired loose fields on
+ * LLMGenerationOptions (json_schema, grammar, response_format) all fold in
+ * here: schema-shaped output via `schema_source`, low-level constrained
+ * decoding via `grammar`/`regex_pattern`.
  */
 public class StructuredOutputOptions(
-  /**
-   * Schema describing the desired output shape.
-   */
-  @field:WireField(
-    tag = 1,
-    adapter = "ai.runanywhere.proto.v1.JSONSchema#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val schema: JSONSchema? = null,
   /**
    * Whether to embed the schema text in the LLM prompt.
    */
@@ -59,7 +54,7 @@ public class StructuredOutputOptions(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "includeSchemaInPrompt",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val include_schema_in_prompt: Boolean = false,
   /**
@@ -69,54 +64,51 @@ public class StructuredOutputOptions(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     jsonName = "strictMode",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val strict_mode: Boolean? = null,
-  /**
-   * Raw JSON Schema string for C ABI and SDKs that already carry schema as
-   * serialized JSON instead of the typed JSONSchema tree.
-   */
+  @field:WireField(
+    tag = 1,
+    adapter = "ai.runanywhere.proto.v1.JSONSchema#ADAPTER",
+    oneofName = "schema_source",
+    schemaIndex = 2,
+  )
+  public val schema: JSONSchema? = null,
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "jsonSchema",
+    oneofName = "schema_source",
     schemaIndex = 3,
   )
   public val json_schema: String? = null,
   /**
-   * Optional generated type/name hints used by Swift/Kotlin/Dart wrappers.
+   * Name for the schema/output type (OpenAI json_schema.name).
    */
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "typeName",
-    schemaIndex = 4,
-  )
-  public val type_name: String? = null,
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val name: String? = null,
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.StructuredOutputMode#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val mode: StructuredOutputMode = StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED,
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "regexPattern",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val regex_pattern: String? = null,
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val grammar: String? = null,
   @field:WireField(
@@ -124,19 +116,27 @@ public class StructuredOutputOptions(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "repairJson",
-    schemaIndex = 9,
+    schemaIndex = 8,
   )
   public val repair_json: Boolean = false,
+  @RacDefaultOption("0")
+  @RacMinOption(0)
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "maxRetries",
-    schemaIndex = 10,
+    schemaIndex = 9,
   )
   public val max_retries: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputOptions, Nothing>(ADAPTER, unknownFields) {
+  init {
+    require(countNonNull(schema, json_schema) <= 1) {
+      "At most one of schema, json_schema may be non-null"
+    }
+  }
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -147,11 +147,10 @@ public class StructuredOutputOptions(
     if (other === this) return true
     if (other !is StructuredOutputOptions) return false
     if (unknownFields != other.unknownFields) return false
-    if (schema != other.schema) return false
     if (include_schema_in_prompt != other.include_schema_in_prompt) return false
     if (strict_mode != other.strict_mode) return false
+    if (schema != other.schema) return false
     if (json_schema != other.json_schema) return false
-    if (type_name != other.type_name) return false
     if (name != other.name) return false
     if (mode != other.mode) return false
     if (regex_pattern != other.regex_pattern) return false
@@ -165,11 +164,10 @@ public class StructuredOutputOptions(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + (schema?.hashCode() ?: 0)
       result = result * 37 + include_schema_in_prompt.hashCode()
       result = result * 37 + (strict_mode?.hashCode() ?: 0)
+      result = result * 37 + (schema?.hashCode() ?: 0)
       result = result * 37 + (json_schema?.hashCode() ?: 0)
-      result = result * 37 + (type_name?.hashCode() ?: 0)
       result = result * 37 + (name?.hashCode() ?: 0)
       result = result * 37 + mode.hashCode()
       result = result * 37 + (regex_pattern?.hashCode() ?: 0)
@@ -183,11 +181,10 @@ public class StructuredOutputOptions(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    if (schema != null) result += """schema=$schema"""
     result += """include_schema_in_prompt=$include_schema_in_prompt"""
     if (strict_mode != null) result += """strict_mode=$strict_mode"""
+    if (schema != null) result += """schema=$schema"""
     if (json_schema != null) result += """json_schema=${sanitize(json_schema)}"""
-    if (type_name != null) result += """type_name=${sanitize(type_name)}"""
     if (name != null) result += """name=${sanitize(name)}"""
     result += """mode=$mode"""
     if (regex_pattern != null) result += """regex_pattern=${sanitize(regex_pattern)}"""
@@ -198,11 +195,10 @@ public class StructuredOutputOptions(
   }
 
   public fun copy(
-    schema: JSONSchema? = this.schema,
     include_schema_in_prompt: Boolean = this.include_schema_in_prompt,
     strict_mode: Boolean? = this.strict_mode,
+    schema: JSONSchema? = this.schema,
     json_schema: String? = this.json_schema,
-    type_name: String? = this.type_name,
     name: String? = this.name,
     mode: StructuredOutputMode = this.mode,
     regex_pattern: String? = this.regex_pattern,
@@ -210,7 +206,7 @@ public class StructuredOutputOptions(
     repair_json: Boolean = this.repair_json,
     max_retries: Int = this.max_retries,
     unknownFields: ByteString = this.unknownFields,
-  ): StructuredOutputOptions = StructuredOutputOptions(schema, include_schema_in_prompt, strict_mode, json_schema, type_name, name, mode, regex_pattern, grammar, repair_json, max_retries, unknownFields)
+  ): StructuredOutputOptions = StructuredOutputOptions(include_schema_in_prompt, strict_mode, schema, json_schema, name, mode, regex_pattern, grammar, repair_json, max_retries, unknownFields)
 
   public companion object {
     @JvmField
@@ -225,15 +221,12 @@ public class StructuredOutputOptions(
     ) {
       override fun encodedSize(`value`: StructuredOutputOptions): Int {
         var size = value.unknownFields.size
-        if (value.schema != null) {
-          size += JSONSchema.ADAPTER.encodedSizeWithTag(1, value.schema)
-        }
         if (value.include_schema_in_prompt != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.include_schema_in_prompt)
         }
         size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.strict_mode)
+        size += JSONSchema.ADAPTER.encodedSizeWithTag(1, value.schema)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.json_schema)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.type_name)
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.name)
         if (value.mode != ai.runanywhere.proto.v1.StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED) {
           size += StructuredOutputMode.ADAPTER.encodedSizeWithTag(7, value.mode)
@@ -250,15 +243,10 @@ public class StructuredOutputOptions(
       }
 
       override fun encode(writer: ProtoWriter, `value`: StructuredOutputOptions) {
-        if (value.schema != null) {
-          JSONSchema.ADAPTER.encodeWithTag(writer, 1, value.schema)
-        }
         if (value.include_schema_in_prompt != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.include_schema_in_prompt)
         }
         ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.strict_mode)
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.json_schema)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.type_name)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.name)
         if (value.mode != ai.runanywhere.proto.v1.StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED) {
           StructuredOutputMode.ADAPTER.encodeWithTag(writer, 7, value.mode)
@@ -271,11 +259,15 @@ public class StructuredOutputOptions(
         if (value.max_retries != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 11, value.max_retries)
         }
+        JSONSchema.ADAPTER.encodeWithTag(writer, 1, value.schema)
+        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.json_schema)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputOptions) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.json_schema)
+        JSONSchema.ADAPTER.encodeWithTag(writer, 1, value.schema)
         if (value.max_retries != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 11, value.max_retries)
         }
@@ -288,23 +280,17 @@ public class StructuredOutputOptions(
           StructuredOutputMode.ADAPTER.encodeWithTag(writer, 7, value.mode)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.name)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.type_name)
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.json_schema)
         ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.strict_mode)
         if (value.include_schema_in_prompt != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.include_schema_in_prompt)
         }
-        if (value.schema != null) {
-          JSONSchema.ADAPTER.encodeWithTag(writer, 1, value.schema)
-        }
       }
 
       override fun decode(reader: ProtoReader): StructuredOutputOptions {
-        var schema: JSONSchema? = null
         var include_schema_in_prompt: Boolean = false
         var strict_mode: Boolean? = null
+        var schema: JSONSchema? = null
         var json_schema: String? = null
-        var type_name: String? = null
         var name: String? = null
         var mode: StructuredOutputMode = StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED
         var regex_pattern: String? = null
@@ -313,11 +299,10 @@ public class StructuredOutputOptions(
         var max_retries: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> schema = JSONSchema.ADAPTER.decode(reader)
             2 -> include_schema_in_prompt = ProtoAdapter.BOOL.decode(reader)
             3 -> strict_mode = ProtoAdapter.BOOL.decode(reader)
+            1 -> schema = JSONSchema.ADAPTER.decode(reader)
             4 -> json_schema = ProtoAdapter.STRING.decode(reader)
-            5 -> type_name = ProtoAdapter.STRING.decode(reader)
             6 -> name = ProtoAdapter.STRING.decode(reader)
             7 -> try {
               mode = StructuredOutputMode.ADAPTER.decode(reader)
@@ -332,11 +317,10 @@ public class StructuredOutputOptions(
           }
         }
         return StructuredOutputOptions(
-          schema = schema,
           include_schema_in_prompt = include_schema_in_prompt,
           strict_mode = strict_mode,
+          schema = schema,
           json_schema = json_schema,
-          type_name = type_name,
           name = name,
           mode = mode,
           regex_pattern = regex_pattern,

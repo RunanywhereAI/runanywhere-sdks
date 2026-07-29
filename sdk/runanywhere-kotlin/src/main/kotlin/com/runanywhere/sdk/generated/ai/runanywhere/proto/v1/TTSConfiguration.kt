@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -41,7 +40,7 @@ import okio.ByteString
  * Defaults (for documentation; proto3 zero-values apply on the wire):
  *   voice              = "default"  (Kotlin) / "com.apple.ttsbundle..." (Swift)
  *   language_code      = "en-US"
- *   speaking_rate      = 1.0   (range 0.5 – 2.0)
+ *   speed              = 1.0   (range 0.5 – 2.0)
  *   pitch              = 1.0   (range 0.5 – 2.0)
  *   volume             = 1.0   (range 0.0 – 1.0)
  *   audio_format       = AUDIO_FORMAT_PCM
@@ -65,88 +64,6 @@ public class TTSConfiguration(
   )
   public val model_id: String = "",
   /**
-   * Voice identifier to use for synthesis. For platform engines this is the
-   * engine-specific voice id (e.g. "com.apple.ttsbundle.siri_female_en-US_compact").
-   */
-  @RacDefaultOption("default")
-  @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
-  )
-  public val voice: String = "",
-  /**
-   * Language for synthesis (BCP-47, e.g. "en-US").
-   */
-  @RacDefaultOption("en-US")
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "languageCode",
-    schemaIndex = 2,
-  )
-  public val language_code: String = "",
-  /**
-   * Speaking rate (0.5 – 2.0; 1.0 is normal).
-   */
-  @RacDefaultOption("1.0")
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "speakingRate",
-    schemaIndex = 3,
-  )
-  public val speaking_rate: Float = 0f,
-  /**
-   * Speech pitch (0.5 – 2.0; 1.0 is normal).
-   */
-  @RacDefaultOption("1.0")
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
-  )
-  public val pitch: Float = 0f,
-  /**
-   * Speech volume (0.0 – 1.0).
-   */
-  @RacDefaultOption("1.0")
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
-  )
-  public val volume: Float = 0f,
-  /**
-   * Output audio format.
-   */
-  @field:WireField(
-    tag = 7,
-    adapter = "ai.runanywhere.proto.v1.AudioFormat#ADAPTER",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "audioFormat",
-    schemaIndex = 6,
-  )
-  public val audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED,
-  /**
-   * Sample rate for output audio in Hz. 0 = engine default
-   * (RAC_TTS_DEFAULT_SAMPLE_RATE = 22050).
-   */
-  @RacDefaultOption("22050")
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "sampleRate",
-    schemaIndex = 7,
-  )
-  public val sample_rate: Int = 0,
-  /**
    * Whether to use neural / premium voice if available.
    */
   @RacDefaultOption("true")
@@ -155,31 +72,30 @@ public class TTSConfiguration(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "enableNeuralVoice",
-    schemaIndex = 8,
+    schemaIndex = 1,
   )
   public val enable_neural_voice: Boolean = false,
   /**
-   * Whether to enable SSML markup support.
-   */
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "enableSsml",
-    schemaIndex = 9,
-  )
-  public val enable_ssml: Boolean = false,
-  /**
-   * Preferred framework for the component. Absent = auto. Mirrors the C
-   * ABI rac_tts_config_t preferred_framework field.
+   * Preferred framework for the component. Absent = auto.
    */
   @field:WireField(
     tag = 11,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     jsonName = "preferredFramework",
-    schemaIndex = 10,
+    schemaIndex = 2,
   )
   public val preferred_framework: InferenceFramework? = null,
+  /**
+   * Component-level defaults applied when a per-call TTSOptions is absent
+   * or leaves a field unset.
+   */
+  @field:WireField(
+    tag = 12,
+    adapter = "ai.runanywhere.proto.v1.TTSOptions#ADAPTER",
+    jsonName = "defaultOptions",
+    schemaIndex = 3,
+  )
+  public val default_options: TTSOptions? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -193,16 +109,9 @@ public class TTSConfiguration(
     if (other !is TTSConfiguration) return false
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
-    if (voice != other.voice) return false
-    if (language_code != other.language_code) return false
-    if (speaking_rate != other.speaking_rate) return false
-    if (pitch != other.pitch) return false
-    if (volume != other.volume) return false
-    if (audio_format != other.audio_format) return false
-    if (sample_rate != other.sample_rate) return false
     if (enable_neural_voice != other.enable_neural_voice) return false
-    if (enable_ssml != other.enable_ssml) return false
     if (preferred_framework != other.preferred_framework) return false
+    if (default_options != other.default_options) return false
     return true
   }
 
@@ -211,16 +120,9 @@ public class TTSConfiguration(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
-      result = result * 37 + voice.hashCode()
-      result = result * 37 + language_code.hashCode()
-      result = result * 37 + speaking_rate.hashCode()
-      result = result * 37 + pitch.hashCode()
-      result = result * 37 + volume.hashCode()
-      result = result * 37 + audio_format.hashCode()
-      result = result * 37 + sample_rate.hashCode()
       result = result * 37 + enable_neural_voice.hashCode()
-      result = result * 37 + enable_ssml.hashCode()
       result = result * 37 + (preferred_framework?.hashCode() ?: 0)
+      result = result * 37 + (default_options?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -229,33 +131,19 @@ public class TTSConfiguration(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
-    result += """voice=${sanitize(voice)}"""
-    result += """language_code=${sanitize(language_code)}"""
-    result += """speaking_rate=$speaking_rate"""
-    result += """pitch=$pitch"""
-    result += """volume=$volume"""
-    result += """audio_format=$audio_format"""
-    result += """sample_rate=$sample_rate"""
     result += """enable_neural_voice=$enable_neural_voice"""
-    result += """enable_ssml=$enable_ssml"""
     if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
+    if (default_options != null) result += """default_options=$default_options"""
     return result.joinToString(prefix = "TTSConfiguration{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     model_id: String = this.model_id,
-    voice: String = this.voice,
-    language_code: String = this.language_code,
-    speaking_rate: Float = this.speaking_rate,
-    pitch: Float = this.pitch,
-    volume: Float = this.volume,
-    audio_format: AudioFormat = this.audio_format,
-    sample_rate: Int = this.sample_rate,
     enable_neural_voice: Boolean = this.enable_neural_voice,
-    enable_ssml: Boolean = this.enable_ssml,
     preferred_framework: InferenceFramework? = this.preferred_framework,
+    default_options: TTSOptions? = this.default_options,
     unknownFields: ByteString = this.unknownFields,
-  ): TTSConfiguration = TTSConfiguration(model_id, voice, language_code, speaking_rate, pitch, volume, audio_format, sample_rate, enable_neural_voice, enable_ssml, preferred_framework, unknownFields)
+  ): TTSConfiguration = TTSConfiguration(model_id, enable_neural_voice, preferred_framework, default_options, unknownFields)
 
   public companion object {
     @JvmField
@@ -272,34 +160,11 @@ public class TTSConfiguration(
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.model_id)
         }
-        if (value.voice != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.voice)
-        }
-        if (value.language_code != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.language_code)
-        }
-        if (!value.speaking_rate.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.speaking_rate)
-        }
-        if (!value.pitch.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.pitch)
-        }
-        if (!value.volume.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(6, value.volume)
-        }
-        if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
-          size += AudioFormat.ADAPTER.encodedSizeWithTag(7, value.audio_format)
-        }
-        if (value.sample_rate != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.sample_rate)
-        }
         if (value.enable_neural_voice != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.enable_neural_voice)
         }
-        if (value.enable_ssml != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.enable_ssml)
-        }
         size += InferenceFramework.ADAPTER.encodedSizeWithTag(11, value.preferred_framework)
+        size += TTSOptions.ADAPTER.encodedSizeWithTag(12, value.default_options)
         return size
       }
 
@@ -307,66 +172,20 @@ public class TTSConfiguration(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
-        if (value.voice != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 2, value.voice)
-        }
-        if (value.language_code != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.language_code)
-        }
-        if (!value.speaking_rate.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.speaking_rate)
-        }
-        if (!value.pitch.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.pitch)
-        }
-        if (!value.volume.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.volume)
-        }
-        if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
-          AudioFormat.ADAPTER.encodeWithTag(writer, 7, value.audio_format)
-        }
-        if (value.sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.sample_rate)
-        }
         if (value.enable_neural_voice != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.enable_neural_voice)
         }
-        if (value.enable_ssml != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.enable_ssml)
-        }
         InferenceFramework.ADAPTER.encodeWithTag(writer, 11, value.preferred_framework)
+        TTSOptions.ADAPTER.encodeWithTag(writer, 12, value.default_options)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSConfiguration) {
         writer.writeBytes(value.unknownFields)
+        TTSOptions.ADAPTER.encodeWithTag(writer, 12, value.default_options)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 11, value.preferred_framework)
-        if (value.enable_ssml != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.enable_ssml)
-        }
         if (value.enable_neural_voice != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.enable_neural_voice)
-        }
-        if (value.sample_rate != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.sample_rate)
-        }
-        if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
-          AudioFormat.ADAPTER.encodeWithTag(writer, 7, value.audio_format)
-        }
-        if (!value.volume.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 6, value.volume)
-        }
-        if (!value.pitch.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.pitch)
-        }
-        if (!value.speaking_rate.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.speaking_rate)
-        }
-        if (value.language_code != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.language_code)
-        }
-        if (value.voice != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 2, value.voice)
         }
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
@@ -375,57 +194,33 @@ public class TTSConfiguration(
 
       override fun decode(reader: ProtoReader): TTSConfiguration {
         var model_id: String = ""
-        var voice: String = ""
-        var language_code: String = ""
-        var speaking_rate: Float = 0f
-        var pitch: Float = 0f
-        var volume: Float = 0f
-        var audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED
-        var sample_rate: Int = 0
         var enable_neural_voice: Boolean = false
-        var enable_ssml: Boolean = false
         var preferred_framework: InferenceFramework? = null
+        var default_options: TTSOptions? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
-            2 -> voice = ProtoAdapter.STRING.decode(reader)
-            3 -> language_code = ProtoAdapter.STRING.decode(reader)
-            4 -> speaking_rate = ProtoAdapter.FLOAT.decode(reader)
-            5 -> pitch = ProtoAdapter.FLOAT.decode(reader)
-            6 -> volume = ProtoAdapter.FLOAT.decode(reader)
-            7 -> try {
-              audio_format = AudioFormat.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            8 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             9 -> enable_neural_voice = ProtoAdapter.BOOL.decode(reader)
-            10 -> enable_ssml = ProtoAdapter.BOOL.decode(reader)
             11 -> try {
               preferred_framework = InferenceFramework.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            12 -> default_options = TTSOptions.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return TTSConfiguration(
           model_id = model_id,
-          voice = voice,
-          language_code = language_code,
-          speaking_rate = speaking_rate,
-          pitch = pitch,
-          volume = volume,
-          audio_format = audio_format,
-          sample_rate = sample_rate,
           enable_neural_voice = enable_neural_voice,
-          enable_ssml = enable_ssml,
           preferred_framework = preferred_framework,
+          default_options = default_options,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: TTSConfiguration): TTSConfiguration = value.copy(
+        default_options = value.default_options?.let(TTSOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

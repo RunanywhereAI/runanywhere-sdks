@@ -32,7 +32,9 @@ public class RerankOptions(
   /**
    * When > 0, only the top_n highest-scoring candidates are returned (every
    * candidate is still scored). 0 = return all candidates, ranked.
+   * Industry name (Cohere rerank `top_n`).
    */
+  @RacDefaultOption("0")
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",

@@ -120,6 +120,7 @@ public class LoraAdapterCatalogEntry(
   /**
    * recommended adapter scale
    */
+  @RacDefaultOption("1.0")
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

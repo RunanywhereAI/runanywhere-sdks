@@ -33,25 +33,21 @@ import kotlin.collections.List
 import okio.ByteString
 
 public class STTLanguageDetectionResult(
+  /**
+   * Detected language, BCP-47.
+   */
   @field:WireField(
-    tag = 1,
-    adapter = "ai.runanywhere.proto.v1.STTLanguage#ADAPTER",
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 0,
   )
-  public val language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED,
-  @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "languageCode",
-    schemaIndex = 1,
-  )
-  public val language_code: String? = null,
+  public val language: String = "",
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val confidence: Float = 0f,
   alternatives: List<String> = emptyList(),
@@ -61,7 +57,7 @@ public class STTLanguageDetectionResult(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val alternatives: List<String> = immutableCopyOf("alternatives", alternatives)
 
@@ -76,7 +72,6 @@ public class STTLanguageDetectionResult(
     if (other !is STTLanguageDetectionResult) return false
     if (unknownFields != other.unknownFields) return false
     if (language != other.language) return false
-    if (language_code != other.language_code) return false
     if (confidence != other.confidence) return false
     if (alternatives != other.alternatives) return false
     return true
@@ -87,7 +82,6 @@ public class STTLanguageDetectionResult(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + language.hashCode()
-      result = result * 37 + (language_code?.hashCode() ?: 0)
       result = result * 37 + confidence.hashCode()
       result = result * 37 + alternatives.hashCode()
       super.hashCode = result
@@ -97,20 +91,18 @@ public class STTLanguageDetectionResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """language=$language"""
-    if (language_code != null) result += """language_code=${sanitize(language_code)}"""
+    result += """language=${sanitize(language)}"""
     result += """confidence=$confidence"""
     if (alternatives.isNotEmpty()) result += """alternatives=${sanitize(alternatives)}"""
     return result.joinToString(prefix = "STTLanguageDetectionResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    language: STTLanguage = this.language,
-    language_code: String? = this.language_code,
+    language: String = this.language,
     confidence: Float = this.confidence,
     alternatives: List<String> = this.alternatives,
     unknownFields: ByteString = this.unknownFields,
-  ): STTLanguageDetectionResult = STTLanguageDetectionResult(language, language_code, confidence, alternatives, unknownFields)
+  ): STTLanguageDetectionResult = STTLanguageDetectionResult(language, confidence, alternatives, unknownFields)
 
   public companion object {
     @JvmField
@@ -125,10 +117,9 @@ public class STTLanguageDetectionResult(
     ) {
       override fun encodedSize(`value`: STTLanguageDetectionResult): Int {
         var size = value.unknownFields.size
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          size += STTLanguage.ADAPTER.encodedSizeWithTag(1, value.language)
+        if (value.language != "") {
+          size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.language)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.language_code)
         if (!value.confidence.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.confidence)
         }
@@ -137,10 +128,9 @@ public class STTLanguageDetectionResult(
       }
 
       override fun encode(writer: ProtoWriter, `value`: STTLanguageDetectionResult) {
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 1, value.language)
+        if (value.language != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.language)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.language_code)
         if (!value.confidence.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.confidence)
         }
@@ -154,25 +144,18 @@ public class STTLanguageDetectionResult(
         if (!value.confidence.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.confidence)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 2, value.language_code)
-        if (value.language != ai.runanywhere.proto.v1.STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
-          STTLanguage.ADAPTER.encodeWithTag(writer, 1, value.language)
+        if (value.language != "") {
+          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.language)
         }
       }
 
       override fun decode(reader: ProtoReader): STTLanguageDetectionResult {
-        var language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED
-        var language_code: String? = null
+        var language: String = ""
         var confidence: Float = 0f
         val alternatives = mutableListOf<String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> try {
-              language = STTLanguage.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
-            2 -> language_code = ProtoAdapter.STRING.decode(reader)
+            5 -> language = ProtoAdapter.STRING.decode(reader)
             3 -> confidence = ProtoAdapter.FLOAT.decode(reader)
             4 -> alternatives.add(ProtoAdapter.STRING.decode(reader))
             else -> reader.readUnknownField(tag)
@@ -180,7 +163,6 @@ public class STTLanguageDetectionResult(
         }
         return STTLanguageDetectionResult(
           language = language,
-          language_code = language_code,
           confidence = confidence,
           alternatives = alternatives,
           unknownFields = unknownFields

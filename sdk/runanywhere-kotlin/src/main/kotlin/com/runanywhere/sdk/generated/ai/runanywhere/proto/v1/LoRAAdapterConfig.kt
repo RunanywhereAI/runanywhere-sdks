@@ -49,6 +49,7 @@ public class LoRAAdapterConfig(
   /**
    * path on disk to the GGUF file
    */
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -57,9 +58,7 @@ public class LoRAAdapterConfig(
     schemaIndex = 0,
   )
   public val adapter_path: String = "",
-  /**
-   * default 1.0 (set by codegen layer)
-   */
+  @RacDefaultOption("1.0")
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

@@ -71,27 +71,27 @@ public class PerformanceMetrics(
   )
   public val throughput_tokens_per_sec: Float = 0f,
   /**
-   * Prompt (input) token count.
+   * Input (prompt) token count.
    */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "promptTokens",
+    jsonName = "inputTokens",
     schemaIndex = 3,
   )
-  public val prompt_tokens: Int = 0,
+  public val input_tokens: Int = 0,
   /**
-   * Completion (output) token count.
+   * Output (completion) token count.
    */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "completionTokens",
+    jsonName = "outputTokens",
     schemaIndex = 4,
   )
-  public val completion_tokens: Int = 0,
+  public val output_tokens: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<PerformanceMetrics, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -107,8 +107,8 @@ public class PerformanceMetrics(
     if (latency_ms != other.latency_ms) return false
     if (memory_bytes != other.memory_bytes) return false
     if (throughput_tokens_per_sec != other.throughput_tokens_per_sec) return false
-    if (prompt_tokens != other.prompt_tokens) return false
-    if (completion_tokens != other.completion_tokens) return false
+    if (input_tokens != other.input_tokens) return false
+    if (output_tokens != other.output_tokens) return false
     return true
   }
 
@@ -119,8 +119,8 @@ public class PerformanceMetrics(
       result = result * 37 + latency_ms.hashCode()
       result = result * 37 + memory_bytes.hashCode()
       result = result * 37 + throughput_tokens_per_sec.hashCode()
-      result = result * 37 + prompt_tokens.hashCode()
-      result = result * 37 + completion_tokens.hashCode()
+      result = result * 37 + input_tokens.hashCode()
+      result = result * 37 + output_tokens.hashCode()
       super.hashCode = result
     }
     return result
@@ -131,8 +131,8 @@ public class PerformanceMetrics(
     result += """latency_ms=$latency_ms"""
     result += """memory_bytes=$memory_bytes"""
     result += """throughput_tokens_per_sec=$throughput_tokens_per_sec"""
-    result += """prompt_tokens=$prompt_tokens"""
-    result += """completion_tokens=$completion_tokens"""
+    result += """input_tokens=$input_tokens"""
+    result += """output_tokens=$output_tokens"""
     return result.joinToString(prefix = "PerformanceMetrics{", separator = ", ", postfix = "}")
   }
 
@@ -140,10 +140,10 @@ public class PerformanceMetrics(
     latency_ms: Long = this.latency_ms,
     memory_bytes: Long = this.memory_bytes,
     throughput_tokens_per_sec: Float = this.throughput_tokens_per_sec,
-    prompt_tokens: Int = this.prompt_tokens,
-    completion_tokens: Int = this.completion_tokens,
+    input_tokens: Int = this.input_tokens,
+    output_tokens: Int = this.output_tokens,
     unknownFields: ByteString = this.unknownFields,
-  ): PerformanceMetrics = PerformanceMetrics(latency_ms, memory_bytes, throughput_tokens_per_sec, prompt_tokens, completion_tokens, unknownFields)
+  ): PerformanceMetrics = PerformanceMetrics(latency_ms, memory_bytes, throughput_tokens_per_sec, input_tokens, output_tokens, unknownFields)
 
   public companion object {
     @JvmField
@@ -167,11 +167,11 @@ public class PerformanceMetrics(
         if (!value.throughput_tokens_per_sec.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.throughput_tokens_per_sec)
         }
-        if (value.prompt_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.prompt_tokens)
+        if (value.input_tokens != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.input_tokens)
         }
-        if (value.completion_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.completion_tokens)
+        if (value.output_tokens != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.output_tokens)
         }
         return size
       }
@@ -186,22 +186,22 @@ public class PerformanceMetrics(
         if (!value.throughput_tokens_per_sec.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.throughput_tokens_per_sec)
         }
-        if (value.prompt_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.prompt_tokens)
+        if (value.input_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.input_tokens)
         }
-        if (value.completion_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.completion_tokens)
+        if (value.output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.output_tokens)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: PerformanceMetrics) {
         writer.writeBytes(value.unknownFields)
-        if (value.completion_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.completion_tokens)
+        if (value.output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.output_tokens)
         }
-        if (value.prompt_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.prompt_tokens)
+        if (value.input_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.input_tokens)
         }
         if (!value.throughput_tokens_per_sec.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.throughput_tokens_per_sec)
@@ -218,15 +218,15 @@ public class PerformanceMetrics(
         var latency_ms: Long = 0L
         var memory_bytes: Long = 0L
         var throughput_tokens_per_sec: Float = 0f
-        var prompt_tokens: Int = 0
-        var completion_tokens: Int = 0
+        var input_tokens: Int = 0
+        var output_tokens: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> latency_ms = ProtoAdapter.INT64.decode(reader)
             2 -> memory_bytes = ProtoAdapter.INT64.decode(reader)
             3 -> throughput_tokens_per_sec = ProtoAdapter.FLOAT.decode(reader)
-            4 -> prompt_tokens = ProtoAdapter.INT32.decode(reader)
-            5 -> completion_tokens = ProtoAdapter.INT32.decode(reader)
+            4 -> input_tokens = ProtoAdapter.INT32.decode(reader)
+            5 -> output_tokens = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -234,8 +234,8 @@ public class PerformanceMetrics(
           latency_ms = latency_ms,
           memory_bytes = memory_bytes,
           throughput_tokens_per_sec = throughput_tokens_per_sec,
-          prompt_tokens = prompt_tokens,
-          completion_tokens = completion_tokens,
+          input_tokens = input_tokens,
+          output_tokens = output_tokens,
           unknownFields = unknownFields
         )
       }

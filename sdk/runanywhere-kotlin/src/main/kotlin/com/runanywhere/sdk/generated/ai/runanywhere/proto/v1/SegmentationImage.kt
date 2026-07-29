@@ -29,6 +29,7 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class SegmentationImage(
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
@@ -37,6 +38,7 @@ public class SegmentationImage(
     schemaIndex = 0,
   )
   public val data_: ByteString = ByteString.EMPTY,
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
@@ -44,6 +46,7 @@ public class SegmentationImage(
     schemaIndex = 1,
   )
   public val width: Int = 0,
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
@@ -51,6 +54,7 @@ public class SegmentationImage(
     schemaIndex = 2,
   )
   public val height: Int = 0,
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.SegmentationPixelFormat#ADAPTER",
@@ -60,6 +64,20 @@ public class SegmentationImage(
   )
   public val pixel_format:
       SegmentationPixelFormat = SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_UNSPECIFIED,
+  /**
+   * Bytes per row. 0 = tightly packed (width * bytes-per-pixel). Was a
+   * C-struct-only field (rac_segmentation_image_t.stride_bytes) with no
+   * wire counterpart.
+   */
+  @RacDefaultOption("0")
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#UINT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "strideBytes",
+    schemaIndex = 4,
+  )
+  public val stride_bytes: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SegmentationImage, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -76,6 +94,7 @@ public class SegmentationImage(
     if (width != other.width) return false
     if (height != other.height) return false
     if (pixel_format != other.pixel_format) return false
+    if (stride_bytes != other.stride_bytes) return false
     return true
   }
 
@@ -87,6 +106,7 @@ public class SegmentationImage(
       result = result * 37 + width.hashCode()
       result = result * 37 + height.hashCode()
       result = result * 37 + pixel_format.hashCode()
+      result = result * 37 + stride_bytes.hashCode()
       super.hashCode = result
     }
     return result
@@ -98,6 +118,7 @@ public class SegmentationImage(
     result += """width=$width"""
     result += """height=$height"""
     result += """pixel_format=$pixel_format"""
+    result += """stride_bytes=$stride_bytes"""
     return result.joinToString(prefix = "SegmentationImage{", separator = ", ", postfix = "}")
   }
 
@@ -106,8 +127,9 @@ public class SegmentationImage(
     width: Int = this.width,
     height: Int = this.height,
     pixel_format: SegmentationPixelFormat = this.pixel_format,
+    stride_bytes: Int = this.stride_bytes,
     unknownFields: ByteString = this.unknownFields,
-  ): SegmentationImage = SegmentationImage(data_, width, height, pixel_format, unknownFields)
+  ): SegmentationImage = SegmentationImage(data_, width, height, pixel_format, stride_bytes, unknownFields)
 
   public companion object {
     @JvmField
@@ -133,6 +155,9 @@ public class SegmentationImage(
         if (value.pixel_format != ai.runanywhere.proto.v1.SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_UNSPECIFIED) {
           size += SegmentationPixelFormat.ADAPTER.encodedSizeWithTag(4, value.pixel_format)
         }
+        if (value.stride_bytes != 0) {
+          size += ProtoAdapter.UINT32.encodedSizeWithTag(5, value.stride_bytes)
+        }
         return size
       }
 
@@ -149,11 +174,17 @@ public class SegmentationImage(
         if (value.pixel_format != ai.runanywhere.proto.v1.SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_UNSPECIFIED) {
           SegmentationPixelFormat.ADAPTER.encodeWithTag(writer, 4, value.pixel_format)
         }
+        if (value.stride_bytes != 0) {
+          ProtoAdapter.UINT32.encodeWithTag(writer, 5, value.stride_bytes)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SegmentationImage) {
         writer.writeBytes(value.unknownFields)
+        if (value.stride_bytes != 0) {
+          ProtoAdapter.UINT32.encodeWithTag(writer, 5, value.stride_bytes)
+        }
         if (value.pixel_format != ai.runanywhere.proto.v1.SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_UNSPECIFIED) {
           SegmentationPixelFormat.ADAPTER.encodeWithTag(writer, 4, value.pixel_format)
         }
@@ -173,6 +204,7 @@ public class SegmentationImage(
         var width: Int = 0
         var height: Int = 0
         var pixel_format: SegmentationPixelFormat = SegmentationPixelFormat.SEGMENTATION_PIXEL_FORMAT_UNSPECIFIED
+        var stride_bytes: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> data_ = ProtoAdapter.BYTES.decode(reader)
@@ -183,6 +215,7 @@ public class SegmentationImage(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            5 -> stride_bytes = ProtoAdapter.UINT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -191,6 +224,7 @@ public class SegmentationImage(
           width = width,
           height = height,
           pixel_format = pixel_format,
+          stride_bytes = stride_bytes,
           unknownFields = unknownFields
         )
       }

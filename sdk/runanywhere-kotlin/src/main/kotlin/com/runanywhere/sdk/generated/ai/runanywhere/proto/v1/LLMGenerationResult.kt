@@ -71,16 +71,16 @@ public class LLMGenerationResult(
   )
   public val input_tokens: Int = 0,
   /**
-   * Number of tokens used (output / completion tokens).
+   * Number of output/completion tokens.
    */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "tokensGenerated",
+    jsonName = "outputTokens",
     schemaIndex = 3,
   )
-  public val tokens_generated: Int = 0,
+  public val output_tokens: Int = 0,
   /**
    * Model used for generation.
    */
@@ -314,7 +314,7 @@ public class LLMGenerationResult(
     if (text != other.text) return false
     if (thinking_content != other.thinking_content) return false
     if (input_tokens != other.input_tokens) return false
-    if (tokens_generated != other.tokens_generated) return false
+    if (output_tokens != other.output_tokens) return false
     if (model_used != other.model_used) return false
     if (generation_time_ms != other.generation_time_ms) return false
     if (ttft_ms != other.ttft_ms) return false
@@ -345,7 +345,7 @@ public class LLMGenerationResult(
       result = result * 37 + text.hashCode()
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
       result = result * 37 + input_tokens.hashCode()
-      result = result * 37 + tokens_generated.hashCode()
+      result = result * 37 + output_tokens.hashCode()
       result = result * 37 + model_used.hashCode()
       result = result * 37 + generation_time_ms.hashCode()
       result = result * 37 + (ttft_ms?.hashCode() ?: 0)
@@ -376,7 +376,7 @@ public class LLMGenerationResult(
     result += """text=${sanitize(text)}"""
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
     result += """input_tokens=$input_tokens"""
-    result += """tokens_generated=$tokens_generated"""
+    result += """output_tokens=$output_tokens"""
     result += """model_used=${sanitize(model_used)}"""
     result += """generation_time_ms=$generation_time_ms"""
     if (ttft_ms != null) result += """ttft_ms=$ttft_ms"""
@@ -404,7 +404,7 @@ public class LLMGenerationResult(
     text: String = this.text,
     thinking_content: String? = this.thinking_content,
     input_tokens: Int = this.input_tokens,
-    tokens_generated: Int = this.tokens_generated,
+    output_tokens: Int = this.output_tokens,
     model_used: String = this.model_used,
     generation_time_ms: Double = this.generation_time_ms,
     ttft_ms: Double? = this.ttft_ms,
@@ -426,7 +426,7 @@ public class LLMGenerationResult(
     tool_calls: List<ToolCall> = this.tool_calls,
     tool_results: List<ToolResult> = this.tool_results,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMGenerationResult = LLMGenerationResult(text, thinking_content, input_tokens, tokens_generated, model_used, generation_time_ms, ttft_ms, tokens_per_second, framework, finish_reason, thinking_tokens, response_tokens, json_output, performance, executed_on, structured_output_validation, total_tokens, error_message, error_code, cached_prompt_tokens, prompt_eval_time_ms, decode_time_ms, tool_calls, tool_results, unknownFields)
+  ): LLMGenerationResult = LLMGenerationResult(text, thinking_content, input_tokens, output_tokens, model_used, generation_time_ms, ttft_ms, tokens_per_second, framework, finish_reason, thinking_tokens, response_tokens, json_output, performance, executed_on, structured_output_validation, total_tokens, error_message, error_code, cached_prompt_tokens, prompt_eval_time_ms, decode_time_ms, tool_calls, tool_results, unknownFields)
 
   public companion object {
     @JvmField
@@ -448,8 +448,8 @@ public class LLMGenerationResult(
         if (value.input_tokens != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.input_tokens)
         }
-        if (value.tokens_generated != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.tokens_generated)
+        if (value.output_tokens != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.output_tokens)
         }
         if (value.model_used != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.model_used)
@@ -504,8 +504,8 @@ public class LLMGenerationResult(
         if (value.input_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.input_tokens)
         }
-        if (value.tokens_generated != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.tokens_generated)
+        if (value.output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.output_tokens)
         }
         if (value.model_used != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_used)
@@ -596,8 +596,8 @@ public class LLMGenerationResult(
         if (value.model_used != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_used)
         }
-        if (value.tokens_generated != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.tokens_generated)
+        if (value.output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.output_tokens)
         }
         if (value.input_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.input_tokens)
@@ -612,7 +612,7 @@ public class LLMGenerationResult(
         var text: String = ""
         var thinking_content: String? = null
         var input_tokens: Int = 0
-        var tokens_generated: Int = 0
+        var output_tokens: Int = 0
         var model_used: String = ""
         var generation_time_ms: Double = 0.0
         var ttft_ms: Double? = null
@@ -638,7 +638,7 @@ public class LLMGenerationResult(
             1 -> text = ProtoAdapter.STRING.decode(reader)
             2 -> thinking_content = ProtoAdapter.STRING.decode(reader)
             3 -> input_tokens = ProtoAdapter.INT32.decode(reader)
-            4 -> tokens_generated = ProtoAdapter.INT32.decode(reader)
+            4 -> output_tokens = ProtoAdapter.INT32.decode(reader)
             5 -> model_used = ProtoAdapter.STRING.decode(reader)
             6 -> generation_time_ms = ProtoAdapter.DOUBLE.decode(reader)
             7 -> ttft_ms = ProtoAdapter.DOUBLE.decode(reader)
@@ -670,7 +670,7 @@ public class LLMGenerationResult(
           text = text,
           thinking_content = thinking_content,
           input_tokens = input_tokens,
-          tokens_generated = tokens_generated,
+          output_tokens = output_tokens,
           model_used = model_used,
           generation_time_ms = generation_time_ms,
           ttft_ms = ttft_ms,

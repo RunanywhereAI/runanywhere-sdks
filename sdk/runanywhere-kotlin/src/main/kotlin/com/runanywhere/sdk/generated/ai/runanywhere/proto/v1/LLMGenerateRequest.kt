@@ -46,23 +46,12 @@ public class LLMGenerateRequest(
     schemaIndex = 0,
   )
   public val prompt: String = "",
-  /**
-   * chain-of-thought tokens emit as TokenKind.THOUGHT
-   */
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "emitThoughts",
-    schemaIndex = 1,
-  )
-  public val emit_thoughts: Boolean = false,
   @field:WireField(
     tag = 14,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val request_id: String = "",
   @field:WireField(
@@ -70,7 +59,7 @@ public class LLMGenerateRequest(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelId",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val model_id: String = "",
   @field:WireField(
@@ -78,7 +67,7 @@ public class LLMGenerateRequest(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "conversationId",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val conversation_id: String = "",
   metadata: Map<String, String> = emptyMap(),
@@ -89,7 +78,7 @@ public class LLMGenerateRequest(
   @field:WireField(
     tag = 26,
     adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val options: LLMGenerationOptions? = null,
   history: List<ChatMessage> = emptyList(),
@@ -99,7 +88,7 @@ public class LLMGenerateRequest(
     tag = 25,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
@@ -115,7 +104,7 @@ public class LLMGenerateRequest(
     tag = 27,
     adapter = "ai.runanywhere.proto.v1.ChatMessage#ADAPTER",
     label = WireField.Label.REPEATED,
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val history: List<ChatMessage> = immutableCopyOf("history", history)
 
@@ -130,7 +119,6 @@ public class LLMGenerateRequest(
     if (other !is LLMGenerateRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (prompt != other.prompt) return false
-    if (emit_thoughts != other.emit_thoughts) return false
     if (request_id != other.request_id) return false
     if (model_id != other.model_id) return false
     if (conversation_id != other.conversation_id) return false
@@ -145,7 +133,6 @@ public class LLMGenerateRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + prompt.hashCode()
-      result = result * 37 + emit_thoughts.hashCode()
       result = result * 37 + request_id.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + conversation_id.hashCode()
@@ -160,7 +147,6 @@ public class LLMGenerateRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """prompt=${sanitize(prompt)}"""
-    result += """emit_thoughts=$emit_thoughts"""
     result += """request_id=${sanitize(request_id)}"""
     result += """model_id=${sanitize(model_id)}"""
     result += """conversation_id=${sanitize(conversation_id)}"""
@@ -172,7 +158,6 @@ public class LLMGenerateRequest(
 
   public fun copy(
     prompt: String = this.prompt,
-    emit_thoughts: Boolean = this.emit_thoughts,
     request_id: String = this.request_id,
     model_id: String = this.model_id,
     conversation_id: String = this.conversation_id,
@@ -180,7 +165,7 @@ public class LLMGenerateRequest(
     options: LLMGenerationOptions? = this.options,
     history: List<ChatMessage> = this.history,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMGenerateRequest = LLMGenerateRequest(prompt, emit_thoughts, request_id, model_id, conversation_id, metadata, options, history, unknownFields)
+  ): LLMGenerateRequest = LLMGenerateRequest(prompt, request_id, model_id, conversation_id, metadata, options, history, unknownFields)
 
   public companion object {
     @JvmField
@@ -201,9 +186,6 @@ public class LLMGenerateRequest(
         if (value.prompt != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.prompt)
         }
-        if (value.emit_thoughts != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.emit_thoughts)
-        }
         if (value.request_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.request_id)
         }
@@ -222,9 +204,6 @@ public class LLMGenerateRequest(
       override fun encode(writer: ProtoWriter, `value`: LLMGenerateRequest) {
         if (value.prompt != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.prompt)
-        }
-        if (value.emit_thoughts != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.emit_thoughts)
         }
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 14, value.request_id)
@@ -255,9 +234,6 @@ public class LLMGenerateRequest(
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 14, value.request_id)
         }
-        if (value.emit_thoughts != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.emit_thoughts)
-        }
         if (value.prompt != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.prompt)
         }
@@ -265,7 +241,6 @@ public class LLMGenerateRequest(
 
       override fun decode(reader: ProtoReader): LLMGenerateRequest {
         var prompt: String = ""
-        var emit_thoughts: Boolean = false
         var request_id: String = ""
         var model_id: String = ""
         var conversation_id: String = ""
@@ -275,7 +250,6 @@ public class LLMGenerateRequest(
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
-            7 -> emit_thoughts = ProtoAdapter.BOOL.decode(reader)
             14 -> request_id = ProtoAdapter.STRING.decode(reader)
             15 -> model_id = ProtoAdapter.STRING.decode(reader)
             16 -> conversation_id = ProtoAdapter.STRING.decode(reader)
@@ -287,7 +261,6 @@ public class LLMGenerateRequest(
         }
         return LLMGenerateRequest(
           prompt = prompt,
-          emit_thoughts = emit_thoughts,
           request_id = request_id,
           model_id = model_id,
           conversation_id = conversation_id,

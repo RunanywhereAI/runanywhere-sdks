@@ -57,18 +57,18 @@ public class LLMStreamFinalResult(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "promptTokens",
+    jsonName = "inputTokens",
     schemaIndex = 2,
   )
-  public val prompt_tokens: Int = 0,
+  public val input_tokens: Int = 0,
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "completionTokens",
+    jsonName = "outputTokens",
     schemaIndex = 3,
   )
-  public val completion_tokens: Int = 0,
+  public val output_tokens: Int = 0,
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -181,8 +181,8 @@ public class LLMStreamFinalResult(
     if (unknownFields != other.unknownFields) return false
     if (text != other.text) return false
     if (thinking_content != other.thinking_content) return false
-    if (prompt_tokens != other.prompt_tokens) return false
-    if (completion_tokens != other.completion_tokens) return false
+    if (input_tokens != other.input_tokens) return false
+    if (output_tokens != other.output_tokens) return false
     if (total_tokens != other.total_tokens) return false
     if (total_time_ms != other.total_time_ms) return false
     if (time_to_first_token_ms != other.time_to_first_token_ms) return false
@@ -203,8 +203,8 @@ public class LLMStreamFinalResult(
       result = unknownFields.hashCode()
       result = result * 37 + text.hashCode()
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
-      result = result * 37 + prompt_tokens.hashCode()
-      result = result * 37 + completion_tokens.hashCode()
+      result = result * 37 + input_tokens.hashCode()
+      result = result * 37 + output_tokens.hashCode()
       result = result * 37 + total_tokens.hashCode()
       result = result * 37 + total_time_ms.hashCode()
       result = result * 37 + time_to_first_token_ms.hashCode()
@@ -225,8 +225,8 @@ public class LLMStreamFinalResult(
     val result = mutableListOf<String>()
     result += """text=${sanitize(text)}"""
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
-    result += """prompt_tokens=$prompt_tokens"""
-    result += """completion_tokens=$completion_tokens"""
+    result += """input_tokens=$input_tokens"""
+    result += """output_tokens=$output_tokens"""
     result += """total_tokens=$total_tokens"""
     result += """total_time_ms=$total_time_ms"""
     result += """time_to_first_token_ms=$time_to_first_token_ms"""
@@ -244,8 +244,8 @@ public class LLMStreamFinalResult(
   public fun copy(
     text: String = this.text,
     thinking_content: String? = this.thinking_content,
-    prompt_tokens: Int = this.prompt_tokens,
-    completion_tokens: Int = this.completion_tokens,
+    input_tokens: Int = this.input_tokens,
+    output_tokens: Int = this.output_tokens,
     total_tokens: Int = this.total_tokens,
     total_time_ms: Long = this.total_time_ms,
     time_to_first_token_ms: Long = this.time_to_first_token_ms,
@@ -258,7 +258,7 @@ public class LLMStreamFinalResult(
     tool_calls: List<ToolCall> = this.tool_calls,
     tool_results: List<ToolResult> = this.tool_results,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMStreamFinalResult = LLMStreamFinalResult(text, thinking_content, prompt_tokens, completion_tokens, total_tokens, total_time_ms, time_to_first_token_ms, tokens_per_second, finish_reason, error_code, error_message, prompt_eval_time_ms, decode_time_ms, tool_calls, tool_results, unknownFields)
+  ): LLMStreamFinalResult = LLMStreamFinalResult(text, thinking_content, input_tokens, output_tokens, total_tokens, total_time_ms, time_to_first_token_ms, tokens_per_second, finish_reason, error_code, error_message, prompt_eval_time_ms, decode_time_ms, tool_calls, tool_results, unknownFields)
 
   public companion object {
     @JvmField
@@ -277,11 +277,11 @@ public class LLMStreamFinalResult(
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.text)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.thinking_content)
-        if (value.prompt_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.prompt_tokens)
+        if (value.input_tokens != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.input_tokens)
         }
-        if (value.completion_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.completion_tokens)
+        if (value.output_tokens != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.output_tokens)
         }
         if (value.total_tokens != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.total_tokens)
@@ -320,11 +320,11 @@ public class LLMStreamFinalResult(
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.text)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.thinking_content)
-        if (value.prompt_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.prompt_tokens)
+        if (value.input_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.input_tokens)
         }
-        if (value.completion_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.completion_tokens)
+        if (value.output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.output_tokens)
         }
         if (value.total_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 5, value.total_tokens)
@@ -389,11 +389,11 @@ public class LLMStreamFinalResult(
         if (value.total_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 5, value.total_tokens)
         }
-        if (value.completion_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.completion_tokens)
+        if (value.output_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.output_tokens)
         }
-        if (value.prompt_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.prompt_tokens)
+        if (value.input_tokens != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.input_tokens)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.thinking_content)
         if (value.text != "") {
@@ -404,8 +404,8 @@ public class LLMStreamFinalResult(
       override fun decode(reader: ProtoReader): LLMStreamFinalResult {
         var text: String = ""
         var thinking_content: String? = null
-        var prompt_tokens: Int = 0
-        var completion_tokens: Int = 0
+        var input_tokens: Int = 0
+        var output_tokens: Int = 0
         var total_tokens: Int = 0
         var total_time_ms: Long = 0L
         var time_to_first_token_ms: Long = 0L
@@ -421,8 +421,8 @@ public class LLMStreamFinalResult(
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
             2 -> thinking_content = ProtoAdapter.STRING.decode(reader)
-            3 -> prompt_tokens = ProtoAdapter.INT32.decode(reader)
-            4 -> completion_tokens = ProtoAdapter.INT32.decode(reader)
+            3 -> input_tokens = ProtoAdapter.INT32.decode(reader)
+            4 -> output_tokens = ProtoAdapter.INT32.decode(reader)
             5 -> total_tokens = ProtoAdapter.INT32.decode(reader)
             6 -> total_time_ms = ProtoAdapter.INT64.decode(reader)
             7 -> time_to_first_token_ms = ProtoAdapter.INT64.decode(reader)
@@ -440,8 +440,8 @@ public class LLMStreamFinalResult(
         return LLMStreamFinalResult(
           text = text,
           thinking_content = thinking_content,
-          prompt_tokens = prompt_tokens,
-          completion_tokens = completion_tokens,
+          input_tokens = input_tokens,
+          output_tokens = output_tokens,
           total_tokens = total_tokens,
           total_time_ms = total_time_ms,
           time_to_first_token_ms = time_to_first_token_ms,

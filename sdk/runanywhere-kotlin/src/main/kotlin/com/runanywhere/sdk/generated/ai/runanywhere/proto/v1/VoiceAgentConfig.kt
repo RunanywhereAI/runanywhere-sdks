@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -162,17 +161,12 @@ public class VoiceAgentConfig(
     schemaIndex = 10,
   )
   public val barge_in_threshold_ms: Int = 0,
-  /**
-   * LLM behavior.
-   */
   @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "systemPrompt",
+    tag = 18,
+    adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
     schemaIndex = 11,
   )
-  public val system_prompt: String = "",
+  public val generation: LLMGenerationOptions? = null,
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -181,13 +175,6 @@ public class VoiceAgentConfig(
     schemaIndex = 12,
   )
   public val max_context_tokens: Int = 0,
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 13,
-  )
-  public val temperature: Float = 0f,
   /**
    * Emit partial transcripts as UserSaidEvent{is_final=false}.
    */
@@ -196,20 +183,9 @@ public class VoiceAgentConfig(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "emitPartials",
-    schemaIndex = 14,
+    schemaIndex = 13,
   )
   public val emit_partials: Boolean = false,
-  /**
-   * Emit thought tokens (qwen3, deepseek-r1) separately from answer tokens.
-   */
-  @field:WireField(
-    tag = 14,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "emitThoughts",
-    schemaIndex = 15,
-  )
-  public val emit_thoughts: Boolean = false,
   /**
    * Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
    * oneof arm; provided so callers that pass this message standalone (or
@@ -219,7 +195,7 @@ public class VoiceAgentConfig(
     tag = 16,
     adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",
     jsonName = "typeKind",
-    schemaIndex = 16,
+    schemaIndex = 14,
   )
   public val type_kind: SolutionType? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -245,11 +221,9 @@ public class VoiceAgentConfig(
     if (audio_file_path != other.audio_file_path) return false
     if (enable_barge_in != other.enable_barge_in) return false
     if (barge_in_threshold_ms != other.barge_in_threshold_ms) return false
-    if (system_prompt != other.system_prompt) return false
+    if (generation != other.generation) return false
     if (max_context_tokens != other.max_context_tokens) return false
-    if (temperature != other.temperature) return false
     if (emit_partials != other.emit_partials) return false
-    if (emit_thoughts != other.emit_thoughts) return false
     if (type_kind != other.type_kind) return false
     return true
   }
@@ -269,11 +243,9 @@ public class VoiceAgentConfig(
       result = result * 37 + audio_file_path.hashCode()
       result = result * 37 + (enable_barge_in?.hashCode() ?: 0)
       result = result * 37 + barge_in_threshold_ms.hashCode()
-      result = result * 37 + system_prompt.hashCode()
+      result = result * 37 + (generation?.hashCode() ?: 0)
       result = result * 37 + max_context_tokens.hashCode()
-      result = result * 37 + temperature.hashCode()
       result = result * 37 + emit_partials.hashCode()
-      result = result * 37 + emit_thoughts.hashCode()
       result = result * 37 + (type_kind?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -293,11 +265,9 @@ public class VoiceAgentConfig(
     result += """audio_file_path=${sanitize(audio_file_path)}"""
     if (enable_barge_in != null) result += """enable_barge_in=$enable_barge_in"""
     result += """barge_in_threshold_ms=$barge_in_threshold_ms"""
-    result += """system_prompt=${sanitize(system_prompt)}"""
+    if (generation != null) result += """generation=$generation"""
     result += """max_context_tokens=$max_context_tokens"""
-    result += """temperature=$temperature"""
     result += """emit_partials=$emit_partials"""
-    result += """emit_thoughts=$emit_thoughts"""
     if (type_kind != null) result += """type_kind=$type_kind"""
     return result.joinToString(prefix = "VoiceAgentConfig{", separator = ", ", postfix = "}")
   }
@@ -314,14 +284,12 @@ public class VoiceAgentConfig(
     audio_file_path: String = this.audio_file_path,
     enable_barge_in: Boolean? = this.enable_barge_in,
     barge_in_threshold_ms: Int = this.barge_in_threshold_ms,
-    system_prompt: String = this.system_prompt,
+    generation: LLMGenerationOptions? = this.generation,
     max_context_tokens: Int = this.max_context_tokens,
-    temperature: Float = this.temperature,
     emit_partials: Boolean = this.emit_partials,
-    emit_thoughts: Boolean = this.emit_thoughts,
     type_kind: SolutionType? = this.type_kind,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceAgentConfig = VoiceAgentConfig(llm_model_id, stt_model_id, tts_model_id, vad_model_id, tts_voice_id, sample_rate_hz, chunk_ms, audio_source, audio_file_path, enable_barge_in, barge_in_threshold_ms, system_prompt, max_context_tokens, temperature, emit_partials, emit_thoughts, type_kind, unknownFields)
+  ): VoiceAgentConfig = VoiceAgentConfig(llm_model_id, stt_model_id, tts_model_id, vad_model_id, tts_voice_id, sample_rate_hz, chunk_ms, audio_source, audio_file_path, enable_barge_in, barge_in_threshold_ms, generation, max_context_tokens, emit_partials, type_kind, unknownFields)
 
   public companion object {
     @JvmField
@@ -366,20 +334,12 @@ public class VoiceAgentConfig(
         if (value.barge_in_threshold_ms != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.barge_in_threshold_ms)
         }
-        if (value.system_prompt != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.system_prompt)
-        }
+        size += LLMGenerationOptions.ADAPTER.encodedSizeWithTag(18, value.generation)
         if (value.max_context_tokens != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(11, value.max_context_tokens)
         }
-        if (!value.temperature.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(12, value.temperature)
-        }
         if (value.emit_partials != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(13, value.emit_partials)
-        }
-        if (value.emit_thoughts != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(14, value.emit_thoughts)
         }
         size += SolutionType.ADAPTER.encodedSizeWithTag(16, value.type_kind)
         return size
@@ -417,20 +377,12 @@ public class VoiceAgentConfig(
         if (value.barge_in_threshold_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 9, value.barge_in_threshold_ms)
         }
-        if (value.system_prompt != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 10, value.system_prompt)
-        }
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 18, value.generation)
         if (value.max_context_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 11, value.max_context_tokens)
         }
-        if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.temperature)
-        }
         if (value.emit_partials != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 13, value.emit_partials)
-        }
-        if (value.emit_thoughts != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 14, value.emit_thoughts)
         }
         SolutionType.ADAPTER.encodeWithTag(writer, 16, value.type_kind)
         writer.writeBytes(value.unknownFields)
@@ -439,21 +391,13 @@ public class VoiceAgentConfig(
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentConfig) {
         writer.writeBytes(value.unknownFields)
         SolutionType.ADAPTER.encodeWithTag(writer, 16, value.type_kind)
-        if (value.emit_thoughts != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 14, value.emit_thoughts)
-        }
         if (value.emit_partials != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 13, value.emit_partials)
-        }
-        if (!value.temperature.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 12, value.temperature)
         }
         if (value.max_context_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 11, value.max_context_tokens)
         }
-        if (value.system_prompt != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 10, value.system_prompt)
-        }
+        LLMGenerationOptions.ADAPTER.encodeWithTag(writer, 18, value.generation)
         if (value.barge_in_threshold_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 9, value.barge_in_threshold_ms)
         }
@@ -499,11 +443,9 @@ public class VoiceAgentConfig(
         var audio_file_path: String = ""
         var enable_barge_in: Boolean? = null
         var barge_in_threshold_ms: Int = 0
-        var system_prompt: String = ""
+        var generation: LLMGenerationOptions? = null
         var max_context_tokens: Int = 0
-        var temperature: Float = 0f
         var emit_partials: Boolean = false
-        var emit_thoughts: Boolean = false
         var type_kind: SolutionType? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -522,11 +464,9 @@ public class VoiceAgentConfig(
             15 -> audio_file_path = ProtoAdapter.STRING.decode(reader)
             8 -> enable_barge_in = ProtoAdapter.BOOL.decode(reader)
             9 -> barge_in_threshold_ms = ProtoAdapter.INT32.decode(reader)
-            10 -> system_prompt = ProtoAdapter.STRING.decode(reader)
+            18 -> generation = LLMGenerationOptions.ADAPTER.decode(reader)
             11 -> max_context_tokens = ProtoAdapter.INT32.decode(reader)
-            12 -> temperature = ProtoAdapter.FLOAT.decode(reader)
             13 -> emit_partials = ProtoAdapter.BOOL.decode(reader)
-            14 -> emit_thoughts = ProtoAdapter.BOOL.decode(reader)
             16 -> try {
               type_kind = SolutionType.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -547,17 +487,16 @@ public class VoiceAgentConfig(
           audio_file_path = audio_file_path,
           enable_barge_in = enable_barge_in,
           barge_in_threshold_ms = barge_in_threshold_ms,
-          system_prompt = system_prompt,
+          generation = generation,
           max_context_tokens = max_context_tokens,
-          temperature = temperature,
           emit_partials = emit_partials,
-          emit_thoughts = emit_thoughts,
           type_kind = type_kind,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VoiceAgentConfig): VoiceAgentConfig = value.copy(
+        generation = value.generation?.let(LLMGenerationOptions.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }
