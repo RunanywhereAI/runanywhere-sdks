@@ -15,8 +15,10 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart'
     show
+        STTAudioSource,
         STTAudioSource_Source,
         STTOptions,
+        STTServiceState,
         STTOutput,
         STTPartialResult,
         STTStreamEvent,
@@ -173,7 +175,8 @@ class DartBridgeSTT {
     return STTOutput.fromBuffer(resultBytes);
   }
 
-  /// Transcribe audio with serialized runanywhere.v1.STTOptions.
+  /// Transcribe audio with a serialized runanywhere.v1.STTTranscriptionRequest
+  /// (inline audio in `request.audio.audio_data`).
   Future<STTOutput> transcribeProto(
     Uint8List audioData,
     STTOptions options,
@@ -193,25 +196,18 @@ class DartBridgeSTT {
       );
     }
 
-    final optionsBytes = options.writeToBuffer();
-    final audioPtr = calloc<Uint8>(audioData.isEmpty ? 1 : audioData.length);
-    final optionsPtr = DartBridgeProtoUtils.copyBytes(optionsBytes);
+    final request = STTTranscriptionRequest(
+      audio: STTAudioSource(audioData: audioData),
+      options: options,
+    );
+    final requestBytes = request.writeToBuffer();
+    final requestPtr = DartBridgeProtoUtils.copyBytes(requestBytes);
     final out = calloc<RacProtoBuffer>();
     final bindings = RacNative.bindings;
 
     try {
-      if (audioData.isNotEmpty) {
-        audioPtr.asTypedList(audioData.length).setAll(0, audioData);
-      }
       bindings.rac_proto_buffer_init(out);
-      final code = fn(
-        handle,
-        audioPtr.cast<Void>(),
-        audioData.length,
-        optionsPtr,
-        optionsBytes.length,
-        out,
-      );
+      final code = fn(handle, requestPtr, requestBytes.length, out);
       DartBridgeProtoUtils.ensureSuccess(
         out,
         code,
@@ -220,10 +216,22 @@ class DartBridgeSTT {
       return DartBridgeProtoUtils.decodeBuffer(out, STTOutput.fromBuffer);
     } finally {
       bindings.rac_proto_buffer_free(out);
-      calloc.free(audioPtr);
-      calloc.free(optionsPtr);
+      calloc.free(requestPtr);
       calloc.free(out);
     }
+  }
+
+  /// Read the lifecycle-owned STT service state.
+  STTServiceState stateLifecycleProto() {
+    final fn = RacNative.bindings.rac_stt_state_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_stt_state_lifecycle_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<STTServiceState>(
+      invoke: fn,
+      decode: STTServiceState.fromBuffer,
+      symbol: 'rac_stt_state_lifecycle_proto',
+    );
   }
 
   // MARK: - Streaming Session (chunk-feed)

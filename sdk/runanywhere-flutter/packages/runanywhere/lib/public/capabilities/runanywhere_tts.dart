@@ -12,6 +12,8 @@ import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart'
     show ComponentLifecycleState;
+import 'package:runanywhere/generated/convenience/ra_convenience.dart'
+    show TTSOptionsConvenience;
 import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
@@ -282,8 +284,27 @@ class RunAnywhereTTS {
     await stopSynthesis();
   }
 
-  /// List available TTS voice ids from the generated registry surface.
+  /// Read the lifecycle-owned TTS service state (readiness, current voice,
+  /// available voices, supported languages).
+  Future<TTSServiceState> ttsState() async {
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeTTS.shared.stateLifecycleProto();
+  }
+
+  /// List available TTS voice ids. Prefers the lifecycle-owned service state
+  /// (populated once a voice engine is up); falls back to the registry when
+  /// the state carries no voices.
   Future<List<String>> availableVoices() async {
+    try {
+      final state = await ttsState();
+      if (state.voices.isNotEmpty) {
+        return state.voices.map((v) => v.id).toList(growable: false);
+      }
+    } catch (_) {
+      // Older commons binaries without the state ABI fall through.
+    }
     final result = await RunAnywhereModels.shared.list(
       query: model_pb.ModelQuery(category: _ttsCategory),
     );
@@ -310,24 +331,27 @@ class RunAnywhereTTS {
   }
 
   TTSOptions _effectiveOptions(TTSOptions options) {
+    // Fill unset fields from the generated defaults, which come from the
+    // rac_default annotations in idl/tts_options.proto.
+    final d = TTSOptionsConvenience.defaults();
     final opts = options.deepCopy();
     if (!opts.hasLanguageCode()) {
-      opts.languageCode = 'en-US';
+      opts.languageCode = d.languageCode;
     }
-    if (!opts.hasSpeakingRate()) {
-      opts.speakingRate = 1.0;
+    if (!opts.hasSpeed()) {
+      opts.speed = d.speed;
     }
     if (!opts.hasPitch()) {
-      opts.pitch = 1.0;
+      opts.pitch = d.pitch;
     }
     if (!opts.hasVolume()) {
-      opts.volume = 1.0;
+      opts.volume = d.volume;
     }
     if (!opts.hasAudioFormat()) {
-      opts.audioFormat = model_pb.AudioFormat.AUDIO_FORMAT_PCM;
+      opts.audioFormat = d.audioFormat;
     }
     if (!opts.hasSampleRate()) {
-      opts.sampleRate = RADefaultsAudioCapture.ttsSampleRateHz;
+      opts.sampleRate = d.sampleRate;
     }
     return opts;
   }

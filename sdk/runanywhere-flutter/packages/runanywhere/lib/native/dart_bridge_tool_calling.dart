@@ -18,13 +18,15 @@ import 'package:fixnum/fixnum.dart' show Int64;
 
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/llm_service.pb.dart'
+    show
+        ToolCallingSessionCreateRequest,
+        ToolCallingSessionEvent,
+        ToolCallingSessionStepWithResultRequest;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
     show
         ToolCallValidationRequest,
         ToolCallValidationResult,
-        ToolCallingSessionCreateRequest,
-        ToolCallingSessionEvent,
-        ToolCallingSessionStepWithResultRequest,
         ToolParseRequest,
         ToolParseResult,
         ToolPromptFormatRequest,

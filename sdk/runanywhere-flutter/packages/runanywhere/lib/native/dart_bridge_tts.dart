@@ -405,6 +405,19 @@ class DartBridgeTTS {
     );
   }
 
+  /// Read the lifecycle-owned TTS service state.
+  TTSServiceState stateLifecycleProto() {
+    final fn = RacNative.bindings.rac_tts_state_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_tts_state_lifecycle_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<TTSServiceState>(
+      invoke: fn,
+      decode: TTSServiceState.fromBuffer,
+      symbol: 'rac_tts_state_lifecycle_proto',
+    );
+  }
+
   /// Enumerate voices via the generated-proto ABI.
   Future<List<TTSVoiceInfo>> listVoicesProto() async {
     final handle = getHandle();

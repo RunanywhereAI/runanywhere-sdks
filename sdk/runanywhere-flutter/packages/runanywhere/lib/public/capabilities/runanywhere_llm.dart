@@ -170,7 +170,6 @@ class RunAnywhereLLM {
       final effectiveRequest = request.deepCopy();
       effectiveRequest.options = _canonicalOptions(
         request.hasOptions() ? request.options : null,
-        streaming: false,
       );
       final result = await _generateProto(effectiveRequest);
 
@@ -198,9 +197,7 @@ class RunAnywhereLLM {
     String prompt, [
     LLMGenerationOptions? options,
   ]) {
-    return generateStreamRequest(
-      _toGenerateRequest(prompt, options, streaming: true),
-    );
+    return generateStreamRequest(_toGenerateRequest(prompt, options));
   }
 
   /// Generated-proto streaming text generation. Mirrors Swift
@@ -215,7 +212,6 @@ class RunAnywhereLLM {
     final effectiveRequest = request.deepCopy();
     effectiveRequest.options = _canonicalOptions(
       request.hasOptions() ? request.options : null,
-      streaming: true,
     );
     return _generateStreamProto(effectiveRequest);
   }
@@ -226,27 +222,22 @@ class RunAnywhereLLM {
 
   LLMGenerateRequest _toGenerateRequest(
     String prompt,
-    LLMGenerationOptions? options, {
-    bool streaming = false,
-  }) {
-    final requestOptions = _canonicalOptions(options, streaming: streaming);
+    LLMGenerationOptions? options,
+  ) {
     return LLMGenerateRequest(
       prompt: prompt,
-      emitThoughts: requestOptions.hasThinkingPattern(),
-      options: requestOptions,
+      options: _canonicalOptions(options),
     );
   }
 
-  LLMGenerationOptions _canonicalOptions(
-    LLMGenerationOptions? options, {
-    required bool streaming,
-  }) {
+  LLMGenerationOptions _canonicalOptions(LLMGenerationOptions? options) {
     // Fill unset fields from the generated defaults, which come from the
     // rac_default annotations in idl/llm_options.proto.
     final d = LLMGenerationOptionsConvenience.defaults();
     final requestOptions = (options ?? LLMGenerationOptions()).deepCopy();
-    if (!requestOptions.hasMaxTokens() || requestOptions.maxTokens <= 0) {
-      requestOptions.maxTokens = d.maxTokens;
+    if (!requestOptions.hasMaxOutputTokens() ||
+        requestOptions.maxOutputTokens <= 0) {
+      requestOptions.maxOutputTokens = d.maxOutputTokens;
     }
     if (!requestOptions.hasTemperature()) {
       requestOptions.temperature = d.temperature;
@@ -258,7 +249,6 @@ class RunAnywhereLLM {
         requestOptions.repetitionPenalty <= 0) {
       requestOptions.repetitionPenalty = d.repetitionPenalty;
     }
-    requestOptions.streamingEnabled = streaming;
     return requestOptions;
   }
 

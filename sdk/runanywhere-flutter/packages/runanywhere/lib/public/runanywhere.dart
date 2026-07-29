@@ -447,15 +447,15 @@ abstract final class RunAnywhere {
         ? finalEvent.result
         : null;
     final inputTokens =
-        finalResult?.promptTokens ??
+        finalResult?.inputTokens ??
         (prompt.length ~/ 4 > 0 ? prompt.length ~/ 4 : 1);
-    final completionTokens = finalResult?.completionTokens ?? tokenCount;
+    final outputTokens = finalResult?.outputTokens ?? tokenCount;
     final result = LLMGenerationResult(
       text: finalResult?.text ?? fullResponse,
       inputTokens: inputTokens,
-      tokensGenerated: completionTokens,
-      responseTokens: completionTokens,
-      totalTokens: finalResult?.totalTokens ?? (inputTokens + completionTokens),
+      outputTokens: outputTokens,
+      responseTokens: outputTokens,
+      totalTokens: finalResult?.totalTokens ?? (inputTokens + outputTokens),
       modelUsed: modelId,
       generationTimeMs: finalResult?.totalTimeMs.toDouble() ?? totalLatencyMs,
       framework: framework,

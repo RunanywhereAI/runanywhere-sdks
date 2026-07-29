@@ -15,18 +15,21 @@ import 'dart:convert';
 
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/chat.pb.dart'
+    show ChatMessage, MessageRole;
 import 'package:runanywhere/generated/convenience/ra_convenience.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
+import 'package:runanywhere/generated/llm_service.pb.dart'
+    show
+        ToolCallingSessionCreateRequest,
+        ToolCallingSessionEvent,
+        ToolCallingSessionEvent_Kind;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
     show
         ToolCall,
-        ToolCallFormatName,
         ToolCallingOptions,
         ToolCallingResult,
-        ToolCallingSessionCreateRequest,
-        ToolCallingSessionEvent,
-        ToolCallingSessionEvent_Kind,
         ToolChoiceMode,
         ToolDefinition,
         ToolResult,
@@ -212,13 +215,13 @@ class RunAnywhereTools {
     List<String> history = const [],
   }) async {
     // Swift default: `options: RALLMGenerationOptions = .defaults()`.
-    final llm = llmOptions ?? _defaultLLMOptions();
+    final generation = (llmOptions ?? _defaultLLMOptions()).deepCopy();
     // Swift: `toolOptions ?? (options.hasToolCalling ? options.toolCalling
     // : RAToolCallingOptions.defaults())`.
     final opts =
         (options ??
-                (llm.hasToolCalling()
-                    ? llm.toolCalling
+                (generation.hasToolCalling()
+                    ? generation.toolCalling
                     : _defaultToolOptions()))
             .deepCopy();
     if (toolChoice != null) {
@@ -227,49 +230,28 @@ class RunAnywhereTools {
     if (forcedToolName != null) {
       opts.forcedToolName = forcedToolName;
     }
-    final tools = opts.tools.isNotEmpty ? opts.tools : getRegisteredTools();
+    if (opts.tools.isEmpty) {
+      opts.tools.addAll(getRegisteredTools());
+    }
     final autoExecute = opts.hasAutoExecute() ? opts.autoExecute : true;
+    generation.toolCalling = opts;
 
-    // Mirrors Swift makeRunLoopRequest (RunAnywhere+ToolCalling.swift:491-548).
+    // Tool config travels inside generation.tool_calling; unset knobs
+    // (max_tool_calls, validate_calls, ...) fall back to the generated proto
+    // defaults inside commons.
     final request = ToolCallingSessionCreateRequest(
       prompt: prompt,
-      tools: tools,
-      format: opts.format,
-      maxToolCalls: opts.maxToolCallCount,
-      keepToolsAvailable: opts.keepToolsAvailable,
-      maxTokens: (opts.hasMaxTokens() && opts.maxTokens > 0)
-          ? opts.maxTokens
-          : llm.maxTokens,
-      temperature: opts.hasTemperature() ? opts.temperature : llm.temperature,
-      topP: llm.topP,
-      // Suppress thinking when either options surface asks for it.
-      disableThinking: opts.disableThinking || llm.disableThinking,
-      autoExecute: autoExecute,
-      replaceSystemPrompt: opts.replaceSystemPrompt,
-      requireJsonArguments: opts.requireJsonArguments,
-      // Prior conversation turns as a flat alternating list
-      // [user0, asst0, ...], EXCLUDING the current turn (which is `prompt`).
-      // Flutter uses the session ABI — commons threads these into every
-      // generate in the loop so multi-turn tool use keeps context.
-      history: history,
+      generation: generation,
+      // Prior conversation turns EXCLUDING the current one (which is
+      // `prompt`). Flutter uses the session ABI — commons threads these into
+      // every generate in the loop so multi-turn tool use keeps context.
+      history: _toChatHistory(history),
     );
     // `validate_calls` is `optional bool` on the proto — leave it UNSET when
     // the caller did not supply a value so commons applies its documented
     // default (true).
     if (validateCalls != null) {
       request.validateCalls = validateCalls;
-    }
-    if (opts.toolChoice != ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED) {
-      request.toolChoice = opts.toolChoice;
-    }
-    if (opts.hasForcedToolName() && opts.forcedToolName.isNotEmpty) {
-      request.forcedToolName = opts.forcedToolName;
-    }
-    // System prompt: tool options win, then the LLM options.
-    if (opts.hasSystemPrompt() && opts.systemPrompt.isNotEmpty) {
-      request.systemPrompt = opts.systemPrompt;
-    } else if (llm.hasSystemPrompt() && llm.systemPrompt.isNotEmpty) {
-      request.systemPrompt = llm.systemPrompt;
     }
 
     final session = DartBridgeToolCalling.shared.createSession(request);
@@ -402,13 +384,21 @@ class RunAnywhereTools {
   static LLMGenerationOptions _defaultLLMOptions() =>
       LLMGenerationOptionsConvenience.defaults();
 
-  /// Mirrors Swift `RAToolCallingOptions.defaults()`
-  /// (ToolCallingTypes.swift:148-154).
-  static ToolCallingOptions _defaultToolOptions() => ToolCallingOptions(
-    maxToolCalls: 5,
-    autoExecute: true,
-    format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
-  );
+  /// Generated from the rac_default annotations in idl/tool_calling.proto.
+  static ToolCallingOptions _defaultToolOptions() =>
+      ToolCallingOptionsConvenience.defaults();
+
+  /// Flat alternating `[user0, asst0, user1, asst1, ...]` strings to typed
+  /// [ChatMessage]s (even index = user, odd = assistant).
+  static List<ChatMessage> _toChatHistory(List<String> history) => [
+    for (var i = 0; i < history.length; i++)
+      ChatMessage(
+        role: i.isEven
+            ? MessageRole.MESSAGE_ROLE_USER
+            : MessageRole.MESSAGE_ROLE_ASSISTANT,
+        content: history[i],
+      ),
+  ];
 }
 
 /// Run-loop knobs derived from [ToolCallingOptions]. Mirrors Swift's

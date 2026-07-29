@@ -139,7 +139,7 @@ class RunAnywhereVLM {
       );
 
       logger.info(
-        'VLM processing complete: ${result.completionTokens} tokens, '
+        'VLM processing complete: ${result.outputTokens} tokens, '
         '${result.tokensPerSecond.toStringAsFixed(1)} tok/s',
       );
 
@@ -168,7 +168,6 @@ class RunAnywhereVLM {
     final opts = _effectiveOptions(
       prompt ?? '',
       options ?? VLMGenerationOptions(),
-      streaming: true,
     );
 
     try {
@@ -183,20 +182,19 @@ class RunAnywhereVLM {
 
   VLMGenerationOptions _effectiveOptions(
     String prompt,
-    VLMGenerationOptions options, {
-    bool streaming = false,
-  }) {
+    VLMGenerationOptions options,
+  ) {
     // Fill unset fields from the generated defaults, which come from the
     // rac_default annotations in idl/vlm_options.proto. The table this replaced
-    // capped maxTokens at 256 against the C layer's 2048 and set topK=40 where
+    // capped max tokens at 256 against the C layer's 2048 and set topK=40 where
     // the C layer disables it.
     final d = VLMGenerationOptionsConvenience.defaults();
     final opts = options.deepCopy();
     if (!opts.hasPrompt()) {
       opts.prompt = prompt;
     }
-    if (!opts.hasMaxTokens()) {
-      opts.maxTokens = d.maxTokens;
+    if (!opts.hasMaxOutputTokens()) {
+      opts.maxOutputTokens = d.maxOutputTokens;
     }
     if (!opts.hasTemperature()) {
       opts.temperature = d.temperature;
@@ -207,7 +205,6 @@ class RunAnywhereVLM {
     if (!opts.hasTopK()) {
       opts.topK = d.topK;
     }
-    opts.streamingEnabled = streaming;
     return opts;
   }
 

@@ -5,13 +5,9 @@
 // Int64-millisecond timestamps, validity checks) without modifying
 // the generated files.
 //
-// The `STTLanguageBcp47.bcp47` getter / `fromBcp47` static factory
-// were retired in T6.4 — call sites now use the generated
-// `STTLanguageWireString.wireString` extension and the top-level
-// `sttLanguageFromWireString` factory in
-// `package:runanywhere/generated/convenience/ra_convenience.dart`
-// (the BCP-47 codes ARE the wire strings; see idl/stt_options.proto
-// `rac_wire_string` annotations on `STTLanguage`).
+// The `STTLanguage` enum was retired with the v2 proto contract —
+// `STTOptions.language` is now an optional BCP-47 string (unset =
+// auto-detect).
 
 import 'package:fixnum/fixnum.dart';
 
