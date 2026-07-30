@@ -326,10 +326,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     val llmRequest = ChatRequestPolicy.buildRequest(
                         turn = effectiveTurn,
+                        // Hosted models do not expose supports_thinking; match iOS
+                        // Connect (loadedModelSupportsThinking = false).
                         options = generationOptions(
                             contextTokens = hostedModel.contextWindow,
                             modelName = hostedModel.displayName,
-                        ),
+                        ).copy(disable_thinking = false),
                         conversationId = ensureConversationId(),
                         streaming = streaming,
                     )

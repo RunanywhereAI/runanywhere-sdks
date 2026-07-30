@@ -20,8 +20,16 @@ const llm_service_1 = require("./llm_service");
 exports.protobufPackage = "runanywhere.v1";
 /**
  * Platform identity is explicit so commons can evaluate role availability
- * from one policy table. Platform SDKs must not hardcode the host/client
- * matrix in UI or transport code.
+ * from one policy table. Presence of an enum value only reserves a stable
+ * wire identity — it does NOT imply Connect support. Commons
+ * `ConnectPlatformPolicy` (rac_connect.cpp) is the sole authority for which
+ * platforms may host or client. Platform SDKs must query/enforce that table
+ * rather than hardcoding the matrix in UI or transport code.
+ *
+ * Current shipping matrix (see commons policy):
+ *   Host:   macOS
+ *   Client: iOS, iPadOS, Android
+ * Reserved / not shipped: React Native, Flutter, Web, Windows
  */
 var ConnectPlatform;
 (function (ConnectPlatform) {
@@ -30,17 +38,20 @@ var ConnectPlatform;
     ConnectPlatform[ConnectPlatform["CONNECT_PLATFORM_IOS"] = 2] = "CONNECT_PLATFORM_IOS";
     ConnectPlatform[ConnectPlatform["CONNECT_PLATFORM_IPADOS"] = 3] = "CONNECT_PLATFORM_IPADOS";
     /**
-     * CONNECT_PLATFORM_ANDROID - Reserved for the follow-on SDK integrations. Keeping the values in the
-     * canonical IDL avoids a later wire-format migration.
+     * CONNECT_PLATFORM_ANDROID - Android is an enabled Connect client. Remaining values are reserved so
+     * follow-on SDK integrations avoid a later wire-format migration.
      */
     ConnectPlatform[ConnectPlatform["CONNECT_PLATFORM_ANDROID"] = 4] = "CONNECT_PLATFORM_ANDROID";
+    /** CONNECT_PLATFORM_REACT_NATIVE - DISABLED until a dedicated adapter ships */
     ConnectPlatform[ConnectPlatform["CONNECT_PLATFORM_REACT_NATIVE"] = 5] = "CONNECT_PLATFORM_REACT_NATIVE";
+    /** CONNECT_PLATFORM_FLUTTER - DISABLED until a dedicated adapter ships */
     ConnectPlatform[ConnectPlatform["CONNECT_PLATFORM_FLUTTER"] = 6] = "CONNECT_PLATFORM_FLUTTER";
+    /** CONNECT_PLATFORM_WEB - PLANNED client */
     ConnectPlatform[ConnectPlatform["CONNECT_PLATFORM_WEB"] = 7] = "CONNECT_PLATFORM_WEB";
     /**
-     * CONNECT_PLATFORM_WINDOWS - Reserved now so adding the planned Windows host adapter does not require
-     * a platform-identity wire migration. Its host role remains PLANNED until
-     * the native transport, discovery, and protected-storage adapter ships.
+     * CONNECT_PLATFORM_WINDOWS - Reserved so adding a Windows host adapter does not require a
+     * platform-identity wire migration. Host and client remain PLANNED until
+     * native transport, discovery, firewall handling, and E2E validation ship.
      */
     ConnectPlatform[ConnectPlatform["CONNECT_PLATFORM_WINDOWS"] = 8] = "CONNECT_PLATFORM_WINDOWS";
     ConnectPlatform[ConnectPlatform["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";

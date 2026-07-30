@@ -15,8 +15,16 @@ import 'dart:core' as $core;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 /// Platform identity is explicit so commons can evaluate role availability
-/// from one policy table. Platform SDKs must not hardcode the host/client
-/// matrix in UI or transport code.
+/// from one policy table. Presence of an enum value only reserves a stable
+/// wire identity — it does NOT imply Connect support. Commons
+/// `ConnectPlatformPolicy` (rac_connect.cpp) is the sole authority for which
+/// platforms may host or client. Platform SDKs must query/enforce that table
+/// rather than hardcoding the matrix in UI or transport code.
+///
+/// Current shipping matrix (see commons policy):
+///   Host:   macOS
+///   Client: iOS, iPadOS, Android
+/// Reserved / not shipped: React Native, Flutter, Web, Windows
 class ConnectPlatform extends $pb.ProtobufEnum {
   static const ConnectPlatform CONNECT_PLATFORM_UNSPECIFIED = ConnectPlatform._(
       0, _omitEnumNames ? '' : 'CONNECT_PLATFORM_UNSPECIFIED');
@@ -27,8 +35,8 @@ class ConnectPlatform extends $pb.ProtobufEnum {
   static const ConnectPlatform CONNECT_PLATFORM_IPADOS =
       ConnectPlatform._(3, _omitEnumNames ? '' : 'CONNECT_PLATFORM_IPADOS');
 
-  /// Reserved for the follow-on SDK integrations. Keeping the values in the
-  /// canonical IDL avoids a later wire-format migration.
+  /// Android is an enabled Connect client. Remaining values are reserved so
+  /// follow-on SDK integrations avoid a later wire-format migration.
   static const ConnectPlatform CONNECT_PLATFORM_ANDROID =
       ConnectPlatform._(4, _omitEnumNames ? '' : 'CONNECT_PLATFORM_ANDROID');
   static const ConnectPlatform CONNECT_PLATFORM_REACT_NATIVE =
@@ -39,9 +47,9 @@ class ConnectPlatform extends $pb.ProtobufEnum {
   static const ConnectPlatform CONNECT_PLATFORM_WEB =
       ConnectPlatform._(7, _omitEnumNames ? '' : 'CONNECT_PLATFORM_WEB');
 
-  /// Reserved now so adding the planned Windows host adapter does not require
-  /// a platform-identity wire migration. Its host role remains PLANNED until
-  /// the native transport, discovery, and protected-storage adapter ships.
+  /// Reserved so adding a Windows host adapter does not require a
+  /// platform-identity wire migration. Host and client remain PLANNED until
+  /// native transport, discovery, firewall handling, and E2E validation ship.
   static const ConnectPlatform CONNECT_PLATFORM_WINDOWS =
       ConnectPlatform._(8, _omitEnumNames ? '' : 'CONNECT_PLATFORM_WINDOWS');
 

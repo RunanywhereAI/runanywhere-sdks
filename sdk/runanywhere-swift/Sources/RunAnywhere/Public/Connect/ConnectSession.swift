@@ -547,7 +547,8 @@ private final class ConnectTransport: @unchecked Sendable {
     private static let maximumFrameLength = 4 * 1024 * 1024
     private static let heartbeatInterval: DispatchTimeInterval = .seconds(3)
     private static let heartbeatTimeout: DispatchTimeInterval = .seconds(2)
-    private static let generationReadTimeout: DispatchTimeInterval = .seconds(120)
+    private static let generationReadTimeout: DispatchTimeInterval =
+        .milliseconds(RADefaults.Connect.generationReadTimeoutMs)
 
     var onHostsChanged: (([ConnectHost]) -> Void)?
     var onHostClientCountChanged: ((Int) -> Void)?
@@ -813,9 +814,11 @@ private final class ConnectTransport: @unchecked Sendable {
                 guard let self else { return }
                 switch result {
                 case .success:
-                    // Keep reading until the host emits a terminal event so the
-                    // framed stream stays aligned for the next prompt.
-                    self.receiveClientInvocationEvent(on: connection, requestID: requestID)
+                    // Receive ownership stays with the invoke loop (armed on
+                    // successful invoke send). Do not re-arm here — a second
+                    // outstanding NWConnection.receive desyncs the framed TCP
+                    // stream for the next prompt.
+                    break
                 case let .failure(error):
                     if keepSessionAlive {
                         self.finishClientInvocation(with: error)
@@ -1089,6 +1092,16 @@ private final class ConnectTransport: @unchecked Sendable {
 
     private func handleHostInvocation(_ invocation: RAConnectInvocationRequest, on hosted: HostedConnection) {
         if hosted.activeRequestID != nil {
+            sendHostTerminalError(
+                "Wait for the current response to finish before sending another message.",
+                requestID: invocation.requestID,
+                on: hosted
+            )
+            return
+        }
+        // Cancel is process-global (RunAnywhere.cancelGeneration), so only one
+        // hosted generation may run across all clients at a time.
+        if hostedConnections.values.contains(where: { $0 !== hosted && $0.activeRequestID != nil }) {
             sendHostTerminalError(
                 "Wait for the current response to finish before sending another message.",
                 requestID: invocation.requestID,

@@ -667,8 +667,12 @@ extension ChatInterfaceView {
 
     func handleModelSelected(_ model: RAModelInfo) async {
         #if os(iOS)
+        // ModelSelectionSheet may already have disconnected before calling
+        // onModelSelected; deactivate must not depend on isConnected.
         if connectController.isConnected {
             connectController.disconnect()
+        }
+        if viewModel.isUsingConnect {
             await viewModel.deactivateConnectModel()
         }
         #endif

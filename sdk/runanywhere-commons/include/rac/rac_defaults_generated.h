@@ -64,6 +64,10 @@
 #define RAC_DEFAULT_NETWORK_MAX_RETRIES           3
 #define RAC_DEFAULT_NETWORK_RETRY_BACKOFF_BASE_MS 100
 
+// ConnectDefaults (sdk_defaults.proto)
+#define RAC_DEFAULT_CONNECT_CONNECT_TIMEOUT_MS         5000
+#define RAC_DEFAULT_CONNECT_GENERATION_READ_TIMEOUT_MS 120000
+
 // AudioCaptureDefaults (sdk_defaults.proto)
 #define RAC_DEFAULT_AUDIO_CAPTURE_MIC_SAMPLE_RATE_HZ    16000
 #define RAC_DEFAULT_AUDIO_CAPTURE_MIC_CHANNELS          1
@@ -134,5 +138,5 @@
 #define RAC_DEFAULT_VLM_GENERATION_OPTIONS_USE_GPU            RAC_TRUE
 #define RAC_DEFAULT_VLM_GENERATION_OPTIONS_REPETITION_PENALTY 1.1f
 
-// 77 defaults across 22 messages.
+// 79 defaults across 23 messages.
 #endif  // RAC_DEFAULTS_GENERATED_H

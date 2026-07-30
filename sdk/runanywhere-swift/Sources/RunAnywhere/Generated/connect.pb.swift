@@ -28,8 +28,16 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
 }
 
 /// Platform identity is explicit so commons can evaluate role availability
-/// from one policy table. Platform SDKs must not hardcode the host/client
-/// matrix in UI or transport code.
+/// from one policy table. Presence of an enum value only reserves a stable
+/// wire identity — it does NOT imply Connect support. Commons
+/// `ConnectPlatformPolicy` (rac_connect.cpp) is the sole authority for which
+/// platforms may host or client. Platform SDKs must query/enforce that table
+/// rather than hardcoding the matrix in UI or transport code.
+///
+/// Current shipping matrix (see commons policy):
+///   Host:   macOS
+///   Client: iOS, iPadOS, Android
+/// Reserved / not shipped: React Native, Flutter, Web, Windows
 public nonisolated enum RAConnectPlatform: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -37,16 +45,22 @@ public nonisolated enum RAConnectPlatform: SwiftProtobuf.Enum, Swift.CaseIterabl
   case ios // = 2
   case ipados // = 3
 
-  /// Reserved for the follow-on SDK integrations. Keeping the values in the
-  /// canonical IDL avoids a later wire-format migration.
+  /// Android is an enabled Connect client. Remaining values are reserved so
+  /// follow-on SDK integrations avoid a later wire-format migration.
   case android // = 4
+
+  /// DISABLED until a dedicated adapter ships
   case reactNative // = 5
+
+  /// DISABLED until a dedicated adapter ships
   case flutter // = 6
+
+  /// PLANNED client
   case web // = 7
 
-  /// Reserved now so adding the planned Windows host adapter does not require
-  /// a platform-identity wire migration. Its host role remains PLANNED until
-  /// the native transport, discovery, and protected-storage adapter ships.
+  /// Reserved so adding a Windows host adapter does not require a
+  /// platform-identity wire migration. Host and client remain PLANNED until
+  /// native transport, discovery, firewall handling, and E2E validation ship.
   case windows // = 8
   case UNRECOGNIZED(Int)
 

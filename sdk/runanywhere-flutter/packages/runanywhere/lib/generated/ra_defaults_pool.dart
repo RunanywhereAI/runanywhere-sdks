@@ -22,6 +22,11 @@ abstract final class RADefaultsNetwork {
   static const int retryBackoffBaseMs = 100;
 }
 
+abstract final class RADefaultsConnect {
+  static const int connectTimeoutMs = 5000;
+  static const int generationReadTimeoutMs = 120000;
+}
+
 abstract final class RADefaultsAudioCapture {
   static const int micSampleRateHz = 16000;
   static const int micChannels = 1;

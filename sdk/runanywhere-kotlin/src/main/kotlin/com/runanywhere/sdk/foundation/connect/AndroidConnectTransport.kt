@@ -16,6 +16,7 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.generated.RADefaults
 import com.runanywhere.sdk.public.types.RALLMStreamEvent
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -441,11 +442,11 @@ internal class AndroidConnectSocket(
 
     private companion object {
         const val MAXIMUM_FRAME_LENGTH = 4 * 1024 * 1024
-        const val CONNECT_TIMEOUT_MS = 5_000
+        val CONNECT_TIMEOUT_MS = RADefaults.Connect.CONNECT_TIMEOUT_MS
         const val HANDSHAKE_TIMEOUT_MS = 5_000
         const val HEARTBEAT_INTERVAL_MS = 3_000L
         const val HEARTBEAT_TIMEOUT_MS = 2_000
         /** Generous inter-frame timeout so a stalled host is visible without false positives. */
-        const val GENERATION_READ_TIMEOUT_MS = 120_000
+        val GENERATION_READ_TIMEOUT_MS = RADefaults.Connect.GENERATION_READ_TIMEOUT_MS
     }
 }
