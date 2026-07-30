@@ -41,6 +41,45 @@ public extension RunAnywhere {
         return try await generateStream(request)
     }
 
+    /// Seed the loaded on-device model's adaptive context with a reusable system prompt.
+    static func injectSystemPrompt(_ prompt: String) async throws {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        try await CppBridge.LLM.shared.injectSystemPrompt(prompt)
+    }
+
+    /// Append text to the loaded on-device model's adaptive context.
+    static func appendContext(_ text: String) async throws {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        try await CppBridge.LLM.shared.appendContext(text)
+    }
+
+    /// Generate from the accumulated adaptive context without clearing the KV cache first.
+    static func generateFromContext(
+        query: String,
+        options: RALLMGenerationOptions? = nil
+    ) async throws -> RALLMGenerationResult {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        return try await CppBridge.LLM.shared.generateFromContext(query: query, options: options)
+    }
+
+    /// Clear the loaded on-device model's adaptive context.
+    static func clearContext() async throws {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        try await CppBridge.LLM.shared.clearContext()
+    }
+
     /// Generate text through the generated-proto C++ LLM service ABI.
     static func generate(_ request: RALLMGenerateRequest) async throws -> RALLMGenerationResult {
         guard isInitialized else {
