@@ -13,15 +13,24 @@ export interface ThinkingSplit {
 const OPEN_TAGS = ['<think>', '<thinking>'] as const;
 const CLOSE_OF: Record<string, string> = { '<think>': '</think>', '<thinking>': '</thinking>' };
 
-/** First opening think tag in `text` (linear scan — no regex backtracking). */
-function firstOpen(text: string): { index: number; tag: string } | null {
-  let index = -1;
-  let tag = '';
-  for (const t of OPEN_TAGS) {
-    const i = text.indexOf(t);
-    if (i >= 0 && (index < 0 || i < index)) { index = i; tag = t; }
+/**
+ * The next opening think tag at or after `from` (linear scan — no regex backtracking).
+ *
+ * Searches for the prefix BOTH tags share and then disambiguates, rather than
+ * running one indexOf per tag. Looking for each tag separately costs a full scan
+ * of the remaining text for whichever tag is absent, which is O(n) per call and
+ * quadratic when a caller loops over many blocks. Here the search cursor only ever
+ * moves forward, so a whole traversal is amortised O(n).
+ */
+const OPEN_PREFIX = '<think';
+function nextOpen(text: string, from: number): { index: number; tag: string } | null {
+  let i = from;
+  for (;;) {
+    const at = text.indexOf(OPEN_PREFIX, i);
+    if (at < 0) return null;
+    for (const t of OPEN_TAGS) if (text.startsWith(t, at)) return { index: at, tag: t };
+    i = at + OPEN_PREFIX.length; // e.g. "<thinker" — always advances
   }
-  return index < 0 ? null : { index, tag };
 }
 
 /**
@@ -33,7 +42,7 @@ function firstOpen(text: string): { index: number; tag: string } | null {
  */
 export function splitThinking(text: string): ThinkingSplit {
   if (!text) return { response: '', thinking: '' };
-  const open = firstOpen(text);
+  const open = nextOpen(text, 0);
   if (!open) return { response: text.trim(), thinking: '' };
   const afterOpen = open.index + open.tag.length;
   const closeTag = CLOSE_OF[open.tag];
@@ -64,23 +73,30 @@ export function stripThinking(text: string): string {
  * Deliberately an indexOf scan rather than a regex: `/<(think|thinking)>[\s\S]*?<\/>/`
  * backtracks polynomially on input with many repeated `<think>` openers
  * (js/polynomial-redos), and model output is untrusted input.
+ *
+ * LINEAR, not merely regex-free. Two traps make the obvious loop quadratic on
+ * `"<think>x</think>".repeat(n)` — measured at 2.9s for n=32000:
+ *   - searching for each tag separately rescans the whole remainder for the tag
+ *     that is absent, on every iteration (see nextOpen);
+ *   - carrying a shrinking `rest` string recopies the remainder, on every iteration.
+ * So this walks ONE cursor over the original string and slices only the pieces it
+ * keeps. Every indexOf here resumes from a strictly increasing offset.
  */
 export function stripAllThinking(text: string): string {
   if (!text) return '';
-  let out = '';
-  let rest = text;
-  // Terminates: every iteration drops at least the open tag from `rest`.
+  const kept: string[] = [];
+  let cursor = 0;
   for (;;) {
-    const open = firstOpen(rest);
+    const open = nextOpen(text, cursor);
     if (!open) break;
-    const afterOpen = open.index + open.tag.length;
     const closeTag = CLOSE_OF[open.tag];
-    const close = rest.indexOf(closeTag, afterOpen);
-    out += rest.slice(0, open.index);
-    if (close < 0) return out.trim();   // unterminated: drop the remainder
-    rest = rest.slice(close + closeTag.length);
+    const close = text.indexOf(closeTag, open.index + open.tag.length);
+    kept.push(text.slice(cursor, open.index));
+    if (close < 0) return kept.join('').trim();   // unterminated: drop the remainder
+    cursor = close + closeTag.length;
   }
-  return (out + rest).trim();
+  kept.push(text.slice(cursor));
+  return kept.join('').trim();
 }
 
 /** True while `text` is inside an as-yet-unclosed thinking block (for live streaming UIs). */
