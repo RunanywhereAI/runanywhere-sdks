@@ -9,13 +9,13 @@ import numpy as np
 
 from .._runtime import runtime
 from ..events import VadEvent, VadEventKind
-from ..inputs import AudioInput
+from ..inputs import STT_SAMPLE_RATE, AudioInput
 from ..options import VadOptions
 from ..results import Segment, VadResult
 
 __all__ = ["vad"]
 
-_SAMPLE_RATE = 16000
+_SAMPLE_RATE = STT_SAMPLE_RATE
 _FRAME = 512  # the frame size the detector expects at 16 kHz
 _FRAME_MS = _FRAME * 1000 // _SAMPLE_RATE
 

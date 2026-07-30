@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
+from ._generated_defaults import AudioCaptureDefaults
 from .audio import decode_wav, downsample, float32_to_pcm16, pcm16_bytes
 from .errors import SDKException
 
@@ -27,6 +28,7 @@ __all__ = [
     "ModelRegistration",
     "ModelFilter",
     "Role",
+    "STT_SAMPLE_RATE",
     "ToolDefinition",
     "RagDocument",
 ]
@@ -34,8 +36,9 @@ __all__ = [
 #: A JSON Schema, as a plain dict (what ``llm.generate_structured`` constrains decoding to).
 JsonSchema = Dict[str, Any]
 
-# The bridge transcribes 16 kHz mono PCM16 only, so every AudioInput normalizes to that.
-_STT_SAMPLE_RATE = 16000
+# The bridge transcribes mono PCM16 at the capture rate only, so every AudioInput
+# normalizes to that. The rate itself is centralized in idl/sdk_defaults.proto.
+STT_SAMPLE_RATE = AudioCaptureDefaults.MIC_SAMPLE_RATE_HZ
 
 
 class AudioEncoding(IntEnum):
@@ -74,7 +77,7 @@ class AudioInput:
     format: AudioFormatSpec
 
     @classmethod
-    def pcm16(cls, data: bytes, sample_rate: int = _STT_SAMPLE_RATE, channels: int = 1) -> "AudioInput":
+    def pcm16(cls, data: bytes, sample_rate: int = STT_SAMPLE_RATE, channels: int = 1) -> "AudioInput":
         """Wrap signed 16-bit little-endian PCM bytes."""
         return cls(bytes(data), AudioFormatSpec(AudioEncoding.PCM16, sample_rate, channels))
 
@@ -102,7 +105,7 @@ class AudioInput:
         except OSError as exc:
             raise SDKException.storage_error(f"could not read audio file {path}: {exc}") from exc
 
-    def samples(self, sample_rate: int = _STT_SAMPLE_RATE) -> np.ndarray:
+    def samples(self, sample_rate: int = STT_SAMPLE_RATE) -> np.ndarray:
         """Decode to mono float32 samples resampled to ``sample_rate``."""
         if self.format.encoding == AudioEncoding.WAV:
             rate, samples = decode_wav(self.data)
@@ -131,11 +134,11 @@ class AudioInput:
             ).astype(np.float32)
         return np.ascontiguousarray(samples, dtype=np.float32)
 
-    def to_pcm16(self, sample_rate: int = _STT_SAMPLE_RATE) -> bytes:
+    def to_pcm16(self, sample_rate: int = STT_SAMPLE_RATE) -> bytes:
         """Encode to signed 16-bit mono PCM bytes at ``sample_rate``."""
         return pcm16_bytes(self.samples(sample_rate))
 
-    def duration_ms(self, sample_rate: int = _STT_SAMPLE_RATE) -> int:
+    def duration_ms(self, sample_rate: int = STT_SAMPLE_RATE) -> int:
         """Length of the audio in milliseconds."""
         return int(round(len(self.samples(sample_rate)) / sample_rate * 1000))
 

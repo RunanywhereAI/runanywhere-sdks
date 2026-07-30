@@ -3,6 +3,7 @@
  * model references, and RAG documents.
  */
 
+import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { VLMImageFormat, type VLMImage } from '@runanywhere/proto-ts/vlm_options';
 import {
   vlmImageFromBase64,
@@ -29,7 +30,7 @@ export interface AudioInput {
   readonly format: AudioFormatSpec;
 }
 
-const DEFAULT_SAMPLE_RATE = 16_000;
+const DEFAULT_SAMPLE_RATE = audioCaptureDefaults.micSampleRateHz;
 
 function float32ToPcm16(samples: Float32Array): Uint8Array {
   const out = new Uint8Array(samples.length * 2);

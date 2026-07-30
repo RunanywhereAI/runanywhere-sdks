@@ -8,13 +8,13 @@ from .._options_bridge import check_stt_options
 from .._runtime import runtime
 from ..errors import SDKException
 from ..events import TranscriptionEvent
-from ..inputs import AudioInput, ModelCategory
+from ..inputs import STT_SAMPLE_RATE, AudioInput, ModelCategory
 from ..options import SttOptions
 from ..results import SttState, Transcription
 
 __all__ = ["stt"]
 
-_SAMPLE_RATE = 16000
+_SAMPLE_RATE = STT_SAMPLE_RATE
 
 
 class Stt:
