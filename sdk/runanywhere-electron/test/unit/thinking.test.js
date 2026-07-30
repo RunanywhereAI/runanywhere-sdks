@@ -83,3 +83,31 @@ test('stripAllThinking is linear on adversarial input (no ReDoS)', () => {
   const ms = Number(process.hrtime.bigint() - started) / 1e6;
   assert.ok(ms < 2000, `stripAllThinking took ${ms.toFixed(0)}ms on 60k repeats`);
 });
+
+test('stripAllThinking is linear on many COMPLETE blocks, not just unterminated ones', () => {
+  // The earlier perf test only used unterminated openers, which exit after one
+  // scan — so it passed while the real loop was quadratic (2.9s at n=32000).
+  // Repeated closed blocks are the case that actually exercises the loop.
+  const time = (n) => {
+    const s = '<think>x</think>'.repeat(n);
+    const started = process.hrtime.bigint();
+    const out = stripAllThinking(s);
+    assert.equal(out, '');
+    return Number(process.hrtime.bigint() - started) / 1e6;
+  };
+  time(4000); // warm up, so JIT compilation is not charged to the first sample
+  const small = Math.max(time(8000), 0.5);
+  const large = time(32000);
+
+  // Linear would be ~4x for 4x the input; quadratic ~16x. Allow generous slack
+  // for a noisy CI box but still fail decisively on a quadratic regression.
+  assert.ok(large / small < 8, `4x the input cost ${(large / small).toFixed(1)}x the time (${small.toFixed(1)}ms -> ${large.toFixed(1)}ms) — looks quadratic`);
+  assert.ok(large < 500, `32k blocks took ${large.toFixed(0)}ms`);
+});
+
+test('a tag-like prefix that is not a real tag is left alone', () => {
+  // nextOpen scans for the shared '<think' prefix, so it must reject near-misses.
+  assert.equal(stripAllThinking('a <thinker> b'), 'a <thinker> b');
+  assert.equal(stripAllThinking('<thinkers>x</thinkers>'), '<thinkers>x</thinkers>');
+  assert.equal(stripAllThinking('<think>t</think>a <thinker> b'), 'a <thinker> b');
+});
