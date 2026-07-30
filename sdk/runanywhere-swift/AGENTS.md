@@ -62,6 +62,25 @@ RACommons.xcframework (prebuilt C++ binary)
 
 `RunAnywhere` is a `public enum` (namespace, never instantiated) at `Sources/RunAnywhere/Public/RunAnywhere.swift`. All consumer API is static methods on this enum or its extensions.
 
+The public surface follows the cross-SDK v3 contract in
+`thoughts/shared/plans/public_api_spec.md`: 14 namespaces (`llm`, `vlm`, `stt`,
+`tts`, `vad`, `embeddings`, `rerank`, `images`, `diarization`, `segmentation`,
+`voice`, `rag`, `models`, `lora`) plus core members (`initialize`, `reset`,
+`isReady`, `version`, `deviceId`, `events`). Those live in
+`Sources/RunAnywhere/Public/API/`, with shared option, input, result, and event
+types in `Options.swift`, `Inputs.swift`, `Results.swift`, and `Events.swift`.
+Option defaults are read from the generated IDL `defaults()` rather than
+hand-copied, so `idl/*.proto` stays the single source of truth.
+
+`Public/Extensions/` carries the older flat verbs (`loadModel`, `transcribe`,
+`ragQuery`, and the rest) as `@available(*, deprecated)` forwarders. Each one
+behaves exactly as it always did; new code calls the namespaces instead.
+
+Two verbs hand back long-lived sessions. `voice.createSession(...)` returns a
+`VoiceSession`, and its `start()` is the only thing that opens the microphone,
+so subscribing to `session.events` is safe on its own. `rag.open(...)` returns a
+`RagSession` with its own native handle, so two corpora can be open at once.
+
 ### Two-Phase Initialization
 
 - **Phase 1** (synchronous, ~1-5ms): Validates params, registers platform callbacks (logging, file I/O, Keychain, HTTP transport, telemetry, device), stores to Keychain. Sets `_isInitialized = true`.
@@ -208,6 +227,13 @@ Configured in `.periphery.yml`. Scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRun
 
 ## Capability Notes
 
-Standalone speaker diarization is exposed through `RunAnywhere.diarize` and
-`RunAnywhere.diarizeStream` when a diarization backend is registered. Wake-word
-detection and semantic-segmentation SDK facades are not yet available.
+Speaker diarization is exposed through `RunAnywhere.diarization` and semantic
+segmentation through `RunAnywhere.segmentation`, both of which require the
+matching backend to be registered. There is no wake-word facade.
+
+Three spec fields have no commons emitter behind them, so they read as absent
+rather than wrong: `VoiceEvent` has no audio-level event (nothing in commons
+populates `AudioLevelEvent`), `SegmentationOptions.includeDiagnosticImage` has
+no field on `SegmentationResult` to land in, and `LoadOptions.contextLength`,
+`.threads`, and `.useGpu` are logged and dropped because the commons load ABI
+does not carry them.

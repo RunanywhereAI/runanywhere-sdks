@@ -4,6 +4,7 @@
 import * as os from 'os';
 import * as path from 'path';
 
+import { BACKEND_METHODS, rpcMethodFor } from '../api/backend';
 import { RpcErrorPayload, RpcRequest, STREAMING_METHODS } from './rpc';
 
 /** Minimal port surface dispatch needs (a subset of Electron's MessagePortMain). */
@@ -81,6 +82,9 @@ export const ALLOWED_RPC_METHODS: ReadonlySet<string> = new Set([
   'ragStats',
   'ragClear',
   'ragDestroySession',
+  // v3 backend contract — one entry per RaBackend operation, namespaced so it
+  // cannot collide with the deprecated addon-shaped methods above.
+  ...BACKEND_METHODS.map(rpcMethodFor),
 ]);
 
 function rpcError(e: unknown): string | RpcErrorPayload {

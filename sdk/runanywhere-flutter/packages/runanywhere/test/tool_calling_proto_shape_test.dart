@@ -23,15 +23,13 @@ void main() {
 
     test('session request carries execution and validation policy', () {
       final request = ToolCallingSessionCreateRequest(
-        autoExecute: false,
-        replaceSystemPrompt: true,
-        requireJsonArguments: true,
+        prompt: 'call the tool',
+        validateCalls: false,
       );
 
-      expect(request.hasAutoExecute(), isTrue);
-      expect(request.autoExecute, isFalse);
-      expect(request.replaceSystemPrompt, isTrue);
-      expect(request.requireJsonArguments, isTrue);
+      expect(request.hasValidateCalls(), isTrue);
+      expect(request.validateCalls, isFalse);
+      expect(request.prompt, 'call the tool');
     });
   });
 }

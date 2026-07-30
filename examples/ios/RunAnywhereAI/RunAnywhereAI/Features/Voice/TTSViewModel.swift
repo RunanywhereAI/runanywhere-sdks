@@ -7,7 +7,7 @@ import os
 
 /// ViewModel for Text-to-Speech functionality
 ///
-/// Uses the simplified `RunAnywhere.speak()` API - the SDK handles all audio playback internally.
+/// Uses `RunAnywhere.tts.speak()` - the SDK handles all audio playback internally.
 @MainActor
 class TTSViewModel: VoiceComponentViewModelBase {
     // MARK: - Component Identity
@@ -20,7 +20,10 @@ class TTSViewModel: VoiceComponentViewModelBase {
 
     // Speaking State
     @Published var isSpeaking = false
-    @Published var lastResult: RATTSSpeakResult?
+
+    /// True once a phrase has been spoken in this session. `tts.speak` returns
+    /// no metrics, so this is all the UI can report about the last utterance.
+    @Published private(set) var didSpeak = false
 
     // Voice Settings
     @Published var speechRate: Double = 1.0
@@ -63,20 +66,16 @@ class TTSViewModel: VoiceComponentViewModelBase {
         logger.info("Speaking: \(text.prefix(50))...")
         isSpeaking = true
         errorMessage = nil
-        lastResult = nil
         didRequestStop = false
 
         do {
-            var options = RATTSOptions.defaults()
-            options.speed = Float(speechRate)
-            options.pitch = Float(pitch)
-
             // SDK handles everything - synthesis AND playback
-            let result = try await RunAnywhere.speak(text, options: options)
-            lastResult = result
-
-            let durationMs = Int(result.duration * 1000)
-            logger.info("Speech generation complete: duration=\(durationMs)ms")
+            try await RunAnywhere.tts.speak(
+                text,
+                options: TtsOptions(speed: Float(speechRate), pitch: Float(pitch))
+            )
+            didSpeak = true
+            logger.info("Speech generation complete")
         } catch {
             // A user- or teardown-initiated stop surfaces here as
             // `.playbackInterrupted`; that is expected, not a failure to report.
@@ -97,7 +96,7 @@ class TTSViewModel: VoiceComponentViewModelBase {
     func stopSpeaking() async {
         logger.info("Stopping speech")
         didRequestStop = true
-        await RunAnywhere.stopSpeaking()
+        await RunAnywhere.tts.stop()
         isSpeaking = false
     }
 
@@ -108,7 +107,7 @@ class TTSViewModel: VoiceComponentViewModelBase {
         // Stop any in-flight playback so speech doesn't keep playing after the
         // screen is dismissed (mirrors STT/VAD cleanup stopping capture).
         didRequestStop = true
-        Task { await RunAnywhere.stopSpeaking() }
+        Task { await RunAnywhere.tts.stop() }
         cleanupBase()
     }
 
@@ -119,16 +118,5 @@ class TTSViewModel: VoiceComponentViewModelBase {
     override func applyLoadedModel(_ model: RAModelInfo) {
         selectedModelId = model.id
         selectedModelName = model.id
-    }
-
-    // MARK: - Formatting Helpers
-
-    func formatBytes(_ bytes: Int64) -> String {
-        let kb = Double(bytes) / 1024.0
-        if kb < 1024 {
-            return String(format: "%.1f KB", kb)
-        } else {
-            return String(format: "%.1f MB", kb / 1024.0)
-        }
     }
 }

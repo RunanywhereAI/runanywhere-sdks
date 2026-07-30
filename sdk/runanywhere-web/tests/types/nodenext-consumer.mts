@@ -9,7 +9,7 @@
 import {
   RunAnywhere,
   SDKException,
-  type ModelLoadRequest,
+  type LoadOptions,
 } from '@runanywhere/web';
 import {
   registerWasmModule,
@@ -40,7 +40,7 @@ export const nodeNextConsumerValues = {
 };
 
 export interface NodeNextConsumerContracts {
-  modelLoad: ModelLoadRequest;
+  modelLoad: LoadOptions;
   backendState: BackendRegistrationState;
   audioCapture: AudioCaptureConfig;
   llamaOptions: LlamaCPPRegisterOptions;

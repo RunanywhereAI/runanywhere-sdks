@@ -21,50 +21,50 @@ pip install "runanywhere[server]==0.20.11"   # OpenAI-compatible local server
 
 ## Quick start
 
-`RunAnywhere` is an instantiable client. Use it as a context manager:
+One `initialize()` call, then a namespace per modality:
 
 ```python
-from runanywhere import RunAnywhere
+import runanywhere as ra
+from runanywhere import LlmOptions
 
-with RunAnywhere() as ra:
-    llm = ra.load_llm("smollm2-360m")
-    print(llm.generate_text("Explain quantum computing in one sentence."))
+ra.initialize()
+print(ra.llm.generate("Explain quantum computing in one sentence.",
+                      LlmOptions(model="smollm2-360m")).text)
 ```
 
-Load by catalog id (downloaded on first use) or by a local `.gguf` path:
+`options.model` takes a catalog id (downloaded on first use), a local `.gguf` path, an
+`https://` URL, or a HuggingFace repo. Once a model is loaded it stays resident, so later
+calls can leave `model` out. `ra.reset()` unloads everything.
 
-```python
-with RunAnywhere() as ra:
-    llm = ra.load_llm("/path/to/model.gguf")
-    for token in llm.generate("Write a haiku.", max_output_tokens=64):
-        print(token, end="", flush=True)
-```
-
-Configuration:
-
-```python
-ra = RunAnywhere(
-    base_dir="~/my-models",        # default: ~/.runanywhere
-    environment="production",
-)
-```
+`RUNANYWHERE_HOME` changes where models and state are cached (default `~/.runanywhere`).
 
 ## Text generation
 
 ```python
-# Full text
-answer = llm.generate_text("What is the capital of France?", max_output_tokens=32)
+result = ra.llm.generate("What is the capital of France?", LlmOptions(max_output_tokens=32))
+print(result.text, result.output_tokens, result.tokens_per_second)
 
-# Streaming with metrics
-for event in llm.generate_stream("Describe a sunset."):
-    if event.is_final:
+for event in ra.llm.generate_stream("Describe a sunset."):
+    if event.is_token:
+        print(event.text, end="", flush=True)
+    elif event.is_completed:
         r = event.result
-        print(f"\n{r.token_count} tokens, {r.tokens_per_second:.1f} tok/s")
-    else:
-        print(event.token, end="", flush=True)
+        print(f"\n{r.output_tokens} tokens, {r.tokens_per_second:.1f} tok/s")
 ```
 
-Async twins exist for every blocking method (`agenerate`, `agenerate_text`, …).
+Multi-turn is a list of messages, not a separate object:
+
+```python
+from runanywhere import ChatMessage, Role
+
+ra.llm.generate([
+    ChatMessage(Role.SYSTEM, "You are terse."),
+    ChatMessage(Role.USER, "Who wrote Hamlet?"),
+])
+```
+
+Every verb that blocks has an `a`-prefixed async twin (`agenerate`, `agenerate_stream`,
+`atranscribe`, `aembed`, `aquery`, …).
 
 ### Structured output and tools
 
@@ -74,74 +74,69 @@ schema = {
     "properties": {"city": {"type": "string"}, "temp_c": {"type": "integer"}},
     "required": ["city", "temp_c"],
 }
-result = llm.generate_structured("Weather in Paris, as JSON.", schema)
+result = ra.llm.generate_structured("Weather in Paris, as JSON.", schema)
+print(result.value, result.valid)
 
-from runanywhere import ToolSpec
-tools = [ToolSpec(name="get_weather", description="...", parameters={...},
-                  execute=lambda args: {"temp_c": 21})]
-run = llm.generate_with_tools("Weather in Berlin?", tools)
-```
+from runanywhere import ToolDefinition
 
-### Chat
-
-```python
-with RunAnywhere() as ra:
-    llm = ra.load_llm("smollm2-360m")
-    chat = ra.create_chat(llm, system="You are a terse assistant.")
-    print(chat.send_text("Who wrote Hamlet?"))
-    print(chat.send_text("And when?"))
+ra.llm.tools.register(
+    ToolDefinition(name="get_weather", parameters=schema, description="Current weather"),
+    lambda args: {"temp_c": 21},
+)
+result = ra.llm.generate("Weather in Berlin?")   # the SDK runs the tool and continues
+print(result.tool_calls, result.text)
 ```
 
 ## Vision, speech, and voice
 
 ```python
-with RunAnywhere() as ra:
-    # VLM
-    vlm = ra.load_vlm("smolvlm-256m")
-    print(vlm.caption_text("photo.jpg", "Describe this image."))
+from runanywhere import AudioInput, ImageInput, SttOptions, TtsOptions
 
-    # STT — 16 kHz mono PCM16 bytes
-    stt = ra.load_stt("whisper-base")
-    text = stt.transcribe(pcm16_bytes)
+print(ra.vlm.generate(ImageInput.file("photo.jpg"), "Describe this image.").text)
 
-    # TTS — returns float32 PCM + sample rate
-    tts = ra.load_tts("piper-amy")
-    audio = tts.synthesize("Hello from RunAnywhere.")
-
-    # Voice agent (STT → LLM → TTS)
-    agent = ra.create_voice_agent(stt, llm, tts)
-    turn = agent.process_turn(pcm16_bytes)
+transcript = ra.stt.transcribe(AudioInput.file("speech.wav"), SttOptions(model="whisper-base"))
+audio = ra.tts.synthesize("Hello from RunAnywhere.", TtsOptions(voice="piper-amy"))
+speech = ra.vad.detect(AudioInput.file("speech.wav"))
 ```
+
+`ra.voice.create_session(...)` is defined but not available in this SDK: the native bridge
+binds no voice agent and the package has no microphone or speaker adapter, so it raises
+`SDKException` naming the missing symbols. Compose `stt` → `llm` → `tts` yourself.
+`ra.rerank`, `ra.images`, `ra.diarization`, `ra.segmentation` and `ra.lora` raise for the
+same reason.
 
 ## Embeddings and RAG
 
 ```python
-with RunAnywhere() as ra:
-    embedder = ra.load_embedder("minilm")
-    vec = embedder.embed("hello world")   # numpy float32, L2-normalized
+from runanywhere import EmbedOptions, ModelRef, RagDocument
 
-    with ra.create_rag("minilm", llm_model="qwen2.5-0.5b") as rag:
-        rag.ingest("Paris is the capital of France.")
-        result = rag.query("What is the capital of France?")
-        print(result.answer)
+# numpy float32, L2-normalized, returned in input order
+vectors = ra.embeddings.embed(["hello world"], EmbedOptions(model="minilm"))
+
+with ra.rag.open(ModelRef("minilm"), ModelRef("qwen2.5-0.5b")) as session:
+    session.ingest(RagDocument("Paris is the capital of France."))
+    print(session.search("capital of France?"))        # retrieval only
+    print(session.query("What is the capital of France?").answer)
 ```
 
 Install `runanywhere[rag]` for RAG support.
 
 ## Models
 
-Catalog ids (`smollm2-360m`, `qwen2.5-0.5b`, `smolvlm-256m`, `minilm`, `whisper-base`, `piper-amy`, …) download on first load. You can also pass:
-
-- a local file path
-- an `https://` URL
-- a HuggingFace repo (`owner/repo` or `owner/repo:file.gguf`)
-
-Pre-download and inspect status:
+Catalog ids (`smollm2-360m`, `qwen2.5-0.5b`, `smolvlm-256m`, `minilm`, `whisper-base`,
+`piper-amy`, …) download on first load. Anything the generation verbs accept as
+`options.model` also works here.
 
 ```python
-ra = RunAnywhere()
-path = ra.download_model("smollm2-360m", on_progress=lambda p: print(f"{p.percent}%"))
-status = ra.model_status()
+from runanywhere import DownloadEventKind, ModelFilter
+
+for event in ra.models.download("smollm2-360m"):
+    if event.kind == DownloadEventKind.PROGRESS:
+        print(f"{event.percent}%")
+
+ra.models.list(ModelFilter(downloaded=True))
+ra.models.load("smollm2-360m")      # pay the load cost now instead of on first generate
+ra.models.state()                   # what is resident + disk used/free
 ```
 
 ## Local OpenAI-compatible server
@@ -181,20 +176,25 @@ Use `--json` for machine-readable output. For the standalone binary, see the [Ru
 ## Errors
 
 ```python
-from runanywhere import SDKException, ErrorCode
+from runanywhere import SDKException
 
 try:
-    with RunAnywhere() as ra:
-        ra.load_llm("missing.gguf")
+    ra.models.load("missing.gguf")
 except SDKException as e:
     print(e.code, e.message, e.recovery_suggestion)
 ```
 
+Verbs raise a typed `SDKException`; nothing returns a result object with a success flag, and
+nothing hides an error message in a text field. An option the native bridge cannot carry
+raises rather than being silently ignored.
+
 ## Notes
 
-- One generation at a time per model handle; load separate handles for concurrency.
+- One generation at a time per resident model; a concurrent `generate` raises immediately.
+- One model per category is resident; asking for a different id in the same category swaps it.
 - Prompts, responses, audio, and images never leave the host during inference.
-- Multiple clients share one reference-counted native runtime.
+- `initialize` does no network work: no authentication, device registration, or telemetry.
+  `api_key` and `base_url` are accepted for cross-SDK signature parity and are unused.
 
 ## Support
 

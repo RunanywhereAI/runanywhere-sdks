@@ -3,14 +3,13 @@
  *
  * Registration is owned exclusively by SettingsScreen (Tool Settings section),
  * matching iOS ToolSettingsView and Android/Flutter ToolSettingsViewModel.
- * ChatScreen only reads the registered tool count via RunAnywhere.getRegisteredTools().
+ * ChatScreen only reads the registered tool count via RunAnywhere.llm.tools.list().
  */
 
 import { RunAnywhere } from '@runanywhere/core';
 import {
   ToolDefinition,
   ToolParameterType,
-  type ToolValue,
 } from '@runanywhere/proto-ts/tool_calling';
 import { safeEvaluateExpression } from './mathParser';
 
@@ -20,10 +19,10 @@ import { safeEvaluateExpression } from './mathParser';
  * Called only from SettingsScreen when the user taps "Add Demo Tools".
  */
 export const registerDemoTools = async (): Promise<void> => {
-  await RunAnywhere.clearTools();
+  await RunAnywhere.llm.tools.clear();
 
   // Weather tool - Real API (wttr.in - no key needed)
-  await RunAnywhere.registerTool(
+  await RunAnywhere.llm.tools.register(
     ToolDefinition.fromPartial({
       name: 'get_weather',
       description: 'Gets the current weather for a city or location',
@@ -38,10 +37,8 @@ export const registerDemoTools = async (): Promise<void> => {
         },
       ],
     }),
-    async (
-      args: Record<string, ToolValue>
-    ): Promise<Record<string, ToolValue>> => {
-      const location = args.location?.stringValue || 'San Francisco';
+    async (args) => {
+      const location = String(args.location ?? 'San Francisco');
       try {
         // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
         const response = await fetch(
@@ -50,43 +47,39 @@ export const registerDemoTools = async (): Promise<void> => {
         const data = await response.json();
         const current = data.current_condition?.[0];
         return {
-          location: { stringValue: location },
-          temperature_c: { stringValue: current?.temp_C || 'N/A' },
-          temperature_f: { stringValue: current?.temp_F || 'N/A' },
-          condition: {
-            stringValue: current?.weatherDesc?.[0]?.value || 'Unknown',
-          },
-          humidity: { stringValue: current?.humidity || 'N/A' },
-          wind_kph: { stringValue: current?.windspeedKmph || 'N/A' },
+          location,
+          temperature_c: current?.temp_C || 'N/A',
+          temperature_f: current?.temp_F || 'N/A',
+          condition: current?.weatherDesc?.[0]?.value || 'Unknown',
+          humidity: current?.humidity || 'N/A',
+          wind_kph: current?.windspeedKmph || 'N/A',
         };
       } catch (error) {
-        return { error: { stringValue: `Failed to get weather: ${error}` } };
+        return { error: `Failed to get weather: ${error}` };
       }
     }
   );
 
   // Current time tool
-  await RunAnywhere.registerTool(
+  await RunAnywhere.llm.tools.register(
     ToolDefinition.fromPartial({
       name: 'get_current_time',
       description: 'Gets the current date, time, and timezone information',
       parameters: [],
     }),
-    async (): Promise<Record<string, ToolValue>> => {
+    async () => {
       const now = new Date();
       return {
-        datetime: { stringValue: now.toLocaleString() },
-        time: { stringValue: now.toLocaleTimeString() },
-        timestamp: { stringValue: now.toISOString() },
-        timezone: {
-          stringValue: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
+        datetime: now.toLocaleString(),
+        time: now.toLocaleTimeString(),
+        timestamp: now.toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       };
     }
   );
 
   // Calculator tool - Math evaluation
-  await RunAnywhere.registerTool(
+  await RunAnywhere.llm.tools.register(
     ToolDefinition.fromPartial({
       name: 'calculate',
       description:
@@ -101,18 +94,12 @@ export const registerDemoTools = async (): Promise<void> => {
         },
       ],
     }),
-    async (
-      args: Record<string, ToolValue>
-    ): Promise<Record<string, ToolValue>> => {
-      const expression = args.expression?.stringValue || '0';
+    async (args) => {
+      const expression = String(args.expression ?? '0');
       try {
-        const result = safeEvaluateExpression(expression);
-        return {
-          expression: { stringValue: expression },
-          result: { numberValue: result },
-        };
+        return { expression, result: safeEvaluateExpression(expression) };
       } catch (error) {
-        return { error: { stringValue: `Failed to calculate: ${error}` } };
+        return { error: `Failed to calculate: ${error}` };
       }
     }
   );

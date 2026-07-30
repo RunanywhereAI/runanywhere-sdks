@@ -214,8 +214,8 @@ public fun StructuredOutputOptions.validate() {
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
 public fun LLMGenerationOptions.Companion.defaults(): LLMGenerationOptions =
     LLMGenerationOptions(
-        max_output_tokens = 100,
-        temperature = 0.8f,
+        max_output_tokens = 512,
+        temperature = 0.7f,
         top_p = 1.0f,
         top_k = 0,
         repetition_penalty = 1.0f,

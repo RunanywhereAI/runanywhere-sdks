@@ -100,13 +100,19 @@ public enum RunAnywhere {
 
     // MARK: - SDK State
 
+    /// Whether local inference is usable.
+    public static var isReady: Bool { isInitializedFlag }
+
     /// Check if SDK is initialized (Phase 1 complete).
+    @available(*, deprecated, renamed: "isReady")
     public static var isInitialized: Bool { isInitializedFlag }
 
     /// Check if services are fully ready (Phase 2 complete)
+    @available(*, deprecated, message: "Network readiness is an SDK-internal concern; use isReady")
     public static var areServicesReady: Bool { hasCompletedServicesInit }
 
     /// Check if SDK is active and ready for use
+    @available(*, deprecated, renamed: "isReady")
     public static var isActive: Bool {
         state.withLock { $0.isInitialized && $0.initParams != nil }
     }
@@ -117,17 +123,13 @@ public enum RunAnywhere {
     /// Current environment (nil if not initialized)
     public static var environment: SDKEnvironment? { currentEnvironment }
 
-    /// Device ID (Keychain-persisted, survives reinstalls)
-    /// Resolved by commons via the device-identity chain
-    /// (secure_get → vendor ID → freshly synthesized UUID).
+    /// Stable per-install device identifier, empty when identity is unavailable.
+    ///
+    /// Resolved by commons through the device-identity chain
+    /// (secure storage → vendor ID → freshly synthesized UUID).
     public static var deviceId: String {
-        get throws { try CppBridge.Device.persistentId }
+        (try? CppBridge.Device.persistentId) ?? ""
     }
-
-    // MARK: - Event Access
-
-    /// Access to all SDK events for subscription-based patterns
-    public static var events: EventBus { EventBus.shared }
 
     // MARK: - Authentication Info (Production/Staging only)
 
@@ -143,9 +145,9 @@ public enum RunAnywhere {
     /// Check if device is registered with backend
     public static func isDeviceRegistered() -> Bool { CppBridge.Device.isRegistered }
 
-    // MARK: - SDK Reset (Testing)
+    // MARK: - SDK Reset
 
-    /// Reset SDK state (for testing purposes)
+    /// Tear the SDK down: unload models, close sessions, clear state.
     public static func reset() async {
         let logger = SDKLogger(category: "RunAnywhere.Reset")
         logger.info("Resetting SDK state...")
@@ -212,12 +214,21 @@ public enum RunAnywhere {
 
     // MARK: - SDK Initialization
 
-    /// Initialize the RunAnywhere SDK.
-    /// Phase 1 runs synchronously; Phase 2 spawns in a detached Task.
+    /// Bring the SDK up: platform adapters, native load, auth, device
+    /// registration, model catalog, and telemetry.
+    ///
+    /// Network work continues in the background and retries on its own; the
+    /// call returns as soon as local inference is usable.
+    ///
+    /// - Parameters:
+    ///   - apiKey: `nil` runs in keyless local mode.
+    ///   - baseUrl: `nil` uses the default control plane for the environment.
+    /// - Throws: `SDKException` when the parameters fail validation or the
+    ///   native core cannot start.
     public static func initialize(
         apiKey: String? = nil,
-        baseURL: String? = nil,
-        environment: SDKEnvironment = .development
+        baseUrl: String? = nil,
+        environment: SDKEnvironment = .production
     ) throws {
         let params: SDKInitParams
         if environment == .development {
@@ -225,14 +236,25 @@ public enum RunAnywhere {
         } else {
             params = try SDKInitParams(
                 apiKey: apiKey ?? "",
-                baseURL: baseURL ?? "",
+                baseURL: baseUrl ?? RADefaults.Environment.productionBaseUrl,
                 environment: environment
             )
         }
         try performCoreInit(with: params, startBackgroundServices: true)
     }
 
+    /// Initialize with a string base URL.
+    @available(*, deprecated, renamed: "initialize(apiKey:baseUrl:environment:)")
+    public static func initialize(
+        apiKey: String? = nil,
+        baseURL: String?,
+        environment: SDKEnvironment = .development
+    ) throws {
+        try initialize(apiKey: apiKey, baseUrl: baseURL, environment: environment)
+    }
+
     /// Initialize with URL type for base URL.
+    @available(*, deprecated, renamed: "initialize(apiKey:baseUrl:environment:)")
     public static func initialize(
         apiKey: String,
         baseURL: URL,
@@ -328,7 +350,7 @@ public enum RunAnywhere {
                 logger.debug("Starting Phase 2 (services) in background...")
                 Task.detached(priority: .userInitiated) {
                     do {
-                        try await completeServicesInitialization()
+                        try await completeServicesInitializationInternal()
                         SDKLogger(category: "RunAnywhere.Init").info("Phase 2 complete (background)")
                     } catch {
                         SDKLogger(category: "RunAnywhere.Init")
@@ -368,7 +390,12 @@ public enum RunAnywhere {
     /// Complete services initialization (Phase 2). Safe to call multiple
     /// times; concurrent callers share the same Task so the step list runs
     /// at most once.
+    @available(*, deprecated, message: "initialize() now owns both phases; this call is no longer needed")
     public static func completeServicesInitialization() async throws {
+        try await completeServicesInitializationInternal()
+    }
+
+    internal static func completeServicesInitializationInternal() async throws {
         if hasCompletedServicesInit { return }
 
         let task: Task<Void, Error> = try state.withLock { lockedState in
@@ -474,7 +501,7 @@ public enum RunAnywhere {
             await retryHTTPSetup()
             return
         }
-        try await completeServicesInitialization()
+        try await completeServicesInitializationInternal()
     }
 
     /// Retry HTTP/auth after an offline initialization. Commons performs the

@@ -3,27 +3,20 @@
  *
  * Mirrors the iOS `VoiceAgentViewModel` pattern (Swift source-of-truth):
  *
- *   1. The user loads three models from the other tabs (Chat for LLM,
- *      Transcribe for STT, Speak for TTS — backed by the same model registry
- *      and `RunAnywhere.loadModel(...)` lifecycle).
- *   2. We probe `RunAnywhere.componentLifecycleSnapshot(SDK_COMPONENT_*)` for
- *      LLM / STT / TTS readiness. When all three are READY, the Start
- *      button enables.
- *   3. Start: capture and endpoint 16 kHz mono audio through the SDK's
- *      `VoiceAgentMicDriver`,
- *      register backend models via
- *      `RunAnywhere.initializeVoiceAgentWithLoadedModels()`, and consume
- *      `RunAnywhere.streamVoiceAgent()` as `AsyncIterable<VoiceEvent>`.
- *   4. Each VoiceEvent oneof arm drives a UI region (iOS parity:
- *      VoiceAgentViewModel.swift:505-584 `handleProtoEvent`):
- *        - `state`              → session status pill
- *        - `vad`                → speech-detected indicator
- *        - `userSaid`           → live transcript area
- *        - `assistantToken`     → streamed assistant response
- *        - `audio`              → SDK mic driver gates capture through playback
+ *   1. The view recommends (or the user picks) an STT / LLM / TTS trio from
+ *      the shared catalog.
+ *   2. `RunAnywhere.voice.createSession({ stt, llm, tts })` owns every
+ *      prerequisite: it downloads and loads those three models, ensures a VAD
+ *      is resident, and wires the pipeline. Nothing here pre-loads anything.
+ *   3. `session.start()` is the only thing that opens the microphone;
+ *      `session.events` is consumed as `AsyncIterable<VoiceEvent>`.
+ *   4. Each event variant drives one UI region:
+ *        - `agentStateChanged`  → session status pill
+ *        - `speechStarted`/`speechEnded` → speech-detected indicator
+ *        - `userTranscribed`    → live transcript area
+ *        - `agentResponse`      → assistant response
  *        - `error`              → inline error banner
- *   5. Stop: cancel the event-consumer task, stop capture/playback through the
- *      driver, and call `RunAnywhere.cleanupVoiceAgent()`.
+ *   5. Stop: `session.close()` releases the microphone and the pipeline.
  *
  * Backends (llamacpp + ONNX) are registered once at app init by `main.ts` —
  * this view assumes they exist and surfaces the SDK's typed error if a verb
@@ -34,17 +27,9 @@ import type { TabLifecycle } from '../app';
 import {
   RunAnywhere,
   ModelCategory,
-  TokenKind,
-  VoiceEventPipelineState,
-  VADStreamEventKind,
-  type AssistantTokenEvent,
-  type ErrorEvent,
-  type StateChangeEvent,
-  type UserSaidEvent,
-  type VADEvent,
   type VoiceEvent,
+  type VoiceSession,
 } from '@runanywhere/web';
-import { VoiceAgentMicDriver } from '@runanywhere/web/browser';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 import { appLogger } from '../services/app-logger';
@@ -89,14 +74,13 @@ type SessionState =
 let container: HTMLElement;
 let unmounted = false;
 
-let micDriver: VoiceAgentMicDriver | null = null;
+let session: VoiceSession | null = null;
 let eventConsumer: AbortController | null = null;
 let sessionState: SessionState = 'disconnected';
 let isSpeechDetected = false;
 let userTranscript = '';
 let assistantResponse = '';
 let lastError: string | null = null;
-let audioLevel = 0;
 let lastEventSummary = '';
 
 // Pre-selected best-for-device voice trio (+ VAD), computed once on first
@@ -256,12 +240,6 @@ function renderView(): void {
           <span id="voice-state-pill" class="badge ${stateBadgeClass(sessionState)}">${prettyState(sessionState)}</span>
           ${isSpeechDetected ? '<span class="badge badge-green" style="margin-left:6px">Speech detected</span>' : ''}
           <span class="text-secondary" style="margin-left:8px"><code>${escapeHtml(lastEventSummary || '(no events yet)')}</code></span>
-        </div>
-        <div class="docs-status" id="voice-level-row">
-          <strong>Mic level:</strong>
-          <div class="progress-bar" style="display:inline-block;width:200px;margin-left:8px;vertical-align:middle">
-            <div class="progress-fill" style="width:${Math.round(audioLevel * 100)}%"></div>
-          </div>
         </div>
         ${lastError
           ? `<div class="docs-status error">Error: ${escapeHtml(lastError)}</div>`
@@ -423,8 +401,14 @@ function updatePipelineSlot(
 
 async function startSession(): Promise<void> {
   if (isActiveState(sessionState)) return;
+  const pipeline = voicePipeline;
+  if (!pipeline?.stt || !pipeline.llm || !pipeline.tts) {
+    lastError = 'Pick an STT, LLM, and TTS model before starting a session.';
+    sessionState = 'error';
+    renderView();
+    return;
+  }
 
-  // Reset state (iOS parity: VoiceAgentViewModel.swift:452-456).
   userTranscript = '';
   assistantResponse = '';
   lastError = null;
@@ -434,36 +418,17 @@ async function startSession(): Promise<void> {
   renderView();
 
   try {
-    // Initialize against the currently-loaded LLM/STT/TTS components. The
-    // SDK owns the multi-step bootstrap (VAD auto-load + model composition).
-    await RunAnywhere.initializeVoiceAgentWithLoadedModels();
+    // One entry point owns download, load, VAD, and pipeline wiring.
+    session = await RunAnywhere.voice.createSession({
+      stt: { id: pipeline.stt.id },
+      llm: { id: pipeline.llm.id },
+      tts: { id: pipeline.tts.id },
+    });
 
-    // Start consuming the proto event stream. We track the consumer via an
-    // `AbortController` so `stopSession()` can deterministically end it.
+    // Subscribing never opens the mic; `start()` is what does.
     eventConsumer = new AbortController();
     void consumeEvents(eventConsumer.signal);
-
-    // The browser-specific SDK driver owns microphone capture and utterance
-    // endpointing, then submits each completed utterance through the one-call
-    // `RunAnywhere.processVoiceTurn()` provider. The example only renders the
-    // resulting canonical VoiceEvents.
-    micDriver = new VoiceAgentMicDriver();
-    await micDriver.start({
-      onLevel: (level) => {
-        audioLevel = level;
-        updateLevelBar();
-      },
-      onPhase: (phase) => {
-        sessionState = phase === 'processing' ? 'processing' : 'listening';
-        if (phase === 'processing') isSpeechDetected = false;
-        scheduleRender();
-      },
-      onError: (error) => {
-        lastError = `Voice turn failed: ${formatError(error)}`;
-        sessionState = 'error';
-        scheduleRender();
-      },
-    });
+    await session.start();
 
     sessionState = 'listening';
     setEventSummary('Listening...');
@@ -483,22 +448,17 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
   eventConsumer?.abort();
   eventConsumer = null;
 
-  if (micDriver) {
-    try { micDriver.stop(); } catch { /* ignore */ }
-    micDriver = null;
+  if (session) {
+    try {
+      await session.close();
+    } catch {
+      // Close is best-effort — the session releases the mic either way.
+    }
+    session = null;
   }
 
-  audioLevel = 0;
   isSpeechDetected = false;
 
-  try {
-    await RunAnywhere.cleanupVoiceAgent();
-  } catch {
-    // Cleanup is best-effort — silently swallow.
-  }
-
-  // iOS parity: VoiceAgentViewModel.swift:484-494 `stopConversation` returns
-  // to .disconnected ("Ready").
   if (wasActive && sessionState !== 'error') {
     sessionState = 'disconnected';
     setEventSummary('Session stopped.');
@@ -512,26 +472,14 @@ async function stopSession(opts: { silent?: boolean } = {}): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function consumeEvents(signal: AbortSignal): Promise<void> {
+  const active = session;
+  if (!active) return;
   try {
-    // Swift parity: `streamVoiceAgent()` finishes EMPTY when the agent is not
-    // ready — no synthetic error events arrive on the iterator, so a stream
-    // that ends right away simply returns the UI to the Ready state below.
-    const stream = RunAnywhere.streamVoiceAgent({
-      eventFilter: '',
-      sessionId: 'web-voice-agent',
-      categories: [],
-      minSeverity: 0,
-      replayFromSeq: 0,
-      // The SDK mic driver plays the returned audio and keeps capture gated
-      // until playback completes, preventing speaker-to-mic feedback.
-      includeAudio: false,
-    }, signal);
-    for await (const event of stream) {
+    for await (const event of active.events) {
       if (signal.aborted || unmounted) break;
       handleVoiceEvent(event);
-      // Re-render incrementally; pre-compute the affected DOM regions to
-      // avoid replacing the whole panel on every token (which would jitter
-      // the user-input transcript while typing).
+      // Pre-compute the affected DOM regions so a token never replaces the
+      // whole panel and jitters the transcript.
       updateTextRegions();
     }
   } catch (err) {
@@ -541,110 +489,44 @@ async function consumeEvents(signal: AbortSignal): Promise<void> {
       renderView();
     }
   } finally {
-    if (!signal.aborted && !unmounted) {
-      // The stream finished on its own (agent stopped or was never ready).
-      if (sessionState !== 'error') {
-        sessionState = 'disconnected';
-        renderView();
-      }
+    if (!signal.aborted && !unmounted && sessionState !== 'error') {
+      sessionState = 'disconnected';
+      renderView();
     }
   }
 }
 
 function handleVoiceEvent(event: VoiceEvent): void {
-  if (event.state) {
-    applyStateChange(event.state);
-    setEventSummary(`state: ${pipelineStateName(event.state.current)}`);
-  }
-  if (event.vad) {
-    applyVadEvent(event.vad);
-  }
-  if (event.userSaid) {
-    applyUserSaid(event.userSaid);
-  }
-  if (event.assistantToken) {
-    applyAssistantToken(event.assistantToken);
-  }
-  if (event.error) {
-    applyErrorEvent(event.error);
-  }
-}
-
-/** iOS parity: VoiceAgentViewModel.swift:507-529 `.state` arm. */
-function applyStateChange(state: StateChangeEvent): void {
-  switch (state.current) {
-    case VoiceEventPipelineState.PIPELINE_STATE_IDLE:
-      sessionState = 'listening';
-      break;
-    case VoiceEventPipelineState.PIPELINE_STATE_LISTENING:
-      if (sessionState !== 'listening' && sessionState !== 'speaking' && sessionState !== 'processing') {
-        sessionState = 'listening';
-      }
-      break;
-    case VoiceEventPipelineState.PIPELINE_STATE_PROCESSING_SPEECH:
-    case VoiceEventPipelineState.PIPELINE_STATE_THINKING:
-    case VoiceEventPipelineState.PIPELINE_STATE_GENERATING_RESPONSE:
-      sessionState = 'processing';
-      isSpeechDetected = false;
-      break;
-    case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING:
-    case VoiceEventPipelineState.PIPELINE_STATE_PLAYING_TTS:
-      sessionState = 'speaking';
-      break;
-    case VoiceEventPipelineState.PIPELINE_STATE_STOPPED:
-      sessionState = 'disconnected';
-      break;
-    case VoiceEventPipelineState.PIPELINE_STATE_ERROR:
-      sessionState = 'error';
-      break;
-    default:
-      break;
-  }
-  // The state pill is part of the full re-render path; queue one.
-  scheduleRender();
-}
-
-/** iOS parity: VoiceAgentViewModel.swift:531-548 `.vad` arm. */
-function applyVadEvent(vad: VADEvent): void {
-  switch (vad.type) {
-    case VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY:
-      if (vad.isSpeech) {
-        isSpeechDetected = true;
-      } else {
-        sessionState = 'processing';
-        isSpeechDetected = false;
-      }
+  switch (event.type) {
+    case 'agentStateChanged':
+      sessionState = event.state === 'thinking' ? 'processing' : event.state;
+      if (event.state !== 'listening') isSpeechDetected = false;
+      setEventSummary(`state: ${event.state}`);
       scheduleRender();
       break;
-    case VADStreamEventKind.VAD_STREAM_EVENT_KIND_STOPPED:
-      sessionState = 'processing';
-      isSpeechDetected = false;
+    case 'speechStarted':
+      isSpeechDetected = true;
+      setEventSummary('speech started');
       scheduleRender();
       break;
-    default:
+    case 'speechEnded':
+      isSpeechDetected = false;
+      setEventSummary('speech ended');
+      scheduleRender();
       break;
-  }
-}
-
-function applyUserSaid(userSaid: UserSaidEvent): void {
-  // Partial hypotheses overwrite; finals stay until the next turn starts.
-  userTranscript = userSaid.text;
-  if (userSaid.isFinal) assistantResponse = '';
-}
-
-function applyAssistantToken(token: AssistantTokenEvent): void {
-  // Append ALL token text — thought tokens included — exactly like iOS
-  // (iOS parity: VoiceAgentViewModel.swift:553-555). Mark the token kind in
-  // the event summary only.
-  assistantResponse += token.text;
-  if (token.kind === TokenKind.TOKEN_KIND_THOUGHT) {
-    setEventSummary('assistant token (thought)');
-  }
-}
-
-function applyErrorEvent(err: ErrorEvent): void {
-  if (err.message) {
-    lastError = err.message;
+    case 'userTranscribed':
+      // Partial hypotheses overwrite; a final clears the previous answer.
+      userTranscript = event.text;
+      if (event.isFinal) assistantResponse = '';
+      break;
+    case 'agentResponse':
+      assistantResponse = event.text;
+      break;
+    case 'error':
+      lastError = event.message;
+      if (!event.recoverable) sessionState = 'error';
+      scheduleRender();
+      break;
   }
 }
 
@@ -671,28 +553,6 @@ function updateTextRegions(): void {
   if (userPre) userPre.textContent = userTranscript || '(waiting for speech...)';
   const respPre = container.querySelector<HTMLPreElement>('#voice-assistant-response');
   if (respPre) respPre.textContent = assistantResponse || '(no response yet)';
-}
-
-function updateLevelBar(): void {
-  const fill = container.querySelector<HTMLDivElement>('#voice-level-row .progress-fill');
-  if (fill) fill.style.width = `${Math.round(audioLevel * 100)}%`;
-}
-
-function pipelineStateName(state: VoiceEventPipelineState): string {
-  switch (state) {
-    case VoiceEventPipelineState.PIPELINE_STATE_IDLE: return 'idle';
-    case VoiceEventPipelineState.PIPELINE_STATE_LISTENING: return 'listening';
-    case VoiceEventPipelineState.PIPELINE_STATE_THINKING: return 'thinking';
-    case VoiceEventPipelineState.PIPELINE_STATE_SPEAKING: return 'speaking';
-    case VoiceEventPipelineState.PIPELINE_STATE_STOPPED: return 'stopped';
-    case VoiceEventPipelineState.PIPELINE_STATE_WAITING_WAKEWORD: return 'waiting-wakeword';
-    case VoiceEventPipelineState.PIPELINE_STATE_PROCESSING_SPEECH: return 'processing-speech';
-    case VoiceEventPipelineState.PIPELINE_STATE_GENERATING_RESPONSE: return 'generating-response';
-    case VoiceEventPipelineState.PIPELINE_STATE_PLAYING_TTS: return 'playing-tts';
-    case VoiceEventPipelineState.PIPELINE_STATE_COOLDOWN: return 'cooldown';
-    case VoiceEventPipelineState.PIPELINE_STATE_ERROR: return 'error';
-    default: return 'unspecified';
-  }
 }
 
 /** iOS parity: VoiceAgentTypes.swift:34-44 `displayName`. */

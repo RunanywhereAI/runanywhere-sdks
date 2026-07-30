@@ -114,14 +114,14 @@ public extension RunAnywhere.LoRA {
         onProgress: ((RADownloadProgress) async -> Void)? = nil
     ) async throws -> String {
         let artifact = try await registerArtifact(entry)
-        let finalProgress = try await RunAnywhere.downloadModel(artifact, onProgress: onProgress)
+        let finalProgress = try await RunAnywhere.performDownload(artifact, onProgress: onProgress)
 
         var localPath = finalProgress.localPath
         if localPath.isEmpty {
             // The import step persisted the path on the registry record.
             var getRequest = RAModelGetRequest()
             getRequest.modelID = artifact.id
-            let lookup = await RunAnywhere.getModel(getRequest)
+            let lookup = await RunAnywhere.performGet(getRequest)
             if lookup.found {
                 localPath = lookup.model.localPath
             }
@@ -157,7 +157,7 @@ public extension RunAnywhere.LoRA {
     /// paths themselves.
     @discardableResult
     func importAdapter(from url: URL) async throws -> RALoraAdapterImportResult {
-        guard RunAnywhere.isInitialized else {
+        guard RunAnywhere.isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 

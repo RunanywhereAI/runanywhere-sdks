@@ -155,6 +155,12 @@ object Embeddings {
     }
 }
 
-/** Capability accessor for Embeddings, mirroring Swift `RunAnywhere.embeddings`. */
-val RunAnywhere.embeddings: Embeddings
+/**
+ * Lifecycle-scoped embeddings surface kept for one release.
+ *
+ * The v3 verb is `RunAnywhere.embeddings.embed(texts, options)`; load the model
+ * with `RunAnywhere.models.load(id)` first.
+ */
+@Deprecated("Use RunAnywhere.embeddings.embed(texts, options) with RunAnywhere.models.load(id).")
+val RunAnywhere.embeddingsLifecycle: Embeddings
     get() = Embeddings

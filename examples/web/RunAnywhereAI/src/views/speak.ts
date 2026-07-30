@@ -1,10 +1,10 @@
 /**
  * Speak Tab — V2 canonical proto-byte TTS.
  *
- * Mirrors iOS `TTSViewModel`: the view hands text to `RunAnywhere.speak()`
+ * Mirrors iOS `TTSViewModel`: the view hands text to `RunAnywhere.tts.speak()`
  * and the SDK handles synthesis AND playback internally (iOS parity:
  * TTSViewModel.swift:69-90). Stopping in-flight speech goes through
- * `RunAnywhere.stopSpeaking()` (iOS parity: TTSViewModel.swift:88-92).
+ * `RunAnywhere.tts.stop()` (iOS parity: TTSViewModel.swift:88-92).
  * The app never decodes PCM or owns an audio-playback pipeline.
  */
 
@@ -57,7 +57,7 @@ export function initSpeakTab(el: HTMLElement): TabLifecycle {
     onDeactivate: () => {
       unmounted = true;
       // Stop any in-flight SDK playback when leaving the tab.
-      RunAnywhere.stopSpeaking();
+      RunAnywhere.tts.stop();
       if (!container.isConnected && unsubscribeState) {
         unsubscribeState();
         unsubscribeState = null;
@@ -67,7 +67,7 @@ export function initSpeakTab(el: HTMLElement): TabLifecycle {
 }
 
 function renderSpeak(): void {
-  const supportsProto = RunAnywhere.tts.supportsProtoTTS();
+  const supportsProto = RunAnywhere.runtime.modalities.tts.status !== 'unavailable';
   const loadedModel = findLoadedModelForCategory(
     ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
   );
@@ -86,7 +86,7 @@ function renderSpeak(): void {
         ? `
           <div class="docs-section">
             <h3>Synthesize</h3>
-            <p class="text-secondary">Type some text and let on-device TTS render it. The SDK synthesizes and plays the audio through <code>RunAnywhere.speak()</code>.</p>
+            <p class="text-secondary">Type some text and let on-device TTS render it. The SDK synthesizes and plays the audio through <code>RunAnywhere.tts.speak()</code>.</p>
             <textarea class="chat-input" id="speak-text" rows="3" ${
               isSynthesizing ? 'disabled' : ''
             }>${escapeHtml(DEFAULT_TEXT)}</textarea>
@@ -126,14 +126,14 @@ function renderSpeak(): void {
           <div class="docs-section">
             <h3>Synthesis</h3>
             <p class="text-secondary">
-              Real TTS calls dispatch through <code>RunAnywhere.speak(text, options)</code>
+              Real TTS calls dispatch through <code>RunAnywhere.tts.speak(text, options)</code>
               once a speech-capable backend is registered against a WASM build
               that includes <code>RAC_WASM_ONNX=ON</code>.
             </p>
             <ul class="feature-unavailable__list">
-              <li><code>RunAnywhere.loadModel(...)</code></li>
-              <li><code>RunAnywhere.speak(text, { speakingRate })</code></li>
-              <li><code>RunAnywhere.stopSpeaking()</code></li>
+              <li><code>RunAnywhere.models.load(id)</code></li>
+              <li><code>RunAnywhere.tts.speak(text, { speed })</code></li>
+              <li><code>RunAnywhere.tts.stop()</code></li>
             </ul>
           </div>`}
     </div>
@@ -157,7 +157,7 @@ function renderSpeak(): void {
       void runSpeak();
     });
     container.querySelector('#stop-btn')?.addEventListener('click', () => {
-      RunAnywhere.stopSpeaking();
+      RunAnywhere.tts.stop();
     });
   }
 }
@@ -173,11 +173,10 @@ async function runSpeak(): Promise<void> {
   renderSpeak();
 
   try {
-    // SDK handles everything — synthesis AND playback (iOS parity:
-    // TTSViewModel.swift:69-78 builds options with speakingRate, then
-    // `RunAnywhere.speak(text, options:)`).
-    const result = await RunAnywhere.speak(text, { speakingRate: speechRate });
-    lastDurationMs = result.durationMs ?? 0;
+    // One verb synthesizes and plays through the device.
+    const startedAt = performance.now();
+    await RunAnywhere.tts.speak(text, { speed: speechRate });
+    lastDurationMs = performance.now() - startedAt;
   } catch (err) {
     lastError = formatError(err);
   } finally {

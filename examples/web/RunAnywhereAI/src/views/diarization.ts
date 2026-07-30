@@ -1,6 +1,6 @@
 /**
  * Diarization Tab — standalone speaker diarization over the canonical
- * `RunAnywhere.diarize` facade (NVIDIA Streaming Sortformer). Offline only:
+ * `RunAnywhere.diarization.diarize` facade (NVIDIA Streaming Sortformer). Offline only:
  * the Web SDK exposes no `diarizeStream` verb yet.
  *
  * No browser diarization engine or model ships in this build yet, so the shared
@@ -12,7 +12,7 @@
  *      `.speakerDiarization` model. Model supply/load is delegated to the SDK's
  *      model management (the shared model sheet) rather than reimplemented here.
  *   2. Accepts a user-picked or recorded audio clip, decodes it to 16 kHz mono
- *      PCM float samples, and runs `RunAnywhere.diarize(request)`.
+ *      PCM float samples, and runs `RunAnywhere.diarization.diarize(audio)`.
  *   3. Renders the returned speaker segments (start / end / speaker) as a list.
  *
  * All inference and model routing live in the SDK / C++ commons. This view is
@@ -20,14 +20,18 @@
  */
 
 import type { TabLifecycle } from '../app';
-import { ModelCategory, RunAnywhere } from '@runanywhere/web';
-import { AudioCapture, AudioFileLoader } from '@runanywhere/web/browser';
-import { onModelStateChange, openSheet } from '../components/model-selection';
 import {
-  DiarizationAudioEncoding,
+  ModelCategory,
+  RunAnywhere,
   type DiarizationResult,
-  type DiarizationSegment,
-} from '@runanywhere/proto-ts/diarization';
+  type SpeakerSegment,
+} from '@runanywhere/web';
+import { AudioCapture, AudioFileLoader } from '@runanywhere/web/browser';
+import {
+  findLoadedModelForCategory,
+  onModelStateChange,
+  openSheet,
+} from '../components/model-selection';
 import { escapeHtml } from '../services/escape-html';
 import { formatError } from '../services/format-error';
 
@@ -105,7 +109,7 @@ function renderView(): void {
         </ul>
         <p class="text-secondary">
           No browser diarization engine or model ships in this build, so the picker
-          above stays empty and <code>RunAnywhere.diarize</code> cannot be run here yet.
+          above stays empty and <code>RunAnywhere.diarization.diarize</code> cannot be run here yet.
           This flow lights up automatically once a browser engine registers a
           <code>.speakerDiarization</code> model; until then, run diarization from a
           native RunAnywhere app.
@@ -131,7 +135,7 @@ function renderView(): void {
       <div class="docs-section">
         <h3>Diarize</h3>
         <p class="text-secondary">
-          Runs <code>RunAnywhere.diarize(request)</code> on the loaded
+          Runs <code>RunAnywhere.diarization.diarize(audio)</code> on the loaded
           <code>.speakerDiarization</code> model and lists the speaker segments.
         </p>
         <div class="toolbar-actions">
@@ -267,20 +271,14 @@ async function onRun(): Promise<void> {
   renderView();
 
   try {
-    const result = await RunAnywhere.diarize({
-      audioData: floatSamplesToBytes(audio.samples),
-      options: {
-        sampleRateHz: SAMPLE_RATE,
-        channelCount: 1,
-        encoding: DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE,
-        minimumDurationMs: 0,
-        mergeGapMs: 0,
-      },
-    });
+    const startedAt = performance.now();
+    const result = await RunAnywhere.diarization.diarize(
+      RunAnywhere.AudioInput.float32(audio.samples, SAMPLE_RATE),
+    );
     lastResult = result;
     setStatus(
       `Done — ${result.speakerCount} speakers, ${result.segments.length} segments in ` +
-        `${Math.round(result.processingTimeMs)}ms (${escapeHtml(result.modelId)}).`,
+        `${Math.round(performance.now() - startedAt)}ms.`,
     );
   } catch (err) {
     setStatus(`Diarization failed: ${formatError(err)}`);
@@ -288,13 +286,6 @@ async function onRun(): Promise<void> {
     isBusy = false;
     renderView();
   }
-}
-
-/** Pack a Float32Array of PCM samples into little-endian F32 bytes. */
-function floatSamplesToBytes(samples: Float32Array): Uint8Array {
-  const bytes = new Uint8Array(samples.length * 4);
-  new Float32Array(bytes.buffer).set(samples);
-  return bytes;
 }
 
 // ---------------------------------------------------------------------------
@@ -320,11 +311,11 @@ function buildSegmentSummary(result: DiarizationResult): HTMLElement {
   const list = document.createElement('ul');
   list.className = 'feature-unavailable__list';
   const sorted = [...result.segments].sort(
-    (a: DiarizationSegment, b: DiarizationSegment) => a.startMs - b.startMs,
+    (a: SpeakerSegment, b: SpeakerSegment) => a.startMs - b.startMs,
   );
   for (const segment of sorted) {
     const item = document.createElement('li');
-    const speaker = segment.speakerId || `Speaker ${segment.speakerIndex + 1}`;
+    const speaker = segment.speakerId;
     const duration = ((segment.endMs - segment.startMs) / 1000).toFixed(1);
     item.innerHTML =
       `<strong>${escapeHtml(speaker)}</strong> — ${formatMs(segment.startMs)} → ` +
@@ -340,15 +331,7 @@ function buildSegmentSummary(result: DiarizationResult): HTMLElement {
 // ---------------------------------------------------------------------------
 
 function isDiarizationModelLoaded(): boolean {
-  try {
-    const current = RunAnywhere.currentModel({
-      category: ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION,
-      includeModelMetadata: false,
-    });
-    return Boolean(current?.found || current?.modelId);
-  } catch {
-    return false;
-  }
+  return findLoadedModelForCategory(ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION) !== null;
 }
 
 function formatMs(ms: number): string {

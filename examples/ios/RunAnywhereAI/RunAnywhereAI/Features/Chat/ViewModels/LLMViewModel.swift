@@ -79,6 +79,9 @@ final class LLMViewModel {
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
     var preparedDocumentRAGPipelineKey: ChatDocumentRAGPipelineKey?
+    /// RAG session backing the chat's document questions. Held open across turns
+    /// for the same document/model triple and closed before a new one opens.
+    var documentRAGSession: RagSession?
     /// TTFT (ms) reported by the SDK event bus for the generation in flight.
     /// The event carries an SDK-side generation id the app never sees on the
     /// result, so the single-generation-at-a-time chat keeps the latest value
@@ -195,11 +198,12 @@ final class LLMViewModel {
     /// to unwind. `stopGeneration()` (same conversation, wants its partial
     /// persisted) deliberately leaves both untouched.
     func cancelActiveGeneration() {
+        // Cancelling the consuming task terminates the SDK stream, which forwards
+        // the cancellation to the native layer.
         generationTask?.cancel()
         activeGenerationID = nil
         generatingConversationId = nil
         setIsGenerating(false)
-        Task { await RunAnywhere.cancelGeneration() }
     }
 
     func clearMessages() {
@@ -388,12 +392,12 @@ final class LLMViewModel {
 
     private func performGeneration(
         prompt: String,
-        options: RALLMGenerationOptions,
+        options: LlmOptions,
         messageIndex: Int,
         generationID: UUID?
     ) async throws {
         // Check if tool calling is enabled and we have registered tools
-        let registeredTools = await RunAnywhere.getRegisteredTools()
+        let registeredTools = await RunAnywhere.llm.tools.list()
         let shouldUseToolCalling = useToolCalling && !registeredTools.isEmpty
 
         if shouldUseToolCalling {
@@ -446,17 +450,13 @@ final class LLMViewModel {
     }
 
     func stopGeneration() {
-        // Cancel cooperatively and stop the SDK, but do NOT flip `isGenerating`
-        // here: cancellation is async, so the in-flight generation keeps
-        // unwinding. Its own `finalizeGeneration` owns the true->false
-        // transition, which keeps `canSend` false until the stream has actually
-        // stopped — otherwise a second `sendMessage()` could start and overlap
-        // the still-running generation on the single-callback LLM component.
+        // Cancel cooperatively, but do NOT flip `isGenerating` here: cancellation
+        // is async, so the in-flight generation keeps unwinding. Its own
+        // `finalizeGeneration` owns the true->false transition, which keeps
+        // `canSend` false until the stream has actually stopped — otherwise a
+        // second `sendMessage()` could start and overlap the still-running
+        // generation on the single-callback LLM component.
         generationTask?.cancel()
-
-        Task {
-            await RunAnywhere.cancelGeneration()
-        }
     }
 
     func createNewConversation() {
@@ -538,7 +538,10 @@ final class LLMViewModel {
 
     func refreshLoraAdapters() async {
         do {
-            let state = try await RunAnywhere.lora.list()
+            // `lora.state()` rather than `lora.list()`: the adapter rows key on the
+            // on-disk adapter path (remove, example prompts), which `LoraState`
+            // does not carry.
+            let state = try await RunAnywhere.lora.state()
             try handleLoraState(state)
         } catch {
             logger.error("Failed to refresh LoRA adapters: \(error)")
@@ -672,7 +675,7 @@ final class LLMViewModel {
         }
     }
 
-    private func getGenerationOptions() -> RALLMGenerationOptions {
+    private func getGenerationOptions() -> LlmOptions {
         // Use object(forKey:) to distinguish an unset key (nil) from a value explicitly set to 0.0
         let savedTemperature = UserDefaults.standard.object(forKey: "defaultTemperature") as? Double
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
@@ -701,28 +704,20 @@ final class LLMViewModel {
             """
         )
 
-        var options = RALLMGenerationOptions.defaults()
-        options.maxOutputTokens = Int32(effectiveSettings.maxTokens)
+        var options = LlmOptions()
+        options.maxOutputTokens = effectiveSettings.maxTokens
         options.temperature = Float(effectiveSettings.temperature)
-        if let effectiveSystemPrompt {
-            options.systemPrompt = effectiveSystemPrompt
-        }
+        options.systemPrompt = effectiveSystemPrompt
         // Structured reasoning control — commons applies the model's no-think
         // directive; the app never injects control tokens into prompts. Chat
         // document attachments use the same gate before calling the SDK RAG
         // pipeline. Thought tokens only reach the UI when includeInOutput is set.
-        var reasoning = RAReasoningOptions()
+        // `pattern` stays nil so the SDK uses the loaded model's own thinking tags.
+        var reasoning = ReasoningOptions()
         if loadedModelSupportsThinking && !thinkingModeEnabled {
             reasoning.mode = .off
         }
         reasoning.includeInOutput = thinkingModeEnabled
-        if let currentModel = ModelListViewModel.shared.currentModel, currentModel.supportsThinking {
-            reasoning.pattern = currentModel.hasThinkingPattern
-                ? currentModel.thinkingPattern
-                : .defaultPattern
-        } else if loadedModelSupportsThinking {
-            reasoning.pattern = .defaultPattern
-        }
         options.reasoning = reasoning
         return options
     }

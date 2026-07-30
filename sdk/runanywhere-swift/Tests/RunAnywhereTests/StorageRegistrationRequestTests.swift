@@ -11,11 +11,18 @@ import XCTest
 
 final class StorageRegistrationRequestTests: XCTestCase {
     func testMultiFileRegistrationPublicSurfaceAppendsDownloadSize() {
-        let register:
-            ([RAModelFileDescriptor], String, String, InferenceFramework, ModelCategory,
-             Int64?, Int?, Bool, RAModelSource, Int64?) async throws -> RAModelInfo =
-            RunAnywhere.registerModel
+        let register: (ModelRegistration) async throws -> ModelInfo =
+            RunAnywhere.models.register
 
+        let registration = ModelRegistration.multiFile(
+            [],
+            id: "multi-file-model",
+            name: "Multi File Model",
+            framework: .onnx,
+            downloadSizeBytes: 1_110_024_519
+        )
+
+        XCTAssertEqual(registration.downloadSizeBytes, 1_110_024_519)
         _ = register
     }
 

@@ -22,12 +22,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { RunAnywhere } from '@runanywhere/core';
-import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+import { AudioInputs, RunAnywhere, formatFramework } from '@runanywhere/core';
+import type { GenerationResult } from '@runanywhere/core';
 import {
   ModelCategory,
-  ModelLoadRequest,
-  ModelUnloadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import { Icon, useTheme } from '../theme/system';
@@ -90,20 +88,12 @@ const LLM_PROMPT =
   'mechanisms, and training procedures. Be as thorough as possible.';
 
 async function unloadCategory(category: ModelCategory): Promise<void> {
-  await RunAnywhere.unloadModel(ModelUnloadRequest.fromPartial({ category }));
+  await RunAnywhere.models.unload(category);
 }
 
-async function loadBenchmarkModel(
-  model: SDKModelInfo,
-  category: ModelCategory
-): Promise<number> {
+async function loadBenchmarkModel(model: SDKModelInfo): Promise<number> {
   const loadStart = Date.now();
-  const result = await RunAnywhere.loadModel(
-    ModelLoadRequest.fromPartial({ modelId: model.id, category })
-  );
-  if (!result.success) {
-    throw new Error(result.errorMessage || `Failed to load ${model.id}`);
-  }
+  await RunAnywhere.models.load(model.id);
   return Date.now() - loadStart;
 }
 
@@ -112,46 +102,51 @@ async function runLLMScenario(
   maxTokens: number
 ): Promise<{ loadTimeMs: number; metricSummary: string }> {
   await unloadCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE);
-  const loadTimeMs = await loadBenchmarkModel(
-    model,
-    ModelCategory.MODEL_CATEGORY_LANGUAGE
-  );
+  const loadTimeMs = await loadBenchmarkModel(model);
   try {
-    const warmupEvents = RunAnywhere.generateStream(
-      'Hello',
-      LLMGenerationOptions.fromPartial({ maxOutputTokens: 5, temperature: 0 })
-    );
+    const warmupEvents = RunAnywhere.llm.generateStream('Hello', {
+      maxOutputTokens: 5,
+      temperature: 0,
+    });
     // Manual iteration — Hermes doesn't support for-await over Nitro iterables.
     const warmupIter = warmupEvents[Symbol.asyncIterator]();
     let warmupStep = await warmupIter.next();
     while (!warmupStep.done) {
-      if (warmupStep.value.isFinal) break;
+      if (warmupStep.value.type === 'completed') break;
       warmupStep = await warmupIter.next();
     }
     await warmupIter.return?.();
 
     const benchStart = Date.now();
-    const events = RunAnywhere.generateStream(
-      LLM_PROMPT,
-      LLMGenerationOptions.fromPartial({
-        maxOutputTokens: maxTokens,
-        temperature: 0,
-        systemPrompt: LLM_SYSTEM_PROMPT,
-      })
-    );
-    const result = await RunAnywhere.aggregateStream(LLM_PROMPT, events);
-    const wallMs = Date.now() - benchStart;
-    const generationMs =
-      result.generationTimeMs > 0 ? result.generationTimeMs : wallMs;
-
-    const parts = [`${generationMs.toFixed(0)} ms total`];
-    if (result.ttftMs !== undefined && result.ttftMs > 0) {
-      parts.push(`TTFT ${result.ttftMs.toFixed(0)} ms`);
+    const events = RunAnywhere.llm.generateStream(LLM_PROMPT, {
+      maxOutputTokens: maxTokens,
+      temperature: 0,
+      systemPrompt: LLM_SYSTEM_PROMPT,
+    });
+    const iterator = events[Symbol.asyncIterator]();
+    let result: GenerationResult | null = null;
+    try {
+      let step = await iterator.next();
+      while (!step.done) {
+        if (step.value.type === 'completed') {
+          result = step.value.result;
+          break;
+        }
+        step = await iterator.next();
+      }
+    } finally {
+      await iterator.return?.();
     }
-    if (result.tokensPerSecond > 0) {
+    const wallMs = Date.now() - benchStart;
+
+    const parts = [`${wallMs.toFixed(0)} ms total`];
+    if (result && result.timeToFirstTokenMs > 0) {
+      parts.push(`TTFT ${result.timeToFirstTokenMs.toFixed(0)} ms`);
+    }
+    if (result && result.tokensPerSecond > 0) {
       parts.push(`${result.tokensPerSecond.toFixed(1)} tok/s`);
     }
-    if (result.outputTokens > 0) {
+    if (result && result.outputTokens > 0) {
       parts.push(`${result.outputTokens} tokens`);
     }
     return { loadTimeMs, metricSummary: parts.join(' · ') };
@@ -164,10 +159,7 @@ async function runSTTScenario(
   model: SDKModelInfo,
   type: 'silent' | 'sine'
 ): Promise<{ loadTimeMs: number; metricSummary: string }> {
-  const loadTimeMs = await loadBenchmarkModel(
-    model,
-    ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-  );
+  const loadTimeMs = await loadBenchmarkModel(model);
   try {
     const durationSeconds = type === 'silent' ? 2 : 3;
     const wav =
@@ -176,14 +168,17 @@ async function runSTTScenario(
         : sineWaveAudioWav(durationSeconds);
 
     const benchStart = Date.now();
-    const result = await RunAnywhere.transcribe(wav, { language: 'en' });
+    await RunAnywhere.stt.transcribe(AudioInputs.wav(wav), { language: 'en' });
     const latencyMs = Date.now() - benchStart;
 
-    const parts = [`${latencyMs.toFixed(0)} ms`, `${durationSeconds}s audio`];
-    const rtf = result.metadata?.realTimeFactor ?? 0;
-    if (rtf > 0) {
-      parts.push(`RTF ${rtf.toFixed(2)}`);
-    }
+    // The SDK no longer reports a real-time factor, so derive it from the
+    // measured wall latency over the known synthetic audio duration.
+    const rtf = latencyMs / (durationSeconds * 1000);
+    const parts = [
+      `${latencyMs.toFixed(0)} ms`,
+      `${durationSeconds}s audio`,
+      `RTF ${rtf.toFixed(2)}`,
+    ];
     return { loadTimeMs, metricSummary: parts.join(' · ') };
   } finally {
     await unloadCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION);
@@ -201,22 +196,18 @@ async function runTTSScenario(
   model: SDKModelInfo,
   length: 'short' | 'medium'
 ): Promise<{ loadTimeMs: number; metricSummary: string }> {
-  const loadTimeMs = await loadBenchmarkModel(
-    model,
-    ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-  );
+  const loadTimeMs = await loadBenchmarkModel(model);
   try {
     const text = TTS_TEXTS[length];
     const benchStart = Date.now();
-    const result = await RunAnywhere.synthesize(text);
+    const result = await RunAnywhere.tts.synthesize(text);
     const latencyMs = Date.now() - benchStart;
 
     const parts = [`${latencyMs.toFixed(0)} ms`];
     if (result.durationMs > 0) {
       parts.push(`${(result.durationMs / 1000).toFixed(1)}s audio`);
     }
-    const charCount = result.metadata?.characterCount ?? text.length;
-    parts.push(`${charCount} chars`);
+    parts.push(`${text.length} chars`);
     return { loadTimeMs, metricSummary: parts.join(' · ') };
   } finally {
     await unloadCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
@@ -283,7 +274,6 @@ export const BenchmarkScreen: React.FC = () => {
   const refreshModels = useCallback(async () => {
     setError(null);
     try {
-      await RunAnywhere.refreshModelRegistry();
       const allModels = await listVisibleCatalogModels();
       const grouped: Record<BenchmarkCategory, SDKModelInfo[]> = { LLM: [], STT: [], TTS: [] };
       for (const category of ALL_CATEGORIES) {
@@ -573,7 +563,7 @@ export const BenchmarkScreen: React.FC = () => {
                               { color: frameworkColor },
                             ]}
                           >
-                            {RunAnywhere.formatFramework(framework)}
+                            {formatFramework(framework)}
                           </Text>
                         </View>
                       </View>

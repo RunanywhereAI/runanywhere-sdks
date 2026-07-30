@@ -1031,8 +1031,8 @@ TestResult test_diarize_arg_surface() {
     return result;
   }
   if (cmd->get_description() !=
-      "Speaker diarization of a WAV file (who spoke when)") {
-    result.expected = "Speaker diarization of a WAV file (who spoke when)";
+      "Label who spoke when in an audio file") {
+    result.expected = "Label who spoke when in an audio file";
     result.actual = cmd->get_description();
     return result;
   }

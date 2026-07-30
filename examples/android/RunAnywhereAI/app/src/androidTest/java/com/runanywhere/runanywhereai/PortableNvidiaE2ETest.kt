@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai
 
 import ai.runanywhere.proto.v1.DownloadStage
 import ai.runanywhere.proto.v1.DownloadState
+import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -10,9 +11,10 @@ import com.runanywhere.runanywhereai.data.ModelCatalog
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.api.embeddings
+import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.downloadModel
-import com.runanywhere.sdk.public.extensions.embeddings
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.transcribe
@@ -216,13 +218,14 @@ class PortableNvidiaE2ETest {
         val negative = "passage: The Pacific Ocean is the largest ocean on Earth."
         try {
             val firstStarted = System.currentTimeMillis()
-            val queryVector = embedOne(query, modelId)
-            // The first call carries the lazy load, so report it separately from steady-state.
+            RunAnywhere.models.load(modelId)
+            val queryVector = embedOne(query)
+            // The load is explicit in v3, so this span still covers load + first embed.
             fields["firstEmbedMsIncludingLoad"] = (System.currentTimeMillis() - firstStarted).toString()
             fields["memAvailKbAfterLoad"] = memAvailableKb().toString()
             val warmStarted = System.currentTimeMillis()
-            val positiveVector = embedOne(positive, modelId)
-            val negativeVector = embedOne(negative, modelId)
+            val positiveVector = embedOne(positive)
+            val negativeVector = embedOne(negative)
             fields["twoWarmEmbedsMs"] = (System.currentTimeMillis() - warmStarted).toString()
 
             val vectors = listOf(queryVector, positiveVector, negativeVector)
@@ -237,7 +240,11 @@ class PortableNvidiaE2ETest {
             check(vectors.all { v -> v.all(Float::isFinite) }) { "non-finite embedding value" }
             check(positiveCosine > negativeCosine) { "distractor outranked the related passage" }
         } finally {
-            runCatching { withTimeout(300_000) { RunAnywhere.embeddings.unload() } }
+            runCatching {
+                withTimeout(300_000) {
+                    RunAnywhere.models.unload(ModelCategory.MODEL_CATEGORY_EMBEDDING)
+                }
+            }
         }
     }
 
@@ -307,12 +314,10 @@ class PortableNvidiaE2ETest {
         }
     }
 
-    private suspend fun embedOne(text: String, modelId: String): FloatArray =
-        withTimeout(600_000) { RunAnywhere.embeddings.embed(text, modelId) }
-            .vectors
+    private suspend fun embedOne(text: String): FloatArray =
+        withTimeout(600_000) { RunAnywhere.embeddings.embed(listOf(text)) }
             .single()
-            .values
-            .toFloatArray()
+            .vector
 
     private fun readPcm(args: android.os.Bundle): ByteArray {
         args.getString("pcmPath")?.takeIf { it.isNotBlank() }?.let { return File(it).readBytes() }

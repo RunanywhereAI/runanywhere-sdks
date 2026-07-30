@@ -1,6 +1,6 @@
 package com.runanywhere.runanywhereai.ui.screens.rag
 
-import ai.runanywhere.proto.v1.ReasoningMode
+import com.runanywhere.sdk.public.api.ReasoningMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -9,18 +9,13 @@ import org.junit.Test
 class RagGenerationPolicyTest {
     @Test
     fun `production options are concise deterministic and disable thinking`() {
-        val options = RagGenerationPolicy.options("What is the total?", multiQueryEnabled = true)
+        val options = RagGenerationPolicy.options()
 
-        val generation = requireNotNull(options.generation)
-        assertEquals(192, generation.max_output_tokens)
-        assertEquals(0.0f, generation.temperature)
-        assertEquals(1.0f, generation.top_p)
-        assertEquals(0, generation.top_k)
-        assertEquals("What is the total?", options.question)
-        assertEquals(ReasoningMode.REASONING_MODE_OFF, generation.reasoning?.mode)
-        assertTrue(options.enable_multi_query)
-        assertFalse(options.stream)
-        assertTrue(generation.system_prompt.orEmpty().contains("at most three concise sentences"))
+        assertEquals(192, options.maxOutputTokens)
+        assertEquals(0.0f, options.temperature)
+        assertEquals(1.0f, options.topP)
+        assertEquals(ReasoningMode.OFF, options.reasoning?.mode)
+        assertTrue(options.systemPrompt.orEmpty().contains("at most three concise sentences"))
     }
 
     @Test

@@ -12,7 +12,6 @@ import {
 } from '@runanywhere/proto-ts/tts_options';
 import { TTSProtoAdapter } from '../../../../src/Adapters/TTSProtoAdapter';
 import type { ModalityProtoModule } from '../../../../src/Adapters/ProtoAdapterTypes';
-import { flatFacade } from '../../../../src/Public/Extensions/RunAnywhere+FlatFacade';
 import {
   synthesize,
   TTS,
@@ -153,7 +152,7 @@ describe('lifecycle-owned Web TTS', () => {
     expect(TTS.listLoadedVoices()).toEqual([
       expect.objectContaining({ id: 'piper-en-us', displayName: 'Piper US' }),
     ]);
-    expect(flatFacade.stopSpeaking()).toBe(true);
+    expect(TTS.stopLoaded()).toBe(true);
     expect(harness.counters).toMatchObject({
       lifecycleVoiceLists: 1,
       lifecycleStops: 1,

@@ -21,6 +21,13 @@ test('unary methods are NOT marked streaming', () => {
   }
 });
 
-test('the streaming set has exactly three members', () => {
-  assert.equal(STREAMING_METHODS.size, 3);
+test('the streaming set is the three pre-v3 methods plus every v3 streaming op', () => {
+  const { BACKEND_STREAMING_METHODS, rpcMethodFor } = require('../../dist/api/backend');
+  const expected = new Set([
+    'generate',
+    'generateVlm',
+    'downloadModel',
+    ...[...BACKEND_STREAMING_METHODS].map(rpcMethodFor),
+  ]);
+  assert.deepEqual(new Set(STREAMING_METHODS), expected);
 });

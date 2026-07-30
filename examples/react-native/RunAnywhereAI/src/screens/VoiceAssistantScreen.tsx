@@ -17,20 +17,14 @@ import {
 } from '../components/model';
 import type { VoiceConversationEntry } from '../types/voice';
 import { VoicePipelineStatus } from '../types/voice';
-import { RunAnywhere, VoiceAgentMicDriver } from '@runanywhere/core';
-import type {
-  VoiceAgentMicTurn,
-  VoiceAgentMicPhase,
-} from '@runanywhere/core';
+import { RunAnywhere } from '@runanywhere/core';
+import type { VoiceEvent, VoiceSession } from '@runanywhere/core';
 import {
   ModelCategory,
-  ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
 import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
-
-const loadModelWithRequest = RunAnywhere.loadModel;
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
 
@@ -51,21 +45,23 @@ export const VoiceAssistantScreen: React.FC = () => {
   const [activeSelectionContext, setActiveSelectionContext] =
     useState<ModelSelectionContext>(ModelSelectionContext.STT);
 
-  const micDriverRef = useRef<VoiceAgentMicDriver | null>(null);
+  const sessionRef = useRef<VoiceSession | null>(null);
+  const eventsRef = useRef<AsyncIterator<VoiceEvent> | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
-  // VAD is optional: the voice agent auto-ensures Silero VAD when none is picked.
-  const allModelsLoaded = sttModel && llmModel && ttsModel;
+  // VAD is optional: the session auto-ensures Silero VAD when none is picked.
+  const allModelsSelected = sttModel && llmModel && ttsModel;
 
   const cleanupVoiceSession = useCallback(async () => {
-    if (micDriverRef.current) {
-      micDriverRef.current.stop();
-      micDriverRef.current = null;
-    }
+    const iterator = eventsRef.current;
+    eventsRef.current = null;
+    await iterator?.return?.().catch(() => undefined);
+    const session = sessionRef.current;
+    sessionRef.current = null;
     try {
-      await RunAnywhere.cleanupVoiceAgent();
+      await session?.close();
     } catch (error) {
-      console.warn('[VoiceAssistant] cleanupVoiceAgent failed:', error);
+      console.warn('[VoiceAssistant] session close failed:', error);
     }
   }, []);
 
@@ -97,63 +93,87 @@ export const VoiceAssistantScreen: React.FC = () => {
     }
   };
 
+  // Seed each empty slot from whatever is already resident; an explicit pick
+  // always wins, since the session (not this screen) loads the models.
   const checkModelStatus = async () => {
     try {
       const [loadedSTT, loadedLLM, loadedTTS, loadedVAD] = await Promise.all([
-        RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
-        RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_LANGUAGE),
-        RunAnywhere.modelInfoForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
-        RunAnywhere.modelInfoForCategory(
-          ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-        ).catch(() => null),
+        RunAnywhere.models.loaded(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
+        RunAnywhere.models.loaded(ModelCategory.MODEL_CATEGORY_LANGUAGE),
+        RunAnywhere.models.loaded(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
+        RunAnywhere.models
+          .loaded(ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION)
+          .catch(() => null),
       ]);
-      setSTTModel(visibleNativeNpuCatalogModelOrNull(loadedSTT));
-      setLLMModel(visibleNativeNpuCatalogModelOrNull(loadedLLM));
-      setTTSModel(visibleNativeNpuCatalogModelOrNull(loadedTTS));
-      setVADModel(visibleNativeNpuCatalogModelOrNull(loadedVAD));
+      setSTTModel((prev) => prev ?? visibleNativeNpuCatalogModelOrNull(loadedSTT));
+      setLLMModel((prev) => prev ?? visibleNativeNpuCatalogModelOrNull(loadedLLM));
+      setTTSModel((prev) => prev ?? visibleNativeNpuCatalogModelOrNull(loadedTTS));
+      setVADModel((prev) => prev ?? visibleNativeNpuCatalogModelOrNull(loadedVAD));
     } catch (error) {
       console.warn('[VoiceAssistant] Error checking model status:', error);
     }
   };
 
-  // Map the mic driver's coarse phase to the UI pipeline status.
-  const phaseToStatus = useCallback((phase: VoiceAgentMicPhase) => {
-    switch (phase) {
-      case 'listening':
-        setStatus(VoicePipelineStatus.Listening);
-        break;
-      case 'processing':
-        setStatus(VoicePipelineStatus.Processing);
-        break;
-      case 'speaking':
-        setStatus(VoicePipelineStatus.Speaking);
-        break;
-    }
-  }, []);
+  const appendEntry = useCallback(
+    (speaker: 'user' | 'assistant', text: string) => {
+      if (text.length === 0) return;
+      setConversation((prev) => [
+        ...prev,
+        { id: generateId(), speaker, text, timestamp: new Date() },
+      ]);
+    },
+    []
+  );
 
-  // Append a finished turn as distinct user + assistant conversation bubbles.
-  const appendTurn = useCallback((turn: VoiceAgentMicTurn) => {
-    setConversation((prev) => {
-      const next = [...prev];
-      if (turn.userText.length > 0) {
-        next.push({
-          id: generateId(),
-          speaker: 'user',
-          text: turn.userText,
-          timestamp: new Date(),
-        });
+  const applyEvent = useCallback(
+    (event: VoiceEvent) => {
+      switch (event.type) {
+        case 'userTranscribed':
+          if (event.isFinal) appendEntry('user', event.text);
+          break;
+        case 'agentResponse':
+          appendEntry('assistant', event.text);
+          break;
+        case 'agentStateChanged':
+          setStatus(
+            event.state === 'listening'
+              ? VoicePipelineStatus.Listening
+              : event.state === 'thinking'
+                ? VoicePipelineStatus.Thinking
+                : VoicePipelineStatus.Speaking
+          );
+          break;
+        case 'error':
+          console.error('[VoiceAssistant] Voice error:', event.message);
+          setStatus(VoicePipelineStatus.Error);
+          setTimeout(() => setStatus(VoicePipelineStatus.Listening), 2000);
+          break;
+        default:
+          break;
       }
-      if (turn.assistantText.length > 0) {
-        next.push({
-          id: generateId(),
-          speaker: 'assistant',
-          text: turn.assistantText,
-          timestamp: new Date(),
-        });
+    },
+    [appendEntry]
+  );
+
+  // Hermes cannot `for await` a Nitro async iterable — drive it by hand.
+  const consumeEvents = useCallback(
+    async (session: VoiceSession) => {
+      const iterator = session.events[Symbol.asyncIterator]();
+      eventsRef.current = iterator;
+      try {
+        let step = await iterator.next();
+        while (!step.done) {
+          applyEvent(step.value);
+          step = await iterator.next();
+        }
+      } catch (error) {
+        if (eventsRef.current === iterator) {
+          console.warn('[VoiceAssistant] Voice event stream ended:', error);
+        }
       }
-      return next;
-    });
-  }, []);
+    },
+    [applyEvent]
+  );
 
   const handleToggleSession = useCallback(async () => {
     if (status === VoicePipelineStatus.Processing || status === VoicePipelineStatus.Thinking) {
@@ -165,50 +185,40 @@ export const VoiceAssistantScreen: React.FC = () => {
       setStatus(VoicePipelineStatus.Idle);
       return;
     }
-    if (!allModelsLoaded) {
+    if (!sttModel || !llmModel || !ttsModel) {
       Alert.alert(
         'Models Required',
-        'Please load all required models (STT, LLM, TTS) to use the voice assistant.'
+        'Please select all required models (STT, LLM, TTS) to use the voice assistant.'
       );
       return;
     }
     try {
-      // Compose the pipeline against the loaded models. ensureVAD defaults to
-      // true → loads silero-vad so the C++ agent uses the model VAD.
-      await RunAnywhere.initializeVoiceAgentWithLoadedModels();
-
-      // The mic driver is the audio ingress: it captures, endpoints, runs each
-      // utterance through processVoiceTurn (VAD→STT→LLM→TTS), surfaces the
-      // turn, and plays the synthesized reply. (streamVoiceAgent alone is dead
-      // air — the C ABI owns no microphone.)
-      const driver = new VoiceAgentMicDriver();
-      micDriverRef.current = driver;
-      const started = await driver.start({
-        onTurn: appendTurn,
-        onPhase: phaseToStatus,
-        onError: (err) => {
-          console.error('[VoiceAssistant] Voice turn error:', err);
-          setStatus(VoicePipelineStatus.Error);
-          setTimeout(() => setStatus(VoicePipelineStatus.Listening), 2000);
-        },
+      const session = await RunAnywhere.voice.createSession({
+        stt: { id: sttModel.id },
+        llm: { id: llmModel.id },
+        tts: { id: ttsModel.id },
+        ...(vadModel ? { vad: { model: vadModel.id } } : {}),
       });
-      if (!started) {
-        micDriverRef.current = null;
-        await cleanupVoiceSession();
-        Alert.alert(
-          'Microphone needed',
-          'Grant microphone permission to use the voice assistant.'
-        );
-        return;
-      }
+      sessionRef.current = session;
+      void consumeEvents(session);
+      await session.start();
       setIsSessionActive(true);
       setStatus(VoicePipelineStatus.Listening);
     } catch (error) {
-      console.error('[VoiceAssistant] Failed to start voice agent:', error);
+      console.error('[VoiceAssistant] Failed to start voice session:', error);
       await cleanupVoiceSession();
-      Alert.alert('Error', `Failed to start voice agent: ${error}`);
+      Alert.alert('Error', `Failed to start voice assistant: ${error}`);
     }
-  }, [isSessionActive, allModelsLoaded, status, appendTurn, phaseToStatus, cleanupVoiceSession]);
+  }, [
+    isSessionActive,
+    status,
+    sttModel,
+    llmModel,
+    ttsModel,
+    vadModel,
+    consumeEvents,
+    cleanupVoiceSession,
+  ]);
 
   const getSelectionContext = (type: 'stt' | 'llm' | 'tts' | 'vad'): ModelSelectionContext => {
     switch (type) {
@@ -231,95 +241,19 @@ export const VoiceAssistantScreen: React.FC = () => {
         Alert.alert('Error', 'Model has not been downloaded. Open the model picker to download it first.');
         return;
       }
-      try {
-        switch (activeSelectionContext) {
-          case ModelSelectionContext.STT: {
-            const result = await loadModelWithRequest(
-              ModelLoadRequest.fromPartial({
-                modelId: model.id,
-                category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-                forceReload: false,
-                validateAvailability: true,
-              })
-            );
-            if (result.success) {
-              const loaded = await RunAnywhere.modelInfoForCategory(
-                ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-              ).catch(() => null);
-              setSTTModel(
-                visibleNativeNpuCatalogModelOrNull(loaded) ?? model
-              );
-            } else {
-              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
-            }
-            break;
-          }
-          case ModelSelectionContext.LLM: {
-            const result = await loadModelWithRequest(
-              ModelLoadRequest.fromPartial({
-                modelId: model.id,
-                category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-                forceReload: false,
-                validateAvailability: true,
-              })
-            );
-            if (result.success) {
-              const loaded = await RunAnywhere.modelInfoForCategory(
-                ModelCategory.MODEL_CATEGORY_LANGUAGE
-              ).catch(() => null);
-              setLLMModel(
-                visibleNativeNpuCatalogModelOrNull(loaded) ?? model
-              );
-            } else {
-              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
-            }
-            break;
-          }
-          case ModelSelectionContext.TTS: {
-            const result = await loadModelWithRequest(
-              ModelLoadRequest.fromPartial({
-                modelId: model.id,
-                category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-                forceReload: false,
-                validateAvailability: true,
-              })
-            );
-            if (result.success) {
-              const loaded = await RunAnywhere.modelInfoForCategory(
-                ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-              ).catch(() => null);
-              setTTSModel(
-                visibleNativeNpuCatalogModelOrNull(loaded) ?? model
-              );
-            } else {
-              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
-            }
-            break;
-          }
-          case ModelSelectionContext.VAD: {
-            const result = await loadModelWithRequest(
-              ModelLoadRequest.fromPartial({
-                modelId: model.id,
-                category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-                forceReload: false,
-                validateAvailability: true,
-              })
-            );
-            if (result.success) {
-              const loaded = await RunAnywhere.modelInfoForCategory(
-                ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-              ).catch(() => null);
-              setVADModel(
-                visibleNativeNpuCatalogModelOrNull(loaded) ?? model
-              );
-            } else {
-              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
-            }
-            break;
-          }
-        }
-      } catch (error) {
-        Alert.alert('Error', `Failed to load model: ${error}`);
+      switch (activeSelectionContext) {
+        case ModelSelectionContext.STT:
+          setSTTModel(model);
+          break;
+        case ModelSelectionContext.LLM:
+          setLLMModel(model);
+          break;
+        case ModelSelectionContext.TTS:
+          setTTSModel(model);
+          break;
+        case ModelSelectionContext.VAD:
+          setVADModel(model);
+          break;
       }
     },
     [activeSelectionContext]
@@ -330,7 +264,7 @@ export const VoiceAssistantScreen: React.FC = () => {
   }, []);
 
   const statusText = (): string => {
-    if (!isSessionActive) return allModelsLoaded ? 'Tap to talk' : 'Setup required';
+    if (!isSessionActive) return allModelsSelected ? 'Tap to talk' : 'Setup required';
     switch (status) {
       case VoicePipelineStatus.Listening: return 'Listening… speak, then pause — tap to stop';
       case VoicePipelineStatus.Processing: return 'Transcribing…';
@@ -342,7 +276,7 @@ export const VoiceAssistantScreen: React.FC = () => {
 
   const micButtonColor = (): string => {
     const starting = status === VoicePipelineStatus.Processing || status === VoicePipelineStatus.Thinking;
-    if (!allModelsLoaded && !isSessionActive) return colors.surfaceContainerHighest;
+    if (!allModelsSelected && !isSessionActive) return colors.surfaceContainerHighest;
     if (starting) return colors.secondary;
     if (status === VoicePipelineStatus.Listening) return colors.error;
     if (isSessionActive) return colors.secondary;
@@ -398,7 +332,7 @@ export const VoiceAssistantScreen: React.FC = () => {
         {conversation.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={[typography.bodyLarge, { color: colors.onSurfaceVariant, textAlign: 'center' }]}>
-              {allModelsLoaded
+              {allModelsSelected
                 ? 'Tap the mic and start talking'
                 : 'Pick a model for each step to begin'}
             </Text>

@@ -10,8 +10,8 @@ import os
 // MARK: - Model Catalog Bootstrap
 //
 // Mirrors Android `ModelBootstrap.seedCuratedCatalog` and Flutter
-// `_registerModulesAndModels()`. Uses the canonical `RunAnywhere.registerModel`
-// async public API including multi-file and archive-with-structure overloads.
+// `_registerModulesAndModels()`. Uses the canonical `RunAnywhere.models.register`
+// async public API including multi-file and archive-with-structure registrations.
 // Safe to re-run on every cold launch — commons merges runtime fields on
 // re-registration (see `register_model_from_url.cpp` header).
 enum ModelCatalogBootstrap {
@@ -1337,15 +1337,17 @@ enum ModelCatalogBootstrap {
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
         do {
-            _ = try await RunAnywhere.registerModel(
-                id: id,
-                name: name,
-                url: url,
-                framework: framework,
-                modality: modality,
-                memoryRequirement: memoryRequirement,
-                supportsThinking: supportsThinking,
-                supportsLora: supportsLora
+            _ = try await RunAnywhere.models.register(
+                .url(
+                    url,
+                    name: name,
+                    framework: framework,
+                    category: modality,
+                    id: id,
+                    memoryRequirementBytes: memoryRequirement,
+                    supportsThinking: supportsThinking,
+                    supportsLora: supportsLora
+                )
             )
         } catch {
             logger.warning("Failed to register model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
@@ -1364,15 +1366,17 @@ enum ModelCatalogBootstrap {
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
         do {
-            _ = try await RunAnywhere.registerModel(
-                archive: url,
-                structure: structure,
-                id: id,
-                name: name,
-                framework: framework,
-                modality: modality,
-                archiveType: archive,
-                memoryRequirement: memoryRequirement
+            _ = try await RunAnywhere.models.register(
+                .archive(
+                    url,
+                    structure: structure,
+                    name: name,
+                    framework: framework,
+                    category: modality,
+                    archiveType: archive,
+                    id: id,
+                    memoryRequirementBytes: memoryRequirement
+                )
             )
         } catch {
             logger.warning("Failed to register archive model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
@@ -1421,16 +1425,18 @@ enum ModelCatalogBootstrap {
             return
         }
         do {
-            _ = try await RunAnywhere.registerModel(
-                multiFile: descriptors,
-                id: id,
-                name: name,
-                framework: framework,
-                modality: modality,
-                memoryRequirement: memoryRequirement,
-                contextLength: contextLength,
-                supportsThinking: supportsThinking,
-                downloadSize: downloadSize
+            _ = try await RunAnywhere.models.register(
+                .multiFile(
+                    descriptors,
+                    id: id,
+                    name: name,
+                    framework: framework,
+                    category: modality,
+                    memoryRequirementBytes: memoryRequirement,
+                    downloadSizeBytes: downloadSize,
+                    contextLength: contextLength,
+                    supportsThinking: supportsThinking
+                )
             )
         } catch {
             logger.warning("Failed to register multi-file model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")

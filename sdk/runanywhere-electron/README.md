@@ -1,8 +1,8 @@
 # RunAnywhere Electron SDK
 
-On-device **LLM, VLM, STT, TTS, and embeddings** for Electron and Node on Windows. The SDK is a native N-API addon over the RunAnywhere `rac_*` C ABI and llama.cpp / ONNX Runtime / Sherpa-ONNX. Inference runs in an isolated Electron **utility process**, streaming results to the renderer over a `MessagePort`.
+On-device **LLM, VLM, STT, TTS, and embeddings** for Electron and Node. The SDK is a native N-API addon over the RunAnywhere `rac_*` C ABI and llama.cpp / ONNX Runtime / Sherpa-ONNX. Inference runs in an isolated Electron **utility process**, streaming results to the renderer over a `MessagePort`.
 
-> **Status:** Unpublished preview (`private: true`, version `0.1.0`). **Windows x64 only** — not available on npm. Build from source in this repository.
+> **Status:** Unpublished preview (`private: true`, version `0.1.0`), not on npm. Windows x64 and Linux x64 build and run; build from source in this repository.
 
 ## Capabilities
 
@@ -29,66 +29,95 @@ Prerequisites: MSVC, Node.js, and a `windows-release` build of `runanywhere-comm
 
 ## Quick start (Node)
 
-After building, require the local package from your app or the example:
+One `initialize` brings up the native runtime, the model store, and the secure
+store. Generation verbs load (and download) whatever `options.model` names, so
+there is nothing else to arrange.
 
 ```js
 const { RunAnywhere } = require('@runanywhere/electron');
 
-RunAnywhere.initialize();
-const llm = await RunAnywhere.loadLLM('qwen2.5-0.5b'); // catalog id or local path
-for await (const t of llm.generate('Explain on-device AI in one sentence.')) {
-  process.stdout.write(t);
+await RunAnywhere.initialize();
+
+for await (const event of RunAnywhere.llm.generateStream(
+  'Explain on-device AI in one sentence.',
+  { model: 'qwen2.5-0.5b' }        // catalog id, HuggingFace repo, URL, or local path
+)) {
+  if (event.type === 'token') process.stdout.write(event.text);
+  if (event.type === 'completed') console.log('\n', event.result.tokensPerSecond, 'tok/s');
 }
-llm.unload();
-RunAnywhere.shutdown();
+
+await RunAnywhere.reset();
 ```
 
-Point at a custom native build with `RUNANYWHERE_NATIVE_PATH` if you are not using `prebuilds/win32-x64/`.
+`apiKey` and `baseUrl` are accepted by `initialize` and currently ignored: this SDK
+has no control plane yet, so it does not authenticate, register a device, or report
+telemetry. `deviceId` is minted locally.
+
+Point at a custom native build with `RUNANYWHERE_NATIVE_PATH` if you are not using
+the bundled prebuild.
 
 ### Structured output
 
 ```js
-const person = await llm.generateStructured(
+const r = await RunAnywhere.llm.generateStructured(
   'Extract the person: "Ada Lovelace, 36, English mathematician."',
   {
-    schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
-        age: { type: 'integer' },
-        interests: { type: 'array', items: { type: 'string' }, maxItems: 5 },
-      },
-      required: ['name', 'age', 'interests'],
+    type: 'object',
+    properties: {
+      name: { type: 'string' },
+      age: { type: 'integer' },
+      interests: { type: 'array', items: { type: 'string' }, maxItems: 5 },
     },
+    required: ['name', 'age', 'interests'],
   }
 );
+console.log(r.value, r.valid);
 ```
 
 ### Tool calling
 
-```js
-const tools = [{
-  name: 'get_weather',
-  description: 'Current weather for a city',
-  parameters: {
-    type: 'object',
-    properties: { city: { type: 'string' } },
-    required: ['city'],
-  },
-  execute: ({ city }) => fetchWeather(city),
-}];
+Register a tool once, then generate. When the model picks it, the SDK runs the
+executor and continues the loop up to `options.maxToolCalls`.
 
-const run = await llm.generateWithTools('Weather in Tokyo?', tools);
-// { name, arguments, result }
+```js
+RunAnywhere.llm.tools.register(
+  {
+    name: 'get_weather',
+    description: 'Current weather for a city',
+    parameters: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
+  },
+  ({ city }) => fetchWeather(city)
+);
+
+const r = await RunAnywhere.llm.generate('Weather in Tokyo?', { toolChoice: 'REQUIRED' });
+console.log(r.toolCalls[0]);   // { id, name, arguments, result }
 ```
+
+Registered tools apply to every request. Pass `toolChoice: 'NONE'` on requests that
+should skip the selection round.
 
 ### Multi-turn chat
 
+Pass the conversation; the SDK owns the chat template and history alternation.
+
 ```js
-const chat = RunAnywhere.createChat(llm, { system: 'You are concise.' });
-await chat.sendText('My name is Aman.');
-await chat.sendText('What is my name?');
+const r = await RunAnywhere.llm.generate([
+  { role: 'system', content: 'You are concise.' },
+  { role: 'user', content: 'My name is Aman.' },
+  { role: 'assistant', content: 'Noted.' },
+  { role: 'user', content: 'What is my name?' },
+]);
 ```
+
+### Other namespaces
+
+`vlm`, `stt`, `tts`, `vad`, `embeddings`, `rerank`, `diarization`, `segmentation`,
+`voice`, `rag`, `models`, `lora`, and `images` follow the same shape. `images`
+throws: no diffusion backend is linked and `rac_diffusion_generate_proto` is not
+bound in the addon.
+
+The pre-v3 surface (`loadLLM`, `createChat`, `generateWithTools`, handle objects)
+still works and is deprecated for one release.
 
 ## Electron (utility-process isolation)
 
@@ -100,7 +129,21 @@ const ra = new RunAnywhereMain({ nativePath: /* optional path to .node */ });
 win.webContents.on('did-finish-load', () => ra.connect(win.webContents));
 ```
 
-**Renderer preload** — set `webPreferences.preload` to `@runanywhere/electron/preload`. It exposes `window.runanywhere` with async APIs (`loadLLM`, `generate`, `transcribe`, `synthesize`, …).
+**Renderer preload:** set `webPreferences.preload` to
+`@runanywhere/electron/preload`. It builds `window.runanywhere` with the same shape
+the main process gets, so renderer and main code are written once. Two Electron
+constraints shape how it does that:
+
+- `contextBridge` hands the page a frozen clone and does not proxy accessors, so
+  the preload assembles the page object in the main world via
+  `contextBridge.executeInMainWorld` and backs `isReady`, `version`, `deviceId`,
+  `environment`, and `events` with live getters. Without that API those five are
+  unavailable in the renderer and the SDK logs a warning.
+- Symbol keys do not cross the bridge, so `for await...of` cannot iterate a bridged
+  stream. Call `next()` until `done`.
+
+Tool executors passed from a renderer run in the renderer. They cannot reach the
+native addon directly.
 
 Renderers that bundle the SDK can import audio helpers:
 

@@ -1,11 +1,7 @@
 package com.runanywhere.runanywhereai.data.benchmark
 
-import ai.runanywhere.proto.v1.AudioFormat
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelListRequest
-import ai.runanywhere.proto.v1.ModelUnloadRequest
-import ai.runanywhere.proto.v1.VLMImageFormat
 import android.content.Context
 import android.graphics.Bitmap
 import android.os.Build
@@ -13,25 +9,21 @@ import com.runanywhere.runanywhereai.ui.screens.models.LlmModelChangeInterlock
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.api.AudioInput
+import com.runanywhere.sdk.public.api.GenerationEvent
+import com.runanywhere.sdk.public.api.GenerationResult
+import com.runanywhere.sdk.public.api.ImageInput
+import com.runanywhere.sdk.public.api.LlmOptions
+import com.runanywhere.sdk.public.api.LoadOptions
+import com.runanywhere.sdk.public.api.SttOptions
+import com.runanywhere.sdk.public.api.TtsOptions
+import com.runanywhere.sdk.public.api.llm
+import com.runanywhere.sdk.public.api.models
+import com.runanywhere.sdk.public.api.stt
+import com.runanywhere.sdk.public.api.tts
+import com.runanywhere.sdk.public.api.vlm
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
-import com.runanywhere.sdk.public.extensions.aggregateStream
-import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
-import com.runanywhere.sdk.public.extensions.generate
-import com.runanywhere.sdk.public.extensions.generateStream
-import com.runanywhere.sdk.public.extensions.listModels
-import com.runanywhere.sdk.public.extensions.loadModel
-import com.runanywhere.sdk.public.extensions.processImage
-import com.runanywhere.sdk.public.extensions.synthesize
-import com.runanywhere.sdk.public.extensions.transcribe
-import com.runanywhere.sdk.public.extensions.unloadModel
-import com.runanywhere.sdk.public.types.RALLMGenerationOptions
-import com.runanywhere.sdk.public.types.RALLMGenerationResult
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.public.types.RAModelLoadRequest
-import com.runanywhere.sdk.public.types.RASTTOptions
-import com.runanywhere.sdk.public.types.RATTSOptions
-import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
-import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -166,37 +158,28 @@ class BenchmarkRunner(private val context: Context) {
     // the caller; its output is validated but never contributes to reported metrics.
     private suspend fun warmupLlm() {
         val warmup = withTimeoutOrNull(WARMUP_TIMEOUT) {
-            withContext(Dispatchers.Default) {
-                RunAnywhere.generate(
-                    "Hello",
-                    RALLMGenerationOptions(max_output_tokens = 5, temperature = 0f),
-                )
-            }
+            RunAnywhere.llm.generate("Hello", LlmOptions(maxOutputTokens = 5, temperature = 0f))
         } ?: throw IllegalStateException("LLM benchmark warmup timed out")
-        check(warmup.error_message.isNullOrBlank()) {
-            warmup.error_message ?: "LLM benchmark warmup failed"
-        }
-        check(warmup.output_tokens > 0) {
+        check(warmup.outputTokens > 0) {
             "LLM benchmark warmup produced zero output tokens"
         }
     }
 
-    // One measured generation via the streaming path so aggregateStream can supply a
-    // wall-clock TTFT fallback when the backend omits it (parity with iOS).
-    private suspend fun measureLlm(maxTokens: Int): Pair<RALLMGenerationResult, Double> {
-        val options = RALLMGenerationOptions(
-            max_output_tokens = maxTokens,
+    // One measured generation via the streaming path: the terminal event carries
+    // the SDK metrics block, and the caller times the whole pass.
+    private suspend fun measureLlm(maxTokens: Int): Pair<GenerationResult, Double> {
+        val options = LlmOptions(
+            maxOutputTokens = maxTokens,
             temperature = 0f,
-            system_prompt = LLM_SYSTEM_PROMPT,
+            systemPrompt = LLM_SYSTEM_PROMPT,
         )
         val start = System.nanoTime()
         val measured = withTimeoutOrNull(BENCH_TIMEOUT) {
-            withContext(Dispatchers.Default) {
-                RunAnywhere.aggregateStream(
-                    prompt = LLM_PROMPT,
-                    events = RunAnywhere.generateStream(LLM_PROMPT, options),
-                )
+            var completed: GenerationResult? = null
+            RunAnywhere.llm.generateStream(LLM_PROMPT, options).collect { event ->
+                if (event is GenerationEvent.Completed) completed = event.result
             }
+            completed
         } ?: throw IllegalStateException("LLM benchmark timed out")
         val e2eMs = (System.nanoTime() - start) / 1_000_000.0
         return measured to e2eMs
@@ -209,29 +192,28 @@ class BenchmarkRunner(private val context: Context) {
             val silent = scenario.contains("Silent")
             val seconds = if (silent) 2.0 else 3.0
             val pcm = if (silent) SyntheticInput.silentPcm(seconds) else SyntheticInput.sinePcm(seconds)
-            val options = RASTTOptions(
-                language = "en",
-                enable_punctuation = true,
-                enable_word_timestamps = true,
-            )
+            val options = SttOptions(language = "en", punctuation = true, wordTimestamps = true)
             // Warmup: one discarded transcription so first-run cache/JIT cost is not
             // charged to the first measured pass (parity with the LLM/VLM warmup).
             val warmupMs = measureMs {
                 runCatching {
-                    RunAnywhere.transcribe(SyntheticInput.silentPcm(WARMUP_AUDIO_SECONDS), options)
+                    RunAnywhere.stt.transcribe(
+                        AudioInput.pcm16(SyntheticInput.silentPcm(WARMUP_AUDIO_SECONDS)),
+                        options,
+                    )
                 }.onFailure { error ->
                     if (error is kotlin.coroutines.cancellation.CancellationException) throw error
                 }
             }
             val start = System.nanoTime()
-            val out = RunAnywhere.transcribe(pcm, options)
+            RunAnywhere.stt.transcribe(AudioInput.pcm16(pcm), options)
             val e2eMs = (System.nanoTime() - start) / 1_000_000.0
             val memAfter = SyntheticInput.availableMemoryBytes(context)
             return BenchmarkMetrics(
                 loadTimeMs = loadMs,
                 warmupTimeMs = warmupMs,
                 endToEndLatencyMs = e2eMs,
-                realTimeFactor = out.metadata?.real_time_factor?.toDouble()?.takeIf { it > 0 },
+                realTimeFactor = (e2eMs / (seconds * 1000.0)).takeIf { seconds > 0 },
                 audioLengthSeconds = seconds,
                 memoryDeltaBytes = memBefore - memAfter,
             )
@@ -245,31 +227,24 @@ class BenchmarkRunner(private val context: Context) {
         val memBefore = SyntheticInput.availableMemoryBytes(context)
         val loadMs = load(model, ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
         try {
-            val options = RATTSOptions(
-                language_code = "en-US",
-                speed = 1f,
-                pitch = 1f,
-                volume = 1f,
-                audio_format = AudioFormat.AUDIO_FORMAT_PCM,
-                sample_rate = 22050,
-            )
+            val options = TtsOptions(language = "en-US", speed = 1f, pitch = 1f)
             // Warmup: one discarded synthesis so first-run cache/JIT cost is excluded.
             val warmupMs = measureMs {
-                runCatching { RunAnywhere.synthesize(TTS_WARMUP, options) }
+                runCatching { RunAnywhere.tts.synthesize(TTS_WARMUP, options) }
                     .onFailure { error ->
                         if (error is kotlin.coroutines.cancellation.CancellationException) throw error
                     }
             }
             val start = System.nanoTime()
-            val out = RunAnywhere.synthesize(text, options)
+            val out = RunAnywhere.tts.synthesize(text, options)
             val e2eMs = (System.nanoTime() - start) / 1_000_000.0
             val memAfter = SyntheticInput.availableMemoryBytes(context)
             return BenchmarkMetrics(
                 loadTimeMs = loadMs,
                 warmupTimeMs = warmupMs,
                 endToEndLatencyMs = e2eMs,
-                audioDurationSeconds = out.duration_ms / 1000.0,
-                charactersProcessed = out.metadata?.character_count ?: text.length,
+                audioDurationSeconds = out.durationMs / 1000.0,
+                charactersProcessed = text.length,
                 memoryDeltaBytes = memBefore - memAfter,
             )
         } finally {
@@ -288,27 +263,32 @@ class BenchmarkRunner(private val context: Context) {
             val loadMs = load(model, ModelCategory.MODEL_CATEGORY_MULTIMODAL)
             val file = withContext(Dispatchers.IO) { writeJpeg(SyntheticInput.gradientImage()) }
             try {
-                val image = RAVLMImage(file_path = file.absolutePath, format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH)
+                val image = ImageInput.file(file.absolutePath)
                 val warmupMs = measureMs {
                     runCatching {
-                        RunAnywhere.processImage(image, RAVLMGenerationOptions(prompt = "Hi", max_output_tokens = 1, temperature = 0f))
+                        RunAnywhere.vlm.generate(
+                            image,
+                            "Hi",
+                            LlmOptions(maxOutputTokens = 1, temperature = 0f),
+                        )
                     }
                 }
-                // Flush any lingering generation state / KV cache before the measured run.
-                RunAnywhere.cancelVLMGeneration()
-                val result = RunAnywhere.processImage(
+                val start = System.nanoTime()
+                val result = RunAnywhere.vlm.generate(
                     image,
-                    RAVLMGenerationOptions(prompt = VLM_PROMPT, max_output_tokens = 128, temperature = 0f),
+                    VLM_PROMPT,
+                    LlmOptions(maxOutputTokens = 128, temperature = 0f),
                 )
+                val e2eMs = (System.nanoTime() - start) / 1_000_000.0
                 val memAfter = SyntheticInput.availableMemoryBytes(context)
                 return BenchmarkMetrics(
                     loadTimeMs = loadMs,
                     warmupTimeMs = warmupMs,
-                    endToEndLatencyMs = result.processing_time_ms.toDouble(),
-                    tokensPerSecond = result.tokens_per_second.toDouble().takeIf { it > 0 },
-                    ttftMs = result.time_to_first_token_ms.toDouble().takeIf { it > 0 },
-                    inputTokens = result.input_tokens,
-                    outputTokens = result.output_tokens,
+                    endToEndLatencyMs = e2eMs,
+                    tokensPerSecond = result.tokensPerSecond.toDouble().takeIf { it > 0 },
+                    ttftMs = result.timeToFirstTokenMs.toDouble().takeIf { it > 0 },
+                    inputTokens = result.inputTokens,
+                    outputTokens = result.outputTokens,
                     memoryDeltaBytes = memBefore - memAfter,
                 ).requireSuccessfulOutput(BenchmarkCategory.VLM)
             } finally {
@@ -324,8 +304,7 @@ class BenchmarkRunner(private val context: Context) {
             LlmModelChangeInterlock.awaitReadyForModelChange()
         }
         val start = System.nanoTime()
-        val res = RunAnywhere.loadModel(RAModelLoadRequest(model_id = model.id, category = category))
-        if (!res.success) throw IllegalStateException(res.error_message.ifBlank { "Model load failed" })
+        RunAnywhere.models.load(model.id, LoadOptions(framework = model.framework))
         RuntimeModelSelection.queryCurrent(selectionContext(category), listOf(model))
         return (System.nanoTime() - start) / 1_000_000.0
     }
@@ -337,7 +316,7 @@ class BenchmarkRunner(private val context: Context) {
             if (category == ModelCategory.MODEL_CATEGORY_LANGUAGE) {
                 LlmModelChangeInterlock.awaitReadyForModelChange()
             }
-            RunAnywhere.unloadModel(ModelUnloadRequest(category = category))
+            runCatching { RunAnywhere.models.unload(category) }
             RuntimeModelSelection.queryCurrent(selectionContext(category))
             if (settleMs > 0) delay(settleMs)
         }
@@ -354,7 +333,7 @@ class BenchmarkRunner(private val context: Context) {
     }
 
     private suspend fun modelsFor(category: BenchmarkCategory): List<RAModelInfo> {
-        val all = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
+        val all = RunAnywhere.models.list()
         return all.filter { accepts(category, it) && it.isDownloadedOnDisk && !isBuiltIn(it) }
     }
 
@@ -364,7 +343,7 @@ class BenchmarkRunner(private val context: Context) {
      * This powers the benchmark screen's prompt to download a model before starting a run.
      */
     suspend fun hasDownloadedModels(categories: Set<BenchmarkCategory>): Boolean {
-        val all = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
+        val all = RunAnywhere.models.list()
         return all.any { model ->
             model.isDownloadedOnDisk && !isBuiltIn(model) &&
                 categories.any { accepts(it, model) }

@@ -36,13 +36,13 @@ void main() {
           sampleRate: 16000,
           channels: 1,
         ),
-        options: STTOptions(sampleRate: 16000),
+        options: STTOptions(beamSize: 4),
       ),
     );
 
     expect(result.text, 'hello');
     expect(seen.audio.audioData, [1, 2, 3, 4]);
-    expect(seen.options.sampleRate, 16000);
+    expect(seen.options.beamSize, 4);
   });
 
   test('lifecycle TTS bridge forwards generated request and result', () {
@@ -79,13 +79,13 @@ void main() {
           sampleRate: 16000,
           channels: 1,
         ),
-        options: VADOptions(threshold: 0.2),
+        options: VADOptions(activationThreshold: 0.2),
       ),
     );
 
     expect(result.isSpeech, isTrue);
     expect(seen.audio.audioData, [0, 0, 1, 0]);
-    expect(seen.options.threshold, 0.2);
+    expect(seen.options.activationThreshold, closeTo(0.2, 1e-6));
   });
 
   test('lifecycle diffusion bridge forwards generated request and result', () {

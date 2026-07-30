@@ -10,7 +10,7 @@ import {
   type STTTranscriptionRequest as ProtoSTTTranscriptionRequest,
 } from '@runanywhere/proto-ts/stt_options';
 import type { ModalityProtoModule } from '../../../../src/Adapters/ProtoAdapterTypes';
-import { RunAnywhere } from '../../../../src/Public/RunAnywhere';
+import { transcribe, transcribeStream } from '../../../../src/Public/Extensions/RunAnywhere+STT';
 import {
   clearRunanywhereModule,
   registerWasmModule,
@@ -57,7 +57,7 @@ describe('lifecycle-owned Web STT', () => {
     const harness = fakeSTTModule();
     install(harness.module);
 
-    const result = await RunAnywhere.transcribe(new Float32Array([0, 0.5, -0.5]));
+    const result = await transcribe(new Float32Array([0, 0.5, -0.5]));
 
     expect(result.text).toBe('lifecycle transcript');
     expect(harness.currentLifecycleModelId()).toBe('sherpa-lifecycle-stt');
@@ -86,7 +86,7 @@ describe('lifecycle-owned Web STT', () => {
     install(harness.module);
 
     const partials: STTPartialResult[] = [];
-    for await (const partial of RunAnywhere.transcribeStream(new Uint8Array([1, 2, 3, 4]))) {
+    for await (const partial of transcribeStream(new Uint8Array([1, 2, 3, 4]))) {
       partials.push(partial);
     }
 

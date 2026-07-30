@@ -3,7 +3,7 @@
 //  RunAnywhereAI
 //
 //  UI for standalone speaker diarization (NVIDIA Sortformer) over
-//  `RunAnywhere.diarize`. Pure SwiftUI: model picker, microphone capture, and a
+//  `RunAnywhere.diarization`. Pure SwiftUI: model picker, microphone capture, and a
 //  speaker-segment list — no inference or model logic lives here.
 //
 

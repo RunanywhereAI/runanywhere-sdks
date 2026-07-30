@@ -38,6 +38,10 @@ int run_voice(const GlobalOptions& options, const std::string& input, const std:
     if (bootstrap(options, &env) != RAC_SUCCESS) {
         return 1;
     }
+    if (input.empty()) {
+        out::error_line("an audio file is required (positional or --input)");
+        return 2;
+    }
 
     ResolvedModelPaths stt;
     ResolvedModelPaths llm;
@@ -145,20 +149,22 @@ int run_voice(const GlobalOptions& options, const std::string& input, const std:
 }  // namespace
 
 void register_voice(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd =
-        app.add_subcommand("voice", "Run a full voice turn (STT → LLM → TTS) on a WAV file");
+    CLI::App* cmd = app.add_subcommand("voice", "Hold one spoken turn: listen, answer, speak");
     auto input = std::make_shared<std::string>();
     auto stt = std::make_shared<std::string>();
     auto llm = std::make_shared<std::string>();
     auto tts = std::make_shared<std::string>();
     auto output = std::make_shared<std::string>();
-    cmd->add_option("--input,-i", *input, "16-bit PCM WAV file with the user's speech")
-        ->required()
+    cmd->add_option("audio", *input, "16-bit PCM WAV file with the user's speech")
         ->check(CLI::ExistingFile);
-    cmd->add_option("--stt", *stt, "STT model (default: " + std::string(kDefaultStt) + ")");
-    cmd->add_option("--llm", *llm, "LLM model (default: " + std::string(kDefaultLlm) + ")");
-    cmd->add_option("--tts", *tts, "TTS voice (default: " + std::string(kDefaultTts) + ")");
-    cmd->add_option("--output,-o", *output, "Write the agent's spoken reply to this WAV path");
+    cmd->add_option("--input,-i", *input, "16-bit PCM WAV file with the user's speech")
+        ->check(CLI::ExistingFile);
+    cmd->add_option("--stt", *stt,
+                    "Transcription model (default: " + std::string(kDefaultStt) + ")");
+    cmd->add_option("--llm", *llm, "Answering model (default: " + std::string(kDefaultLlm) + ")");
+    cmd->add_option("--tts", *tts, "Voice that speaks the reply (default: " +
+                                       std::string(kDefaultTts) + ")");
+    cmd->add_option("--output,-o", *output, "WAV file for the spoken reply");
     cmd->callback([&options, input, stt, llm, tts, output]() {
         const int exit_code = run_voice(options, *input, *stt, *llm, *tts, *output);
         if (exit_code != 0) {

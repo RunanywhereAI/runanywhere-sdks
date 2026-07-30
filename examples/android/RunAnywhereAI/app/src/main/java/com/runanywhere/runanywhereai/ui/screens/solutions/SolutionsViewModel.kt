@@ -8,8 +8,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.extensions.SolutionHandle
-import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.solutions
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.NonCancellable
@@ -44,7 +44,7 @@ class SolutionsViewModel : ViewModel() {
         viewModelScope.launch {
             isCheckingModels = true
             val models = runCatching {
-                RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
+                RunAnywhere.models.list()
             }.getOrDefault(emptyList<RAModelInfo>())
             resolvedSolutions = AndroidSolutionsConfig.resolve(models)
             isCheckingModels = false

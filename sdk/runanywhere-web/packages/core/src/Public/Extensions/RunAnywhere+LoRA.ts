@@ -473,11 +473,11 @@ export async function downloadLoraAdapter(
   onProgress?: (progress: DownloadProgress) => void,
 ): Promise<string> {
   const artifact = await registerLoraArtifact(entry);
-  // Dynamic import: RunAnywhere.ts statically imports this module, so the
-  // facade (which owns the canonical downloadModel plan/start/poll/OPFS
+  // Dynamic import: SDKCore.ts statically imports this module, so the core
+  // (which owns the canonical downloadModel plan/start/poll/OPFS
   // orchestration) is reached lazily to avoid a circular module-eval.
-  const { RunAnywhere } = await import('../RunAnywhere.js');
-  const finalProgress = await RunAnywhere.downloadModel({
+  const { SDKCore } = await import('../SDKCore.js');
+  const finalProgress = await SDKCore.downloadModel({
     modelId: artifact.id,
     model: artifact,
     onProgress,

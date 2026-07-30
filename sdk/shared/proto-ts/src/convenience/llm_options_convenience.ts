@@ -18,8 +18,8 @@ import { LLMConfiguration, LLMGenerationOptions } from '../llm_options';
 import { ValidationError } from './_errors';
 
 export const lLMGenerationOptionsDefaults = (): LLMGenerationOptions => ({
-  maxOutputTokens: 100,
-  temperature: 0.8,
+  maxOutputTokens: 512,
+  temperature: 0.7,
   topP: 1.0,
   topK: 0,
   repetitionPenalty: 1.0,

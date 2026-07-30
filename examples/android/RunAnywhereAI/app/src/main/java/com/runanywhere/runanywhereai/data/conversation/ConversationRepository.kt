@@ -8,7 +8,7 @@ import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.generate
+import com.runanywhere.sdk.public.api.llm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -121,12 +121,10 @@ object ConversationRepository {
 
         val rawTitle = try {
             RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
-            withContext(Dispatchers.Default) {
-                RunAnywhere.generate(
-                    prompt = "Create a descriptive, readable title for this conversation:\n\n$conversationText\n\nTitle:",
-                    options = SmartTitlePolicy.generationOptions(TITLE_INSTRUCTIONS),
-                )
-            }.takeIf { it.error_message.isNullOrBlank() }?.text
+            RunAnywhere.llm.generate(
+                prompt = "Create a descriptive, readable title for this conversation:\n\n$conversationText\n\nTitle:",
+                options = SmartTitlePolicy.generationOptions(TITLE_INSTRUCTIONS),
+            ).text
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

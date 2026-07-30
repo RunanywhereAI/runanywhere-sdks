@@ -163,6 +163,9 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<void>> vlmProcessStreamProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmCancelProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> diffusionGenerateLifecycleProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> diarizationDiarizeLifecycleProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> segmentationSegmentLifecycleProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> rerankProto(const std::string& modelPath, const std::string& modelId, const std::string& modelName, const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::string>> getPersistentDeviceUUID() = 0;
       virtual std::shared_ptr<Promise<void>> flushTelemetry() = 0;
       virtual std::shared_ptr<Promise<bool>> isTelemetryInitialized() = 0;

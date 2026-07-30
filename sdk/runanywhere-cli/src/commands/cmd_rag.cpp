@@ -67,10 +67,28 @@ bool read_text_file(const std::string& path, std::string* out, std::string* erro
     return true;
 }
 
-int run_rag_query(const GlobalOptions& options, const std::string& llm_model,
-                  const std::string& embed_model, const std::vector<std::string>& docs,
-                  const std::vector<std::string>& files, const std::string& question,
-                  int top_k, int max_tokens, float temperature) {
+struct RagParams {
+    std::string llm_model = kDefaultRagLlm;
+    std::string embed_model = kDefaultRagEmbed;
+    std::vector<std::string> docs;
+    std::vector<std::string> files;
+    std::string system_prompt;
+    int top_k = 0;
+    int chunk_size = 0;
+    int chunk_overlap = 0;
+    int max_output_tokens = 0;
+    float temperature = -1.0f;
+    float similarity_threshold = -1.0f;
+};
+
+// One session covers the whole invocation: open (embedding + LLM) → ingest
+// every document → ask. The CLI cannot split those verbs apart the way the SDK
+// spec does because commons keeps RAG indexes in memory only
+// (RAGConfiguration.index_path / persist_index are not honored) and
+// rac_rag_query_proto requires an LLM service, so there is no retrieval-only
+// call to expose as `rag search`.
+int run_rag(const GlobalOptions& options, const RagParams& params,
+            const std::string& question) {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {
         return 1;
@@ -80,6 +98,11 @@ int run_rag_query(const GlobalOptions& options, const std::string& llm_model,
         out::error_line("a question is required (positional argument)");
         return 2;
     }
+    const std::string& llm_model = params.llm_model;
+    const std::string& embed_model = params.embed_model;
+    const std::vector<std::string>& docs = params.docs;
+    const std::vector<std::string>& files = params.files;
+    const int top_k = params.top_k;
 
     std::vector<std::string> documents = docs;
     for (const auto& path : files) {
@@ -97,13 +120,21 @@ int run_rag_query(const GlobalOptions& options, const std::string& llm_model,
     }
 
     // Both models must already be downloaded — the session resolves them from
-    // the registry. (Pull them first with `rcli pull <id>` if missing.)
-    // Create the RAG session.
+    // the registry. (Pull them first with `rcli models download <id>`.)
     v1::RAGConfiguration config;
     config.set_embedding_model_id(embed_model);
     config.set_llm_model_id(llm_model);
     if (top_k > 0) {
         config.set_top_k(top_k);
+    }
+    if (params.chunk_size > 0) {
+        config.set_chunk_size(params.chunk_size);
+    }
+    if (params.chunk_overlap > 0) {
+        config.set_chunk_overlap(params.chunk_overlap);
+    }
+    if (params.similarity_threshold >= 0.0f) {
+        config.set_similarity_threshold(params.similarity_threshold);
     }
 
     const std::string config_bytes = proto::serialize(config);
@@ -142,11 +173,17 @@ int run_rag_query(const GlobalOptions& options, const std::string& llm_model,
     // Query.
     v1::RAGQueryOptions query;
     query.set_question(question);
-    if (max_tokens > 0) {
-        query.mutable_generation()->set_max_output_tokens(max_tokens);
+    if (params.max_output_tokens > 0) {
+        query.mutable_generation()->set_max_output_tokens(params.max_output_tokens);
     }
-    if (temperature >= 0.0f) {
-        query.mutable_generation()->set_temperature(temperature);
+    if (params.temperature >= 0.0f) {
+        query.mutable_generation()->set_temperature(params.temperature);
+    }
+    if (!params.system_prompt.empty()) {
+        query.mutable_generation()->set_system_prompt(params.system_prompt);
+    }
+    if (params.similarity_threshold >= 0.0f) {
+        query.set_similarity_threshold(params.similarity_threshold);
     }
     if (top_k > 0) {
         query.set_retrieval_top_k(top_k);
@@ -176,12 +213,20 @@ int run_rag_query(const GlobalOptions& options, const std::string& llm_model,
         out::JsonWriter json;
         json.begin_object()
             .field("answer", result.answer())
-            .field("retrieved_chunks", static_cast<int64_t>(result.retrieved_chunks_size()))
             .field("retrieval_time_ms", static_cast<int64_t>(result.retrieval_time_ms()))
             .field("generation_time_ms", static_cast<int64_t>(result.generation_time_ms()))
             .field("total_time_ms", static_cast<int64_t>(result.total_time_ms()))
             .field("prompt_tokens", static_cast<int64_t>(result.prompt_tokens()))
             .field("completion_tokens", static_cast<int64_t>(result.completion_tokens()));
+        json.begin_array("matches");
+        for (const v1::RAGSearchResult& match : result.retrieved_chunks()) {
+            json.begin_array_object()
+                .field("text", match.text())
+                .field("score", static_cast<double>(match.similarity_score()))
+                .field("source", match.source_document())
+                .end_object();
+        }
+        json.end_array();
         out::result_line(json.end_object().str());
     } else {
         out::result_line(result.answer());
@@ -198,36 +243,49 @@ int run_rag_query(const GlobalOptions& options, const std::string& llm_model,
 
 }  // namespace
 
+namespace {
+
+// Corpus and retrieval flags are the same for search and query; only `query`
+// generates an answer, so only it takes the generation knobs.
+void add_corpus_options(CLI::App* cmd, const std::shared_ptr<RagParams>& params) {
+    cmd->add_option("--doc,-d", params->docs, "Document text to index; repeat for several");
+    cmd->add_option("--file,-f", params->files, "Text file to index; repeat for several");
+    cmd->add_option("--embedding-model,--embed", params->embed_model,
+                    "Embedding model to index with (default: " + std::string(kDefaultRagEmbed) +
+                        ")");
+    cmd->add_option("--top-k", params->top_k, "Retrieve this many chunks per question");
+    cmd->add_option("--chunk-size", params->chunk_size,
+                    "Tokens per chunk when splitting documents");
+    cmd->add_option("--chunk-overlap", params->chunk_overlap,
+                    "Tokens shared between neighbouring chunks");
+    cmd->add_option("--similarity-threshold", params->similarity_threshold,
+                    "Discard chunks scoring below this");
+}
+
+}  // namespace
+
 void register_rag(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand("rag", "Retrieval-augmented generation");
-    CLI::App* query_cmd = cmd->add_subcommand("query", "Ingest documents and answer a question");
+    CLI::App* cmd = app.add_subcommand("rag", "Answer questions over your own documents");
+    cmd->require_subcommand(1);
 
+    CLI::App* query_cmd = cmd->add_subcommand("query", "Answer a question from the documents");
     auto question = std::make_shared<std::string>();
-    auto docs = std::make_shared<std::vector<std::string>>();
-    auto files = std::make_shared<std::vector<std::string>>();
-    auto llm_model = std::make_shared<std::string>(kDefaultRagLlm);
-    auto embed_model = std::make_shared<std::string>(kDefaultRagEmbed);
-    auto top_k = std::make_shared<int>(0);
-    auto max_tokens = std::make_shared<int>(0);
-    auto temperature = std::make_shared<float>(-1.0f);
-
-    query_cmd->add_option("question", *question, "Question to answer over the ingested documents")
+    auto params = std::make_shared<RagParams>();
+    query_cmd->add_option("question", *question, "Question to answer over the documents")
         ->required();
-    query_cmd->add_option("--doc,-d", *docs, "Inline document text (repeat for multiple)");
-    query_cmd->add_option("--file,-f", *files, "Path to a text file to ingest (repeat for multiple)");
-    query_cmd->add_option("--llm", *llm_model, "LLM model id (default: " + std::string(kDefaultRagLlm) + ")")
-        ->default_val(kDefaultRagLlm);
-    query_cmd->add_option("--embed", *embed_model,
-                          "Embedding model id (default: " + std::string(kDefaultRagEmbed) + ")")
-        ->default_val(kDefaultRagEmbed);
-    query_cmd->add_option("--top-k", *top_k, "Number of chunks to retrieve");
-    query_cmd->add_option("--max-output-tokens,--max-tokens", *max_tokens, "Max answer tokens");
-    query_cmd->add_option("--temperature", *temperature, "Sampling temperature");
+    add_corpus_options(query_cmd, params);
+    query_cmd->add_option("--model,--llm", params->llm_model,
+                          "LLM that writes the answer (default: " + std::string(kDefaultRagLlm) +
+                              ")");
+    query_cmd->add_option("--system-prompt", params->system_prompt,
+                          "Steer the answer with a system instruction");
+    query_cmd->add_option("--max-output-tokens,--max-tokens", params->max_output_tokens,
+                          "Cap the answer length in tokens");
+    query_cmd->add_option("--temperature", params->temperature,
+                          "Raise for more random sampling");
 
-    query_cmd->callback([&options, question, docs, files, llm_model, embed_model, top_k, max_tokens,
-                         temperature]() {
-        const int exit_code = run_rag_query(options, *llm_model, *embed_model, *docs, *files,
-                                            *question, *top_k, *max_tokens, *temperature);
+    query_cmd->callback([&options, question, params]() {
+        const int exit_code = run_rag(options, *params, *question);
         if (exit_code != 0) {
             throw CLI::RuntimeError(exit_code);
         }

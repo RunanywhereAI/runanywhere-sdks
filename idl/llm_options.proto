@@ -65,16 +65,16 @@ message LLMGenerationOptions {
     // 25 disable_thinking (folded into reasoning)
     reserved 7, 10, 14, 20, 21, 25;
 
-    // Maximum number of tokens to generate. 0 (default) = unset → engine
-    // default (typically 100).
+    // Maximum number of tokens to generate. 0 = unset → this default applies.
+    // 512 leaves room for a full chat answer; 100 truncated mid-sentence.
     int32  max_output_tokens   = 1 [
-        (runanywhere.v1.rac_default) = "100",
+        (runanywhere.v1.rac_default) = "512",
         (runanywhere.v1.rac_min) = 0
     ];
 
     // Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding.
     float  temperature         = 2 [
-        (runanywhere.v1.rac_default) = "0.8",
+        (runanywhere.v1.rac_default) = "0.7",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 2.0
     ];

@@ -44,7 +44,9 @@ class ToolSettingsViewModel extends ChangeNotifier {
     if (_toolCallingEnabled) {
       await registerDemoTools();
     } else {
-      RunAnywhere.tools.clearTools();
+      for (final tool in RunAnywhere.llm.tools.list()) {
+        RunAnywhere.llm.tools.unregister(tool.name);
+      }
       await refreshRegisteredTools();
     }
     notifyListeners();
@@ -56,20 +58,22 @@ class ToolSettingsViewModel extends ChangeNotifier {
     if (_toolCallingEnabled) {
       await registerDemoTools();
     } else {
-      RunAnywhere.tools.clearTools();
+      for (final tool in RunAnywhere.llm.tools.list()) {
+        RunAnywhere.llm.tools.unregister(tool.name);
+      }
       await refreshRegisteredTools();
     }
   }
 
   Future<void> refreshRegisteredTools() async {
-    _registeredTools = RunAnywhere.tools.getRegisteredTools();
+    _registeredTools = RunAnywhere.llm.tools.list();
     notifyListeners();
   }
 
   /// Register demo tools (matches iOS implementation)
   Future<void> registerDemoTools() async {
     // 1. Weather Tool - Uses Open-Meteo API (free, no API key required)
-    RunAnywhere.tools.registerTool(
+    RunAnywhere.llm.tools.register(
       ToolDefinition(
         name: 'get_weather',
         description:
@@ -86,7 +90,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
     );
 
     // 2. Time Tool - Real system time with timezone
-    RunAnywhere.tools.registerTool(
+    RunAnywhere.llm.tools.register(
       ToolDefinition(
         name: 'get_current_time',
         description: 'Gets the current date, time, and timezone information',
@@ -96,7 +100,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
     );
 
     // 3. Calculator Tool - Real math evaluation
-    RunAnywhere.tools.registerTool(
+    RunAnywhere.llm.tools.register(
       ToolDefinition(
         name: 'calculate',
         description:
@@ -116,7 +120,9 @@ class ToolSettingsViewModel extends ChangeNotifier {
   }
 
   Future<void> clearAllTools() async {
-    RunAnywhere.tools.clearTools();
+    for (final tool in RunAnywhere.llm.tools.list()) {
+      RunAnywhere.llm.tools.unregister(tool.name);
+    }
     await refreshRegisteredTools();
   }
 

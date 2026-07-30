@@ -22,20 +22,21 @@ public extension RunAnywhere {
     /// extraction, canonicalization, and schema validation. This restores the
     /// pre-PR-494 behavior where caller generation knobs were honored
     /// (see comment record `swift-public-features-004`).
+    @available(*, deprecated, renamed: "llm.generateStructured(prompt:schema:options:)")
     static func generateStructured(
         prompt: String,
         schema: RAJSONSchema,
         options: RALLMGenerationOptions? = nil
     ) async throws -> RAStructuredOutputResult {
-        guard isInitialized else {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
-        let generation = try await generateWithStructuredOutput(
+        let generation = try await generateWithStructuredOutputProto(
             prompt: prompt,
             structuredOutput: .defaults(schema: schema),
             options: options
         )
-        return try extractStructuredOutput(text: generation.text, schema: schema)
+        return try parseStructuredOutput(text: generation.text, schema: schema)
     }
 
     /// Stream structured output generation using a JSON schema (CANONICAL_API §3).
@@ -55,12 +56,13 @@ public extension RunAnywhere {
     /// or the iterator's `throw`, matching the cross-SDK contract (Kotlin
     /// `Flow` exception propagation, Web `AsyncIterable` throw).
     /// (See comment record `swift-public-features-007`.)
+    @available(*, deprecated, renamed: "llm.generateStructured(prompt:schema:options:)")
     static func generateStructuredStream(
         prompt: String,
         schema: RAJSONSchema,
         options: RALLMGenerationOptions? = nil
     ) throws -> AsyncThrowingStream<RAStructuredOutputStreamEvent, Error> {
-        guard isInitialized else {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
@@ -71,7 +73,7 @@ public extension RunAnywhere {
         return AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    let stream = try await generateStream(request)
+                    let stream = try await generateStreamProto(request)
                     var accumulated = ""
                     var seq: UInt64 = 0
                     for await event in stream {
@@ -87,7 +89,7 @@ public extension RunAnywhere {
                         }
                     }
                     seq &+= 1
-                    let parsed = try extractStructuredOutput(text: accumulated, schema: schema)
+                    let parsed = try parseStructuredOutput(text: accumulated, schema: schema)
                     var terminal = RAStructuredOutputStreamEvent()
                     terminal.kind = .completed
                     terminal.result = parsed
@@ -116,7 +118,20 @@ public extension RunAnywhere {
     /// Generate raw text via the LLM with a structured-output configuration
     /// applied to the request. Returns the raw `RALLMGenerationResult`; callers
     /// can pass `text` to `extractStructuredOutput(text:schema:)` for parsing.
+    @available(*, deprecated, renamed: "llm.generateStructured(prompt:schema:options:)")
     static func generateWithStructuredOutput(
+        prompt: String,
+        structuredOutput: RAStructuredOutputOptions,
+        options: RALLMGenerationOptions? = nil
+    ) async throws -> RALLMGenerationResult {
+        try await generateWithStructuredOutputProto(
+            prompt: prompt,
+            structuredOutput: structuredOutput,
+            options: options
+        )
+    }
+
+    internal static func generateWithStructuredOutputProto(
         prompt: String,
         structuredOutput: RAStructuredOutputOptions,
         options: RALLMGenerationOptions? = nil
@@ -131,7 +146,7 @@ public extension RunAnywhere {
             if prep.hasSystemPrompt { internalOptions.systemPrompt = prep.systemPrompt }
         }
         let request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
-        return try await generate(request)
+        return try await generateProto(request)
     }
 
 }

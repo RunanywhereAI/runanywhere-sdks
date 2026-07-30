@@ -1,10 +1,8 @@
 package com.runanywhere.runanywhereai.ui.screens.rag
 
-import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.RAGQueryOptions
-import ai.runanywhere.proto.v1.ReasoningMode
-import ai.runanywhere.proto.v1.ReasoningOptions
-import com.runanywhere.sdk.public.extensions.defaults
+import com.runanywhere.sdk.public.api.LlmOptions
+import com.runanywhere.sdk.public.api.ReasoningMode
+import com.runanywhere.sdk.public.api.ReasoningOptions
 
 internal object RagGenerationPolicy {
     const val MAX_OUTPUT_TOKENS = 192
@@ -16,18 +14,13 @@ internal object RagGenerationPolicy {
             "Do not reveal reasoning, analysis, or thinking. " +
             "If the context is insufficient, say that clearly."
 
-    fun options(question: String, multiQueryEnabled: Boolean): RAGQueryOptions =
-        RAGQueryOptions.defaults(question = question).copy(
-            generation = LLMGenerationOptions(
-                system_prompt = SYSTEM_PROMPT,
-                max_output_tokens = MAX_OUTPUT_TOKENS,
-                temperature = 0.0f,
-                top_p = 1.0f,
-                top_k = 0,
-                reasoning = ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF),
-            ),
-            stream = false,
-            enable_multi_query = multiQueryEnabled,
+    fun options(): LlmOptions =
+        LlmOptions(
+            systemPrompt = SYSTEM_PROMPT,
+            maxOutputTokens = MAX_OUTPUT_TOKENS,
+            temperature = 0.0f,
+            topP = 1.0f,
+            reasoning = ReasoningOptions(mode = ReasoningMode.OFF),
         )
 }
 

@@ -1,0 +1,2023 @@
+/**
+ * Web SDK core — SDK lifecycle, identity, model lifecycle, download
+ * orchestration, and browser persistent-storage coordination.
+ *
+ * Internal. Applications use the namespaced `RunAnywhere` facade in
+ * `Public/API/RunAnywhere.ts`; backend packages reach the two exported
+ * init helpers through `@runanywhere/web/backend`.
+ */
+
+import { EventCategory } from '@runanywhere/proto-ts/component_types';
+import {
+  SDKEnvironment,
+  ModelCategory,
+  type InferenceFramework,
+  type ModelInfo,
+} from '@runanywhere/proto-ts/model_types';
+import {
+  DownloadFailureReason,
+  DownloadState,
+  type DownloadPlanRequest,
+  type DownloadPlanResult,
+  type DownloadProgress,
+} from '@runanywhere/proto-ts/download_service';
+import {
+  SdkInitEnvironment,
+  SdkInitPhase1Request,
+  SdkInitPhase2Request,
+  SdkInitResult,
+  type SdkInitResult as ProtoSdkInitResult,
+} from '@runanywhere/proto-ts/sdk_init';
+import type { SDKInitOptions } from '../types/models.js';
+import { EventBus } from '../Foundation/EventBus.js';
+import { SDKLogger } from '../Foundation/SDKLogger.js';
+import { ensureDownloadStorageReady, requestPersistentStorage } from '../Infrastructure/BrowserStorage.js';
+import { LocalFileStorage } from '../Infrastructure/LocalFileStorage.js';
+import { OPFSBridge } from '../Infrastructure/OPFSBridge.js';
+import {
+  frameworkOPFSDir,
+  isExtractedDirectoryArtifact,
+  primaryFilenameFromModel,
+} from '../Infrastructure/FrameworkOPFSPaths.js';
+import { ProtoErrorCode, SDKException } from '../Foundation/SDKException.js';
+import { Runtime, prepareModelLoad } from '../Foundation/RuntimeConfig.js';
+import { ragDestroyPipeline, resetRAGFacadeState } from './Extensions/RunAnywhere+RAG.js';
+import { resetVoiceAgentFacadeState } from './Extensions/RunAnywhere+VoiceAgent.js';
+import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downloads.js';
+import { ModelRegistry as ModelRegistryCapability } from './Extensions/RunAnywhere+ModelRegistry.js';
+import { WebModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle.js';
+import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage.js';
+import { getStoredHfToken, setHfToken } from './Extensions/RunAnywhere+HuggingFace.js';
+import {
+  createStorageNamespace,
+  setRegisterModelHydrateHook,
+} from './Extensions/RunAnywhere+Storage.js';
+import { StorageAdapter } from '../Adapters/StorageAdapter.js';
+import { HTTPAdapter } from '../Adapters/HTTPAdapter.js';
+import { DeviceRegistrationAdapter } from '../Adapters/DeviceRegistrationAdapter.js';
+import { SDK_PLATFORM, SDK_VERSION } from '../Foundation/Version.js';
+import {
+  clearRunanywhereModule,
+  getAllRegisteredModules,
+  getModuleForCapability,
+  tryRunanywhereModule,
+  type EmscriptenRunanywhereModule,
+} from '../runtime/EmscriptenModule.js';
+import { CommonsModule } from '../runtime/CommonsModule.js';
+import { ProtoWasmBridge } from '../runtime/ProtoWasm.js';
+import { OffscreenRuntimeBridge, setStreamWorkerInit } from '../runtime/OffscreenRuntimeBridge.js';
+import { setStreamWorkerFactory } from '../runtime/StreamWorkerFactoryRegistry.js';
+import { setBackendWorkerFactory } from '../runtime/BackendWorkerFactoryRegistry.js';
+import { networkDefaults } from '@runanywhere/proto-ts/defaults/pool';
+
+/**
+ * Persistent storage backend active for the current SDK session.
+ * - `fsAccess`: File System Access API (user picked a real directory, Chrome 122+).
+ * - `opfs`: Origin Private File System (default persistent fallback).
+ * - `memory`: No persistent backend — model downloads are unavailable because
+ *   independent backend WASMs cannot share their private MEMFS instances.
+ */
+export type StorageBackend = 'fsAccess' | 'opfs' | 'memory';
+
+export interface DownloadModelOptions {
+  modelId: string;
+  model?: ModelInfo;
+  allowMeteredNetwork?: boolean;
+  resumeExisting?: boolean;
+  verifyChecksums?: boolean;
+  validateExistingBytes?: boolean;
+  updateRegistryOnCompletion?: boolean;
+  storageNamespace?: string;
+  availableStorageBytes?: number;
+  requiredFreeBytesAfterDownload?: number;
+  pollIntervalMs?: number;
+  onProgress?: (progress: DownloadProgress) => void;
+}
+
+const logger = new SDKLogger('RunAnywhere');
+
+// ---------------------------------------------------------------------------
+// Internal State
+// ---------------------------------------------------------------------------
+
+let _isInitialized = false;
+let _initOptions: SDKInitOptions | null = null;
+let _initializingPromise: Promise<void> | null = null;
+let _shutdownPromise: Promise<void> | null = null;
+let _shutdownRequired = false;
+let _localFileStorage: LocalFileStorage | null = null;
+let _deviceId: string | null = null;
+let _hasCompletedNativePhase1 = false;
+
+// Phase 2 (services) init state — mirrors Swift's
+// `hasCompletedServicesInit` + `hasCompletedHTTPSetup` split.
+let _hasCompletedServicesInit = false;
+// Separate from _hasCompletedServicesInit: Phase 2 marks services ready even
+// if the HTTP/auth round-trip failed (offline mode). ensureServicesReady()
+// retries HTTP-only on the next API call without re-running Phase 2.
+let _hasCompletedHTTPSetup = false;
+let _servicesInitPromise: Promise<void> | null = null;
+// Invalidates asynchronous work that belongs to an SDK lifetime which has
+// already been shut down. JavaScript fetches can settle after teardown even
+// when their AbortSignal fires, so state commits must also be generation-safe.
+let _lifecycleGeneration = 0;
+
+interface SdkInitModule extends EmscriptenRunanywhereModule {
+  _rac_sdk_init_phase1_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_sdk_init_phase2_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_wasm_set_client_info?(
+    sdkBinding: number,
+    appIdentifier: number,
+    appName: number,
+    appVersion: number,
+    appBuild: number,
+    locale: number,
+    timezone: number,
+  ): void;
+  _rac_wasm_get_version_major?(): number;
+  _rac_wasm_get_version_minor?(): number;
+  _rac_wasm_get_version_patch?(): number;
+  _rac_auth_is_authenticated?(): number;
+  _rac_auth_get_user_id?(): number;
+  _rac_auth_get_organization_id?(): number;
+  _rac_state_is_device_registered?(): number;
+  _rac_device_manager_register_if_needed?(environment: number, buildTokenPtr: number): number;
+}
+
+/** Generate (and cache) a stable device ID, matching Swift's UUID-style. */
+function generateDeviceId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+const DEVICE_ID_STORAGE_KEY =
+  'rac_sdk_plaintext_com.runanywhere.sdk.device.uuid';
+const CANONICAL_DEVICE_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Persist + retrieve the canonical browser device ID across SDK sessions. */
+function ensureDeviceId(): string {
+  if (_deviceId) return _deviceId;
+
+  if (typeof localStorage === 'undefined') {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+      'Persistent browser storage is required for device identity.',
+    );
+  }
+
+  try {
+    const stored = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (stored !== null) {
+      if (!CANONICAL_DEVICE_ID_PATTERN.test(stored)) {
+        throw new Error('stored device identity is not a canonical UUID');
+      }
+      _deviceId = stored;
+      return stored;
+    }
+
+    const id = generateDeviceId();
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, id);
+    if (localStorage.getItem(DEVICE_ID_STORAGE_KEY) !== id) {
+      throw new Error('localStorage did not retain the device identity');
+    }
+    _deviceId = id;
+    return id;
+  } catch (error) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+      `Failed to persist browser device identity: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
+function mapSdkInitEnvironment(env: SDKEnvironment): SdkInitEnvironment {
+  switch (env) {
+    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
+      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
+    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
+    default:
+      return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
+  }
+}
+
+function invokeSdkInitProto(
+  module: SdkInitModule,
+  bytes: Uint8Array,
+  fn: (requestBytes: number, requestSize: number, outResult: number) => number,
+  functionName: string,
+): ProtoSdkInitResult | null {
+  return new ProtoWasmBridge(module, logger).withHeapBytes(bytes, (ptr, size) => (
+    new ProtoWasmBridge(module, logger).callResultProto(
+      SdkInitResult,
+      (outResult) => fn(ptr, size, outResult),
+      functionName,
+    )
+  ));
+}
+
+function invokeSdkResultProto(
+  module: SdkInitModule,
+  fn: (outResult: number) => number,
+  functionName: string,
+): ProtoSdkInitResult | null {
+  return new ProtoWasmBridge(module, logger).callResultProto(
+    SdkInitResult,
+    (outResult) => fn(outResult),
+    functionName,
+  );
+}
+
+async function completePendingDeviceRegistration(
+  module: SdkInitModule,
+  environment: SDKEnvironment,
+  buildToken: string,
+  lifecycleGeneration: number,
+): Promise<void> {
+  if (!(await DeviceRegistrationAdapter.waitForPendingRegistration(module))) return;
+  if (lifecycleGeneration !== _lifecycleGeneration) return;
+  const register = module._rac_device_manager_register_if_needed;
+  if (typeof register !== 'function') {
+    logger.warning(
+      'WASM module cannot finalize asynchronous device registration; rebuild the Web artifact.',
+    );
+    return;
+  }
+
+  const token = environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+    ? buildToken.trim()
+    : '';
+  let tokenPtr = 0;
+  try {
+    if (token) {
+      const size = module.lengthBytesUTF8(token) + 1;
+      tokenPtr = module._malloc(size);
+      if (!tokenPtr) {
+        logger.warning('Device registration build-token allocation failed.');
+        return;
+      }
+      module.stringToUTF8(token, tokenPtr, size);
+    }
+    const result = register.call(module, mapSdkInitEnvironment(environment), tokenPtr);
+    if (result !== 0) {
+      logger.warning(`Device registration remained deferred (code ${result}).`);
+    }
+  } finally {
+    if (tokenPtr) module._free(tokenPtr);
+  }
+}
+
+function normalizeMetadataString(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : null;
+}
+
+function browserDocumentTitle(): string | null {
+  if (typeof document === 'undefined') return null;
+  const appNameMeta = document.querySelector<HTMLMetaElement>('meta[name="application-name"]');
+  return normalizeMetadataString(appNameMeta?.content)
+    ?? normalizeMetadataString(document.title);
+}
+
+function browserLocale(): string | null {
+  if (typeof navigator === 'undefined') return null;
+  return normalizeMetadataString(navigator.languages?.[0])
+    ?? normalizeMetadataString(navigator.language);
+}
+
+function browserTimezone(): string | null {
+  try {
+    return normalizeMetadataString(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  } catch {
+    return null;
+  }
+}
+
+function clientInfoValue(value: string | null | undefined): string | null {
+  return normalizeMetadataString(value);
+}
+
+function nativeSdkVersion(module: SdkInitModule): string {
+  if (
+    typeof module._rac_wasm_get_version_major !== 'function'
+    || typeof module._rac_wasm_get_version_minor !== 'function'
+    || typeof module._rac_wasm_get_version_patch !== 'function'
+  ) {
+    return SDK_VERSION;
+  }
+
+  try {
+    const major = module._rac_wasm_get_version_major();
+    const minor = module._rac_wasm_get_version_minor();
+    const patch = module._rac_wasm_get_version_patch();
+    if (major < 0 || minor < 0 || patch < 0) return SDK_VERSION;
+    return `${major}.${minor}.${patch}`;
+  } catch {
+    return SDK_VERSION;
+  }
+}
+
+function configureWebClientInfo(module: SdkInitModule): void {
+  if (typeof module._rac_wasm_set_client_info !== 'function') return;
+
+  const values = [
+    'web',
+    clientInfoValue(_initOptions?.appIdentifier)
+      ?? (typeof location !== 'undefined' ? normalizeMetadataString(location.origin) : null),
+    clientInfoValue(_initOptions?.appName) ?? browserDocumentTitle(),
+    clientInfoValue(_initOptions?.appVersion),
+    clientInfoValue(_initOptions?.appBuild),
+    browserLocale(),
+    browserTimezone(),
+  ];
+  const ptrs: number[] = [];
+  try {
+    for (const value of values) {
+      if (!value) {
+        ptrs.push(0);
+        continue;
+      }
+      const bytes = module.lengthBytesUTF8(value) + 1;
+      const ptr = module._malloc(bytes);
+      module.stringToUTF8(value, ptr, bytes);
+      ptrs.push(ptr);
+    }
+    module._rac_wasm_set_client_info(
+      ptrs[0],
+      ptrs[1],
+      ptrs[2],
+      ptrs[3],
+      ptrs[4],
+      ptrs[5],
+      ptrs[6],
+    );
+  } finally {
+    for (const ptr of ptrs) {
+      if (ptr) module._free(ptr);
+    }
+  }
+}
+
+function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string): void {
+  if (!result) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+      `${phase} returned no sdk-init result.`,
+    );
+  }
+  if (!result.success) {
+    throw new SDKException(result.error ?? {
+      category: 0,
+      code: 0,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+      message: `${phase} failed.`,
+      nestedMessage: result.warning || undefined,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: 0,
+      component: 'sdk',
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    });
+  }
+  if (result.warning) {
+    logger.warning(`${phase} completed with a warning`);
+  }
+}
+
+export function completeNativePhase1ForModule(module: EmscriptenRunanywhereModule): void {
+  if (_hasCompletedNativePhase1) return;
+  const sdkModule = module as SdkInitModule;
+  if (typeof sdkModule._rac_sdk_init_phase1_proto !== 'function') {
+    logger.warning(
+      'WASM module missing _rac_sdk_init_phase1_proto; native Phase 1 will run after the artifact is rebuilt.',
+    );
+    return;
+  }
+
+  const environment = _initOptions?.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+  const bytes = SdkInitPhase1Request.encode({
+    environment: mapSdkInitEnvironment(environment),
+    apiKey: _initOptions?.apiKey ?? '',
+    baseUrl: _initOptions?.baseURL ?? '',
+    deviceId: ensureDeviceId(),
+    platform: SDK_PLATFORM,
+    sdkVersion: nativeSdkVersion(sdkModule),
+  }).finish();
+
+  const result = invokeSdkInitProto(
+    sdkModule,
+    bytes,
+    sdkModule._rac_sdk_init_phase1_proto.bind(sdkModule),
+    'rac_sdk_init_phase1_proto',
+  );
+  throwIfSdkInitFailed(result, 'SDK Phase 1');
+  configureWebClientInfo(sdkModule);
+  _hasCompletedNativePhase1 = true;
+}
+
+export async function completeDeferredServicesInitialization(): Promise<void> {
+  if (!_isInitialized || _hasCompletedServicesInit) return;
+  await SDKCore.completeServicesInitialization();
+}
+
+function readNullableCString(fn?: () => number): string | null {
+  if (typeof fn !== 'function') return null;
+  const module = tryRunanywhereModule() as SdkInitModule | null;
+  if (!module) return null;
+  try {
+    const ptr = fn.call(module);
+    return ptr ? module.UTF8ToString(ptr) : null;
+  } catch {
+    return null;
+  }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Optional extra args accepted by the Swift-shaped flat facade verbs that
+ * mirror the cancellation contract Swift expresses through Task cancellation.
+ * Mirrors the `{ signal?: AbortSignal }` shape already used by
+ * `toolCalling.generateWithTools`.
+ */
+export interface CancellableCall {
+  signal?: AbortSignal;
+}
+
+/**
+ * Pre-check an AbortSignal before issuing a blocking native call. The Swift
+ * source dispatches via `Task.checkCancellation()` at each suspension point;
+ * the Web port can only short-circuit at the entry boundary because every
+ * `_rac_*` invocation runs synchronously inside a single WASM worker tick.
+ * Mirrors the eager-check pattern in `RunAnywhere+ToolCalling.ts`.
+ */
+function throwIfAborted(signal: AbortSignal | undefined, verb: string): void {
+  if (signal?.aborted) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_GENERATION_CANCELLED,
+      `${verb} cancelled`,
+      'AbortSignal was already aborted before the call was invoked',
+    );
+  }
+}
+
+/**
+ * Wire an AbortSignal into the synchronous WASM cancel ABI for a streaming
+ * call: the cancel function is invoked on abort so commons stops pulling
+ * more tokens. The returned cleanup detaches the listener. Suitable for
+ * `generateStream` / `transcribeStream` / `synthesizeStream` / VLM stream.
+ */
+function attachSignalToCancel(
+  signal: AbortSignal | undefined,
+  cancel: () => void,
+): () => void {
+  if (!signal) return () => undefined;
+  const onAbort = (): void => {
+    try {
+      cancel();
+    } catch { /* best-effort; native cancel may not be wired yet */ }
+  };
+  if (signal.aborted) {
+    onAbort();
+    return () => undefined;
+  }
+  signal.addEventListener('abort', onAbort, { once: true });
+  return () => signal.removeEventListener('abort', onAbort);
+}
+
+function throwIfStaleLifecycle(generation: number, operation: string): void {
+  if (generation !== _lifecycleGeneration) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_CANCELLED,
+      `${operation} cancelled because the SDK lifetime ended`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-file Download Helpers (Web / OPFS platform layer)
+// ---------------------------------------------------------------------------
+
+function opfsModelDirectory(model: ModelInfo): string | null {
+  const dir = frameworkOPFSDir(model.framework as InferenceFramework);
+  if (!dir) return null;
+  return `/opfs/RunAnywhere/Models/${dir}/${model.id}`;
+}
+
+/** Registry path after download/extract — archives hydrate as model dirs, not .tar.gz files. */
+function registryLocalPathForDownload(model: ModelInfo, reportedPath: string): string {
+  const modelDir = opfsModelDirectory(model);
+  if (modelDir && isExtractedDirectoryArtifact(model)) {
+    return modelDir;
+  }
+  const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
+  if (modelDir && isMultiFile) {
+    return modelDir;
+  }
+  return reportedPath;
+}
+
+/** Expected payload size used to reject mid-refresh partial OPFS files. */
+function expectedHydrationBytes(model: ModelInfo): number {
+  const fromFiles = (model.multiFile?.files ?? []).reduce(
+    (total, file) => total + Math.max(0, Number(file.sizeBytes ?? 0)),
+    0,
+  );
+  return Math.max(0, Number(model.downloadSizeBytes ?? 0), fromFiles);
+}
+
+async function isCompleteOpfsFile(path: string, expectedBytes: number): Promise<boolean> {
+  const size = await OPFSBridge.fileSize(path);
+  if (size <= 0) return false;
+  if (expectedBytes <= 0) return true;
+  // Match commons validate_downloaded_sizes (80% threshold).
+  return size * 5 >= expectedBytes * 4;
+}
+
+async function resolveHydratedModelPath(
+  model: ModelInfo,
+  frameworkDir: string,
+): Promise<{ exists: boolean; localPath: string }> {
+  const modelDir = `/opfs/RunAnywhere/Models/${frameworkDir}/${model.id}`;
+  const isMultiFile = (model.multiFile?.files?.length ?? 0) > 1;
+  const isExtractedDir = isExtractedDirectoryArtifact(model);
+  if (isMultiFile || isExtractedDir) {
+    const hasDir = await OPFSBridge.directoryHasArtifacts([
+      'RunAnywhere',
+      'Models',
+      frameworkDir,
+      model.id,
+    ]);
+    if (!hasDir) {
+      return { exists: false, localPath: modelDir };
+    }
+    // Archives unpack then delete the .tar.gz/.zip blob. Completeness is
+    // "extracted tree has files", not "archive file still present". Requiring
+    // primaryFilename (often `model.tar.gz`) falsely clears isDownloaded and
+    // breaks worker STT/TTS load after refresh.
+    if (isExtractedDir) {
+      return { exists: true, localPath: modelDir };
+    }
+    // Loose multi-file models: require the primary file to look complete.
+    const filename = primaryFilenameFromModel(model);
+    if (filename) {
+      const primaryPath = `${modelDir}/${filename}`;
+      const primaryExpected = Math.max(
+        0,
+        Number(
+          model.multiFile?.files?.find((file) => file.filename === filename)?.sizeBytes
+            ?? model.downloadSizeBytes
+            ?? 0,
+        ),
+      );
+      if (!(await isCompleteOpfsFile(primaryPath, primaryExpected))) {
+        return { exists: false, localPath: modelDir };
+      }
+    }
+    return { exists: true, localPath: modelDir };
+  }
+  const filename = primaryFilenameFromModel(model);
+  if (!filename) {
+    return { exists: false, localPath: modelDir };
+  }
+  const opfsPath = `${modelDir}/${filename}`;
+  const exists = await OPFSBridge.exists(opfsPath)
+    && await isCompleteOpfsFile(opfsPath, expectedHydrationBytes(model));
+  return { exists, localPath: exists ? opfsPath : modelDir };
+}
+
+/**
+ * Mirror a completed download into the user-visible model registry so
+ * `getModel()` / `downloadedModels()` reflect on-disk state immediately.
+ * Matches iOS `RunAnywhere+Storage.persistDownloadCompletion` → `importModel`.
+ *
+ * Self-heal inside the C++ download orchestrator may update only the
+ * commons WASM's `s_model_registry`. `registerModel` broadcasts to every
+ * known module via `ModelRegistryAdapter`.
+ */
+/**
+ * Invoke one of the `rac_wasm_file_manager_clear_*` shims (wasm_exports.cpp)
+ * on the commons-owning module. The shims build the rac_file_callbacks_t in
+ * C++ against the module's own filesystem, so commons keeps ownership of the
+ * Cache/Temp path computation and clear semantics.
+ */
+async function callWasmFileManagerClear(
+  operation: 'clearCache' | 'cleanTempFiles',
+  exportName: '_rac_wasm_file_manager_clear_cache' | '_rac_wasm_file_manager_clear_temp',
+): Promise<void> {
+  const module = getModuleForCapability('commons') ?? tryRunanywhereModule();
+  const fn = (module as unknown as Record<string, (() => number) | undefined>)?.[exportName];
+  if (!module || typeof fn !== 'function') {
+    throw SDKException.backendNotAvailable(
+      operation,
+      `The loaded WASM artifact does not export ${exportName}; rebuild with ` +
+        `sdk/runanywhere-web/scripts/build-core-wasm.sh to enable ${operation}.`,
+    );
+  }
+  const rc = fn();
+  if (rc !== 0) {
+    throw SDKException.fromCode(rc, `${exportName} failed with code ${rc}`);
+  }
+}
+
+function mirrorDownloadCompletionToRegistry(model: ModelInfo, localPath: string): void {
+  const importedModel: ModelInfo = {
+    ...model,
+    localPath,
+    isDownloaded: true,
+    isAvailable: true,
+    updatedAtUnixMs: Date.now(),
+  };
+  // Swift parity (RunAnywhere+Storage.swift persistDownloadCompletion):
+  // route through the commons import path (ModelImportRequest →
+  // rac_model_registry_import_proto) so C++ owns import semantics instead
+  // of a bare registerModel write.
+  const result = ModelRegistryCapability.importModel({
+    model: importedModel,
+    sourcePath: localPath,
+    copyIntoManagedStorage: false,
+    overwriteExisting: true,
+    validateBeforeRegister: false,
+    files: importedModel.multiFile?.files ?? [],
+  });
+  if (!result?.success) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+      result?.errorMessage
+        ? result.errorMessage
+        : 'Downloaded model could not be imported into the registry',
+      'downloadModel',
+    );
+  }
+}
+
+/**
+ * Reconcile the Web vision-language provider's private "loaded" flag with
+ * the canonical C++ lifecycle state. Called from `loadModel` and
+ * `unloadModel` so example app views never need to invoke
+ * `RunAnywhere.visionLanguage.loadCurrentModel()` themselves.
+ *
+ * Both `.multimodal` and `.vision` categories collapse to
+ * `SDK_COMPONENT_VLM` in C++ commons (same as iOS Swift); query both
+ * before deciding the provider should be unloaded.
+ *
+ * Errors are swallowed because backend availability is allowed to lag
+ * the lifecycle (e.g. LlamaCPP WASM still initializing). Real provider
+ * failures will surface when `processImage` next runs.
+ */
+async function syncVisionLanguageProviderToLifecycle(): Promise<void> {
+  try {
+    const currentVLM =
+      ModelLifecycleCapability.currentModel({
+        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        includeModelMetadata: true,
+      }) ??
+      ModelLifecycleCapability.currentModel({
+        category: ModelCategory.MODEL_CATEGORY_VISION,
+        includeModelMetadata: true,
+      });
+
+    const hasVLMModelLoaded = Boolean(currentVLM?.modelId);
+    const providerReportsLoaded = VisionLanguageCapability.isModelLoaded;
+
+    if (hasVLMModelLoaded && !providerReportsLoaded) {
+      await VisionLanguageCapability.loadCurrentModel();
+    } else if (!hasVLMModelLoaded && providerReportsLoaded) {
+      await VisionLanguageCapability.unloadModel();
+    }
+  } catch (err) {
+    if (err instanceof SDKException && err.code === ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE) {
+      return;
+    }
+    logger.debug(
+      `vision-language provider sync skipped: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+function isVisionLanguageCategory(category: ModelCategory): boolean {
+  return category === ModelCategory.MODEL_CATEGORY_MULTIMODAL
+    || category === ModelCategory.MODEL_CATEGORY_VISION;
+}
+
+/** Let a JSPI promising export fully unwind before entering its WASM again. */
+function nextLifecycleTurn(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/**
+ * Plan a download and retry once after clearing oversize partial bytes.
+ *
+ * Mirrors Swift `RunAnywhere+Storage.planDownload(_:)`: when a prior
+ * interrupted download left more bytes on disk than the new plan expects
+ * (e.g. the server reported a smaller Content-Length after a CDN swap),
+ * delete the oversize partials and re-plan instead of surfacing
+ * `existing partial bytes exceed` to the caller as a hard error. Web partials
+ * live in each module's MEMFS and in OPFS under the synthetic `/opfs/` prefix,
+ * so the removal goes through `OPFSBridge.removeFile`.
+ */
+async function planDownloadWithSelfHeal(
+  modelId: string,
+  request: DownloadPlanRequest,
+): Promise<DownloadPlanResult | null> {
+  const plan = DownloadsCapability.plan(request);
+  if (
+    !plan ||
+    plan.canStart ||
+    plan.failureReason !== DownloadFailureReason.DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES
+  ) {
+    return plan;
+  }
+
+  const modules = getAllRegisteredModules();
+  for (const file of plan.files) {
+    if (!file.destinationPath) continue;
+    await OPFSBridge.removeFile(modules, file.destinationPath);
+    logger.warning(
+      `Removed oversize partial download at '${file.destinationPath}' for '${modelId}'`,
+    );
+  }
+
+  return DownloadsCapability.plan(request);
+}
+
+/**
+ * Browser OPFS / origin free space from `navigator.storage.estimate()`.
+ * Returns 0 when the API is unavailable so callers can fall back to other
+ * gates. Never returns MEMFS/WASM-heap leftovers — those falsely refuse
+ * multi-GB downloads (see download_orchestrator filesystem_available_bytes).
+ */
+async function resolveBrowserAvailableStorageBytes(): Promise<number> {
+  if (typeof navigator === 'undefined' || typeof navigator.storage?.estimate !== 'function') {
+    return 0;
+  }
+  try {
+    const estimate = await navigator.storage.estimate();
+    const quota = Number(estimate.quota ?? 0);
+    const usage = Number(estimate.usage ?? 0);
+    if (!Number.isFinite(quota) || quota <= 0) return 0;
+    return Math.max(0, quota - (Number.isFinite(usage) ? Math.min(quota, usage) : 0));
+  } catch {
+    return 0;
+  }
+}
+
+async function assertBrowserStorageQuota(
+  modelId: string,
+  plan: DownloadPlanResult,
+  requiredFreeBytesAfterDownload: number,
+  availableStorageBytes?: number,
+): Promise<void> {
+  const remaining = availableStorageBytes !== undefined && availableStorageBytes > 0
+    ? availableStorageBytes
+    : await resolveBrowserAvailableStorageBytes();
+  if (remaining <= 0) return;
+  const planWithSizes = plan as unknown as {
+    totalBytes?: number;
+    requiredBytes?: number;
+    files?: Array<{ totalBytes?: number; expectedBytes?: number; sizeBytes?: number; remainingBytes?: number }>;
+  };
+  const plannedBytes = planWithSizes.requiredBytes
+    ?? planWithSizes.totalBytes
+    ?? planWithSizes.files?.reduce(
+      (total, file) => total + (file.remainingBytes ?? file.expectedBytes ?? file.totalBytes ?? file.sizeBytes ?? 0),
+      0,
+    )
+    ?? 0;
+  const needed = plannedBytes + requiredFreeBytesAfterDownload;
+  // A plan without size metadata cannot be preflighted safely; commons still
+  // performs its native storage check before it starts the transfer.
+  if (needed > 0 && needed > remaining) {
+    throw SDKException.fromCode(
+      -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+      `Insufficient browser storage for '${modelId}': need ${needed} bytes, only ${remaining} bytes remain.`,
+      'downloadModel',
+    );
+  }
+}
+
+/** Map a failed download plan/start/terminal state to a storage or download error. */
+function throwDownloadFailure(feature: string, message: string, reason?: DownloadFailureReason): never {
+  const storageFailure = reason === DownloadFailureReason.DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE
+    || /not enough storage|insufficient (browser )?storage|free space/i.test(message);
+  throw SDKException.fromCode(
+    storageFailure
+      ? -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR
+      : -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+    message,
+    feature,
+  );
+}
+
+async function pollDownloadWithRetry(
+  modelId: string,
+  taskId: string,
+  maxRetries = networkDefaults.maxRetries,
+): Promise<DownloadProgress | null> {
+  let failure: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return DownloadsCapability.poll({ modelId, taskId });
+    } catch (error) {
+      failure = error;
+      if (attempt === maxRetries) break;
+      const backoffMs = networkDefaults.retryBackoffBaseMs * (2 ** attempt);
+      logger.warning(`Download poll failed; resuming '${modelId}' in ${backoffMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await delay(backoffMs);
+      // Native download tasks retain their resume token and partial bytes.
+      // Polling again is therefore resumable without restarting the transfer.
+    }
+  }
+  throw SDKException.fromCode(
+    -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+    `Download polling failed after ${maxRetries + 1} attempts: ${failure instanceof Error ? failure.message : String(failure)}`,
+    'downloadModel',
+  );
+}
+
+// The previous in-TS multi-file
+// orchestrator that walked `model.multiFile.files`, fetched each URL,
+// wrote to OPFS, and mirrored to MEMFS used to live here. The commons C
+// download orchestrator already drives the same flow via
+// `rac_download_plan_proto` / `rac_download_start_proto` /
+// `rac_download_progress_poll_proto` (the multi_file_plan branch in
+// `download_orchestrator.cpp` writes the folder path back as
+// `completion_local_path`), and the post-download
+// `OPFSBridge.ensureDownloadPersisted` already detects directory artifacts
+// and flushes them recursively into OPFS via `flushDirectoryFromMemfs`.
+// Multi-file models now share the single canonical download codepath as
+// every other framework SDK; nothing Web-specific belongs in the TS layer.
+
+// ---------------------------------------------------------------------------
+// HTTP retry (mirrors Swift retryHTTPSetup / RN retryHTTPSetupInternal)
+// ---------------------------------------------------------------------------
+
+/**
+ * Retry HTTP/auth after an offline initialization. Commons owns the retry
+ * orchestration (auth, device registration, telemetry flush); Web only
+ * ensures the fetch-backed transport was registered with the active WASM.
+ */
+async function retryHTTPSetup(): Promise<void> {
+  if (_hasCompletedHTTPSetup) return;
+  const module = tryRunanywhereModule() as SdkInitModule | null;
+  if (!module) {
+    throw SDKException.backendNotAvailable(
+      'retryHTTPSetup',
+      'No active commons WASM module is available for HTTP setup retry.',
+    );
+  }
+  const retry = module._rac_sdk_retry_http_proto;
+  if (typeof retry !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'retryHTTPSetup',
+      'The loaded WASM artifact does not export _rac_sdk_retry_http_proto. ' +
+        'Rebuild and package the current Web native artifacts.',
+    );
+  }
+
+  const result = invokeSdkResultProto(
+    module,
+    retry.bind(module),
+    'rac_sdk_retry_http_proto',
+  );
+  throwIfSdkInitFailed(result, 'SDK HTTP retry');
+  _hasCompletedHTTPSetup = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
+  if (result?.warning) {
+    logger.debug('HTTP/Auth retry completed with a warning');
+  }
+  if (_hasCompletedHTTPSetup) {
+    logger.info('HTTP/Auth setup succeeded on retry');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SDK core — lifecycle, identity, model lifecycle, downloads, browser storage.
+//
+// Not a public symbol. The public surface is the namespaced `RunAnywhere`
+// facade in `Public/API/RunAnywhere.ts`, which delegates here.
+// ---------------------------------------------------------------------------
+
+export const SDKCore = {
+  // =========================================================================
+  // SDK State
+  // =========================================================================
+
+  get isInitialized(): boolean {
+    return _isInitialized;
+  },
+
+  /** Mirror Swift `RunAnywhere.areServicesReady` (Phase 2 complete). */
+  get areServicesReady(): boolean {
+    return _hasCompletedServicesInit;
+  },
+
+  /** Mirror Swift `RunAnywhere.isActive`. */
+  get isActive(): boolean {
+    return _isInitialized && _initOptions !== null;
+  },
+
+  get version(): string {
+    return SDK_VERSION;
+  },
+
+  get environment(): SDKEnvironment | null {
+    return _initOptions?.environment ?? null;
+  },
+
+  get events(): EventBus {
+    return EventBus.shared;
+  },
+
+  /**
+   * Stable device identifier. On the Web SDK this is persisted in
+   * `localStorage` so it survives reloads.
+   */
+  get deviceId(): string {
+    return ensureDeviceId();
+  },
+
+  /**
+   * Returns true if the SDK currently holds a non-expired access token.
+   *
+   * Delegates to commons `rac_auth_is_authenticated()` via the WASM module
+   * once a commons/backend module has installed it. Before any module loads,
+   * no WASM module exists and the SDK cannot be authenticated — this returns false.
+   *
+   * Phase 2 owns auth/refresh in commons via the registered browser fetch
+   * transport; this getter only reflects the current native auth state.
+   */
+  get isAuthenticated(): boolean {
+    const mod = tryRunanywhereModule() as SdkInitModule | null;
+    if (!mod) return false;
+    const fn = mod._rac_auth_is_authenticated;
+    if (typeof fn !== 'function') return false;
+    try {
+      return fn.call(mod) !== 0;
+    } catch {
+      return false;
+    }
+  },
+
+  getUserId(): string | null {
+    const mod = tryRunanywhereModule() as SdkInitModule | null;
+    return readNullableCString(mod?._rac_auth_get_user_id);
+  },
+
+  getOrganizationId(): string | null {
+    const mod = tryRunanywhereModule() as SdkInitModule | null;
+    return readNullableCString(mod?._rac_auth_get_organization_id);
+  },
+
+  isDeviceRegistered(): boolean {
+    const mod = tryRunanywhereModule() as SdkInitModule | null;
+    const fn = mod?._rac_state_is_device_registered;
+    if (typeof fn !== 'function') return false;
+    try {
+      return fn.call(mod) !== 0;
+    } catch {
+      return false;
+    }
+  },
+
+  /** Runtime configuration surface (acceleration mode etc.). */
+  get runtime(): typeof Runtime {
+    return Runtime;
+  },
+
+  /** Configure the Hugging Face download token (or clear it with `null`). */
+  setHfToken,
+
+  /** Convenience setter for the preferred acceleration. */
+  async setRuntime(mode: 'cpu' | 'webgpu' | 'auto'): Promise<void> {
+    if (mode === 'auto') {
+      Runtime.preferred = 'auto';
+      return;
+    }
+    await Runtime.setAcceleration(mode);
+  },
+
+  // =========================================================================
+  // Initialization
+  // =========================================================================
+
+  /**
+   * Initialize the RunAnywhere SDK.
+   *
+   * Web owns browser setup (logging, persisted storage, WASM/package loading,
+   * OPFS/MEMFS hydration, fetch transport registration). Commons owns the
+   * deterministic init phases once a WASM module is available.
+   */
+  async initialize(options: SDKInitOptions = {}): Promise<void> {
+    if (_shutdownPromise) {
+      await _shutdownPromise;
+    }
+    if (_shutdownRequired) {
+      throw SDKException.invalidState(
+        'The previous SDK shutdown did not complete; retry shutdown before initialization.',
+      );
+    }
+    if (_isInitialized) {
+      logger.debug('Already initialized');
+      return;
+    }
+
+    if (_initializingPromise) {
+      logger.debug('Initialization already in progress, awaiting...');
+      return _initializingPromise;
+    }
+
+    const lifecycleGeneration = _lifecycleGeneration;
+    const initializingPromise = (async () => {
+      try {
+        const env = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+        _initOptions = { ...options, environment: env };
+
+        // Swift parity (RunAnywhere.swift performCoreInitSerial): set the
+        // environment first so logging boots with the correct config
+        // (dev=debug, prod=warning/local-off).
+        SDKLogger.applyEnvironmentConfiguration(env);
+
+        logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
+
+        if (typeof ReadableStream === 'undefined') {
+          throw SDKException.fromCode(
+            -ProtoErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+            'ReadableStream is not available in this environment. ' +
+            'The RunAnywhere Web SDK requires the Fetch Streams API ' +
+            '(Chrome 43+, Firefox 65+, Safari 14.1+, Edge 79+).',
+          );
+        }
+
+        try {
+          await SDKCore.storage.restoreLocalStorage();
+        } catch {
+          logger.warning('Failed to restore local storage');
+        }
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
+
+        await requestPersistentStorage();
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
+
+        // Load the core commons WASM so the SDK facade (init, environment,
+        // auth, model registry, lifecycle, proto events) has its native
+        // backing. Swift parity (RunAnywhere.swift performCoreInitSerial):
+        // Phase 1 failure is fatal — initialize() rethrows and
+        // `isInitialized` stays false.
+        await CommonsModule.shared.ensureLoaded({
+          apiKey: _initOptions.apiKey,
+          baseURL: _initOptions.baseURL,
+          environment: env,
+          sdkVersion: SDK_VERSION,
+        });
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
+
+        // Re-apply any previously stored HF token so a rebuilt WASM artifact
+        // that exports `_rac_http_hf_token_set` receives it after commons load.
+        try {
+          const storedHfToken = getStoredHfToken();
+          if (storedHfToken) setHfToken(storedHfToken);
+        } catch (error) {
+          logger.debug(
+            `Hugging Face token hydration skipped: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+
+        _isInitialized = true;
+
+        ensureDeviceId();
+
+        logger.info('RunAnywhere Web SDK initialized successfully');
+        EventBus.shared.publish('sdk.initialized', EventCategory.EVENT_CATEGORY_INITIALIZATION, {
+          environment: env,
+        });
+
+        // Phase 2 (services) runs in the background so initialize() can
+        // resolve before the WASM-backed services come up. A failure must
+        // be observable to callers — surface it on the event bus and keep
+        // `areServicesReady === false` so polling consumers can react.
+        // The promise itself is intentionally fire-and-forget; consumers
+        // who need to wait can call `RunAnywhere.completeServicesInitialization()`
+        // (or `ensureServicesReady()`) directly and await the same promise.
+        void SDKCore.completeServicesInitialization().catch(() => {
+          const message = 'Phase 2 initialization failed';
+          logger.warning('Phase 2 init failed (non-fatal)');
+          EventBus.shared.publish(
+            'sdk.initializationFailed',
+            EventCategory.EVENT_CATEGORY_INITIALIZATION,
+            { error: message, source: 'completeServicesInitialization' },
+          );
+        });
+
+        // Hydrate any pre-existing OPFS-backed models registered before
+        // `initialize()` returned, so the Storage tab paints the correct
+        // "Downloaded" state on first render. Catalogs registered AFTER
+        // `initialize()` resolves go through the new `registerModel(...)`
+        // overloads, which schedule their own follow-up hydrate. This
+        // call is idempotent and no-ops if the registry is empty.
+        try {
+          await SDKCore.hydrateModelRegistry();
+        } catch {
+          logger.warning('Initial model registry hydrate failed (non-fatal)');
+        }
+        throwIfStaleLifecycle(lifecycleGeneration, 'SDK initialization');
+      } catch (error) {
+        if (lifecycleGeneration !== _lifecycleGeneration) {
+          logger.debug('Discarding initialization work from a shut-down SDK lifetime');
+          throw error;
+        }
+        // Swift parity (RunAnywhere.swift performCoreInitSerial error path):
+        // reset init state fully and rethrow so callers observe the failure.
+        logger.error('Initialization failed');
+        const rollbackFailures: unknown[] = [];
+        const rollback = (operation: string, action: () => void): void => {
+          try {
+            action();
+          } catch (rollbackError) {
+            logger.warning(`${operation} failed during initialization rollback`);
+            rollbackFailures.push(rollbackError);
+          }
+        };
+        rollback('Commons shutdown', () => CommonsModule.shared.shutdown());
+        rollback('WASM module cleanup', clearRunanywhereModule);
+        rollback('HTTP adapter cleanup', () => HTTPAdapter.clearDefaultModule());
+        rollback('Storage adapter cleanup', () => StorageAdapter.clearDefaultHandles());
+        _isInitialized = false;
+        _initOptions = null;
+        _deviceId = null;
+        _hasCompletedNativePhase1 = false;
+        _hasCompletedServicesInit = false;
+        _hasCompletedHTTPSetup = false;
+        _servicesInitPromise = null;
+        _shutdownRequired = rollbackFailures.length > 0;
+        throw error;
+      }
+    })();
+    _initializingPromise = initializingPromise;
+    void initializingPromise.finally(() => {
+      if (_initializingPromise === initializingPromise) {
+        _initializingPromise = null;
+      }
+    }).catch(() => undefined);
+
+    return initializingPromise;
+  },
+
+  /**
+   * Complete the Phase 2 (services) initialization. Mirror of Swift's
+   * `RunAnywhere.completeServicesInitialization()`. Idempotent — concurrent
+   * callers share a single in-flight promise. The promise is kept alive until
+   * it either settles successfully (`_hasCompletedServicesInit = true`) or
+   * throws, mirroring Swift's `_servicesInitLock` + `_servicesInitTask` join
+   * pattern so two callers arriving concurrently never spawn duplicate Phase 2
+   * work.
+   */
+  async completeServicesInitialization(): Promise<void> {
+    if (_shutdownPromise || _shutdownRequired) {
+      throw SDKException.invalidState('SDK shutdown is in progress.');
+    }
+    if (_hasCompletedServicesInit) return;
+    if (_servicesInitPromise) return _servicesInitPromise;
+
+    const lifecycleGeneration = _lifecycleGeneration;
+    const servicesInitPromise = Promise.resolve().then(async () => {
+      try {
+        const module = tryRunanywhereModule() as SdkInitModule | null;
+        if (!module) {
+          logger.debug('Services initialization deferred until a Web backend registers a WASM module');
+          if (_servicesInitPromise === servicesInitPromise) {
+            _servicesInitPromise = null;
+          }
+          return;
+        }
+
+        if (!_hasCompletedNativePhase1) {
+          completeNativePhase1ForModule(module);
+        }
+
+        let httpConfigured = false;
+        if (typeof module._rac_sdk_init_phase2_proto === 'function') {
+          const environment = _initOptions?.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+          const bytes = SdkInitPhase2Request.encode({
+            // No released SDK bakes or forwards a build token; the backend is
+            // reached only through the effective base URL (keyless staging).
+            buildToken: '',
+            forceRefreshAssignments: false,
+            flushTelemetry: true,
+            discoverDownloadedModels: true,
+            rescanLocalModels: true,
+          }).finish();
+          const result = invokeSdkInitProto(
+            module,
+            bytes,
+            module._rac_sdk_init_phase2_proto.bind(module),
+            'rac_sdk_init_phase2_proto',
+          );
+          throwIfSdkInitFailed(result, 'SDK Phase 2');
+          await completePendingDeviceRegistration(
+            module,
+            environment,
+            '',
+            lifecycleGeneration,
+          );
+          if (lifecycleGeneration !== _lifecycleGeneration) return;
+          httpConfigured = result?.hasCompletedHttpSetup ?? result?.httpConfigured ?? false;
+          const linkedModelsCount = result?.linkedModelsCount ?? 0;
+          if (linkedModelsCount > 0) {
+            logger.info(`Phase 2 linked ${linkedModelsCount} downloaded models`);
+          }
+        } else {
+          logger.warning(
+            'WASM module missing _rac_sdk_init_phase2_proto; services init remains browser-only until rebuild.',
+          );
+        }
+
+        if (lifecycleGeneration !== _lifecycleGeneration) return;
+        _hasCompletedServicesInit = true;
+        _hasCompletedHTTPSetup = httpConfigured;
+        if (httpConfigured) {
+          logger.debug('Services initialization complete (Phase 2)');
+        } else {
+          logger.debug('Services initialization complete (Phase 2, HTTP/auth deferred — will retry on next online call)');
+        }
+      } catch (err) {
+        // A shutdown owns the stale lifetime's outcome. Do not let a late
+        // rejection clear or fail a newer lifecycle's services promise.
+        if (lifecycleGeneration !== _lifecycleGeneration) return;
+        // Clear the promise on failure so a subsequent retry can re-enter.
+        if (_servicesInitPromise === servicesInitPromise) {
+          _servicesInitPromise = null;
+        }
+        throw err;
+      }
+      // Success path: leave _servicesInitPromise set so any late concurrent
+      // caller that reads it after _hasCompletedServicesInit flips true still
+      // gets a resolved promise rather than re-entering the init logic.
+    });
+    _servicesInitPromise = servicesInitPromise;
+    void servicesInitPromise.finally(() => {
+      if (!_hasCompletedServicesInit && _servicesInitPromise === servicesInitPromise) {
+        // A no-module/deferred path must remain retryable. Keeping this
+        // resolved no-op promise would permanently suppress Phase 2 after a
+        // module is registered later in the same SDK lifetime.
+        _servicesInitPromise = null;
+      }
+    }).catch(() => undefined);
+    return servicesInitPromise;
+  },
+
+  /**
+   * Internal-style guard used by extensions that need a fully-initialized SDK.
+   * Three-branch mirror of Swift's ensureServicesReady():
+   *   1. Fast path: services + HTTP both done → return immediately.
+   *   2. Recovery path: services done, HTTP failed (offline init) → retry HTTP only.
+   *   3. Cold-start path: Phase 2 not yet run → completeServicesInitialization().
+   */
+  async ensureServicesReady(): Promise<void> {
+    if (_shutdownPromise || _shutdownRequired) {
+      throw SDKException.invalidState('SDK shutdown is in progress.');
+    }
+    if (!_isInitialized && !tryRunanywhereModule()) {
+      throw SDKException.notInitialized(
+        'RunAnywhere.initialize() must complete before services can be used.',
+      );
+    }
+    if (_hasCompletedServicesInit && _hasCompletedHTTPSetup) {
+      return;
+    }
+    if (_hasCompletedServicesInit && !_hasCompletedHTTPSetup) {
+      await retryHTTPSetup();
+      return;
+    }
+    return SDKCore.completeServicesInitialization();
+  },
+
+  // =========================================================================
+  // Storage namespace
+  //
+  // Intentionally PUBLIC despite having no Swift namespace counterpart:
+  // File System Access API / OPFS directory selection, persistence restore,
+  // and backend probing are genuinely Web-platform surface (the browser is
+  // the only platform where the host must ask the user for a persistent
+  // filesystem), so this stays a web-justified namespace rather than being
+  // folded into the Swift-shaped flat facade.
+  // =========================================================================
+
+  storage: createStorageNamespace({
+    get isLocalStorageSupported(): boolean {
+      return LocalFileStorage.isSupported;
+    },
+
+    get isLocalStorageReady(): boolean {
+      return _localFileStorage?.isReady ?? false;
+    },
+
+    get hasLocalStorageHandle(): boolean {
+      return _localFileStorage?.hasStoredHandle ?? false;
+    },
+
+    get localStorageDirectoryName(): string | null {
+      return _localFileStorage?.directoryName ?? LocalFileStorage.storedDirectoryName;
+    },
+
+    get storageBackend(): StorageBackend {
+      if (LocalFileStorage.isSupported && _localFileStorage?.isReady) {
+        return 'fsAccess';
+      }
+      const hasOPFS = typeof navigator !== 'undefined'
+        && 'storage' in navigator
+        && 'getDirectory' in (navigator.storage || {});
+      return hasOPFS ? 'opfs' : 'memory';
+    },
+
+    async chooseLocalStorageDirectory(): Promise<boolean> {
+      if (!LocalFileStorage.isSupported) {
+        logger.warning('File System Access API not supported — using browser storage (OPFS)');
+        return false;
+      }
+
+      if (!_localFileStorage) {
+        _localFileStorage = new LocalFileStorage();
+      }
+
+      const success = await _localFileStorage.chooseDirectory();
+      if (success) {
+        OPFSBridge.setPersistentRoot(_localFileStorage.writableDirectoryHandle);
+        if (_isInitialized) {
+          await SDKCore.hydrateModelRegistry();
+        }
+        EventBus.shared.publish('storage.localDirectorySelected', EventCategory.EVENT_CATEGORY_STORAGE, {
+          directoryName: _localFileStorage.directoryName,
+        });
+      }
+      return success;
+    },
+
+    async restoreLocalStorage(): Promise<boolean> {
+      if (!LocalFileStorage.isSupported) return false;
+
+      if (!_localFileStorage) {
+        _localFileStorage = new LocalFileStorage();
+      }
+
+      const success = await _localFileStorage.restoreDirectory();
+      if (success) {
+        OPFSBridge.setPersistentRoot(_localFileStorage.writableDirectoryHandle);
+        logger.info(`Local storage restored: ${_localFileStorage.directoryName}`);
+      } else {
+        // A stored handle with prompt/denied permission must not remain the
+        // active write target. Continue safely on OPFS until a user gesture
+        // grants access through requestLocalStorageAccess().
+        OPFSBridge.setPersistentRoot(null);
+      }
+      return success;
+    },
+
+    async requestLocalStorageAccess(): Promise<boolean> {
+      if (!_localFileStorage) return false;
+      const success = await _localFileStorage.requestAccess();
+      if (success) {
+        OPFSBridge.setPersistentRoot(_localFileStorage.writableDirectoryHandle);
+        if (_isInitialized) {
+          await SDKCore.hydrateModelRegistry();
+        }
+      }
+      return success;
+    },
+  }),
+
+  async loadModel(
+    request: Parameters<typeof ModelLifecycleCapability.loadModel>[0],
+  ): Promise<Awaited<ReturnType<typeof ModelLifecycleCapability.loadModelAsync>>> {
+    await SDKCore.ensureServicesReady();
+    const result = await ModelLifecycleCapability.loadModelAsync(request);
+    // VLM lifecycle mirror: when the loaded model is multimodal/vision and a
+    // Web vision-language provider is registered, automatically populate
+    // its private `_modelLoaded` flag against the lifecycle-resolved
+    // current model. Without this, app code had to call
+    // `RunAnywhere.visionLanguage.loadCurrentModel()` itself after every
+    // load — the SDK now owns that coupling so example views stay free
+    // of SDK-internal lifecycle bridge calls.
+    if (result?.success && isVisionLanguageCategory(result.category)) {
+      await nextLifecycleTurn();
+      await syncVisionLanguageProviderToLifecycle();
+    }
+    return result;
+  },
+
+  async unloadModel(
+    request: Parameters<typeof ModelLifecycleCapability.unloadModel>[0],
+  ): Promise<Awaited<ReturnType<typeof ModelLifecycleCapability.unloadModelAsync>>> {
+    const result = await ModelLifecycleCapability.unloadModelAsync(request);
+    // Symmetric to loadModel above: drop the VLM provider's loaded flag
+    // when the lifecycle no longer reports a current VLM model so the
+    // next processImage call surfaces "no model loaded" instead of
+    // dispatching against a stale provider handle.
+    if (result?.success) {
+      await nextLifecycleTurn();
+      await syncVisionLanguageProviderToLifecycle();
+    }
+    return result;
+  },
+
+  async downloadModel(
+    input: string | DownloadModelOptions,
+    extra: CancellableCall = {},
+  ): Promise<DownloadProgress> {
+    throwIfAborted(extra.signal, 'downloadModel');
+    await SDKCore.ensureServicesReady();
+    const request = typeof input === 'string' ? { modelId: input } : input;
+    const model = request.model ?? ModelRegistryCapability.getModel(request.modelId) ?? undefined;
+    if (!model) {
+      throw SDKException.backendNotAvailable(
+        'downloadModel',
+        `Model metadata for '${request.modelId}' is not registered.`,
+      );
+    }
+
+    // The split Web SDK downloads through the commons WASM, while inference
+    // runs in a separate backend WASM with its own private MEMFS. OPFS (or a
+    // user-approved directory routed through OPFSBridge) is the transfer
+    // medium between those modules. Reject before planning or starting the
+    // network request when no such medium exists; downloading into the
+    // commons MEMFS would leave bytes that no inference backend can read.
+    if (!OPFSBridge.isSupported) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+        'Model download requires persistent browser storage.',
+        'This browser provides neither OPFS nor an approved local directory. '
+          + 'Use a browser with OPFS support or choose a local storage folder, then retry.',
+      );
+    }
+
+    // Multi-file models (VLM = primary GGUF + mmproj
+    // sidecar, embeddings = model.onnx + vocab.txt) now flow through the
+    // same canonical plan/start/poll path. The C++ orchestrator's
+    // multi_file_plan branch reports the folder path as
+    // `completion_local_path`, and `OPFSBridge.ensureDownloadPersisted`
+    // recursively flushes the directory contents to OPFS + mirrors them
+    // into every module's MEMFS. No Web-specific orchestrator below.
+
+    const requiredBytes = Math.max(0, Number(model.downloadSizeBytes ?? 0));
+    const storageReady = await ensureDownloadStorageReady({ requiredBytes });
+
+    await prepareModelLoad({
+      request: {
+        modelId: request.modelId,
+        category: model.category,
+        framework: model.framework,
+      },
+      model,
+    });
+    ModelRegistryCapability.registerModel(model);
+
+    // Prefer the browser OPFS/origin quota over MEMFS leftovers. Shipping a
+    // real `availableStorageBytes` into the commons planner avoids the false
+    // "only 2 GB is free" refusal on multi-GB models (Qwen3 4B, etc.).
+    let browserAvailableBytes = request.availableStorageBytes !== undefined
+      && request.availableStorageBytes > 0
+      ? request.availableStorageBytes
+      : storageReady.availableBytes > 0
+        ? storageReady.availableBytes
+        : await resolveBrowserAvailableStorageBytes();
+    // When estimate() is unavailable, still avoid the MEMFS ~2 GB figure that
+    // commons would otherwise read via fs::space. OPFS quota is enforced by the
+    // browser during the write; assertBrowserStorageQuota remains best-effort.
+    if (browserAvailableBytes <= 0 && OPFSBridge.isSupported) {
+      browserAvailableBytes = Number.MAX_SAFE_INTEGER;
+      logger.debug(
+        'navigator.storage.estimate() unavailable — skipping MEMFS free-space gate for OPFS download',
+      );
+    }
+
+    // Plan defaults mirror Swift RunAnywhere+Storage.swift:187-189:
+    // resumeExisting=true, validateExistingBytes=true,
+    // verifyChecksums=!checksum.isEmpty.
+    const planRequest = {
+      modelId: request.modelId,
+      model,
+      resumeExisting: request.resumeExisting ?? true,
+      availableStorageBytes: browserAvailableBytes,
+      allowMeteredNetwork: request.allowMeteredNetwork ?? true,
+      storageNamespace: request.storageNamespace ?? '',
+      validateExistingBytes: request.validateExistingBytes ?? true,
+      verifyChecksums:
+        request.verifyChecksums ?? (model.checksumSha256?.length ?? 0) > 0,
+      requiredFreeBytesAfterDownload: request.requiredFreeBytesAfterDownload ?? 0,
+    };
+    const plan = await planDownloadWithSelfHeal(request.modelId, planRequest);
+    if (!plan?.canStart) {
+      throwDownloadFailure(
+        'downloadModel',
+        plan?.errorMessage || `Download plan for '${request.modelId}' could not start.`,
+        plan?.failureReason,
+      );
+    }
+    await assertBrowserStorageQuota(
+      request.modelId,
+      plan,
+      request.requiredFreeBytesAfterDownload ?? 0,
+      browserAvailableBytes,
+    );
+
+    // Swift parity (RunAnywhere+Storage.swift:207-210): commons does NOT
+    // update the registry on completion; the explicit import below
+    // (mirrorDownloadCompletionToRegistry — Web's RAModelImportRequest
+    // equivalent) is the canonical persistence step, run after the OPFS
+    // flush. Callers may still opt out via updateRegistryOnCompletion=false.
+    const start = DownloadsCapability.start({
+      modelId: request.modelId,
+      plan,
+      resume: request.resumeExisting ?? true,
+      resumeToken: plan.resumeToken,
+      updateRegistryOnCompletion: false,
+    });
+    if (!start?.accepted) {
+      throwDownloadFailure(
+        'downloadModel',
+        start?.errorMessage || `Download start for '${request.modelId}' was rejected.`,
+      );
+    }
+
+    const terminal = new Set([
+      DownloadState.DOWNLOAD_STATE_COMPLETED,
+      DownloadState.DOWNLOAD_STATE_FAILED,
+      DownloadState.DOWNLOAD_STATE_CANCELLED,
+    ]);
+
+    // Mirror Swift's `cancelNativeDownload(taskID:modelID:)`: wire the
+    // AbortSignal so rac_download_cancel_proto fires with deletePartialBytes=false
+    // (preserves resume tokens). Detach the listener in the finally block.
+    const detachCancel = attachSignalToCancel(extra.signal, () => {
+      DownloadsCapability.cancel({
+        modelId: request.modelId,
+        taskId: start.taskId,
+        deletePartialBytes: false,
+      });
+    });
+
+    let lastProgress = start.initialProgress;
+    // Suppress COMPLETED here for the same reason as the poll loop below:
+    // a cached download whose `start.initialProgress` is already COMPLETED
+    // would otherwise produce two onProgress callbacks (one here, one after
+    // the OPFS flush below). The single post-flush emit at the bottom of
+    // downloadModel() is the canonical "download done" signal.
+    if (lastProgress && lastProgress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
+      request.onProgress?.(lastProgress);
+    }
+
+    try {
+      while (!lastProgress || !terminal.has(lastProgress.state)) {
+        throwIfAborted(extra.signal, 'downloadModel');
+        await delay(request.pollIntervalMs ?? 250);
+        const progress = await pollDownloadWithRetry(request.modelId, start.taskId);
+        if (!progress) continue;
+        lastProgress = progress;
+        // Defer COMPLETED to onProgress until OPFS flush finishes.
+        // UI/E2E often triggers loadModel on COMPLETED; firing it early races
+        // the async MEMFS→OPFS persist that follows the poll loop.
+        if (progress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
+          request.onProgress?.(progress);
+        }
+      }
+    } finally {
+      detachCancel();
+    }
+
+    if (lastProgress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
+      throwDownloadFailure(
+        'downloadModel',
+        lastProgress.errorMessage || `Download for '${request.modelId}' ended in state ${lastProgress.state}.`,
+      );
+    }
+
+    // OPFS persistence: the C++ download orchestrator wrote
+    // bytes via `std::ofstream` which on Emscripten lands on MEMFS — an
+    // in-memory filesystem invisible to `navigator.storage.estimate()` and
+    // destroyed on tab reload. Flush the freshly-written file into the
+    // Origin Private File System so the download actually persists.
+    //
+    // Architectural note: on iOS / Android / desktop the SDKs do nothing
+    // here because libc maps `std::ofstream` to the real filesystem.
+    // Web's responsibility — per the platform-adapter IoC contract — is to
+    // back the synthetic `/opfs/` prefix with a real persistent
+    // filesystem. We do that here at the TS layer (no WASM rebuild) by
+    // mirroring MEMFS → OPFS once the download completes.
+    if (lastProgress.localPath) {
+      const downloaderModule = getModuleForCapability('commons')
+        ?? tryRunanywhereModule();
+      const allModules = getAllRegisteredModules();
+      if (downloaderModule) {
+        try {
+          await OPFSBridge.ensureDownloadPersisted(
+            lastProgress.localPath,
+            downloaderModule,
+            allModules,
+          );
+        } catch (err) {
+          throw SDKException.fromCode(
+            -ProtoErrorCode.ERROR_CODE_STORAGE_ERROR,
+            err instanceof Error ? err.message : String(err),
+            'downloadModel',
+          );
+        }
+      }
+    }
+
+    // Single canonical COMPLETED emit: both the start.initialProgress
+    // branch and the poll loop intentionally suppress COMPLETED so the only
+    // place this fires is HERE, AFTER OPFSBridge.ensureDownloadPersisted has
+    // resolved. UI/E2E observers gate loadModel on this; firing earlier races
+    // the MEMFS→OPFS persist.
+    request.onProgress?.(lastProgress);
+
+    // Self-heal may only update the commons WASM registry. Mirror
+    // localPath + isDownloaded into every module so harness/UI polls succeed.
+    if (request.updateRegistryOnCompletion !== false && lastProgress.localPath) {
+      try {
+        const registryPath = registryLocalPathForDownload(model, lastProgress.localPath);
+        mirrorDownloadCompletionToRegistry(model, registryPath);
+      } catch (err) {
+        logger.debug(
+          `post-download registry mirror failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    return lastProgress;
+  },
+
+  /**
+   * Stream download progress for a registered model. Mirrors Swift's
+   * `downloadModelStream(_:)` (RunAnywhere+Storage.swift:263) — a thin
+   * async-iterable over the callback-based `downloadModel`. Consumer
+   * cancellation (break / `return()`) cancels the in-flight download,
+   * matching Swift's `onTermination == .cancelled` branch.
+   */
+  downloadModelStream(
+    input: string | DownloadModelOptions,
+    extra: CancellableCall = {},
+  ): AsyncIterable<DownloadProgress> {
+    return (async function* downloadProgressStream(): AsyncGenerator<DownloadProgress> {
+      const queue: DownloadProgress[] = [];
+      let notify: (() => void) | null = null;
+      let done = false;
+      let failure: unknown = null;
+      const controller = new AbortController();
+      const detachOuter = attachSignalToCancel(extra.signal, () => controller.abort());
+      const request = typeof input === 'string' ? { modelId: input } : { ...input };
+      const callerOnProgress = request.onProgress;
+
+      const downloadPromise = SDKCore.downloadModel(
+        {
+          ...request,
+          onProgress: (progress) => {
+            callerOnProgress?.(progress);
+            queue.push(progress);
+            notify?.();
+          },
+        },
+        { signal: controller.signal },
+      ).then(
+        () => {
+          done = true;
+          notify?.();
+        },
+        (err: unknown) => {
+          failure = err;
+          done = true;
+          notify?.();
+        },
+      );
+
+      try {
+        for (;;) {
+          while (queue.length > 0) {
+            yield queue.shift()!;
+          }
+          if (done) break;
+          await new Promise<void>((resolve) => {
+            notify = resolve;
+          });
+          notify = null;
+        }
+        if (failure) throw failure;
+        await downloadPromise;
+      } finally {
+        detachOuter();
+        if (!done) {
+          controller.abort();
+        }
+      }
+    })();
+  },
+
+  /**
+   * Scan the Origin Private File System for models that were downloaded in a
+   * previous session and update the C++ registry's `localPath` for any
+   * that are found on disk but not yet reflected in the in-memory registry.
+   *
+   * Call this once after backends register and the model catalog is
+   * populated, to restore the "Downloaded" status across tab reloads.
+   *
+   * Returns the number of registry entries patched.
+   *
+   * TODO(layering): the positive-link branch (mark isDownloaded=true when the
+   * canonical OPFS path exists) is now largely redundant with the C++ adapter
+   * rescan that `rac_model_registry_refresh_proto` runs via the registered
+   * `file_list_directory` slot. The piece C++ does NOT yet cover is the
+   * negative reconciliation below (clear isDownloaded when OPFS bytes were
+   * purged) — the commons `prune_orphans` path is still a documented no-op.
+   * Once a C++ orphan-prune lands, this can be retired entirely. Do not
+   * delete until then.
+   */
+  async hydrateModelRegistry(): Promise<number> {
+    const list = ModelRegistryCapability.listModels();
+    if (!list?.models?.length) return 0;
+
+    let patched = 0;
+    for (const model of list.models) {
+      const existing = ModelRegistryCapability.getModel(model.id);
+      if (!existing) continue;
+
+      const dir = frameworkOPFSDir(existing.framework as InferenceFramework);
+      if (!dir) continue;
+
+      const { exists, localPath } = await resolveHydratedModelPath(existing, dir);
+
+      // clearSiteStorage (or manual OPFS purge) — and mid-download refresh —
+      // can leave a partial OPFS file while the registry still says
+      // isDownloaded=true. Reconcile: missing OR incomplete bytes clear the
+      // flag so the UI shows Retry instead of a broken Use.
+      if (!exists) {
+        if (existing.localPath || existing.isDownloaded) {
+          try {
+            if (ModelRegistryCapability.updateDownloadStatus(existing.id, null)) patched++;
+          } catch { /* ignore */ }
+        }
+        continue;
+      }
+
+      if (existing.localPath && existing.isDownloaded) continue;
+
+      try {
+        if (ModelRegistryCapability.updateDownloadStatus(existing.id, localPath)) patched++;
+      } catch { /* ignore */ }
+    }
+    // Always notify — even when patched === 0 (already reconciled). Late UI
+    // subscribers and sheet opens must re-query after cold-start OPFS scan.
+    EventBus.shared.publish(
+      'models.hydrated',
+      EventCategory.EVENT_CATEGORY_STORAGE,
+      { count: patched },
+    );
+    return patched;
+  },
+
+  getStorageInfo(
+    request: Parameters<ReturnType<typeof createStorageNamespace>['info']>[0],
+  ): ReturnType<ReturnType<typeof createStorageNamespace>['info']> {
+    return SDKCore.storage.info(request);
+  },
+
+  deleteStorage(
+    request: Parameters<ReturnType<typeof createStorageNamespace>['delete']>[0],
+  ): ReturnType<ReturnType<typeof createStorageNamespace>['delete']> {
+    return SDKCore.storage.delete(request);
+  },
+
+  deleteModel(
+    modelId: string,
+  ): ReturnType<ReturnType<typeof createStorageNamespace>['deleteModel']> {
+    return SDKCore.storage.deleteModel(modelId);
+  },
+
+  /**
+   * Clear the SDK's Cache directory. Mirrors Swift `clearCache()`
+   * (RunAnywhere+Storage.swift:305-313): init guard + ensureServicesReady,
+   * then the commons file manager clears {base}/RunAnywhere/Cache
+   * (delete-recursive + recreate) via the `rac_wasm_file_manager_clear_cache`
+   * shim. Platform note: on Web that directory lives in the commons module's
+   * volatile MEMFS — OPFS is untouched by design (cache/temp are never
+   * flushed there; OPFS reclamation is `deleteStorage`/`storage.delete`).
+   * Throws backendNotAvailable against older WASM artifacts without the shim.
+   */
+  async clearCache(): Promise<void> {
+    await SDKCore.ensureServicesReady();
+    await callWasmFileManagerClear('clearCache', '_rac_wasm_file_manager_clear_cache');
+  },
+
+  /**
+   * Clear the SDK's Temp directory. Mirrors Swift `cleanTempFiles()`
+   * (RunAnywhere+Storage.swift:315-325); same platform semantics as
+   * [clearCache].
+   */
+  async cleanTempFiles(): Promise<void> {
+    await SDKCore.ensureServicesReady();
+    await callWasmFileManagerClear('cleanTempFiles', '_rac_wasm_file_manager_clear_temp');
+  },
+
+  // =========================================================================
+  // Shutdown
+  // =========================================================================
+
+  shutdown(): Promise<void> {
+    if (_shutdownPromise) return _shutdownPromise;
+
+    // Invalidate Phase 2 before its fetch can settle and before teardown starts.
+    // The generation check prevents this lifetime from mutating flags after a
+    // subsequent initialize has begun.
+    _lifecycleGeneration += 1;
+    _shutdownRequired = true;
+    // Close the public facade synchronously. Native/module owners remain alive
+    // until the shared shutdown promise drains them below.
+    _isInitialized = false;
+    const initializingPromise = _initializingPromise;
+    const servicesInitPromise = _servicesInitPromise;
+    const shutdownPromise = (async () => {
+      logger.info('Shutting down RunAnywhere Web SDK...');
+      const shutdownFailures: unknown[] = [];
+      const recordShutdownFailure = (operation: string, error: unknown): void => {
+        logger.warning(`${operation} failed during SDK shutdown`);
+        shutdownFailures.push(error);
+      };
+      const cleanup = (operation: string, action: () => void): void => {
+        try {
+          action();
+        } catch (error) {
+          recordShutdownFailure(operation, error);
+        }
+      };
+
+      // Initialization owns module registration and state publication. Join
+      // the invalidated lifetime before tearing those resources down so stale
+      // async work cannot resurrect them after shutdown returns.
+      if (initializingPromise) {
+        try {
+          await initializingPromise;
+        } catch {
+          // Expected when the generation guard cancels stale initialization.
+        }
+      }
+
+      // Phase 2 may be awaiting browser fetch/device registration while holding
+      // callbacks borrowed from Commons. Join the invalidated operation before
+      // releasing those callbacks or the WASM module.
+      if (servicesInitPromise) {
+        try {
+          await servicesInitPromise;
+        } catch {
+          // The originating caller owns the Phase-2 error. Generation guards
+          // prevent stale state publication; shutdown only needs quiescence.
+        }
+      }
+
+      // Stop admitting destructive storage work and drain every delete accepted
+      // by this runtime before destroying its analyzer callbacks or WASM module.
+      try {
+        await StorageAdapter.prepareForShutdown();
+      } catch (error) {
+        recordShutdownFailure('StorageAdapter.prepareForShutdown', error);
+      }
+
+    // Voice-agent providers may own native handles, stream subscribers, and
+    // cross-WASM conversation state. Release them before their backend modules.
+      try {
+        await resetVoiceAgentFacadeState();
+      } catch (err) {
+        recordShutdownFailure('Voice-agent teardown', err);
+      }
+
+    // RAG owns provider state outside the WASM adapter registry (including
+    // the cross-WASM in-memory vector index). Destroy it while backend modules
+    // are still available when possible, then synchronously invalidate the
+    // facade even if a caller already unregistered a backend or destroy fails.
+      try {
+        await ragDestroyPipeline();
+      } catch (err) {
+        recordShutdownFailure('RAG teardown', err);
+      } finally {
+        cleanup('RAG facade cleanup', resetRAGFacadeState);
+      }
+
+    // Release the core WASM singleton itself, not only the adapter registry.
+    // `initialize()` obtains this singleton again on the next SDK lifetime;
+    // leaving it marked loaded after clearing the registry made a subsequent
+    // initialize() skip module registration and produced a half-initialized
+    // runtime. Backend packages still own and unregister their modules before
+    // callers invoke this full SDK shutdown.
+      try {
+        CommonsModule.shared.shutdown();
+      } catch (err) {
+        recordShutdownFailure('CommonsModule shutdown', err);
+      }
+
+    // Clear every WASM adapter singleton that module registration
+    // installed (DownloadAdapter, ModelLifecycleAdapter,
+    // ModelRegistryAdapter, ModalityProtoAdapter, SDKEventStreamAdapter)
+    // and null the global module so post-shutdown calls into
+    // ModalityProtoAdapter / tryRunanywhereModule()
+    // can't acquire stale references to a torn-down backend.
+      cleanup('WASM module cleanup', clearRunanywhereModule);
+    // HTTPAdapter and StorageAdapter are owned outside the capability registry,
+    // so they must be cleared explicitly to complete the ownership boundary.
+      cleanup('HTTP adapter cleanup', () => HTTPAdapter.clearDefaultModule());
+      cleanup('Storage adapter cleanup', () => StorageAdapter.clearDefaultHandles());
+
+    // Tear down the Worker streaming pipeline. The WASM ownership boundary
+    // is `clearRunanywhereModule()`, but the Worker singletons
+    // (`OffscreenRuntimeBridge._instance`, `_init` payload, and the
+    // `StreamWorkerFactoryRegistry._factory`) live outside that
+    // boundary. Without explicit teardown the spawned worker keeps its
+    // mirror Emscripten module + loaded model weights alive across
+    // logout / account-switch / test reset, and the next `initialize()`
+    // would reuse the stale bridge.
+      try {
+        OffscreenRuntimeBridge.disposeShared();
+      } catch (err) {
+        recordShutdownFailure('Offscreen runtime cleanup', err);
+      }
+      cleanup('Stream worker factory cleanup', () => setStreamWorkerFactory(null));
+      cleanup('Stream worker state cleanup', () => setStreamWorkerInit(null));
+      cleanup('Backend worker factory cleanup', () => setBackendWorkerFactory(null));
+
+      cleanup('Event bus cleanup', () => EventBus.reset());
+
+      _isInitialized = false;
+      _initOptions = null;
+      _deviceId = null;
+      OPFSBridge.setPersistentRoot(null);
+      _localFileStorage = null;
+      _hasCompletedNativePhase1 = false;
+      _hasCompletedServicesInit = false;
+      _hasCompletedHTTPSetup = false;
+      _servicesInitPromise = null;
+
+      if (shutdownFailures.length === 0) {
+        _shutdownRequired = false;
+        logger.info('RunAnywhere Web SDK shut down');
+      } else {
+        logger.warning('RunAnywhere Web SDK shutdown remains incomplete');
+      }
+      if (shutdownFailures.length === 1) throw shutdownFailures[0];
+      if (shutdownFailures.length > 1) {
+        throw new AggregateError(
+          shutdownFailures,
+          'Multiple SDK shutdown operations failed',
+        );
+      }
+    })();
+    _shutdownPromise = shutdownPromise;
+    void shutdownPromise.finally(() => {
+      if (_shutdownPromise === shutdownPromise) {
+        _shutdownPromise = null;
+      }
+    }).catch(() => undefined);
+    return shutdownPromise;
+  },
+
+  reset(): Promise<void> {
+    return SDKCore.shutdown();
+  },
+};
+
+// Install the post-register hydrate hook so the high-level
+// `RunAnywhere.registerModel*(...)` overloads in `RunAnywhere+Storage.ts`
+// automatically reconcile OPFS-backed model state with the freshly-added
+// catalog entry. Fire-and-forget — `hydrateModelRegistry()` is idempotent
+// and logs its own failures.
+setRegisterModelHydrateHook(() => {
+  void SDKCore.hydrateModelRegistry().catch((err) => {
+    logger.debug(
+      `post-register hydrate failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  });
+});
+
+/** Focused test hooks for browser-only download safeguards. */
+export const __testing__ = {
+  assertBrowserStorageQuota,
+  pollDownloadWithRetry,
+  resolveBrowserAvailableStorageBytes,
+  throwDownloadFailure,
+};

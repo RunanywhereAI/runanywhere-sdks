@@ -681,10 +681,10 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(20, (index) {
                 final threshold = index / 20;
-                final isActive = _viewModel.audioLevel > threshold;
+                final isActive = _viewModel.micActivity > threshold;
                 return Container(
                   width: 4,
-                  height: 24 * (isActive ? _viewModel.audioLevel : 0.2),
+                  height: 24 * (isActive ? _viewModel.micActivity : 0.2),
                   margin: const EdgeInsets.symmetric(horizontal: 1),
                   decoration: BoxDecoration(
                     color: isActive

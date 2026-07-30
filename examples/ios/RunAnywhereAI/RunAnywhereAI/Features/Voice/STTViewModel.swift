@@ -15,6 +15,9 @@ import os
 /// Manages recording, transcription, model selection, and microphone permissions
 @MainActor
 class STTViewModel: VoiceComponentViewModelBase {
+    /// `AudioCaptureManager` delivers mono Int16 PCM at this rate.
+    private static let captureSampleRate = 16_000
+
     private let audioCapture = AudioCaptureManager()
 
     // MARK: - Component Identity
@@ -66,9 +69,9 @@ class STTViewModel: VoiceComponentViewModelBase {
     private var audioBuffer = Data()
 
     /// Live mode: mic chunks are fed straight into the SDK's streaming
-    /// transcription session (`RunAnywhere.transcribeStream`), which owns
+    /// transcription session (`RunAnywhere.stt.transcribeStream`), which owns
     /// endpointing/segmentation natively. No app-side silence detection.
-    private var liveAudioContinuation: AsyncStream<Data>.Continuation?
+    private var liveAudioContinuation: AsyncStream<AudioInput>.Continuation?
     private var liveStreamTask: Task<Void, Never>?
     private var committedTranscription = ""
     private var hybridRouter: HybridSTTRouter?
@@ -188,7 +191,7 @@ class STTViewModel: VoiceComponentViewModelBase {
         }
 
         if selectedMode == .live {
-            startLiveTranscription()
+            guard await startLiveTranscription() else { return }
         }
 
         do {
@@ -196,7 +199,7 @@ class STTViewModel: VoiceComponentViewModelBase {
             try await AudioCapturePump.startRecording(with: audioCapture) { [weak self] audioData in
                 guard let self else { return }
                 if self.selectedMode == .live {
-                    self.liveAudioContinuation?.yield(audioData)
+                    self.liveAudioContinuation?.yield(.pcm16(audioData, sampleRate: Self.captureSampleRate))
                 } else {
                     self.audioBuffer.append(audioData)
                 }
@@ -249,9 +252,11 @@ class STTViewModel: VoiceComponentViewModelBase {
         transcription = ""
 
         do {
-            let output = try await RunAnywhere.transcribe(audio: audioBuffer)
-            transcription = output.text
-            logger.info("Batch transcription complete: \(output.text)")
+            let result = try await RunAnywhere.stt.transcribe(
+                .pcm16(audioBuffer, sampleRate: Self.captureSampleRate)
+            )
+            transcription = result.text
+            logger.info("Batch transcription complete: \(result.text)")
         } catch {
             logger.error("Batch transcription failed: \(error.localizedDescription)")
             errorMessage = "Transcription failed: \(error.localizedDescription)"
@@ -364,46 +369,66 @@ class STTViewModel: VoiceComponentViewModelBase {
 
     /// Start the SDK streaming transcription session for live mode.
     ///
-    /// Mic chunks are yielded into an `AsyncStream<Data>` consumed by
-    /// `RunAnywhere.transcribeStream`; the native session owns segmentation
+    /// Mic chunks are yielded into an `AsyncStream<AudioInput>` consumed by
+    /// `RunAnywhere.stt.transcribeStream`; the native session owns segmentation
     /// and emits partial + final results.
-    private func startLiveTranscription() {
+    ///
+    /// - Returns: `false` when the session could not be opened, in which case
+    ///   the caller must not start audio capture.
+    private func startLiveTranscription() async -> Bool {
         logger.info("Starting live streaming transcription")
 
-        let (stream, continuation) = AsyncStream<Data>.makeStream()
-        liveAudioContinuation = continuation
+        let (stream, continuation) = AsyncStream<AudioInput>.makeStream()
 
-        liveStreamTask = Task { [weak self] in
-            for await partial in RunAnywhere.transcribeStream(audio: stream) {
-                guard let self, !Task.isCancelled else { break }
-                self.handleLivePartial(partial)
-            }
-            self?.logger.info("Live transcription stream ended")
+        let events: AsyncThrowingStream<TranscriptionEvent, Error>
+        do {
+            events = try await RunAnywhere.stt.transcribeStream(stream)
+        } catch {
+            continuation.finish()
+            logger.error("Live transcription failed to start: \(error.localizedDescription)")
+            errorMessage = "Live transcription failed to start: \(error.localizedDescription)"
+            return false
         }
+
+        liveAudioContinuation = continuation
+        liveStreamTask = Task { [weak self] in
+            do {
+                for try await event in events {
+                    guard let self, !Task.isCancelled else { break }
+                    self.handleTranscriptionEvent(event)
+                }
+                self?.logger.info("Live transcription stream ended")
+            } catch {
+                guard let self, !Task.isCancelled else { return }
+                self.logger.error("Live transcription failed: \(error.localizedDescription)")
+                self.errorMessage = "Live transcription failed: \(error.localizedDescription)"
+            }
+        }
+        return true
     }
 
-    /// Fold one streaming partial into the displayed transcription:
-    /// non-final partials preview the current utterance, finals commit it.
-    private func handleLivePartial(_ partial: RASTTPartialResult) {
-        let text = partial.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Fold one streaming event into the displayed transcription:
+    /// partials preview the current utterance, finals commit it.
+    private func handleTranscriptionEvent(_ event: TranscriptionEvent) {
+        switch event {
+        case .started:
+            break
 
-        if partial.isFinal {
-            // Stream errors surface as a terminal partial carrying the
-            // failure text (see RunAnywhere.transcribeStream).
-            if text.hasPrefix("STT stream failed") {
-                errorMessage = text
-                return
-            }
+        case .partial(let text):
+            let preview = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !preview.isEmpty else { return }
+            transcription = committedTranscription.isEmpty
+                ? preview
+                : committedTranscription + "\n" + preview
+
+        case .final(let result):
+            let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !text.isEmpty {
                 committedTranscription = committedTranscription.isEmpty
                     ? text
                     : committedTranscription + "\n" + text
             }
             transcription = committedTranscription
-        } else if !text.isEmpty {
-            transcription = committedTranscription.isEmpty
-                ? text
-                : committedTranscription + "\n" + text
         }
     }
 

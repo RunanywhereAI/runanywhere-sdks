@@ -103,15 +103,15 @@ int run_auth_login(const GlobalOptions& options) {
 }  // namespace
 
 void register_auth(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand("auth", "Control-plane authentication");
+    CLI::App* cmd = app.add_subcommand("auth", "Sign this device in to the control plane");
     cmd->require_subcommand(1);
 
     CLI::App* login_cmd = cmd->add_subcommand(
         "login",
-        "Authenticate against the configured backend (API key → JWT), register "
-        "this device and fetch model assignments. Requires --environment "
-        "production with --base-url and --api-key (or RUNANYWHERE_* env vars). "
-        "Keyless development has no login path.");
+        "Exchange the API key for a JWT, register this device and fetch model "
+        "assignments. Requires --environment production with --base-url and "
+        "--api-key (or RUNANYWHERE_* env vars). Keyless development has no login "
+        "path.");
     login_cmd->callback([&options]() {
         const int exit_code = run_auth_login(options);
         if (exit_code != 0) {

@@ -3,7 +3,7 @@ package com.runanywhere.runanywhereai.data
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.hybrid.Cloud
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.lora
+import com.runanywhere.sdk.public.extensions.loraCatalog
 import com.runanywhere.sdk.public.extensions.refreshModelRegistry
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -108,7 +108,7 @@ object ModelBootstrap {
     private suspend fun seedLora() {
         for (adapter in ModelCatalog.loraAdapters) {
             try {
-                RunAnywhere.lora.register(adapter)
+                RunAnywhere.loraCatalog.register(adapter)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

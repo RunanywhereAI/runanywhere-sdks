@@ -127,12 +127,12 @@ struct RunAnywhereAIApp: App {
         if let credentials = storedCredentials() ?? bundledCredentials() {
             try RunAnywhere.initialize(
                 apiKey: credentials.apiKey,
-                baseURL: credentials.baseURL,
+                baseUrl: credentials.baseURL,
                 environment: .production
             )
         } else {
             #if DEBUG
-            try RunAnywhere.initialize()
+            try RunAnywhere.initialize(environment: .development)
             #else
             fatalError(
                 "Release builds require RUNANYWHERE_API_KEY and RUNANYWHERE_BASE_URL via xcconfig or Settings; " +
@@ -221,19 +221,19 @@ struct RunAnywhereAIApp: App {
     private func refreshSDKCatalogs() async {
         logger.info("Refreshing SDK model registry...")
 
-        await RunAnywhere.refreshModelRegistry()
+        await RunAnywhere.models.refresh()
 
-        let listResult = await RunAnywhere.listModels()
-        if listResult.success {
-            let models = listResult.models.models
+        do {
+            let models = try await RunAnywhere.models.list()
             let downloaded = models.filter(\.isDownloaded).count
             let available = models.filter(\.isAvailableForUse).count
             logger.info(
                 "Model registry: registered=\(models.count), downloaded=\(downloaded), available=\(available)"
             )
-        } else {
-            let message = listResult.errorMessage.isEmpty ? "unknown error" : listResult.errorMessage
-            logger.warning("Model registry refresh incomplete: \(message, privacy: .public)")
+        } catch {
+            logger.warning(
+                "Model registry refresh incomplete: \(error.localizedDescription, privacy: .public)"
+            )
         }
 
         do {

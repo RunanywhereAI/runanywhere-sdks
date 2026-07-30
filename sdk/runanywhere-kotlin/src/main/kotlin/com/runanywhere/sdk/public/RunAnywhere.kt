@@ -35,6 +35,9 @@ import com.runanywhere.sdk.generated.convenience.wireString
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.api.Environment
+import com.runanywhere.sdk.public.api.SdkEvent
+import com.runanywhere.sdk.public.api.toSdkEvents
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
 import com.runanywhere.sdk.public.events.EventBus
@@ -50,6 +53,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -163,24 +167,16 @@ internal class SDKLifetimeGate {
 }
 
 /**
- * The RunAnywhere SDK - Single entry point for on-device AI
+ * The single entry point for on-device AI.
  *
- * Mirrors the iOS `RunAnywhere` enum (`Sources/RunAnywhere/Public/RunAnywhere.swift`)
- * one-to-one:
- *  - SDK initialization (two-phase: fast sync Phase 1 + async Phase 2)
- *  - State access (isInitialized, areServicesReady, isActive, version, environment)
- *  - Event access via `events` property
- *  - Reset / cleanup / ensureServicesReady() retry path for offline init
+ * Call [initialize] once, then reach every capability through its namespace:
+ * `llm`, `vlm`, `stt`, `tts`, `vad`, `embeddings`, `rerank`, `images`,
+ * `diarization`, `segmentation`, `voice`, `rag`, `models`, and `lora`.
  *
- * Feature-specific APIs are available through extension functions in public/extensions/:
- * - STT: RunAnywhere.transcribe(), RunAnywhere.transcribeStream()
- * - TTS: RunAnywhere.synthesize(), RunAnywhere.loadModel(RAModelLoadRequest)
- * - LLM: RunAnywhere.generate(), RunAnywhere.generateStream()
- * - VAD: RunAnywhere.detectSpeech()
- * - VoiceAgent: VoiceAgentStreamAdapter(handle).stream()
- *
- * All AI component logic (LLM, STT, TTS, VAD) is delegated to the C++ runanywhere-commons
- * layer via CppBridge. Kotlin only handles platform-specific operations (HTTP, audio, file I/O).
+ * ```kotlin
+ * RunAnywhere.initialize(context)
+ * val reply = RunAnywhere.llm.generate("Hello", LlmOptions(model = "qwen3-0.6b"))
+ * ```
  */
 object RunAnywhere {
     // Private state
@@ -259,6 +255,10 @@ object RunAnywhere {
 
     // Public properties
 
+    /** True once local inference is usable. */
+    val isReady: Boolean
+        get() = _isInitialized
+
     /**
      * Check if SDK is initialized (Phase 1 complete)
      */
@@ -268,6 +268,10 @@ object RunAnywhere {
     /**
      * Check if services are fully ready (Phase 2 complete)
      */
+    @Deprecated(
+        "Phase 2 runs in the background from initialize(); use isReady.",
+        ReplaceWith("isReady"),
+    )
     val areServicesReady: Boolean
         get() = _areServicesReady
 
@@ -277,9 +281,7 @@ object RunAnywhere {
     val isActive: Boolean
         get() = _isInitialized && _initParams != null
 
-    /**
-     * Current SDK version
-     */
+    /** The SDK's semantic version. */
     val version: String
         get() = SDKConstants.SDK_VERSION
 
@@ -291,17 +293,15 @@ object RunAnywhere {
 
     // Event access
 
+    /** Lifecycle, model, and error breadcrumbs from the whole SDK. */
+    val events: Flow<SdkEvent>
+        get() = EventBus.events.toSdkEvents()
+
     /**
-     * Event bus for SDK event subscriptions.
-     *
-     * Example usage:
-     * ```kotlin
-     * RunAnywhere.events.llmEvents.collect { event ->
-     *     println("LLM event: ${event.type}")
-     * }
-     * ```
+     * Raw proto event envelope stream, for consumers that need categories and
+     * payloads the [events] grammar does not surface.
      */
-    val events: EventBus
+    val eventBus: EventBus
         get() = EventBus
 
     // Authentication info (production/staging only)
@@ -369,118 +369,102 @@ object RunAnywhere {
     // Phase 1: core initialization (synchronous)
 
     /**
-     * Initialize the RunAnywhere SDK (Phase 1)
+     * Bring the SDK up: platform adapters, native load, auth, device
+     * registration, model catalog, and telemetry.
      *
-     * Mirrors Swift's `RunAnywhere.initialize(apiKey:baseURL:environment:)`:
-     * 1. Builds an [SDKInitParams] envelope from the caller's inputs.
-     * 2. Validates inputs via the canonical C++ validator
-     *    (`rac_validate_api_key` / `rac_validate_base_url`) — invalid combos
-     *    throw [SDKException] before any native state is mutated.
-     * 3. Calls the platform bridge, which internally drives Phase 1
-     *    (`rac_sdk_init_phase1_proto` via `CppBridgeSdkInit.phase1` for
-     *    validation + config/state init), telemetry boot, and the
-     *    `emitSDKInitStarted` / `emitSDKInitCompleted` event pair.
-     * 4. Spawns Phase 2 in the background via [initScope] so the call
-     *    returns synchronously (mirrors Swift's
-     *    `Task.detached(priority: .userInitiated)`).
-     *
-     * ## Usage Examples
+     * The call returns as soon as local inference is usable. Auth, device
+     * registration, and catalog fetch continue in the background and retry, so
+     * there is no second phase for callers to remember. A null [apiKey] and
+     * null [baseUrl] together mean keyless local mode, which always runs in the
+     * development environment regardless of [environment].
      *
      * ```kotlin
-     * // Development mode (default)
-     * RunAnywhere.initialize()
-     *
-     * // Production mode
-     * RunAnywhere.initialize(
-     *     apiKey = "...",
-     *     baseURL = "https://api.example.com",
-     *     environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-     * )
+     * RunAnywhere.initialize(context)                                   // keyless, local only
+     * RunAnywhere.initialize(context, apiKey = key, baseUrl = endpoint) // control plane
      * ```
      *
-     * @param apiKey API key (optional for development, required for production/staging)
-     * @param baseURL Backend API base URL (optional)
-     * @param environment SDK environment (default: DEVELOPMENT)
-     * @throws SDKException when validation fails for staging/production.
+     * @throws SDKException when the API key or base URL fail validation for
+     *   the requested environment.
      */
     fun initialize(
         apiKey: String? = null,
-        baseURL: String? = null,
-        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+        baseUrl: String? = null,
+        environment: Environment = Environment.SDK_ENVIRONMENT_PRODUCTION,
     ) {
-        // Build + validate SDKInitParams. Mirrors Swift's branching between
-        // `SDKInitParams(forDevelopmentWithAPIKey:)` and `SDKInitParams(apiKey:baseURL:environment:)`.
-        val params: SDKInitParams =
-            if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-                SDKInitParams.forDevelopment(apiKey = apiKey ?: "")
-            } else {
-                SDKInitParams.create(
-                    apiKey = apiKey ?: "",
-                    baseURL = baseURL ?: "",
-                    environment = environment,
-                )
-            }
-
-        performCoreInit(params = params, startBackgroundServices = true)
+        performCoreInit(
+            params = resolveInitParams(apiKey, baseUrl, environment),
+            startBackgroundServices = true,
+        )
     }
 
     /**
-     * Initialize the RunAnywhere SDK using a typed [URL] for the backend base URL.
+     * Bring the SDK up with a typed [URL] for the control plane.
      *
-     * Mirrors Swift's URL-typed overload while preserving the string-backed
-     * [SDKInitParams] contract used by the Android bridge.
+     * @throws SDKException when the API key or base URL fail validation.
      */
     fun initialize(
         apiKey: String,
-        baseURL: URL,
-        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+        baseUrl: URL,
+        environment: Environment = Environment.SDK_ENVIRONMENT_PRODUCTION,
     ) {
-        initialize(apiKey = apiKey, baseURL = baseURL.toString(), environment = environment)
+        initialize(apiKey = apiKey, baseUrl = baseUrl.toString(), environment = environment)
     }
 
     /**
-     * Initialize the RunAnywhere SDK with an Android [Context] (Android-specific
-     * convenience overload). Absorbs the previously example-side
-     * `AndroidPlatformContext.initialize(context)` call so callers do not need
-     * to reach into SDK-internal foundation packages.
+     * Bring the SDK up, wiring [context] into secure storage and model paths first.
      *
-     * The Context is wired into [AndroidPlatformContext] (which feeds
-     * `CppBridgePlatformAdapter` for secure storage and `CppBridgeModelPaths`
-     * for filesDir/cacheDir resolution) before Phase 1 starts. Subsequent calls
-     * with the same application context are no-ops at the `AndroidPlatformContext`
-     * level.
+     * ```kotlin
+     * RunAnywhere.initialize(context)
+     * ```
      *
-     * Equivalent to the Swift `RunAnywhere.initialize(apiKey:baseURL:environment:)`
-     * entry point — Apple platforms do not need an explicit Context handle
-     * (Keychain is process-scoped).
-     *
-     * @param context Android application context (any Context is fine — the
-     *                application context will be retained, not the activity).
-     * @param apiKey  API key (optional for development).
-     * @param baseURL Backend API base URL (optional for development).
-     * @param environment SDK environment (default: DEVELOPMENT).
+     * @param context Any Android Context; the application context is retained,
+     *   never the activity.
+     * @throws SDKException when the API key or base URL fail validation.
      */
     fun initialize(
         context: Context,
         apiKey: String? = null,
-        baseURL: String? = null,
-        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
+        baseUrl: String? = null,
+        environment: Environment = Environment.SDK_ENVIRONMENT_PRODUCTION,
     ) {
         AndroidPlatformContext.initialize(context)
-        initialize(apiKey = apiKey, baseURL = baseURL, environment = environment)
+        initialize(apiKey = apiKey, baseUrl = baseUrl, environment = environment)
     }
 
     /**
-     * Android [Context] convenience paired with the URL-typed backend overload.
+     * Bring the SDK up with an Android [Context] and a typed control-plane [URL].
+     *
+     * @throws SDKException when the API key or base URL fail validation.
      */
     fun initialize(
         context: Context,
         apiKey: String,
-        baseURL: URL,
-        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+        baseUrl: URL,
+        environment: Environment = Environment.SDK_ENVIRONMENT_PRODUCTION,
     ) {
         AndroidPlatformContext.initialize(context)
-        initialize(apiKey = apiKey, baseURL = baseURL, environment = environment)
+        initialize(apiKey = apiKey, baseUrl = baseUrl, environment = environment)
+    }
+
+    /**
+     * Keyless local mode has nothing to authenticate against, so it always
+     * resolves to the development envelope even when the caller left
+     * [environment] at its production default.
+     */
+    private fun resolveInitParams(
+        apiKey: String?,
+        baseUrl: String?,
+        environment: Environment,
+    ): SDKInitParams {
+        val keyless = apiKey.isNullOrBlank() && baseUrl.isNullOrBlank()
+        if (keyless || environment == Environment.SDK_ENVIRONMENT_DEVELOPMENT) {
+            return SDKInitParams.forDevelopment(apiKey = apiKey ?: "")
+        }
+        return SDKInitParams.create(
+            apiKey = apiKey ?: "",
+            baseURL = baseUrl ?: "",
+            environment = environment,
+        )
     }
 
     /**
@@ -566,7 +550,7 @@ object RunAnywhere {
                     servicesInitJob =
                         initScope.launch {
                             try {
-                                completeServicesInitialization()
+                                completeServicesInitializationInternal()
                                 logger.debug("Phase 2 complete (background)")
                             } catch (error: Throwable) {
                                 logger.warn("Phase 2 failed (non-critical): ${error.message}")
@@ -618,7 +602,15 @@ object RunAnywhere {
      * [ensureServicesReady] call can retry HTTP/auth through
      * `CppBridgeSdkInit.retryHTTP` without re-running the rest of the bootstrap.
      */
+    @Deprecated(
+        "initialize() now runs Phase 2 in the background; this call is no longer needed.",
+        ReplaceWith("initialize()"),
+    )
     suspend fun completeServicesInitialization() {
+        completeServicesInitializationInternal()
+    }
+
+    private suspend fun completeServicesInitializationInternal() {
         synchronized(lock) {
             lifetimeGate.requireInitializationAllowed()
         }
@@ -758,7 +750,7 @@ object RunAnywhere {
 
         // Cold start path — Phase 1 must already be complete.
         requireInitialized()
-        completeServicesInitialization()
+        completeServicesInitializationInternal()
     }
 
     /** Called with [lock] held; concurrent callers share one lazy retry. */
@@ -864,8 +856,9 @@ object RunAnywhere {
     // SDK reset
 
     /**
-     * Reset SDK state
-     * Clears all initialization state and releases resources
+     * Tear the SDK down: unload models, close sessions, and clear all state.
+     *
+     * @throws SDKException when native teardown fails and a retry is required.
      */
     suspend fun reset() {
         logger.info("Resetting SDK state...")

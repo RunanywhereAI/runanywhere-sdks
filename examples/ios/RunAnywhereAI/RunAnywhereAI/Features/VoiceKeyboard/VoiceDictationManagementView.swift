@@ -12,7 +12,6 @@
 
 #if os(iOS)
 import SwiftUI
-import RunAnywhere
 
 struct VoiceDictationManagementView: View {
     @StateObject private var viewModel = VoiceDictationManagementViewModel()

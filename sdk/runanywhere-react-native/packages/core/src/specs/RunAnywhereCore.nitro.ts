@@ -908,6 +908,52 @@ export interface RunAnywhereCore extends HybridObject<{
     requestBytes: ArrayBuffer
   ): Promise<ArrayBuffer>;
 
+  // ============================================================================
+  // Diarization / Segmentation / Rerank Capabilities
+  //
+  // Diarization and segmentation publish handle-free `*_lifecycle_proto` verbs
+  // whose commons resolver reads the global loaded-model store, like VLM and
+  // diffusion. Rerank ships only the handle-scoped
+  // `rac_rerank_component_rerank_proto`, whose lifecycle acquire is
+  // owner-scoped, so the bridge owns a rerank component handle and loads the
+  // caller-resolved model into it before scoring. Mirrors Kotlin
+  // `CppBridgeDiarization` / `CppBridgeSegmentation` / `CppBridgeRerank`.
+  // ============================================================================
+
+  /**
+   * Diarize one buffer from serialized runanywhere.v1.DiarizationRequest bytes
+   * using the lifecycle-loaded speaker-diarization model. Returns serialized
+   * runanywhere.v1.DiarizationResult bytes. Backed by
+   * `rac_diarization_diarize_lifecycle_proto`.
+   */
+  diarizationDiarizeLifecycleProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Segment one image from serialized runanywhere.v1.SegmentationRequest bytes
+   * using the lifecycle-loaded segmentation model. Returns serialized
+   * runanywhere.v1.SegmentationResult bytes. Backed by
+   * `rac_segmentation_segment_lifecycle_proto`.
+   */
+  segmentationSegmentLifecycleProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Score candidates from serialized runanywhere.v1.RerankRequest bytes with
+   * the cross-encoder model at `modelPath`, returning serialized
+   * runanywhere.v1.RerankResult bytes. The bridge loads the model into its
+   * rerank component handle first (same-model re-load is a no-op), then calls
+   * `rac_rerank_component_rerank_proto`.
+   */
+  rerankProto(
+    modelPath: string,
+    modelId: string,
+    modelName: string,
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
   /**
    * Get persistent device UUID.
    * Persists in platform secure storage for the lifetime of the app installation.

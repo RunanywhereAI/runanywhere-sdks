@@ -18,7 +18,7 @@ extension LLMViewModel {
     func subscribeToModelLifecycle() {
         // Typed lifecycle stream: the SDK folds all native load/unload
         // channels into one publisher.
-        lifecycleCancellable = RunAnywhere.events.modelLifecycle
+        lifecycleCancellable = RunAnywhere.eventBus.modelLifecycle
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 guard let self = self else { return }
@@ -29,7 +29,7 @@ extension LLMViewModel {
 
         // Generation analytics (TTFT, completion metrics) are chat-screen
         // analytics, not lifecycle — they stay on the raw event bus.
-        generationCancellable = RunAnywhere.events.events
+        generationCancellable = RunAnywhere.eventBus.events
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 guard let self = self else { return }
@@ -40,17 +40,12 @@ extension LLMViewModel {
     }
 
     func checkModelStatusFromSDK() async {
-        // Resolve currently-loaded LLM via canonical proto snapshot API.
-        var request = RACurrentModelRequest()
-        request.category = .language
-        let snapshot = RunAnywhere.currentModel(request)
-        let isLoaded = snapshot.found
-        let modelId = snapshot.found ? snapshot.modelID : nil
+        let loadedModelId = await RunAnywhere.models.state().loaded[.language]?.id
 
         await MainActor.run {
-            self.updateModelLoadedState(isLoaded: isLoaded)
-            if let id = modelId,
-               let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == id }) {
+            self.updateModelLoadedState(isLoaded: loadedModelId != nil)
+            if let loadedModelId,
+               let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == loadedModelId }) {
                 self.updateLoadedModelInfo(name: matchingModel.name, framework: matchingModel.framework)
                 self.setLoadedModelSupportsThinking(matchingModel.supportsThinking)
             }

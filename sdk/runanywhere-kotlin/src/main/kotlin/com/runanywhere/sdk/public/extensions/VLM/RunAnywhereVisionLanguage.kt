@@ -57,6 +57,7 @@ private suspend fun RunAnywhere.isVLMModelLoaded(): Boolean {
 
 // MARK: - Inference
 
+@Deprecated("Use RunAnywhere.vlm.generate(image, prompt, options).")
 suspend fun RunAnywhere.processImage(
     image: RAVLMImage,
     options: RAVLMGenerationOptions,
@@ -100,6 +101,7 @@ suspend fun RunAnywhere.processImage(
  * COMPLETED/ERROR. COMPLETED carries the full `VLMResult` with metrics; an
  * ERROR event closes the flow with [SDKException].
  */
+@Deprecated("Use RunAnywhere.vlm.generateStream(image, prompt, options).")
 fun RunAnywhere.processImageStream(
     image: RAVLMImage,
     options: RAVLMGenerationOptions,
@@ -163,6 +165,7 @@ fun RunAnywhere.processImageStream(
  * and React Native: the prompt is applied onto `options.prompt` before
  * streaming.
  */
+@Deprecated("Use RunAnywhere.vlm.generateStream(image, prompt, options).")
 fun RunAnywhere.processImageStream(
     image: RAVLMImage,
     prompt: String,
@@ -171,6 +174,7 @@ fun RunAnywhere.processImageStream(
 
 // MARK: - Generation Control
 
+@Deprecated("Cancel the Flow returned by RunAnywhere.vlm.generateStream instead.")
 suspend fun RunAnywhere.cancelVLMGeneration() {
     vlmNativeRequests.cancelActive()
 }

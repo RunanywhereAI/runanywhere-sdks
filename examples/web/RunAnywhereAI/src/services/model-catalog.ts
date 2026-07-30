@@ -1,6 +1,6 @@
 /**
  * Model Catalog — example-app catalog seeded through the SDK's
- * `RunAnywhere.registerModel*` facades.
+ * `RunAnywhere.models.register` verb.
  *
  * Mirrors iOS `ModelCatalogBootstrap.registerAll()`
  * (examples/ios/RunAnywhereAI/RunAnywhereAI/Core/Services/ModelCatalogBootstrap.swift)
@@ -34,7 +34,7 @@
 
 import {
   RunAnywhere,
-  type LoraAdapterCatalogEntry,
+  type ModelFileRegistration,
   type ModelInfo,
 } from '@runanywhere/web';
 import {
@@ -48,7 +48,7 @@ import { appLogger } from './app-logger';
 
 /**
  * Declarative description of a single catalog entry. Promoted to a full
- * `ModelInfo` proto by the SDK's `RunAnywhere.registerModel*` facades — never
+ * `ModelInfo` proto by the SDK's `RunAnywhere.models.register` verb — never
  * by this file. Kept as a flat shape so the catalog list reads as data.
  */
 export interface CatalogEntry {
@@ -648,7 +648,19 @@ const CATALOG: readonly CatalogEntry[] = [
 // every cold launch.
 // ---------------------------------------------------------------------------
 
-const LORA_ADAPTERS: readonly LoraAdapterCatalogEntry[] = [
+/** One LoRA adapter offered by the demo, registered as a catalog artifact. */
+interface LoraCatalogEntry {
+  id: string;
+  name: string;
+  description: string;
+  url: string;
+  filename: string;
+  compatibleModels: readonly string[];
+  sizeBytes: number;
+  defaultScale: number;
+}
+
+const LORA_ADAPTERS: readonly LoraCatalogEntry[] = [
   {
     id: 'abliterated-lora',
     name: 'Abliterated LoRA (F16)',
@@ -658,13 +670,11 @@ const LORA_ADAPTERS: readonly LoraAdapterCatalogEntry[] = [
     compatibleModels: ['qwen2.5-0.5b-instruct-q6_k'],
     sizeBytes: 17_620_224,
     defaultScale: 1.0,
-    tags: [],
-    metadata: {},
   },
 ];
 
 // ---------------------------------------------------------------------------
-// Registration — delegated to the SDK's `RunAnywhere.registerModel*` facades.
+// Registration — delegated to `RunAnywhere.models.register`.
 // ---------------------------------------------------------------------------
 
 /**
@@ -680,11 +690,10 @@ export async function registerAll(): Promise<number> {
 }
 
 /**
- * Seed the catalog through the SDK facade. Multi-file entries go to
- * `registerModelMultiFile`, archive entries to `registerModelArchive`, and
- * single-file entries to `registerModel`. Returns the count successfully
- * registered. `0` means the registry adapter is not installed yet (typically
- * because no backend WASM has loaded).
+ * Seed the catalog through `RunAnywhere.models.register`, which picks the
+ * single-file, archive, or multi-file path from the entry itself. Returns the
+ * count successfully registered. `0` means the registry adapter is not
+ * installed yet (typically because no backend WASM has loaded).
  */
 export function registerModelCatalog(): number {
   let registered = 0;
@@ -787,14 +796,22 @@ export function webSizeCompatibility(
 // ---------------------------------------------------------------------------
 
 async function registerLoraAdapters(): Promise<void> {
+  // Adapters are ordinary catalog artifacts in v3, so they register through
+  // the same verb as models and apply through `RunAnywhere.lora.apply(id)`.
   for (const adapter of LORA_ADAPTERS) {
     try {
-      await RunAnywhere.lora.registerArtifact(adapter);
+      RunAnywhere.models.register({
+        id: adapter.id,
+        name: adapter.name,
+        description: adapter.description,
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        format: ModelFormat.MODEL_FORMAT_GGUF,
+        category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        url: adapter.url,
+        sizeBytes: adapter.sizeBytes,
+      });
     } catch (err) {
-      appLogger.warning(
-        `[model-catalog] registerLoraArtifact(${adapter.id}) failed:`,
-        err,
-      );
+      appLogger.warning(`[model-catalog] LoRA register(${adapter.id}) failed:`, err);
     }
   }
 }
@@ -812,50 +829,46 @@ function tryRegister(entry: CatalogEntry): boolean {
   }
 }
 
-function registerViaFacade(entry: CatalogEntry): ModelInfo | null {
-  if (entry.files && entry.files.length > 0) {
-    return RunAnywhere.registerModelMultiFile({
-      id: entry.id,
-      name: entry.name,
-      framework: entry.framework,
-      files: entry.files,
-      description: entry.description,
-      format: entry.format,
-      modality: entry.category,
-      memoryRequirement: entry.memoryRequiredBytes,
-      downloadSizeBytes: entry.downloadSizeBytes,
-      contextLength: entry.contextLength,
-      supportsThinking: entry.supportsThinking,
-      supportsLora: entry.supportsLora,
-    });
-  }
+const ARCHIVE_KINDS: Partial<Record<ModelArtifactType, 'tarGz' | 'zip'>> = {
+  [ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE]: 'tarGz',
+  [ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE]: 'zip',
+};
 
-  const options = {
+const FILE_ROLE_NAMES: Partial<Record<ModelFileRole, ModelFileRegistration['role']>> = {
+  [ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL]: 'primary',
+  [ModelFileRole.MODEL_FILE_ROLE_COMPANION]: 'companion',
+  [ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR]: 'projector',
+  [ModelFileRole.MODEL_FILE_ROLE_TOKENIZER]: 'tokenizer',
+  [ModelFileRole.MODEL_FILE_ROLE_CONFIG]: 'config',
+  [ModelFileRole.MODEL_FILE_ROLE_VOCABULARY]: 'vocabulary',
+};
+
+function registerViaFacade(entry: CatalogEntry): ModelInfo | null {
+  return RunAnywhere.models.register({
     id: entry.id,
+    name: entry.name,
     description: entry.description,
+    framework: entry.framework,
     format: entry.format,
-    modality: entry.category,
-    memoryRequirement: entry.memoryRequiredBytes,
-    downloadSizeBytes: entry.downloadSizeBytes,
+    category: entry.category,
+    memoryRequiredBytes: entry.memoryRequiredBytes,
+    sizeBytes: entry.downloadSizeBytes,
     contextLength: entry.contextLength,
     supportsThinking: entry.supportsThinking,
     supportsLora: entry.supportsLora,
-  };
-
-  if (entry.artifactType && entry.artifactType !== ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE) {
-    return RunAnywhere.registerModelArchive(
-      entry.downloadUrl,
-      entry.name,
-      entry.framework,
-      entry.artifactType,
-      options,
-    );
-  }
-
-  return RunAnywhere.registerModel(
-    entry.downloadUrl,
-    entry.name,
-    entry.framework,
-    options,
-  );
+    ...(entry.files && entry.files.length > 0
+      ? {
+        files: entry.files.map((file) => ({
+          url: file.url,
+          filename: file.filename,
+          role: FILE_ROLE_NAMES[file.role],
+          sizeBytes: file.sizeBytes,
+          isRequired: file.isRequired,
+        })),
+      }
+      : {
+        url: entry.downloadUrl,
+        archive: entry.artifactType ? ARCHIVE_KINDS[entry.artifactType] : undefined,
+      }),
+  });
 }

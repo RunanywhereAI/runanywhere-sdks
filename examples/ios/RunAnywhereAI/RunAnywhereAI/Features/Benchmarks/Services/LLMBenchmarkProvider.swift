@@ -11,6 +11,15 @@ import RunAnywhere
 struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
     let category: BenchmarkCategory = .llm
 
+    private static let systemPrompt = "You are a helpful assistant. Always give extremely detailed, "
+        + "thorough responses. Never stop early. Use the full response length available "
+        + "to you. Elaborate on every point with examples and explanations."
+
+    private static let prompt = "Write a very long and detailed explanation of how neural networks work, "
+        + "covering perceptrons, activation functions, backpropagation, gradient descent, "
+        + "loss functions, convolutional layers, recurrent layers, transformers, attention "
+        + "mechanisms, and training procedures. Be as thorough as possible."
+
     func scenarios() -> [BenchmarkScenario] {
         [
             BenchmarkScenario(name: "Short (50 tokens)", category: .llm, parameters: ["maxTokens": "50"]),
@@ -19,7 +28,6 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
         ]
     }
 
-    // swiftlint:disable:next function_body_length
     func execute(
         scenario: BenchmarkScenario,
         model: RAModelInfo
@@ -28,89 +36,72 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
         var metrics = BenchmarkMetrics()
 
         // Ensure clean state: unload any LLM left over from Chat or a previous run
-        var preUnloadRequest = RAModelUnloadRequest()
-        preUnloadRequest.category = .language
-        _ = await RunAnywhere.unloadModel(preUnloadRequest)
+        try? await RunAnywhere.models.unload(category: .language)
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
-        // Load (canonical proto-request form)
         let loadStart = Date()
-        var loadRequest = RAModelLoadRequest()
-        loadRequest.modelID = model.id
-        loadRequest.category = .language
-        let loadResult = await RunAnywhere.loadModel(loadRequest)
-        guard loadResult.success else {
-            throw SDKException(code: .unknown, message: loadResult.errorMessage, category: .internal)
-        }
+        try await RunAnywhere.models.load(id: model.id)
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
 
-        var unloadRequest = RAModelUnloadRequest()
-        unloadRequest.category = .language
-
         do {
-            // generateStream returns
-            // AsyncStream<RALLMStreamEvent>; benchmark derives TTFT +
-            // tokens/sec from the event sequence directly.
-            let warmupStart = Date()
-            var warmupOptions = RALLMGenerationOptions.defaults()
-            warmupOptions.maxOutputTokens = 5
-            warmupOptions.temperature = 0.0
-            let warmupRequest = warmupOptions.toRALLMGenerateRequest(prompt: "Hello")
-            let warmupEvents = try await RunAnywhere.generateStream(warmupRequest)
-            for await event in warmupEvents where event.isFinal { break }
-            metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
-
-            // Benchmark
-            let benchStart = Date()
-            let systemPrompt = "You are a helpful assistant. Always give extremely detailed, "
-                + "thorough responses. Never stop early. Use the full response length available "
-                + "to you. Elaborate on every point with examples and explanations."
-            let prompt = "Write a very long and detailed explanation of how neural networks work, "
-                + "covering perceptrons, activation functions, backpropagation, gradient descent, "
-                + "loss functions, convolutional layers, recurrent layers, transformers, attention "
-                + "mechanisms, and training procedures. Be as thorough as possible."
-            var benchOptions = RALLMGenerationOptions.defaults()
-            benchOptions.maxOutputTokens = Int32(maxTokens)
-            benchOptions.temperature = 0.0
-            benchOptions.systemPrompt = systemPrompt
-            let benchRequest = benchOptions.toRALLMGenerateRequest(prompt: prompt)
-            let benchEvents = try await RunAnywhere.generateStream(benchRequest)
-
-            let result = await withTaskCancellationHandler {
-                await RunAnywhere.aggregateStream(prompt: prompt, events: benchEvents)
-            } onCancel: {
-                // Benchmark cancelled mid-run: stop the in-flight generation so the
-                // model doesn't keep decoding for tens of seconds before the loop
-                // observes cancellation.
-                Task { await RunAnywhere.cancelGeneration() }
-            }
-            let wallMs = Date().timeIntervalSince(benchStart) * 1000
-            let generationMs = result.generationTimeMs > 0 ? result.generationTimeMs : wallMs
-
-            metrics.endToEndLatencyMs = generationMs
-            metrics.ttftMs = result.ttftMs > 0 ? result.ttftMs : nil
-            metrics.tokensPerSecond = result.tokensPerSecond > 0 ? result.tokensPerSecond : nil
-            metrics.inputTokens = result.inputTokens > 0 ? Int(result.inputTokens) : nil
-            metrics.outputTokens = result.outputTokens > 0 ? Int(result.outputTokens) : nil
-
-            if result.decodeTimeMs > 0, result.outputTokens > 0 {
-                metrics.decodeTokensPerSecond =
-                    Double(result.outputTokens) / (Double(result.decodeTimeMs) / 1000.0)
-            }
-            if result.promptEvalTimeMs > 0, result.inputTokens > 0 {
-                metrics.prefillTokensPerSecond =
-                    Double(result.inputTokens) / (Double(result.promptEvalTimeMs) / 1000.0)
-            }
+            metrics.warmupTimeMs = try await runWarmup()
+            try await measure(maxTokens: maxTokens, into: &metrics)
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter
 
-            _ = await RunAnywhere.unloadModel(unloadRequest)
+            try? await RunAnywhere.models.unload(category: .language)
             return metrics
         } catch {
-            _ = await RunAnywhere.unloadModel(unloadRequest)
+            try? await RunAnywhere.models.unload(category: .language)
             throw error
         }
+    }
+
+    /// One discarded short generation so first-run cache/JIT cost is not charged
+    /// to the measured pass.
+    private func runWarmup() async throws -> Double {
+        let start = Date()
+        let events = try await RunAnywhere.llm.generateStream(
+            prompt: "Hello",
+            options: LlmOptions(maxOutputTokens: 5, temperature: 0.0)
+        )
+        for try await event in events {
+            if case .completed = event { break }
+        }
+        return Date().timeIntervalSince(start) * 1000
+    }
+
+    /// Cancelling the consuming Task cancels the generation, so no explicit
+    /// cancel verb is needed on the benchmark's cancellation path.
+    private func measure(maxTokens: Int, into metrics: inout BenchmarkMetrics) async throws {
+        let start = Date()
+        let events = try await RunAnywhere.llm.generateStream(
+            prompt: Self.prompt,
+            options: LlmOptions(
+                maxOutputTokens: maxTokens,
+                temperature: 0.0,
+                systemPrompt: Self.systemPrompt
+            )
+        )
+
+        var final: GenerationResult?
+        for try await event in events {
+            try Task.checkCancellation()
+            if case .completed(let result) = event {
+                final = result
+                break
+            }
+        }
+
+        let wallMs = Date().timeIntervalSince(start) * 1000
+        metrics.endToEndLatencyMs = wallMs
+        metrics.generationTimeMs = wallMs
+        guard let final else { return }
+        metrics.ttftMs = final.timeToFirstTokenMs > 0 ? Double(final.timeToFirstTokenMs) : nil
+        metrics.tokensPerSecond = final.tokensPerSecond > 0 ? Double(final.tokensPerSecond) : nil
+        metrics.inputTokens = final.inputTokens > 0 ? final.inputTokens : nil
+        metrics.outputTokens = final.outputTokens > 0 ? final.outputTokens : nil
     }
 }

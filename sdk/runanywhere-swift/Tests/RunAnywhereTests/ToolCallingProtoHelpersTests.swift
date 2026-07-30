@@ -84,15 +84,16 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
             description: "echo tool",
             parameters: []
         )
-        await RunAnywhere.registerTool(definition) { _ in [:] }
-        defer { Task { await RunAnywhere.unregisterTool("echo") } }
+        await RunAnywhere.llm.tools.register(definition) { _ in [:] }
+        defer { Task { await RunAnywhere.llm.tools.unregister(name: "echo") } }
 
         var toolCall = RAToolCall()
         toolCall.name = "echo"
         toolCall.argumentsJson = "{not valid json}"
         toolCall.id = "call_parse_fail"
 
-        let result = await RunAnywhere.executeTool(toolCall)
+        // Tool execution has no public v3 verb: the SDK runs the loop itself.
+        let result = await RunAnywhere.executeToolInternal(toolCall)
         XCTAssertFalse(result.success)
         XCTAssertFalse(result.error.isEmpty)
     }

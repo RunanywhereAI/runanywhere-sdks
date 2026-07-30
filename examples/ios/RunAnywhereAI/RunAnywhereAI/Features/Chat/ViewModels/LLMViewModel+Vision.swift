@@ -39,21 +39,22 @@ extension LLMViewModel {
         let messageIndex = messagesValue.count - 1
 
         // Track the turn so Stop / conversation-switch can cancel it (mirrors the
-        // text path). The VLM stream isn't SDK-cancellable yet, so consumeVisionStream
-        // also breaks its loop cooperatively on Task.isCancelled.
+        // text path). Cancelling this task terminates the SDK stream, which
+        // forwards the cancellation to the native layer.
         let task = Task {
             do {
-                try ensureVisionModelLoaded()
+                try await ensureVisionModelLoaded()
 
-                var options = RAVLMGenerationOptions.defaults(prompt: prompt)
-                options.maxOutputTokens = 500
-
-                let stream = try await RunAnywhere.processImageStream(attachment.image, options: options)
+                let stream = try await RunAnywhere.vlm.generateStream(
+                    image: attachment.image,
+                    prompt: prompt,
+                    options: LlmOptions(maxOutputTokens: 500)
+                )
                 let response = try await consumeVisionStream(
                     stream, messageIndex: messageIndex, generationID: generationID
                 )
                 if isCurrentGeneration(generationID) {
-                    updateVisionMessage(at: messageIndex, response: response)
+                    await updateVisionMessage(at: messageIndex, response: response)
                 }
             } catch {
                 if isCurrentGeneration(generationID) {
@@ -86,52 +87,36 @@ extension LLMViewModel {
         }
     }
 
-    private func ensureVisionModelLoaded() throws {
-        var request = RACurrentModelRequest()
-        request.category = .multimodal
-        guard RunAnywhere.currentModel(request).found else {
+    private func ensureVisionModelLoaded() async throws {
+        guard await RunAnywhere.models.state().loaded[.multimodal] != nil else {
             throw LLMError.custom("Choose or download a vision model before asking about an image.")
         }
     }
 
     private func consumeVisionStream(
-        _ stream: AsyncStream<RAVLMStreamEvent>,
+        _ stream: AsyncThrowingStream<GenerationEvent, Error>,
         messageIndex: Int,
         generationID: UUID?
     ) async throws -> String {
         var fullResponse = ""
 
-        for await event in stream {
-            // Cooperative stop: the SDK VLM stream has no cancel entry point, so
-            // break here when the turn's task is cancelled (Stop / navigate-away).
-            if Task.isCancelled { break }
-            switch event.kind {
-            case .token:
-                guard !event.token.isEmpty else { continue }
-                fullResponse += event.token
-                // Drop live tokens once superseded (the SDK VLM stream isn't
-                // cancelled on navigate-away, so keep draining but stop writing).
+        for try await event in stream {
+            switch event {
+            case .token(let text, _):
+                guard !text.isEmpty else { continue }
+                fullResponse += text
+                // Drop live tokens once superseded (user navigated away).
                 if isCurrentGeneration(generationID) {
                     updateMessageContent(at: messageIndex, content: fullResponse)
                 }
-            case .completed:
-                if fullResponse.isEmpty, !event.result.text.isEmpty {
-                    fullResponse = event.result.text
+            case .completed(let result):
+                if fullResponse.isEmpty, !result.text.isEmpty {
+                    fullResponse = result.text
                     if isCurrentGeneration(generationID) {
                         updateMessageContent(at: messageIndex, content: fullResponse)
                     }
                 }
-            case .error:
-                throw NSError(
-                    domain: "RunAnywhereAI.VisionChat",
-                    code: Int(event.errorCode),
-                    userInfo: [
-                        NSLocalizedDescriptionKey: event.errorMessage.isEmpty
-                            ? "Image question failed"
-                            : event.errorMessage
-                    ]
-                )
-            default:
+            case .started, .toolCall:
                 break
             }
         }
@@ -139,7 +124,7 @@ extension LLMViewModel {
         return fullResponse.isEmpty ? "I couldn't produce a response for that image." : fullResponse
     }
 
-    private func updateVisionMessage(at index: Int, response: String) {
+    private func updateVisionMessage(at index: Int, response: String) async {
         guard index < messagesValue.count else { return }
 
         let currentMessage = messagesValue[index]
@@ -150,20 +135,17 @@ extension LLMViewModel {
             thinkingContent: currentMessage.thinkingContent,
             timestamp: currentMessage.timestamp,
             analytics: nil,
-            modelInfo: currentVisionModelInfo(),
+            modelInfo: await currentVisionModelInfo(),
             attachment: currentMessage.attachment
         )
         updateMessage(at: index, with: updatedMessage)
     }
 
-    private func currentVisionModelInfo() -> MessageModelInfo? {
-        var request = RACurrentModelRequest()
-        request.category = .multimodal
-        let snapshot = RunAnywhere.currentModel(request)
-        guard snapshot.found else { return nil }
+    private func currentVisionModelInfo() async -> MessageModelInfo? {
+        guard let loadedId = await RunAnywhere.models.state().loaded[.multimodal]?.id else { return nil }
 
         guard let model = ModelListViewModel.shared.availableModels.first(where: {
-            $0.id == snapshot.modelID
+            $0.id == loadedId
         }) else {
             return nil
         }

@@ -36,16 +36,18 @@ final class HuggingFaceDownloadModel: ObservableObject {
     ) async {
         phases[key] = .downloading(0)
         do {
-            let model = try await RunAnywhere.registerModel(
-                name: name,
-                url: url,
-                framework: framework,
-                memoryRequirement: sizeBytes
+            let model = try await RunAnywhere.models.register(
+                .url(
+                    url,
+                    name: name,
+                    framework: framework,
+                    memoryRequirementBytes: sizeBytes
+                )
             )
-            try await RunAnywhere.downloadModel(model) { [weak self] progress in
-                await MainActor.run {
-                    self?.phases[key] = .downloading(Double(progress.overallProgress))
-                }
+            for try await event in try await RunAnywhere.models.download(id: model.id) {
+                guard case .progress(_, _, let percent) = event else { continue }
+                // `DownloadEvent.percent` is 0–100; the phase carries a fraction.
+                phases[key] = .downloading(Double(percent) / 100)
             }
             phases[key] = .done
             await ModelListViewModel.shared.loadModelsFromRegistry()

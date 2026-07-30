@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CommonsModule } from '../../../src/runtime/CommonsModule';
 import { StorageAdapter } from '../../../src/Adapters/StorageAdapter';
-import { RunAnywhere } from '../../../src/Public/RunAnywhere';
+import { SDKCore as RunAnywhere } from '../../../src/Public/SDKCore';
 
 describe('RunAnywhere initialization lifetime', () => {
   const values = new Map<string, string>();

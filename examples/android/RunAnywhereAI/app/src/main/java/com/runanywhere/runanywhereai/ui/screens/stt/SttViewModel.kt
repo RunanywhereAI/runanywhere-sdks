@@ -20,10 +20,10 @@ import com.runanywhere.sdk.hybrid.HybridRoutingPolicy
 import com.runanywhere.sdk.hybrid.HybridSTTRouter
 import com.runanywhere.sdk.hybrid.HybridTranscribeOptions
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.RASTTPartialResult
-import com.runanywhere.sdk.public.extensions.transcribe
-import com.runanywhere.sdk.public.extensions.transcribeStream
-import com.runanywhere.sdk.public.types.RASTTOptions
+import com.runanywhere.sdk.public.api.AudioInput
+import com.runanywhere.sdk.public.api.SttOptions
+import com.runanywhere.sdk.public.api.TranscriptionEvent
+import com.runanywhere.sdk.public.api.stt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -88,10 +88,10 @@ class SttViewModel : ViewModel() {
     private val buffer = ByteArrayOutputStream()
 
     // Live mode: mic chunks are fed straight into the SDK's streaming
-    // transcription (RunAnywhere.transcribeStream), which owns endpointing/
+    // transcription (RunAnywhere.stt.transcribeStream), which owns endpointing/
     // segmentation natively. No app-side silence detection. Mirrors iOS
     // STTViewModel.
-    private var liveAudio: Channel<ByteArray>? = null
+    private var liveAudio: Channel<AudioInput>? = null
     private var liveJob: Job? = null
     private var operationJob: Job? = null
     private var operationEpoch = 0
@@ -151,7 +151,7 @@ class SttViewModel : ViewModel() {
                 onChunk = { chunk, level ->
                     // Batch/hybrid buffer locally; live feeds the SDK streaming session.
                     if (mode == SttMode.LIVE) {
-                        liveAudio?.trySend(chunk)
+                        liveAudio?.trySend(AudioInput.pcm16(chunk, AudioRecorder.SAMPLE_RATE))
                     } else {
                         synchronized(buffer) { buffer.write(chunk) }
                     }
@@ -181,7 +181,7 @@ class SttViewModel : ViewModel() {
         // A native fallback recognizer can spend seconds finalizing an
         // utterance. Bound mic ingress so navigation/stop never leaves minutes
         // of 100 ms chunks queued behind one blocking JNI call.
-        val channel = Channel<ByteArray>(
+        val channel = Channel<AudioInput>(
             capacity = LIVE_CHANNEL_CAPACITY,
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
@@ -189,10 +189,10 @@ class SttViewModel : ViewModel() {
         liveJob = viewModelScope.launch {
             try {
                 RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT)
-                RunAnywhere.transcribeStream(
+                RunAnywhere.stt.transcribeStream(
                     channel.receiveAsFlow(),
-                    RASTTOptions(language = "en", enable_punctuation = true),
-                ).collect { partial -> onLivePartial(partial) }
+                    SttOptions(language = "en", punctuation = true),
+                ).collect(::onLiveEvent)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -204,21 +204,20 @@ class SttViewModel : ViewModel() {
         }
     }
 
-    // Fold one streaming partial into the displayed transcript: non-final
-    // partials preview the current utterance, finals commit it as a line.
-    private fun onLivePartial(partial: RASTTPartialResult) {
-        val text = partial.text.trim()
-        if (partial.is_final) {
-            // Stream errors surface as a terminal partial carrying the
-            // failure text (see RunAnywhere.transcribeStream).
-            if (text.startsWith("STT stream failed")) {
-                error = text
-                return
+    // Fold one streaming event into the displayed transcript: partials preview
+    // the current utterance, the final result commits it as a line.
+    private fun onLiveEvent(event: TranscriptionEvent) {
+        when (event) {
+            is TranscriptionEvent.Partial -> {
+                val text = event.text.trim()
+                if (text.isNotEmpty()) transcript = join(committed, text)
             }
-            if (text.isNotEmpty()) committed = join(committed, text)
-            transcript = committed
-        } else if (text.isNotEmpty()) {
-            transcript = join(committed, text)
+            is TranscriptionEvent.Final -> {
+                val text = event.transcription.text.trim()
+                if (text.isNotEmpty()) committed = join(committed, text)
+                transcript = committed
+            }
+            TranscriptionEvent.Started -> Unit
         }
     }
 
@@ -365,16 +364,15 @@ class SttViewModel : ViewModel() {
     private suspend fun runTranscription(audio: ByteArray): String? = try {
         RuntimeModelSelection.requireCurrent(ModelSelectionContext.STT)
         val started = System.currentTimeMillis()
-        val output = RunAnywhere.transcribe(
-            audio,
-            RASTTOptions(language = "en", enable_punctuation = true),
+        val output = RunAnywhere.stt.transcribe(
+            AudioInput.pcm16(audio, AudioRecorder.SAMPLE_RATE),
+            SttOptions(language = "en", punctuation = true),
         )
         val elapsed = System.currentTimeMillis() - started
         val text = output.text.trim()
-        val audioMs = output.duration_ms.takeIf { it > 0 }
-            ?: output.metadata?.audio_length_ms?.takeIf { it > 0 }
+        val audioMs = output.durationMs.takeIf { it > 0 }
             ?: (audio.size.toLong() / (AudioRecorder.SAMPLE_RATE * 2L / 1000L))
-        val processingMs = output.metadata?.processing_time_ms?.takeIf { it > 0 } ?: elapsed
+        val processingMs = elapsed
         metrics = SttMetrics(
             audioSec = audioMs / 1000.0,
             processingMs = processingMs,

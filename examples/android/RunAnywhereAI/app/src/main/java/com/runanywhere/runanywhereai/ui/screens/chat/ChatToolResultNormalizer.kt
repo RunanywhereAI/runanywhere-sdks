@@ -1,7 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
-import ai.runanywhere.proto.v1.ToolCallingResult
-import ai.runanywhere.proto.v1.ToolResult
+import com.runanywhere.sdk.public.api.GenerationResult
+import com.runanywhere.sdk.public.api.ToolResult
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -34,21 +34,15 @@ internal object ChatToolResultNormalizer {
         options = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
     )
 
-    fun normalize(result: ToolCallingResult): NormalizedChatToolResult {
-        val rawText = result.text.ifBlank {
-            result.raw_text.takeIf { containsThinkingMarkup(it) }.orEmpty()
-        }
-        val split = splitThinking(rawText)
-        val typedThinking = result.thinking_content
+    fun normalize(result: GenerationResult): NormalizedChatToolResult {
+        val split = splitThinking(result.text)
+        val typedThinking = result.thinkingText
             ?.let(::sanitizeTypedThinking)
             ?.takeIf { it.isNotBlank() }
         val thinking = typedThinking ?: split.thinking.takeIf { it.isNotBlank() }
 
         val text = split.visibleText.ifBlank {
-            successfulToolFallback(result.tool_results)
-                ?: result.error_message
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let { "Error: ${visibleOnly(it)}" }
+            successfulToolFallback(result.toolResults)
                 ?: "The model did not produce a visible answer."
         }
         return NormalizedChatToolResult(
@@ -164,9 +158,6 @@ internal object ChatToolResultNormalizer {
     }
 
     private fun visibleOnly(value: String): String = splitThinking(value).visibleText
-
-    private fun containsThinkingMarkup(value: String): Boolean =
-        thinkingTag.containsMatchIn(value) || incompleteThinkingTag.containsMatchIn(value)
 
     private fun removeThinkingMarkup(value: String): String =
         incompleteThinkingTag.replace(thinkingTag.replace(value, ""), "")

@@ -60,11 +60,13 @@ pip install runanywhere
 ```
 
 ```python
-from runanywhere import RunAnywhere
+import runanywhere as ra
+from runanywhere import LlmOptions
 
-with RunAnywhere() as ra:
-    llm = ra.load_llm("qwen2.5-0.5b")  # downloads on first use
-    print(llm.generate_text("Explain on-device AI in one sentence."))
+ra.initialize()
+# downloads on first use
+print(ra.llm.generate("Explain on-device AI in one sentence.",
+                      LlmOptions(model="qwen2.5-0.5b")).text)
 ```
 
 Prefer a terminal? The same core ships as a CLI:
@@ -303,25 +305,28 @@ Install: build from source (Windows x64 preview), see the [SDK README](sdk/runan
 <br/>
 
 ```python
-from runanywhere import RunAnywhere
+import runanywhere as ra
+from runanywhere import LlmOptions
 
-with RunAnywhere() as ra:
-    # 1. Load a model (auto-downloads on first use)
-    llm = ra.load_llm("qwen2.5-0.5b")
+# 1. One call brings the SDK up
+ra.initialize()
 
-    # 2. Stream tokens (sync)
-    for token in llm.generate("What is the capital of France?"):
-        print(token, end="", flush=True)
+# 2. Stream tokens (the model auto-downloads and auto-loads)
+for event in ra.llm.generate_stream("What is the capital of France?",
+                                    LlmOptions(model="qwen2.5-0.5b")):
+    if event.is_token:
+        print(event.text, end="", flush=True)
 
-    # 2b. Or async
-    # async for token in llm.agenerate("..."):
-    #     ...
+# 2b. Or async
+# async for event in ra.llm.agenerate_stream("..."):
+#     ...
 
-    # 3. Or grab the full text
-    print(llm.generate_text("Capital of France? One word."))  # "Paris"
+# 3. Or grab the whole result, metrics included
+result = ra.llm.generate("Capital of France? One word.")
+print(result.text, result.tokens_per_second)   # "Paris" 41.2
 ```
 
-Every method has an async twin. LLM, VLM, STT, TTS, embeddings (numpy), VAD, voice agent, RAG, structured output, and tool calling, with prebuilt wheels that bundle the native runtime. CUDA is available as an opt-in source build.
+Namespaces per modality (`llm`, `vlm`, `stt`, `tts`, `vad`, `embeddings`, `rag`, `models`), an `a`-prefixed async twin for every blocking verb, structured output and tool calling, with prebuilt wheels that bundle the native runtime. CUDA is available as an opt-in source build.
 
 Install via pip:
 

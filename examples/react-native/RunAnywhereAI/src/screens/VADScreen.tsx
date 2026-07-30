@@ -19,27 +19,40 @@ import {
 import {
   RunAnywhere,
   AudioCaptureManager,
+  AudioInputs,
   createPushableAudioStream,
+  type AudioInput,
   type PushableAudioStream,
+  type VadEvent,
+  type VadResult,
 } from '@runanywhere/core';
 import {
   ModelCategory,
-  ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
-import type { VADResult } from '@runanywhere/proto-ts/vad_options';
 import { visibleNativeNpuCatalogModelOrNull } from '../services/NpuModelCatalog';
 
-function chunkToArrayBuffer(chunk: Uint8Array): ArrayBuffer {
-  return chunk.buffer.slice(
-    chunk.byteOffset,
-    chunk.byteOffset + chunk.byteLength
-  ) as ArrayBuffer;
-}
-
-function pcm16ChunkToFloat32Bytes(chunk: Uint8Array): Uint8Array {
-  const samples = RunAnywhere.pcm16ToFloat32(chunkToArrayBuffer(chunk));
-  return new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength);
+function pcmAudioInputs(
+  chunks: AsyncIterable<Uint8Array>
+): AsyncIterable<AudioInput> {
+  return {
+    [Symbol.asyncIterator]() {
+      const iterator = chunks[Symbol.asyncIterator]();
+      return {
+        async next() {
+          const step = await iterator.next();
+          if (step.done) {
+            return { value: undefined as unknown as AudioInput, done: true };
+          }
+          return { value: AudioInputs.pcm16(step.value), done: false };
+        },
+        async return() {
+          await iterator.return?.();
+          return { value: undefined as unknown as AudioInput, done: true };
+        },
+      };
+    },
+  };
 }
 
 const BAR_COUNT = 12;
@@ -57,7 +70,7 @@ export const VADScreen: React.FC = () => {
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [showModelSelection, setShowModelSelection] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [latestResult, setLatestResult] = useState<VADResult | null>(null);
+  const [latestResult, setLatestResult] = useState<VadResult | null>(null);
   const [frameCount, setFrameCount] = useState(0);
   const [activityLog, setActivityLog] = useState<LogEntry[]>([]);
 
@@ -76,9 +89,9 @@ export const VADScreen: React.FC = () => {
   };
 
   const refreshLoadedModel = useCallback(async () => {
-    const loaded = await RunAnywhere.modelInfoForCategory(
-      ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-    ).catch(() => null);
+    const loaded = await RunAnywhere.models
+      .loaded(ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION)
+      .catch(() => null);
     setCurrentModel(visibleNativeNpuCatalogModelOrNull(loaded));
   }, []);
 
@@ -92,7 +105,7 @@ export const VADScreen: React.FC = () => {
   }, [refreshLoadedModel]);
 
   const speechDetected = latestResult?.isSpeech ?? false;
-  const audioLevel = Math.min(1, (latestResult?.energy ?? 0) * 5);
+  const audioLevel = Math.min(1, latestResult?.probability ?? 0);
 
   useEffect(() => {
     if (speechDetected && !prevSpeechRef.current) {
@@ -135,34 +148,27 @@ export const VADScreen: React.FC = () => {
         Alert.alert('Model Required', 'Download the VAD model first.');
         return;
       }
-      const result = await RunAnywhere.loadModel(
-        ModelLoadRequest.fromPartial({
-          modelId: model.id,
-          category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-          forceReload: false,
-          validateAvailability: true,
-        })
+      await RunAnywhere.models.load(model.id);
+      setCurrentModel(model);
+    } catch (error) {
+      Alert.alert(
+        'Load Failed',
+        error instanceof Error ? error.message : 'Failed to load VAD model.'
       );
-      if (result.success) {
-        setCurrentModel(model);
-      } else {
-        Alert.alert(
-          'Load Failed',
-          result.errorMessage || 'Failed to load VAD model.'
-        );
-      }
     } finally {
       setIsModelLoading(false);
     }
   };
 
-  const consumeVAD = async (results: AsyncIterable<VADResult>) => {
-    const iterator = results[Symbol.asyncIterator]();
+  const consumeVAD = async (events: AsyncIterable<VadEvent>) => {
+    const iterator = events[Symbol.asyncIterator]();
     try {
       let step = await iterator.next();
       while (!step.done && isListeningRef.current) {
-        setLatestResult(step.value);
-        setFrameCount((count) => count + 1);
+        if (step.value.type === 'frame') {
+          setLatestResult(step.value.result);
+          setFrameCount((count) => count + 1);
+        }
         step = await iterator.next();
       }
     } finally {
@@ -186,9 +192,11 @@ export const VADScreen: React.FC = () => {
     isListeningRef.current = true;
     setLatestResult(null);
     setFrameCount(0);
-    taskRef.current = consumeVAD(RunAnywhere.streamVAD(stream.iterable));
+    taskRef.current = consumeVAD(
+      RunAnywhere.vad.detectStream(pcmAudioInputs(stream.iterable))
+    );
     await capture.startRecording((chunk) => {
-      stream.push(pcm16ChunkToFloat32Bytes(chunk));
+      stream.push(chunk);
     });
     setIsListening(true);
   };

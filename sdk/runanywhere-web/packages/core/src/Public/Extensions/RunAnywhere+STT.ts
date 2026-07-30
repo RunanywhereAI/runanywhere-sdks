@@ -3,14 +3,14 @@
  *
  * Speech-to-text namespace — mirrors Swift's `RunAnywhere+STT.swift`.
  * Provides `RunAnywhere.stt.*` capability surface for owning STT component
- * handles plus lifecycle-owned `transcribeAuto` / `transcribeStreamAuto`
- * shortcuts.
+ * handles plus the lifecycle-owned `transcribe` / `transcribeStream` entry
+ * points the public `RunAnywhere.stt` namespace builds on.
  *
  * The proto-byte adapters (`STTProtoAdapter`) take a numeric `handle` argument
  * — it comes from `_rac_stt_component_create()` followed by
  * `_rac_stt_component_load_model()`. This facade owns those calls so the
  * example app and external consumers never have to touch raw exports. The
- * auto shortcuts deliberately do not create component handles: they dispatch
+ * lifecycle-owned entry points deliberately do not create component handles: they dispatch
  * through commons' lifecycle-owned STT ABI so the currently loaded model is
  * never replaced as a side effect of inference.
  */
@@ -183,9 +183,6 @@ function callLoadModel(
 export type TranscribeOptions = Partial<STTOptions>;
 
 export const STT = {
-  transcribeAuto: transcribe,
-  transcribeStreamAuto: transcribeStream,
-
   /**
    * Returns true when the WASM module is loaded with both the proto-byte
    * STT exports AND the component lifecycle exports (create / load_model /
@@ -315,11 +312,11 @@ export async function transcribe(
   audio: Uint8Array | Float32Array,
   options?: TranscribeOptions,
 ): Promise<STTOutput> {
-  requireSTTModule('RunAnywhere.stt.transcribeAuto');
+  requireSTTModule('RunAnywhere.stt.transcribe');
   const adapter = STTProtoAdapter.tryDefault();
   if (!adapter?.supportsLifecycleProtoSTT()) {
     throw SDKException.backendNotAvailable(
-      'RunAnywhere.stt.transcribeAuto',
+      'RunAnywhere.stt.transcribe',
       'Loaded WASM module does not export rac_stt_transcribe_lifecycle_proto.',
     );
   }
@@ -344,11 +341,11 @@ export function transcribeStream(
   audio: Uint8Array | Float32Array,
   options?: TranscribeOptions,
 ): AsyncIterable<STTPartialResult> {
-  requireSTTModule('RunAnywhere.stt.transcribeStreamAuto');
+  requireSTTModule('RunAnywhere.stt.transcribeStream');
   const adapter = STTProtoAdapter.tryDefault();
   if (!adapter?.supportsLifecycleProtoSTT()) {
     throw SDKException.backendNotAvailable(
-      'RunAnywhere.stt.transcribeStreamAuto',
+      'RunAnywhere.stt.transcribeStream',
       'Loaded WASM module does not export rac_stt_transcribe_stream_lifecycle_proto.',
     );
   }

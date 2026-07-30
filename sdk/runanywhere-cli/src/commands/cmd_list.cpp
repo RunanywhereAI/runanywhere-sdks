@@ -1,6 +1,7 @@
 /**
  * @file cmd_list.cpp
- * @brief `rcli list` — downloaded models (default) or full catalog (--all).
+ * @brief `rcli models list` (alias `rcli list`) — downloaded models by
+ *        default, the whole catalog with --all.
  *
  * The registry is refreshed with rescan_local so on-disk artifacts pulled by
  * previous runs (or by the test rig / playground tooling) are linked before
@@ -114,9 +115,7 @@ int run_list(const GlobalOptions& options, bool show_all) {
 
 }  // namespace
 
-void register_list(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand("list", "List models (downloaded by default)");
-    cmd->alias("ls");
+void configure_models_list(CLI::App* cmd, GlobalOptions& options) {
     auto show_all = std::make_shared<bool>(false);
     cmd->add_flag("--all,-a", *show_all, "Include catalog models that are not downloaded");
     cmd->callback([&options, show_all]() {

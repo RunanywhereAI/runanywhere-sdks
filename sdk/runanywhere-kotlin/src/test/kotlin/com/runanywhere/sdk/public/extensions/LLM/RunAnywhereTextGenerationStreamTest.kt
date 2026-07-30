@@ -94,7 +94,7 @@ class RunAnywhereTextGenerationStreamTest {
 
             assertEquals((1L..tokenCount.toLong() + 1).toList(), observedSequences)
             assertEquals(expectedText, result.text)
-            assertEquals(tokenCount, result.tokens_generated)
+            assertEquals(tokenCount, result.output_tokens)
             assertEquals(tokenCount, result.response_tokens)
             assertEquals(tokenCount + 1, result.total_tokens)
             assertEquals("stop", result.finish_reason)
@@ -111,8 +111,8 @@ class RunAnywhereTextGenerationStreamTest {
                 LLMStreamFinalResult(
                     text = "canonical answer",
                     thinking_content = "canonical reasoning",
-                    prompt_tokens = 7,
-                    completion_tokens = 9,
+                    input_tokens = 7,
+                    output_tokens = 9,
                     total_tokens = 16,
                     total_time_ms = 123L,
                     time_to_first_token_ms = 8L,
@@ -148,7 +148,7 @@ class RunAnywhereTextGenerationStreamTest {
             assertEquals("canonical answer", result.text)
             assertEquals("canonical reasoning", result.thinking_content)
             assertEquals(7, result.input_tokens)
-            assertEquals(9, result.tokens_generated)
+            assertEquals(9, result.output_tokens)
             assertEquals(9, result.response_tokens)
             assertEquals(16, result.total_tokens)
             assertEquals(123.0, result.generation_time_ms, 0.0)

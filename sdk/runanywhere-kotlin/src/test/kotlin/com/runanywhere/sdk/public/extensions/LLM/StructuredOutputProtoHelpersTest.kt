@@ -19,6 +19,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -73,7 +74,8 @@ class StructuredOutputProtoHelpersTest {
         val options = StructuredOutputOptions.defaults(schema = schema)
         assertEquals(StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA, options.mode)
         assertTrue(options.include_schema_in_prompt)
-        assertEquals(JSONSchemaType.JSON_SCHEMA_TYPE_ARRAY, options.schema?.type)
+        // schema/json_schema are a oneof; defaults() fills the pre-serialized arm.
+        assertNull(options.schema)
 
         val json = parseObject(options.json_schema ?: "")
         assertEquals("array", json["type"]?.jsonPrimitive?.content)
@@ -99,7 +101,7 @@ class StructuredOutputProtoHelpersTest {
         assertEquals("structured-test", request.request_id)
         assertEquals("answer {\"status\":\"ok\"}", request.text)
         val opts = assertNotNull(request.options)
-        assertEquals(JSONSchemaType.JSON_SCHEMA_TYPE_OBJECT, opts.schema?.type)
+        assertNull(opts.schema)
         assertEquals(StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA, opts.mode)
         assertTrue(opts.include_schema_in_prompt)
         assertTrue((opts.json_schema ?: "").contains("\"status\""))
@@ -120,7 +122,7 @@ class StructuredOutputProtoHelpersTest {
         assertEquals("prepare-test", request.request_id)
         assertEquals("Return rows", request.prompt)
         val opts = assertNotNull(request.options)
-        assertEquals(JSONSchemaType.JSON_SCHEMA_TYPE_ARRAY, opts.schema?.type)
+        assertNull(opts.schema)
         assertEquals(StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA, opts.mode)
         assertTrue((opts.json_schema ?: "").contains("\"array\""))
     }

@@ -2,100 +2,49 @@
 //  RunAnywhere+TextGeneration.swift
 //  RunAnywhere SDK
 //
-//  Public API for text generation (LLM) operations.
-//  Calls C++ directly via CppBridge.LLM for all operations.
-//  Events are emitted by C++ layer via CppEventBridge.
+//  Deprecated flat text-generation verbs. The v3 surface is `RunAnywhere.llm`.
 //
 
 import Foundation
 
-// MARK: - Text Generation
-
 public extension RunAnywhere {
 
-    /// Generate text from a plain prompt — convenience overload that mirrors
-    /// the Kotlin `RunAnywhere.generate(prompt:options:)` signature.
-    /// Forwards to the proto-request variant after assembling the request
-    /// from `options ?? .defaults()`.
+    /// Generate text from a plain prompt.
+    @available(*, deprecated, renamed: "llm.generate(prompt:options:)")
     static func generate(
         prompt: String,
         options: RALLMGenerationOptions? = nil
     ) async throws -> RALLMGenerationResult {
         let requestOptions = options ?? .defaults()
-        let request = requestOptions.toRALLMGenerateRequest(prompt: prompt)
-        return try await generate(request)
+        return try await generateProto(requestOptions.toRALLMGenerateRequest(prompt: prompt))
     }
 
-    /// Stream text generation from a plain prompt — convenience overload that
-    /// mirrors the Kotlin `RunAnywhere.generateStream(prompt:options:)`
-    /// signature. Forwards to the proto-request variant after assembling
-    /// the request from `options ?? .defaults()` and enabling streaming.
+    /// Stream text generation from a plain prompt.
+    @available(*, deprecated, renamed: "llm.generateStream(prompt:options:)")
     static func generateStream(
         prompt: String,
         options: RALLMGenerationOptions? = nil
     ) async throws -> AsyncStream<RALLMStreamEvent> {
         let requestOptions = options ?? .defaults()
-        let request = requestOptions.toRALLMGenerateRequest(prompt: prompt)
-        return try await generateStream(request)
+        return try await generateStreamProto(requestOptions.toRALLMGenerateRequest(prompt: prompt))
     }
 
     /// Generate text through the generated-proto C++ LLM service ABI.
+    @available(*, deprecated, renamed: "llm.generate(prompt:options:)")
     static func generate(_ request: RALLMGenerateRequest) async throws -> RALLMGenerationResult {
-        guard isInitialized else {
-            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
-        }
-
-        try await ensureServicesReady()
-
-        let options = request.options
-        let systemPromptDesc = options.systemPrompt.isEmpty ? "nil" : "set(\(options.systemPrompt.count) chars)"
-        SDKLogger.llm.info(
-            "[PARAMS] generate: temperature=\(options.temperature), top_p=\(options.topP), "
-            + "max_output_tokens=\(options.maxOutputTokens), system_prompt=\(systemPromptDesc)"
-        )
-
-        return try await CppBridge.LLM.shared.generate(request)
+        try await generateProto(request)
     }
 
     /// Stream text generation through the generated-proto C++ LLM service ABI.
-    ///
-    /// Each `RALLMStreamEvent` is decoded from the full proto envelope so all
-    /// optional fields are surfaced to consumers without any switch-case
-    /// filtering at the adapter layer:
-    ///   - `token` / `kind` / `tokenID` / `logprob` for streaming tokens
-    ///   - `eventKind` (proto `LLMStreamEventKind`) to classify the event
-    ///   - `toolCall` (proto field 18, hotspot-idl-002) when the event
-    ///     represents a structured tool-call boundary — consumers can read
-    ///     `event.hasToolCall` / `event.toolCall` directly without falling
-    ///     back to JSON-parsing the raw `token` text (pass2-syn-010 follow-up).
-    ///   - `result` (final aggregate metrics on terminal events).
+    @available(*, deprecated, renamed: "llm.generateStream(prompt:options:)")
     static func generateStream(_ request: RALLMGenerateRequest) async throws -> AsyncStream<RALLMStreamEvent> {
-        guard isInitialized else {
-            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
-        }
-
-        try await ensureServicesReady()
-
-        let options = request.options
-        let systemPromptDesc = options.systemPrompt.isEmpty ? "nil" : "set(\(options.systemPrompt.count) chars)"
-        SDKLogger.llm.info(
-            "[PARAMS] generateStream: temperature=\(options.temperature), top_p=\(options.topP), "
-            + "max_output_tokens=\(options.maxOutputTokens), system_prompt=\(systemPromptDesc)"
-        )
-
-        return try await CppBridge.LLM.shared.generateStream(request)
+        try await generateStreamProto(request)
     }
 
     /// Cancel the current text generation.
-    ///
-    /// Routes through the lifecycle proto ABI (`rac_llm_cancel_proto`) so the
-    /// active `generate` / `generateStream` call — which runs through the
-    /// handleless lifecycle path — observes the cancel signal and terminates
-    /// promptly with `finishReason == .cancelled`. Calling the per-component
-    /// actor `cancel()` is a no-op against lifecycle generation
-    /// (see comment record `hotspot-swift-public-features-002`).
+    @available(*, deprecated, message: "Cancel the Task consuming llm.generateStream instead")
     static func cancelGeneration() async {
-        guard isInitialized else { return }
+        guard isReady else { return }
         do {
             _ = try await CppBridge.LLM.shared.cancelProto()
         } catch {
@@ -103,30 +52,55 @@ public extension RunAnywhere {
         }
     }
 
-    /// Build a canonical `RALLMGenerationResult` from a stream of
-    /// `RALLMStreamEvent`s and the currently-loaded LLM model.
-    ///
-    /// Example apps previously synthesised this struct themselves with a
-    /// hardcoded `framework = "llamacpp"` literal because the SDK exposed
-    /// only the per-token stream. The aggregation logic (concatenating
-    /// `event.token` text, counting tokens, computing TTFT/throughput from
-    /// timestamps) is now owned by the SDK and the framework string is
-    /// resolved from `currentModel(_:).framework.analyticsKey` so callers
-    /// stay aligned with the registry's canonical framework label.
-    ///
-    /// - Parameters:
-    ///   - prompt: Prompt text used to estimate `inputTokens` when the
-    ///     backend does not surface it directly.
-    ///   - events: AsyncStream of stream events from
-    ///     `generateStream(_:)`. The function consumes the stream until
-    ///     `isFinal == true` or the stream finishes.
-    ///   - onThinking: Optional callback invoked for each typed thought token.
-    ///     Receives the accumulated model-emitted reasoning text so far.
-    ///   - onToken: Optional callback invoked for each typed answer token.
-    ///     Receives the accumulated answer transcript so far.
-    /// - Returns: A populated `RALLMGenerationResult` whose `framework`
-    ///   field matches the loaded LLM model's analytics key; on terminal
-    ///   error events the `errorMessage` is propagated.
+    /// Extract structured output from a raw text string using a JSON schema.
+    @available(*, deprecated, renamed: "llm.generateStructured(prompt:schema:options:)")
+    static func extractStructuredOutput(
+        text: String,
+        schema: RAJSONSchema
+    ) throws -> RAStructuredOutputResult {
+        try parseStructuredOutput(text: text, schema: schema)
+    }
+}
+
+// MARK: - Internal proto-level helpers
+
+extension RunAnywhere {
+
+    internal static func generateProto(_ request: RALLMGenerateRequest) async throws -> RALLMGenerationResult {
+        guard isReady else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        logGenerationParams("generate", options: request.options)
+        return try await CppBridge.LLM.shared.generate(request)
+    }
+
+    internal static func generateStreamProto(
+        _ request: RALLMGenerateRequest
+    ) async throws -> AsyncStream<RALLMStreamEvent> {
+        guard isReady else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        logGenerationParams("generateStream", options: request.options)
+        return try await CppBridge.LLM.shared.generateStream(request)
+    }
+
+    private static func logGenerationParams(_ verb: String, options: RALLMGenerationOptions) {
+        let systemPromptDesc = options.systemPrompt.isEmpty ? "nil" : "set(\(options.systemPrompt.count) chars)"
+        SDKLogger.llm.info(
+            "[PARAMS] \(verb): temperature=\(options.temperature), top_p=\(options.topP), "
+            + "max_output_tokens=\(options.maxOutputTokens), system_prompt=\(systemPromptDesc)"
+        )
+    }
+}
+
+// MARK: - Stream aggregation (deprecated)
+
+public extension RunAnywhere {
+
+    /// Build a canonical `RALLMGenerationResult` from a stream of events.
+    @available(*, deprecated, message: "llm.generateStream emits a .completed event carrying the full result")
     static func aggregateStream(
         prompt: String,
         events: AsyncStream<RALLMStreamEvent>,
@@ -169,17 +143,15 @@ public extension RunAnywhere {
         let totalLatency = Date().timeIntervalSince(startTime) * 1000
         let ttft = firstTokenTime.map { $0.timeIntervalSince(startTime) * 1000 }
 
-        var llmRequest = RACurrentModelRequest()
-        llmRequest.category = .language
-        let snapshot = RunAnywhere.currentModel(llmRequest)
+        let snapshot = loadedModelSnapshot(category: .language, includeModelMetadata: true)
         let modelID = snapshot.found ? snapshot.modelID : ""
         let framework = snapshot.found
             ? snapshot.model.framework.analyticsKey
             : InferenceFramework.unknown.analyticsKey
 
         // Prefer the backend's terminal aggregate result (text + metrics) when
-        // the final event carries one, matching the Web SDK; otherwise fall back
-        // to the locally concatenated text / wall-clock metrics.
+        // the final event carries one; otherwise fall back to the locally
+        // concatenated text and wall-clock metrics.
         let final = finalEvent.flatMap { $0.hasResult ? $0.result : nil }
         var result = RALLMGenerationResult()
         result.text = final?.text ?? answerResponse
@@ -207,23 +179,5 @@ public extension RunAnywhere {
         if !finishReason.isEmpty { result.finishReason = finishReason }
         if !terminalError.isEmpty { result.errorMessage = terminalError }
         return result
-    }
-}
-
-// MARK: - Structured Output Extraction
-
-public extension RunAnywhere {
-
-    /// Extract structured output from a raw text string using a JSON schema.
-    ///
-    /// Delegates to the generated structured-output parse proto ABI so commons
-    /// owns extraction, canonicalization, and schema validation.
-    static func extractStructuredOutput(
-        text: String,
-        schema: RAJSONSchema
-    ) throws -> RAStructuredOutputResult {
-        try CppBridge.StructuredOutput.parse(
-            CppBridge.StructuredOutput.makeParseRequest(text: text, schema: schema)
-        )
     }
 }

@@ -281,8 +281,8 @@ extension StructuredOutputOptionsValidate on StructuredOutputOptions {
 extension LLMGenerationOptionsConvenience on LLMGenerationOptions {
   static LLMGenerationOptions defaults() {
     final r = LLMGenerationOptions();
-    r.maxOutputTokens = 100;
-    r.temperature = 0.8;
+    r.maxOutputTokens = 512;
+    r.temperature = 0.7;
     r.topP = 1.0;
     r.topK = 0;
     r.repetitionPenalty = 1.0;

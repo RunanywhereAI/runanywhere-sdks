@@ -15,8 +15,8 @@ import RunAnywhere
 /// - **Survives navigation** — the download continues (and stays visible) when the
 ///   user leaves the row that started it, instead of the `Task` becoming an
 ///   invisible orphan.
-/// - **Cancellable** — the stored `Task` can be cancelled; `RunAnywhere.downloadModel`
-///   is already Task-cancellation-aware and tears down the native worker.
+/// - **Cancellable** — the stored `Task` can be cancelled; the download stream's
+///   termination handler tears down the native worker.
 /// - **De-duplicated** — the same model shown in two places (e.g. Recommended and
 ///   its family) can't start two concurrent downloads into the same partial file.
 @MainActor
@@ -47,8 +47,10 @@ final class ModelDownloadTracker {
 
         let task = Task { [weak self] in
             do {
-                _ = try await RunAnywhere.downloadModel(model) { progress in
-                    await MainActor.run { self?.active[modelID]?.progress = Double(progress.overallProgress) }
+                for try await event in try await RunAnywhere.models.download(id: modelID) {
+                    guard case .progress(_, _, let percent) = event else { continue }
+                    // `DownloadEvent.percent` is 0–100; the UI wants a fraction.
+                    self?.active[modelID]?.progress = Double(percent) / 100
                 }
                 self?.active[modelID] = nil
                 onFinished()

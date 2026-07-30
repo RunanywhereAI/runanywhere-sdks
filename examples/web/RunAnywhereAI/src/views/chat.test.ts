@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ChatMessageStatus, MessageRole, SDKException } from '@runanywhere/web';
+import { SDKException } from '@runanywhere/web';
 import {
   conversationHistoryForGeneration,
   conversationSuppressesModelOverlay,
@@ -33,33 +33,15 @@ describe('saved conversation visibility', () => {
 });
 
 describe('conversation generation context', () => {
-  it('maps prior UI turns to the public SDK history shape', () => {
+  it('maps prior UI turns to the public SDK transcript shape', () => {
     expect(conversationHistoryForGeneration([
       { role: 'user', content: 'My name is Ada.' },
       { role: 'assistant', content: 'Nice to meet you, Ada.' },
       { role: 'assistant', content: '   ' },
       { role: 'tool', content: 'ignored' },
     ])).toEqual([
-      {
-        id: '',
-        role: MessageRole.MESSAGE_ROLE_USER,
-        content: 'My name is Ada.',
-        timestampUs: 0,
-        toolCalls: [],
-        status: ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE,
-        metadata: {},
-        attachments: [],
-      },
-      {
-        id: '',
-        role: MessageRole.MESSAGE_ROLE_ASSISTANT,
-        content: 'Nice to meet you, Ada.',
-        timestampUs: 0,
-        toolCalls: [],
-        status: ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE,
-        metadata: {},
-        attachments: [],
-      },
+      { role: 'user', content: 'My name is Ada.' },
+      { role: 'assistant', content: 'Nice to meet you, Ada.' },
     ]);
   });
 });

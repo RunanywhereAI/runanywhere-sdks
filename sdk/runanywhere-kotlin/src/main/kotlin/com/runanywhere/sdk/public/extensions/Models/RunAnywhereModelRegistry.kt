@@ -51,6 +51,7 @@ internal fun registerModelInternal(modelInfo: RAModelInfo) {
 
 // MARK: - Swift-Parity Discovery API
 
+@Deprecated("Use RunAnywhere.models.list(filter).")
 suspend fun RunAnywhere.listModels(request: ModelListRequest = ModelListRequest()): ModelListResult {
     if (!isInitialized) {
         return ModelListResult(success = false, error_message = "SDK not initialized")
@@ -70,9 +71,11 @@ suspend fun RunAnywhere.listModels(request: ModelListRequest = ModelListRequest(
     return modelListResult(infoList)
 }
 
+@Deprecated("Use RunAnywhere.models.list(filter).")
 suspend fun RunAnywhere.queryModels(query: ModelQuery): ModelListResult =
     listModels(ModelListRequest(query = query))
 
+@Deprecated("Use RunAnywhere.models.get(id).")
 suspend fun RunAnywhere.getModel(request: ModelGetRequest): ModelGetResult {
     if (!isInitialized) {
         return ModelGetResult(found = false, error_message = "SDK not initialized")
@@ -92,6 +95,7 @@ suspend fun RunAnywhere.getModel(request: ModelGetRequest): ModelGetResult {
     return ModelGetResult(found = true, model = model)
 }
 
+@Deprecated("Use RunAnywhere.models.list(ModelFilter(downloadedOnly = true)).")
 suspend fun RunAnywhere.downloadedModels(): ModelListResult =
     queryModels(ModelQuery(downloaded_only = true))
 

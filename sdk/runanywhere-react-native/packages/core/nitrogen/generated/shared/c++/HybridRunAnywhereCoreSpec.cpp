@@ -126,6 +126,9 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("vlmProcessStreamProto", &HybridRunAnywhereCoreSpec::vlmProcessStreamProto);
       prototype.registerHybridMethod("vlmCancelProto", &HybridRunAnywhereCoreSpec::vlmCancelProto);
       prototype.registerHybridMethod("diffusionGenerateLifecycleProto", &HybridRunAnywhereCoreSpec::diffusionGenerateLifecycleProto);
+      prototype.registerHybridMethod("diarizationDiarizeLifecycleProto", &HybridRunAnywhereCoreSpec::diarizationDiarizeLifecycleProto);
+      prototype.registerHybridMethod("segmentationSegmentLifecycleProto", &HybridRunAnywhereCoreSpec::segmentationSegmentLifecycleProto);
+      prototype.registerHybridMethod("rerankProto", &HybridRunAnywhereCoreSpec::rerankProto);
       prototype.registerHybridMethod("getPersistentDeviceUUID", &HybridRunAnywhereCoreSpec::getPersistentDeviceUUID);
       prototype.registerHybridMethod("flushTelemetry", &HybridRunAnywhereCoreSpec::flushTelemetry);
       prototype.registerHybridMethod("isTelemetryInitialized", &HybridRunAnywhereCoreSpec::isTelemetryInitialized);

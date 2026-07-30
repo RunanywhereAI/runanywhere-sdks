@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProtoErrorCode } from '../../../../src/Foundation/SDKException';
-import { RunAnywhere } from '../../../../src/Public/RunAnywhere';
 import {
   Diffusion,
   cancelImageGeneration,
@@ -22,7 +21,7 @@ describe('RunAnywhere diffusion API (core lifecycle facade)', () => {
       available: false,
       reason: expect.stringContaining('Web diffusion is not available'),
     });
-    expect(RunAnywhere.diffusion.availability().available).toBe(false);
+    expect(Diffusion.availability().available).toBe(false);
   });
 
   it('surfaces an optional diagnostic provider without claiming a capability', () => {
@@ -32,7 +31,7 @@ describe('RunAnywhere diffusion API (core lifecycle facade)', () => {
       acceleration: 'webgpu',
     }));
 
-    expect(RunAnywhere.diffusion.availability()).toEqual({
+    expect(Diffusion.availability()).toEqual({
       available: false,
       reason: 'Browser diffusion engine not linked into this WASM build.',
       acceleration: 'webgpu',
@@ -53,9 +52,5 @@ describe('RunAnywhere diffusion API (core lifecycle facade)', () => {
 
     const iterator = generateImageStream({ prompt: 'a sunset' })[Symbol.asyncIterator]();
     await expect(iterator.next()).rejects.toBeTruthy();
-    expect(typeof RunAnywhere.generateImage).toBe('function');
-    expect(typeof RunAnywhere.generateImageStream).toBe('function');
-    expect(typeof RunAnywhere.cancelImageGeneration).toBe('function');
-    expect(typeof RunAnywhere.inpaint).toBe('function');
   });
 });

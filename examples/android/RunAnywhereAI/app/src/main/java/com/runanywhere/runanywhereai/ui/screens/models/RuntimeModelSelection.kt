@@ -8,7 +8,7 @@ import ai.runanywhere.proto.v1.ModelUnloadRequest
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.currentModel
-import com.runanywhere.sdk.public.extensions.unloadModel
+import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -87,7 +87,7 @@ object RuntimeModelSelection {
             // activity-scoped chat cancel and drain any in-flight generation
             // first — the same barrier every other model-change path takes.
             LlmModelChangeInterlock.awaitReadyForModelChange()
-            RunAnywhere.unloadModel(ModelUnloadRequest(unload_all = true))
+            RunAnywhere.models.unload()
             clearAll()
             GlobalState.model.set(null)
             GlobalState.lora.set(null)

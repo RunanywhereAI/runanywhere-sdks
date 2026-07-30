@@ -50,7 +50,7 @@ public extension EventBus {
     /// Unified model load/unload stream across all native signal channels.
     ///
     /// ```swift
-    /// RunAnywhere.events.modelLifecycle
+    /// RunAnywhere.eventBus.modelLifecycle
     ///     .filter { $0.component == .llm }
     ///     .receive(on: DispatchQueue.main)
     ///     .sink { change in ... }

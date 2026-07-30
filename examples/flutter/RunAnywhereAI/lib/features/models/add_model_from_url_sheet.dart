@@ -85,11 +85,13 @@ class _AddModelFromUrlSheetState extends State<AddModelFromUrlSheet> {
           : null;
 
       final model = await sdk.RunAnywhere.models.register(
-        name: name,
-        url: url,
-        framework: _selectedFramework,
-        memoryRequirement: memoryRequirement,
-        supportsThinking: _supportsThinking,
+        sdk.ModelRegistration.url(
+          name: name,
+          url: url,
+          framework: _selectedFramework,
+          memoryRequirementBytes: memoryRequirement,
+          supportsThinking: _supportsThinking,
+        ),
       );
 
       await ModelListViewModel.shared.loadModelsFromRegistry();

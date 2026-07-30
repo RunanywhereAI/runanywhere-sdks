@@ -69,6 +69,13 @@ final class VoiceAgentMicDriver: @unchecked Sendable {
         try await feedLoop()
     }
 
+    /// Cut the agent off mid-utterance: stop playout and drop the frames that
+    /// were captured while it was speaking.
+    func stopPlayback() {
+        playback.stop()
+        discardPendingChunks()
+    }
+
     // MARK: - Audio session
 
     private func configureVoiceAudioSession() async throws {

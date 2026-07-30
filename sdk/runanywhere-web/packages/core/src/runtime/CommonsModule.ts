@@ -305,7 +305,7 @@ export class CommonsModule {
       await this._initRACommons();
       // Lazy import to avoid a static circular dependency with
       // `../Public/RunAnywhere`.
-      const { completeNativePhase1ForModule } = await import('../Public/RunAnywhere.js');
+      const { completeNativePhase1ForModule } = await import('../Public/SDKCore.js');
       completeNativePhase1ForModule(this._module);
 
       // Register against the 'commons' capability so the SDK facade's

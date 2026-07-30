@@ -34,6 +34,7 @@ import okio.ByteString.Companion.toByteString
  *
  * Mirrors Swift's `RunAnywhere.diarize(audioData:options:)` convenience.
  */
+@Deprecated("Use RunAnywhere.diarization.diarize(audio, options).")
 suspend fun RunAnywhere.diarize(
     audioData: ByteArray,
     options: RADiarizationOptions = RADiarizationOptions(),
@@ -53,6 +54,7 @@ suspend fun RunAnywhere.diarize(
  * [ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION]; this call never downloads
  * weights or creates a second model owner.
  */
+@Deprecated("Use RunAnywhere.diarization.diarize(audio, options).")
 suspend fun RunAnywhere.diarize(request: RADiarizationRequest): RADiarizationResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK")
@@ -71,6 +73,7 @@ suspend fun RunAnywhere.diarize(request: RADiarizationRequest): RADiarizationRes
  *
  * Mirrors Swift's `RunAnywhere.diarizeStream(audio:options:)`.
  */
+@Deprecated("Use RunAnywhere.diarization.diarize on closed buffers; streaming diarization has no v3 verb.")
 fun RunAnywhere.diarizeStream(
     audio: Flow<ByteArray>,
     options: RADiarizationOptions = RADiarizationOptions(),

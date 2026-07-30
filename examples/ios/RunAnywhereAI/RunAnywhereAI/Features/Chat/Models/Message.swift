@@ -144,80 +144,41 @@ public struct ToolCallInfo: Codable, Sendable {
         self.error = error
     }
 
-    public init?(from toolCallingResult: RAToolCallingResult) {
-        guard !toolCallingResult.toolCalls.isEmpty || !toolCallingResult.toolResults.isEmpty else {
+    /// Build the tool-call badge from a finished generation. `GenerationResult`
+    /// reports the calls the model made but not their execution results, so
+    /// `result` stays nil for SDK-run tool loops.
+    public init?(from generationResult: GenerationResult) {
+        guard !generationResult.toolCalls.isEmpty else {
             return nil
         }
 
-        if toolCallingResult.toolCalls.count == 1,
-           let toolCall = toolCallingResult.toolCalls.first {
-            let toolResult = ToolCallInfo.matchingResult(
-                for: toolCall,
-                in: toolCallingResult.toolResults
-            )
+        let succeeded = generationResult.finishReason != .cancelled
+
+        if generationResult.toolCalls.count == 1,
+           let toolCall = generationResult.toolCalls.first {
             self.init(
                 toolName: toolCall.name,
                 argumentsJSON: toolCall.argumentsJson,
-                resultJSON: toolResult?.resultJson,
-                success: toolResult?.success ?? (toolCallingResult.errorCode == 0),
-                error: ToolCallInfo.errorMessage(from: toolResult, fallback: toolCallingResult)
+                resultJSON: nil,
+                success: succeeded
             )
             return
         }
 
         self.init(
-            toolName: "\(toolCallingResult.toolCalls.count) tool calls",
-            argumentsJSON: ToolCallInfo.callsJSON(toolCallingResult.toolCalls),
-            resultJSON: ToolCallInfo.resultsJSON(toolCallingResult.toolResults),
-            success: toolCallingResult.errorCode == 0
-                && !toolCallingResult.toolResults.contains { !$0.success || $0.hasError },
-            error: toolCallingResult.hasErrorMessage ? toolCallingResult.errorMessage : nil
+            toolName: "\(generationResult.toolCalls.count) tool calls",
+            argumentsJSON: ToolCallInfo.callsJSON(generationResult.toolCalls),
+            resultJSON: nil,
+            success: succeeded
         )
     }
 
-    private static func matchingResult(
-        for toolCall: RAToolCall,
-        in results: [RAToolResult]
-    ) -> RAToolResult? {
-        let callID = toolCall.id
-        if !callID.isEmpty {
-            return results.first { $0.toolCallID == callID }
-        }
-        return results.first { $0.name == toolCall.name }
-    }
-
-    private static func errorMessage(
-        from result: RAToolResult?,
-        fallback toolCallingResult: RAToolCallingResult
-    ) -> String? {
-        if let result, result.hasError, !result.error.isEmpty {
-            return result.error
-        }
-        if toolCallingResult.hasErrorMessage, !toolCallingResult.errorMessage.isEmpty {
-            return toolCallingResult.errorMessage
-        }
-        return nil
-    }
-
-    private static func callsJSON(_ calls: [RAToolCall]) -> String {
+    private static func callsJSON(_ calls: [ToolCall]) -> String {
         let payload = calls.map { call in
             [
                 "id": call.id,
                 "name": call.name,
                 "arguments": jsonObject(from: call.argumentsJson) ?? call.argumentsJson
-            ] as [String: Any]
-        }
-        return prettyJSONString(payload, fallback: "[]")
-    }
-
-    private static func resultsJSON(_ results: [RAToolResult]) -> String {
-        let payload = results.map { result in
-            [
-                "id": result.toolCallID,
-                "name": result.name,
-                "success": result.success,
-                "result": jsonObject(from: result.resultJson) ?? result.resultJson,
-                "error": result.hasError ? result.error : ""
             ] as [String: Any]
         }
         return prettyJSONString(payload, fallback: "[]")

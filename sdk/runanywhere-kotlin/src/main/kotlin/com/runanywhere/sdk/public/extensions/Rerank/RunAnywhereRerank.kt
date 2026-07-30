@@ -26,6 +26,7 @@ import com.runanywhere.sdk.public.types.RARerankResult
  *
  * Mirrors Swift's `RunAnywhere.rerank(query:candidates:options:)` convenience.
  */
+@Deprecated("Use RunAnywhere.rerank.rerank(query, documents, topN).")
 suspend fun RunAnywhere.rerank(
     query: String,
     candidates: List<RARerankCandidate>,
@@ -47,6 +48,7 @@ suspend fun RunAnywhere.rerank(
  * ([SDKComponent.SDK_COMPONENT_RERANK]); this call never downloads weights or
  * creates a second model owner.
  */
+@Deprecated("Use RunAnywhere.rerank.rerank(query, documents, topN).")
 suspend fun RunAnywhere.rerank(request: RARerankRequest): RARerankResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK")

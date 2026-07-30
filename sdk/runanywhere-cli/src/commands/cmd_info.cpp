@@ -21,7 +21,8 @@
 namespace rcli::commands {
 
 void register_info(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand("info", "Show rcli environment information");
+    CLI::App* cmd = app.add_subcommand("info", "Report versions, paths, memory and backends");
+    cmd->alias("doctor");
     cmd->callback([&options]() {
         Bootstrapped env;
         if (bootstrap(options, &env) != RAC_SUCCESS) {

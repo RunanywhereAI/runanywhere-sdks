@@ -72,6 +72,10 @@ export interface RAGProvider {
   ragIngestDocument?(document: RAGDocument): Promise<RAGStatistics>;
   ragAddDocumentsBatch?(documents: Array<{ text: string; metadataJson?: string }>): Promise<void>;
   ragQuery(question: string, options?: RAGQueryOverrides): Promise<RAGResult>;
+  /** Retrieval without generation. Optional — commons exports no
+   * retrieval-only RAG ABI, so only the TypeScript-owned vector index
+   * implements it today. */
+  ragSearch?(question: string, topK?: number): Promise<RAGSearchResult[]>;
   /** Streaming query — emits a RAGStreamEvent per token, then COMPLETED/ERROR.
    * Optional so providers without a streaming path stay compatible. */
   ragQueryStream?(question: string, options?: RAGQueryOverrides): AsyncIterable<RAGStreamEvent>;
@@ -710,6 +714,58 @@ class CrossWasmRAGProvider implements RAGProvider {
     }
   }
 
+  /**
+   * Embed the query and rank the in-memory chunk index against it. Shared by
+   * `ragQuery` (which then generates) and `ragSearch` (which does not).
+   */
+  private async retrieve(
+    query: string,
+    queryOptions: RAGQueryOptions,
+    version: number,
+  ): Promise<RAGSearchResult[]> {
+    const queryEmbedding = await Embeddings.embed(query, this.config.embeddingModelId);
+    this.assertCurrent(version, 'RAG.retrieve');
+    const queryVector = queryEmbedding.vectors[0];
+    if (!queryVector) {
+      throw SDKException.backendNotAvailable(
+        'RAG.retrieve',
+        'Embedding backend returned no query vector.',
+      );
+    }
+    const minimumSimilarity = queryOptions.similarityThreshold ?? 0;
+    const requestedTopK = queryOptions.retrievalTopK || this.config.topK || 5;
+    return this.chunks
+      .map((chunk) => ({ chunk, score: embeddingCosineSimilarity(queryVector, chunk.vector) }))
+      .filter(({ score }) => score >= minimumSimilarity)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, Math.max(1, requestedTopK))
+      .map(({ chunk, score }, index) => ({
+        chunkId: chunk.id,
+        text: chunk.text,
+        similarityScore: score,
+        sourceDocument: chunk.documentName,
+        metadata: { ...chunk.metadata },
+        rank: index + 1,
+        startOffset: chunk.startOffset,
+        endOffset: chunk.endOffset,
+        tokenCount: chunk.tokenCount,
+      }));
+  }
+
+  async ragSearch(question: string, topK?: number): Promise<RAGSearchResult[]> {
+    this.requireInitialized('RAG.search');
+    const query = question.trim();
+    if (!query) {
+      throw SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_INVALID_INPUT,
+        'RAG search query is empty.',
+        'RAG.search',
+      );
+    }
+    const queryOptions = makeRAGQuery(query, this.config, topK ? { retrievalTopK: topK } : {});
+    return this.retrieve(query, queryOptions, this.lifecycleVersion);
+  }
+
   async ragQuery(
     question: string,
     options: RAGQueryOverrides = {},
@@ -727,43 +783,9 @@ class CrossWasmRAGProvider implements RAGProvider {
 
     const totalStarted = nowMs();
     const retrievalStarted = nowMs();
-    const queryEmbedding = await Embeddings.embed(
-      query,
-      this.config.embeddingModelId,
-    );
-    this.assertCurrent(version, 'RAG.query');
-    const queryVector = queryEmbedding.vectors[0];
-    if (!queryVector) {
-      throw SDKException.backendNotAvailable(
-        'RAG.query',
-        'Embedding backend returned no query vector.',
-      );
-    }
-
     const queryOptions = makeRAGQuery(query, this.config, options);
-    const minimumSimilarity = queryOptions.similarityThreshold ?? 0;
-    const requestedTopK = queryOptions.retrievalTopK || this.config.topK || 5;
-    const ranked = this.chunks
-      .map((chunk) => ({
-        chunk,
-        score: embeddingCosineSimilarity(queryVector, chunk.vector),
-      }))
-      .filter(({ score }) => score >= minimumSimilarity)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, Math.max(1, requestedTopK));
+    const retrievedChunks = await this.retrieve(query, queryOptions, version);
     const retrievalTimeMs = nowMs() - retrievalStarted;
-
-    const retrievedChunks: RAGSearchResult[] = ranked.map(({ chunk, score }, index) => ({
-      chunkId: chunk.id,
-      text: chunk.text,
-      similarityScore: score,
-      sourceDocument: chunk.documentName,
-      metadata: { ...chunk.metadata },
-      rank: index + 1,
-      startOffset: chunk.startOffset,
-      endOffset: chunk.endOffset,
-      tokenCount: chunk.tokenCount,
-    }));
     if (retrievedChunks.length === 0) {
       const totalTimeMs = nowMs() - totalStarted;
       this.lastQueryMs = Date.now();
@@ -1580,6 +1602,26 @@ export function ragResultTotalTime(result: RAGResult): number {
 export function ragStatisticsLastUpdated(statistics: RAGStatistics): Date | null {
   if (statistics.lastUpdatedMs <= 0) return null;
   return new Date(statistics.lastUpdatedMs);
+}
+
+/**
+ * Retrieve chunks for a query without generating an answer. Only the
+ * TypeScript-owned vector index implements this; the native WASM RAG session
+ * exports no retrieval-only ABI.
+ */
+export async function ragSearch(
+  question: string,
+  topK?: number,
+): Promise<RAGSearchResult[]> {
+  const provider = requireProvider('RAG.search');
+  if (!provider.ragSearch) {
+    throw SDKException.backendNotAvailable(
+      'RAG.search',
+      'The active RAG provider has no retrieval-only path. commons exports no '
+        + 'rac_rag_search_proto; use query() or install the persistent cross-WASM provider.',
+    );
+  }
+  return provider.ragSearch(question, topK);
 }
 
 export async function ragGetStatistics(): Promise<RAGStatistics> {

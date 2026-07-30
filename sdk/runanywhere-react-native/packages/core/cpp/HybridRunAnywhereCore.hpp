@@ -393,6 +393,24 @@ public:
       const std::shared_ptr<ArrayBuffer> &requestBytes) override;
 
   // ============================================================================
+  // Diarization / Segmentation / Rerank Capabilities
+  // Diarization and segmentation use the handle-free
+  // `*_lifecycle_proto` verbs; rerank ships only the handle-scoped verb, so
+  // the bridge owns a rerank component handle.
+  // ============================================================================
+
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  diarizationDiarizeLifecycleProto(
+      const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  segmentationSegmentLifecycleProto(
+      const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  rerankProto(const std::string &modelPath, const std::string &modelId,
+              const std::string &modelName,
+              const std::shared_ptr<ArrayBuffer> &requestBytes) override;
+
+  // ============================================================================
   // Device Identity
   // ============================================================================
 

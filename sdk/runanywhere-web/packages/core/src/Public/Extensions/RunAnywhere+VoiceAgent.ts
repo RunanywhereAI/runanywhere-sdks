@@ -877,7 +877,7 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
     });
     if (currentVAD?.modelId && VAD.supportsLifecycleProtoVAD()) {
       try {
-        const result = await VAD.detectVoiceAuto(samples, {
+        const result = await VAD.detectVoice(samples, {
           modelId: currentVAD.modelId,
           minSpeechDurationMs: 100,
           minSilenceDurationMs: this.config.sessionConfig?.silenceDurationMs || 800,

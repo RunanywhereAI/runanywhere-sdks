@@ -12,7 +12,7 @@
 
 **Desktop sample for the [@runanywhere/electron SDK](../../../sdk/runanywhere-electron/).** Chat with streaming and metrics, structured JSON output, tool calling, vision, embeddings, voice (STT → LLM → TTS), and VAD—using an isolated utility-process architecture (main process forks the native addon host; renderer talks over a MessagePort).
 
-> **Platform note:** This example targets **Windows** today. Prebuilt native addons ship under `sdk/runanywhere-electron/prebuilds/`. macOS and Linux support is not covered by this demo path.
+> **Platform note:** Windows and Linux both run today. `run-demo.cmd` and `run-demo.sh` launch the matching prebuild from `sdk/runanywhere-electron/prebuilds/`. macOS is not covered by this demo path.
 
 ---
 
@@ -80,19 +80,53 @@ Then point `RUNANYWHERE_NATIVE_PATH` at your built `runanywhere_native.node` or 
 
 ## Features
 
+Every tab calls the v3 namespaced API. The app never holds a model handle, never
+assembles a prompt, and never runs a bootstrap sequence before a verb works.
+
 | Tab | SDK surface |
 |-----|-------------|
-| **Chat** | `generateStream` with conversation history, markdown, per-message metrics |
-| **Structured** | `generateStructured` (grammar-constrained JSON) |
-| **Tools** | `generateToolCall` with demo tool selection |
-| **Vision** | `loadVLM` / `generateVlm` on a picked image |
-| **Embeddings** | `loadEmbedder` / `embed` with cosine similarity |
-| **Voice** | Hold-to-talk: `transcribe` → `generate` → `synthesize` |
-| **VAD** | `createVad` / `vadProcess` with threshold slider |
-| **Models** | Catalog, download progress, load/unload |
-| **Settings** | System prompt, temperature, max tokens, DPAPI-encrypted API key |
+| **Chat** | `llm.generateStream(messages, options)`. History goes over as `ChatMessage[]`, tokens arrive tagged `TEXT` or `THOUGHT`, and the metrics come off the `completed` event |
+| **Structured** | `llm.generateStructured(prompt, schema, options)` (grammar-constrained JSON) |
+| **Tools** | `llm.tools.register`, then `llm.generate(..., { toolChoice: 'REQUIRED' })`. The SDK runs the executor and the tab shows its result |
+| **Vision** | `vlm.generateStream(image.file(path), prompt, options)` |
+| **Embeddings** | `embeddings.embed([a, b])` with cosine similarity |
+| **Knowledge** | `rag.open(embeddingModel, llmModel, config)`, then `ingest` / `queryStream` / `stats` / `clear` |
+| **Voice** | `voice.createSession({ stt, llm, tts })`. It loads its own models, keeps a VAD resident, and streams `VoiceEvent`s |
+| **VAD** | `vad.detect(audio.float32(...), options)`, which returns debounced speech segments |
+| **Models** | `models.list` / `download` / `load` / `unload` / `register` / `state` |
+| **Settings** | System prompt, temperature, `maxOutputTokens`, reasoning mode, encrypted API key via `secure.set` |
 
 Default catalog models (`qwen2.5-0.5b`, `smolvlm-256m`, `minilm`, `whisper-tiny`, `piper-lessac`) auto-download on first use. Conversation history and settings persist to Electron `userData`.
+
+### Electron's limits on the renderer surface
+
+Two constraints come from Electron, not from the SDK.
+
+`contextBridge` hands the page a frozen clone of whatever the preload exposes, and
+it does not proxy accessors. So the SDK assembles `window.runanywhere` in the main
+world and backs `isReady`, `version`, `deviceId`, `environment`, and `events` with
+getters that call through the bridge. That needs
+`contextBridge.executeInMainWorld`; on an Electron without it those five are
+missing in the renderer, the SDK warns about it, and the verbs still work.
+
+Symbol keys do not survive `contextBridge` either, which means `for await...of`
+will not iterate a stream that came through it. Drive `next()` instead. See
+`each()` in `renderer.js`.
+
+Tool executors are page functions the SDK calls back through the bridge, so they
+run in the renderer rather than in the utility host. A tool cannot reach the
+native addon directly.
+
+### Gaps this demo does not paper over
+
+There is no control plane. `initialize({ apiKey, baseUrl, environment })` accepts
+the key and the URL and then ignores them: the Electron SDK does not authenticate,
+register a device, or report telemetry yet. `deviceId` is minted locally and kept
+in the secure store.
+
+There is no image generation either. `images.generate` throws, because no
+diffusion backend is linked and `rac_diffusion_generate_proto` is not bound in the
+addon.
 
 ---
 

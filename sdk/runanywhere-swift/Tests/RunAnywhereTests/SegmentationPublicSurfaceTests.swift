@@ -52,8 +52,8 @@ final class SegmentationPublicSurfaceTests: XCTestCase {
     }
 
     func testRunAnywhereExposesCanonicalRequestFacade() {
-        let segment: (RASegmentationRequest) async throws -> RASegmentationResult =
-            RunAnywhere.segment
+        let segment: (ImageInput, SegmentationOptions?) async throws -> SegmentationResult =
+            RunAnywhere.segmentation.segment
 
         withExtendedLifetime(segment) {}
     }

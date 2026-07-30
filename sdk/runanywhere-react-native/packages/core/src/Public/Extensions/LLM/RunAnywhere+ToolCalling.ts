@@ -151,6 +151,28 @@ function toolValueMapToJsonString(map: Record<string, ToolValue>): string {
   return JSON.stringify(out);
 }
 
+/** Convert a proto `ToolValue` argument map into plain JSON values. */
+export function toolValueMapToJson(
+  map: Record<string, ToolValue>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(map)) {
+    out[key] = toolValueToPlainJson(value);
+  }
+  return out;
+}
+
+/** Convert plain JSON values into the proto `ToolValue` map executors return. */
+export function toolValueMapFromJson(
+  map: Record<string, unknown>
+): Record<string, ToolValue> {
+  const out: Record<string, ToolValue> = {};
+  for (const [key, value] of Object.entries(map)) {
+    out[key] = plainJsonToToolValue(value);
+  }
+  return out;
+}
+
 const registeredTools: Map<string, RegisteredTool> = new Map();
 
 /**

@@ -1,8 +1,8 @@
 package com.runanywhere.runanywhereai.data.conversation
 
-import ai.runanywhere.proto.v1.ReasoningMode
-import ai.runanywhere.proto.v1.ReasoningOptions
-import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.api.LlmOptions
+import com.runanywhere.sdk.public.api.ReasoningMode
+import com.runanywhere.sdk.public.api.ReasoningOptions
 
 internal object SmartTitlePolicy {
     const val TIMEOUT_MILLIS: Long = 8_000L
@@ -22,12 +22,12 @@ internal object SmartTitlePolicy {
         return conversation.title == ConversationRepository.DEFAULT_TITLE || conversation.title == fallback
     }
 
-    fun generationOptions(systemPrompt: String): RALLMGenerationOptions =
-        RALLMGenerationOptions(
-            max_output_tokens = MAX_TOKENS,
+    fun generationOptions(systemPrompt: String): LlmOptions =
+        LlmOptions(
+            maxOutputTokens = MAX_TOKENS,
             temperature = TEMPERATURE,
-            system_prompt = systemPrompt,
-            reasoning = ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF),
+            systemPrompt = systemPrompt,
+            reasoning = ReasoningOptions(mode = ReasoningMode.OFF),
         )
 
     fun normalizedTitle(raw: String): String? {

@@ -18,6 +18,7 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
         ]
     }
 
+    // swiftlint:disable:next function_body_length
     func execute(
         scenario: BenchmarkScenario,
         model: RAModelInfo
@@ -35,28 +36,16 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
 
         let memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
-        // Load (canonical proto-request form)
         let loadStart = Date()
-        var loadRequest = RAModelLoadRequest()
-        loadRequest.modelID = model.id
-        loadRequest.category = .speechSynthesis
-        let loadResult = await RunAnywhere.loadModel(loadRequest)
-        guard loadResult.success else {
-            throw SDKException(code: .unknown, message: loadResult.errorMessage, category: .internal)
-        }
+        try await RunAnywhere.models.load(id: model.id)
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
 
-        var unloadRequest = RAModelUnloadRequest()
-        unloadRequest.category = .speechSynthesis
-
         do {
-            let options = RATTSOptions.defaults()
-
             // Warmup: one discarded synthesis so first-run cache/JIT cost is not
             // charged to the measured pass (parity with the LLM/VLM warmup).
             let warmupStart = Date()
             do {
-                _ = try await RunAnywhere.synthesize("Hi.", options: options)
+                _ = try await RunAnywhere.tts.synthesize("Hi.")
             } catch let error as CancellationError {
                 throw error
             } catch {
@@ -66,20 +55,19 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
 
             // Synthesize (not speak)
             let benchStart = Date()
-            let result = try await RunAnywhere.synthesize(text, options: options)
+            let audio = try await RunAnywhere.tts.synthesize(text)
             metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
 
-            // processingTime is in seconds, convert to ms-context
-            metrics.audioDurationSeconds = result.duration
-            metrics.charactersProcessed = Int(result.metadata.characterCount)
+            metrics.audioDurationSeconds = Double(audio.durationMs) / 1000.0
+            metrics.charactersProcessed = text.count
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter
 
-            _ = await RunAnywhere.unloadModel(unloadRequest)
+            try? await RunAnywhere.models.unload(category: .speechSynthesis)
             return metrics
         } catch {
-            _ = await RunAnywhere.unloadModel(unloadRequest)
+            try? await RunAnywhere.models.unload(category: .speechSynthesis)
             throw error
         }
     }

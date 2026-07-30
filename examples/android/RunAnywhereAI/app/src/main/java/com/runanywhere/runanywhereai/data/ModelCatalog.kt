@@ -179,7 +179,8 @@ internal object ModelCatalog {
             "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf",
             LLAMA,
             LANGUAGE,
-            500_000_000,
+            memoryBytes = 500_000_000,
+            downloadBytes = 396_705_472,
             supportsThinking = true
         ),
         SingleFileModel(

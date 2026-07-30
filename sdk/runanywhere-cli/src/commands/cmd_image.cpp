@@ -274,10 +274,11 @@ int run_image_generate(const GlobalOptions& options, const ImageParams& params) 
 }  // namespace
 
 void register_image(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand("image", "Generate images (CoreML diffusion, Apple only)");
+    CLI::App* cmd =
+        app.add_subcommand("image", "Make images from text (CoreML diffusion, Apple only)");
     cmd->require_subcommand(1);
 
-    CLI::App* generate = cmd->add_subcommand("generate", "Text-to-image generation");
+    CLI::App* generate = cmd->add_subcommand("generate", "Render an image from a prompt");
     auto params = std::make_shared<ImageParams>();
     generate
         ->add_option("--model,-m", params->model,
@@ -285,13 +286,15 @@ void register_image(CLI::App& app, GlobalOptions& options) {
                      "(default: " +
                          std::string(kDefaultDiffusionModel) + ")")
         ->default_val(kDefaultDiffusionModel);
-    generate->add_option("--prompt,-p", params->prompt, "Text prompt")->required();
-    generate->add_option("--negative", params->negative_prompt, "Negative prompt");
-    generate->add_option("--steps", params->steps, "Number of denoising steps (0 = model default)");
-    generate->add_option("--guidance", params->guidance,
-                         "Classifier-free guidance scale (0 = model default)");
-    generate->add_option("--seed", params->seed, "RNG seed (-1 = random)");
-    generate->add_option("--out,-o", params->out_path, "Output image path (.png)")->required();
+    generate->add_option("--prompt,-p", params->prompt, "What to draw")->required();
+    generate->add_option("--negative-prompt,--negative", params->negative_prompt,
+                         "What to keep out of the image");
+    generate->add_option("--steps", params->steps, "Denoising steps to run (0 = model default)");
+    generate->add_option("--guidance-scale,--guidance", params->guidance,
+                         "How closely to follow the prompt (0 = model default)");
+    generate->add_option("--seed", params->seed,
+                         "Fix the RNG for a repeatable image (-1 = random)");
+    generate->add_option("--output,-o,--out", params->out_path, "PNG file to write")->required();
     generate->callback([&options, params]() {
         const int exit_code = run_image_generate(options, *params);
         if (exit_code != 0) {

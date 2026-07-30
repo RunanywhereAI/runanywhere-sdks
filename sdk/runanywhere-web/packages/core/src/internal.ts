@@ -34,7 +34,7 @@ export type { PlatformAdapterModule } from './runtime/PlatformAdapter.js';
 export {
   completeDeferredServicesInitialization,
   completeNativePhase1ForModule,
-} from './Public/RunAnywhere.js';
+} from './Public/SDKCore.js';
 
 export {
   Runtime,

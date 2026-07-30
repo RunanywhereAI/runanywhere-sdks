@@ -639,11 +639,12 @@ extension ChatInterfaceView {
                 throw LLMError.custom("The selected image could not be loaded.")
             }
 
-            let image: RAVLMImage?
+            // The SDK owns pixel conversion; hand it the platform image type.
+            let image: ImageInput?
             #if canImport(UIKit)
-            image = UIImage(data: data).flatMap { RAVLMImage.fromUIImage($0) }
+            image = try UIImage(data: data).map { try ImageInput.uiImage($0) }
             #elseif canImport(AppKit)
-            image = NSImage(data: data).flatMap { RAVLMImage.fromNSImage($0) }
+            image = try NSImage(data: data).map { try ImageInput.nsImage($0) }
             #else
             image = nil
             #endif
@@ -670,9 +671,8 @@ extension ChatInterfaceView {
 
     @MainActor
     private func refreshVisionModelStatus() async {
-        var request = RACurrentModelRequest()
-        request.category = .multimodal
-        isVisionModelReady = RunAnywhere.currentModel(request).found
+        let state = await RunAnywhere.models.state()
+        isVisionModelReady = state.loaded[.multimodal] != nil
     }
 
     private func handleDocumentImport(_ result: Result<[URL], Error>) {

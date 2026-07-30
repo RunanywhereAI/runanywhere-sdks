@@ -1,12 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.diarization
 
-import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.DiarizationAudioEncoding
-import ai.runanywhere.proto.v1.DiarizationOptions
-import ai.runanywhere.proto.v1.DiarizationSegment
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelImportRequest
-import ai.runanywhere.proto.v1.ModelLoadRequest
 import android.app.Application
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -19,10 +14,11 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.ui.screens.stt.AudioRecorder
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.currentModel
-import com.runanywhere.sdk.public.extensions.diarize
+import com.runanywhere.sdk.public.api.AudioInput
+import com.runanywhere.sdk.public.api.SpeakerSegment
+import com.runanywhere.sdk.public.api.diarization
+import com.runanywhere.sdk.public.api.models
 import com.runanywhere.sdk.public.extensions.importModel
-import com.runanywhere.sdk.public.extensions.loadModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -31,7 +27,7 @@ import java.io.File
 
 /**
  * Drives standalone speaker diarization (NVIDIA Sortformer) through the canonical
- * `RunAnywhere.diarize` facade. Pure platform plumbing: SDK model lifecycle,
+ * `RunAnywhere.diarization.diarize` facade. Pure platform plumbing: SDK model lifecycle,
  * microphone capture, and the diarize call. All inference and model routing live
  * in the SDK / C++ commons.
  */
@@ -51,7 +47,7 @@ class DiarizationViewModel(application: Application) : AndroidViewModel(applicat
     var audioLevel by mutableFloatStateOf(0f)
         private set
 
-    var segments by mutableStateOf<List<DiarizationSegment>>(emptyList())
+    var segments by mutableStateOf<List<SpeakerSegment>>(emptyList())
         private set
     var speakerCount by mutableStateOf(0)
         private set
@@ -71,9 +67,8 @@ class DiarizationViewModel(application: Application) : AndroidViewModel(applicat
     fun refreshModelStatus() {
         viewModelScope.launch {
             isModelLoaded = runCatching {
-                RunAnywhere.currentModel(
-                    CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION),
-                ).found
+                RunAnywhere.models.state().loaded
+                    .containsKey(ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION)
             }.getOrDefault(false)
         }
     }
@@ -110,20 +105,10 @@ class DiarizationViewModel(application: Application) : AndroidViewModel(applicat
                 }
 
                 status = "Loading model…"
-                // Framework is intentionally omitted: the SDK resolves the engine
-                // from the imported model's registry entry (ONNX Sortformer). The
-                // example must not pin an engine/framework constant (layering rule).
-                val loadResult = RunAnywhere.loadModel(
-                    ModelLoadRequest(
-                        model_id = modelId,
-                        category = ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION,
-                    ),
-                )
-                if (!loadResult.success) {
-                    error = loadResult.error_message.ifEmpty { "Model load failed." }
-                    status = ""
-                    return@launch
-                }
+                // No LoadOptions.framework: the SDK resolves the engine from the
+                // imported model's registry entry (ONNX Sortformer). The example
+                // must not pin an engine constant (layering rule).
+                RunAnywhere.models.load(modelId)
                 loadedModelId = modelId
                 isModelLoaded = true
                 status = "Model loaded: $modelId."
@@ -194,22 +179,17 @@ class DiarizationViewModel(application: Application) : AndroidViewModel(applicat
             error = null
             status = "Running diarization…"
             try {
-                val result = withContext(Dispatchers.Default) {
-                    RunAnywhere.diarize(
-                        audio,
-                        DiarizationOptions(
-                            sample_rate = AudioRecorder.SAMPLE_RATE,
-                            channels = 1,
-                            encoding = DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE,
-                        ),
-                    )
-                }
-                segments = result.segments.sortedBy { it.start_ms }
-                speakerCount = result.speaker_count
-                audioDurationMs = result.audio_duration_ms
-                processingTimeMs = result.processing_time_ms
-                status = "Done — ${result.speaker_count} speakers, " +
-                    "${result.segments.size} segments in ${result.processing_time_ms}ms."
+                val startedAt = System.currentTimeMillis()
+                val result = RunAnywhere.diarization.diarize(
+                    AudioInput.pcm16(audio, AudioRecorder.SAMPLE_RATE),
+                )
+                val elapsed = System.currentTimeMillis() - startedAt
+                segments = result.segments.sortedBy { it.startMs }
+                speakerCount = result.speakerCount
+                audioDurationMs = audio.size.toLong() / (AudioRecorder.SAMPLE_RATE * 2L / 1000L)
+                processingTimeMs = elapsed
+                status = "Done — ${result.speakerCount} speakers, " +
+                    "${result.segments.size} segments in ${elapsed}ms."
             } catch (e: Exception) {
                 RACLog.e("$TAG: Diarization failed", e)
                 error = "Diarization failed: ${e.message}"

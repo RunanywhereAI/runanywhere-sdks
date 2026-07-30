@@ -18,13 +18,30 @@ const preloadPath = electronPath ? require.resolve('../../dist/process/preload')
 
 const tick = () => new Promise((r) => setImmediate(r));
 
+// The real contextBridge hands the page a FROZEN clone, so the preload assembles
+// window.runanywhere in the main world via executeInMainWorld. The fake models
+// both halves: exposeInMainWorld freezes what it publishes, and executeInMainWorld
+// runs the serialized function against a stand-in main-world global.
 function installFakeElectron() {
   const exposed = {};
-  const state = { ipcOn: {}, ipcSends: [] };
+  const mainWorld = {};
+  const state = { ipcOn: {}, ipcSends: [], mainWorld };
   const fakeElectron = {
     contextBridge: {
       exposeInMainWorld(name, api) {
-        exposed[name] = api;
+        mainWorld[name] = Object.freeze(api);
+      },
+      executeInMainWorld({ func, args = [] }) {
+        const saved = globalThis.__runanywhereBridge;
+        globalThis.__runanywhereBridge = mainWorld.__runanywhereBridge;
+        try {
+          const ok = func(...args);
+          if (globalThis.runanywhere) mainWorld.runanywhere = globalThis.runanywhere;
+          return ok;
+        } finally {
+          globalThis.__runanywhereBridge = saved;
+          delete globalThis.runanywhere;
+        }
       },
     },
     ipcRenderer: {
@@ -50,6 +67,9 @@ function freshPreload() {
   const { exposed, state } = installFakeElectron();
   delete require.cache[preloadPath];
   require(preloadPath);
+  // What the page ends up with is the assembled main-world object.
+  exposed.runanywhere = state.mainWorld.runanywhere;
+  exposed.runanywhereTest = state.mainWorld.runanywhereTest;
   return { exposed, state };
 }
 
@@ -77,12 +97,28 @@ function connect(state) {
   return port;
 }
 
+// v3 initialize() is a handshake rather than one call: v3.initialize, then
+// v3.version, then the secure-store round trip that mints a device id. Answer
+// every request as it is posted so the promise can settle.
+async function pump(port, replies = {}) {
+  let answered = 0;
+  for (let i = 0; i < 16; i++) {
+    await tick();
+    while (answered < port.posts.length) {
+      const msg = port.posts[answered++];
+      port.onmessage({
+        data: { id: msg.id, ok: true, result: replies[msg.method] },
+      });
+    }
+  }
+}
+
 test('exposes window.runanywhere with the full method surface', { skip: SKIP }, () => {
   const { exposed } = freshPreload();
   const api = exposed.runanywhere;
   assert.ok(api, 'runanywhere API exposed');
   for (const m of [
-    'ready', 'version', 'initialize', 'onEvent', 'splitThinking', 'catalog', 'modelStatus', 'downloadModel',
+    'ready', 'initialize', 'reset', 'onEvent', 'splitThinking', 'catalog', 'modelStatus', 'downloadModel',
     'loadLLM', 'generate', 'generateStream', 'generateStructured', 'generateObject', 'generateToolCall', 'unloadLLM',
     'loadVLM', 'generateVlm', 'unloadVLM',
     'loadEmbedder', 'embed', 'unloadEmbedder',
@@ -98,6 +134,25 @@ test('exposes window.runanywhere with the full method surface', { skip: SKIP }, 
   ]) {
     assert.equal(typeof api[m], 'function', `runanywhere.${m} is a function`);
   }
+  // v3 core state is read as properties, not called (version() was the pre-v3 verb).
+  for (const p of ['isReady', 'version', 'deviceId', 'environment']) {
+    assert.notEqual(typeof api[p], 'function', `runanywhere.${p} is a property`);
+  }
+  assert.equal(typeof api.version, 'string');
+  // All 14 v3 namespaces reach the page, so main-process and renderer code is
+  // written once against the same shape.
+  for (const ns of [
+    'llm', 'vlm', 'stt', 'tts', 'vad', 'embeddings', 'rerank', 'images',
+    'diarization', 'segmentation', 'voice', 'rag', 'models', 'lora',
+  ]) {
+    assert.equal(typeof api[ns], 'object', `runanywhere.${ns} namespace exposed`);
+  }
+  assert.equal(typeof api.llm.generate, 'function');
+  assert.equal(typeof api.llm.generateStream, 'function');
+  assert.equal(typeof api.llm.tools.register, 'function');
+  assert.equal(typeof api.models.download, 'function');
+  assert.equal(typeof api.rag.open, 'function');
+  assert.equal(typeof api.voice.createSession, 'function');
 });
 
 test('splitThinking bridge splits reasoning from the answer', { skip: SKIP }, () => {
@@ -187,26 +242,26 @@ test('the port handshake starts the port and resolves ready()', { skip: SKIP }, 
 test('a unary call posts {id,method,args} and resolves with the reply result', { skip: SKIP }, async () => {
   const { exposed, state } = freshPreload();
   const port = connect(state);
-  const p = exposed.runanywhere.version();
+  const p = exposed.runanywhere.modelStatus();
   await tick();
   const msg = port.last();
-  assert.equal(msg.method, 'version');
+  assert.equal(msg.method, 'modelStatus');
   assert.deepEqual(msg.args, []);
   assert.equal(typeof msg.id, 'number');
-  port.onmessage({ data: { id: msg.id, ok: true, result: 'v9.9' } });
-  assert.equal(await p, 'v9.9');
+  port.onmessage({ data: { id: msg.id, ok: true, result: { a: 1 } } });
+  assert.deepEqual(await p, { a: 1 });
 });
 
-test('initialize forwards its args', { skip: SKIP }, async () => {
+test('initialize folds the pre-v3 positional form into the v3 handshake', { skip: SKIP }, async () => {
   const { exposed, state } = freshPreload();
   const port = connect(state);
   const p = exposed.runanywhere.initialize('/sec', '/base');
-  await tick();
-  const msg = port.last();
-  assert.equal(msg.method, 'initialize');
-  assert.deepEqual(msg.args, ['/sec', '/base']);
-  port.onmessage({ data: { id: msg.id, ok: true } });
-  await p;
+  await Promise.all([p, pump(port, { 'v3.version': '9.9.9' })]);
+  const init = port.posts.find((m) => m.method === 'v3.initialize');
+  assert.ok(init, 'initialize reaches the host as a v3 backend call');
+  assert.deepEqual(init.args, [{ secureDir: '/sec', baseDir: '/base' }]);
+  assert.equal(exposed.runanywhere.isReady, true);
+  assert.equal(exposed.runanywhere.version, '9.9.9');
 });
 
 test('transcribe forwards the pcm bytes and resolves with the transcript', { skip: SKIP }, async () => {
@@ -328,9 +383,7 @@ test('onEvent subscribes to lifecycle events and returns an unsubscribe', { skip
   const off = exposed.runanywhere.onEvent((e) => seen.push(e.type));
   assert.equal(typeof off, 'function');
   const p = exposed.runanywhere.initialize('/s', '/b');
-  await tick();
-  port.onmessage({ data: { id: port.last().id, ok: true } });
-  await p;
+  await Promise.all([p, pump(port)]);
   assert.ok(seen.includes('initialized'), 'initialize emits an initialized event');
   off();
 });
@@ -365,7 +418,7 @@ test('generateVlm streams tokens over an image + prompt call', { skip: SKIP }, a
 test('calls made BEFORE the handshake wait for the port, then post once connected', { skip: SKIP }, async () => {
   const { exposed, state } = freshPreload();
   // No connect() yet — the port is null and ready is unresolved.
-  const p = exposed.runanywhere.version();
+  const p = exposed.runanywhere.modelStatus();
   await tick();
   // Nothing could have been posted (no port). Now connect.
   const port = connect(state);
@@ -379,7 +432,7 @@ test('calls made BEFORE the handshake wait for the port, then post once connecte
 test('reply ids are unique per in-flight call and route independently', { skip: SKIP }, async () => {
   const { exposed, state } = freshPreload();
   const port = connect(state);
-  const p1 = exposed.runanywhere.version();
+  const p1 = exposed.runanywhere.modelStatus();
   const p2 = exposed.runanywhere.shutdown();
   await tick();
   assert.equal(port.posts.length, 2);
@@ -395,7 +448,7 @@ test('reply ids are unique per in-flight call and route independently', { skip: 
 test('an unknown reply id is ignored (no throw, no cross-talk)', { skip: SKIP }, async () => {
   const { exposed, state } = freshPreload();
   const port = connect(state);
-  const p = exposed.runanywhere.version();
+  const p = exposed.runanywhere.modelStatus();
   await tick();
   const msg = port.last();
   // A stray message for an id we never sent must be a no-op.

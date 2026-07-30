@@ -58,7 +58,7 @@ vi.mock('../../../src/runtime/ProtoWasm', () => ({
   },
 }));
 
-import { RunAnywhere } from '../../../src/Public/RunAnywhere';
+import { SDKCore as RunAnywhere } from '../../../src/Public/SDKCore';
 
 function fakeSdkModule() {
   const heap = new ArrayBuffer(256);

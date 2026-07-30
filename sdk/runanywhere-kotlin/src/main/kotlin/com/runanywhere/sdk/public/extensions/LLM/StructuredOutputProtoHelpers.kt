@@ -45,9 +45,10 @@ fun StructuredOutputOptions.Companion.defaults(
     strict: Boolean = false,
 ): StructuredOutputOptions =
     StructuredOutputOptions(
-        schema = schema,
         include_schema_in_prompt = includeSchemaInPrompt,
         strict_mode = strict,
+        // schema and json_schema are one oneof arm each, so setting both throws.
+        // commons prefers json_schema when present (structured_output.cpp:471).
         json_schema = schema.jsonSchemaString,
         mode = StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
     )

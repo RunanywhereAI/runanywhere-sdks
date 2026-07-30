@@ -71,8 +71,7 @@ class _VADViewState extends State<VADView> {
               _StatusCard(
                 isListening: _viewModel.isListening,
                 isSpeech: _viewModel.isSpeech,
-                confidence: _viewModel.confidence,
-                energy: _viewModel.energy,
+                probability: _viewModel.probability,
                 audioLevel: _viewModel.audioLevel,
                 frameCount: _viewModel.frameCount,
               ),
@@ -99,16 +98,14 @@ class _StatusCard extends StatelessWidget {
   const _StatusCard({
     required this.isListening,
     required this.isSpeech,
-    required this.confidence,
-    required this.energy,
+    required this.probability,
     required this.audioLevel,
     required this.frameCount,
   });
 
   final bool isListening;
   final bool isSpeech;
-  final double confidence;
-  final double energy;
+  final double probability;
   final double audioLevel;
   final int frameCount;
 
@@ -143,14 +140,9 @@ class _StatusCard extends StatelessWidget {
               color: AppColors.primaryBlue,
             ),
             _MetricRow(
-              label: 'Confidence',
-              value: confidence,
+              label: 'Speech probability',
+              value: probability,
               color: statusColor,
-            ),
-            _MetricRow(
-              label: 'Energy',
-              value: energy,
-              color: AppColors.primaryPurple,
             ),
             const Divider(),
             Text(

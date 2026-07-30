@@ -2,38 +2,41 @@
 //  RunAnywhere+SDKEvents.swift
 //  RunAnywhere SDK
 //
-//  Public proto-backed SDK event stream API.
+//  Deprecated imperative SDK-event plumbing. The v3 surface is
+//  `RunAnywhere.events` (folded `SdkEvent` stream) with `RunAnywhere.eventBus`
+//  as the raw-proto escape hatch.
 //
 
 import CRACommons
 
-/// Imperative SDK-event surface kept for cross-SDK parity (this is Kotlin's
-/// primary event API and the documented React Native surface). Swift consumers
-/// should prefer the Combine publisher `RunAnywhere.events.events`, which wraps
-/// this same native bridge; these top-level entry points are intentionally
-/// retained rather than removed as dead code.
 public extension RunAnywhere {
+
     @discardableResult
+    @available(*, deprecated, renamed: "events")
     static func subscribeSDKEvents(
         _ handler: @escaping @Sendable (RASDKEvent) -> Void
     ) -> UInt64 {
         CppBridge.Events.subscribeSDKEvents(handler)
     }
 
+    @available(*, deprecated, renamed: "events")
     static func unsubscribeSDKEvents(_ subscriptionId: UInt64) {
         CppBridge.Events.unsubscribeSDKEvents(subscriptionId)
     }
 
     @discardableResult
+    @available(*, deprecated, renamed: "eventBus")
     static func publishSDKEvent(_ event: RASDKEvent) -> Bool {
         CppBridge.Events.publishSDKEvent(event)
     }
 
+    @available(*, deprecated, renamed: "events")
     static func pollSDKEvent() -> RASDKEvent? {
         CppBridge.Events.pollSDKEvent()
     }
 
     @discardableResult
+    @available(*, deprecated, renamed: "eventBus")
     static func publishSDKFailure(
         errorCode: rac_result_t,
         message: String,

@@ -372,15 +372,20 @@
 
           <section class="panel" id="voice"><div class="wrap">
             <h2 class="lead">Voice</h2>
-            <p class="hint">Hold to talk — mic → speech-to-text → LLM → text-to-speech → speaker.</p>
-            <button class="btn" id="voicebtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Hold to talk</button>
+            <p class="hint">A live conversation: <code>voice.createSession</code> loads speech-to-text, the LLM, and text-to-speech, keeps a VAD resident, and runs the turn loop. Just talk — it detects when you stop.</p>
+            <div class="row" style="align-items:center">
+              <button class="btn" id="voicebtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Start conversation</button>
+              <button class="btn ghost" id="voicesay" style="flex:0 0 auto">Say something</button>
+              <button class="btn ghost" id="voiceinterrupt" style="flex:0 0 auto">Interrupt</button>
+              <span class="muted" id="voicestate">idle</span>
+            </div>
             <div class="label">Heard</div><div id="voiceheard" class="out"></div>
             <div class="label">Reply</div><div id="voicereply" class="out"></div>
           </div></section>
 
           <section class="panel" id="vad"><div class="wrap">
             <h2 class="lead">Voice activity detection</h2>
-            <p class="hint">Built-in energy VAD. Hold and speak — the first ~2s calibrate ambient noise.</p>
+            <p class="hint">Hold and speak; releasing runs one <code>vad.detect</code> over the recording, which returns debounced speech segments.</p>
             <div class="label">Threshold · <span id="vadthval">0.015</span></div>
             <input id="vadth" type="range" min="0.005" max="0.2" step="0.005" value="0.015" style="max-width:340px" />
             <div style="margin-top:14px"><button class="btn" id="vadbtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-7 4 16 3-11 2 5 3-3h3"/></svg> Hold + speak</button></div>

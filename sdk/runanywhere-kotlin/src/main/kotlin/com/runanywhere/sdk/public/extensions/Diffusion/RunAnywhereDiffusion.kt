@@ -17,6 +17,7 @@ import com.runanywhere.sdk.public.types.RADiffusionResult
 import okio.ByteString.Companion.toByteString
 
 /** Generate an image with the lifecycle-loaded image-generation model. */
+@Deprecated("Use RunAnywhere.images.generate(prompt, options).")
 suspend fun RunAnywhere.generateImage(
     options: RADiffusionGenerationOptions,
     modelId: String? = null,
@@ -46,6 +47,7 @@ suspend fun RunAnywhere.generateImage(
  * Inpaint an encoded PNG/JPEG using an encoded mask where white pixels mark
  * the region to replace. The result advertises its raw RGBA media type.
  */
+@Deprecated("Use RunAnywhere.images.generate with ImageOptions.mode = ImageMode.Inpaint.")
 suspend fun RunAnywhere.inpaint(
     inputImage: ByteArray,
     maskImage: ByteArray,

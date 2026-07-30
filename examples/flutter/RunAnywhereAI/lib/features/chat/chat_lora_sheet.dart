@@ -140,9 +140,9 @@ class _ChatLoRASheetState extends State<ChatLoRASheet> {
 
   Widget _loadedAdapterTile(
     BuildContext context,
-    sdk.LoRAAdapterInfo adapter,
+    sdk.AppliedAdapter adapter,
   ) {
-    final fileName = adapter.adapterPath.split('/').last;
+    final fileName = adapter.id.split('/').last;
 
     return ListTile(
       title: Text(fileName, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -151,7 +151,7 @@ class _ChatLoRASheetState extends State<ChatLoRASheet> {
         icon: const Icon(Icons.cancel_outlined),
         tooltip: 'Remove adapter',
         onPressed: () =>
-            unawaited(widget.viewModel.removeAdapter(adapter.adapterPath)),
+            unawaited(widget.viewModel.removeAdapter(adapter.id)),
       ),
     );
   }

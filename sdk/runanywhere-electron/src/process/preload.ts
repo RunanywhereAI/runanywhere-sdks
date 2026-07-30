@@ -21,8 +21,10 @@ import type { RagConfig, RagDoc, RagQuery, RagResult, RagStats } from '../rag';
 import type { JsonSchema } from '../grammar';
 import { toolCallSchema, toolCallPrompt, parseStructured } from '../structured';
 import type { ToolSpec } from '../structured';
-import { toNativeGenerateOptions } from '../options';
-import type { GenerateOptions } from '../options';
+import { toNativeGenerateOptions } from '../legacy-options';
+import type { GenerateOptions } from '../legacy-options';
+import { createRunAnywhere } from '../api/facade';
+import { RpcBackend } from '../api/rpc-backend';
 import { toAsyncIterable, streamWithMetrics } from '../stream';
 import type { LLMStreamEvent } from '../stream';
 import { bus } from '../events';
@@ -109,11 +111,77 @@ function emitAfter<T>(p: Promise<T>, event: () => void): Promise<T> {
   });
 }
 
-contextBridge.exposeInMainWorld('runanywhere', {
+// The v3 surface, built from the same factory the main process uses. Every stream
+// it returns is a plain self-iterating object (see api/iter.ts), which is what lets
+// contextBridge carry AsyncIterables and sessions into the page intact.
+const v3 = createRunAnywhere(new RpcBackend(send));
+
+// contextBridge copies values and proxies functions, but it does not proxy
+// accessors, and the object it hands the page is frozen: a getter is invoked once
+// during the clone, and the page can neither redefine nor add a property
+// afterwards. So `isReady`/`version`/`deviceId`/`environment`/`events` are read
+// through these two proxied functions, and buildMainWorldApi() assembles the real
+// `window.runanywhere` in the page from them — which is how the renderer ends up
+// with the same live shape as the main-process facade.
+const readCoreState = (): {
+  isReady: boolean;
+  version: string;
+  deviceId: string;
+  environment: string;
+} => ({
+  isReady: v3.isReady,
+  version: v3.version,
+  deviceId: v3.deviceId,
+  environment: v3.environment,
+});
+
+const surface = {
+  // ---- v3 core ----
+  /**
+   * Bring the SDK up. The pre-v3 positional form `initialize(secureDir, baseDir)`
+   * is still accepted and folds into the options object.
+   */
+  initialize: (
+    optionsOrSecureDir?: Parameters<typeof v3.initialize>[0] | string,
+    baseDir?: string
+  ): Promise<void> =>
+    typeof optionsOrSecureDir === 'string' || typeof baseDir === 'string'
+      ? v3.initialize({ secureDir: optionsOrSecureDir as string | undefined, baseDir })
+      : v3.initialize(optionsOrSecureDir),
+  reset: () => v3.reset(),
+
+  // isReady / version / deviceId / environment / events are deliberately absent
+  // here: contextBridge would clone them as non-configurable data properties
+  // frozen at clone time. buildMainWorldApi() adds them as live accessors.
+
+  // Internal plumbing for buildMainWorldApi(); not part of the public surface.
+  __coreState: readCoreState,
+  __events: () => v3.events,
+
+  // ---- v3 namespaces ----
+  llm: v3.llm,
+  vlm: v3.vlm,
+  stt: v3.stt,
+  tts: v3.tts,
+  vad: v3.vad,
+  embeddings: v3.embeddings,
+  rerank: v3.rerank,
+  images: v3.images,
+  diarization: v3.diarization,
+  segmentation: v3.segmentation,
+  voice: v3.voice,
+  rag: v3.rag,
+  models: v3.models,
+  lora: v3.lora,
+  secure: v3.secure,
+  audio: v3.audio,
+  image: v3.image,
+  ragDocument: v3.ragDocument,
+
+  // ---- deprecated (pre-v3), kept for one release ----
   ready: (): Promise<void> => ready,
-  version: () => send('version', []),
-  initialize: (secureDir?: string, baseDir?: string) =>
-    emitAfter(send('initialize', [secureDir, baseDir]), () => bus.emit({ type: 'initialized' })),
+  /** @deprecated Read the `version` property; initialize() populates it. */
+  versionAsync: () => send('version', []),
 
   // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
   onEvent: (listener: EventListener) => bus.on(listener),
@@ -299,7 +367,68 @@ contextBridge.exposeInMainWorld('runanywhere', {
   unloadVad: (handle: number) => send('unloadVad', [handle]),
 
   shutdown: () => send('shutdown', []),
-});
+};
+
+/** The page-side property names that must be live rather than cloned. */
+const LIVE_KEYS = ['isReady', 'version', 'deviceId', 'environment'];
+
+/**
+ * Assemble `window.runanywhere` inside the page from the bridged surface, adding
+ * the live core-state accessors. Runs in the main world (so the object is the
+ * page's own and therefore extensible) and returns false when this Electron build
+ * has no `executeInMainWorld`.
+ */
+function buildMainWorldApi(): boolean {
+  const bridge = contextBridge as unknown as {
+    executeInMainWorld?: (script: { func: (...a: unknown[]) => unknown; args?: unknown[] }) => unknown;
+  };
+  if (typeof bridge.executeInMainWorld !== 'function') return false;
+  contextBridge.exposeInMainWorld('__runanywhereBridge', surface);
+  try {
+    return (
+      bridge.executeInMainWorld({
+        // Serialized into the page: no closures, no imports — read everything off
+        // the bridged object.
+        func: (...a: unknown[]) => {
+          const liveKeys = a[0] as string[];
+          const w = globalThis as unknown as Record<string, unknown>;
+          const b = w.__runanywhereBridge as Record<string, unknown> | undefined;
+          if (!b) return false;
+          const api: Record<string, unknown> = {};
+          for (const key of Object.keys(b)) {
+            if (!key.startsWith('__')) api[key] = b[key];
+          }
+          const state = b.__coreState as () => Record<string, unknown>;
+          for (const key of liveKeys) {
+            Object.defineProperty(api, key, { get: () => state()[key], enumerable: true });
+          }
+          Object.defineProperty(api, 'events', {
+            get: () => (b.__events as () => unknown)(),
+            enumerable: true,
+          });
+          w.runanywhere = api;
+          return true;
+        },
+        args: [LIVE_KEYS],
+      }) === true
+    );
+  } catch {
+    return false;
+  }
+}
+
+// Fall back to exposing the bridged surface directly when the page-side assembly
+// is unavailable. The verbs all work; the core-state properties are then frozen
+// snapshots, so say that instead of letting a renderer believe the SDK never
+// became ready.
+if (!buildMainWorldApi()) {
+  contextBridge.exposeInMainWorld('runanywhere', surface);
+  console.warn(
+    '[runanywhere] this Electron build cannot assemble window.runanywhere in the page: ' +
+      'isReady/version/deviceId/environment/events are unavailable there. ' +
+      'Call window.runanywhere.__coreState() or read them in the main process.'
+  );
+}
 
 // Test-only hook (kept off the SDK surface) so the example app can signal the
 // main process when the headless run finishes.

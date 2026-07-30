@@ -1,7 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.vision
 
-import ai.runanywhere.proto.v1.VLMImageFormat
-import ai.runanywhere.proto.v1.VLMResult
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.getValue
@@ -14,9 +12,9 @@ import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
-import com.runanywhere.sdk.public.extensions.processImage
-import com.runanywhere.sdk.public.types.RAVLMImage
+import com.runanywhere.sdk.public.api.GenerationResult
+import com.runanywhere.sdk.public.api.ImageInput
+import com.runanywhere.sdk.public.api.vlm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -30,7 +28,6 @@ data class VlmMetrics(
     val tokens: Int,
     val tokensPerSecond: Double,
     val processingMs: Long,
-    val imageEncodeMs: Long,
     val ttftMs: Long,
 )
 
@@ -86,26 +83,24 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
             var file: File? = null
             try {
                 file = withContext(Dispatchers.IO) { writeJpegToCache(bitmap) }
-                val vlmImage = RAVLMImage(
-                    file_path = file.absolutePath,
-                    format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
+                val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.VLM)
+                val options = VisionGenerationPolicy.options(
+                    model = activeModel.model,
+                    mode = requestMode,
+                    userLimit = SettingsRepository.settings.maxTokens,
                 )
-                val result = withContext(Dispatchers.Default) {
-                    val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.VLM)
-                    val options = VisionGenerationPolicy.options(
-                        prompt = requestPrompt,
-                        model = activeModel.model,
-                        mode = requestMode,
-                        userLimit = SettingsRepository.settings.maxTokens,
-                    )
-                    // This screen presents one complete analysis card, so use the
-                    // canonical result path. It returns the final caption and native
-                    // metrics uniformly even when a backend's stream granularity is
-                    // whole-response rather than token-by-token.
-                    RunAnywhere.processImage(vlmImage, options)
-                }
+                // This screen presents one complete analysis card, so use the
+                // canonical result path. It returns the final caption and native
+                // metrics uniformly even when a backend's stream granularity is
+                // whole-response rather than token-by-token.
+                val startedAt = System.currentTimeMillis()
+                val result = RunAnywhere.vlm.generate(
+                    ImageInput.file(file.absolutePath),
+                    requestPrompt,
+                    options,
+                )
                 description = result.toDisplayText()
-                metrics = result.toUiMetrics()
+                metrics = result.toUiMetrics(System.currentTimeMillis() - startedAt)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -123,7 +118,6 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
 
     fun stop() {
         job?.cancel()
-        viewModelScope.launch { runCatching { RunAnywhere.cancelVLMGeneration() } }
         // Keep the busy guard raised until the native call actually unwinds in
         // the job's finally block. Clearing it here lets a second request race
         // the still-running lifecycle component and fail with INVALID_STATE.
@@ -133,11 +127,10 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
-     * Force-clears the busy guard if a request never unwinds. A non-cancellable
-     * processImage JNI call can outlive its coroutine's cancellation, leaving the
-     * job's finally block unreached and isGenerating stuck true forever. This
-     * timeout is a UI backstop (not a native cancel) that surfaces a timed-out
-     * error and re-enables the screen; it runs independently of [job].
+     * Force-clears the busy guard if a request never unwinds. Cancelling the job
+     * reaches the native VLM cancel through the SDK, but a wedged engine can
+     * still leave the job's finally block unreached, so this timeout is the UI
+     * backstop that surfaces the failure and re-enables the screen.
      */
     private fun startWatchdog() {
         watchdog?.cancel()
@@ -145,7 +138,6 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
             delay(GENERATION_TIMEOUT_MS)
             if (isGenerating) {
                 job?.cancel()
-                runCatching { RunAnywhere.cancelVLMGeneration() }
                 isGenerating = false
                 error = "Vision timed out"
             }
@@ -170,13 +162,12 @@ class VisionViewModel(application: Application) : AndroidViewModel(application) 
     }
 }
 
-internal fun VLMResult.toUiMetrics(): VlmMetrics =
+internal fun GenerationResult.toUiMetrics(processingMs: Long): VlmMetrics =
     VlmMetrics(
-        tokens = output_tokens,
-        tokensPerSecond = tokens_per_second.toDouble(),
-        processingMs = processing_time_ms,
-        imageEncodeMs = image_encode_time_ms,
-        ttftMs = time_to_first_token_ms,
+        tokens = outputTokens,
+        tokensPerSecond = tokensPerSecond.toDouble(),
+        processingMs = processingMs,
+        ttftMs = timeToFirstTokenMs,
     )
 
-internal fun VLMResult.toDisplayText(): String = text.ifBlank { "I could not read that image." }
+internal fun GenerationResult.toDisplayText(): String = text.ifBlank { "I could not read that image." }

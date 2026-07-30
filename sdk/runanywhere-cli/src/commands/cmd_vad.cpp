@@ -1,6 +1,9 @@
 /**
  * @file cmd_vad.cpp
- * @brief `rcli vad --input a.wav [model]` — speech segment detection.
+ * @brief `rcli vad detect <a.wav>` — speech segment detection.
+ *
+ * `rcli vad --input a.wav` is the same command: the options live on the `vad`
+ * namespace and `detect` is a CLI11 fallthrough alias.
  *
  * Feeds 16 kHz float frames through the VAD component (Silero when the model
  * is loaded, energy-based otherwise) and derives segments from
@@ -32,14 +35,28 @@ struct Segment {
     double end_s;
 };
 
-int run_vad(const GlobalOptions& options, const std::string& ref, const std::string& input) {
+struct VadParams {
+    std::string model;
+    std::string audio;
+    std::string input;  // --input/-i spelling of the same file
+    float activation_threshold = 0.0f;
+};
+
+int run_vad(const GlobalOptions& options, const VadParams& params) {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {
         return 1;
     }
 
+    const std::string& input = params.audio.empty() ? params.input : params.audio;
+    if (input.empty()) {
+        out::error_line("an audio file is required (positional or --input)");
+        return 2;
+    }
+
     ResolvedModelPaths model;
-    const int setup = ensure_model_ready(options, ref.empty() ? kDefaultVadModel : ref, &model);
+    const int setup = ensure_model_ready(
+        options, params.model.empty() ? kDefaultVadModel : params.model, &model);
     if (setup != 0) {
         return setup;
     }
@@ -66,6 +83,12 @@ int run_vad(const GlobalOptions& options, const std::string& ref, const std::str
         out::error_line("failed to load VAD model: " + out::describe_result(rc));
         rac_vad_component_destroy(vad);
         return 1;
+    }
+    if (params.activation_threshold > 0.0f &&
+        rac_vad_component_set_energy_threshold(vad, params.activation_threshold) != RAC_SUCCESS) {
+        out::error_line("invalid --activation-threshold (expected 0.0-1.0)");
+        rac_vad_component_destroy(vad);
+        return 2;
     }
     if (rac_vad_component_initialize(vad) != RAC_SUCCESS ||
         rac_vad_component_start(vad) != RAC_SUCCESS) {
@@ -134,15 +157,19 @@ int run_vad(const GlobalOptions& options, const std::string& ref, const std::str
 }  // namespace
 
 void register_vad(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand("vad", "Detect speech segments in a WAV file");
-    auto ref = std::make_shared<std::string>();
-    auto input = std::make_shared<std::string>();
-    cmd->add_option("model", *ref, "VAD model (default: " + std::string(kDefaultVadModel) + ")");
-    cmd->add_option("--input,-i", *input, "16-bit PCM WAV file")
-        ->required()
-        ->check(CLI::ExistingFile);
-    cmd->callback([&options, ref, input]() {
-        const int exit_code = run_vad(options, *ref, *input);
+    CLI::App* cmd = app.add_subcommand("vad", "Find the speech in an audio file");
+    cmd->require_subcommand(0, 1);
+    add_verb_alias(cmd, "detect", "Report speech segments with timestamps");
+
+    auto params = std::make_shared<VadParams>();
+    cmd->add_option("audio", params->audio, "16-bit PCM WAV file")->check(CLI::ExistingFile);
+    cmd->add_option("--input,-i", params->input, "16-bit PCM WAV file")->check(CLI::ExistingFile);
+    cmd->add_option("--model,-m", params->model,
+                    "VAD model to use (default: " + std::string(kDefaultVadModel) + ")");
+    cmd->add_option("--activation-threshold", params->activation_threshold,
+                    "Speech probability needed to open a segment (0 = model default)");
+    cmd->callback([&options, params]() {
+        const int exit_code = run_vad(options, *params);
         if (exit_code != 0) {
             throw CLI::RuntimeError(exit_code);
         }

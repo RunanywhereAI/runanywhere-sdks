@@ -3,7 +3,7 @@
  *
  * Text-to-speech namespace — mirrors Swift's `RunAnywhere+TTS.swift`.
  * Provides `RunAnywhere.tts.*` capability surface for owning TTS component
- * handles plus a `RunAnywhere.tts.synthesizeAuto(text, options)` shortcut.
+ * handles plus a `RunAnywhere.tts.synthesize(text, options)` shortcut.
  *
  * Low-level proto-byte adapter methods take a numeric component handle. The
  * auto shortcut uses commons' lifecycle-owned TTS ABI so synthesis cannot
@@ -207,21 +207,19 @@ export interface SynthesizeOptions extends Partial<TTSOptions> {
 }
 
 export const TTS = {
-  synthesizeAuto: synthesize,
-
   /**
    * Streaming synthesis on the lifecycle-loaded TTS model (no component
-   * handle). Handle-less form backing Swift's `RunAnywhere.synthesizeStream(_:
-   * options:)`. The handle-owning form stays on `RunAnywhere.tts.synthesizeStream`.
+   * handle). Handle-less form backing the public `RunAnywhere.tts.synthesizeStream`.
+   * The handle-owning form is `synthesizeStream(handle, ...)` below.
    */
-  synthesizeStreamAuto(
+  synthesizeLoadedStream(
     text: string,
     options?: Partial<TTSOptions>,
   ): AsyncIterable<TTSOutput> {
     const adapter = TTSProtoAdapter.tryDefault();
     if (!adapter || !adapter.supportsLifecycleProtoTTS()) {
       throw SDKException.backendNotAvailable(
-        'TTS.synthesizeStreamAuto',
+        'TTS.synthesizeLoadedStream',
         'No Web WASM backend with rac_tts_*_proto lifecycle exports is registered.',
       );
     }
@@ -374,13 +372,13 @@ export async function synthesize(
   text: string,
   options?: SynthesizeOptions,
 ): Promise<TTSOutput> {
-  requireTTSModule('RunAnywhere.tts.synthesizeAuto');
+  requireTTSModule('RunAnywhere.tts.synthesize');
   const resolvedOptions = autoTTSOptions(options);
   if (currentLifecycleVoiceId()) {
     const adapter = TTSProtoAdapter.tryDefault();
     if (!adapter?.supportsLifecycleProtoTTS()) {
       throw SDKException.backendNotAvailable(
-        'RunAnywhere.tts.synthesizeAuto',
+        'RunAnywhere.tts.synthesize',
         'Loaded WASM module does not export rac_tts_synthesize_lifecycle_proto.',
       );
     }

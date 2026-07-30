@@ -1,9 +1,9 @@
-"""The FastAPI app: OpenAI-compatible routes over the RunAnywhere SDK (needs the [server] extra).
+"""The FastAPI app: OpenAI-compatible routes over the RunAnywhere namespaces.
 
-``create_app(model_manager=None)`` is the injectable factory (pass a fake manager in tests). Routes
-resolve the live manager via the ``get_manager`` dependency, so tests can also use
-``app.dependency_overrides``. Streaming iterates the SDK's already-threaded ``agenerate`` directly
-(no extra thread); blocking calls (``embed``) are off-loaded with ``asyncio.to_thread``.
+``create_app(model_manager=None)`` is the injectable factory (pass a fake manager in tests).
+Routes resolve the live manager via the ``get_manager`` dependency. The wire contract is
+OpenAI's — ``max_tokens``, ``response_format``, ``tool_choice`` and ``stop`` keep their OpenAI
+names on the HTTP surface and are translated into the SDK's options here.
 """
 from __future__ import annotations
 
@@ -21,28 +21,36 @@ import time
 import urllib.parse
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, List, Optional
 
 import numpy as np
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 
-from ..audio import decode_wav, downsample, encode_wav, pcm16_bytes
+import runanywhere as ra
+
 from ..catalog import CATALOG, is_catalog_id
 from ..errors import SDKException
-from ..grammar import json_schema_to_grammar
-from ..structured import ToolCall, ToolSpec
+from ..inputs import AudioFormat, AudioInput, ImageInput, ToolDefinition
+from ..options import (
+    EmbedOptions,
+    LlmOptions,
+    StructuredOutput,
+    SttOptions,
+    ToolChoice,
+    ToolChoiceMode,
+    TtsOptions,
+)
+from ..results import ToolCall
 from .errors import http_status_for, install_error_handlers, openai_error_body
 from .manager import ModelManager
 from .schemas import ChatMessage, ChatRequest, CompletionRequest, EmbeddingsRequest, SpeechRequest
-from runanywhere._generated_defaults import AudioCaptureDefaults
 
-STT_SAMPLE_RATE = AudioCaptureDefaults.MIC_SAMPLE_RATE_HZ
 _DONE = "data: [DONE]\n\n"
 MAX_IMAGE_BYTES = 20 * 1024 * 1024  # cap decoded/fetched image bytes (DoS guard)
 _MAX_DATA_URI_CHARS = (MAX_IMAGE_BYTES // 3 + 1) * 4 + 64  # base64 input cap (pre-decode)
 DEFAULT_MAX_BODY_BYTES = 50 * 1024 * 1024  # reject larger request bodies with 413
-MAX_EMBEDDING_INPUTS = 2048  # cap the /v1/embeddings batch (matches OpenAI) — bound the lock hold
+MAX_EMBEDDING_INPUTS = 2048  # cap the /v1/embeddings batch (matches OpenAI)
 
 
 def get_manager(request: Request) -> ModelManager:
@@ -52,22 +60,25 @@ def get_manager(request: Request) -> ModelManager:
 
 # --------------------------------------------------------------------------- generic helpers
 def _approx_tokens(text: str) -> int:
-    return max(1, len(text) // 4)  # rough; the SDK backends don't surface exact counts here
+    return max(1, len(text) // 4)  # rough; the bridge reports no prompt-token count
 
 
-def _gen_opts(req: Any) -> dict[str, Any]:
-    """Whitelist the generation controls the SDK honours (unknown keys are dropped by it)."""
-    opts: dict[str, Any] = {}
+def _gen_opts(req: Any, model: str) -> LlmOptions:
+    """Translate the OpenAI sampling fields into SDK generation options."""
+    options = LlmOptions(model=model)
     max_tokens = getattr(req, "max_completion_tokens", None) or getattr(req, "max_tokens", None)
     if max_tokens is not None:
-        opts["max_output_tokens"] = max_tokens
+        options.max_output_tokens = int(max_tokens)
     if getattr(req, "temperature", None) is not None:
-        opts["temperature"] = req.temperature
+        options.temperature = float(req.temperature)
     if getattr(req, "top_p", None) is not None:
-        opts["top_p"] = req.top_p
+        options.top_p = float(req.top_p)
     if getattr(req, "top_k", None) is not None:
-        opts["top_k"] = req.top_k
-    return opts
+        options.top_k = int(req.top_k)
+    stop = getattr(req, "stop", None)
+    if stop:
+        options.stop_sequences = [stop] if isinstance(stop, str) else list(stop)
+    return options
 
 
 def _message_text(content: Any) -> str:
@@ -77,33 +88,33 @@ def _message_text(content: Any) -> str:
     if isinstance(content, str):
         return content
     parts = []
-    for p in content:
-        if isinstance(p, dict) and p.get("type") == "text":
-            parts.append(p.get("text", ""))
-        elif isinstance(p, str):
-            parts.append(p)
+    for part in content:
+        if isinstance(part, dict) and part.get("type") == "text":
+            parts.append(part.get("text", ""))
+        elif isinstance(part, str):
+            parts.append(part)
     return "\n".join(x for x in parts if x)
 
 
-def _build_prompt(messages: list[ChatMessage]) -> tuple[Optional[str], str]:
-    """(system, prompt). A single user turn is passed verbatim (the backend applies the model's
+def _build_prompt(messages: List[ChatMessage]) -> tuple:
+    """(system, prompt). A single user turn is passed verbatim (the engine applies the model's
     chat template); multi-turn is serialized into a simple transcript."""
     system = "\n".join(_message_text(m.content) for m in messages if m.role == "system") or None
     turns = [m for m in messages if m.role != "system"]
     if len(turns) == 1 and turns[0].role == "user":
         return system, _message_text(turns[0].content)
     lines = []
-    for m in turns:
-        who = "User" if m.role == "user" else "Assistant"
-        lines.append(f"{who}: {_message_text(m.content)}")
+    for message in turns:
+        who = "User" if message.role == "user" else "Assistant"
+        lines.append(f"{who}: {_message_text(message.content)}")
     lines.append("Assistant:")
     return system, "\n".join(lines)
 
 
-def _last_user_text(messages: list[ChatMessage]) -> str:
-    for m in reversed(messages):
-        if m.role == "user":
-            return _message_text(m.content)
+def _last_user_text(messages: List[ChatMessage]) -> str:
+    for message in reversed(messages):
+        if message.role == "user":
+            return _message_text(message.content)
     return ""
 
 
@@ -121,46 +132,46 @@ def _chat_chunk(cid: str, model: str, delta: dict, finish: Optional[str]) -> str
 def _error_line(exc: Exception) -> str:
     """A terminal SSE ``data:`` error line for a mid-stream failure.
 
-    SDKException messages are intentional and safe to surface; any OTHER exception is coerced to
-    a GENERIC message rather than ``str(exc)`` so the streaming path does not leak raw backend
-    exception text (paths, model internals) to the client — matching the non-streaming catch-all
-    handler's no-echo posture. The exact error is still logged server-side by the caller.
+    SDKException messages are intentional and safe to surface; any OTHER exception is coerced
+    to a generic message so the streaming path does not leak raw backend exception text.
     """
-    e = exc if isinstance(exc, SDKException) else SDKException.generation_failed(
-        "internal error during generation"
+    error = (
+        exc
+        if isinstance(exc, SDKException)
+        else SDKException.generation_failed("internal error during generation")
     )
-    body = openai_error_body(e.message, http_status_for(e), code=int(e.code))
+    body = openai_error_body(error.message, http_status_for(error), code=int(error.code))
     return f"data: {json.dumps(body)}\n\n"
 
 
 def _chat_completion(
     cid: str, model: str, message: dict, finish: str, prompt: str, completion: str
 ) -> dict:
-    pt, ct = _approx_tokens(prompt), _approx_tokens(completion)
+    prompt_tokens, completion_tokens = _approx_tokens(prompt), _approx_tokens(completion)
     return {
         "id": cid,
         "object": "chat.completion",
         "created": int(time.time()),
         "model": model,
         "choices": [{"index": 0, "message": message, "finish_reason": finish}],
-        "usage": {"prompt_tokens": pt, "completion_tokens": ct, "total_tokens": pt + ct},
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        },
     }
 
 
 # --------------------------------------------------------------------------- structured output
-def _apply_response_format(rf: Optional[dict], opts: dict[str, Any]) -> Optional[str]:
-    """For ``json_schema`` set a GBNF grammar on ``opts``; for ``json_object`` return a system
-    hint. Returns None otherwise."""
+def _apply_response_format(rf: Optional[dict], options: LlmOptions) -> Optional[str]:
+    """For ``json_schema`` constrain decoding; for ``json_object`` return a system hint."""
     if not rf:
         return None
     rf_type = rf.get("type")
     if rf_type == "json_schema":
         schema = (rf.get("json_schema") or {}).get("schema")
         if schema:
-            try:
-                opts["grammar"] = json_schema_to_grammar(schema)
-            except Exception as exc:  # noqa: BLE001 — a bad schema is a client error (400), not 500
-                raise SDKException.invalid_input(f"invalid response_format json_schema: {exc}") from exc
+            options.structured_output = StructuredOutput(schema=schema)
         return None
     if rf_type == "json_object":
         return "You must respond with a single valid JSON object."
@@ -168,36 +179,43 @@ def _apply_response_format(rf: Optional[dict], opts: dict[str, Any]) -> Optional
 
 
 # --------------------------------------------------------------------------- tool calling
-def _tools_to_specs(tools: Optional[list[dict]]) -> list[ToolSpec]:
-    specs = []
-    for t in tools or []:
-        fn = t.get("function") if isinstance(t, dict) else None
-        fn = fn if isinstance(fn, dict) else (t if isinstance(t, dict) else {})
+def _tool_defs(tools: Optional[List[dict]]) -> List[ToolDefinition]:
+    out: List[ToolDefinition] = []
+    for tool in tools or []:
+        fn = tool.get("function") if isinstance(tool, dict) else None
+        fn = fn if isinstance(fn, dict) else (tool if isinstance(tool, dict) else {})
         name = fn.get("name")
         if not name:
             continue
-        specs.append(
-            ToolSpec(
+        out.append(
+            ToolDefinition(
                 name=name,
                 parameters=fn.get("parameters") or {"type": "object"},
                 description=fn.get("description"),
             )
         )
-    return specs
+    return out
 
 
-def _tool_choice_mode(tool_choice: Any) -> tuple[str, Optional[str]]:
-    """(mode, named) where mode is none|auto|required|named."""
+def _tool_choice(tool_choice: Any, tools: List[ToolDefinition]) -> ToolChoice:
+    """Map OpenAI's ``tool_choice`` onto the SDK's policy."""
     if tool_choice is None:
-        return "auto", None
+        return ToolChoice(ToolChoiceMode.AUTO)
     if isinstance(tool_choice, str):
-        return (tool_choice if tool_choice in ("none", "auto", "required") else "auto"), None
+        if tool_choice == "none":
+            return ToolChoice(ToolChoiceMode.NONE)
+        if tool_choice == "required":
+            return ToolChoice(ToolChoiceMode.REQUIRED)
+        return ToolChoice(ToolChoiceMode.AUTO)
     if isinstance(tool_choice, dict):
-        return "named", (tool_choice.get("function") or {}).get("name")
-    return "auto", None
+        name = (tool_choice.get("function") or {}).get("name")
+        if not name or name not in {tool.name for tool in tools}:
+            raise SDKException.invalid_input(f"tool_choice named an unknown tool: {name!r}")
+        return ToolChoice.forced(name)
+    return ToolChoice(ToolChoiceMode.AUTO)
 
 
-def _tool_calls_message(tc: ToolCall) -> dict:
+def _tool_calls_message(calls: List[ToolCall]) -> dict:
     return {
         "role": "assistant",
         "content": None,
@@ -205,72 +223,39 @@ def _tool_calls_message(tc: ToolCall) -> dict:
             {
                 "id": f"call_{uuid.uuid4().hex[:24]}",
                 "type": "function",
-                "function": {"name": tc.name, "arguments": json.dumps(tc.arguments)},
+                "function": {"name": call.name, "arguments": json.dumps(call.arguments)},
             }
+            for call in calls
         ],
     }
 
 
-def _auto_tool_prompt(prompt: str, specs: list[ToolSpec]) -> str:
-    doc = "\n".join(
-        f"- {s.name}: {s.description or ''} (arguments: {json.dumps(s.parameters)})" for s in specs
-    )
-    return (
-        f"{prompt}\n\nYou may call one of these tools if it helps answer:\n{doc}\n\n"
-        'If a tool is needed, reply with ONLY a JSON object {"name": <tool>, "arguments": {...}} '
-        "and nothing else. Otherwise, answer the user normally."
-    )
-
-
-def _try_parse_tool_call(text: str, names: set[str]) -> Optional[ToolCall]:
-    """Best-effort: pull a ``{name, arguments}`` object out of a free-form 'auto' reply."""
-    s = text.strip()
-    if s.startswith("```"):
-        s = s.strip("`")
-        if s.lstrip().lower().startswith("json"):
-            s = s.lstrip()[4:]
-    start, end = s.find("{"), s.rfind("}")
-    if start == -1 or end == -1 or end < start:
-        return None
-    try:
-        obj = json.loads(s[start : end + 1])
-    except (ValueError, TypeError):
-        return None
-    if not isinstance(obj, dict):
-        return None
-    name = obj.get("name")
-    if not isinstance(name, str) or name not in names:
-        return None
-    args = obj.get("arguments")
-    return ToolCall(name=name, arguments=args if isinstance(args, dict) else {})
-
-
 # --------------------------------------------------------------------------- vision (image input)
-def _last_user_image(messages: list[ChatMessage]) -> Optional[str]:
-    for m in reversed(messages):
-        if m.role == "user" and isinstance(m.content, list):
-            for p in m.content:
-                if isinstance(p, dict) and p.get("type") == "image_url":
-                    iu = p.get("image_url")
-                    if isinstance(iu, dict):
-                        return iu.get("url")
-                    if isinstance(iu, str):
-                        return iu
+def _last_user_image(messages: List[ChatMessage]) -> Optional[str]:
+    for message in reversed(messages):
+        if message.role == "user" and isinstance(message.content, list):
+            for part in message.content:
+                if isinstance(part, dict) and part.get("type") == "image_url":
+                    url = part.get("image_url")
+                    if isinstance(url, dict):
+                        return url.get("url")
+                    if isinstance(url, str):
+                        return url
     return None
 
 
 def _img_suffix(header: str) -> str:
-    h = header.lower()
-    if "png" in h:
+    lowered = header.lower()
+    if "png" in lowered:
         return ".png"
-    if "webp" in h:
+    if "webp" in lowered:
         return ".webp"
-    if "gif" in h:
+    if "gif" in lowered:
         return ".gif"
     return ".jpg"
 
 
-def _ip_is_public(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+def _ip_is_public(ip) -> bool:
     """True iff ``ip`` is globally routable (SSRF allowlist). Normalises IPv4-mapped IPv6."""
     mapped = getattr(ip, "ipv4_mapped", None)
     if mapped is not None:  # ::ffff:127.0.0.1 -> 127.0.0.1 before the check
@@ -278,12 +263,12 @@ def _ip_is_public(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     return bool(ip.is_global) and not ip.is_reserved
 
 
-def _validated_connect_targets(host: str, port: int) -> list[tuple[int, int, int, tuple]]:
+def _validated_connect_targets(host: str, port: int) -> list:
     """Resolve ``host`` and return ``getaddrinfo`` rows whose IPs pass the SSRF allowlist.
 
-    Fail-closed: any non-public address in the resolution set rejects the whole host (a dual-stack
-    name that also answers on a private A/AAAA must not be fetchable). Callers then ``connect()``
-    to one of these sockaddr tuples — never re-resolve — closing the DNS-rebinding window.
+    Fail-closed: any non-public address in the resolution set rejects the whole host. Callers
+    then ``connect()`` to one of these sockaddr tuples — never re-resolve — closing the
+    DNS-rebinding window.
     """
     try:
         infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
@@ -291,7 +276,7 @@ def _validated_connect_targets(host: str, port: int) -> list[tuple[int, int, int
         raise SDKException.invalid_input("could not resolve image host") from None
     if not infos:
         raise SDKException.invalid_input("could not resolve image host")
-    out: list[tuple[int, int, int, tuple]] = []
+    out = []
     for family, socktype, proto, _canon, sockaddr in infos:
         if not _ip_is_public(ipaddress.ip_address(sockaddr[0])):
             raise SDKException.invalid_input("image URL host is not allowed")
@@ -300,13 +285,7 @@ def _validated_connect_targets(host: str, port: int) -> list[tuple[int, int, int
 
 
 def _fetch_image_bytes(url: str) -> bytes:
-    """Fetch an http(s) image with SSRF hardening: DNS allowlist, connect-by-IP, no redirects.
-
-    Steps: parse → resolve + validate every A/AAAA → ``connect()`` to a validated sockaddr (so
-    urllib cannot re-resolve to a private IP) → TLS SNI / Host header keep the original hostname
-    → reject 3xx (redirects would need a fresh allowlist check per hop; we disallow instead) →
-    hard size cap. URL fetch remains opt-in (``allow_image_urls``); data-URIs are the safe path.
-    """
+    """Fetch an http(s) image with SSRF hardening: DNS allowlist, connect-by-IP, no redirects."""
     parsed = urllib.parse.urlparse(url)
     scheme = (parsed.scheme or "").lower()
     if scheme not in ("http", "https"):
@@ -320,7 +299,7 @@ def _fetch_image_bytes(url: str) -> bytes:
         path = f"{path}?{parsed.query}"
 
     family, socktype, proto, sockaddr = _validated_connect_targets(host, port)[0]
-    conn: http.client.HTTPConnection | None = None
+    conn: Optional[http.client.HTTPConnection] = None
     try:
         sock = socket.socket(family, socktype, proto)
         sock.settimeout(10)
@@ -331,20 +310,18 @@ def _fetch_image_bytes(url: str) -> bytes:
         conn = http.client.HTTPConnection(host, port, timeout=10)
         conn.sock = sock
         conn.request(
-            "GET",
-            path,
-            headers={"Host": host, "Accept": "image/*,*/*", "Connection": "close"},
+            "GET", path, headers={"Host": host, "Accept": "image/*,*/*", "Connection": "close"}
         )
         resp = conn.getresponse()
         if 300 <= resp.status < 400:
-            # A public URL redirecting to 169.254.169.254 (etc.) would bypass a one-shot host check.
+            # A public URL redirecting to 169.254.169.254 would bypass a one-shot host check.
             raise SDKException.invalid_input("image URL redirects are not allowed")
         if resp.status != 200:
             raise SDKException.invalid_input("could not fetch image URL")
         raw = resp.read(MAX_IMAGE_BYTES + 1)
     except SDKException:
         raise
-    except Exception:  # noqa: BLE001 — generic message; exact error stays server-side (recon oracle)
+    except Exception:  # noqa: BLE001 — generic message; exact error stays server-side
         raise SDKException.invalid_input("could not fetch image URL") from None
     finally:
         if conn is not None:
@@ -357,24 +334,29 @@ def _fetch_image_bytes(url: str) -> bytes:
     return raw
 
 
-def _materialize_image(ref: str, allow_urls: bool) -> tuple[str, bool]:
+def _materialize_image(ref: str, allow_urls: bool) -> tuple:
     """Return ``(temp_path, True)`` for a data-URI (or, if ``allow_urls``, an http(s)) image.
+
     Blocking (decode / fetch / write) — call via ``asyncio.to_thread``. Local filesystem paths
     are never accepted (arbitrary-file-read guard); size is capped BEFORE decode (DoS guard).
-    Raises ``SDKException.invalid_input`` (-> HTTP 400) on any rejection."""
+    """
     if ref.startswith("data:"):
         header, _, data = ref.partition(",")
         if len(data) > _MAX_DATA_URI_CHARS:  # cap the base64 INPUT before allocating the decode
             raise SDKException.invalid_input("image exceeds the size limit")
         try:
-            raw = base64.b64decode(data) if ";base64" in header else urllib.parse.unquote_to_bytes(data)
+            raw = (
+                base64.b64decode(data)
+                if ";base64" in header
+                else urllib.parse.unquote_to_bytes(data)
+            )
         except Exception:  # noqa: BLE001
             raise SDKException.invalid_input("could not decode data-URI image") from None
         if len(raw) > MAX_IMAGE_BYTES:
             raise SDKException.invalid_input("image exceeds the size limit")
         fd, path = tempfile.mkstemp(suffix=_img_suffix(header))
-        with os.fdopen(fd, "wb") as f:
-            f.write(raw)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(raw)
         return path, True
     if ref.startswith("http://") or ref.startswith("https://"):
         if not allow_urls:
@@ -384,17 +366,17 @@ def _materialize_image(ref: str, allow_urls: bool) -> tuple[str, bool]:
             )
         raw = _fetch_image_bytes(ref)
         fd, path = tempfile.mkstemp(suffix=".img")
-        with os.fdopen(fd, "wb") as f:
-            f.write(raw)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(raw)
         return path, True
     # Neither a data: URI nor an http(s) URL: do NOT treat network input as a local file path.
     raise SDKException.invalid_input("image_url must be a data: URI or an http(s) URL")
 
 
 def _resolve_model_id(req_model: Optional[str], default: str, allow_arbitrary: bool) -> str:
-    """The model id to load. Client-supplied ids must be catalog ids (or match the operator's
-    configured default) unless ``allow_arbitrary`` — so a network client can't make the server
-    load an arbitrary local path / HF repo (arbitrary-load + unbounded-model-pinning guard)."""
+    """The model id to load. Client-supplied ids must be catalog ids (or the operator's
+    configured default) unless ``allow_arbitrary`` — so a network client cannot make the
+    server load an arbitrary local path / HF repo."""
     model = req_model or default
     if allow_arbitrary or model == default or is_catalog_id(model):
         return model
@@ -402,8 +384,8 @@ def _resolve_model_id(req_model: Optional[str], default: str, allow_arbitrary: b
 
 
 def _pick_vlm(req_model: Optional[str], default_vlm: str, allow_arbitrary: bool) -> str:
-    """Resolve the VLM: a known VLM id is used; a custom path only if ``allow_arbitrary`` or it is
-    the configured default; anything else falls back to the default VLM (vision never 404s here)."""
+    """Resolve the VLM: a known VLM id is used; a custom path only if ``allow_arbitrary`` or it
+    is the configured default; anything else falls back to the default VLM."""
     if req_model:
         entry = CATALOG.get(req_model)
         if entry is not None and entry.type == "vlm":
@@ -428,14 +410,21 @@ def _encode_embedding(vec: Any, encoding_format: str) -> Any:
 
 
 # --------------------------------------------------------------------------- SSE generators
-async def _chat_text_sse(agen_factory, lock, cid: str, model: str) -> AsyncIterator[str]:
-    """Stream chat deltas from an async token iterator factory, holding the model lock."""
+async def _atext(events) -> AsyncIterator[str]:
+    """Yield answer text from a generation event stream."""
+    async for event in events:
+        if event.is_token and not event.is_thought:
+            yield event.text
+
+
+async def _chat_text_sse(factory, lock, cid: str, model: str) -> AsyncIterator[str]:
+    """Stream chat deltas from an event-stream factory, holding the category lock."""
     async with lock:
         yield _chat_chunk(cid, model, {"role": "assistant", "content": ""}, None)
         try:
-            async for tok in agen_factory():
-                yield _chat_chunk(cid, model, {"content": tok}, None)
-        except Exception as exc:  # noqa: BLE001 — headers already sent (200); emit a terminal line
+            async for text in _atext(factory()):
+                yield _chat_chunk(cid, model, {"content": text}, None)
+        except Exception as exc:  # noqa: BLE001 — headers already sent (200)
             yield _error_line(exc)
             yield _DONE
             return
@@ -448,7 +437,7 @@ async def _final_sse(cid: str, model: str, message: dict, finish: str) -> AsyncI
     yield _chat_chunk(cid, model, {"role": "assistant", "content": ""}, None)
     if message.get("tool_calls"):
         # OpenAI streamed tool-call deltas MUST carry an `index` so clients can accumulate them.
-        deltas = [{**tc, "index": i} for i, tc in enumerate(message["tool_calls"])]
+        deltas = [{**call, "index": i} for i, call in enumerate(message["tool_calls"])]
         yield _chat_chunk(cid, model, {"tool_calls": deltas}, None)
     elif message.get("content"):
         yield _chat_chunk(cid, model, {"content": message["content"]}, None)
@@ -456,14 +445,14 @@ async def _final_sse(cid: str, model: str, message: dict, finish: str) -> AsyncI
     yield _DONE
 
 
-async def _completions_sse(agen_factory, lock, cid: str, model: str) -> AsyncIterator[str]:
+async def _completions_sse(factory, lock, cid: str, model: str) -> AsyncIterator[str]:
     async with lock:
         try:
-            async for tok in agen_factory():
+            async for text in _atext(factory()):
                 payload = {
                     "id": cid, "object": "text_completion", "created": int(time.time()),
                     "model": model,
-                    "choices": [{"index": 0, "text": tok, "finish_reason": None, "logprobs": None}],
+                    "choices": [{"index": 0, "text": text, "finish_reason": None, "logprobs": None}],
                 }
                 yield f"data: {json.dumps(payload)}\n\n"
         except Exception as exc:  # noqa: BLE001
@@ -479,9 +468,9 @@ async def _completions_sse(agen_factory, lock, cid: str, model: str) -> AsyncIte
 
 
 class _BodyLimitMiddleware:
-    """Reject request bodies over ``max_bytes`` with 413, enforced on ACTUAL bytes (so a chunked
-    body with no Content-Length can't bypass a header-only check). Buffers up to the limit, then
-    replays the body to the app — bounding memory to ``max_bytes`` per request."""
+    """Reject request bodies over ``max_bytes`` with 413, enforced on ACTUAL bytes (so a
+    chunked body with no Content-Length can't bypass a header-only check). Buffers up to the
+    limit, then replays the body to the app — bounding memory to ``max_bytes`` per request."""
 
     def __init__(self, app, max_bytes: int) -> None:
         self.app = app
@@ -543,12 +532,12 @@ def create_app(
     allow_image_urls: bool = False,
     allow_arbitrary_models: bool = False,
 ) -> FastAPI:
-    """Build the FastAPI app. Pass ``model_manager`` to inject a (fake) manager for tests; else a
-    real one is built in the lifespan so importing/creating the app never touches native code.
+    """Build the FastAPI app. Pass ``model_manager`` to inject a (fake) manager for tests; else
+    a real one is built in the lifespan so importing/creating the app never touches native code.
 
-    Security defaults (opt in only if you trust the clients): ``allow_image_urls=False`` accepts
-    only data-URI images (no server-side URL fetch = no SSRF); ``allow_arbitrary_models=False``
-    accepts only catalog model ids (or the configured defaults), not arbitrary paths / HF repos.
+    Security defaults (opt in only if you trust the clients): ``allow_image_urls=False``
+    accepts only data-URI images (no server-side URL fetch = no SSRF);
+    ``allow_arbitrary_models=False`` accepts only catalog model ids.
     """
 
     @asynccontextmanager
@@ -581,7 +570,7 @@ def create_app(
     async def require_api_key(authorization: Optional[str] = Header(default=None)) -> None:
         if api_key is None:
             return
-        # Constant-time compare on bytes (never raises on a non-ASCII header, unlike str compare).
+        # Constant-time compare on bytes (never raises on a non-ASCII header).
         expected = f"Bearer {api_key}".encode()
         got = authorization.encode() if isinstance(authorization, str) else b""
         if not hmac.compare_digest(got, expected):
@@ -607,24 +596,26 @@ def create_app(
         }
 
     # -- models -------------------------------------------------------------
-    def _model_obj(mid: str, entry, status: dict) -> dict:
-        st = status.get(mid)
+    def _model_obj(mid: str, entry, downloaded: set) -> dict:
         return {
             "id": mid, "object": "model", "created": 0, "owned_by": "runanywhere",
-            "type": entry.type, "downloaded": bool(getattr(st, "downloaded", False)),
+            "type": entry.type, "downloaded": mid in downloaded,
         }
 
     @app.get("/v1/models", dependencies=guarded)
     async def list_models(mgr: ModelManager = Depends(get_manager)) -> dict:
-        status = mgr.model_status()
-        return {"object": "list", "data": [_model_obj(m, e, status) for m, e in sorted(CATALOG.items())]}
+        downloaded = mgr.downloaded()
+        return {
+            "object": "list",
+            "data": [_model_obj(m, e, downloaded) for m, e in sorted(CATALOG.items())],
+        }
 
     @app.get("/v1/models/{model_id}", dependencies=guarded)
     async def retrieve_model(model_id: str, mgr: ModelManager = Depends(get_manager)) -> dict:
         entry = CATALOG.get(model_id)
         if entry is None:
             raise HTTPException(status_code=404, detail=f"model {model_id!r} not found")
-        return _model_obj(model_id, entry, mgr.model_status())
+        return _model_obj(model_id, entry, mgr.downloaded())
 
     # -- chat ---------------------------------------------------------------
     @app.post("/v1/chat/completions", dependencies=guarded)
@@ -637,45 +628,42 @@ def create_app(
             return await _handle_vision(mgr, req, image_ref, cid)
 
         system, prompt = _build_prompt(req.messages)
-        opts = _gen_opts(req)
-        hint = _apply_response_format(req.response_format, opts)
+        model = _resolve_model_id(req.model, mgr.default_llm, allow_arbitrary_models)
+        options = _gen_opts(req, model)
+        hint = _apply_response_format(req.response_format, options)
         system = "\n".join(x for x in (system, hint) if x) or None
         if system:
-            opts["system_prompt"] = system
+            options.system_prompt = system
 
-        model = _resolve_model_id(req.model, mgr.default_llm, allow_arbitrary_models)
-        llm, lock = await mgr.llm(model)
-
-        specs = _tools_to_specs(req.tools)
-        mode, named = _tool_choice_mode(req.tool_choice)
-        if specs and mode != "none":
-            return await _handle_tools(llm, lock, prompt, specs, mode, named, opts, req, cid, model)
+        tools = _tool_defs(req.tools)
+        choice = _tool_choice(req.tool_choice, tools)
+        lock = mgr.lock("llm")
+        if tools and choice.mode != ToolChoiceMode.NONE:
+            options.tools = tools
+            options.tool_choice = choice
+            return await _handle_tools(lock, prompt, options, req, cid, model)
 
         if req.stream:
-            gen = lambda: llm.agenerate(prompt, **opts)  # noqa: E731
             return StreamingResponse(
-                _chat_text_sse(gen, lock, cid, model), media_type="text/event-stream"
+                _chat_text_sse(lambda: ra.llm.agenerate_stream(prompt, options), lock, cid, model),
+                media_type="text/event-stream",
             )
         async with lock:
-            text = await llm.agenerate_text(prompt, **opts)
-        return _chat_completion(cid, model, {"role": "assistant", "content": text}, "stop", prompt, text)
+            result = await ra.llm.agenerate(prompt, options)
+        return _chat_completion(
+            cid, model, {"role": "assistant", "content": result.text}, "stop", prompt, result.text
+        )
 
-    async def _handle_tools(llm, lock, prompt, specs, mode, named, opts, req, cid, model):
-        if mode in ("required", "named"):
-            use = [s for s in specs if s.name == named] if mode == "named" else specs
-            if not use:
-                raise SDKException.invalid_input(f"tool_choice named an unknown tool: {named!r}")
-            async with lock:
-                tc = await llm.agenerate_tool_call(prompt, use, **opts)
-            message, finish, completion = _tool_calls_message(tc), "tool_calls", json.dumps(tc.arguments)
-        else:  # auto: let the model decide; parse the free-form reply
-            async with lock:
-                text = await llm.agenerate_text(_auto_tool_prompt(prompt, specs), **opts)
-            tc = _try_parse_tool_call(text, {s.name for s in specs})
-            if tc is not None:
-                message, finish, completion = _tool_calls_message(tc), "tool_calls", json.dumps(tc.arguments)
-            else:
-                message, finish, completion = {"role": "assistant", "content": text}, "stop", text
+    async def _handle_tools(lock, prompt, options, req, cid, model):
+        async with lock:
+            result = await ra.llm.agenerate(prompt, options)
+        if result.tool_calls:
+            message = _tool_calls_message(result.tool_calls)
+            finish = "tool_calls"
+            completion = json.dumps([call.arguments for call in result.tool_calls])
+        else:
+            message = {"role": "assistant", "content": result.text}
+            finish, completion = "stop", result.text
         if req.stream:
             return StreamingResponse(
                 _final_sse(cid, model, message, finish), media_type="text/event-stream"
@@ -685,7 +673,8 @@ def create_app(
     async def _handle_vision(mgr, req, image_ref, cid):
         prompt = _last_user_text(req.messages) or "Describe the image."
         model = _pick_vlm(req.model, mgr.default_vlm, allow_arbitrary_models)
-        vlm, lock = await mgr.vlm(model)
+        options = _gen_opts(req, model)
+        lock = mgr.lock("vlm")
         # Blocking (decode / SSRF-filtered fetch / write) -> off the event loop; may raise -> 400.
         path, is_temp = await asyncio.to_thread(_materialize_image, image_ref, allow_image_urls)
 
@@ -695,8 +684,9 @@ def create_app(
                     async with lock:
                         yield _chat_chunk(cid, model, {"role": "assistant", "content": ""}, None)
                         try:
-                            async for tok in vlm.acaption(path, prompt):
-                                yield _chat_chunk(cid, model, {"content": tok}, None)
+                            events = ra.vlm.agenerate_stream(ImageInput.file(path), prompt, options)
+                            async for text in _atext(events):
+                                yield _chat_chunk(cid, model, {"content": text}, None)
                         except Exception as exc:  # noqa: BLE001
                             yield _error_line(exc)
                             yield _DONE
@@ -711,32 +701,40 @@ def create_app(
 
         try:
             async with lock:
-                text = await vlm.acaption_text(path, prompt)
+                result = await ra.vlm.agenerate(ImageInput.file(path), prompt, options)
         finally:
             if is_temp:
                 _safe_unlink(path)
-        return _chat_completion(cid, model, {"role": "assistant", "content": text}, "stop", prompt, text)
+        return _chat_completion(
+            cid, model, {"role": "assistant", "content": result.text}, "stop", prompt, result.text
+        )
 
     # -- completions (legacy) ----------------------------------------------
     @app.post("/v1/completions", dependencies=guarded)
     async def completions(req: CompletionRequest, mgr: ModelManager = Depends(get_manager)):
         prompt = req.prompt if isinstance(req.prompt, str) else "\n".join(req.prompt)
-        opts = _gen_opts(req)
         model = _resolve_model_id(req.model, mgr.default_llm, allow_arbitrary_models)
-        llm, lock = await mgr.llm(model)
+        options = _gen_opts(req, model)
         cid = f"cmpl-{uuid.uuid4().hex}"
+        lock = mgr.lock("llm")
         if req.stream:
-            gen = lambda: llm.agenerate(prompt, **opts)  # noqa: E731
             return StreamingResponse(
-                _completions_sse(gen, lock, cid, model), media_type="text/event-stream"
+                _completions_sse(
+                    lambda: ra.llm.agenerate_stream(prompt, options), lock, cid, model
+                ),
+                media_type="text/event-stream",
             )
         async with lock:
-            text = await llm.agenerate_text(prompt, **opts)
-        pt, ct = _approx_tokens(prompt), _approx_tokens(text)
+            result = await ra.llm.agenerate(prompt, options)
+        prompt_tokens, completion_tokens = _approx_tokens(prompt), _approx_tokens(result.text)
         return {
             "id": cid, "object": "text_completion", "created": int(time.time()), "model": model,
-            "choices": [{"index": 0, "text": text, "finish_reason": "stop", "logprobs": None}],
-            "usage": {"prompt_tokens": pt, "completion_tokens": ct, "total_tokens": pt + ct},
+            "choices": [{"index": 0, "text": result.text, "finish_reason": "stop", "logprobs": None}],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
         }
 
     # -- embeddings ---------------------------------------------------------
@@ -744,22 +742,25 @@ def create_app(
     async def embeddings(req: EmbeddingsRequest, mgr: ModelManager = Depends(get_manager)):
         inputs = [req.input] if isinstance(req.input, str) else list(req.input)
         if not inputs or any(not isinstance(t, str) or t == "" for t in inputs):
-            raise SDKException.invalid_input("input must be a non-empty string or list of non-empty strings")
+            raise SDKException.invalid_input(
+                "input must be a non-empty string or list of non-empty strings"
+            )
         if len(inputs) > MAX_EMBEDDING_INPUTS:
-            # An unbounded batch would hold the per-model lock for a long time, blocking every
-            # other embeddings request (DoS). Reject oversized batches like OpenAI does.
+            # An unbounded batch would hold the lock for a long time, blocking every other
+            # embeddings request (DoS). Reject oversized batches like OpenAI does.
             raise SDKException.invalid_input(f"too many inputs (max {MAX_EMBEDDING_INPUTS})")
         model = _resolve_model_id(req.model, mgr.default_embedder, allow_arbitrary_models)
-        embedder, lock = await mgr.embedder(model)
-        data, total = [], 0
-        async with lock:
-            for i, text in enumerate(inputs):
-                vec = await asyncio.to_thread(embedder.embed, text)
-                data.append(
-                    {"object": "embedding", "index": i,
-                     "embedding": _encode_embedding(vec, req.encoding_format)}
-                )
-                total += _approx_tokens(text)
+        async with mgr.lock("embeddings"):
+            vectors = await ra.embeddings.aembed(inputs, EmbedOptions(model=model))
+        data = [
+            {
+                "object": "embedding",
+                "index": vector.index,
+                "embedding": _encode_embedding(vector.vector, req.encoding_format),
+            }
+            for vector in vectors
+        ]
+        total = sum(_approx_tokens(text) for text in inputs)
         return {
             "object": "list", "data": data, "model": model,
             "usage": {"prompt_tokens": total, "total_tokens": total},
@@ -772,26 +773,28 @@ def create_app(
         model: Optional[str] = Form(default=None),
         mgr: ModelManager = Depends(get_manager),
     ):
-        stt, lock = await mgr.stt(_resolve_model_id(model, mgr.default_stt, allow_arbitrary_models))
+        model_id = _resolve_model_id(model, mgr.default_stt, allow_arbitrary_models)
         raw = await file.read()
         try:
-            sample_rate, samples = decode_wav(raw)
-        except Exception:  # noqa: BLE001 — generic client-facing message; details stay server-side
-            raise HTTPException(status_code=400, detail="could not decode audio (send a 16-bit WAV)") from None
-        if sample_rate != STT_SAMPLE_RATE:
-            samples = downsample(samples, sample_rate, STT_SAMPLE_RATE)
-        pcm16 = pcm16_bytes(samples)
-        async with lock:
-            text = await stt.atranscribe(pcm16)
-        return {"text": text}
+            audio = AudioInput.wav(raw)
+            audio.samples()  # decode eagerly so a bad upload is a 400, not a 500
+        except Exception:  # noqa: BLE001 — generic client-facing message
+            raise HTTPException(
+                status_code=400, detail="could not decode audio (send a 16-bit WAV)"
+            ) from None
+        async with mgr.lock("stt"):
+            transcription = await ra.stt.atranscribe(audio, SttOptions(model=model_id))
+        return {"text": transcription.text}
 
     @app.post("/v1/audio/speech", dependencies=guarded)
     async def speech(req: SpeechRequest, mgr: ModelManager = Depends(get_manager)):
         if req.response_format != "wav":
             raise HTTPException(status_code=400, detail="only response_format=wav is supported")
-        tts, lock = await mgr.tts(_resolve_model_id(req.model, mgr.default_tts, allow_arbitrary_models))
-        async with lock:
-            synth = await tts.asynthesize(req.input)
-        return Response(content=encode_wav(synth.samples, synth.sample_rate), media_type="audio/wav")
+        model_id = _resolve_model_id(req.model, mgr.default_tts, allow_arbitrary_models)
+        async with mgr.lock("tts"):
+            audio = await ra.tts.asynthesize(
+                req.input, TtsOptions(model=model_id, voice=req.voice, format=AudioFormat.WAV)
+            )
+        return Response(content=audio.data, media_type="audio/wav")
 
     return app

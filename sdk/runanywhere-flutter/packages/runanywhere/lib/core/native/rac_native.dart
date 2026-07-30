@@ -539,6 +539,14 @@ typedef RacArtifactInferFromUrlProtoDart =
 // header contract: unset callback → rac_stt_proto_quiesce() → free user_data.
 // ---------------------------------------------------------------------------
 
+/// `rac_*_component_create(rac_handle_t* out_handle)`.
+typedef RacComponentCreateNative =
+    ffi.Int32 Function(ffi.Pointer<ffi.Pointer<ffi.Void>>);
+
+/// Dart view of [RacComponentCreateNative].
+typedef RacComponentCreateDart =
+    int Function(ffi.Pointer<ffi.Pointer<ffi.Void>>);
+
 typedef RacSttComponentLoadModelNative =
     ffi.Int32 Function(
       ffi.Pointer<ffi.Void>,
@@ -1477,6 +1485,45 @@ class RacBindings {
                   RacLifecycleRequestProtoDart
                 >('rac_diffusion_generate_lifecycle_proto'),
           ),
+      rac_diarization_diarize_lifecycle_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_diarization_diarize_lifecycle_proto'),
+          ),
+      rac_segmentation_segment_lifecycle_proto =
+          _lookupOptional<RacLifecycleRequestProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacLifecycleRequestProtoNative,
+                  RacLifecycleRequestProtoDart
+                >('rac_segmentation_segment_lifecycle_proto'),
+          ),
+      rac_rerank_component_create = _lookupOptional<RacComponentCreateDart>(
+        () =>
+            lib.lookupFunction<
+              RacComponentCreateNative,
+              RacComponentCreateDart
+            >('rac_rerank_component_create'),
+      ),
+      rac_rerank_component_load_model =
+          _lookupOptional<RacSttComponentLoadModelDart>(
+            () =>
+                lib.lookupFunction<
+                  RacSttComponentLoadModelNative,
+                  RacSttComponentLoadModelDart
+                >('rac_rerank_component_load_model'),
+          ),
+      rac_rerank_component_rerank_proto =
+          _lookupOptional<RacHandleBytesToProtoDart>(
+            () =>
+                lib.lookupFunction<
+                  RacHandleBytesToProtoNative,
+                  RacHandleBytesToProtoDart
+                >('rac_rerank_component_rerank_proto'),
+          ),
       rac_rag_session_create_proto =
           _lookupOptional<RacRagSessionCreateProtoDart>(
             () =>
@@ -2185,6 +2232,24 @@ class RacBindings {
   rac_embeddings_embed_batch_lifecycle_proto;
 
   final RacLifecycleRequestProtoDart? rac_diffusion_generate_lifecycle_proto;
+
+  /// `rac_diarization_diarize_lifecycle_proto` — offline speaker diarization
+  /// over the lifecycle-loaded model. Null on older commons binaries.
+  final RacLifecycleRequestProtoDart? rac_diarization_diarize_lifecycle_proto;
+
+  /// `rac_segmentation_segment_lifecycle_proto` — semantic segmentation over
+  /// the lifecycle-loaded model. Null on older commons binaries.
+  final RacLifecycleRequestProtoDart? rac_segmentation_segment_lifecycle_proto;
+
+  /// `rac_rerank_component_create(out_handle)`. The rerank primitive ships
+  /// only handle-scoped verbs, so the bridge owns a component handle.
+  final RacComponentCreateDart? rac_rerank_component_create;
+
+  /// `rac_rerank_component_load_model(handle, path, id, name)`.
+  final RacSttComponentLoadModelDart? rac_rerank_component_load_model;
+
+  /// `rac_rerank_component_rerank_proto(handle, request, size, out)`.
+  final RacHandleBytesToProtoDart? rac_rerank_component_rerank_proto;
 
   final RacRagSessionCreateProtoDart? rac_rag_session_create_proto;
 

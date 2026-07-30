@@ -1,0 +1,223 @@
+//
+//  RagSession.swift
+//  RunAnywhere SDK
+//
+//  A retrieval-augmented-generation session. Each session owns its own native
+//  handle, so two sessions with different corpora can exist at once.
+//
+
+import CRACommons
+import Foundation
+
+/// Carries the opaque native session pointer across a `@Sendable` boundary; the
+/// handle is only ever read and handed straight back to the C ABI.
+private struct RagSessionHandleRef: @unchecked Sendable {
+    let handle: rac_handle_t
+}
+
+/// An open RAG corpus you can ingest into, search, and query.
+public actor RagSession {
+
+    private let handle: rac_handle_t
+    private let llmModelId: String
+    private let defaultTopK: Int
+    private var isClosed = false
+
+    internal init(handle: rac_handle_t, llmModelId: String, defaultTopK: Int) {
+        self.handle = handle
+        self.llmModelId = llmModelId
+        self.defaultTopK = defaultTopK
+    }
+
+    /// Add one document to the index.
+    ///
+    /// - Throws: `SDKException` when the session is closed or embedding fails.
+    public func ingest(document: RagDocument) async throws {
+        try requireOpen()
+        _ = try await CppBridge.RAG.shared.ingest(handle: handle, document.toProto())
+    }
+
+    /// Add several documents to the index.
+    ///
+    /// - Throws: `SDKException` when the session is closed or embedding fails.
+    public func ingest(documents: [RagDocument]) async throws {
+        try requireOpen()
+        for document in documents {
+            _ = try await CppBridge.RAG.shared.ingest(handle: handle, document.toProto())
+        }
+    }
+
+    /// Retrieve the closest chunks to `query` without generating an answer.
+    ///
+    /// - Throws: `SDKException` when the session is closed or retrieval fails.
+    public func search(query: String, topK: Int? = nil) async throws -> [Match] {
+        try requireOpen()
+        var options = RARAGQueryOptions.defaults(question: query)
+        options.retrievalTopK = Int32(topK ?? defaultTopK)
+        // Zero output tokens keeps this a pure retrieval pass.
+        var generation = RALLMGenerationOptions.defaults()
+        generation.maxOutputTokens = 0
+        options.generation = generation
+        let result = try await CppBridge.RAG.shared.query(handle: handle, options)
+        try RagSession.throwIfFailed(result)
+        return result.retrievedChunks.map(Match.init(proto:))
+    }
+
+    /// Answer `question` from the indexed corpus.
+    ///
+    /// - Throws: `SDKException` when the session has no LLM, is closed, or the
+    ///   query fails.
+    public func query(question: String, options: LlmOptions? = nil) async throws -> RagResult {
+        try requireOpen()
+        try requireGenerationModel()
+        let result = try await CppBridge.RAG.shared.query(
+            handle: handle,
+            queryOptions(question: question, options: options)
+        )
+        try RagSession.throwIfFailed(result)
+        return RagResult(proto: result, model: llmModelId)
+    }
+
+    /// Answer `question`, streaming retrieval and tokens as they arrive.
+    ///
+    /// - Throws: `SDKException` from this call when the session has no LLM or is
+    ///   closed, and into the returned stream when the query fails.
+    public func queryStream(
+        question: String,
+        options: LlmOptions? = nil
+    ) async throws -> AsyncThrowingStream<RagEvent, Error> {
+        try requireOpen()
+        try requireGenerationModel()
+        let sessionHandle = RagSessionHandleRef(handle: handle)
+        let events = try await CppBridge.RAG.shared.runQueryStream(
+            handle: handle,
+            queryOptions(question: question, options: options)
+        )
+        let model = llmModelId
+
+        return AsyncThrowingStream { continuation in
+            let task = Task {
+                var retrievedProtos: [RARAGSearchResult] = []
+                var retrieved: [Match] = []
+                var answer = ""
+                var sawCompletion = false
+                for await event in events {
+                    if Task.isCancelled { break }
+                    switch event.kind {
+                    case .chunkRetrieved:
+                        if event.hasChunk {
+                            retrievedProtos.append(event.chunk)
+                            retrieved.append(Match(proto: event.chunk))
+                        }
+                    case .contextReady:
+                        continuation.yield(.retrieved(retrieved))
+                    case .token:
+                        if !event.token.isEmpty {
+                            answer += event.token
+                            continuation.yield(.token(text: event.token, kind: .text))
+                        }
+                    case .completed:
+                        let result = event.hasResult ? event.result : RARAGResult()
+                        continuation.yield(.completed(RagResult(proto: result, model: model)))
+                        sawCompletion = true
+                    case .error:
+                        continuation.finish(throwing: SDKException(
+                            code: .processingFailed,
+                            message: event.hasErrorMessage ? event.errorMessage : "RAG query failed",
+                            category: .component
+                        ))
+                        return
+                    default:
+                        break
+                    }
+                }
+
+                // End in `completed` or throw, never a silent finish.
+                if !sawCompletion, !Task.isCancelled {
+                    guard !answer.isEmpty else {
+                        continuation.finish(throwing: SDKException(
+                            code: .processingFailed,
+                            message: "RAG query ended before producing an answer",
+                            category: .component
+                        ))
+                        return
+                    }
+                    var synthesized = RARAGResult()
+                    synthesized.answer = answer
+                    synthesized.retrievedChunks = retrievedProtos
+                    continuation.yield(.completed(RagResult(proto: synthesized, model: model)))
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { @Sendable termination in
+                task.cancel()
+                if case .cancelled = termination {
+                    Task { await CppBridge.RAG.shared.cancelActiveQuery(handle: sessionHandle.handle) }
+                }
+            }
+        }
+    }
+
+    /// Report how much this session currently holds.
+    ///
+    /// - Throws: `SDKException` when the session is closed.
+    public func stats() async throws -> RagStats {
+        try requireOpen()
+        return RagStats(proto: try await CppBridge.RAG.shared.statsProto(handle: handle))
+    }
+
+    /// Drop every ingested document from the index.
+    ///
+    /// - Throws: `SDKException` when the session is closed or the index cannot be cleared.
+    public func clear() async throws {
+        try requireOpen()
+        _ = try await CppBridge.RAG.shared.clearProto(handle: handle)
+    }
+
+    /// Release the session and its native index.
+    public func close() async {
+        guard !isClosed else { return }
+        isClosed = true
+        await CppBridge.RAG.shared.destroySession(handle: handle)
+    }
+
+    // MARK: - Private
+
+    private func queryOptions(question: String, options: LlmOptions?) -> RARAGQueryOptions {
+        var queryOptions = RARAGQueryOptions.defaults(question: question)
+        queryOptions.retrievalTopK = Int32(defaultTopK)
+        if let options {
+            queryOptions.generation = options.toProto()
+        }
+        return queryOptions
+    }
+
+    private func requireOpen() throws {
+        guard !isClosed else {
+            throw SDKException(
+                code: .invalidState,
+                message: "RAG session is closed",
+                category: .component
+            )
+        }
+    }
+
+    private func requireGenerationModel() throws {
+        guard !llmModelId.isEmpty else {
+            throw SDKException(
+                code: .modelNotLoaded,
+                message: "This RAG session is retrieval-only; open it with an llmModel to generate answers",
+                category: .validation
+            )
+        }
+    }
+
+    private static func throwIfFailed(_ result: RARAGResult) throws {
+        guard result.errorCode != 0 else { return }
+        throw SDKException(
+            code: .processingFailed,
+            message: result.hasErrorMessage ? result.errorMessage : "RAG query failed",
+            category: .component
+        )
+    }
+}

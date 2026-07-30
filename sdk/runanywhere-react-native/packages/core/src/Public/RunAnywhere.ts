@@ -1,10 +1,9 @@
 /**
- * RunAnywhere React Native SDK - Main Entry Point
+ * The RunAnywhere React Native SDK facade.
  *
- * Thin wrapper over native commons.
- * All business logic is in native C++ (runanywhere-commons).
- *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift
+ * One `initialize` call brings the SDK up; every capability then hangs off a
+ * namespace (`llm`, `stt`, `voice`, `models`, …). All inference lives in native
+ * commons — this layer only marshals options and results.
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../native';
@@ -42,46 +41,41 @@ import {
 import { registerServicesReadyGuard } from '../Foundation/Initialization/ServicesReadyGuard';
 import { registerInitializedProvider } from '../Foundation/Initialization/InitializedGuard';
 import type { SDKInitOptions } from '../types/models';
-
-// Import extensions
-import * as TextGeneration from './Extensions/LLM/RunAnywhere+TextGeneration';
-import * as STT from './Extensions/STT/RunAnywhere+STT';
-import * as TTS from './Extensions/TTS/RunAnywhere+TTS';
-import * as VAD from './Extensions/VAD/RunAnywhere+VAD';
-import * as Storage from './Extensions/Storage/RunAnywhere+Storage';
-import * as SDKEvents from './Extensions/Events/RunAnywhere+SDKEvents';
-import * as Lifecycle from './Extensions/Models/RunAnywhere+ModelLifecycle';
-import * as Logging from './Extensions/RunAnywhere+Logging';
-import { pluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
-import * as VoiceAgent from './Extensions/VoiceAgent/RunAnywhere+VoiceAgent';
-import * as StructuredOutput from './Extensions/LLM/RunAnywhere+StructuredOutput';
-import * as ToolCalling from './Extensions/LLM/RunAnywhere+ToolCalling';
-import * as RAG from './Extensions/RAG/RunAnywhere+RAG';
-import * as VLM from './Extensions/VLM/RunAnywhere+VisionLanguage';
-import * as Diffusion from './Extensions/Diffusion/RunAnywhere+Diffusion';
-import { lora as LoRACapability } from './Extensions/LLM/RunAnywhere+LoRA';
-import { solutions as SolutionsCapability } from './Extensions/Solutions/RunAnywhere+Solutions';
-import { embeddings as EmbeddingsCapability } from './Extensions/Embeddings/RunAnywhere+Embeddings';
-import { AudioConvert } from './Extensions/Audio/RunAnywhere+AudioConvert';
-import * as ModelManagement from './Extensions/Models/RunAnywhere+ModelRegistry';
-import { formatFramework } from './Helpers/formatFramework';
-import { EventBus } from './Events/EventBus';
 import {
   asSDKException,
   sdkExceptionFromRcResult,
   SDKException,
 } from '../Foundation/Errors/SDKException';
 
+import { pluginLoader } from './Extensions/RunAnywhere+PluginLoader';
+import { solutions } from './Extensions/Solutions/RunAnywhere+Solutions';
+import { llm } from './Api/Llm';
+import { vlm } from './Api/Vlm';
+import { stt } from './Api/Stt';
+import { tts } from './Api/Tts';
+import { vad } from './Api/Vad';
+import { embeddings } from './Api/Embeddings';
+import { rerank } from './Api/Rerank';
+import { images } from './Api/Images';
+import { diarization } from './Api/Diarization';
+import { segmentation } from './Api/Segmentation';
+import { voice } from './Api/Voice';
+import { rag } from './Api/Rag';
+import { models } from './Api/Models';
+import { lora } from './Api/Lora';
+import { sdkEvents } from './Api/Events';
+import { auth, logging, storage } from './Api/Platform';
+import type { InitializeOptions, SdkEvent } from './Api/Types';
+
 const logger = new SDKLogger('RunAnywhere');
 
 // ============================================================================
-// Internal State
+// Internal lifecycle state
 // ============================================================================
 
 let initState: InitializationState = createInitialState();
 let servicesInitPromise: Promise<void> | null = null;
 // In-flight Phase 1 promise shared across concurrent initialize() callers.
-// Mirrors Swift's `guard !isInitializedFlag else { return }` + Kotlin's `synchronized` guard.
 let initializingPromise: Promise<void> | null = null;
 // In-flight offline HTTP recovery. Reset joins this before native teardown so
 // retry cannot race credential/config release or rewrite a newer lifetime.
@@ -94,10 +88,7 @@ let lifecycleGeneration = 0;
 // until a later reset successfully completes teardown.
 let resetRequired = false;
 
-function requireCurrentLifecycle(
-  generation: number,
-  operation: string
-): void {
+function requireCurrentLifecycle(generation: number, operation: string): void {
   if (generation !== lifecycleGeneration) {
     throw SDKException.notInitialized(`SDK lifetime ended during ${operation}`);
   }
@@ -115,9 +106,7 @@ async function awaitSettlement(promise: Promise<unknown> | null): Promise<void> 
 
 /**
  * Decode the serialized `RASdkInitResult` returned by the native phase-2 /
- * HTTP-retry bridge. Mirrors Swift, which reads `hasCompletedHttpSetup ||
- * httpConfigured` and `httpApplicable` from the same proto.
- *
+ * HTTP-retry bridge.
  */
 function decodeSdkInitResultPayload(payload: ArrayBuffer): {
   httpConfigured: boolean;
@@ -148,9 +137,7 @@ async function asNativeSDKException(error: unknown): Promise<SDKException> {
   return asSDKException(error);
 }
 
-function mapSdkInitEnvironment(
-  environment: SDKEnvironment
-): SdkInitEnvironment {
+function mapSdkInitEnvironment(environment: SDKEnvironment): SdkInitEnvironment {
   switch (environment) {
     case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
@@ -172,457 +159,317 @@ function environmentToConfigString(environment: SDKEnvironment): string {
   }
 }
 
-// Lifecycle INITIALIZATION_STAGE_* events are published once by commons
-// (rac_sdk_init_phase1_proto); RN no longer hand-emits duplicates.
-
-// ============================================================================
-// RunAnywhere SDK
-// ============================================================================
-
 /**
- * The RunAnywhere SDK for React Native
+ * Run the deferred network phase: auth, device registration, catalog, and
+ * telemetry. `initialize` starts this in the background and callers never wait
+ * on it; the services-ready guard joins it when an online call needs it.
+ *
+ * Not part of the public facade — exported only so the lifecycle-serialization
+ * tests can drive the phase directly.
+ *
+ * @internal
  */
-export const RunAnywhere = {
-  // ============================================================================
-  // Event Access
-  // ============================================================================
+export async function completeServicesInitialization(): Promise<void> {
+  const activeReset = resetPromise;
+  if (activeReset) await activeReset;
 
-  events: EventBus.shared,
+  if (!initState.isCoreInitialized) {
+    throw SDKException.notInitialized(
+      'The SDK core must be initialized before its network phase can run'
+    );
+  }
+  if (initState.hasCompletedServicesInit) return;
+  if (servicesInitPromise) return servicesInitPromise;
+  if (!isNativeModuleAvailable()) throw SDKException.nativeModuleUnavailable();
 
-  // ============================================================================
-  // SDK State
-  // ============================================================================
+  const generation = lifecycleGeneration;
+  const operation = (async () => {
+    const native = requireNativeModule();
 
-  get isInitialized(): boolean {
-    return initState.isCoreInitialized;
-  },
+    requireCurrentLifecycle(generation, 'services initialization');
+    initState = markServicesInitializing(initState);
 
-  get areServicesReady(): boolean {
-    return initState.hasCompletedServicesInit;
-  },
+    const phase2Result = await native.completeServicesInitialization();
+    const { httpConfigured, httpApplicable } =
+      decodeSdkInitResultPayload(phase2Result);
 
-  get environment(): SDKEnvironment | null {
-    return initState.environment;
-  },
-
-  get version(): string {
-    return SDKConstants.version;
-  },
-
-  // ============================================================================
-  // SDK Initialization
-  // ============================================================================
-
-  async initialize(options: SDKInitOptions = {}): Promise<void> {
-    const activeReset = resetPromise;
-    if (activeReset) await activeReset;
-    if (resetRequired) {
-      throw SDKException.notInitialized(
-        'Previous SDK teardown did not complete; call reset() again'
+    requireCurrentLifecycle(generation, 'services initialization');
+    initState = markServicesInitialized(
+      initState,
+      httpConfigured,
+      httpApplicable
+    );
+    if (httpConfigured) {
+      logger.info('Network phase completed.');
+    } else if (!httpApplicable) {
+      logger.info(
+        'Network phase completed (HTTP setup not applicable for this configuration).'
+      );
+    } else {
+      logger.info(
+        'Network phase completed (HTTP/auth deferred — will retry on the next online call).'
       );
     }
+  })();
+  servicesInitPromise = operation;
 
-    // Idempotency guard — mirrors Swift `guard !isInitializedFlag else { return }`.
-    if (initState.isCoreInitialized) return;
-    // Re-entrancy guard — concurrent callers share the in-flight Phase 1 promise
-    // instead of racing through init and double-emitting lifecycle events.
-    if (initializingPromise) return initializingPromise;
+  try {
+    await operation;
+  } catch (error) {
+    const sdkError = await asNativeSDKException(error);
+    if (generation === lifecycleGeneration) {
+      logger.error('Network phase failed', {
+        errorCode: sdkError.code,
+        errorCategory: sdkError.category,
+      });
+    }
+    throw sdkError;
+  } finally {
+    if (servicesInitPromise === operation) servicesInitPromise = null;
+  }
+}
 
-    const generation = lifecycleGeneration;
+async function initializeCore(options: InitializeOptions): Promise<void> {
+  const activeReset = resetPromise;
+  if (activeReset) await activeReset;
+  if (resetRequired) {
+    throw SDKException.notInitialized(
+      'Previous SDK teardown did not complete; call reset() again'
+    );
+  }
+  if (initState.isCoreInitialized) return;
+  if (initializingPromise) return initializingPromise;
 
-    initializingPromise = (async () => {
+  const generation = lifecycleGeneration;
+
+  initializingPromise = (async () => {
+    try {
+      const environment =
+        options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
+      const effectiveBaseURL = options.baseUrl?.trim() || DEFAULT_BASE_URL;
+      const effectiveApiKey = isUsableCredential(options.apiKey)
+        ? options.apiKey!.trim()
+        : '';
+      // Keyless staging is valid: commons overrides the base URL with the baked
+      // staging backend and requests go out unauthenticated (PUBLIC-org
+      // ingestion). Only production demands credentials.
+      const requiresCredentials =
+        environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+      if (
+        !isUsableHTTPURL(effectiveBaseURL, {
+          requireHTTPS:
+            environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+        })
+      ) {
+        throw SDKException.validationFailed({
+          fieldPath: 'InitializeOptions.baseUrl',
+          message:
+            environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+              ? 'baseUrl must be an absolute HTTPS URL without embedded credentials, query, or fragment'
+              : 'baseUrl must be an absolute HTTP(S) URL without embedded credentials, query, or fragment',
+        });
+      }
+      if (requiresCredentials && !effectiveApiKey) {
+        throw SDKException.validationFailed({
+          fieldPath: 'InitializeOptions.apiKey',
+          message:
+            'apiKey must be non-empty and must not be a placeholder outside development',
+        });
+      }
+
+      const phase1Request: SdkInitPhase1RequestMessage =
+        SdkInitPhase1Request.create();
+      phase1Request.environment = mapSdkInitEnvironment(environment);
+      phase1Request.apiKey = effectiveApiKey;
+      phase1Request.baseUrl = effectiveBaseURL;
+      phase1Request.deviceId = '';
+      phase1Request.platform = SDKConstants.platform;
+      phase1Request.sdkVersion = SDKConstants.version;
+
+      const phase2Request: SdkInitPhase2RequestMessage =
+        SdkInitPhase2Request.create();
+      // The baked dev build token is gone; the backend is reached solely
+      // through the effective base URL. Keep the proto field, always empty.
+      phase2Request.buildToken = '';
+      phase2Request.forceRefreshAssignments = false;
+      phase2Request.flushTelemetry = true;
+      phase2Request.discoverDownloadedModels = true;
+      phase2Request.rescanLocalModels = true;
+
+      const initParams: SDKInitOptions = {
+        apiKey: phase1Request.apiKey,
+        baseURL: phase1Request.baseUrl,
+        environment,
+        buildToken: phase2Request.buildToken,
+        forceRefreshAssignments: phase2Request.forceRefreshAssignments,
+        flushTelemetry: phase2Request.flushTelemetry,
+        discoverDownloadedModels: phase2Request.discoverDownloadedModels,
+        rescanLocalModels: phase2Request.rescanLocalModels,
+      };
+
+      logger.info('SDK initialization starting...');
+      ensureProtoTextEncoding();
+
       try {
-        const environment =
-          options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
-        const effectiveBaseURL = options.baseURL?.trim() || DEFAULT_BASE_URL;
-        const effectiveApiKey = isUsableCredential(options.apiKey)
-          ? options.apiKey!.trim()
-          : '';
-        // Keyless staging is valid: commons overrides the base URL with the
-        // baked staging backend and requests go out unauthenticated
-        // (PUBLIC-org ingestion). Only production demands credentials.
-        const requiresCredentials =
-          environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
-        if (
-          !isUsableHTTPURL(effectiveBaseURL, {
-            requireHTTPS:
-              environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-          })
-        ) {
-          throw SDKException.validationFailed({
-            fieldPath: 'SDKInitOptions.baseURL',
-            message:
-              environment === SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
-                ? 'baseURL must be an absolute HTTPS URL without embedded credentials, query, or fragment'
-                : 'baseURL must be an absolute HTTP(S) URL without embedded credentials, query, or fragment',
-          });
-        }
-        if (requiresCredentials && !effectiveApiKey) {
-          throw SDKException.validationFailed({
-            fieldPath: 'SDKInitOptions.apiKey',
-            message:
-              'apiKey must be non-empty and must not be a placeholder outside development',
-          });
-        }
-        const phase1Request: SdkInitPhase1RequestMessage =
-          SdkInitPhase1Request.create();
-        phase1Request.environment = mapSdkInitEnvironment(environment);
-        phase1Request.apiKey = effectiveApiKey;
-        phase1Request.baseUrl = effectiveBaseURL;
-        phase1Request.deviceId = '';
-        phase1Request.platform = SDKConstants.platform;
-        phase1Request.sdkVersion = SDKConstants.version;
+        await initializeNitroModulesGlobally();
+      } catch (error) {
+        logger.warning('NitroModules global initialization failed', { error });
+      }
 
-        const phase2Request: SdkInitPhase2RequestMessage =
-          SdkInitPhase2Request.create();
-        // The baked dev build token is gone; the backend is reached solely
-        // through the effective base URL. Keep the proto field, always empty.
-        phase2Request.buildToken = '';
-        phase2Request.forceRefreshAssignments =
-          options.forceRefreshAssignments ?? false;
-        phase2Request.flushTelemetry = options.flushTelemetry ?? true;
-        phase2Request.discoverDownloadedModels =
-          options.discoverDownloadedModels ?? true;
-        phase2Request.rescanLocalModels = options.rescanLocalModels ?? true;
+      requireCurrentLifecycle(generation, 'initialization');
 
-        const initParams: SDKInitOptions = {
+      if (!isNativeModuleAvailable()) {
+        logger.warning('Native module not available');
+        const nativeUnavailableError = SDKException.nativeModuleUnavailable();
+        initState = markInitializationFailed(initState, nativeUnavailableError);
+        throw nativeUnavailableError;
+      }
+
+      const native = requireNativeModule();
+
+      try {
+        // RN still crosses an async native bridge for Phase 1. The generated
+        // proto request objects are the call-site envelope; native fills the
+        // platform-owned device id before invoking the commons proto ABI.
+        const configJson = JSON.stringify({
           apiKey: phase1Request.apiKey,
           baseURL: phase1Request.baseUrl,
-          environment,
+          environment: environmentToConfigString(environment),
+          platform: phase1Request.platform,
+          sdkVersion: phase1Request.sdkVersion,
           buildToken: phase2Request.buildToken,
           forceRefreshAssignments: phase2Request.forceRefreshAssignments,
           flushTelemetry: phase2Request.flushTelemetry,
           discoverDownloadedModels: phase2Request.discoverDownloadedModels,
           rescanLocalModels: phase2Request.rescanLocalModels,
-        };
+        });
 
-        logger.info('SDK initialization starting...');
-        ensureProtoTextEncoding();
-
-        try {
-          await initializeNitroModulesGlobally();
-        } catch (error) {
-          logger.warning('NitroModules global initialization failed', {
-            error,
-          });
+        const initialized = await native.initialize(configJson);
+        if (initialized === false) {
+          throw SDKException.notInitialized('Native SDK initialization failed');
         }
 
         requireCurrentLifecycle(generation, 'initialization');
+        initState = markCoreInitialized(initState, initParams);
 
-        if (!isNativeModuleAvailable()) {
-          logger.warning('Native module not available');
-          const nativeUnavailableError = SDKException.nativeModuleUnavailable();
-          initState = markInitializationFailed(
-            initState,
-            nativeUnavailableError
+        logger.info('SDK initialized successfully');
+
+        // The network phase runs in the background: local inference is already
+        // usable, and the services-ready guard joins this when an online call
+        // needs it.
+        void completeServicesInitialization().catch((err) => {
+          if (generation !== lifecycleGeneration) return;
+          logger.warning(
+            `Network phase failed (non-fatal): ${
+              err instanceof Error ? err.message : String(err)
+            }`
           );
-          throw nativeUnavailableError;
-        }
-
-        const native = requireNativeModule();
-
-        try {
-          // RN still crosses an async native bridge for Phase 1. The generated
-          // proto request objects are the call-site envelope; native fills the
-          // platform-owned device id before invoking the commons proto ABI.
-          const configJson = JSON.stringify({
-            apiKey: phase1Request.apiKey,
-            baseURL: phase1Request.baseUrl,
-            environment: environmentToConfigString(environment),
-            platform: phase1Request.platform,
-            sdkVersion: phase1Request.sdkVersion,
-            buildToken: phase2Request.buildToken,
-            forceRefreshAssignments: phase2Request.forceRefreshAssignments,
-            flushTelemetry: phase2Request.flushTelemetry,
-            discoverDownloadedModels: phase2Request.discoverDownloadedModels,
-            rescanLocalModels: phase2Request.rescanLocalModels,
-          });
-
-          const initialized = await native.initialize(configJson);
-          if (initialized === false) {
-            throw SDKException.notInitialized(
-              'Native SDK initialization failed'
-            );
-          }
-
-          requireCurrentLifecycle(generation, 'initialization');
-          initState = markCoreInitialized(initState, initParams);
-
-          logger.info('SDK initialized successfully');
-
-          // completeServicesInitialization() manages servicesInitPromise internally.
-          // Do NOT wipe it here — an unconditional null would destroy any in-flight
-          // Phase 2 promise from a concurrent ensureServicesReady caller.
-          void this.completeServicesInitialization().catch((err) => {
-            if (generation !== lifecycleGeneration) return;
-            logger.warning(
-              `Phase 2 services initialization failed (non-fatal): ${
-                err instanceof Error ? err.message : String(err)
-              }`
-            );
-          });
-        } catch (error) {
-          const sdkError = await asNativeSDKException(error);
-          if (generation === lifecycleGeneration) {
-            // Initialization failures can originate in auth/config transports.
-            // Log only structured non-secret identifiers; the full exception is
-            // returned to the caller and must not be copied into device logs.
-            logger.error('SDK initialization failed', {
-              errorCode: sdkError.code,
-              errorCategory: sdkError.category,
-            });
-            initState = markInitializationFailed(initState, sdkError);
-          }
-          throw sdkError;
-        }
-      } finally {
-        initializingPromise = null;
-      }
-    })();
-
-    return initializingPromise;
-  },
-
-  reset(): Promise<void> {
-    if (resetPromise) return resetPromise;
-
-    const pendingInitialization = initializingPromise;
-    const pendingServicesInitialization = servicesInitPromise;
-    const pendingHTTPRetry = httpRetryPromise;
-    lifecycleGeneration += 1;
-    resetRequired = true;
-    // Close the facade synchronously. Generation guards prevent Phase 1,
-    // Phase 2, and HTTP recovery from reopening this lifetime while their
-    // native work settles.
-    initState = resetState();
-
-    const operation = (async () => {
-      // Never destroy native state underneath Phase 1/2. Both operations are
-      // invalidated by the generation bump above, so their late completions
-      // cannot reopen the facade while reset waits for them to settle.
-      await awaitSettlement(pendingInitialization);
-      await awaitSettlement(pendingServicesInitialization);
-      await awaitSettlement(pendingHTTPRetry);
-
-      initializingPromise = null;
-      servicesInitPromise = null;
-      httpRetryPromise = null;
-
-      if (isNativeModuleAvailable()) {
-        const native = requireNativeModule();
-        await native.destroy();
-      }
-      resetRequired = false;
-    })();
-
-    resetPromise = operation;
-    void operation.then(
-      () => {
-        if (resetPromise === operation) resetPromise = null;
-      },
-      () => {
-        if (resetPromise === operation) resetPromise = null;
-      }
-    );
-    return operation;
-  },
-
-  /**
-   * Whether the SDK has completed core initialization.
-   *
-   * Matches Swift: `RunAnywhere.isActive`.
-   */
-  get isActive(): boolean {
-    return initState.isCoreInitialized && initState.environment !== null;
-  },
-
-  /**
-   * Retry just the Phase-2 (services) initialisation. Useful after a
-   * transient connectivity failure where Phase 1 (core) succeeded but
-   * services init failed or was skipped.
-   *
-   * Matches Swift: `RunAnywhere.completeServicesInitialization()`.
-   */
-  async completeServicesInitialization(): Promise<void> {
-    const activeReset = resetPromise;
-    if (activeReset) await activeReset;
-
-    if (!initState.isCoreInitialized) {
-      throw SDKException.notInitialized(
-        'completeServicesInitialization() requires the SDK core to be initialised. Call initialize() first.'
-      );
-    }
-    if (initState.hasCompletedServicesInit) {
-      logger.debug('Services already initialised; nothing to do.');
-      return;
-    }
-
-    if (servicesInitPromise) {
-      return servicesInitPromise;
-    }
-
-    if (!isNativeModuleAvailable()) {
-      throw SDKException.nativeModuleUnavailable();
-    }
-
-    const generation = lifecycleGeneration;
-    const operation = (async () => {
-      const native = requireNativeModule();
-
-      requireCurrentLifecycle(generation, 'services initialization');
-      initState = markServicesInitializing(initState);
-
-      const phase2Result = await native.completeServicesInitialization();
-      const decoded = decodeSdkInitResultPayload(phase2Result);
-      const { httpConfigured, httpApplicable } = decoded;
-
-      requireCurrentLifecycle(generation, 'services initialization');
-      initState = markServicesInitialized(
-        initState,
-        httpConfigured,
-        httpApplicable
-      );
-      if (httpConfigured) {
-        logger.info('Services initialisation completed.');
-      } else if (!httpApplicable) {
-        logger.info(
-          'Services initialisation completed (HTTP setup not applicable for this configuration).'
-        );
-      } else {
-        logger.info(
-          'Services initialisation completed (HTTP/auth deferred — will retry on next online call).'
-        );
-      }
-    })();
-    servicesInitPromise = operation;
-
-    try {
-      await operation;
-    } catch (error) {
-      const sdkError = await asNativeSDKException(error);
-      if (generation === lifecycleGeneration) {
-        logger.error('Services initialisation failed', {
-          errorCode: sdkError.code,
-          errorCategory: sdkError.category,
         });
+      } catch (error) {
+        const sdkError = await asNativeSDKException(error);
+        if (generation === lifecycleGeneration) {
+          // Initialization failures can originate in auth/config transports.
+          // Log only structured non-secret identifiers; the full exception is
+          // returned to the caller and must not be copied into device logs.
+          logger.error('SDK initialization failed', {
+            errorCode: sdkError.code,
+            errorCategory: sdkError.category,
+          });
+          initState = markInitializationFailed(initState, sdkError);
+        }
+        throw sdkError;
       }
-      throw sdkError;
     } finally {
-      if (servicesInitPromise === operation) {
-        servicesInitPromise = null;
-      }
+      initializingPromise = null;
     }
-  },
+  })();
 
-  // ============================================================================
-  // Authentication Info (Production/Staging only)
-  // Matches Swift SDK: RunAnywhere.getUserId(), getOrganizationId(), etc.
-  //
-  // Platform shape (RN vs Swift):
-  //   These getters are async on React Native because every call has to
-  //   cross the JS<->native bridge. Nitro Modules' proto-bytes methods
-  //   (`getUserId`, `getOrganizationId`, `isAuthenticated`,
-  //   `isDeviceRegistered`, `getDeviceId`, `getPersistentDeviceUUID`)
-  //   return `Promise<...>`; JS cannot observe the resolved C++ state
-  //   synchronously the way Swift can read `CppBridge.State.userId` /
-  //   `CppBridge.Auth.isAuthenticated` directly. The Swift surface
-  //   exposes these as plain `String?` / `Bool` properties because the
-  //   bridge is in-process and lock-free on read; the RN bridge is
-  //   asynchronous by construction. The semantics (when the value
-  //   becomes non-empty / true, what falsy means) match exactly — only
-  //   the call shape differs.
-  //
-  // Swift reference:
-  //   sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift:66,82-91
-  // ============================================================================
+  return initializingPromise;
+}
 
+function resetInternal(): Promise<void> {
+  if (resetPromise) return resetPromise;
+
+  const pendingInitialization = initializingPromise;
+  const pendingServicesInitialization = servicesInitPromise;
+  const pendingHTTPRetry = httpRetryPromise;
+  lifecycleGeneration += 1;
+  resetRequired = true;
+  // Close the facade synchronously. Generation guards prevent Phase 1, the
+  // network phase, and HTTP recovery from reopening this lifetime while their
+  // native work settles.
+  initState = resetState();
+
+  const operation = (async () => {
+    await awaitSettlement(pendingInitialization);
+    await awaitSettlement(pendingServicesInitialization);
+    await awaitSettlement(pendingHTTPRetry);
+
+    initializingPromise = null;
+    servicesInitPromise = null;
+    httpRetryPromise = null;
+
+    if (isNativeModuleAvailable()) {
+      const native = requireNativeModule();
+      await native.destroy();
+    }
+    resetRequired = false;
+  })();
+
+  resetPromise = operation;
+  void operation.then(
+    () => {
+      if (resetPromise === operation) resetPromise = null;
+    },
+    () => {
+      if (resetPromise === operation) resetPromise = null;
+    }
+  );
+  return operation;
+}
+
+// ============================================================================
+// Public facade
+// ============================================================================
+
+/** On-device AI for React Native. */
+export const RunAnywhere = {
   /**
-   * Get current user ID from authentication.
+   * Bring the SDK up: platform adapters, native load, auth, device
+   * registration, catalog, and telemetry.
    *
-   * Matches Swift `RunAnywhere.getUserId() -> String?`. RN returns
-   * `Promise<string | null>` instead of `String?` because the user-id read
-   * crosses the Nitro JS<->C++ bridge; resolves to `null` when there is
-   * no authenticated user, preserving the 3-state contract (authenticated /
-   * unauthenticated / unknown).
+   * Returns as soon as local inference is usable; the network work continues in
+   * the background and retries on its own.
    *
-   * @returns User ID if authenticated, null otherwise
+   * @example
+   * await RunAnywhere.initialize({ apiKey, environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION });
+   * const result = await RunAnywhere.llm.generate('Hello');
+   *
+   * @throws SDKException when the options are invalid or native initialization fails.
    */
-  async getUserId(): Promise<string | null> {
-    if (!isNativeModuleAvailable()) return null;
-    const native = requireNativeModule();
-    const userId = await native.getUserId();
-    return userId != null && userId !== '' ? userId : null;
+  initialize(options: InitializeOptions = {}): Promise<void> {
+    return initializeCore(options);
+  },
+
+  /** Unload models, close sessions, and clear SDK state. */
+  reset(): Promise<void> {
+    return resetInternal();
+  },
+
+  /** Whether local inference is usable. */
+  get isReady(): boolean {
+    return initState.isCoreInitialized;
+  },
+
+  /** SDK version. */
+  get version(): string {
+    return SDKConstants.version;
   },
 
   /**
-   * Supply a Hugging Face bearer token so the SDK can download **private**
-   * model repos (e.g. gated `runanywhere/<name>_HNPU` NPU bundles). Auth
-   * lives in the C++ commons layer, which attaches it ONLY to https
-   * `huggingface.co`/`hf.co` requests — downloads, HEAD size preflight,
-   * resumable transfers, and HF repo registration — on every platform
-   * uniformly. Kotlin parity: `RunAnywhere.setHfToken`.
+   * Stable device identity for this app installation.
    *
-   * Pass an empty string to clear the token and restore the public no-auth
-   * behavior (also disables the `HF_TOKEN` env fallback).
-   */
-  async setHfToken(token: string): Promise<void> {
-    if (!isNativeModuleAvailable()) return;
-    const native = requireNativeModule();
-    await native.setHfToken(token);
-  },
-
-  /**
-   * Get current organization ID from authentication.
-   *
-   * Matches Swift `RunAnywhere.getOrganizationId() -> String?`. RN
-   * returns `Promise<string | null>` (rather than `String?`) because the read
-   * crosses the Nitro JS<->C++ bridge; resolves to `null` when there is
-   * no authenticated org.
-   *
-   * @returns Organization ID if authenticated, null otherwise
-   */
-  async getOrganizationId(): Promise<string | null> {
-    if (!isNativeModuleAvailable()) return null;
-    const native = requireNativeModule();
-    const orgId = await native.getOrganizationId();
-    return orgId != null && orgId !== '' ? orgId : null;
-  },
-
-  /**
-   * Check if currently authenticated.
-   *
-   * Matches Swift `RunAnywhere.isAuthenticated: Bool` (sync property).
-   * On RN this is a method returning `Promise<boolean>` because authentication
-   * state lives in native C++ behind the Nitro async bridge; JS cannot read it
-   * synchronously. Using a method (not a getter-returning-Promise) avoids the
-   * property-returning-Promise antipattern.
-   */
-  async isAuthenticated(): Promise<boolean> {
-    if (!isNativeModuleAvailable()) return false;
-    const native = requireNativeModule();
-    return native.isAuthenticated();
-  },
-
-  /**
-   * Check if device is registered with backend.
-   *
-   * Matches Swift `RunAnywhere.isDeviceRegistered() -> Bool` (sync).
-   * RN returns `Promise<boolean>` because device-registration state is
-   * read across the Nitro async bridge.
-   */
-  async isDeviceRegistered(): Promise<boolean> {
-    if (!isNativeModuleAvailable()) return false;
-    const native = requireNativeModule();
-    return native.isDeviceRegistered();
-  },
-
-  /**
-   * Device ID persisted in platform secure storage for the app installation.
-   *
-   * Mirrors Swift's single throwing `RunAnywhere.deviceId` accessor. RN returns
-   * a `Promise<string>` because the value lives behind the Nitro async bridge
-   * (a synchronous getter is not expressible over it); the promise rejects if
-   * native identity cannot be resolved durably.
+   * @throws SDKException when native identity cannot be resolved durably.
    */
   get deviceId(): Promise<string> {
     return (async () => {
@@ -645,216 +492,40 @@ export const RunAnywhere = {
     })();
   },
 
-  // ============================================================================
-  // Logging (Delegated to Extension)
-  // ============================================================================
+  /** Lifecycle, model, and error breadcrumbs. */
+  get events(): AsyncIterable<SdkEvent> {
+    return sdkEvents();
+  },
 
-  configureLogging: Logging.configureLogging,
-  setLocalLoggingEnabled: Logging.setLocalLoggingEnabled,
-  setLogLevel: Logging.setLogLevel,
-  addLogDestination: Logging.addLogDestination,
-  setDebugMode: Logging.setDebugMode,
-  flushLogs: Logging.flushLogs,
+  llm,
+  vlm,
+  stt,
+  tts,
+  vad,
+  embeddings,
+  rerank,
+  images,
+  diarization,
+  segmentation,
+  voice,
+  rag,
+  models,
+  lora,
 
-  // ============================================================================
-  // Plugin Loader — canonical RunAnywhere.pluginLoader namespace
-  // ============================================================================
-
-  pluginLoader: PluginLoaderCapability,
-
-  // ============================================================================
-  // Text Generation - LLM (Swift-shaped public extension)
-  // ============================================================================
-
-  generate: TextGeneration.generate,
-  generateStream: TextGeneration.generateStream,
-  aggregateStream: TextGeneration.aggregateStream,
-  cancelGeneration: TextGeneration.cancelGeneration,
-
-  // ============================================================================
-  // Speech-to-Text (Swift-shaped public extension)
-  // ============================================================================
-
-  transcribe: STT.transcribe,
-  transcribeStream: STT.transcribeStream,
-  sttState: STT.sttState,
-
-  // ============================================================================
-  // Text-to-Speech (Swift-shaped public extension)
-  // ============================================================================
-
-  synthesize: TTS.synthesize,
-  synthesizeStream: TTS.synthesizeStream,
-  stopSynthesis: TTS.stopSynthesis,
-  speak: TTS.speak,
-  ttsState: TTS.ttsState,
-  stopSpeaking: TTS.stopSpeaking,
-
-  // ============================================================================
-  // Voice Activity Detection (Swift-shaped public extension)
-  // ============================================================================
-
-  detectVoiceActivity: VAD.detectVoiceActivity,
-  streamVAD: VAD.streamVAD,
-  resetVAD: VAD.resetVAD,
-
-  // ============================================================================
-  // Voice Agent (Swift-shaped public extension)
-  // ============================================================================
-
-  initializeVoiceAgent: VoiceAgent.initializeVoiceAgent,
-  initializeVoiceAgentWithLoadedModels:
-    VoiceAgent.initializeVoiceAgentWithLoadedModels,
-  defaultVADModelID: VoiceAgent.defaultVADModelID,
-  ensureDefaultVAD: VoiceAgent.ensureDefaultVAD,
-  getVoiceAgentComponentStates: VoiceAgent.getVoiceAgentComponentStates,
-  processVoiceTurn: VoiceAgent.processVoiceTurn,
-  streamVoiceAgent: VoiceAgent.streamVoiceAgent,
-  cleanupVoiceAgent: VoiceAgent.cleanupVoiceAgent,
-
-  // ============================================================================
-  // Structured Output (Swift-shaped public extension)
-  // ============================================================================
-
-  generateStructured: StructuredOutput.generateStructured,
-  generateStructuredStream: StructuredOutput.generateStructuredStream,
-  generateWithStructuredOutput: StructuredOutput.generateWithStructuredOutput,
-  extractStructuredOutput: StructuredOutput.extractStructuredOutput,
-
-  // ============================================================================
-  // Tool Calling (Swift-shaped public extension)
-  // ============================================================================
-
-  registerTool: ToolCalling.registerTool,
-  unregisterTool: ToolCalling.unregisterTool,
-  getRegisteredTools: ToolCalling.getRegisteredTools,
-  clearTools: ToolCalling.clearTools,
-  executeTool: ToolCalling.executeTool,
-  generateWithTools: ToolCalling.generateWithTools,
-
-  // ============================================================================
-  // Vision Language Model (Swift-shaped public extension)
-  // ============================================================================
-
-  processImage: VLM.processImage,
-  processImageStream: VLM.processImageStream,
-  cancelVLMGeneration: VLM.cancelVLMGeneration,
-
-  // ============================================================================
-  // Diffusion / Image Generation (Swift-shaped public extension, Apple-only)
-  // Matches Swift: RunAnywhere+Diffusion.swift
-  // ============================================================================
-
-  generateImage: Diffusion.generateImage,
-  generateImageStream: Diffusion.generateImageStream,
-  cancelImageGeneration: Diffusion.cancelImageGeneration,
-
-  // ============================================================================
-  // LoRA Adapters — canonical `RunAnywhere.lora.*` namespace
-  // Matches Swift: RunAnywhere+LoRA.swift
-  // ============================================================================
-
-  lora: LoRACapability,
-
-  // ============================================================================
-  // RAG Pipeline (Delegated to Extension)
-  // ============================================================================
-
-  ragCreatePipeline: RAG.ragCreatePipeline,
-  ragDestroyPipeline: RAG.ragDestroyPipeline,
-  ragIngest: RAG.ragIngest,
-  ragAddDocumentsBatch: RAG.ragAddDocumentsBatch,
-  ragQuery: RAG.ragQuery,
-  ragQueryStream: RAG.ragQueryStream,
-  ragClearDocuments: RAG.ragClearDocuments,
-  ragGetDocumentCount: RAG.ragGetDocumentCount,
-  ragDocumentCount: RAG.ragDocumentCount,
-  ragGetStatistics: RAG.ragGetStatistics,
-  ragResolvedConfiguration: RAG.ragResolvedConfiguration,
-
-  // ============================================================================
-  // Solutions (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
-  // Capability shape: `RunAnywhere.solutions.run({ config | configBytes | yaml })`
-  // returns a `SolutionHandle` with start / stop / cancel / feed / closeInput /
-  // destroy verbs. Mirrors the namespace exposed by every other RunAnywhere SDK.
-  // ============================================================================
-
-  solutions: SolutionsCapability,
-
-  // ============================================================================
-  // Embeddings — canonical `RunAnywhere.embeddings.*` namespace
-  // Matches Swift: RunAnywhere+Embeddings.swift
-  // ============================================================================
-
-  embeddings: EmbeddingsCapability,
-
-  // ============================================================================
-  // Audio conversion helpers (PCM16 → Float32 / WAV)
-  // Matches Swift: RAAudioConvert.swift
-  // ============================================================================
-
-  pcm16ToFloat32: AudioConvert.pcm16ToFloat32,
-  pcm16ToFloat32Samples: AudioConvert.pcm16ToFloat32Samples,
-  pcm16ToWav: AudioConvert.pcm16ToWav,
-
-  // ============================================================================
-  // Model Management (Delegated to Extension) — Swift parity
-  // ============================================================================
-
-  registerModel: ModelManagement.registerModel,
-  registerMultiFileModel: ModelManagement.registerMultiFileModel,
-  registerArchiveModel: ModelManagement.registerArchiveModel,
-  listModels: ModelManagement.listModels,
-  queryModels: ModelManagement.queryModels,
-  getModel: ModelManagement.getModel,
-  downloadedModels: ModelManagement.downloadedModels,
-  importModel: ModelManagement.importModel,
-  downloadModel: ModelManagement.downloadModel,
-  downloadModelStream: ModelManagement.downloadModelStream,
-  refreshModelRegistry: ModelManagement.refreshModelRegistry,
-  getDefaultFramework: ModelManagement.getDefaultFramework,
-  inferModelFileRole: ModelManagement.inferModelFileRole,
-
-  // ============================================================================
-  // Display helpers (proxies for commons C ABI tables)
-  // ============================================================================
-
-  formatFramework,
-
-  // ============================================================================
-  // Storage Management (Delegated to Extension)
-  // ============================================================================
-
-  getStorageInfo: Storage.getStorageInfo,
-  deleteStorage: Storage.deleteStorage,
-  deleteModel: Storage.deleteModel,
-  clearCache: Storage.clearCache,
-  cleanTempFiles: Storage.cleanTempFiles,
-
-  // ============================================================================
-  // Canonical SDK Events / Lifecycle (proto-byte native truth)
-  // ============================================================================
-
-  subscribeSDKEvents: SDKEvents.subscribeSDKEvents,
-  unsubscribeSDKEvents: SDKEvents.unsubscribeSDKEvents,
-  publishSDKEvent: SDKEvents.publishSDKEvent,
-  pollSDKEvent: SDKEvents.pollSDKEvent,
-  publishSDKFailure: SDKEvents.publishSDKFailure,
-  loadModel: Lifecycle.loadModel,
-  unloadModel: Lifecycle.unloadModel,
-  currentModel: Lifecycle.currentModel,
-  modelInfoForCategory: Lifecycle.modelInfoForCategory,
-  componentLifecycleSnapshot: Lifecycle.componentLifecycleSnapshot,
+  // Platform services outside the modality spec.
+  storage,
+  logging,
+  auth,
+  pluginLoader,
+  solutions,
 };
 
 // ============================================================================
-// Internal Phase-2 guard — mirrors Swift RunAnywhere.ensureServicesReady() and
-// Kotlin RunAnywhere.ensureServicesReady(). Three branches:
-//   1. Fast path: services + HTTP both done → return immediately (O(1)).
+// Internal network-phase guard. Three branches:
+//   1. Fast path: services + HTTP both done → return immediately.
 //   2. Recovery path: services done, HTTP failed (offline init) → retry HTTP
-//      without re-running Phase 2. Keeps local-model inference alive after an
-//      offline boot while re-authenticating transparently once online.
-//   3. Cold-start path: Phase 2 not yet run → completeServicesInitialization().
+//      without re-running the network phase.
+//   3. Cold-start path: the network phase has not run yet.
 // ============================================================================
 
 async function retryHTTPSetupInternal(): Promise<void> {
@@ -866,9 +537,7 @@ async function retryHTTPSetupInternal(): Promise<void> {
     );
   }
   if (httpRetryPromise) return httpRetryPromise;
-  if (!isNativeModuleAvailable()) {
-    return;
-  }
+  if (!isNativeModuleAvailable()) return;
 
   const generation = lifecycleGeneration;
   const operation = (async () => {
@@ -906,9 +575,7 @@ async function retryHTTPSetupInternal(): Promise<void> {
     }
     throw sdkError;
   } finally {
-    if (httpRetryPromise === operation) {
-      httpRetryPromise = null;
-    }
+    if (httpRetryPromise === operation) httpRetryPromise = null;
   }
 }
 
@@ -916,21 +583,18 @@ async function ensureServicesReadyInternal(): Promise<void> {
   const services = initState.hasCompletedServicesInit;
   const http = initState.hasCompletedHTTPSetup;
   const applicable = initState.httpSetupApplicable;
-  if (services && (http || !applicable)) {
-    return;
-  }
+  if (services && (http || !applicable)) return;
   if (services && !http && applicable) {
     await retryHTTPSetupInternal();
     return;
   }
-  await RunAnywhere.completeServicesInitialization();
+  await completeServicesInitialization();
 }
 
-// Register the Phase-2 guard so extension files can call ensureServicesReady()
-// without importing RunAnywhere directly (avoids circular imports).
+// Register the network-phase guard so capability files can call
+// ensureServicesReady() without importing RunAnywhere (avoids circular imports).
 registerServicesReadyGuard(ensureServicesReadyInternal);
 
-// Register the live Phase-1 flag so extension files can run the Swift-shaped
-// `guard isInitialized` check (requireInitialized / isSDKInitialized) without
-// importing RunAnywhere directly (avoids circular imports).
+// Register the live core-initialized flag so capability files can run the
+// `guard isInitialized` check without importing RunAnywhere.
 registerInitializedProvider(() => initState.isCoreInitialized);

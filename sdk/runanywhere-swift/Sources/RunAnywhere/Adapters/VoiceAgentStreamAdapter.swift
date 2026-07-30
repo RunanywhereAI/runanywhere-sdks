@@ -10,11 +10,10 @@
 //  into the generic `HandleStreamAdapter<Handle, Event>`; this file is
 //  now a thin specialization that wires the voice-agent-specific symbols.
 //
-//  Public API (preserved):
-//      try await RunAnywhere.initializeVoiceAgentWithLoadedModels()
+//  Consumed by `VoiceSession.events`:
 //      let handle = try await CppBridge.VoiceAgent.shared.getHandle()
-//      let adapter = VoiceAgentStreamAdapter(handle: handle)
-//      for await event in adapter.stream() { handle(event) }
+//      let adapter = VoiceAgentStreamAdapter(handle: handle.rawValue)
+//      for await event in adapter.stream() { ... }
 //
 //  Cancellation: standard `for-await break` cancels the underlying
 //  AsyncStream which deregisters the C callback via `onTermination`

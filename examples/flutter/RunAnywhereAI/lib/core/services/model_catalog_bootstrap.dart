@@ -477,7 +477,8 @@ abstract final class ModelCatalogBootstrap {
   static Future<void> refreshNpuCatalog() async {
     await _applyPersistedHfToken();
     await _registerNpuBundles();
-    await RunAnywhere.refreshModelRegistry();
+    // models.list() reconciles the registry against disk after registration.
+    await RunAnywhere.models.list();
   }
 
   static Future<void> _applyPersistedHfToken() async {
@@ -506,7 +507,7 @@ abstract final class ModelCatalogBootstrap {
       defaultScale: 1.0,
     );
     try {
-      await RunAnywhere.lora.registerArtifact(adapter);
+      await RunAnywhere.lora.register(adapter);
     } catch (e) {
       debugPrint('Failed to register LoRA adapter: $e');
     }
@@ -527,14 +528,16 @@ abstract final class ModelCatalogBootstrap {
   }) async {
     try {
       await RunAnywhere.models.register(
-        id: id,
-        name: name,
-        url: url,
-        framework: framework,
-        modality: modality,
-        memoryRequirement: memoryRequirement,
-        supportsThinking: supportsThinking,
-        supportsLora: supportsLora,
+        ModelRegistration.url(
+          id: id,
+          name: name,
+          url: url,
+          framework: framework,
+          category: modality,
+          memoryRequirementBytes: memoryRequirement,
+          supportsThinking: supportsThinking,
+          supportsLora: supportsLora,
+        ),
       );
     } catch (e) {
       debugPrint('Failed to register model $id: $e');
@@ -552,12 +555,14 @@ abstract final class ModelCatalogBootstrap {
   }) async {
     try {
       await RunAnywhere.models.register(
-        id: id,
-        name: name,
-        url: url,
-        framework: InferenceFramework.INFERENCE_FRAMEWORK_COREML,
-        modality: ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
-        memoryRequirement: memoryRequirement,
+        ModelRegistration.url(
+          id: id,
+          name: name,
+          url: url,
+          framework: InferenceFramework.INFERENCE_FRAMEWORK_COREML,
+          category: ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION,
+          memoryRequirementBytes: memoryRequirement,
+        ),
       );
     } catch (e) {
       debugPrint('Failed to register diffusion model $id: $e');
@@ -575,15 +580,17 @@ abstract final class ModelCatalogBootstrap {
     required int memoryRequirement,
   }) async {
     try {
-      await RunAnywhere.models.registerArchiveModel(
-        id: id,
-        name: name,
-        archiveUrl: url,
-        archiveType: archive,
-        structure: structure,
-        framework: framework,
-        modality: modality,
-        memoryRequirement: memoryRequirement,
+      await RunAnywhere.models.register(
+        ModelRegistration.archive(
+          id: id,
+          name: name,
+          url: url,
+          archiveType: archive,
+          structure: structure,
+          framework: framework,
+          category: modality,
+          memoryRequirementBytes: memoryRequirement,
+        ),
       );
     } catch (e) {
       debugPrint('Failed to register archive model $id: $e');
@@ -598,29 +605,27 @@ abstract final class ModelCatalogBootstrap {
     required ModelCategory modality,
     required int memoryRequirement,
   }) async {
+    // File roles are left unset: the SDK fills them from the shared commons
+    // classifier so the app never mirrors its filename conventions.
     final descriptors = files
         .map(
           (file) => ModelFileDescriptor(
             filename: file.filename,
             url: file.url,
             isRequired: true,
-            // Shared commons classifier — keeps the SDK and the C++
-            // model-paths resolver agreeing on primary vs mmproj/vocab roles.
-            role: RunAnywhere.models.inferModelFileRole(
-              filename: file.filename,
-              modality: modality,
-            ),
           ),
         )
         .toList();
     try {
-      await RunAnywhere.models.registerMultiFile(
-        id: id,
-        name: name,
-        files: descriptors,
-        framework: framework,
-        modality: modality,
-        memoryRequirement: memoryRequirement,
+      await RunAnywhere.models.register(
+        ModelRegistration.multiFile(
+          id: id,
+          name: name,
+          files: descriptors,
+          framework: framework,
+          category: modality,
+          memoryRequirementBytes: memoryRequirement,
+        ),
       );
     } catch (e) {
       debugPrint('Failed to register multi-file model $id: $e');

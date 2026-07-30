@@ -87,20 +87,14 @@ final class BenchmarkRunner {
     /// Checks which categories have downloaded models before running. This lets the UI
     /// inform the user which categories will be skipped.
     func preflight(categories: Set<BenchmarkCategory>) async throws -> BenchmarkPreflightResult {
-        await RunAnywhere.refreshModelRegistry()
+        await RunAnywhere.models.refresh()
 
         let allModels: [RAModelInfo]
-        let listResult = await RunAnywhere.listModels()
-        guard listResult.success else {
-            throw BenchmarkRunnerError.fetchModelsFailed(
-                underlying: SDKException(
-                    code: .processingFailed,
-                    message: listResult.errorMessage.isEmpty ? "model registry" : listResult.errorMessage,
-                    category: .internal
-                )
-            )
+        do {
+            allModels = try await RunAnywhere.models.list()
+        } catch {
+            throw BenchmarkRunnerError.fetchModelsFailed(underlying: error)
         }
-        allModels = listResult.models.models
 
         var available: [BenchmarkCategory: [RAModelInfo]] = [:]
         var skipped: [BenchmarkCategory] = []

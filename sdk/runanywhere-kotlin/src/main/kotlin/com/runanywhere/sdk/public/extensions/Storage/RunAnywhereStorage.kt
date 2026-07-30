@@ -58,6 +58,7 @@ private fun requireStorageInitialized(sdk: RunAnywhere) {
 
 // MARK: - Model Registration
 
+@Deprecated("Use RunAnywhere.models.register(ModelRegistration.url(...)).")
 suspend fun RunAnywhere.registerModel(
     id: String? = null,
     name: String,
@@ -103,6 +104,7 @@ suspend fun RunAnywhere.registerModel(
     return saved
 }
 
+@Deprecated("Use RunAnywhere.models.register(ModelRegistration.archive(...)).")
 suspend fun RunAnywhere.registerModel(
     archiveUrl: String,
     structure: ArchiveStructure,
@@ -158,6 +160,7 @@ suspend fun RunAnywhere.registerModel(
     return model
 }
 
+@Deprecated("Use RunAnywhere.models.register(ModelRegistration.multiFile(...)).")
 suspend fun RunAnywhere.registerModel(
     multiFile: List<ModelFileDescriptor>,
     id: String,
@@ -232,6 +235,7 @@ suspend fun RunAnywhere.deleteStorage(request: StorageDeleteRequest): StorageDel
  * over [deleteStorage] with the canonical flag set — mirrors Swift
  * `RunAnywhere.deleteModel(_:)`.
  */
+@Deprecated("Use RunAnywhere.models.delete(id).")
 suspend fun RunAnywhere.deleteModel(modelId: String): StorageDeleteResult =
     deleteStorage(
         StorageDeleteRequest(

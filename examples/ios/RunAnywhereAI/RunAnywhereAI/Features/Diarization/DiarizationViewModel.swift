@@ -2,12 +2,12 @@
 //  DiarizationViewModel.swift
 //  RunAnywhereAI
 //
-//  Standalone speaker diarization over the canonical `RunAnywhere.diarize` facade.
+//  Standalone speaker diarization over the `RunAnywhere.diarization` facade.
 //
 //  This view model is pure platform plumbing: it loads a catalog Sortformer
 //  model through the SDK lifecycle, captures microphone audio, and calls
-//  `RunAnywhere.diarize`. All inference and model routing live in the SDK /
-//  C++ commons.
+//  `RunAnywhere.diarization.diarize`. All inference and model routing live in
+//  the SDK / C++ commons.
 //
 
 import Combine
@@ -30,9 +30,10 @@ final class DiarizationViewModel {
 
     // Diarization output
     private(set) var isDiarizing = false
-    private(set) var segments: [RADiarizationSegment] = []
-    private(set) var speakerCount: Int32 = 0
-    private(set) var audioDurationMs: Int64 = 0
+    private(set) var segments: [DiarizedSegment] = []
+    private(set) var speakerCount = 0
+
+    /// Wall-clock time of the last run; `DiarizationResult` carries no timing.
     private(set) var processingTimeMs: Int64 = 0
 
     private(set) var statusMessage = ""
@@ -48,12 +49,13 @@ final class DiarizationViewModel {
     // MARK: - Model status
 
     func refreshModelStatus() {
-        var request = RACurrentModelRequest()
-        request.category = .speakerDiarization
-        let current = RunAnywhere.currentModel(request)
-        isModelLoaded = current.found
-        if current.found, !current.model.name.isEmpty {
-            loadedModelName = current.model.name
+        Task { [weak self] in
+            let loaded = await RunAnywhere.models.state().loaded[.speakerDiarization]
+            guard let self else { return }
+            self.isModelLoaded = loaded != nil
+            if let name = loaded?.name, !name.isEmpty {
+                self.loadedModelName = name
+            }
         }
     }
 
@@ -66,12 +68,10 @@ final class DiarizationViewModel {
         statusMessage = "Loading model…"
         defer { isProcessing = false }
 
-        var loadRequest = RAModelLoadRequest()
-        loadRequest.modelID = model.id
-        loadRequest.category = .speakerDiarization
-        let loadResult = await RunAnywhere.loadModel(loadRequest)
-        guard loadResult.success else {
-            error = loadResult.errorMessage.isEmpty ? "Model load failed." : loadResult.errorMessage
+        do {
+            try await RunAnywhere.models.load(id: model.id)
+        } catch {
+            self.error = "Model load failed: \(error.localizedDescription)"
             statusMessage = ""
             return
         }
@@ -102,8 +102,6 @@ final class DiarizationViewModel {
         error = nil
         segments = []
         speakerCount = 0
-        audioDurationMs = 0
-        processingTimeMs = 0
         audioBuffer = Data()
         subscribeToAudioLevel()
 
@@ -141,18 +139,15 @@ final class DiarizationViewModel {
         defer { isDiarizing = false }
 
         do {
-            var options = RADiarizationOptions()
-            options.sampleRate = Int32(Self.sampleRate)
-            options.channels = 1
-            options.encoding = .pcmS16Le
-
-            let result = try await RunAnywhere.diarize(audioData: audio, options: options)
-            segments = result.segments.sorted { $0.startMs < $1.startMs }
+            let started = Date()
+            let result = try await RunAnywhere.diarization.diarize(
+                .pcm16(audio, sampleRate: Self.sampleRate)
+            )
+            processingTimeMs = Int64((Date().timeIntervalSince(started) * 1000).rounded())
+            segments = DiarizedSegment.presentable(result.segments)
             speakerCount = result.speakerCount
-            audioDurationMs = result.audioDurationMs
-            processingTimeMs = result.processingTimeMs
             statusMessage = "Done — \(result.speakerCount) speakers, " +
-                "\(result.segments.count) segments in \(result.processingTimeMs)ms."
+                "\(result.segments.count) segments in \(processingTimeMs)ms."
         } catch {
             logger.error("Diarization failed: \(error.localizedDescription)")
             self.error = "Diarization failed: \(error.localizedDescription)"
@@ -183,4 +178,33 @@ final class DiarizationViewModel {
 
     private static let minBytes = 16_000
     private static let sampleRate = 16_000
+}
+
+// MARK: - Presentation model
+
+/// One speaker turn shaped for the list: the SDK reports a speaker id, and the
+/// UI additionally needs a small stable index to pick a chip colour.
+struct DiarizedSegment {
+    let speakerIndex: Int
+    let speakerID: String
+    let startMs: Int64
+    let endMs: Int64
+
+    /// Sort by start time and assign each distinct speaker id an index in order
+    /// of first appearance.
+    static func presentable(_ segments: [SpeakerSegment]) -> [DiarizedSegment] {
+        var indexBySpeaker: [String: Int] = [:]
+        return segments
+            .sorted { $0.startMs < $1.startMs }
+            .map { segment in
+                let index = indexBySpeaker[segment.speakerId] ?? indexBySpeaker.count
+                indexBySpeaker[segment.speakerId] = index
+                return DiarizedSegment(
+                    speakerIndex: index,
+                    speakerID: segment.speakerId,
+                    startMs: segment.startMs,
+                    endMs: segment.endMs
+                )
+            }
+    }
 }

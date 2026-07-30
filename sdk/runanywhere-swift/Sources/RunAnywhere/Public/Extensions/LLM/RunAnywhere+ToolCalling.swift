@@ -23,7 +23,7 @@ import SwiftProtobuf
 // MARK: - Tool Registry (Thread-safe)
 
 /// Actor-based tool registry for thread-safe tool registration and lookup.
-private actor ToolRegistry {
+internal actor ToolRegistry {
     static let shared = ToolRegistry()
 
     private var tools: [String: RegisteredTool] = [:]
@@ -86,34 +86,8 @@ public extension RunAnywhere {
 
     // MARK: - Tool Registration
 
-    /// Register a tool that the LLM can use.
-    ///
-    /// Tools are stored in-memory and available for all subsequent `generateWithTools` calls.
-    /// Executors run in Swift and have full access to Swift/iOS APIs (networking, device, etc.).
-    ///
-    /// Example:
-    /// ```swift
-    /// await RunAnywhere.registerTool(
-    ///     RAToolDefinition(
-    ///         name: "get_weather",
-    ///         description: "Gets current weather for a location",
-    ///         parameters: [
-    ///             RAToolParameter(name: "location", type: .string, description: "City name")
-    ///         ]
-    ///     )
-    /// ) { args in
-    ///     let location = args["location"]?.string ?? "Unknown"
-    ///     // Call weather API...
-    ///     return [
-    ///         "temperature": RAToolValue(72),
-    ///         "condition": RAToolValue("Sunny")
-    ///     ]
-    /// }
-    /// ```
-    ///
-    /// - Parameters:
-    ///   - definition: Tool definition (name, description, parameters)
-    ///   - executor: Async closure that executes the tool
+    /// Register a tool the model may call.
+    @available(*, deprecated, renamed: "llm.tools.register(_:executor:)")
     static func registerTool(
         _ definition: RAToolDefinition,
         executor: @escaping ToolExecutor
@@ -122,20 +96,19 @@ public extension RunAnywhere {
     }
 
     /// Unregister a tool by name.
-    ///
-    /// - Parameter toolName: The name of the tool to remove
+    @available(*, deprecated, renamed: "llm.tools.unregister(name:)")
     static func unregisterTool(_ toolName: String) async {
         await ToolRegistry.shared.unregister(toolName)
     }
 
     /// Get all registered tool definitions.
-    ///
-    /// - Returns: Array of registered tool definitions
+    @available(*, deprecated, renamed: "llm.tools.list()")
     static func getRegisteredTools() async -> [RAToolDefinition] {
         await ToolRegistry.shared.getAll()
     }
 
     /// Clear all registered tools.
+    @available(*, deprecated, renamed: "llm.tools.clear()")
     static func clearTools() async {
         await ToolRegistry.shared.clear()
     }
@@ -149,7 +122,12 @@ public extension RunAnywhere {
     ///
     /// - Parameter toolCall: The tool call to execute
     /// - Returns: Result of the tool execution
+    @available(*, deprecated, message: "Tool execution is driven by the commons run loop; this is an internal step")
     static func executeTool(_ toolCall: RAToolCall) async -> RAToolResult {
+        await executeToolInternal(toolCall)
+    }
+
+    internal static func executeToolInternal(_ toolCall: RAToolCall) async -> RAToolResult {
         let toolName = toolCall.name
         let toolCallID = toolCallIdentifier(toolCall)
 
@@ -244,6 +222,7 @@ public extension RunAnywhere {
     /// Note: `tool_choice` / `forced_tool_name` live on the
     /// `RAToolCallingOptions` proto and travel inside
     /// `generation.toolCalling` on the session-create request.
+    @available(*, deprecated, renamed: "llm.generate(prompt:options:)")
     static func generateWithTools(
         prompt: String,
         options: RALLMGenerationOptions = .defaults(),
@@ -254,7 +233,34 @@ public extension RunAnywhere {
         validateCalls: Bool? = nil,
         history: [String] = []
     ) async throws -> RAToolCallingResult {
-        guard isInitialized else {
+        try await runToolLoop(
+            prompt: prompt,
+            options: options,
+            toolOptions: toolOptions,
+            toolChoice: toolChoice,
+            forcedToolName: forcedToolName,
+            reasoning: reasoning,
+            validateCalls: validateCalls,
+            history: history.enumerated().map { index, content in
+                var message = RAChatMessage()
+                message.role = index.isMultiple(of: 2) ? .user : .assistant
+                message.content = content
+                return message
+            }
+        )
+    }
+
+    internal static func runToolLoop(
+        prompt: String,
+        options: RALLMGenerationOptions = .defaults(),
+        toolOptions: RAToolCallingOptions? = nil,
+        toolChoice: RAToolChoiceMode? = nil,
+        forcedToolName: String? = nil,
+        reasoning: RAReasoningOptions? = nil,
+        validateCalls: Bool? = nil,
+        history: [RAChatMessage] = []
+    ) async throws -> RAToolCallingResult {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
@@ -394,11 +400,10 @@ public extension RunAnywhere {
         tools: [RAToolDefinition],
         reasoning: RAReasoningOptions? = nil,
         validateCalls: Bool? = nil,
-        // Prior conversation turns as a flat alternating list
-        // `[user0, asst0, ...]`, EXCLUDING the current turn (which is `prompt`).
-        // commons threads these into every generate in the loop so multi-turn
-        // tool use keeps context.
-        history: [String] = []
+        // Prior conversation turns, EXCLUDING the current turn (which is
+        // `prompt`). commons threads these into every generate in the loop so
+        // multi-turn tool use keeps context.
+        history: [RAChatMessage] = []
     ) -> RAToolCallingSessionCreateRequest {
         var request = RAToolCallingSessionCreateRequest()
         request.prompt = prompt
@@ -422,14 +427,7 @@ public extension RunAnywhere {
         if let validateCalls {
             request.validateCalls = validateCalls
         }
-        // Role-tagged prior turns (alternating USER / ASSISTANT from the flat
-        // string list) so the commons run-loop keeps multi-turn context.
-        request.history = history.enumerated().map { index, content in
-            var message = RAChatMessage()
-            message.role = index.isMultiple(of: 2) ? .user : .assistant
-            message.content = content
-            return message
-        }
+        request.history = history
         return request
     }
 }
@@ -493,7 +491,7 @@ private let toolExecuteTrampoline: ToolCallingRunLoopProtoABI.ExecuteCallback = 
     // loop indefinitely.
     let resultBox = ToolResultBox()
     Task.detached(priority: .userInitiated) {
-        let result = await RunAnywhere.executeTool(toolCall)
+        let result = await RunAnywhere.executeToolInternal(toolCall)
         resultBox.set(result)
     }
     let toolResult = resultBox.awaitResult(timeout: 120.0) ?? failedResult(

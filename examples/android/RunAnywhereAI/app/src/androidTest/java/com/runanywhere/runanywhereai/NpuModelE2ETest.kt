@@ -22,9 +22,9 @@ import com.runanywhere.runanywhereai.data.SingleFileModel
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.api.embeddings
 import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.downloadModel
-import com.runanywhere.sdk.public.extensions.embeddings
 import com.runanywhere.sdk.public.extensions.fromFilePath
 import com.runanywhere.sdk.public.extensions.generateImage
 import com.runanywhere.sdk.public.extensions.generateStream
@@ -386,7 +386,7 @@ class NpuModelE2ETest {
                     ModelCategory.MODEL_CATEGORY_MULTIMODAL -> runVlm(report, maxNew, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> runStt(report, suite)
                     ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> runTts(report, model, outDir, suite)
-                    ModelCategory.MODEL_CATEGORY_EMBEDDING -> runEmbedding(report, model, suite)
+                    ModelCategory.MODEL_CATEGORY_EMBEDDING -> runEmbedding(report, suite)
                     ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION ->
                         if (suite?.metric == "t2i_reference_smoke") runTextToImage(report, suite, outDir)
                         else runInpaint(report, model, suite, outDir)
@@ -978,7 +978,7 @@ class NpuModelE2ETest {
 
     // ------------------------------------------------------------- EMBEDDING ----
     // Canonical retrieval-ranking gate through the public embedding API.
-    private suspend fun runEmbedding(report: RunReport, model: SingleFileModel, suite: NpuSuite?) {
+    private suspend fun runEmbedding(report: RunReport, suite: NpuSuite?) {
         requireNotNull(suite) { "embedding requires a canonical npu_suite/v1" }
         require(suite.metric == "embedding_retrieval_ranking") {
             "embedding suite metric must be embedding_retrieval_ranking, got ${suite.metric}"
@@ -987,12 +987,12 @@ class NpuModelE2ETest {
         var embedMsTotal = 0L
         suspend fun vec(t: String): FloatArray {
             val start = System.currentTimeMillis()
-            val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.embeddings.embed(t, model.id) }
+            val r = withTimeout(INFER_TIMEOUT_MS) { RunAnywhere.embeddings.embed(listOf(t)) }
             val elapsed = System.currentTimeMillis() - start
             embedCalls++
             embedMsTotal += elapsed
             report.put("last_embed_ms", elapsed)
-            return (r.vectors.firstOrNull()?.values ?: emptyList()).toFloatArray()
+            return r.firstOrNull()?.vector ?: FloatArray(0)
         }
         val retrievalCases = suite.cases.filter {
             it.query != null && it.positive != null && it.negative != null

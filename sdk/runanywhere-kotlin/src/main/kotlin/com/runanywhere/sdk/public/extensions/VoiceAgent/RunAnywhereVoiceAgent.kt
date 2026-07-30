@@ -111,6 +111,7 @@ val RunAnywhere.defaultVADModelID: String
  * @return `true` when a VAD model is loaded after the call; `false`
  *   when no VAD model is loaded (auto-load failed or skipped).
  */
+@Deprecated("RunAnywhere.voice.createSession ensures a VAD itself.")
 suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean {
     if (!isInitialized) return false
 
@@ -144,6 +145,7 @@ suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean {
     return true
 }
 
+@Deprecated("Use RunAnywhere.voice.createSession(stt, llm, tts).")
 suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) {
     if (!isInitialized) throw notInitializedException()
     ensureServicesReady()
@@ -155,6 +157,7 @@ suspend fun RunAnywhere.initializeVoiceAgent(config: RAVoiceAgentComposeConfig) 
     voiceAgentLogger.info("Voice agent initialized from RAVoiceAgentComposeConfig: ready=${states.ready}")
 }
 
+@Deprecated("Use RunAnywhere.models.state().")
 suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentStates {
     if (!isInitialized) throw notInitializedException()
     ensureServicesReady()
@@ -182,6 +185,7 @@ suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentSta
  * here produces invalid voice selection for multi-voice models (see
  * Swift comment at `RunAnywhere+VoiceAgent.swift:152-161`).
  */
+@Deprecated("Use RunAnywhere.voice.createSession(stt, llm, tts).")
 suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
     ttsVoiceId: String? = null,
     ensureVAD: Boolean = true,
@@ -226,10 +230,12 @@ suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels(
  * Mirrors Swift `cleanupVoiceAgent()` → `CppBridge.VoiceAgent.cleanup()`,
  * which releases owned child components while keeping the handle alive.
  */
+@Deprecated("Use VoiceSession.close().")
 suspend fun RunAnywhere.cleanupVoiceAgent() {
     CppBridgeVoiceAgent.cleanup()
 }
 
+@Deprecated("Use RunAnywhere.voice.createSession and VoiceSession.start().")
 suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult {
     if (!isInitialized) throw notInitializedException()
     ensureServicesReady()
@@ -266,6 +272,7 @@ suspend fun RunAnywhere.processVoiceTurn(audioData: ByteArray): VoiceAgentResult
  * @throws SDKException when the SDK is not initialized, or voice-agent
  *   services/handle cannot be acquired (delivered to the flow collector).
  */
+@Deprecated("Use RunAnywhere.voice.createSession, then VoiceSession.events and VoiceSession.start().")
 fun RunAnywhere.streamVoiceAgent(): Flow<VoiceEvent> =
     flow {
         if (!isInitialized) throw notInitializedException()

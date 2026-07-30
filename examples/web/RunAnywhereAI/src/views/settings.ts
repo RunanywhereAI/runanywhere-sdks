@@ -12,12 +12,7 @@
  * Keychain-equivalent secret store to a normal Web application.
  */
 
-import {
-  environmentDescription,
-  environmentShouldSendTelemetry,
-  getStoredHfToken,
-  RunAnywhere,
-} from '@runanywhere/web';
+import { RunAnywhere } from '@runanywhere/web';
 import { escapeHtml } from '../services/escape-html';
 import {
   isUsableCredential,
@@ -135,6 +130,15 @@ type APIConfigurationApplyHandler = (
 
 let applyAPIConfigurationHandler: APIConfigurationApplyHandler | null = null;
 
+/** Environment the running SDK was initialized with, reported by the bootstrap. */
+let activeEnvironment = 'development';
+
+/**
+ * Whether a Hugging Face token was set in this session. The SDK deliberately
+ * offers no read-back, so this flag only reflects what this view submitted.
+ */
+let hfTokenConfigured = false;
+
 /**
  * Installed by the application bootstrap so the Settings view stays a thin
  * UI layer while `main.ts` owns SDK/backend lifecycle ordering.
@@ -235,20 +239,20 @@ export function initSettingsTab(el: HTMLElement): void {
       </div>
 
       <!-- Hugging Face access token for gated/private model downloads. The SDK
-           owns the token (RunAnywhere.setHfToken); it is held in memory for the
+           owns the token (RunAnywhere.setHuggingFaceToken); it is held in memory for the
            current session only and is never persisted to browser storage. -->
       <div class="settings-section">
         <div class="settings-section-title">Hugging Face Access</div>
         <div class="setting-row">
           <span class="setting-label">Token</span>
-          <span class="setting-value" id="settings-hf-state">${getStoredHfToken() ? 'Configured' : 'Not set'}</span>
+          <span class="setting-value" id="settings-hf-state">${hfTokenConfigured ? 'Configured' : 'Not set'}</span>
         </div>
         <div class="setting-row setting-row--stacked">
           <input type="password" class="text-input w-full" id="settings-hf-token" placeholder="hf_..." autocomplete="off" spellcheck="false">
           <p class="setting-hint">
             Optional. Add a Hugging Face token to download gated or private
             models; public models need none. The token is passed to the SDK via
-            <code>RunAnywhere.setHfToken</code>, kept in memory for this session
+            <code>RunAnywhere.setHuggingFaceToken</code>, kept in memory for this session
             only, and never persisted to browser storage; re-enter it after a
             reload.
             <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Get a token</a>.
@@ -343,10 +347,9 @@ export function initSettingsTab(el: HTMLElement): void {
     void applyAPIConfiguration(apiKeyInput, baseURLInput, applyButton, status);
   });
 
-  // Hugging Face access token. The SDK owns it (RunAnywhere.setHfToken /
-  // getStoredHfToken) and holds it in memory for the current session only; it
-  // is never persisted to browser storage. Public models need no token;
-  // gated/private models download once a token is set.
+  // Hugging Face access token. The SDK owns it and holds it in memory for the
+  // current session only; the token is never read back or persisted here.
+  // Public models need no token; gated/private models download once one is set.
   const hfInput = container.querySelector('#settings-hf-token') as HTMLInputElement;
   const hfState = container.querySelector('#settings-hf-state') as HTMLElement;
   const hfStatus = container.querySelector('#settings-hf-status') as HTMLElement;
@@ -354,7 +357,8 @@ export function initSettingsTab(el: HTMLElement): void {
     const token = hfInput.value.trim();
     if (!token) return;
     try {
-      RunAnywhere.setHfToken(token);
+      RunAnywhere.setHuggingFaceToken(token);
+      hfTokenConfigured = true;
       hfInput.value = '';
       hfState.textContent = 'Configured';
       hfStatus.textContent = 'Token set for downloads this session.';
@@ -365,7 +369,8 @@ export function initSettingsTab(el: HTMLElement): void {
   });
   container.querySelector('#settings-hf-clear')!.addEventListener('click', () => {
     try {
-      RunAnywhere.setHfToken(null);
+      RunAnywhere.setHuggingFaceToken(null);
+      hfTokenConfigured = false;
       hfInput.value = '';
       hfState.textContent = 'Not set';
       hfStatus.textContent = 'Token cleared.';
@@ -446,22 +451,21 @@ function validateAPIConfiguration(apiKey: string, baseURL: string): APIConfigura
 }
 
 function telemetryState(): { label: string; hint: string } {
-  const environment = RunAnywhere.environment;
-  if (environment === null) {
+  if (!RunAnywhere.isReady) {
     return {
       label: 'Unavailable',
       hint: 'Telemetry is controlled by the SDK environment and the SDK is not initialized.',
     };
   }
-  const description = environmentDescription(environment);
-  const enabled = environmentShouldSendTelemetry(environment);
+  const enabled = activeEnvironment === 'production';
   return {
     label: enabled ? 'Enabled' : 'Disabled',
-    hint: `Read-only SDK state: ${description} environment ${enabled ? 'sends' : 'does not send'} telemetry.`,
+    hint: `Read-only SDK state: ${activeEnvironment} environment ${enabled ? 'sends' : 'does not send'} telemetry.`,
   };
 }
 
 function updateTelemetryState(environment: string, enabled: boolean): void {
+  activeEnvironment = environment;
   const state = container.querySelector('#settings-analytics-state');
   const hint = container.querySelector('#settings-analytics-hint');
   if (state) state.textContent = enabled ? 'Enabled' : 'Disabled';

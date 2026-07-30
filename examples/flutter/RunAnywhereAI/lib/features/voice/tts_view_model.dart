@@ -33,12 +33,6 @@ class TTSViewModel extends VoiceComponentViewModelBase {
   // --- Component identity -----------------------------------------------------
 
   @override
-  sdk.SDKComponent get component => sdk.SDKComponent.SDK_COMPONENT_TTS;
-
-  @override
-  sdk.EventCategory get eventCategory => sdk.EventCategory.EVENT_CATEGORY_TTS;
-
-  @override
   ModelCategory get modelCategory =>
       ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
 
@@ -82,14 +76,14 @@ class TTSViewModel extends VoiceComponentViewModelBase {
   void _subscribeToPlayback() {
     // Subscribe to the SDK's speak() playback state.
     _playingSubscription =
-        sdk.RunAnywhere.tts.playbackStateStream.listen((playing) {
+        sdk.RunAnywhere.tts.playbackState.listen((playing) {
       isPlaying = playing;
       if (playing) isGenerating = false;
       notify();
     });
 
     _progressSubscription =
-        sdk.RunAnywhere.tts.playbackProgressStream.listen((progress) {
+        sdk.RunAnywhere.tts.playbackProgress.listen((progress) {
       playbackProgress = progress;
       currentTime = duration * progress;
       notify();
@@ -109,7 +103,7 @@ class TTSViewModel extends VoiceComponentViewModelBase {
 
   @override
   Future<void> performLoad(ModelInfo model) =>
-      sdk.RunAnywhere.tts.loadVoice(model.id);
+      sdk.RunAnywhere.models.load(model.id);
 
   @override
   void applyLoadedModel(ModelInfo model) {
@@ -137,22 +131,20 @@ class TTSViewModel extends VoiceComponentViewModelBase {
     notify();
 
     try {
-      if (!sdk.RunAnywhere.tts.isLoaded) {
+      if (!hasModelSelected) {
         throw StateError(
             'TTS component not loaded. Please load a TTS voice first.');
       }
 
-      final options = sdk.TTSOptions(
-        speed: _speechRate,
-        pitch: pitch,
-        volume: 1.0,
+      final result = await sdk.RunAnywhere.tts.speak(
+        text,
+        options: sdk.TtsOptions(speed: _speechRate, pitch: pitch),
       );
-      final result = await sdk.RunAnywhere.speak(text, options);
 
-      duration = result.durationMs.toInt() / 1000.0;
+      duration = result.durationMs / 1000.0;
       metadata = TTSMetadata(
         durationMs: result.durationMs.toDouble(),
-        audioSize: result.audioSizeBytes.toInt(),
+        audioSize: result.data.length,
         sampleRate: result.sampleRate,
       );
       debugPrint(
@@ -169,7 +161,7 @@ class TTSViewModel extends VoiceComponentViewModelBase {
   /// Stop current speech playback.
   Future<void> stopSpeaking() async {
     debugPrint('Stopping speech');
-    await sdk.RunAnywhere.tts.stopSpeaking();
+    await sdk.RunAnywhere.tts.stop();
   }
 
   // --- Cleanup ---------------------------------------------------------------------------

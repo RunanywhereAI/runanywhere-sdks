@@ -122,8 +122,37 @@ bool load_embeddings_model(const GlobalOptions& options, const std::string& mode
     return true;
 }
 
+bool parse_normalize(const std::string& mode, v1::EmbeddingsNormalizeMode* out) {
+    if (mode.empty()) {
+        *out = v1::EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED;
+    } else if (mode == "l2") {
+        *out = v1::EMBEDDINGS_NORMALIZE_MODE_L2;
+    } else if (mode == "none") {
+        *out = v1::EMBEDDINGS_NORMALIZE_MODE_NONE;
+    } else {
+        return false;
+    }
+    return true;
+}
+
+bool parse_pooling(const std::string& mode, v1::EmbeddingsPoolingStrategy* out) {
+    if (mode.empty()) {
+        *out = v1::EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED;
+    } else if (mode == "mean") {
+        *out = v1::EMBEDDINGS_POOLING_STRATEGY_MEAN;
+    } else if (mode == "cls") {
+        *out = v1::EMBEDDINGS_POOLING_STRATEGY_CLS;
+    } else if (mode == "last") {
+        *out = v1::EMBEDDINGS_POOLING_STRATEGY_LAST;
+    } else {
+        return false;
+    }
+    return true;
+}
+
 int run_embed(const GlobalOptions& options, const std::string& ref, const std::string& engine,
-              const std::vector<std::string>& texts) {
+              const std::vector<std::string>& texts, const std::string& normalize,
+              const std::string& pooling) {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {
         return 1;
@@ -163,6 +192,19 @@ int run_embed(const GlobalOptions& options, const std::string& ref, const std::s
     for (const auto& text : texts) {
         request.add_texts(text);
     }
+    v1::EmbeddingsNormalizeMode normalize_mode;
+    v1::EmbeddingsPoolingStrategy pooling_strategy;
+    if (!parse_normalize(normalize, &normalize_mode) ||
+        !parse_pooling(pooling, &pooling_strategy)) {
+        out::error_line("--normalize expects l2|none and --pooling expects mean|cls|last");
+        return 2;
+    }
+    if (normalize_mode != v1::EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED) {
+        request.mutable_options()->set_normalize_mode(normalize_mode);
+    }
+    if (pooling_strategy != v1::EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED) {
+        request.mutable_options()->set_pooling(pooling_strategy);
+    }
 
     const std::string bytes = proto::serialize(request);
     rac_proto_buffer_t out_buffer;
@@ -192,26 +234,33 @@ int run_embed(const GlobalOptions& options, const std::string& ref, const std::s
 }  // namespace
 
 void register_embed(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand("embed", "Generate text embeddings");
+    CLI::App* cmd = app.add_subcommand("embed", "Turn text into embedding vectors");
     auto model = std::make_shared<std::string>(kDefaultEmbeddingModel);
     auto engine = std::make_shared<std::string>();
     auto positional_text = std::make_shared<std::string>();
     auto option_texts = std::make_shared<std::vector<std::string>>();
+    auto normalize = std::make_shared<std::string>();
+    auto pooling = std::make_shared<std::string>();
     cmd->add_option("input", *positional_text, "Text to embed");
     cmd->add_option("--model,-m", *model,
-                    "Embedding model (default: " + std::string(kDefaultEmbeddingModel) + ")")
+                    "Embedding model to use (default: " + std::string(kDefaultEmbeddingModel) + ")")
         ->default_val(kDefaultEmbeddingModel);
     cmd->add_option("--engine", *engine,
-                    "Engine/framework hint for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
+                    "Pin the inference engine for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
     cmd->add_option("--text,-t", *option_texts,
-                    "Additional text to embed; repeat for batch embeddings");
-    cmd->callback([&options, model, engine, positional_text, option_texts]() {
+                    "Embed this text too; repeat to batch several");
+    cmd->add_option("--normalize", *normalize, "Scale vectors to unit length or leave them raw")
+        ->check(CLI::IsMember({"l2", "none"}));
+    cmd->add_option("--pooling", *pooling, "Collapse token vectors with this strategy")
+        ->check(CLI::IsMember({"mean", "cls", "last"}));
+    cmd->callback([&options, model, engine, positional_text, option_texts, normalize, pooling]() {
         std::vector<std::string> texts;
         if (!positional_text->empty()) {
             texts.push_back(*positional_text);
         }
         texts.insert(texts.end(), option_texts->begin(), option_texts->end());
-        const int exit_code = run_embed(options, *model, *engine, texts);
+        const int exit_code =
+            run_embed(options, *model, *engine, texts, *normalize, *pooling);
         if (exit_code != 0) {
             throw CLI::RuntimeError(exit_code);
         }

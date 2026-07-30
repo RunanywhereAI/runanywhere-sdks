@@ -1,8 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.rag
 
-import ai.runanywhere.proto.v1.RAGConfiguration
-import ai.runanywhere.proto.v1.RAGDocument
-import ai.runanywhere.proto.v1.RAGStreamEventKind
 import android.app.Application
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -15,22 +12,20 @@ import com.runanywhere.runanywhereai.data.rag.DocumentExtractor
 import com.runanywhere.runanywhereai.data.rag.ExtractedDocument
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.generated.convenience.defaults
-import com.runanywhere.sdk.public.extensions.ragCancelQuery
-import com.runanywhere.sdk.public.extensions.ragCreatePipeline
-import com.runanywhere.sdk.public.extensions.ragGetStatistics
-import com.runanywhere.sdk.public.extensions.ragIngest
-import com.runanywhere.sdk.public.extensions.ragQueryStream
+import com.runanywhere.sdk.public.api.ModelRef
+import com.runanywhere.sdk.public.api.RagConfig
+import com.runanywhere.sdk.public.api.RagDocument
+import com.runanywhere.sdk.public.api.RagEvent
+import com.runanywhere.sdk.public.api.RagSession
+import com.runanywhere.sdk.public.api.rag
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 
 data class RagSource(val text: String, val score: Float, val document: String)
@@ -55,25 +50,6 @@ internal fun buildRagAnswerMessage(
         elapsedMs = elapsedMs,
     )
 
-/**
- * Stops the query coroutine before dispatching the explicit native cancel.
- *
- * The query itself owns a cancellation hook that calls the native cancel ABI
- * from its awaiting coroutine. Cancelling it first guarantees that hook can run
- * even when [requestNativeCancellation] is queued on the same saturated IO
- * dispatcher as the blocking JNI query.
- */
-internal suspend fun cancelActiveRagQuery(
-    queryJob: Job?,
-    requestNativeCancellation: suspend () -> Unit,
-    onNativeCancellationFailure: (Throwable) -> Unit,
-) {
-    queryJob?.cancel()
-    runCatching { requestNativeCancellation() }
-        .onFailure(onNativeCancellationFailure)
-    queryJob?.join()
-}
-
 class RagViewModel(application: Application) : AndroidViewModel(application) {
 
     val documents = mutableStateListOf<String>()
@@ -88,16 +64,15 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
     var error by mutableStateOf<String?>(null)
         private set
 
-    // RAG retrieval options exposed as UI toggles. Rerank is a pipeline-level
-    // setting (RAGConfiguration); multi-query is a per-query option.
+    // Retrieval options exposed as UI toggles. Both live on the RAG session, so
+    // flipping either re-opens it and re-indexes the loaded documents.
     var rerankEnabled by mutableStateOf(false)
         private set
     var multiQueryEnabled by mutableStateOf(false)
         private set
 
-    private var pipelineKey: Pair<String, String>? = null
-    private var ingestKey: Pair<String, String>? = null
-    private val pipelineOwner = "documents-${UUID.randomUUID()}"
+    private var session: RagSession? = null
+    private var sessionKey: SessionKey? = null
     private var job: Job? = null
     private var ingestJob: Job? = null
     private var rerankJob: Job? = null
@@ -105,7 +80,7 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
     private var queryGeneration = 0L
     private var isRerankRebuildInFlight = false
 
-    // Cached so a pipeline recreate (rerank toggle) can rebuild the full corpus.
+    // Cached so a session rebuild (rerank toggle) can re-index the corpus.
     private val loadedDocs = mutableListOf<ExtractedDocument>()
 
     val hasDocuments: Boolean get() = documents.isNotEmpty()
@@ -116,17 +91,12 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         error = null
         isIngesting = true
         val generation = corpusGeneration
-        ingestKey = embeddingId to llmId
         ingestJob = viewModelScope.launch {
             try {
                 val doc = withContext(Dispatchers.IO) { DocumentExtractor.extract(getApplication(), uri) }
-                val indexedChunks = withPipeline(embeddingId, llmId) {
-                    RunAnywhere.ragIngest(
-                        RAGDocument(text = doc.text, metadata = doc.metadata),
-                    )
-                    runCatching { RunAnywhere.ragGetStatistics().indexed_chunks.toInt() }
-                        .getOrDefault(0)
-                }
+                val active = openSession(embeddingId, llmId)
+                active.ingest(RagDocument(text = doc.text, metadata = doc.metadata))
+                val indexedChunks = runCatching { active.stats().chunkCount.toInt() }.getOrDefault(0)
                 currentCoroutineContext().ensureActive()
                 if (generation != corpusGeneration) return@launch
                 loadedDocs += doc
@@ -140,50 +110,54 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
                     error = e.message ?: "Could not add the document."
                 }
             } finally {
-                if (generation == corpusGeneration) {
-                    ingestKey = null
-                    isIngesting = false
-                }
+                if (generation == corpusGeneration) isIngesting = false
             }
         }
     }
 
     fun updateMultiQuery(value: Boolean) {
+        if (multiQueryEnabled == value || isCorpusBusy) return
         multiQueryEnabled = value
+        rebuildSession { multiQueryEnabled = !value }
     }
 
-    // Rerank is set on the pipeline (RAGConfiguration), so flipping it recreates
-    // the pipeline. The recreated index starts empty, so re-ingest the loaded
-    // document to keep it queryable after the change.
+    // Rerank is a session setting, so flipping it rebuilds the session and
+    // re-indexes the documents already loaded.
     fun updateRerank(value: Boolean) {
         if (rerankEnabled == value || isCorpusBusy) return
         val previous = rerankEnabled
-        val key = pipelineKey
-        if (key == null) {
+        if (sessionKey == null) {
             rerankEnabled = value
             return
         }
         rerankEnabled = value
+        rebuildSession { rerankEnabled = previous }
+    }
+
+    /** Retrieval settings live on the session, so changing one re-opens it and re-indexes. */
+    private fun rebuildSession(rollback: () -> Unit) {
+        val key = sessionKey ?: return
         isRerankRebuildInFlight = true
         val generation = corpusGeneration
         rerankJob = viewModelScope.launch {
             try {
-                withPipeline(key.first, key.second) {
-                    chunkCount = RunAnywhere.ragGetStatistics().indexed_chunks.toInt()
+                closeSession()
+                val active = openSession(key.embeddingId, key.llmId)
+                loadedDocs.toList().forEach {
+                    active.ingest(RagDocument(text = it.text, metadata = it.metadata))
                 }
+                chunkCount = active.stats().chunkCount.toInt()
             } catch (e: CancellationException) {
-                if (generation == corpusGeneration) rerankEnabled = previous
+                if (generation == corpusGeneration) rollback()
                 throw e
             } catch (e: Exception) {
                 if (generation != corpusGeneration) return@launch
-                RACLog.e("rag rerank toggle failed", e)
-                // The old pipeline is already torn down; roll the toggle back and
-                // drop the (now gone) corpus so the UI reflects the real state.
-                rerankEnabled = previous
+                RACLog.e("rag session rebuild failed", e)
+                rollback()
                 documents.clear()
                 loadedDocs.clear()
                 chunkCount = 0
-                error = e.message ?: "Could not apply the rerank change."
+                error = e.message ?: "Could not apply the retrieval change."
             } finally {
                 if (generation == corpusGeneration) isRerankRebuildInFlight = false
             }
@@ -198,52 +172,44 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         isQuerying = true
         val requestVersion = RagQueryVersion(query = ++queryGeneration, corpus = corpusGeneration)
         job = viewModelScope.launch {
-            // Live-updating answer slot; tokens stream in, then the COMPLETED
-            // event replaces it with the final answer + cited sources. No
-            // wall-clock timeout — progress is visible as it generates.
+            // Live-updating answer slot; tokens stream in, then the completed
+            // event replaces it with the final answer and cited sources.
             val answerIndex = messages.size
             messages += RagMessage("", isUser = false)
             val streamed = StringBuilder()
             var finalized = false
             try {
-                val options = RagGenerationPolicy.options(q, multiQueryEnabled)
-                val key = pipelineKey ?: error("Choose document models and add a document first.")
-                withPipeline(key.first, key.second) {
-                    RunAnywhere.ragQueryStream(q, options).collect { event ->
-                        currentCoroutineContext().ensureActive()
-                        if (!requestVersion.isCurrent(queryGeneration, corpusGeneration)) {
-                            return@collect
+                val active = session ?: error("Choose document models and add a document first.")
+                val startedAt = System.currentTimeMillis()
+                val options = RagGenerationPolicy.options()
+                active.queryStream(q, options).collect { event ->
+                    currentCoroutineContext().ensureActive()
+                    if (!requestVersion.isCurrent(queryGeneration, corpusGeneration)) {
+                        return@collect
+                    }
+                    when (event) {
+                        is RagEvent.Token -> {
+                            streamed.append(event.text)
+                            messages[answerIndex] = RagMessage(
+                                text = RagAnswerNormalizer.visibleAnswer(streamed.toString()),
+                                isUser = false,
+                            )
                         }
-                        when (event.kind) {
-                            RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN -> {
-                                streamed.append(event.token)
-                                messages[answerIndex] = RagMessage(
-                                    text = RagAnswerNormalizer.visibleAnswer(streamed.toString()),
-                                    isUser = false,
-                                )
-                            }
-                            RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED -> {
-                                val result = event.result
-                                val sources = result?.retrieved_chunks?.map {
+                        is RagEvent.Completed -> {
+                            messages[answerIndex] = buildRagAnswerMessage(
+                                rawAnswer = event.result.answer,
+                                sources = event.result.sources.map {
                                     RagSource(
                                         text = it.text.trim(),
-                                        score = it.similarity_score,
-                                        document = it.source_document.orEmpty(),
+                                        score = it.score,
+                                        document = it.metadata["source"].orEmpty(),
                                     )
-                                } ?: emptyList()
-                                messages[answerIndex] = buildRagAnswerMessage(
-                                    rawAnswer = result?.answer ?: streamed.toString(),
-                                    sources = sources,
-                                    elapsedMs = result?.total_time_ms ?: 0L,
-                                )
-                                finalized = true
-                            }
-                            RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR -> {
-                                error = event.error_message?.takeIf { it.isNotBlank() }
-                                    ?: "The query failed."
-                            }
-                            else -> Unit
+                                },
+                                elapsedMs = System.currentTimeMillis() - startedAt,
+                            )
+                            finalized = true
                         }
+                        is RagEvent.Retrieved -> Unit
                     }
                 }
             } catch (e: CancellationException) {
@@ -276,106 +242,76 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         val stoppedJob = job
         job = null
         viewModelScope.launch {
-            cancelActiveRagQuery(
-                queryJob = stoppedJob,
-                requestNativeCancellation = { RunAnywhere.ragCancelQuery() },
-                onNativeCancellationFailure = {
-                    RACLog.w("rag query cancellation failed: ${it.message}")
-                },
-            )
+            stoppedJob?.cancel()
+            stoppedJob?.join()
             if (stoppedVersion == queryGeneration) isQuerying = false
         }
     }
 
     fun clearAll() {
         cancelCorpusWork()
-        viewModelScope.launch { RagPipelineCoordinator.release(pipelineOwner) }
-        pipelineKey = null
+        viewModelScope.launch { closeSession() }
         clearCorpusState(clearMessages = true)
     }
 
-    // The vector index is tied to the embedding model; if the chosen models change, the pipeline
-    // and everything ingested under it are no longer valid, so tear them down and start fresh.
+    // The vector index is tied to the embedding model; if the chosen models change,
+    // the session and everything indexed under it are no longer valid.
     fun onModelsChanged(embeddingId: String?, llmId: String?) {
-        val key = pipelineKey ?: ingestKey ?: return
-        if (embeddingId != null && llmId != null && key == (embeddingId to llmId)) return
+        val key = sessionKey ?: return
+        if (embeddingId != null && llmId != null && key == SessionKey(embeddingId, llmId)) return
         cancelCorpusWork()
-        viewModelScope.launch { RagPipelineCoordinator.release(pipelineOwner) }
-        pipelineKey = null
-        ingestKey = null
+        viewModelScope.launch { closeSession() }
         clearCorpusState(clearMessages = true)
     }
 
-    // Pipeline config: rerank layered onto the model defaults.
-    private fun buildConfig(embeddingId: String, llmId: String): RAGConfiguration =
-        RAGConfiguration.defaults().copy(
-            embedding_model_id = embeddingId,
-            llm_model_id = llmId,
-            rerank_results = rerankEnabled,
-        )
-
-    private suspend fun <T> withPipeline(
-        embeddingId: String,
-        llmId: String,
-        block: suspend () -> T,
-    ): T {
-        val key = embeddingId to llmId
-        if (pipelineKey != null && pipelineKey != key) {
+    private suspend fun openSession(embeddingId: String, llmId: String): RagSession {
+        val key = SessionKey(embeddingId, llmId)
+        session?.let { existing ->
+            if (sessionKey == key) return existing
             documents.clear()
             messages.clear()
             chunkCount = 0
             loadedDocs.clear()
+            closeSession()
         }
-        val identity = RagPipelineIdentity(
-            embeddingModelId = embeddingId,
-            llmModelId = llmId,
-            rerankEnabled = rerankEnabled,
+        val opened = RunAnywhere.rag.open(
+            embeddingModel = ModelRef(embeddingId),
+            llmModel = ModelRef(llmId),
+            config = RagConfig(rerank = rerankEnabled, multiQuery = multiQueryEnabled),
         )
-        return RagPipelineCoordinator.withPipeline(
-            requestedOwner = pipelineOwner,
-            requestedIdentity = identity,
-            create = { RunAnywhere.ragCreatePipeline(buildConfig(embeddingId, llmId)) },
-            rehydrate = {
-                loadedDocs.toList().forEach {
-                    RunAnywhere.ragIngest(
-                        RAGDocument(text = it.text, metadata = it.metadata),
-                    )
-                }
-            },
-        ) {
-            pipelineKey = key
-            block()
-        }
+        session = opened
+        sessionKey = key
+        return opened
+    }
+
+    private suspend fun closeSession() {
+        val open = session ?: return
+        session = null
+        sessionKey = null
+        runCatching { open.close() }.onFailure { RACLog.w("rag session close failed: ${it.message}") }
     }
 
     @OptIn(DelicateCoroutinesApi::class)
     override fun onCleared() {
         cancelCorpusWork()
-        if (pipelineKey != null) GlobalScope.launch { RagPipelineCoordinator.release(pipelineOwner) }
+        val open = session
+        session = null
+        sessionKey = null
+        if (open != null) GlobalScope.launch { runCatching { open.close() } }
     }
 
     private fun cancelCorpusWork() {
-        val hadActiveQuery = isQuerying
         corpusGeneration++
         queryGeneration++
         job?.cancel()
         job = null
-        if (hadActiveQuery) requestNativeQueryCancellation()
         ingestJob?.cancel()
         ingestJob = null
-        ingestKey = null
         rerankJob?.cancel()
         rerankJob = null
         isIngesting = false
         isQuerying = false
         isRerankRebuildInFlight = false
-    }
-
-    private fun requestNativeQueryCancellation() {
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching { RunAnywhere.ragCancelQuery() }
-                .onFailure { RACLog.w("rag query cancellation failed: ${it.message}") }
-        }
     }
 
     private fun clearCorpusState(clearMessages: Boolean) {
@@ -385,4 +321,6 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
         loadedDocs.clear()
         error = null
     }
+
+    private data class SessionKey(val embeddingId: String, val llmId: String)
 }

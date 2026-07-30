@@ -1,18 +1,21 @@
 /**
  * @file cmd_lora.cpp
- * @brief `rcli lora import <file>` / `rcli lora list` — LoRA adapter catalog.
+ * @brief `rcli lora apply|remove|list` (+ `catalog` and `import`) — LoRA
+ *        adapters on the loaded LLM.
  *
- * Import places a local adapter file through the canonical commons entry
- * point (rac_lora_adapter_import_proto): catalog matching, canonical
- * placement, artifact registration, and manifest persistence all happen in
- * commons. This file only translates argv ↔ proto bytes, per the repo
- * layering rule.
+ * `list` reports the adapters currently attached (rac_lora_state_proto) — the
+ * spec's LoraState — while `catalog` lists registered adapter metadata. Import
+ * places a local adapter file through the canonical commons entry point
+ * (rac_lora_adapter_import_proto): catalog matching, canonical placement,
+ * artifact registration, and manifest persistence all happen in commons. This
+ * file only translates argv ↔ proto bytes, per the repo layering rule.
  */
 
 #include "commands/commands.h"
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "lora_options.pb.h"
 #include "model_types.pb.h"
@@ -87,7 +90,7 @@ int run_lora_import(const GlobalOptions &options, const std::string &file) {
   return 0;
 }
 
-int run_lora_list(const GlobalOptions &options) {
+int run_lora_catalog(const GlobalOptions &options) {
   Bootstrapped env;
   if (bootstrap(options, &env) != RAC_SUCCESS) {
     return 1;
@@ -145,6 +148,100 @@ int run_lora_list(const GlobalOptions &options) {
     out::result_line(entry.id() + "  " + entry.name() +
                      (downloaded ? "  [downloaded]" : ""));
   }
+  return 0;
+}
+
+void print_lora_state(const GlobalOptions &options, const v1::LoRAState &state) {
+  if (options.json) {
+    out::JsonWriter json;
+    json.begin_object()
+        .field("has_active_adapters", state.has_active_adapters())
+        .field("base_model_id", state.base_model_id())
+        .begin_array("applied");
+    for (const v1::LoRAAdapterInfo &adapter : state.loaded_adapters()) {
+      json.begin_array_object()
+          .field("id", adapter.adapter_id())
+          .field("path", adapter.adapter_path())
+          .field("scale", static_cast<double>(adapter.scale()))
+          .field("applied", adapter.applied())
+          .end_object();
+    }
+    json.end_array().end_object();
+    out::result_line(json.str());
+    return;
+  }
+  if (state.loaded_adapters().empty()) {
+    out::result_line("no adapters applied");
+    return;
+  }
+  std::vector<std::vector<std::string>> rows;
+  for (const v1::LoRAAdapterInfo &adapter : state.loaded_adapters()) {
+    rows.push_back({adapter.adapter_id().empty() ? adapter.adapter_path()
+                                                 : adapter.adapter_id(),
+                    std::to_string(adapter.scale()),
+                    adapter.applied() ? "yes" : "no"});
+  }
+  out::table({"ADAPTER", "SCALE", "APPLIED"}, rows);
+}
+
+int run_lora_list(const GlobalOptions &options) {
+  Bootstrapped env;
+  if (bootstrap(options, &env) != RAC_SUCCESS) {
+    return 1;
+  }
+
+  v1::LoRAState request;
+  const std::string request_bytes = proto::serialize(request);
+  rac_proto_buffer_t out_buffer;
+  rac_proto_buffer_init(&out_buffer);
+  const rac_result_t rc = rac_lora_state_proto(
+      reinterpret_cast<const uint8_t *>(request_bytes.data()),
+      request_bytes.size(), &out_buffer);
+  v1::LoRAState state;
+  std::string error;
+  if (!proto::parse_proto_buffer(&out_buffer, &state, &error) ||
+      rc != RAC_SUCCESS) {
+    out::error_line("cannot read LoRA state: " + error);
+    return 1;
+  }
+  print_lora_state(options, state);
+  return 0;
+}
+
+int run_lora_remove(const GlobalOptions &options, const std::string &adapter) {
+  Bootstrapped env;
+  if (bootstrap(options, &env) != RAC_SUCCESS) {
+    return 1;
+  }
+
+  v1::LoRARemoveRequest request;
+  if (adapter.empty()) {
+    request.set_clear_all(true);
+  } else if (adapter.find('/') != std::string::npos ||
+             adapter.ends_with(".gguf")) {
+    request.add_adapter_paths(adapter);
+  } else {
+    request.add_adapter_ids(adapter);
+  }
+
+  const std::string request_bytes = proto::serialize(request);
+  rac_proto_buffer_t out_buffer;
+  rac_proto_buffer_init(&out_buffer);
+  const rac_result_t rc = rac_lora_remove_proto(
+      reinterpret_cast<const uint8_t *>(request_bytes.data()),
+      request_bytes.size(), &out_buffer);
+  v1::LoRAState state;
+  std::string error;
+  if (!proto::parse_proto_buffer(&out_buffer, &state, &error) ||
+      rc != RAC_SUCCESS) {
+    out::error_line("remove failed: " + error);
+    return 1;
+  }
+  if (state.has_error_message()) {
+    out::error_line("remove failed: " + state.error_message());
+    return 1;
+  }
+  print_lora_state(options, state);
   return 0;
 }
 
@@ -227,23 +324,40 @@ int run_lora_apply(const GlobalOptions &options, const std::string &model_id,
 } // namespace
 
 void register_lora(CLI::App &app, GlobalOptions &options) {
-  CLI::App *cmd = app.add_subcommand("lora", "LoRA adapter catalog");
+  CLI::App *cmd = app.add_subcommand("lora", "Attach LoRA adapters to a language model");
   cmd->require_subcommand(1);
 
-  CLI::App *import_cmd = cmd->add_subcommand(
-      "import", "Import a local adapter file into SDK-owned storage");
-  auto file = std::make_shared<std::string>();
-  import_cmd->add_option("file", *file, "Path to the adapter file (.gguf)")
+  CLI::App *apply_cmd =
+      cmd->add_subcommand("apply", "Attach an adapter to a model, loading both");
+  auto apply_model = std::make_shared<std::string>();
+  auto adapter_path = std::make_shared<std::string>();
+  auto scale = std::make_shared<float>(1.0f);
+  apply_cmd->add_option("adapter", *adapter_path, "Path to the adapter file (.gguf)")
       ->required();
-  import_cmd->callback([&options, file]() {
-    const int exit_code = run_lora_import(options, *file);
+  apply_cmd->add_option("--model,-m", *apply_model, "LLM to attach the adapter to")
+      ->required();
+  apply_cmd->add_option("--scale", *scale, "How strongly the adapter applies (default 1.0)")
+      ->default_val(1.0f);
+  apply_cmd->callback([&options, apply_model, adapter_path, scale]() {
+    const int exit_code = run_lora_apply(options, *apply_model, *adapter_path, *scale);
     if (exit_code != 0) {
       throw CLI::RuntimeError(exit_code);
     }
   });
 
-  CLI::App *list_cmd =
-      cmd->add_subcommand("list", "List registered LoRA adapters");
+  CLI::App *remove_cmd =
+      cmd->add_subcommand("remove", "Detach one adapter, or every adapter");
+  auto remove_ref = std::make_shared<std::string>();
+  remove_cmd->add_option("adapter", *remove_ref,
+                         "Adapter id or path (omit to detach all)");
+  remove_cmd->callback([&options, remove_ref]() {
+    const int exit_code = run_lora_remove(options, *remove_ref);
+    if (exit_code != 0) {
+      throw CLI::RuntimeError(exit_code);
+    }
+  });
+
+  CLI::App *list_cmd = cmd->add_subcommand("list", "Show the adapters currently attached");
   list_cmd->callback([&options]() {
     const int exit_code = run_lora_list(options);
     if (exit_code != 0) {
@@ -251,19 +365,22 @@ void register_lora(CLI::App &app, GlobalOptions &options) {
     }
   });
 
-  CLI::App *apply_cmd = cmd->add_subcommand(
-      "apply", "Load an LLM and attach a LoRA adapter (.gguf) to it");
-  auto apply_model = std::make_shared<std::string>();
-  auto adapter_path = std::make_shared<std::string>();
-  auto scale = std::make_shared<float>(1.0f);
-  apply_cmd->add_option("adapter", *adapter_path, "Path to the adapter file (.gguf)")
+  CLI::App *catalog_cmd =
+      cmd->add_subcommand("catalog", "List adapters registered with the SDK");
+  catalog_cmd->callback([&options]() {
+    const int exit_code = run_lora_catalog(options);
+    if (exit_code != 0) {
+      throw CLI::RuntimeError(exit_code);
+    }
+  });
+
+  CLI::App *import_cmd =
+      cmd->add_subcommand("import", "Copy a local adapter file into SDK storage");
+  auto file = std::make_shared<std::string>();
+  import_cmd->add_option("file", *file, "Path to the adapter file (.gguf)")
       ->required();
-  apply_cmd->add_option("--model,-m", *apply_model, "LLM model id to attach the adapter to")
-      ->required();
-  apply_cmd->add_option("--scale", *scale, "Adapter scale factor (default: 1.0)")
-      ->default_val(1.0f);
-  apply_cmd->callback([&options, apply_model, adapter_path, scale]() {
-    const int exit_code = run_lora_apply(options, *apply_model, *adapter_path, *scale);
+  import_cmd->callback([&options, file]() {
+    const int exit_code = run_lora_import(options, *file);
     if (exit_code != 0) {
       throw CLI::RuntimeError(exit_code);
     }

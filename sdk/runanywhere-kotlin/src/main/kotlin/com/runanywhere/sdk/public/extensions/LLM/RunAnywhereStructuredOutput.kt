@@ -34,6 +34,7 @@ import java.util.UUID
 
 // MARK: - Structured Output
 
+@Deprecated("Use RunAnywhere.llm.generateStructured(prompt, schema, options).")
 suspend fun RunAnywhere.generateStructured(
     prompt: String,
     schema: RAJSONSchema,
@@ -50,6 +51,7 @@ suspend fun RunAnywhere.generateStructured(
     return extractStructuredOutput(generation.text, schema)
 }
 
+@Deprecated("Use RunAnywhere.llm.generateStructured(prompt, schema, options).")
 suspend fun RunAnywhere.generateWithStructuredOutput(
     prompt: String,
     structuredOutput: StructuredOutputOptions,
@@ -84,6 +86,7 @@ suspend fun RunAnywhere.generateWithStructuredOutput(
     return generate(request)
 }
 
+@Deprecated("Use RunAnywhere.llm.generateStructured(prompt, schema, options).")
 suspend fun RunAnywhere.extractStructuredOutput(
     text: String,
     schema: RAJSONSchema,
@@ -99,6 +102,7 @@ suspend fun RunAnywhere.extractStructuredOutput(
     }
 }
 
+@Deprecated("Use RunAnywhere.llm.generateStream with LlmOptions.structuredOutput.")
 fun RunAnywhere.generateStructuredStream(
     prompt: String,
     schema: RAJSONSchema,

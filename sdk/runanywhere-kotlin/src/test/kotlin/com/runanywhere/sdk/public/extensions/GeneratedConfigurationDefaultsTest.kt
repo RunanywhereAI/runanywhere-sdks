@@ -9,7 +9,6 @@ import ai.runanywhere.proto.v1.EmbeddingsConfiguration
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.STTConfiguration
 import ai.runanywhere.proto.v1.STTOptions
-import ai.runanywhere.proto.v1.TTSConfiguration
 import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.VADConfiguration
 import com.runanywhere.sdk.generated.convenience.defaults
@@ -35,7 +34,7 @@ class GeneratedConfigurationDefaultsTest {
 
         val vad = VADConfiguration.defaults()
         assertEquals(16_000, vad.sample_rate)
-        assertEquals(0.015f, vad.threshold)
+        assertEquals(0.015f, vad.activation_threshold)
 
         val sttConfiguration = STTConfiguration.defaults()
         assertEquals(16_000, sttConfiguration.sample_rate)
@@ -46,7 +45,7 @@ class GeneratedConfigurationDefaultsTest {
         assertEquals(true, sttOptions.enable_punctuation)
         assertEquals(true, sttOptions.enable_word_timestamps)
 
-        assertEquals(22_050, TTSConfiguration.defaults().sample_rate)
+        // TTS synthesis knobs left TTSConfiguration in the v2 contract; TTSOptions owns them.
         assertEquals(22_050, TTSOptions.defaults().sample_rate)
     }
 }

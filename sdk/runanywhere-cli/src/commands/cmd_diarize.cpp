@@ -168,18 +168,17 @@ int run_diarize(const GlobalOptions& options, const std::string& audio_path,
 }  // namespace
 
 void register_diarize(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd =
-        app.add_subcommand("diarize", "Speaker diarization of a WAV file (who spoke when)");
+    CLI::App* cmd = app.add_subcommand("diarize", "Label who spoke when in an audio file");
     auto audio = std::make_shared<std::string>();
     auto model = std::make_shared<std::string>();
     auto diar = std::make_shared<rac_diarization_options_t>(RAC_DIARIZATION_OPTIONS_DEFAULT);
     cmd->add_option("audio", *audio, "16-bit PCM WAV file")->required()->check(CLI::ExistingFile);
     cmd->add_option("--model,-m", *model, "Diarization model id or on-disk path")->required();
     cmd->add_option("--threshold", diar->threshold,
-                    "Speaker-activity threshold in [0,1] (default 0.5)");
-    cmd->add_option("--min-duration", diar->minimum_duration_ms,
+                    "Speaker activity needed to open a segment, in [0,1] (default 0.5)");
+    cmd->add_option("--minimum-duration-ms,--min-duration", diar->minimum_duration_ms,
                     "Drop segments shorter than this many ms (default 0)");
-    cmd->add_option("--merge-gap", diar->merge_gap_ms,
+    cmd->add_option("--merge-gap-ms,--merge-gap", diar->merge_gap_ms,
                     "Merge same-speaker segments closer than this many ms (default 0)");
     cmd->callback([&options, audio, model, diar]() {
         const int exit_code = run_diarize(options, *audio, *model, *diar);

@@ -227,8 +227,8 @@ extension RALLMGenerationOptions {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RALLMGenerationOptions {
         var r = RALLMGenerationOptions()
-        r.maxOutputTokens = 100
-        r.temperature = 0.8
+        r.maxOutputTokens = 512
+        r.temperature = 0.7
         r.topP = 1.0
         r.topK = 0
         r.repetitionPenalty = 1.0

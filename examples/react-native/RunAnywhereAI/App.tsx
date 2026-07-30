@@ -229,7 +229,7 @@ const App: React.FC = () => {
           // example (custom URL honored, full bearer auth + registration).
           await RunAnywhere.initialize({
             apiKey: configuration.apiKey,
-            baseURL: configuration.baseURL,
+            baseUrl: configuration.baseURL,
             environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
           });
           console.log(
@@ -240,25 +240,19 @@ const App: React.FC = () => {
           // registration stay local-only until credentials are provided.
           await RunAnywhere.initialize({
             apiKey: '',
-            baseURL: '',
+            baseUrl: '',
             environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
           });
           console.log('[App] SDK initialized in DEVELOPMENT mode (keyless)');
         }
 
         await registerAll(backendState);
-        await RunAnywhere.refreshModelRegistry();
 
         const initTime = Date.now() - startTime;
-        const isInit = await RunAnywhere.isInitialized;
-        const version = RunAnywhere.version;
-        const sdkState = {
-          environment: RunAnywhere.environment,
-          servicesReady: RunAnywhere.areServicesReady,
-        };
-
         console.log(
-          `[App] SDK initialized: v${version}, ${isInit ? 'Active' : 'Inactive'}, ${initTime}ms, state: ${JSON.stringify(sdkState)}`
+          `[App] SDK initialized: v${RunAnywhere.version}, ${
+            RunAnywhere.isReady ? 'ready' : 'not ready'
+          }, ${initTime}ms`
         );
         /* eslint-enable no-console */
 

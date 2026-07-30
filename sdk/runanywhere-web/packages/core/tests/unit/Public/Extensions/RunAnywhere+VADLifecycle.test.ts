@@ -195,7 +195,7 @@ describe('canonical lifecycle VAD facade', () => {
     registerWasmModule(['vad'], module, ['onnx', 'sherpa']);
 
     const samples = new Float32Array([0.25, -0.5, 1]);
-    const result = await VAD.detectVoiceAuto(samples, {
+    const result = await VAD.detectVoice(samples, {
       threshold: 0.2,
       config: { sampleRate: 16_000 },
     });
@@ -235,7 +235,7 @@ describe('canonical lifecycle VAD facade', () => {
     registerWasmModule(['vad'], module, ['onnx', 'sherpa']);
 
     const results: VADResult[] = [];
-    for await (const result of VAD.streamVoiceAuto(chunks(3), { threshold: 0.15 })) {
+    for await (const result of VAD.streamVoiceActivity(chunks(3), { threshold: 0.15 })) {
       results.push(result);
     }
 
@@ -266,7 +266,7 @@ describe('canonical lifecycle VAD facade', () => {
     const { module, counters } = fakeLifecycleModule();
     registerWasmModule(['vad'], module, ['onnx', 'sherpa']);
 
-    for await (const _result of VAD.streamVoiceAuto(chunks(3))) {
+    for await (const _result of VAD.streamVoiceActivity(chunks(3))) {
       break;
     }
 

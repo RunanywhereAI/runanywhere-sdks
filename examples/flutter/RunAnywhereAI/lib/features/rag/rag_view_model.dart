@@ -16,14 +16,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// A single message in the RAG conversation.
 ///
 /// User messages contain only text. Assistant messages also carry
-/// the [RAGResult] for displaying retrieved chunks and timing info.
+/// the [RagResult] for displaying retrieved chunks and metrics.
 class RAGMessage {
   final proto.MessageRole role;
   final String text;
 
   /// The RAG result associated with this assistant message.
   /// Null for user messages and error messages.
-  final RAGResult? result;
+  final RagResult? result;
 
   const RAGMessage({required this.role, required this.text, this.result});
 }
@@ -63,43 +63,11 @@ class RAGViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  RAGResult? _lastResult;
-  RAGResult? get lastResult => _lastResult;
+  RagResult? _lastResult;
+  RagResult? get lastResult => _lastResult;
 
-  // RAG retrieval options. Rerank is a pipeline setting (RAGConfiguration);
-  // multi-query is a per-query option (RAGQueryOptions).
-  bool _rerankEnabled = false;
-  bool get rerankEnabled => _rerankEnabled;
+  RagSession? _session;
 
-  bool _multiQueryEnabled = false;
-  bool get multiQueryEnabled => _multiQueryEnabled;
-
-  set multiQueryEnabled(bool value) {
-    _multiQueryEnabled = value;
-    notifyListeners();
-  }
-
-  // Rerank rebuilds the pipeline, so changing it after a document is loaded
-  // resets the session (re-add the document), matching a model change.
-  Future<void> setRerankEnabled(bool value) async {
-    if (_rerankEnabled == value) return;
-    final previous = _rerankEnabled;
-    _rerankEnabled = value;
-    _error = null;
-    try {
-      if (_isDocumentLoaded) {
-        await RunAnywhere.rag.destroyPipeline();
-        _isDocumentLoaded = false;
-        _documentName = null;
-        _messages = [];
-      }
-    } catch (e) {
-      _rerankEnabled = previous;
-      _error = e.toString();
-    } finally {
-      notifyListeners();
-    }
-  }
 
   bool get canAskQuestion =>
       _isDocumentLoaded && !_isQuerying && _currentQuestion.trim().isNotEmpty;
@@ -121,21 +89,23 @@ class RAGViewModel extends ChangeNotifier {
     try {
       final extractedText = await DocumentService.extractText(filePath);
 
-      await RunAnywhere.rag.ragCreatePipelineForModels(
-        embeddingModel: embeddingModel,
-        llmModel: llmModel,
-        baseConfiguration: RAGConfiguration(rerankResults: _rerankEnabled),
+      await _session?.close();
+      final session = await RunAnywhere.rag.open(
+        embeddingModel: ModelRef(embeddingModel.id),
+        llmModel: ModelRef(llmModel.id),
       );
-      await RunAnywhere.rag.ragIngest(proto.RAGDocument(text: extractedText));
+      _session = session;
+      await session.ingest(RagDocument(extractedText));
 
       _documentName = File(filePath).uri.pathSegments.last;
       _isDocumentLoaded = true;
       _llmSupportsThinking = llmModel.supportsThinking;
     } catch (e) {
       _error = e.toString();
-      // Tear down any partially-created pipeline so a failed ingest doesn't
-      // leave an orphaned C++ pipeline session behind.
-      await RunAnywhere.rag.destroyPipeline();
+      // Tear down any partially-created session so a failed ingest doesn't
+      // leave an orphaned native index behind.
+      await _session?.close();
+      _session = null;
     } finally {
       _isLoadingDocument = false;
       notifyListeners();
@@ -167,18 +137,19 @@ class RAGViewModel extends ChangeNotifier {
       // RAG answers never render thinking, so a thinking-capable model with
       // the toggle off gets reasoning explicitly switched off; otherwise the
       // pipeline defaults apply (thoughts stripped from the answer).
-      final result = await RunAnywhere.rag.query(
+      final session = _session;
+      if (session == null) {
+        throw StateError('No RAG session is open');
+      }
+      final result = await session.query(
         question,
-        options: RAGQueryOptions(
-          generation: _llmSupportsThinking && !thinkingModeEnabled
-              ? proto.LLMGenerationOptions(
-                  reasoning: proto.ReasoningOptions(
-                    mode: proto.ReasoningMode.REASONING_MODE_OFF,
-                  ),
-                )
-              : null,
-          enableMultiQuery: _multiQueryEnabled,
-        ),
+        options: _llmSupportsThinking && !thinkingModeEnabled
+            ? LlmOptions(
+                reasoning: const ReasoningOptions(
+                  mode: ReasoningMode.REASONING_MODE_OFF,
+                ),
+              )
+            : null,
       );
 
       _messages = [
@@ -209,7 +180,8 @@ class RAGViewModel extends ChangeNotifier {
   ///
   /// Resets all document and conversation state.
   Future<void> clearDocument() async {
-    await RunAnywhere.rag.destroyPipeline();
+    await _session?.close();
+    _session = null;
 
     _documentName = null;
     _isDocumentLoaded = false;
@@ -223,9 +195,10 @@ class RAGViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    // Destroy the C++ RAG pipeline so it isn't leaked when the screen is popped
-    // without an explicit clearDocument(). dispose() is sync, so fire-and-forget.
-    unawaited(RunAnywhere.rag.destroyPipeline());
+    // Close the session so its native index isn't leaked when the screen is
+    // popped without an explicit clearDocument(). dispose() is sync.
+    unawaited(_session?.close());
+    _session = null;
     super.dispose();
   }
 }

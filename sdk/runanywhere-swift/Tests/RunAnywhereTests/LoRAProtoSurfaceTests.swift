@@ -13,7 +13,7 @@ final class LoRAProtoSurfaceTests: XCTestCase {
     func testLoRARuntimeSurfaceUsesGeneratedProtoTypes() {
         let apply: (RALoRAApplyRequest) async throws -> RALoRAApplyResult = RunAnywhere.lora.apply
         let remove: (RALoRARemoveRequest) async throws -> RALoRAState = RunAnywhere.lora.remove
-        let list: () async throws -> RALoRAState = RunAnywhere.lora.list
+        let list: () async throws -> LoraState = RunAnywhere.lora.list
         let state: () async throws -> RALoRAState = RunAnywhere.lora.state
         let checkCompatibility: (RALoRAAdapterConfig) async -> RALoraCompatibilityResult =
             RunAnywhere.lora.checkCompatibility

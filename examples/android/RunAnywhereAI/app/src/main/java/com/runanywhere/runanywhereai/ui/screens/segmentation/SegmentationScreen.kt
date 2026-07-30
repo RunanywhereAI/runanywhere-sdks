@@ -286,12 +286,12 @@ private fun ResultCard(viewModel: SegmentationViewModel) {
         viewModel.classSummaries.forEach { summary ->
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    summary.label.ifEmpty { "class ${summary.class_id}" },
+                    summary.label.ifEmpty { "class ${summary.classId}" },
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    "${summary.pixel_count} px · ${"%.1f".format(summary.fraction * 100)}%",
+                    "${summary.pixelCount} px · ${"%.1f".format(summary.fraction * 100)}%",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

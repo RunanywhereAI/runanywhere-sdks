@@ -15,16 +15,10 @@ class VADViewModel extends VoiceComponentViewModelBase {
   VADViewModel();
 
   final sdk.AudioCaptureManager _capture = sdk.AudioCaptureManager();
-  StreamSubscription<sdk.VADResult>? _vadSubscription;
+  StreamSubscription<sdk.VadResult>? _vadSubscription;
   StreamSubscription<double>? _levelSubscription;
 
   // --- Component identity -----------------------------------------------------
-
-  @override
-  sdk.SDKComponent get component => sdk.SDKComponent.SDK_COMPONENT_VAD;
-
-  @override
-  sdk.EventCategory get eventCategory => sdk.EventCategory.EVENT_CATEGORY_VAD;
 
   @override
   ModelCategory get modelCategory =>
@@ -35,8 +29,7 @@ class VADViewModel extends VoiceComponentViewModelBase {
   bool isProcessing = false;
   bool isListening = false;
   bool isSpeech = false;
-  double confidence = 0;
-  double energy = 0;
+  double probability = 0;
   int frameCount = 0;
   double audioLevel = 0;
 
@@ -63,7 +56,7 @@ class VADViewModel extends VoiceComponentViewModelBase {
 
   @override
   Future<void> performLoad(ModelInfo model) =>
-      sdk.RunAnywhere.vad.loadModel(model.id);
+      sdk.RunAnywhere.models.load(model.id);
 
   /// VAD resolves the display name from the model catalog when available
   /// (mirrors iOS).
@@ -85,7 +78,7 @@ class VADViewModel extends VoiceComponentViewModelBase {
 
   Future<void> startListening() async {
     debugPrint('Starting VAD listening');
-    if (!sdk.RunAnywhere.vad.isModelLoaded) {
+    if (!hasModelSelected) {
       errorMessage = 'Select a VAD model first';
       notify();
       return;
@@ -107,20 +100,14 @@ class VADViewModel extends VoiceComponentViewModelBase {
       notify();
     });
 
-    // Consume the SDK's streaming VAD session: one VADResult per mic chunk;
+    // Consume the SDK's streaming VAD session: one result per mic chunk;
     // the SDK owns model framing — no app-side buffer math.
-    _vadSubscription = sdk.RunAnywhere.vad.streamVAD(chunks).listen(
+    _vadSubscription = sdk.RunAnywhere.vad
+        .detectStream(chunks.map(sdk.AudioInput.pcm16))
+        .listen(
       (result) {
-        if (result.errorMessage.isNotEmpty) {
-          errorMessage = result.errorMessage;
-          isListening = false;
-          notify();
-          unawaited(_capture.cancel());
-          return;
-        }
         isSpeech = result.isSpeech;
-        confidence = result.confidence;
-        energy = result.energy;
+        probability = result.probability;
         frameCount += 1;
         notify();
       },

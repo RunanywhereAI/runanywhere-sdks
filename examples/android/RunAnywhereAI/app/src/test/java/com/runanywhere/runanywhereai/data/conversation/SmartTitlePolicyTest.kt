@@ -1,6 +1,6 @@
 package com.runanywhere.runanywhereai.data.conversation
 
-import ai.runanywhere.proto.v1.ReasoningMode
+import com.runanywhere.sdk.public.api.ReasoningMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,8 +12,8 @@ class SmartTitlePolicyTest {
     fun `title generation always disables thinking and stays tightly bounded`() {
         val options = SmartTitlePolicy.generationOptions("title only")
 
-        assertEquals(32, options.max_output_tokens)
-        assertEquals(ReasoningMode.REASONING_MODE_OFF, options.reasoning?.mode)
+        assertEquals(32, options.maxOutputTokens)
+        assertEquals(ReasoningMode.OFF, options.reasoning?.mode)
         assertEquals(8_000L, SmartTitlePolicy.TIMEOUT_MILLIS)
     }
 

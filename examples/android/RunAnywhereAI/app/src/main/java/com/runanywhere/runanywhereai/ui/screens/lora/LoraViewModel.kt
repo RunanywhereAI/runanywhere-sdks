@@ -9,8 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.lora
-import com.runanywhere.sdk.public.types.RALoRARemoveRequest
+import com.runanywhere.sdk.public.api.lora
+import com.runanywhere.sdk.public.extensions.loraCatalog
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -42,7 +42,7 @@ class LoraViewModel : ViewModel() {
             state = state.copy(busyId = entry.id, progressPercent = 0, error = null)
             try {
                 val path =
-                    adapterLocalPath(entry) ?: RunAnywhere.lora.download(entry) { progress ->
+                    adapterLocalPath(entry) ?: RunAnywhere.loraCatalog.download(entry) { progress ->
                         val pct =
                             if (progress.total_bytes > 0) {
                                 (progress.bytes_downloaded * 100 / progress.total_bytes).toInt()
@@ -75,18 +75,9 @@ class LoraViewModel : ViewModel() {
         viewModelScope.launch {
             state = state.copy(busyId = entry.id, error = null)
             try {
-                val result = RunAnywhere.lora.apply(
-                    entry = entry,
-                    localPath = path,
-                    scale = scale,
-                    replaceExisting = true,
-                )
-                if (result.success) {
-                    GlobalState.lora.set(entry.id)
-                    state = state.copy(busyId = null, activeId = entry.id)
-                } else {
-                    state = state.copy(busyId = null, error = result.error_message?.ifBlank { null } ?: "Apply failed")
-                }
+                RunAnywhere.lora.apply(entry.id, scale)
+                GlobalState.lora.set(entry.id)
+                state = state.copy(busyId = null, activeId = entry.id)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -99,7 +90,7 @@ class LoraViewModel : ViewModel() {
     fun clear() {
         viewModelScope.launch {
             try {
-                RunAnywhere.lora.remove(RALoRARemoveRequest(clear_all = true))
+                RunAnywhere.lora.remove()
                 GlobalState.lora.set(null)
                 state = state.copy(activeId = null)
             } catch (e: CancellationException) {
@@ -129,14 +120,13 @@ class LoraViewModel : ViewModel() {
             return
         }
         try {
-            val adapters = RunAnywhere.lora.adaptersForModel(modelId)
+            val adapters = RunAnywhere.loraCatalog.adaptersForModel(modelId)
             adapters.forEach { entry ->
                 entry.local_path?.takeIf { it.isNotBlank() }?.let { path ->
                     downloadedPaths[entry.id] = path
                 }
             }
-            val active = RunAnywhere.lora.state().loaded_adapters
-                .firstOrNull { it.applied }?.adapter_id?.takeIf { it.isNotEmpty() }
+            val active = RunAnywhere.lora.list().applied.firstOrNull()?.id?.takeIf { it.isNotEmpty() }
             GlobalState.lora.set(active)
             state = state.copy(adapters = adapters, activeId = active, isLoading = false, error = null)
         } catch (e: CancellationException) {

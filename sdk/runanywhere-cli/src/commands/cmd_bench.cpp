@@ -721,7 +721,7 @@ int run_bench(const GlobalOptions& options, const std::string& only_model, int t
 
 void register_bench(CLI::App& app, GlobalOptions& options) {
     CLI::App* cmd = app.add_subcommand(
-        "bench", "Benchmark installed models (auto-runs all downloaded LLM/STT/TTS/VLM models)");
+        "bench", "Measure throughput and load time of downloaded models");
     auto model = std::make_shared<std::string>();
     auto trials = std::make_shared<int>(3);
     auto vlm_image = std::make_shared<std::string>("docs/gifs/npu-model-tag-screenshot.png");

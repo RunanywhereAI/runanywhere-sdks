@@ -12,11 +12,11 @@ extension LLMViewModel {
     // MARK: - Analytics Creation
 
     func createAnalytics(
-        from result: RALLMGenerationResult,
+        from result: GenerationResult,
         messageId: String,
         conversationId: String,
         wasInterrupted: Bool,
-        options: RALLMGenerationOptions
+        options: LlmOptions
     ) -> MessageAnalytics? {
         guard let modelName = loadedModelName,
               let currentModel = ModelListViewModel.shared.currentModel else {
@@ -36,44 +36,49 @@ extension LLMViewModel {
 
     // swiftlint:disable:next function_parameter_count
     func buildMessageAnalytics(
-        result: RALLMGenerationResult,
+        result: GenerationResult,
         messageId: String,
         conversationId: String,
         modelName: String,
         currentModel: RAModelInfo,
         wasInterrupted: Bool,
-        options: RALLMGenerationOptions
+        options: LlmOptions
     ) -> MessageAnalytics {
         let completionStatus: MessageAnalytics.CompletionStatus = wasInterrupted ? .interrupted : .complete
         let generationParameters = MessageAnalytics.GenerationParameters(
             temperature: Double(options.temperature),
-            maxTokens: Int(options.maxOutputTokens),
+            maxTokens: options.maxOutputTokens,
             topP: nil,
             topK: nil
         )
         // Prefer the TTFT carried on the result (streaming sets it); fall back
         // to the value recorded from the SDK's first-token event. Mirrors
         // Android ChatViewModel.buildStats.
-        let ttftMs = result.timeToFirstTokenMs ?? activeGenerationTTFTMs
+        let ttftMs = result.timeToFirstTokenMs > 0 ? Double(result.timeToFirstTokenMs) : activeGenerationTTFTMs
+        // GenerationResult reports throughput, not elapsed time, so the decode
+        // duration is recovered from tokens ÷ tokens-per-second.
+        let generationSeconds = result.tokensPerSecond > 0
+            ? Double(result.outputTokens) / Double(result.tokensPerSecond)
+            : 0
 
         return MessageAnalytics(
             messageId: messageId,
             conversationId: conversationId,
             modelId: currentModel.id,
             modelName: modelName,
-            framework: result.framework.isEmpty ? currentModel.framework.wireString : result.framework,
+            framework: currentModel.framework.wireString,
             timestamp: Date(),
             timeToFirstToken: ttftMs.map { $0 / 1000.0 },
-            totalGenerationTime: result.latencyMs / 1000.0,
+            totalGenerationTime: generationSeconds,
             thinkingTime: nil,
             responseTime: nil,
-            inputTokens: Int(result.inputTokens),
-            outputTokens: result.tokensUsed,
-            thinkingTokens: result.thinkingTokens > 0 ? Int(result.thinkingTokens) : nil,
-            responseTokens: result.responseTokens > 0 ? Int(result.responseTokens) : result.tokensUsed,
-            averageTokensPerSecond: result.tokensPerSecond,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            thinkingTokens: nil,
+            responseTokens: result.outputTokens,
+            averageTokensPerSecond: Double(result.tokensPerSecond),
             messageLength: result.text.count,
-            wasThinkingMode: result.hasThinkingContent,
+            wasThinkingMode: result.thinkingText?.isEmpty == false,
             wasInterrupted: wasInterrupted,
             retryCount: 0,
             completionStatus: completionStatus,

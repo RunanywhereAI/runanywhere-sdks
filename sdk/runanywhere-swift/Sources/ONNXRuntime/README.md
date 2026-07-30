@@ -38,13 +38,13 @@ func bootstrap() throws {
     ONNX.register()
     try RunAnywhere.initialize(
         apiKey: "<YOUR_API_KEY>",
-        baseURL: "https://api.runanywhere.ai",
+        baseUrl: "https://api.runanywhere.ai",
         environment: .production
     )
 }
 
 // Load models and transcribe via RunAnywhere core APIs
-let output = try await RunAnywhere.transcribe(audio: audioData)
+let output = try await RunAnywhere.stt.transcribe(.wav(audioData))
 print(output.text)
 ```
 

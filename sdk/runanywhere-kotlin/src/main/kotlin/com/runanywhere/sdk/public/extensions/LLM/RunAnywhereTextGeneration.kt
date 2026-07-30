@@ -43,6 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 private val llmLogger = SDKLogger.llm
 
+@Deprecated("Use RunAnywhere.llm.generate(prompt, options).")
 suspend fun RunAnywhere.generate(
     prompt: String,
     options: RALLMGenerationOptions? = null,
@@ -58,6 +59,7 @@ suspend fun RunAnywhere.generate(
     return CppBridgeLLM.generate(prompt, options)
 }
 
+@Deprecated("Use RunAnywhere.llm.generate(prompt, options).")
 suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGenerationResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -81,6 +83,7 @@ suspend fun RunAnywhere.generate(request: RALLMGenerateRequest): RALLMGeneration
     return CppBridgeLLM.generate(request)
 }
 
+@Deprecated("Use RunAnywhere.llm.generateStream(prompt, options).")
 fun RunAnywhere.generateStream(
     prompt: String,
     options: RALLMGenerationOptions? = null,
@@ -99,6 +102,7 @@ fun RunAnywhere.generateStream(
     )
 }
 
+@Deprecated("Use RunAnywhere.llm.generateStream(prompt, options).")
 fun RunAnywhere.generateStream(request: RALLMGenerateRequest): Flow<RALLMStreamEvent> {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -164,6 +168,7 @@ internal fun losslessLLMStreamFlow(
     }.buffer(Channel.UNLIMITED)
         .flowOn(Dispatchers.IO)
 
+@Deprecated("Cancel the Flow returned by RunAnywhere.llm.generateStream instead.")
 suspend fun RunAnywhere.cancelGeneration() {
     if (!isInitialized) return
     try {
@@ -201,6 +206,7 @@ internal data class LLMStreamModelIdentity(
  *   matches the loaded LLM model's analytics key; on terminal error events the
  *   [RALLMGenerationResult.error_message] is propagated.
  */
+@Deprecated("Collect RunAnywhere.llm.generateStream and read GenerationEvent.Completed.")
 suspend fun RunAnywhere.aggregateStream(
     prompt: String,
     events: Flow<RALLMStreamEvent>,

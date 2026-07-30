@@ -42,6 +42,7 @@ private val downloadLogger = SDKLogger("RunAnywhere.Download")
  * Cancellation propagates to the native worker via [CppBridgeDownload.cancel], preserving
  * resume bytes for a later retry.
  */
+@Deprecated("Use RunAnywhere.models.download(id).")
 suspend fun RunAnywhere.downloadModel(
     model: RAModelInfo,
     onProgress: (suspend (DownloadProgress) -> Unit)? = null,
@@ -181,6 +182,7 @@ private suspend fun RunAnywhere.downloadCompatibleModel(
  * Flow-shaped convenience wrapper around [downloadModel]. Collects the suspend+callback
  * form into a cold [Flow] for Kotlin consumers who prefer reactive collection.
  */
+@Deprecated("Use RunAnywhere.models.download(id).")
 fun RunAnywhere.downloadModelStream(model: RAModelInfo): Flow<DownloadProgress> =
     flow {
         downloadModel(model) { progress -> emit(progress) }

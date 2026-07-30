@@ -44,6 +44,7 @@ private fun notInitializedException(): SDKException =
         shouldLog = false,
     )
 
+@Deprecated("Use RunAnywhere.vad.detect(audio, options).")
 suspend fun RunAnywhere.detectVoiceActivity(
     audioData: ByteArray,
     options: RAVADOptions? = null,
@@ -91,6 +92,7 @@ suspend fun RunAnywhere.detectVoiceActivity(
  * `error_code`) and the flow finishes so callers do not silently keep
  * pumping audio into a dead detector.
  */
+@Deprecated("Use RunAnywhere.vad.detectStream(audio, options).")
 fun RunAnywhere.streamVAD(
     audio: Flow<ByteArray>,
     options: RAVADOptions? = null,
@@ -108,6 +110,7 @@ fun RunAnywhere.streamVAD(
             )
         }
 
+@Deprecated("Cancel the Flow returned by RunAnywhere.vad.detectStream instead.")
 suspend fun RunAnywhere.resetVAD() {
     if (!isInitialized) {
         throw notInitializedException()

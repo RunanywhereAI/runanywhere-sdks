@@ -44,31 +44,31 @@ extension LLMViewModel {
         let messageIndex = messagesValue.count - 1
 
         // Track the turn so Stop / conversation-switch cancels it and unlocks the
-        // composer (mirrors the text path). ragQuery is a single await with no SDK
-        // cancel entry point, so cancellation is observed once it returns.
+        // composer (mirrors the text path). The RAG query is a single await, so
+        // cancellation is observed once it returns.
         let task = Task {
             do {
-                try await prepareDocumentRAGPipelineIfNeeded(
+                let session = try await prepareDocumentRAGSessionIfNeeded(
                     document: document,
                     embeddingModel: embeddingModel,
                     answerModel: answerModel
                 )
 
-                var options = RARAGQueryOptions.defaults(question: prompt)
                 let settings = SettingsViewModel.shared
-                var reasoning = RAReasoningOptions()
+                var reasoning = ReasoningOptions()
                 if answerModel.supportsThinking && !settings.thinkingModeEnabled {
                     reasoning.mode = .off
                 }
                 reasoning.includeInOutput = settings.thinkingModeEnabled
-                options.generation.reasoning = reasoning
+                var options = LlmOptions()
+                options.reasoning = reasoning
 
-                let result = try await RunAnywhere.ragQuery(options)
+                let result = try await session.query(question: prompt, options: options)
                 if isCurrentGeneration(generationID) {
                     updateDocumentMessage(
                         at: messageIndex,
                         answer: result.answer,
-                        thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
+                        thinkingContent: nil,
                         answerModel: answerModel
                     )
                 }
@@ -116,32 +116,41 @@ extension LLMViewModel {
         }
     }
 
-    private func prepareDocumentRAGPipelineIfNeeded(
+    /// Reuse the open session while the document and both models are unchanged;
+    /// otherwise close it and open a fresh corpus.
+    private func prepareDocumentRAGSessionIfNeeded(
         document: ChatDocumentAttachment,
         embeddingModel: RAModelInfo,
         answerModel: RAModelInfo
-    ) async throws {
+    ) async throws -> RagSession {
         let key = ChatDocumentRAGPipelineKey(
             documentID: document.id,
             embeddingModelID: embeddingModel.id,
             answerModelID: answerModel.id
         )
-        guard preparedDocumentRAGPipelineKey != key else { return }
+        if preparedDocumentRAGPipelineKey == key, let session = documentRAGSession {
+            return session
+        }
 
         preparedDocumentRAGPipelineKey = nil
-        await RunAnywhere.ragDestroyPipeline()
-        try await RunAnywhere.ragCreatePipeline(
-            embeddingModel: embeddingModel,
-            llmModel: answerModel
+        await documentRAGSession?.close()
+        documentRAGSession = nil
+
+        let session = try await RunAnywhere.rag.open(
+            embeddingModel: ModelRef(id: embeddingModel.id),
+            llmModel: ModelRef(id: answerModel.id)
         )
-        var ragDocument = RARAGDocument()
-        ragDocument.text = document.text
-        ragDocument.metadata = [
-            "source": document.filename,
-            "filename": document.filename
-        ]
-        try await RunAnywhere.ragIngest(ragDocument)
+        try await session.ingest(document: RagDocument(
+            text: document.text,
+            metadata: [
+                "source": document.filename,
+                "filename": document.filename
+            ]
+        ))
+
+        documentRAGSession = session
         preparedDocumentRAGPipelineKey = key
+        return session
     }
 
     private func updateDocumentMessage(

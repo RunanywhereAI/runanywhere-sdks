@@ -88,8 +88,10 @@ app.whenReady().then(() => {
   // The GPU (CUDA) build is a separate prebuild; infer it from the addon path so
   // the UI can reflect the real compute device.
   const device = /cuda|gpu/i.test(process.env.RUNANYWHERE_NATIVE_PATH || '') ? 'gpu' : 'cpu';
+  // The self-test only captions when RA_TEST_IMAGE points at a real file; without
+  // it the vision step reports SKIPPED rather than failing on a missing path.
   const query = SELFTEST
-    ? { selftest: '1', device, image: process.env.RA_TEST_IMAGE || 'e:\\codes\\qual\\models\\test_red_circle.jpg' }
+    ? { selftest: '1', device, ...(process.env.RA_TEST_IMAGE ? { image: process.env.RA_TEST_IMAGE } : {}) }
     : { device };
   win.loadFile(path.join(__dirname, 'index.html'), { query });
 

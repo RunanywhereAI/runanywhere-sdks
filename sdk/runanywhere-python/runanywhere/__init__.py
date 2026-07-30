@@ -1,33 +1,46 @@
-"""RunAnywhere — on-device LLM / VLM / STT / TTS / embeddings for Python.
+"""RunAnywhere — on-device LLM, VLM, speech, embeddings and RAG for Python.
 
-The public surface of the SDK. Importing this package does NOT load the compiled native
-``_core`` extension: every pure-Python module stays importable (and hermetically testable)
-without a native build. The native library is loaded lazily on the first
-``RunAnywhere.initialize()`` (via :func:`runanywhere._native.get_core`), so nothing here
-imports ``_core`` at module top level.
+The public surface is one ``initialize`` call plus a namespace per modality::
+
+    import runanywhere as ra
+    from runanywhere import LlmOptions
+
+    ra.initialize()
+    print(ra.llm.generate("Hello", LlmOptions(model="smollm2-135m")).text)
+
+Verbs that block — on native decode, on a download, on disk — have an ``a``-prefixed async
+twin doing the same work on the event loop (``agenerate``, ``agenerate_stream``,
+``atranscribe``, ``aembed``, ``aquery``, ``aload``, …). The three stream verbs that consume a
+host-side iterable of audio (``stt.transcribe_stream``, ``tts.synthesize_stream``,
+``vad.detect_stream``) have no twin: they do no blocking work of their own beyond the frame
+they were handed.
+
+Importing this package does NOT load the compiled native ``_core`` extension: every module
+stays importable — and testable — without a native build. The library is loaded lazily on
+the first :func:`initialize`.
 """
 
 from __future__ import annotations
 
-# NOTE: keep this module free of any `_core` import (direct or transitive) — see the
-# module docstring. The client / model wrappers pull in the native layer lazily.
-from .audio import (
-    decode_wav,
-    downsample,
-    encode_wav,
-    float32_to_pcm16,
-    pcm16_bytes,
-    pcm16_to_float32,
-    rms,
-)
-from .catalog import CATALOG, CatalogEntry, CatalogFile, ModelType, is_catalog_id
-from .chat import Chat, ChatMessage, ChatRole
-from .client import RunAnywhere
-from .download import (
-    download_file,
-    model_status,
-    models_root,
-    resolve_model,
+from typing import Optional
+
+from ._runtime import runtime as _runtime
+from .api import (
+    RagSession,
+    diarization,
+    embeddings,
+    images,
+    llm,
+    lora,
+    models,
+    rag,
+    rerank,
+    segmentation,
+    stt,
+    tts,
+    vad,
+    vlm,
+    voice,
 )
 from .errors import (
     ErrorCategory,
@@ -37,145 +50,273 @@ from .errors import (
     is_sdk_exception,
 )
 from .events import (
+    DownloadEvent,
+    DownloadEventKind,
     EventBus,
     GenerationEvent,
-    InitializedEvent,
-    ModelLoadedEvent,
-    ModelUnloadedEvent,
-    RunAnywhereEvent,
-    ServicesReadyEvent,
-    ShutdownEvent,
-    bus,
+    GenerationEventKind,
+    ImageEvent,
+    ImageEventKind,
+    RagEvent,
+    RagEventKind,
+    SdkEvent,
+    SdkEventKind,
+    TranscriptionEvent,
+    TranscriptionEventKind,
+    VadEvent,
+    VadEventKind,
+    VoiceAgentState,
+    VoiceEvent,
+    VoiceEventKind,
 )
-from .grammar import json_schema_to_grammar
-from .models import Embedder, LLMModel, STTModel, TTSVoice, Vad, VLMModel
+from .events import bus as events
+from .inputs import (
+    AudioEncoding,
+    AudioFormat,
+    AudioFormatSpec,
+    AudioInput,
+    ChatMessage,
+    ImageInput,
+    InferenceFramework,
+    ModelCategory,
+    ModelFilter,
+    ModelRef,
+    ModelRegistration,
+    RagDocument,
+    Role,
+    ToolDefinition,
+)
 from .options import (
-    ChatOptions,
-    DownloadOptions,
-    GenerateOptions,
-    InitOptions,
+    DiarizationOptions,
+    EmbedOptions,
+    Endpointing,
+    Environment,
+    ImageMode,
+    ImageModeKind,
+    ImageOptions,
+    Interruption,
+    LlmOptions,
     LoadOptions,
+    NormalizeMode,
+    PoolingMode,
+    RagConfig,
     ReasoningMode,
     ReasoningOptions,
+    SegmentationOptions,
+    StructuredOutput,
+    SttOptions,
+    ToolChoice,
+    ToolChoiceMode,
+    TtsOptions,
+    TurnHandlingOptions,
     VadOptions,
 )
-# RAG value types. `rag` guards its optional protobuf import internally, so importing it here
-# never pulls protobuf (or `_core`) into a base install — only actually running a RAG op does.
-from .rag import (
-    RagDocument,
-    RagResult,
-    RagSearchResult,
-    RagSession,
-    RagStatistics,
-    RagStreamEvent,
-)
 from .results import (
-    DownloadProgress,
-    LLMGenerationResult,
-    LLMStreamEvent,
-    ModelStatus,
-    ResolvedModel,
-    Synthesis,
-    VoiceTurn,
-)
-from .stream_metrics import stream_with_metrics
-from .structured import (
+    AppliedAdapter,
+    Audio,
+    AudioChunk,
+    ClassInfo,
+    DiarizationResult,
+    Embedding,
+    FinishReason,
+    GenerationResult,
+    ImageData,
+    ImageResult,
+    LoraState,
+    Match,
+    ModelInfo,
+    ModelsState,
+    RagResult,
+    RagStats,
+    RankedResult,
+    Segment,
+    SegmentationResult,
+    SpeakerSegment,
+    StructuredResult,
+    SttState,
+    TokenKind,
     ToolCall,
-    ToolRun,
-    ToolSpec,
-    object_grammar,
-    parse_structured,
-    tool_call_prompt,
-    tool_call_schema,
+    Transcription,
+    VadResult,
+    Voice,
+    Word,
 )
-from .voice_agent import VoiceAgent
 
 __version__ = "0.20.12"
 
+
+def initialize(
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    environment: Environment = Environment.PRODUCTION,
+) -> None:
+    """Bring the SDK up; everything local inference needs happens inside this one call.
+
+    Args:
+        api_key: accepted for cross-SDK signature parity. This SDK has no control-plane
+            client, so no authentication, device registration or telemetry is performed.
+        base_url: accepted for the same reason, and equally unused.
+
+    Raises:
+        SDKException: the native library cannot be loaded or initialized.
+
+    Example:
+        >>> import runanywhere
+        >>> runanywhere.initialize()
+    """
+    _runtime.initialize(api_key=api_key, base_url=base_url, environment=environment)
+
+
+def reset() -> None:
+    """Unload every model, close every session, and shut the native runtime down."""
+    _runtime.reset()
+
+
+def is_ready() -> bool:
+    """True once local inference is usable."""
+    return _runtime.is_ready
+
+
+def version() -> str:
+    """The native runtime version.
+
+    Raises:
+        SDKException: the SDK is not initialized.
+    """
+    return _runtime.version()
+
+
+def device_id() -> str:
+    """A stable id for this install, persisted under the RunAnywhere home directory.
+
+    Raises:
+        SDKException: the id file cannot be read or written.
+    """
+    return _runtime.device_id()
+
+
+def backends() -> list:
+    """The engine backends compiled into this build, e.g. ``['llamacpp', 'onnx', 'sherpa']``."""
+    return _runtime.backends()
+
+
 __all__ = [
     "__version__",
-    # facade
-    "RunAnywhere",
-    # model wrappers
-    "LLMModel",
-    "VLMModel",
-    "Embedder",
-    "STTModel",
-    "TTSVoice",
-    "Vad",
-    # conversation
-    "Chat",
-    "ChatMessage",
-    "ChatRole",
-    "VoiceAgent",
-    # RAG (talk-to-your-documents)
+    # core
+    "initialize",
+    "reset",
+    "is_ready",
+    "version",
+    "device_id",
+    "backends",
+    "events",
+    "Environment",
+    # namespaces
+    "llm",
+    "vlm",
+    "stt",
+    "tts",
+    "vad",
+    "embeddings",
+    "rerank",
+    "images",
+    "diarization",
+    "segmentation",
+    "voice",
+    "rag",
+    "models",
+    "lora",
     "RagSession",
+    # inputs
+    "AudioEncoding",
+    "AudioFormat",
+    "AudioFormatSpec",
+    "AudioInput",
+    "ChatMessage",
+    "ImageInput",
+    "InferenceFramework",
+    "ModelCategory",
+    "ModelFilter",
+    "ModelRef",
+    "ModelRegistration",
     "RagDocument",
-    "RagResult",
-    "RagSearchResult",
-    "RagStatistics",
-    "RagStreamEvent",
+    "Role",
+    "ToolDefinition",
     # options
-    "InitOptions",
-    "GenerateOptions",
+    "DiarizationOptions",
+    "EmbedOptions",
+    "Endpointing",
+    "ImageMode",
+    "ImageModeKind",
+    "ImageOptions",
+    "Interruption",
+    "LlmOptions",
+    "LoadOptions",
+    "NormalizeMode",
+    "PoolingMode",
+    "RagConfig",
     "ReasoningMode",
     "ReasoningOptions",
-    "LoadOptions",
-    "DownloadOptions",
+    "SegmentationOptions",
+    "StructuredOutput",
+    "SttOptions",
+    "ToolChoice",
+    "ToolChoiceMode",
+    "TtsOptions",
+    "TurnHandlingOptions",
     "VadOptions",
-    "ChatOptions",
-    # results / value types
-    "LLMGenerationResult",
-    "LLMStreamEvent",
-    "Synthesis",
-    "VoiceTurn",
-    "ResolvedModel",
-    "DownloadProgress",
-    "ModelStatus",
+    # results
+    "AppliedAdapter",
+    "Audio",
+    "AudioChunk",
+    "ClassInfo",
+    "DiarizationResult",
+    "Embedding",
+    "FinishReason",
+    "GenerationResult",
+    "ImageData",
+    "ImageResult",
+    "LoraState",
+    "Match",
+    "ModelInfo",
+    "ModelsState",
+    "RagResult",
+    "RagStats",
+    "RankedResult",
+    "Segment",
+    "SegmentationResult",
+    "SpeakerSegment",
+    "StructuredResult",
+    "SttState",
+    "TokenKind",
+    "ToolCall",
+    "Transcription",
+    "VadResult",
+    "Voice",
+    "Word",
+    # events
+    "DownloadEvent",
+    "DownloadEventKind",
+    "EventBus",
+    "GenerationEvent",
+    "GenerationEventKind",
+    "ImageEvent",
+    "ImageEventKind",
+    "RagEvent",
+    "RagEventKind",
+    "SdkEvent",
+    "SdkEventKind",
+    "TranscriptionEvent",
+    "TranscriptionEventKind",
+    "VadEvent",
+    "VadEventKind",
+    "VoiceAgentState",
+    "VoiceEvent",
+    "VoiceEventKind",
     # errors
     "SDKException",
     "ErrorCode",
     "ErrorCategory",
     "is_sdk_exception",
     "as_sdk_exception",
-    # events
-    "EventBus",
-    "bus",
-    "RunAnywhereEvent",
-    "InitializedEvent",
-    "ServicesReadyEvent",
-    "ShutdownEvent",
-    "ModelLoadedEvent",
-    "ModelUnloadedEvent",
-    "GenerationEvent",
-    # grammar / structured / tools
-    "json_schema_to_grammar",
-    "object_grammar",
-    "parse_structured",
-    "tool_call_schema",
-    "tool_call_prompt",
-    "ToolSpec",
-    "ToolCall",
-    "ToolRun",
-    # streaming
-    "stream_with_metrics",
-    # audio helpers
-    "float32_to_pcm16",
-    "pcm16_to_float32",
-    "pcm16_bytes",
-    "downsample",
-    "rms",
-    "encode_wav",
-    "decode_wav",
-    # catalog
-    "CATALOG",
-    "CatalogEntry",
-    "CatalogFile",
-    "ModelType",
-    "is_catalog_id",
-    # download / resolution
-    "resolve_model",
-    "download_file",
-    "models_root",
-    "model_status",
 ]

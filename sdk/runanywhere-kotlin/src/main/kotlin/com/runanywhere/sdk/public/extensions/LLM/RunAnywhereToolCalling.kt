@@ -34,24 +34,30 @@ import com.runanywhere.sdk.public.extensions.LLM.ToolResult
 import com.runanywhere.sdk.public.extensions.LLM.toToolCallingOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 
+@Deprecated("Use RunAnywhere.llm.tools.register(tool, executor).")
 suspend fun RunAnywhere.registerTool(definition: ToolDefinition, executor: ToolExecutor) {
     ToolCallingOrchestrator.registerTool(definition, executor)
 }
 
+@Deprecated("Use RunAnywhere.llm.tools.unregister(name).")
 suspend fun RunAnywhere.unregisterTool(toolName: String) {
     ToolCallingOrchestrator.unregisterTool(toolName)
 }
 
+@Deprecated("Use RunAnywhere.llm.tools.list().")
 suspend fun RunAnywhere.getRegisteredTools(): List<ToolDefinition> =
     ToolCallingOrchestrator.getRegisteredTools()
 
+@Deprecated("Unregister tools individually with RunAnywhere.llm.tools.unregister(name).")
 suspend fun RunAnywhere.clearTools() {
     ToolCallingOrchestrator.clearTools()
 }
 
+@Deprecated("Tool execution is driven by RunAnywhere.llm.generate when tools are registered.")
 suspend fun RunAnywhere.executeTool(toolCall: ToolCall): ToolResult =
     ToolCallingOrchestrator.executeTool(toolCall)
 
+@Deprecated("Use RunAnywhere.llm.generate with LlmOptions.tools and LlmOptions.toolChoice.")
 suspend fun RunAnywhere.generateWithTools(
     prompt: String,
     options: RALLMGenerationOptions?,

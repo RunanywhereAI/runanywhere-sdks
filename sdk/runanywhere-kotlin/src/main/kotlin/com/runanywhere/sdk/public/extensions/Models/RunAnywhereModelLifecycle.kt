@@ -36,6 +36,7 @@ import kotlinx.coroutines.withContext
 
 private val logger = SDKLogger("ModelLifecycle")
 
+@Deprecated("Use RunAnywhere.models.load(id, options).")
 suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResult =
     withContext(Dispatchers.IO) {
         if (!isInitialized) {
@@ -86,6 +87,7 @@ private suspend fun RunAnywhere.performModelLoad(request: RAModelLoadRequest): R
     return result
 }
 
+@Deprecated("Use RunAnywhere.models.load(id, options).")
 suspend fun RunAnywhere.loadModel(model: RAModelInfo): RAModelLoadResult =
     loadModel(
         RAModelLoadRequest(
@@ -95,6 +97,7 @@ suspend fun RunAnywhere.loadModel(model: RAModelInfo): RAModelLoadResult =
         ),
     )
 
+@Deprecated("Use RunAnywhere.models.unload(category).")
 suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult {
     if (!isInitialized) {
         return ModelUnloadResult(

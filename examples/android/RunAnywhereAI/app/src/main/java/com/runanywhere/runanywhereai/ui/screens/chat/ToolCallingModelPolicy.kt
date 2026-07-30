@@ -1,12 +1,10 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
-import ai.runanywhere.proto.v1.ReasoningMode
-import ai.runanywhere.proto.v1.ReasoningOptions
-import ai.runanywhere.proto.v1.ToolChoiceMode
-import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
-import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.api.LlmOptions
+import com.runanywhere.sdk.public.api.ReasoningMode
+import com.runanywhere.sdk.public.api.ReasoningOptions
+import com.runanywhere.sdk.public.api.ToolDefinition
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.public.types.RAToolDefinition
 
 /** The generation path selected after tool/model compatibility preflight. */
 internal enum class ToolCallingRoute {
@@ -26,10 +24,7 @@ internal data class ToolCallingPreflight(
 )
 
 internal data class ToolCallingExecutionPlan(
-    val generationOptions: RALLMGenerationOptions,
-    val toolOptions: RAToolCallingOptions,
-    val toolChoice: ToolChoiceMode?,
-    val forcedToolName: String?,
+    val generationOptions: LlmOptions,
 )
 
 /**
@@ -102,40 +97,29 @@ internal object ToolCallingExecutionPolicy {
     const val TIMEOUT_MILLIS: Long = 45_000L
     const val PROGRESS_MESSAGE: String = "Using web & tools…"
 
-    fun generationOptions(base: RALLMGenerationOptions): RALLMGenerationOptions =
+    fun generationOptions(base: LlmOptions): LlmOptions =
         base.copy(
-            max_output_tokens = base.max_output_tokens.takeIf { it in 1..MAX_FINAL_RESPONSE_TOKENS }
+            maxOutputTokens = base.maxOutputTokens.takeIf { it in 1..MAX_FINAL_RESPONSE_TOKENS }
                 ?: MAX_FINAL_RESPONSE_TOKENS,
-            // Tool decisions must be reproducible. The native tool loop now
+            // Tool decisions must be reproducible. The native tool loop
             // preserves temperature=0 as greedy instead of treating it as an
             // unset value and falling back to 0.8 sampling.
             temperature = 0f,
-            top_p = 1f,
-            reasoning = ReasoningOptions(mode = ReasoningMode.REASONING_MODE_OFF),
+            topP = 1f,
+            reasoning = ReasoningOptions(mode = ReasoningMode.OFF),
         )
 
+    // Commons recognizes an unambiguous explicit tool name in the prompt and
+    // narrows the native decision there, so the tool choice stays AUTO and no
+    // app-side routing heuristic is needed.
     fun plan(
-        base: RALLMGenerationOptions,
-        registeredTools: List<RAToolDefinition>,
-    ): ToolCallingExecutionPlan {
-        val generation = generationOptions(base)
-        return ToolCallingExecutionPlan(
-            generationOptions = generation,
-            toolOptions = toolOptions(registeredTools),
-            // Commons recognizes an unambiguous explicit tool name in the
-            // prompt and narrows the native decision there, so every SDK gets
-            // the same behavior without app-side routing heuristics.
-            toolChoice = null,
-            forcedToolName = null,
+        base: LlmOptions,
+        registeredTools: List<ToolDefinition>,
+    ): ToolCallingExecutionPlan =
+        ToolCallingExecutionPlan(
+            generationOptions = generationOptions(base).copy(
+                tools = registeredTools,
+                maxToolCalls = MAX_TOOL_CALLS,
+            ),
         )
-    }
-
-    private fun toolOptions(
-        tools: List<RAToolDefinition>,
-    ): RAToolCallingOptions = RAToolCallingOptions(
-        tools = tools,
-        max_tool_calls = MAX_TOOL_CALLS,
-        auto_execute = true,
-        keep_tools_available = false,
-    )
 }

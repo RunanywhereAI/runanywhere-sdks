@@ -330,7 +330,6 @@ private fun StatsCard(metrics: VlmMetrics) {
         add("Tokens" to metrics.tokens.toString())
         if (metrics.tokensPerSecond > 0) add("Speed" to String.format(Locale.US, "%.1f tok/s", metrics.tokensPerSecond))
         add("Processing" to String.format(Locale.US, "%.1fs", metrics.processingMs / 1000.0))
-        if (metrics.imageEncodeMs > 0) add("Image encode" to "${metrics.imageEncodeMs}ms")
         if (metrics.ttftMs > 0) add("Time to first token" to "${metrics.ttftMs}ms")
     }
     Column(

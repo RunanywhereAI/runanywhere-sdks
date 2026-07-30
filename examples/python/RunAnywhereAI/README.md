@@ -42,28 +42,45 @@ time:
 .venv/bin/python -m runanywhere ls
 ```
 
+## The API these scripts use
+
+One `runanywhere.initialize()` call, then a namespace per modality: `ra.llm`, `ra.rag`,
+`ra.models`, and so on. Options are dataclasses (`LlmOptions`, `RagConfig`), every
+generation result carries the same metrics block, and the blocking verbs have an
+`a`-prefixed async twin (`agenerate`, `aquery`).
+
+```python
+import runanywhere as ra
+from runanywhere import LlmOptions
+
+ra.initialize()
+print(ra.llm.generate("Hello", LlmOptions(model="smollm2-135m")).text)
+```
+
 ## Running
 
-`chat.py` loads the LLM, runs one unary completion, then two streamed completions
-showing the v2 generation options: `max_output_tokens`, and `ReasoningOptions` with
-`include_in_output` off (thinking stripped) and on (thought tokens printed, prefixed
-with `~`).
+`chat.py` walks the `llm` namespace: a unary `generate` with its metrics, a streamed
+`generate_stream`, the same stream with `ReasoningOptions(include_in_output=True)` so
+thought tokens print prefixed with `~`, a multi-turn `ChatMessage` list, and a
+registered tool the SDK calls and feeds back into the loop. It downloads the model
+first through `ra.models.download` when it is not cached yet.
 
 ```bash
 .venv/bin/python chat.py            # or: .venv/bin/python chat.py qwen2.5-0.5b
 ```
 
-`rag.py` opens a RAG session over the `minilm` embedder plus the same small LLM,
-ingests three short documents, and asks one grounded question with generation options
-on the query.
+`rag.py` opens a session over the `minilm` embedder plus the same small LLM, ingests
+three documents, then shows all three read verbs: `search` (retrieval only), `query`
+(grounded answer plus sources), and `query_stream`.
 
 ```bash
 .venv/bin/python rag.py
 ```
 
-`server_demo.sh` starts `runanywhere serve` on port 8000 (override with `PORT=`),
-waits for `/health`, sends one `/v1/chat/completions` request with curl, and shuts the
-server down.
+`server_demo.sh` starts `runanywhere serve` on port 8000 (override with `PORT=`), waits
+for `/health`, sends a unary and a streaming `/v1/chat/completions` request with curl,
+then shuts the server down. The HTTP surface keeps OpenAI's field names — `max_tokens`,
+`response_format`, `stream` — and the server translates them into the SDK's options.
 
 ```bash
 ./server_demo.sh

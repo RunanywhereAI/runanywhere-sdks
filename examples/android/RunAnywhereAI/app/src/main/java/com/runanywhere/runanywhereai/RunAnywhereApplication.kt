@@ -115,7 +115,7 @@ class RunAnywhereApplication : Application() {
             apiKey = BuildConfig.RUNANYWHERE_API_KEY.takeIf {
                 environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             },
-            baseURL = BuildConfig.RUNANYWHERE_BASE_URL.takeIf {
+            baseUrl = BuildConfig.RUNANYWHERE_BASE_URL.takeIf {
                 environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
             },
             environment = environment,

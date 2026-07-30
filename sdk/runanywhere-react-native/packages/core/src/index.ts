@@ -1,21 +1,99 @@
 /**
- * @runanywhere/core - React Native public SDK facade.
+ * @runanywhere/core — the React Native public SDK surface.
  *
- * Swift is the source of truth for this surface. Generated DTOs/enums come
- * directly from `@runanywhere/proto-ts/*`; this root exports only the
- * RunAnywhere facade and the small RN call-site types/errors that do not have
- * a standalone generated package entry.
- *
- * Provider/internal plumbing lives at `@runanywhere/core/internal`.
+ * `RunAnywhere` is the single entry point: `initialize` once, then reach every
+ * capability through its namespace. The v3 option, input, result, and event
+ * types live alongside it here; wire-level generated messages stay in
+ * `@runanywhere/proto-ts`, and provider plumbing in
+ * `@runanywhere/core/internal`.
  *
  * @packageDocumentation
  */
 
 export { RunAnywhere } from './Public/RunAnywhere';
 
-// Hybrid STT router (offline sherpa <-> cloud). THIN binding over the
-// commons hybrid router — commons owns all routing. Mirrors Swift `Hybrid/*`
-// and Kotlin `public/hybrid/*` (RACRouter / CloudSTT / RoutingPolicy).
+export { AudioInputs, ImageInputs } from './Public/Api/Inputs';
+export type { RagOpenOptions } from './Public/Api/Rag';
+export type { VoiceCreateSessionOptions } from './Public/Api/Voice';
+
+export type {
+  AgentState,
+  ArchiveLayout,
+  Audio,
+  AudioChunk,
+  AudioEncoding,
+  AudioFormatName,
+  AudioInput,
+  AppliedAdapter,
+  ChatMessage,
+  ChatRole,
+  ClassInfo,
+  DiarizationOptions,
+  DiarizationResult,
+  DownloadEvent,
+  EmbedOptions,
+  Embedding,
+  Environment,
+  FinishReason,
+  GenerationEvent,
+  GenerationResult,
+  ImageData,
+  ImageEvent,
+  ImageInput,
+  ImageMode,
+  ImageOptions,
+  ImagePixelFormat,
+  ImageResult,
+  InitializeOptions,
+  JsonSchema,
+  LlmOptions,
+  LoadOptions,
+  LoraState,
+  Match,
+  ModelFile,
+  ModelFilter,
+  ModelRef,
+  ModelRegistration,
+  ModelsState,
+  NormalizeMode,
+  PoolingMode,
+  RagConfig,
+  RagDocument,
+  RagEvent,
+  RagResult,
+  RagSession,
+  RagStats,
+  RankedResult,
+  ReasoningOptions,
+  SdkEvent,
+  Segment,
+  SegmentationOptions,
+  SegmentationResult,
+  SpeakerSegment,
+  SttOptions,
+  SttState,
+  StructuredOutput,
+  StructuredResult,
+  TokenKind,
+  ToolCall,
+  ToolChoice,
+  ToolDefinition,
+  ToolExecutor,
+  Transcription,
+  TranscriptionEvent,
+  TtsOptions,
+  TurnHandlingOptions,
+  VadEvent,
+  VadOptions,
+  VadResult,
+  Voice,
+  VoiceEvent,
+  VoiceSession,
+  Word,
+} from './Public/Api/Types';
+
+// Hybrid STT router (offline sherpa <-> cloud). THIN binding over the commons
+// hybrid router — commons owns all routing. Outside the v3 modality spec.
 export {
   HybridSTTRouter,
   CloudSTT,
@@ -48,9 +126,8 @@ export type {
 } from './Public/Extensions/Hybrid';
 
 export { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
-export type { SDKInitOptions } from './types/models';
 
-// SDKEnvironment behaviour helpers — mirror Swift SDKEnvironment.swift:42-128.
+// SDKEnvironment behaviour helpers.
 export {
   deployableEnvironments,
   environmentDescription,
@@ -63,26 +140,28 @@ export {
   defaultLogLevel,
 } from './Public/Helpers/SDKEnvironment+Helpers';
 
-// SDKComponent display names — mirror Swift RASDKComponent+DisplayName.swift.
+// SDKComponent display names.
 export { sdkComponentDisplayName } from './Public/Helpers/SDKComponent+DisplayName';
 
-// Pushable audio stream — RN adaptation of Swift's AsyncStream<Data> for
-// feeding microphone chunks into transcribeStream() / streamVAD().
+// Framework display names sourced from the commons table.
+export { formatFramework } from './Public/Helpers/formatFramework';
+
+// Pushable audio stream — feeds microphone chunks into the streaming verbs.
 export {
   createPushableAudioStream,
   type PushableAudioStream,
 } from './Public/Helpers/PushableAudioStream';
 
-// VLMImage factory helpers — mirror Swift RAVLMImage+Helpers.swift.
-export { VLMImages } from './Public/Extensions/VLM/VLMImage+Helpers';
+// PCM conversion helpers for apps that own their own audio capture UI.
+export { AudioConvert } from './Public/Extensions/Audio/RunAnywhere+AudioConvert';
 
-// Embedding vector math helpers — mirror Swift EmbeddingsProto+Helpers.swift.
+// Embedding vector math helpers.
 export {
   cosineSimilarity,
   computeNorm,
 } from './Public/Extensions/Embeddings/EmbeddingsProto+Helpers';
 
-// Storage proto helpers — mirror Swift StorageProto+Helpers.swift.
+// Storage proto helpers.
 export {
   makeDeviceStorageInfo,
   makeAppStorageInfo,
@@ -106,31 +185,11 @@ export {
 } from './Foundation/Errors';
 export type { ErrorContext } from './Foundation/Errors';
 
-// In-SDK audio capture/playback — mirror Swift's
-// Features/STT/Services/AudioCaptureManager.swift and
-// Features/TTS/Services/AudioPlaybackManager.swift.
+// In-SDK audio capture/playback for apps that drive their own audio UI.
 export { AudioCaptureManager } from './Features/VoiceSession/AudioCaptureManager';
 export { AudioPlaybackManager } from './Features/VoiceSession/AudioPlaybackManager';
-// Mic-driven voice-agent ingress (capture → endpoint → processVoiceTurn → TTS
-// playback). Mirrors the Kotlin/Flutter VoiceAgentMicDriver; without it the
-// voice agent only observes output events and never receives audio.
-export { VoiceAgentMicDriver } from './Features/VoiceSession/VoiceAgentMicDriver';
-export type {
-  VoiceAgentMicTurn,
-  VoiceAgentMicPhase,
-  VoiceAgentMicCallbacks,
-} from './Features/VoiceSession/VoiceAgentMicDriver';
-
-export { EventBus, modelLifecycleChange } from './Public/Events/EventBus';
-export type {
-  EventBusCancellable,
-  SDKEventHandler,
-  ModelLifecycleChange,
-} from './Public/Events/EventBus';
 
 export type {
   PluginInfo,
   PluginLoaderCapability,
 } from './Public/Extensions/RunAnywhere+PluginLoader';
-
-export type { ToolExecutor } from './Public/Extensions/LLM/RunAnywhere+ToolCalling';

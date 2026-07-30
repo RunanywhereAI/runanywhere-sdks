@@ -148,7 +148,7 @@ class ToolSettingsViewModel: ObservableObject {
     }
 
     func refreshRegisteredTools() async {
-        registeredTools = await RunAnywhere.getRegisteredTools()
+        registeredTools = await RunAnywhere.llm.tools.list()
     }
 
     func registerBuiltInTools() async {
@@ -156,14 +156,14 @@ class ToolSettingsViewModel: ObservableObject {
         logger.info("Registered tool \(RunAnywhere.webSearchToolDefinition.name)")
 
         for tool in builtInTools {
-            await RunAnywhere.registerTool(tool.definition, executor: tool.executor)
+            await RunAnywhere.llm.tools.register(tool.definition, executor: tool.executor)
             logger.info("Registered tool \(tool.definition.name)")
         }
         await refreshRegisteredTools()
     }
 
     func clearAllTools() async {
-        await RunAnywhere.clearTools()
+        await RunAnywhere.llm.tools.clear()
         await refreshRegisteredTools()
     }
 }

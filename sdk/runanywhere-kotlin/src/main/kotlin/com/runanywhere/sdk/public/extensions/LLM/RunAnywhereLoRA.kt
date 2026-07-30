@@ -439,5 +439,13 @@ internal object AndroidLoRA : LoRA {
     }
 }
 
-val RunAnywhere.lora: LoRA
+/**
+ * LoRA catalog surface kept for one release.
+ *
+ * The v3 namespace `RunAnywhere.lora` covers apply, remove, and list; commons
+ * keeps its catalog behind a separate ABI, so registration and import still
+ * come from here.
+ */
+@Deprecated("Use RunAnywhere.lora for apply/remove/list; catalog verbs remain here for one release.")
+val RunAnywhere.loraCatalog: LoRA
     get() = AndroidLoRA

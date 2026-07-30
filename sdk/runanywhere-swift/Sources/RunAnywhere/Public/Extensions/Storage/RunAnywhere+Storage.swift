@@ -8,7 +8,7 @@
 import CRACommons
 import Foundation
 
-public extension RunAnywhere {
+extension RunAnywhere {
     /// Register a remote model with the in-memory model registry from a
     /// download URL or Hugging Face reference, through the canonical commons
     /// factory (`rac_register_model_from_url_proto`). Commons derives
@@ -16,7 +16,8 @@ public extension RunAnywhere {
     /// selection, mmproj pairing, sharded GGUF sets, per-file checksums), and
     /// preserves prior download state when a catalog re-seeds on launch.
     @discardableResult
-    static func registerModel(
+    @available(*, deprecated, renamed: "models.register(_:)")
+    public static func registerModel(
         id: String? = nil,
         name: String,
         url: String,
@@ -27,7 +28,32 @@ public extension RunAnywhere {
         supportsThinking: Bool = false,
         supportsLora: Bool = false
     ) async throws -> RAModelInfo {
-        guard isInitialized else {
+        try await registerFromURL(
+            id: id,
+            name: name,
+            url: url,
+            framework: framework,
+            modality: modality,
+            artifactType: artifactType,
+            memoryRequirement: memoryRequirement,
+            supportsThinking: supportsThinking,
+            supportsLora: supportsLora
+        )
+    }
+
+    @discardableResult
+    internal static func registerFromURL(
+        id: String? = nil,
+        name: String,
+        url: String,
+        framework: InferenceFramework,
+        modality: ModelCategory = .language,
+        artifactType: RAModelArtifactType? = nil,
+        memoryRequirement: Int64? = nil,
+        supportsThinking: Bool = false,
+        supportsLora: Bool = false
+    ) async throws -> RAModelInfo {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
@@ -67,7 +93,8 @@ public extension RunAnywhere {
     /// layers on the caller-supplied capability fields, and persists through the
     /// registry's proto save path in a single `save(...)`.
     @discardableResult
-    static func registerModel(
+    @available(*, deprecated, renamed: "models.register(_:)")
+    public static func registerModel(
         archive url: String,
         structure: RAArchiveStructure,
         id: String? = nil,
@@ -79,7 +106,34 @@ public extension RunAnywhere {
         supportsThinking: Bool = false,
         supportsLora: Bool = false
     ) async throws -> RAModelInfo {
-        guard isInitialized else {
+        try await registerArchive(
+            url: url,
+            structure: structure,
+            id: id,
+            name: name,
+            framework: framework,
+            modality: modality,
+            archiveType: archiveType,
+            memoryRequirement: memoryRequirement,
+            supportsThinking: supportsThinking,
+            supportsLora: supportsLora
+        )
+    }
+
+    @discardableResult
+    internal static func registerArchive(
+        url: String,
+        structure: RAArchiveStructure,
+        id: String? = nil,
+        name: String,
+        framework: InferenceFramework,
+        modality: ModelCategory = .language,
+        archiveType: RAArchiveType? = nil,
+        memoryRequirement: Int64? = nil,
+        supportsThinking: Bool = false,
+        supportsLora: Bool = false
+    ) async throws -> RAModelInfo {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
@@ -124,7 +178,8 @@ public extension RunAnywhere {
     /// (`rac_register_multi_file_model_proto`) — no URL is involved at the
     /// model level because each `RAModelFileDescriptor` carries its own URL.
     @discardableResult
-    static func registerModel(
+    @available(*, deprecated, renamed: "models.register(_:)")
+    public static func registerModel(
         multiFile descriptors: [RAModelFileDescriptor],
         id: String,
         name: String,
@@ -136,7 +191,34 @@ public extension RunAnywhere {
         source: RAModelSource = .remote,
         downloadSize: Int64? = nil
     ) async throws -> RAModelInfo {
-        guard isInitialized else {
+        try await registerMultiFile(
+            descriptors: descriptors,
+            id: id,
+            name: name,
+            framework: framework,
+            modality: modality,
+            memoryRequirement: memoryRequirement,
+            contextLength: contextLength,
+            supportsThinking: supportsThinking,
+            source: source,
+            downloadSize: downloadSize
+        )
+    }
+
+    @discardableResult
+    internal static func registerMultiFile(
+        descriptors: [RAModelFileDescriptor],
+        id: String,
+        name: String,
+        framework: InferenceFramework,
+        modality: ModelCategory = .language,
+        memoryRequirement: Int64? = nil,
+        contextLength: Int? = nil,
+        supportsThinking: Bool = false,
+        source: RAModelSource = .remote,
+        downloadSize: Int64? = nil
+    ) async throws -> RAModelInfo {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
@@ -185,11 +267,20 @@ public extension RunAnywhere {
     /// plan → start → poll → import orchestration loop and surfaces the
     /// generated proto progress events to the caller.
     @discardableResult
-    static func downloadModel(
+    @available(*, deprecated, renamed: "models.download(id:)")
+    public static func downloadModel(
         _ model: RAModelInfo,
         onProgress: ((RADownloadProgress) async -> Void)? = nil
     ) async throws -> RADownloadProgress {
-        guard isInitialized else {
+        try await performDownload(model, onProgress: onProgress)
+    }
+
+    @discardableResult
+    internal static func performDownload(
+        _ model: RAModelInfo,
+        onProgress: ((RADownloadProgress) async -> Void)? = nil
+    ) async throws -> RADownloadProgress {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .network)
         }
         try await ensureServicesReady()
@@ -273,14 +364,13 @@ public extension RunAnywhere {
         }
     }
 
-    /// Stream download progress for a registered model. Mirrors Kotlin's
-    /// `downloadModelStream(_:)` convenience over the callback-based
-    /// `downloadModel(_:onProgress:)` API.
-    static func downloadModelStream(_ model: RAModelInfo) -> AsyncThrowingStream<RADownloadProgress, Error> {
+    /// Stream download progress for a registered model.
+    @available(*, deprecated, renamed: "models.download(id:)")
+    public static func downloadModelStream(_ model: RAModelInfo) -> AsyncThrowingStream<RADownloadProgress, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    _ = try await downloadModel(model) { progress in
+                    _ = try await performDownload(model) { progress in
                         continuation.yield(progress)
                     }
                     continuation.finish()
@@ -299,29 +389,39 @@ public extension RunAnywhere {
     /// Import a stable, platform-normalized local model path into the generated
     /// registry. This is also the public local-import entry point for file
     /// picker/bookmark flows after Swift has handled sandbox access.
-    static func importModel(_ request: RAModelImportRequest) async throws -> RAModelImportResult {
-        guard isInitialized else {
+    public static func importModel(_ request: RAModelImportRequest) async throws -> RAModelImportResult {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         return try await CppBridge.ModelRegistry.shared.importModel(request)
     }
 
     /// Get storage information as the canonical generated proto result.
-    static func getStorageInfo(_ request: RAStorageInfoRequest = RAStorageInfoRequest()) async -> RAStorageInfoResult {
+    @available(*, deprecated, renamed: "models.state()")
+    public static func getStorageInfo(_ request: RAStorageInfoRequest = RAStorageInfoRequest()) async -> RAStorageInfoResult {
+        await storageInfo(request)
+    }
+
+    internal static func storageInfo(
+        _ request: RAStorageInfoRequest = RAStorageInfoRequest()
+    ) async -> RAStorageInfoResult {
         await CppBridge.Storage.shared.info(request)
     }
 
     /// Execute or dry-run storage deletion as canonical generated proto data.
-    static func deleteStorage(_ request: RAStorageDeleteRequest) async -> RAStorageDeleteResult {
+    public static func deleteStorage(_ request: RAStorageDeleteRequest) async -> RAStorageDeleteResult {
         await CppBridge.Storage.shared.delete(request)
     }
 
-    /// Delete one downloaded model end-to-end: unload it if loaded, remove its
-    /// files through the platform adapter, and clear its registry path so the
-    /// entry returns to registered-not-downloaded (re-downloadable).
-    /// Convenience over `deleteStorage(_:)` with the canonical flag set.
+    /// Delete one downloaded model end-to-end.
     @discardableResult
-    static func deleteModel(_ modelId: String) async -> RAStorageDeleteResult {
+    @available(*, deprecated, renamed: "models.delete(id:)")
+    public static func deleteModel(_ modelId: String) async -> RAStorageDeleteResult {
+        await performDelete(modelId)
+    }
+
+    @discardableResult
+    internal static func performDelete(_ modelId: String) async -> RAStorageDeleteResult {
         var request = RAStorageDeleteRequest()
         request.modelIds = [modelId]
         request.deleteFiles = true
@@ -331,10 +431,9 @@ public extension RunAnywhere {
         return await deleteStorage(request)
     }
 
-    /// Clear the SDK's Cache directory. Forwards to `CppBridge.FileManager.clearCache()`,
-    /// matching Kotlin's top-level `RunAnywhere.clearCache()` entry point.
-    static func clearCache() async throws {
-        guard isInitialized else {
+    /// Empty the SDK's cache directory.
+    public static func clearCache() async throws {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
@@ -343,10 +442,9 @@ public extension RunAnywhere {
         }
     }
 
-    /// Clear the SDK's Temp directory. Forwards to `CppBridge.FileManager.clearTemp()`,
-    /// matching Kotlin's top-level `RunAnywhere.cleanTempFiles()` entry point.
-    static func cleanTempFiles() async throws {
-        guard isInitialized else {
+    /// Empty the SDK's temp directory.
+    public static func cleanTempFiles() async throws {
+        guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
@@ -364,7 +462,7 @@ private extension RunAnywhere {
     static func resolveModelForDownload(_ model: RAModelInfo) async -> RAModelInfo {
         var request = RAModelGetRequest()
         request.modelID = model.id
-        let getResult = await getModel(request)
+        let getResult = await performGet(request)
         if getResult.found {
             let registryModel = getResult.model
             if !registryModel.downloadURL.isEmpty || model.downloadURL.isEmpty {
@@ -373,7 +471,7 @@ private extension RunAnywhere {
             return model
         }
 
-        let listResult = await listModels()
+        let listResult = await performList()
         guard listResult.success else { return model }
         if let listed = listResult.models.models.first(where: { $0.id == model.id }) {
             if !listed.downloadURL.isEmpty || model.downloadURL.isEmpty {

@@ -1,7 +1,8 @@
 /**
  * @file cmd_pull.cpp
- * @brief `rcli pull <model|hf.co/...|url>` — download via the commons
- *        orchestrator: plan → start → progress callback → terminal state.
+ * @brief `rcli models download <model|hf.co/...|url>` (alias `rcli pull`) —
+ *        download via the commons orchestrator: plan → start → progress
+ *        callback → terminal state.
  *
  * SIGINT cancels the task (partial bytes preserved → re-pull resumes via the
  * plan's can_resume path). Exit codes: 0 done, 1 failure, 130 user cancel.
@@ -256,15 +257,13 @@ int pull_model_flow(const GlobalOptions &options, const std::string &model_id) {
   return 0;
 }
 
-void register_pull(CLI::App &app, GlobalOptions &options) {
-  CLI::App *cmd = app.add_subcommand(
-      "pull", "Download a model (catalog id, hf.co/... or direct URL)");
+void configure_models_download(CLI::App *cmd, GlobalOptions &options) {
   auto ref = std::make_shared<std::string>();
   auto engine = std::make_shared<std::string>();
   cmd->add_option("model", *ref, "Model id, alias, hf.co/org/repo/file or URL")
       ->required();
   cmd->add_option("--engine", *engine,
-                  "Engine/framework hint for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
+                  "Pin the inference engine for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
   cmd->callback([&options, ref, engine]() {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {

@@ -3,7 +3,7 @@
  *
  * Voice activity detection namespace — mirrors Swift's `RunAnywhere+VAD.swift`.
  * Provides `RunAnywhere.vad.*` capability surface for owning VAD component
- * handles plus a `RunAnywhere.vad.detectVoiceAuto(audio, options)` shortcut.
+ * handles plus a `RunAnywhere.vad.detectVoice(audio, options)` shortcut.
  *
  * The proto-byte adapters (`VADProtoAdapter`) take a numeric `handle` argument
  * — it comes from `_rac_vad_component_create()` followed by
@@ -234,18 +234,18 @@ function assertRequestedModelMatches(
 }
 
 export const VAD = {
-  detectVoiceAuto: detectVoice,
-  streamVoiceAuto: streamVoiceActivity,
+  detectVoice,
+  streamVoiceActivity,
 
   /**
    * Reset the lifecycle-loaded VAD service (clears speech-segment buffers).
    * Handle-less form backing Swift's parameterless `RunAnywhere.resetVAD()`.
    * No-op returning false when no VAD model is loaded through lifecycle.
    */
-  resetVoiceAuto(): boolean {
+  resetLoaded(): boolean {
     if (!currentLifecycleVADModel()) return false;
     return (
-      lifecycleVADAdapter('RunAnywhere.vad.resetVoiceAuto').resetLifecycle() !=
+      lifecycleVADAdapter('RunAnywhere.vad.resetLoaded').resetLifecycle() !=
       null
     );
   },
@@ -433,7 +433,7 @@ export async function detectVoice(
     );
   }
   assertRequestedModelMatches(current, options);
-  const adapter = lifecycleVADAdapter('RunAnywhere.vad.detectVoiceAuto');
+  const adapter = lifecycleVADAdapter('RunAnywhere.vad.detectVoice');
   const config = lifecycleConfiguration(options);
   if (!adapter.configureLifecycle(config)) {
     throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');
@@ -479,7 +479,7 @@ export async function* streamVoiceActivity(
     );
   }
   assertRequestedModelMatches(current, options);
-  const adapter = lifecycleVADAdapter('VAD.streamVoiceAuto');
+  const adapter = lifecycleVADAdapter('VAD.streamVoiceActivity');
   const config = lifecycleConfiguration(options);
   if (!adapter.configureLifecycle(config)) {
     throw SDKException.processingFailed('Failed to configure the lifecycle VAD service');

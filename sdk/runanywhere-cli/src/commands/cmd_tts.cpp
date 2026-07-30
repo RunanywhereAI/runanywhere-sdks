@@ -1,6 +1,9 @@
 /**
  * @file cmd_tts.cpp
- * @brief `rcli tts --text "..." --output o.wav [voice]` — synthesize speech.
+ * @brief `rcli tts synthesize "text" --output o.wav` — speech synthesis.
+ *
+ * `rcli tts --text "…" --output o.wav` is the same command: the options live on
+ * the `tts` namespace and `synthesize` is a CLI11 fallthrough alias.
  *
  * The sherpa TTS engine returns float PCM at the voice's native sample rate
  * (see tests/test_voice_agent.cpp fixture synthesis); converted to int16 WAV.
@@ -25,13 +28,36 @@ namespace {
 
 constexpr const char* kDefaultVoice = "vits-piper-en_US-lessac-medium";
 
-int run_tts(const GlobalOptions& options, const std::string& ref, const std::string& text,
-            const std::string& output) {
+struct TtsParams {
+    std::string model;
+    std::string voice;
+    std::string positional_text;
+    std::string text;  // --text/-t spelling of the same string
+    std::string output;
+    std::string language;
+    float speed = 1.0f;
+    float pitch = 1.0f;
+    int32_t sample_rate = 0;  // 0 = the voice's native rate
+};
+
+int run_tts(const GlobalOptions& options, const TtsParams& params) {
     Bootstrapped env;
     if (bootstrap(options, &env) != RAC_SUCCESS) {
         return 1;
     }
 
+    const std::string& text = params.positional_text.empty() ? params.text
+                                                            : params.positional_text;
+    if (text.empty()) {
+        out::error_line("text to speak is required (positional or --text)");
+        return 2;
+    }
+    if (params.output.empty()) {
+        out::error_line("--output is required");
+        return 2;
+    }
+
+    const std::string& ref = !params.model.empty() ? params.model : params.voice;
     ResolvedModelPaths voice;
     const int setup = ensure_model_ready(options, ref.empty() ? kDefaultVoice : ref, &voice);
     if (setup != 0) {
@@ -52,9 +78,20 @@ int run_tts(const GlobalOptions& options, const std::string& ref, const std::str
         return 1;
     }
 
+    rac_tts_options_t tts_options = RAC_TTS_OPTIONS_DEFAULT;
+    tts_options.voice = params.voice.empty() ? nullptr : params.voice.c_str();
+    if (!params.language.empty()) {
+        tts_options.language = params.language.c_str();
+    }
+    tts_options.rate = params.speed;
+    tts_options.pitch = params.pitch;
+    if (params.sample_rate > 0) {
+        tts_options.sample_rate = params.sample_rate;
+    }
+
     const auto started = std::chrono::steady_clock::now();
     rac_tts_result_t result = {};
-    rc = rac_tts_component_synthesize(tts, text.c_str(), nullptr, &result);
+    rc = rac_tts_component_synthesize(tts, text.c_str(), &tts_options, &result);
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                              std::chrono::steady_clock::now() - started)
                              .count();
@@ -70,14 +107,15 @@ int run_tts(const GlobalOptions& options, const std::string& ref, const std::str
         const std::vector<int16_t> pcm16 = wav::to_int16(float_samples, sample_count);
 
         std::string error;
-        if (!wav::write_wav(output, pcm16.data(), pcm16.size(), result.sample_rate, &error)) {
+        if (!wav::write_wav(params.output, pcm16.data(), pcm16.size(), result.sample_rate,
+                            &error)) {
             out::error_line(error);
             exit_code = 1;
         } else if (options.json) {
             out::JsonWriter json;
             json.begin_object()
                 .field("voice", voice.model_id)
-                .field("path", output)
+                .field("path", params.output)
                 .field("sample_rate", static_cast<int64_t>(result.sample_rate))
                 .field("duration_ms",
                        static_cast<int64_t>(sample_count * 1000 /
@@ -86,7 +124,7 @@ int run_tts(const GlobalOptions& options, const std::string& ref, const std::str
                 .end_object();
             out::result_line(json.str());
         } else {
-            out::result_line(output);
+            out::result_line(params.output);
             if (options.verbose) {
                 out::status_line("(" + std::to_string(elapsed) + " ms, " +
                                  std::to_string(result.sample_rate) + " Hz)");
@@ -102,15 +140,26 @@ int run_tts(const GlobalOptions& options, const std::string& ref, const std::str
 }  // namespace
 
 void register_tts(CLI::App& app, GlobalOptions& options) {
-    CLI::App* cmd = app.add_subcommand("tts", "Synthesize speech to a WAV file");
-    auto ref = std::make_shared<std::string>();
-    auto text = std::make_shared<std::string>();
-    auto output = std::make_shared<std::string>();
-    cmd->add_option("voice", *ref, "TTS voice (default: " + std::string(kDefaultVoice) + ")");
-    cmd->add_option("--text,-t", *text, "Text to speak")->required();
-    cmd->add_option("--output,-o", *output, "Output WAV path")->required();
-    cmd->callback([&options, ref, text, output]() {
-        const int exit_code = run_tts(options, *ref, *text, *output);
+    CLI::App* cmd = app.add_subcommand("tts", "Speak text with an on-device voice");
+    cmd->require_subcommand(0, 1);
+    add_verb_alias(cmd, "synthesize", "Write spoken audio to a WAV file");
+
+    auto params = std::make_shared<TtsParams>();
+    // CLI11 matches option names without their dashes, so the positional
+    // cannot also be called "text" while `--text` exists.
+    cmd->add_option("TEXT", params->positional_text, "Text to speak");
+    cmd->add_option("--text,-t", params->text, "Text to speak");
+    cmd->add_option("--output,-o", params->output, "WAV file to write");
+    cmd->add_option("--model,-m", params->model,
+                    "Voice model to load (default: " + std::string(kDefaultVoice) + ")");
+    cmd->add_option("--voice", params->voice, "Voice inside the model to speak with");
+    cmd->add_option("--language", params->language, "BCP-47 language to speak (default en-US)");
+    cmd->add_option("--speed", params->speed, "Speak faster or slower than 1.0");
+    cmd->add_option("--pitch", params->pitch, "Raise or lower the pitch from 1.0");
+    cmd->add_option("--sample-rate", params->sample_rate,
+                    "Output sample rate in Hz (0 = the voice's own)");
+    cmd->callback([&options, params]() {
+        const int exit_code = run_tts(options, *params);
         if (exit_code != 0) {
             throw CLI::RuntimeError(exit_code);
         }

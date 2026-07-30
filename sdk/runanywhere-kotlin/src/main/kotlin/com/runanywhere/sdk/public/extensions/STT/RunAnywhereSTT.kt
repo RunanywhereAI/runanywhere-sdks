@@ -47,6 +47,7 @@ private val sttLogger = SDKLogger.stt
  * Snapshot the lifecycle STT service state (readiness, current model,
  * supported language codes). Mirrors Swift `RunAnywhere.sttState()`.
  */
+@Deprecated("Use RunAnywhere.stt.state().")
 suspend fun RunAnywhere.sttState(): STTServiceState {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -55,6 +56,7 @@ suspend fun RunAnywhere.sttState(): STTServiceState {
     return CppBridgeSTT.state()
 }
 
+@Deprecated("Use RunAnywhere.stt.transcribe(audio, options).")
 suspend fun RunAnywhere.transcribe(
     audio: ByteArray,
     options: RASTTOptions = RASTTOptions.defaults(),
@@ -83,6 +85,7 @@ suspend fun RunAnywhere.transcribe(
     return result
 }
 
+@Deprecated("Use RunAnywhere.stt.transcribeStream(audio, options).")
 fun RunAnywhere.transcribeStream(
     audio: Flow<ByteArray>,
     options: RASTTOptions = RASTTOptions.defaults(),

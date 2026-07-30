@@ -2,33 +2,18 @@
 //  RunAnywhere+Segmentation.swift
 //  RunAnywhere SDK
 //
-//  Public semantic image-segmentation facade.
+//  Deprecated flat segmentation verb. The v3 surface is
+//  `RunAnywhere.segmentation`.
 //
 
 public extension RunAnywhere {
-    /// Segment one packed RGB8, RGBA8, or BGRA8 image through the currently
-    /// loaded `.semanticSegmentation` model.
-    ///
-    /// Model ownership stays in the canonical lifecycle. Import/register a
-    /// local model, then call `loadModel(_:)` with
-    /// `category = .semanticSegmentation` before invoking this method.
-    /// RunAnywhere does not implicitly download or load restricted model
-    /// weights from this inference entry point.
+
+    /// Segment one packed RGB8, RGBA8, or BGRA8 image.
+    @available(*, deprecated, renamed: "segmentation.segment(_:options:)")
     static func segment(
         _ request: RASegmentationRequest
     ) async throws -> RASegmentationResult {
-        guard isInitialized else {
-            throw SDKException(
-                code: .notInitialized,
-                message: "SDK not initialized",
-                category: .internal
-            )
-        }
-        try await ensureServicesReady()
-
-        let snapshot = loadedModelSnapshot(category: .semanticSegmentation)
-        try requireSemanticSegmentationModel(snapshot)
-        return try await CppBridge.Segmentation.segment(request)
+        try await segmentProto(request)
     }
 
     /// Shared readiness gate kept separate from native dispatch so focused

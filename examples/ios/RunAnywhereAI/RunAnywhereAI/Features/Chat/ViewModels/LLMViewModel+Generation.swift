@@ -13,67 +13,68 @@ extension LLMViewModel {
 
     func generateStreamingResponse(
         prompt: String,
-        options: RALLMGenerationOptions,
+        options: LlmOptions,
         messageIndex: Int,
         generationID: UUID?
     ) async throws {
-        // The SDK's `aggregateStream(prompt:events:onToken:)` consumes the
-        // RALLMStreamEvent sequence, populates the canonical
-        // RALLMGenerationResult (including `framework` resolved from the
-        // currently-loaded LLM model), and invokes `onToken` for live UI
-        // updates. Avoids the synthetic result construction the example used
-        // to do alongside a hardcoded `framework = "llamacpp"` literal.
-        let history = Self.makeHistory(from: self.messagesValue, currentUserIndex: messageIndex - 1)
-        let request = Self.makeRequest(prompt: prompt, options: options, history: history)
-        let eventStream = try await RunAnywhere.generateStream(request)
-        let result = await RunAnywhere.aggregateStream(
-            prompt: prompt,
-            events: eventStream,
-            onThinking: { fullThinking in
-                await MainActor.run {
+        let chatMessages = Self.makeChatMessages(
+            from: self.messagesValue,
+            currentUserIndex: messageIndex - 1,
+            prompt: prompt
+        )
+        let stream = try await RunAnywhere.llm.generateStream(messages: chatMessages, options: options)
+
+        var answer = ""
+        var thinking = ""
+
+        for try await event in stream {
+            switch event {
+            case .token(let text, let kind):
+                switch kind {
+                case .thought:
+                    thinking += text
                     // Drop thoughts from a superseded generation (user navigated away).
-                    guard self.isCurrentGeneration(generationID) else { return }
-                    self.updateMessageThinking(at: messageIndex, content: fullThinking)
-                }
-            },
-            onToken: { fullResponse in
-                await MainActor.run {
+                    guard isCurrentGeneration(generationID) else { continue }
+                    updateMessageThinking(at: messageIndex, content: thinking)
+                case .text:
+                    answer += text
                     // Drop tokens from a superseded generation (user navigated away).
-                    guard self.isCurrentGeneration(generationID) else { return }
+                    guard isCurrentGeneration(generationID) else { continue }
                     // `@Observable` publishes the message mutation; the chat view
                     // auto-scrolls via `.onChange(of: messages.last?.content)`.
-                    self.updateMessageContent(at: messageIndex, content: fullResponse)
+                    updateMessageContent(at: messageIndex, content: answer)
                 }
+
+            case .completed(let result):
+                guard isCurrentGeneration(generationID) else { return }
+                await updateMessageWithResult(
+                    at: messageIndex,
+                    result: result,
+                    prompt: prompt,
+                    options: options,
+                    wasInterrupted: false
+                )
+
+            case .started, .toolCall:
+                break
             }
-        )
-
-        if !result.errorMessage.isEmpty {
-            throw NSError(domain: "RunAnywhereAI", code: -1, userInfo: [
-                NSLocalizedDescriptionKey: result.errorMessage
-            ])
         }
-
-        guard isCurrentGeneration(generationID) else { return }
-        await updateMessageWithResult(
-            at: messageIndex,
-            result: result,
-            prompt: prompt,
-            options: options,
-            wasInterrupted: false
-        )
     }
 
     // MARK: - Non-Streaming Response Generation
 
     func generateNonStreamingResponse(
         prompt: String,
-        options: RALLMGenerationOptions,
+        options: LlmOptions,
         messageIndex: Int,
         generationID: UUID?
     ) async throws {
-        let history = Self.makeHistory(from: self.messagesValue, currentUserIndex: messageIndex - 1)
-        let request = Self.makeRequest(prompt: prompt, options: options, history: history)
-        let result = try await RunAnywhere.generate(request)
+        let chatMessages = Self.makeChatMessages(
+            from: self.messagesValue,
+            currentUserIndex: messageIndex - 1,
+            prompt: prompt
+        )
+        let result = try await RunAnywhere.llm.generate(messages: chatMessages, options: options)
         guard isCurrentGeneration(generationID) else { return }
         await updateMessageWithResult(
             at: messageIndex,
@@ -84,41 +85,27 @@ extension LLMViewModel {
         )
     }
 
-    /// Compose a canonical `RALLMGenerateRequest` from a prompt and options.
-    /// Example-local convenience for bridging the app's options-based API into
-    /// the SDK's canonical request-based entry points.
+    /// Map the app's prior `Message`s plus the live user turn into the SDK's
+    /// conversation shape, so commons renders the model's chat template with the
+    /// earlier turns in place. Without them every turn is sent context-free and
+    /// the model cannot recall earlier messages.
     ///
-    /// `history` carries the prior conversation turns so commons renders
-    /// `{system_prompt, history, prompt}` via the model's chat template. Without
-    /// it every turn is sent context-free and the model cannot recall earlier
-    /// messages.
-    static func makeRequest(
-        prompt: String,
-        options: RALLMGenerationOptions,
-        history: [RAChatMessage] = []
-    ) -> RALLMGenerateRequest {
-        var request = RALLMGenerateRequest()
-        request.prompt = prompt
-        request.options = options
-        request.history = history
-        return request
-    }
-
-    /// Map the app's prior `Message`s into the SDK `history` field.
-    ///
-    /// Excludes the live user turn and the empty assistant slot being streamed
-    /// into (both live at/after `currentUserIndex`), and any `system` turns —
-    /// the system prompt travels separately via `options.systemPrompt`.
-    static func makeHistory(from messages: [Message], currentUserIndex: Int) -> [RAChatMessage] {
+    /// Excludes the empty assistant slot being streamed into (it lives at
+    /// `currentUserIndex + 1`) and any `system` turns — the system prompt travels
+    /// separately via `options.systemPrompt`.
+    static func makeChatMessages(
+        from messages: [Message],
+        currentUserIndex: Int,
+        prompt: String
+    ) -> [ChatMessage] {
         // Clamp the upper bound: `currentUserIndex` is captured before `await`s,
         // so if the user switched/cleared the conversation mid-generation the
         // buffer may now be shorter and an unclamped slice would crash (range out
         // of bounds).
         let end = min(max(currentUserIndex, 0), messages.count)
-        guard end > 0 else { return [] }
-        var history: [RAChatMessage] = []
+        var history: [ChatMessage] = []
         for message in messages[0..<end] {
-            let role: RAMessageRole
+            let role: ChatMessage.Role
             switch message.role {
             case .user: role = .user
             case .assistant: role = .assistant
@@ -134,12 +121,10 @@ extension LLMViewModel {
             // strictly alternating history and reject repeats; keep the most
             // recent turn of any same-role run.
             if history.last?.role == role { history.removeLast() }
-            var chatMessage = RAChatMessage()
-            chatMessage.role = role
-            chatMessage.content = message.content
-            history.append(chatMessage)
+            history.append(ChatMessage(role: role, content: message.content))
         }
-        return history
+        if history.last?.role == .user { history.removeLast() }
+        return history + [ChatMessage(role: .user, content: prompt)]
     }
 
     // MARK: - Message Updates
@@ -180,9 +165,9 @@ extension LLMViewModel {
 
     func updateMessageWithResult(
         at index: Int,
-        result: RALLMGenerationResult,
+        result: GenerationResult,
         prompt: String,
-        options: RALLMGenerationOptions,
+        options: LlmOptions,
         wasInterrupted: Bool
     ) async {
         // LLMViewModel is @MainActor (class-level); this extension inherits that
@@ -213,7 +198,7 @@ extension LLMViewModel {
             id: currentMessage.id,
             role: currentMessage.role,
             content: result.text,
-            thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
+            thinkingContent: result.thinkingText,
             timestamp: currentMessage.timestamp,
             analytics: analytics,
             modelInfo: modelInfo,

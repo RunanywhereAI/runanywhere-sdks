@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   synthesize: vi.fn(),
   generate: vi.fn(),
   cancelGeneration: vi.fn(),
-  detectVoiceAuto: vi.fn(),
+  detectVoice: vi.fn(),
   vadLifecycleAvailable: false,
   sttAvailable: true,
   ttsAvailable: true,
@@ -35,7 +35,7 @@ vi.mock('../../../../src/Public/Extensions/RunAnywhere+TextGeneration', () => ({
 vi.mock('../../../../src/Public/Extensions/RunAnywhere+VAD', () => ({
   VAD: {
     supportsLifecycleProtoVAD: () => mocks.vadLifecycleAvailable,
-    detectVoiceAuto: mocks.detectVoiceAuto,
+    detectVoice: mocks.detectVoice,
   },
 }));
 
@@ -91,7 +91,7 @@ describe('CrossWasmVoiceAgentProvider', () => {
     mocks.sttAvailable = true;
     mocks.ttsAvailable = true;
     mocks.llmAvailable = true;
-    mocks.detectVoiceAuto.mockReset().mockResolvedValue({
+    mocks.detectVoice.mockReset().mockResolvedValue({
       isSpeech: true,
       confidence: 0.99,
       durationMs: 1_000,
@@ -112,8 +112,8 @@ describe('CrossWasmVoiceAgentProvider', () => {
 
     await provider.processVoiceTurn(new Float32Array(16_000).fill(0.2));
 
-    expect(mocks.detectVoiceAuto).toHaveBeenCalledOnce();
-    expect(mocks.detectVoiceAuto.mock.calls[0]?.[1]).toMatchObject({
+    expect(mocks.detectVoice).toHaveBeenCalledOnce();
+    expect(mocks.detectVoice.mock.calls[0]?.[1]).toMatchObject({
       modelId: `model-${ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION}`,
       config: {
         sampleRate: 16_000,
@@ -121,7 +121,7 @@ describe('CrossWasmVoiceAgentProvider', () => {
         threshold: 0.5,
       },
     });
-    expect(mocks.detectVoiceAuto.mock.calls[0]?.[1]).not.toHaveProperty('threshold');
+    expect(mocks.detectVoice.mock.calls[0]?.[1]).not.toHaveProperty('threshold');
   });
 
   it('applies the spoken system prompt and bounded conversational history', async () => {
