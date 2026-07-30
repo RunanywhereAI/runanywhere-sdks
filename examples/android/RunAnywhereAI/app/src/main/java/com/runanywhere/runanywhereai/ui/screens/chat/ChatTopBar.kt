@@ -42,11 +42,13 @@ import com.runanywhere.runanywhereai.ui.theme.LocalDimens
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.runanywhereai.ui.theme.primaryGreen
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.connect.ConnectModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatTopBar(
     model: RAModelInfo?,
+    hostedModel: ConnectModel?,
     conversationModelName: String?,
     generating: Boolean,
     loraActive: Boolean,
@@ -77,6 +79,7 @@ fun ChatTopBar(
         title = {
             ModelCard(
                 model = model,
+                hostedModel = hostedModel,
                 fallbackModelName = conversationModelName,
                 generating = generating,
                 onClick = onModelClick,
@@ -89,7 +92,7 @@ fun ChatTopBar(
             IconButton(onClick = onNewChat) {
                 Icon(RACIcons.Outline.Plus, contentDescription = "New chat")
             }
-            if (hasMessages || model?.supports_lora == true) {
+            if (hasMessages || (hostedModel == null && model?.supports_lora == true)) {
                 IconButton(onClick = { overflowExpanded = true }) {
                     Icon(RACIcons.Outline.DotsVertical, contentDescription = "More chat actions")
                 }
@@ -107,7 +110,7 @@ fun ChatTopBar(
                             },
                         )
                     }
-                    if (model?.supports_lora == true) {
+                    if (hostedModel == null && model?.supports_lora == true) {
                         DropdownMenuItem(
                             text = { Text(if (loraActive) "Adapters active" else "Adapters") },
                             leadingIcon = { Icon(RACIcons.Outline.Adjustments, contentDescription = null) },
@@ -126,28 +129,32 @@ fun ChatTopBar(
 @Composable
 private fun ModelCard(
     model: RAModelInfo?,
+    hostedModel: ConnectModel?,
     fallbackModelName: String?,
     generating: Boolean,
     onClick: () -> Unit,
 ) {
     val dimens = LocalDimens.current
-    val brand = model?.brand()
+    val brand = if (hostedModel == null) model?.brand() else null
     // Mirrors iOS loadConversation restore: with no model loaded, the
     // conversation's recorded model is shown as a preselection (not loaded).
     val statusText = when {
         generating -> "Generating…"
+        hostedModel != null -> "Ready on host"
         model != null -> "Ready"
         fallbackModelName != null -> "Not loaded"
         else -> "Tap to choose"
     }
-    val backendStatusText = if (model != null && !generating) {
+    val backendStatusText = if (hostedModel != null && !generating) {
+        "Host · $statusText"
+    } else if (model != null && !generating) {
         "${model.framework.shortLabel()} · $statusText"
     } else {
         statusText
     }
     val dotColor = when {
         generating -> MaterialTheme.colorScheme.primary
-        model != null -> primaryGreen
+        hostedModel != null || model != null -> primaryGreen
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     val dotAlpha = if (generating) {
@@ -169,7 +176,7 @@ private fun ModelCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = brand?.icon ?: RACIcons.Outline.Bolt,
+                imageVector = if (hostedModel != null) RACIcons.Outline.Desktop else brand?.icon ?: RACIcons.Outline.Bolt,
                 contentDescription = "Model",
                 tint = brand?.color ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(dimens.spacingSm),
@@ -177,9 +184,12 @@ private fun ModelCard(
 
             Column(modifier = Modifier.padding(end = dimens.spacingSm)) {
                 Text(
-                    // The same cleaned title the picker shows, so the bar reads
-                    // "SmolLM2 360M" instead of clipping "SmolLM2 360M Q8_0".
-                    text = model?.displayTitle() ?: fallbackModelName ?: "Select Model",
+                    // Hosted Connect models keep their host display name; local
+                    // models use the same cleaned title the picker shows.
+                    text = hostedModel?.displayName
+                        ?: model?.displayTitle()
+                        ?: fallbackModelName
+                        ?: "Select Model",
                     overflow = TextOverflow.Ellipsis,
                     maxLines = 1,
                     style = MaterialTheme.typography.titleMedium,

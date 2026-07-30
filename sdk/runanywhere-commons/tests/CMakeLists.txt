@@ -63,6 +63,31 @@ function(rac_test_define_have_solutions target)
     endif()
 endfunction()
 
+# --- Connect role policy + transport-independent handshake -----------------
+# Covers the shared contract used by Swift, Kotlin, Flutter, and React Native:
+# role admission, protocol negotiation, model adoption, and reconnect
+# deduplication. Platform discovery/socket adapters are tested in their SDKs.
+add_executable(test_connect_proto_abi test_connect_proto_abi.cpp)
+target_include_directories(test_connect_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_connect_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_connect_proto_abi)
+target_compile_features(test_connect_proto_abi PRIVATE cxx_std_20)
+rac_test_define_have_protobuf(test_connect_proto_abi)
+add_test(NAME connect_proto_abi_tests COMMAND test_connect_proto_abi)
+
+add_executable(test_connect_transport_registry test_connect_transport_registry.cpp)
+target_include_directories(test_connect_transport_registry PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_connect_transport_registry PRIVATE rac_commons)
+rac_link_archive_deps(test_connect_transport_registry)
+target_compile_features(test_connect_transport_registry PRIVATE cxx_std_20)
+add_test(NAME connect_transport_registry_tests COMMAND test_connect_transport_registry)
+
 set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 
 # Tests may need access to commons private headers (e.g. the internal

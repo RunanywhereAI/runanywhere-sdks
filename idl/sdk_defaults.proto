@@ -105,6 +105,28 @@ message NetworkDefaults {
 }
 
 // ---------------------------------------------------------------------------
+// LAN Connect (macOS host / native mobile clients) socket timings.
+//
+// Distinct from NetworkDefaults.connect_timeout_ms (HTTP TCP connect, 30s).
+// Pre-pool call sites: AndroidConnectTransport.kt companion CONNECT_TIMEOUT_MS
+// / GENERATION_READ_TIMEOUT_MS; ConnectSession.swift generationReadTimeout.
+// ---------------------------------------------------------------------------
+message ConnectDefaults {
+    // TCP connect timeout for joining a LAN Connect host.
+    int32 connect_timeout_ms           = 1 [
+        (runanywhere.v1.rac_default) = "5000",
+        (runanywhere.v1.rac_min) = 1000
+    ];
+
+    // Inter-frame read ceiling while a hosted generation is streaming. Generous
+    // so a stalled host is visible without false positives on slow tokens.
+    int32 generation_read_timeout_ms   = 2 [
+        (runanywhere.v1.rac_default) = "120000",
+        (runanywhere.v1.rac_min) = 1000
+    ];
+}
+
+// ---------------------------------------------------------------------------
 // Microphone capture and audio playback rates.
 //
 // Pre-pool call sites: VoiceAgentMicDriver.swift:178-179;

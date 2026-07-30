@@ -9,6 +9,10 @@ export declare const networkDefaults: Readonly<{
     maxRetries: number;
     retryBackoffBaseMs: number;
 }>;
+export declare const connectDefaults: Readonly<{
+    connectTimeoutMs: number;
+    generationReadTimeoutMs: number;
+}>;
 export declare const audioCaptureDefaults: Readonly<{
     micSampleRateHz: number;
     micChannels: number;

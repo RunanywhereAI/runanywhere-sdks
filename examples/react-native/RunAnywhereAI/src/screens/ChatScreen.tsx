@@ -21,7 +21,12 @@
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Views/ChatInterfaceView.swift
  */
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+} from 'react';
 import {
   View,
   Text,
@@ -33,10 +38,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   typography,
   useTheme,
@@ -148,9 +150,7 @@ export const ChatScreen: React.FC = () => {
   // Refs
   const flatListRef = useRef<FlatList>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
-
-  // Safe area insets for header status bar handling
-  const insets = useSafeAreaInsets();
+  const generationTokenRef = useRef(0);
 
   // Initialize conversation store and create first conversation
   useEffect(() => {
@@ -190,6 +190,11 @@ export const ChatScreen: React.FC = () => {
       setRegisteredToolCount(tools.length)
     );
   }, []);
+
+  // Invalidate in-flight generation when the active conversation changes.
+  useEffect(() => {
+    generationTokenRef.current += 1;
+  }, [currentConversation?.id]);
 
   // Messages from current conversation
   const messages = currentConversation?.messages || [];
@@ -362,10 +367,10 @@ export const ChatScreen: React.FC = () => {
   const handleToggleTools = useCallback(() => {
     setToolsEnabled((prev) => {
       const next = !prev;
-      void AsyncStorage.setItem(
+      AsyncStorage.setItem(
         APP_STORAGE_KEYS.TOOL_CALLING_ENABLED,
         next ? 'true' : 'false'
-      );
+      ).catch(() => undefined);
       return next;
     });
   }, []);
@@ -383,7 +388,7 @@ export const ChatScreen: React.FC = () => {
       const text = (
         typeof promptOverride === 'string' ? promptOverride : inputText
       ).trim();
-      if (isLoading || !text || !currentConversation) return;
+      if (isLoading || !text || !currentConversation || !currentModel) return;
 
       const userMessage: Message = {
         id: generateId(),
@@ -400,6 +405,8 @@ export const ChatScreen: React.FC = () => {
 
       const assistantMessageId = generateId();
       let assistantMessageInserted = false;
+      const generationToken = ++generationTokenRef.current;
+      const conversationIdAtStart = currentConversation.id;
 
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -414,12 +421,12 @@ export const ChatScreen: React.FC = () => {
           '[ChatScreen] Starting streaming generation for:',
           prompt,
           'model:',
-          currentModel?.id
+          currentModel.id
         );
 
         const registeredTools = await RunAnywhere.getRegisteredTools();
         const shouldUseTools = toolsEnabled && registeredTools.length > 0;
-        const supportsThinking = currentModel?.supportsThinking ?? false;
+        const supportsThinking = currentModel.supportsThinking ?? false;
         const wasThinkingMode = supportsThinking && options.thinkingModeEnabled;
         const disableThinking =
           supportsThinking && !options.thinkingModeEnabled;
@@ -447,8 +454,10 @@ export const ChatScreen: React.FC = () => {
           disableThinking,
         });
 
+        const activeModelId = currentModel.id;
+        const activeModelName = currentModel.name || 'Unknown Model';
         const frameworkName = RunAnywhere.formatFramework(
-          currentModel?.preferredFramework ?? currentModel?.framework
+          currentModel.preferredFramework ?? currentModel.framework
         );
 
         // Insert the initial empty assistant message once (matches iOS two-phase pattern).
@@ -459,8 +468,8 @@ export const ChatScreen: React.FC = () => {
           timestamp: new Date(),
           isStreaming: true,
           modelInfo: {
-            modelId: currentModel?.id || 'unknown',
-            modelName: currentModel?.name || 'Unknown Model',
+            modelId: activeModelId,
+            modelName: activeModelName,
             framework: frameworkName,
             frameworkDisplayName: frameworkName,
           },
@@ -509,8 +518,8 @@ export const ChatScreen: React.FC = () => {
             thinkingContent: result.thinkingContent,
             timestamp: new Date(),
             modelInfo: {
-              modelId: currentModel?.id || 'unknown',
-              modelName: currentModel?.name || 'Unknown Model',
+              modelId: activeModelId,
+              modelName: activeModelName,
               framework: frameworkName,
               frameworkDisplayName: frameworkName,
             },
@@ -541,6 +550,7 @@ export const ChatScreen: React.FC = () => {
             prompt,
             eventStream,
             async (transcript) => {
+              if (generationToken !== generationTokenRef.current) return;
               accumulatedText = transcript;
               updateMessage(
                 {
@@ -550,18 +560,23 @@ export const ChatScreen: React.FC = () => {
                   timestamp: new Date(),
                   isStreaming: true,
                   modelInfo: {
-                    modelId: currentModel?.id || 'unknown',
-                    modelName: currentModel?.name || 'Unknown Model',
+                    modelId: activeModelId,
+                    modelName: activeModelName,
                     framework: frameworkName,
                     frameworkDisplayName: frameworkName,
                   },
                 },
-                currentConversation.id
+                conversationIdAtStart
               );
               flatListRef.current?.scrollToEnd({ animated: false });
               await new Promise<void>((resolve) => setTimeout(resolve, 0));
             }
           );
+
+          if (generationToken !== generationTokenRef.current) return;
+          if (result.errorMessage) {
+            throw new Error(result.errorMessage);
+          }
 
           const finalContent =
             result.text || accumulatedText || '(No response generated)';
@@ -575,8 +590,8 @@ export const ChatScreen: React.FC = () => {
             thinkingContent: result.thinkingContent,
             timestamp: new Date(),
             modelInfo: {
-              modelId: currentModel?.id || 'unknown',
-              modelName: currentModel?.name || 'Unknown Model',
+              modelId: activeModelId,
+              modelName: activeModelName,
               framework: frameworkName,
               frameworkDisplayName: frameworkName,
             },
@@ -600,10 +615,11 @@ export const ChatScreen: React.FC = () => {
         }
 
         // Apply analytics fields in-memory first, then persist once.
-        updateMessage(finalMessage, currentConversation.id);
+        if (generationToken !== generationTokenRef.current) return;
+        updateMessage(finalMessage, conversationIdAtStart);
         const latestConversation = useConversationStore
           .getState()
-          .conversations.find((c) => c.id === currentConversation.id);
+          .conversations.find((c) => c.id === conversationIdAtStart);
         if (latestConversation) {
           await updateConversation(latestConversation);
         }
@@ -662,7 +678,8 @@ export const ChatScreen: React.FC = () => {
 
   const handleStopGeneration = useCallback(() => {
     generationAbortRef.current?.abort();
-    void RunAnywhere.cancelGeneration();
+    RunAnywhere.cancelGeneration().catch(() => undefined);
+    generationTokenRef.current += 1;
     setIsLoading(false);
   }, []);
 
@@ -742,7 +759,8 @@ export const ChatScreen: React.FC = () => {
     />
   );
 
-  const showOverlay = !currentModel && !isModelLoading;
+  const hasUsableModel = !!currentModel;
+  const showOverlay = !hasUsableModel && !isModelLoading;
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
@@ -807,11 +825,13 @@ export const ChatScreen: React.FC = () => {
           )}
 
           {/* Example prompts (mode follows tool/LoRA state), shown on an empty chat */}
-          {currentModel && messages.length === 0 && (
+          {hasUsableModel && messages.length === 0 && (
             <PromptSuggestions
               toolsEnabled={toolsEnabled}
               loraActive={loraAdapterCount > 0}
-              onSelect={(p) => void handleSend(p)}
+              onSelect={(p) => {
+                handleSend(p).catch(() => undefined);
+              }}
             />
           )}
 
@@ -821,12 +841,12 @@ export const ChatScreen: React.FC = () => {
             onChangeText={setInputText}
             onSend={handleSend}
             onStop={handleStopGeneration}
-            disabled={!currentModel || !currentConversation}
+            disabled={!hasUsableModel || !currentConversation}
             isLoading={isLoading}
             toolsEnabled={toolsEnabled}
             onToggleTools={currentModel ? handleToggleTools : undefined}
             placeholder={
-              currentModel
+              hasUsableModel
                 ? 'Type a message...'
                 : 'Select a model to start chatting'
             }

@@ -92,6 +92,8 @@ await chat.sendText('What is my name?');
 
 ## Electron (utility-process isolation)
 
+> **Not LAN Connect.** `RunAnywhereMain.connect(webContents)` wires a **local** `MessagePort` between the renderer and an Electron **utility process** that hosts the native addon. It does **not** advertise or join RunAnywhere’s LAN Connect protocol (`_runanywhere-connect._tcp`). LAN Connect hosting/clients are native Swift/Kotlin only in this release; see the [root README Connect section](../../README.md#connect-trusted-lan).
+
 **Main process:**
 
 ```js

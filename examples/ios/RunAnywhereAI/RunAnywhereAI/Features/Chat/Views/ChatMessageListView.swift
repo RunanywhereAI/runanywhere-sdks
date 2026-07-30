@@ -262,19 +262,19 @@ struct ChatInputAreaView: View {
                     thinkingModeBadge
                 }
 
-                if viewModel.useToolCalling {
+                if viewModel.useToolCalling && !viewModel.isUsingConnect {
                     toolCallingBadge
                 }
 
-                if !viewModel.loraAdapters.isEmpty {
+                if !viewModel.isUsingConnect && !viewModel.loraAdapters.isEmpty {
                     loraAdapterBadge
                 }
             }
             .padding(
                 .top,
                 ((settingsViewModel.thinkingModeEnabled && viewModel.loadedModelSupportsThinking)
-                    || viewModel.useToolCalling
-                    || !viewModel.loraAdapters.isEmpty
+                    || (viewModel.useToolCalling && !viewModel.isUsingConnect)
+                    || (!viewModel.isUsingConnect && !viewModel.loraAdapters.isEmpty)
                     || imageAttachment != nil
                     || documentAttachment != nil) ? 8 : 0
             )

@@ -279,6 +279,46 @@ extension LLMGenerationOptionsValidate on LLMGenerationOptions {
   }
 }
 
+extension VADConfigurationConvenience on VADConfiguration {
+  static VADConfiguration defaults() {
+    final r = VADConfiguration();
+    r.sampleRate = 16000;
+    r.frameLengthMs = 100;
+    r.threshold = 0.015;
+    r.calibrationMultiplier = 2.0;
+    return r;
+  }
+}
+
+extension VADConfigurationValidate on VADConfiguration {
+  void validate() {
+    if (sampleRate < 1 || sampleRate > 48000) {
+      throw SDKException.validationFailed(
+        'sample_rate must be in 1...48000 (got $sampleRate)',
+        fieldPath: 'VADConfiguration.sample_rate',
+      );
+    }
+    if (frameLengthMs < 1 || frameLengthMs > 1000) {
+      throw SDKException.validationFailed(
+        'frame_length_ms must be in 1...1000 (got $frameLengthMs)',
+        fieldPath: 'VADConfiguration.frame_length_ms',
+      );
+    }
+    if (!threshold.isFinite || threshold < 0.0 || threshold > 1.0) {
+      throw SDKException.validationFailed(
+        'threshold must be in 0.0...1.0 (got $threshold)',
+        fieldPath: 'VADConfiguration.threshold',
+      );
+    }
+    if (!calibrationMultiplier.isFinite || calibrationMultiplier < 1.5 || calibrationMultiplier > 4.0) {
+      throw SDKException.validationFailed(
+        'calibration_multiplier must be in 1.5...4.0 (got $calibrationMultiplier)',
+        fieldPath: 'VADConfiguration.calibration_multiplier',
+      );
+    }
+  }
+}
+
 extension DiarizationOptionsConvenience on DiarizationOptions {
   static DiarizationOptions defaults() {
     final r = DiarizationOptions();
@@ -366,46 +406,6 @@ extension EmbeddingsOptionsConvenience on EmbeddingsOptions {
     final r = EmbeddingsOptions();
     r.normalize = true;
     return r;
-  }
-}
-
-extension VADConfigurationConvenience on VADConfiguration {
-  static VADConfiguration defaults() {
-    final r = VADConfiguration();
-    r.sampleRate = 16000;
-    r.frameLengthMs = 100;
-    r.threshold = 0.015;
-    r.calibrationMultiplier = 2.0;
-    return r;
-  }
-}
-
-extension VADConfigurationValidate on VADConfiguration {
-  void validate() {
-    if (sampleRate < 1 || sampleRate > 48000) {
-      throw SDKException.validationFailed(
-        'sample_rate must be in 1...48000 (got $sampleRate)',
-        fieldPath: 'VADConfiguration.sample_rate',
-      );
-    }
-    if (frameLengthMs < 1 || frameLengthMs > 1000) {
-      throw SDKException.validationFailed(
-        'frame_length_ms must be in 1...1000 (got $frameLengthMs)',
-        fieldPath: 'VADConfiguration.frame_length_ms',
-      );
-    }
-    if (!threshold.isFinite || threshold < 0.0 || threshold > 1.0) {
-      throw SDKException.validationFailed(
-        'threshold must be in 0.0...1.0 (got $threshold)',
-        fieldPath: 'VADConfiguration.threshold',
-      );
-    }
-    if (!calibrationMultiplier.isFinite || calibrationMultiplier < 1.5 || calibrationMultiplier > 4.0) {
-      throw SDKException.validationFailed(
-        'calibration_multiplier must be in 1.5...4.0 (got $calibrationMultiplier)',
-        fieldPath: 'VADConfiguration.calibration_multiplier',
-      );
-    }
   }
 }
 

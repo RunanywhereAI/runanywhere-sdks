@@ -24,8 +24,9 @@ extension LLMViewModel {
         // updates. Avoids the synthetic result construction the example used
         // to do alongside a hardcoded `framework = "llamacpp"` literal.
         let history = Self.makeHistory(from: self.messagesValue, currentUserIndex: messageIndex - 1)
-        let request = Self.makeRequest(prompt: prompt, options: options, history: history)
-        let eventStream = try await RunAnywhere.generateStream(request)
+        var request = Self.makeRequest(prompt: prompt, options: options, history: history)
+        request = connectAwareRequest(request, messageIndex: messageIndex)
+        let eventStream = try await generationStream(for: request)
         let result = await RunAnywhere.aggregateStream(
             prompt: prompt,
             events: eventStream,
@@ -72,8 +73,28 @@ extension LLMViewModel {
         generationID: UUID?
     ) async throws {
         let history = Self.makeHistory(from: self.messagesValue, currentUserIndex: messageIndex - 1)
-        let request = Self.makeRequest(prompt: prompt, options: options, history: history)
-        let result = try await RunAnywhere.generate(request)
+        var request = Self.makeRequest(prompt: prompt, options: options, history: history)
+        request = connectAwareRequest(request, messageIndex: messageIndex)
+        let result: RALLMGenerationResult
+        #if os(iOS)
+        if isUsingConnect {
+            // Connect uses one typed streaming transport for both chat modes;
+            // aggregate it here when the user has disabled live token updates.
+            result = await RunAnywhere.aggregateStream(
+                prompt: prompt,
+                events: try await generationStream(for: request)
+            )
+            if !result.errorMessage.isEmpty {
+                throw NSError(domain: "RunAnywhereAI", code: -1, userInfo: [
+                    NSLocalizedDescriptionKey: result.errorMessage
+                ])
+            }
+        } else {
+            result = try await RunAnywhere.generate(request)
+        }
+        #else
+        result = try await RunAnywhere.generate(request)
+        #endif
         guard isCurrentGeneration(generationID) else { return }
         await updateMessageWithResult(
             at: messageIndex,
@@ -142,6 +163,30 @@ extension LLMViewModel {
         return history
     }
 
+    private func generationStream(for request: RALLMGenerateRequest) async throws -> AsyncStream<RALLMStreamEvent> {
+        #if os(iOS)
+        if isUsingConnect {
+            return try await ConnectClientController.shared.session.generateStream(request)
+        }
+        #endif
+        return try await RunAnywhere.generateStream(request)
+    }
+
+    /// Stamp Connect request/conversation IDs when the phone is using a host.
+    /// On macOS hosting this is a no-op (`isUsingConnect` stays false).
+    private func connectAwareRequest(_ request: RALLMGenerateRequest, messageIndex: Int) -> RALLMGenerateRequest {
+        #if os(iOS)
+        guard isUsingConnect, messageIndex < messagesValue.count else { return request }
+        var updated = request
+        updated.requestID = messagesValue[messageIndex].id.uuidString
+        updated.conversationID = currentConversation?.id ?? ""
+        activeHostedRequestID = updated.requestID
+        return updated
+        #else
+        return request
+        #endif
+    }
+
     // MARK: - Message Updates
 
     func updateMessageContent(at index: Int, content: String) {
@@ -203,16 +248,24 @@ extension LLMViewModel {
         )
 
         let modelInfo: MessageModelInfo?
-        if let currentModel = ModelListViewModel.shared.currentModel {
+        if !isUsingConnect, let currentModel = ModelListViewModel.shared.currentModel {
             modelInfo = MessageModelInfo(from: currentModel)
         } else {
             modelInfo = nil
         }
 
+        // Keep the longer of streamed UI text vs terminal result.text. Connect
+        // finals have been observed with a short/empty aggregate that would
+        // otherwise wipe a good in-progress transcript.
+        let mergedContent =
+            result.text.count >= currentMessage.content.count
+            ? result.text
+            : currentMessage.content
+
         let updatedMessage = Message(
             id: currentMessage.id,
             role: currentMessage.role,
-            content: result.text,
+            content: mergedContent,
             thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
             timestamp: currentMessage.timestamp,
             analytics: analytics,
@@ -272,6 +325,11 @@ extension LLMViewModel {
         // clear it exactly once for a normal completion or a Stop.
         self.setActiveGenerationID(nil)
         self.setIsGenerating(false)
+        #if os(iOS)
+        if activeHostedRequestID != nil {
+            activeHostedRequestID = nil
+        }
+        #endif
 
         // Guard the JSON write against a conversation swap that somehow kept the
         // id (should not normally happen once the id matches).

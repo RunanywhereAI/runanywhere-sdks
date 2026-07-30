@@ -171,9 +171,13 @@ class ChatViewModel extends ChangeNotifier {
   void dispose() {
     unawaited(_lifecycleSubscription?.cancel());
     if (_isGenerating) {
-      sdk.RunAnywhere.llm.cancelGeneration();
+      _cancelActiveGeneration();
     }
     super.dispose();
+  }
+
+  void _cancelActiveGeneration() {
+    sdk.RunAnywhere.llm.cancelGeneration();
   }
 
   /// Sync loaded-model state from the SDK snapshot.
@@ -199,7 +203,7 @@ class ChatViewModel extends ChangeNotifier {
   // --- Sending --------------------------------------------------------------
 
   bool canSend(String text) =>
-      text.isNotEmpty && !_isGenerating && sdk.RunAnywhere.llm.isLoaded;
+      text.isNotEmpty && !_isGenerating && isModelLoaded;
 
   void clearError() {
     _errorMessage = null;
@@ -289,7 +293,7 @@ class ChatViewModel extends ChangeNotifier {
   /// message, iOS parity).
   void clearChat() {
     if (_isGenerating) {
-      sdk.RunAnywhere.llm.cancelGeneration();
+      _cancelActiveGeneration();
     }
     _messages.clear();
     _errorMessage = null;
@@ -301,7 +305,7 @@ class ChatViewModel extends ChangeNotifier {
   /// Restore a persisted conversation into the chat.
   void loadConversation(Conversation conversation) {
     if (_isGenerating) {
-      sdk.RunAnywhere.llm.cancelGeneration();
+      _cancelActiveGeneration();
       _isGenerating = false;
     }
     _currentConversation = conversation;

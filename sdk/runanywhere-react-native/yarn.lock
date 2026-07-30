@@ -2064,6 +2064,8 @@ __metadata:
     long: ^5.3.2
     nitrogen: ^0.34.1
     protobufjs: ^7.5.8
+    react: 19.2.3
+    react-native: 0.85.3
     react-native-nitro-modules: ^0.33.9
     ts-jest: ^29.1.2
     typescript: ^5.9.3

@@ -122,6 +122,18 @@ ONNX.register()  // STT, TTS, VAD (requires runanywhere-onnx artifact)
 
 Models are managed through the SDK catalog and lifecycle APIs: `RunAnywhere.downloadModelStream()`, `RunAnywhere.loadModel()`, and `RunAnywhere.listModels()`.
 
+### Connect (trusted LAN client)
+
+`ConnectSession` is an **Android client** for a language model hosted by a **macOS Swift** app on the same local network. Android does **not** host in this release.
+
+- Discovery: Android NSD for `_runanywhere-connect._tcp` (published by the Mac host via Bonjour)
+- Commons owns role policy, handshake validation, and generation request checks; Kotlin owns NSD + framed TCP
+- `startBrowsing()` is opt-in and is the point that may trigger local-network permission UI
+- Trust model: **trusted LAN only** — no TLS or pairing PIN. Do not use across untrusted networks
+- React Native and Flutter SDKs do **not** ship Connect clients; use this Kotlin API (or the Swift client on iOS/iPadOS)
+
+See [`examples/android/RunAnywhereAI/`](../../examples/android/RunAnywhereAI/) for the model-selection Connect UI and status banner.
+
 ---
 
 ## Documentation and Examples

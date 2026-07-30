@@ -18,17 +18,34 @@ extension LLMViewModel {
         wasInterrupted: Bool,
         options: RALLMGenerationOptions
     ) -> MessageAnalytics? {
-        guard let modelName = loadedModelName,
-              let currentModel = ModelListViewModel.shared.currentModel else {
-            return nil
-        }
+        // Android attaches stats whenever the generation result has timing data.
+        // Do not require a local catalog model — Connect clients often have none
+        // loaded, and that used to drop the entire footer (tok/s, TTFT, etc.).
+        guard let modelName = loadedModelName else { return nil }
+
+        let localModel = ModelListViewModel.shared.currentModel
+        #if os(iOS)
+        let modelId = localModel?.id
+            ?? activeConnectModelId
+            ?? (isUsingConnect ? "connect" : "unknown")
+        let frameworkFallback = localModel?.framework.wireString
+            ?? activeConnectFramework
+            ?? selectedFramework?.wireString
+            ?? (isUsingConnect ? "connect" : "unknown")
+        #else
+        let modelId = localModel?.id ?? "unknown"
+        let frameworkFallback = localModel?.framework.wireString
+            ?? selectedFramework?.wireString
+            ?? "unknown"
+        #endif
 
         return buildMessageAnalytics(
             result: result,
             messageId: messageId,
             conversationId: conversationId,
+            modelId: modelId,
             modelName: modelName,
-            currentModel: currentModel,
+            framework: result.framework.isEmpty ? frameworkFallback : result.framework,
             wasInterrupted: wasInterrupted,
             options: options
         )
@@ -39,8 +56,9 @@ extension LLMViewModel {
         result: RALLMGenerationResult,
         messageId: String,
         conversationId: String,
+        modelId: String,
         modelName: String,
-        currentModel: RAModelInfo,
+        framework: String,
         wasInterrupted: Bool,
         options: RALLMGenerationOptions
     ) -> MessageAnalytics {
@@ -55,13 +73,21 @@ extension LLMViewModel {
         // to the value recorded from the SDK's first-token event. Mirrors
         // Android ChatViewModel.buildStats.
         let ttftMs = result.timeToFirstTokenMs ?? activeGenerationTTFTMs
+        // Mirror Android: derive tok/s from tokens/time when the result omits it.
+        let tokensPerSecond: Double = {
+            if result.tokensPerSecond > 0 { return result.tokensPerSecond }
+            let totalMs = result.latencyMs
+            let tokens = result.tokensUsed
+            guard totalMs > 0, tokens > 0 else { return 0 }
+            return Double(tokens) * 1000.0 / totalMs
+        }()
 
         return MessageAnalytics(
             messageId: messageId,
             conversationId: conversationId,
-            modelId: currentModel.id,
+            modelId: modelId,
             modelName: modelName,
-            framework: result.framework.isEmpty ? currentModel.framework.wireString : result.framework,
+            framework: framework,
             timestamp: Date(),
             timeToFirstToken: ttftMs.map { $0 / 1000.0 },
             totalGenerationTime: result.latencyMs / 1000.0,
@@ -71,7 +97,7 @@ extension LLMViewModel {
             outputTokens: result.tokensUsed,
             thinkingTokens: result.thinkingTokens > 0 ? Int(result.thinkingTokens) : nil,
             responseTokens: result.responseTokens > 0 ? Int(result.responseTokens) : result.tokensUsed,
-            averageTokensPerSecond: result.tokensPerSecond,
+            averageTokensPerSecond: tokensPerSecond,
             messageLength: result.text.count,
             wasThinkingMode: result.hasThinkingContent,
             wasInterrupted: wasInterrupted,

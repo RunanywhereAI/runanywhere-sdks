@@ -184,9 +184,18 @@ public extension RunAnywhere {
         // Prefer the backend's terminal aggregate result (text + metrics) when
         // the final event carries one, matching the Web SDK; otherwise fall back
         // to the locally concatenated text / wall-clock metrics.
+        //
+        // Connect (and some backends) may emit a final event whose `result.text`
+        // is empty/short even after tokens were streamed. Never replace a longer
+        // accumulated transcript with a weaker terminal payload — that shows up
+        // as "here's the code:" with no code after the stream completes.
         let final = finalEvent.flatMap { $0.hasResult ? $0.result : nil }
         var result = RALLMGenerationResult()
-        result.text = final?.text ?? answerResponse
+        if let finalText = final?.text, !finalText.isEmpty, finalText.count >= answerResponse.count {
+            result.text = finalText
+        } else {
+            result.text = answerResponse.isEmpty ? (final?.text ?? "") : answerResponse
+        }
         if let final, final.hasThinkingContent {
             result.thinkingContent = final.thinkingContent
         } else if !thinkingResponse.isEmpty {
