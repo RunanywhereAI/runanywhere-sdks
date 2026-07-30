@@ -452,6 +452,11 @@ if(ANDROID)
     set(HAVE_LCHMOD 0 CACHE INTERNAL "lchmod not provided by Android bionic")
 endif()
 
+# libarchive turns -Werror on by default in Debug, and its own sources trip
+# gcc 14's -Wdiscarded-qualifiers. A dependency's warning policy must not fail
+# our Debug builds.
+set(ENABLE_WERROR OFF CACHE BOOL "" FORCE)
+
 FetchContent_MakeAvailable(libarchive)
 if(_HAD_BUILD_SHARED_LIBS)
     set(BUILD_SHARED_LIBS "${_SAVED_BUILD_SHARED_LIBS}")
@@ -1395,7 +1400,6 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/router.pb.cc
     ${_RAC_PROTO_GEN_DIR}/thinking_tag_pattern.pb.cc
     ${_RAC_PROTO_GEN_DIR}/component_types.pb.cc
-    ${_RAC_PROTO_GEN_DIR}/lifecycle_service.pb.cc
     # Two-phase SDK init request/result envelope.
     ${_RAC_PROTO_GEN_DIR}/sdk_init.pb.cc
     # Hybrid LLM router wire shape: descriptor, policy, filter, cascade,
