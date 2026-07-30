@@ -275,8 +275,8 @@ struct ModelSelectionSheet: View {
                 switch connectController.session.status {
                 case .idle:
                     connectDiscoveryButton(
-                        title: "Connect to a Mac",
-                        subtitle: "Use a language model hosted on your local network",
+                        title: "Connect to a local host",
+                        subtitle: "Use a language model hosted on a Mac on your local network",
                         systemImage: "macbook.and.iphone"
                     )
 

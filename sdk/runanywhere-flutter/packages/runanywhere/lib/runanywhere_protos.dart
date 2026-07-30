@@ -12,8 +12,6 @@ export 'generated/chat.pb.dart';
 export 'generated/chat.pbenum.dart';
 export 'generated/component_types.pb.dart';
 export 'generated/component_types.pbenum.dart';
-export 'generated/connect.pb.dart';
-export 'generated/connect.pbenum.dart';
 export 'generated/diarization.pb.dart';
 export 'generated/diarization.pbenum.dart';
 export 'generated/diffusion_options.pb.dart';

@@ -2,7 +2,7 @@
 //  ConnectClientController.swift
 //  RunAnywhereAI
 //
-//  iPhone and iPad discovery, pairing, and banner state for a Mac host.
+//  iPhone and iPad discovery, pairing, and banner state for a local Mac host.
 //
 
 #if os(iOS)

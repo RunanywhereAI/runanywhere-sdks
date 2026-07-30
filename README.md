@@ -440,6 +440,22 @@ All SDKs ship on one version line, currently **0.20.11**, from a single C++ core
 | MLX (Apple silicon) | Yes | n/a | Yes | Yes | n/a | n/a | n/a | Yes |
 | OpenAI-compatible server | n/a | n/a | n/a | n/a | n/a | n/a | Yes | Yes |
 | Model download + progress | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| **Connect (LAN host/client)** | Host (macOS) / Client (iOS, iPadOS) | Client | — | — | — | — | — | — |
+
+### Connect (trusted LAN)
+
+Connect lets a **macOS Swift app** host a loaded language model on the local network so **iOS, iPadOS, and Android** clients can discover it and stream generation without downloading that model. It is **app-scoped** (lives with the host app process), not an OS daemon.
+
+| Role | Supported today | Not in this release |
+|------|-----------------|---------------------|
+| **Host** | macOS (Swift example / SDK) | Windows, Electron, Web, RN, Flutter |
+| **Client** | iOS, iPadOS (Swift), Android (Kotlin) | React Native, Flutter, Web, Electron |
+
+- **Discovery:** Bonjour / NSD service type `_runanywhere-connect._tcp`
+- **Transport:** framed TCP on the LAN; commons owns protocol version, role policy, session accounting, and generation validation (`idl/connect.proto`, `rac_connect_*`)
+- **Lifecycle:** the host app selects and loads the model, starts hosting, and supplies generation; stopping the host disconnects clients
+- **Threat model:** **trusted LAN only** — no TLS, pairing PIN, or mutual auth in this release. Do not expose Connect across untrusted networks. Future work may add TLS/pairing, Windows hosting, or a daemon; those change lifecycle and security and are out of scope here
+- **Electron note:** `RunAnywhereMain.connect()` is **local MessagePort / utility-process IPC** inside one Electron app. It is unrelated to LAN Connect
 
 ---
 

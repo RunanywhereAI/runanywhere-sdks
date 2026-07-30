@@ -32,7 +32,6 @@ import {
   getPrimaryFramework,
 } from '../../utils/modelDisplay';
 import { RunAnywhere } from '@runanywhere/core';
-import type { ConnectHost } from '@runanywhere/core';
 import {
   InferenceFramework,
   ModelCategory,
@@ -44,7 +43,6 @@ import {
 } from '../../services/NpuModelCatalog';
 import { RAG_EMBEDDING_FRAMEWORKS } from '../../services/EmbeddingCatalogPolicy';
 import { listVisibleCatalogModels } from '../../services/ModelRegistryQueries';
-import { ConnectService } from '../../services/ConnectService';
 
 const downloadModelStreamHelper = RunAnywhere.downloadModelStream;
 
@@ -190,23 +188,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     getNpuCatalogSnapshot,
     getNpuCatalogSnapshot
   );
-  const connectState = useSyncExternalStore(
-    ConnectService.subscribe,
-    ConnectService.getSnapshot,
-    ConnectService.getSnapshot
-  );
-
-  const handleConnect = useCallback(
-    async (host: ConnectHost) => {
-      try {
-        await ConnectService.connect(host);
-        onClose();
-      } catch (error) {
-        console.error('[ModelSelectionSheet] Connect failed:', error);
-      }
-    },
-    [onClose]
-  );
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -283,9 +264,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       setLoadingId(model.id);
       try {
         await onModelSelected(model);
-        if (context === ModelSelectionContext.LLM) {
-          ConnectService.disconnect();
-        }
         setActiveId(model.id);
         if (isRAGContext(context)) onClose();
       } catch (error) {
@@ -492,187 +470,6 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
       </View>
 
       <BottomSheetScrollView contentContainerStyle={styles.content}>
-        {context === ModelSelectionContext.LLM && (
-          <View style={styles.section}>
-            <Text
-              style={[
-                styles.sectionLabel,
-                typography.labelMedium,
-                styles.bold,
-                { color: colors.onSurfaceVariant },
-              ]}
-            >
-              Connect
-            </Text>
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: colors.surfaceContainerHigh },
-              ]}
-            >
-              {connectState.status === 'connected' ? (
-                <TouchableOpacity style={styles.connectRow} onPress={onClose}>
-                  <View
-                    style={[
-                      styles.tile,
-                      { backgroundColor: colors.primaryContainer },
-                    ]}
-                  >
-                    <Icon name="check" size={20} color={colors.primary} />
-                  </View>
-                  <View style={styles.rowText}>
-                    <Text
-                      style={[
-                        typography.titleMedium,
-                        styles.bold,
-                        { color: colors.onSurface },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {connectState.activeHost?.displayName || 'Connected Host'}
-                    </Text>
-                    <Text
-                      style={[
-                        typography.bodySmall,
-                        { color: colors.onSurfaceVariant },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {connectState.activeModel?.displayName ||
-                        'Hosted language model'}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      typography.labelLarge,
-                      styles.bold,
-                      { color: colors.primary },
-                    ]}
-                  >
-                    Use
-                  </Text>
-                </TouchableOpacity>
-              ) : connectState.availableHosts.length === 0 ? (
-                <TouchableOpacity
-                  style={styles.connectRow}
-                  onPress={() => {
-                    ConnectService.findHosts().catch(() => undefined);
-                  }}
-                  disabled={connectState.status === 'discovering'}
-                >
-                  <View
-                    style={[
-                      styles.tile,
-                      { backgroundColor: colors.primaryContainer },
-                    ]}
-                  >
-                    <Icon name="host" size={20} color={colors.primary} />
-                  </View>
-                  <View style={styles.rowText}>
-                    <Text
-                      style={[
-                        typography.titleMedium,
-                        styles.bold,
-                        { color: colors.onSurface },
-                      ]}
-                    >
-                      {connectState.status === 'discovering'
-                        ? 'Looking for Hosts'
-                        : connectState.status === 'disconnected'
-                          ? 'Find a Host again'
-                          : 'Connect to a Host'}
-                    </Text>
-                    <Text
-                      style={[
-                        typography.bodySmall,
-                        { color: colors.onSurfaceVariant },
-                      ]}
-                    >
-                      {connectState.message ||
-                        'Use a language model hosted on your local network'}
-                    </Text>
-                  </View>
-                  {connectState.status === 'discovering' ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Text
-                      style={[
-                        typography.labelLarge,
-                        styles.bold,
-                        { color: colors.primary },
-                      ]}
-                    >
-                      {connectState.status === 'disconnected' ||
-                      connectState.status === 'failed'
-                        ? 'Retry'
-                        : 'Find Host'}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              ) : (
-                connectState.availableHosts.map((host) => {
-                  const connectingThis =
-                    connectState.status === 'connecting' &&
-                    connectState.connectingHost?.id === host.id;
-                  const connectingOther =
-                    connectState.status === 'connecting' && !connectingThis;
-                  return (
-                  <TouchableOpacity
-                    key={host.id}
-                    style={styles.connectRow}
-                    onPress={() => {
-                      handleConnect(host).catch(() => undefined);
-                    }}
-                    disabled={connectingThis || connectingOther}
-                  >
-                    <View
-                      style={[
-                        styles.tile,
-                        { backgroundColor: colors.primaryContainer },
-                      ]}
-                    >
-                      <Icon name="host" size={20} color={colors.primary} />
-                    </View>
-                    <View style={styles.rowText}>
-                      <Text
-                        style={[
-                          typography.titleMedium,
-                          styles.bold,
-                          { color: colors.onSurface },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {host.displayName}
-                      </Text>
-                      <Text
-                        style={[
-                          typography.bodySmall,
-                          { color: colors.onSurfaceVariant },
-                        ]}
-                      >
-                        Language model available on this host
-                      </Text>
-                    </View>
-                    {connectingThis ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <Text
-                        style={[
-                          typography.labelLarge,
-                          styles.bold,
-                          { color: colors.primary },
-                        ]}
-                      >
-                        Connect
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                  );
-                })
-              )}
-            </View>
-          </View>
-        )}
         {isLoading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={colors.primary} />
@@ -878,13 +675,6 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
-  },
-  connectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 14,
   },
   tile: {
     width: 40,

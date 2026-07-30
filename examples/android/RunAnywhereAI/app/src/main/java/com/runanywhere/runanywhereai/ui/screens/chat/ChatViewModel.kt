@@ -639,7 +639,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun generationOptions(activeModel: RuntimeModelSnapshot): RALLMGenerationOptions {
-        val options = generationOptions(activeModel.model.context_length, activeModel.model.name)
+        // NPU (QHexRT) W8 reasoning bundles — e.g. Cosmos3-Edge Text — put too little probability
+        // mass on their end-of-turn token for temperature sampling to reliably select it, so at
+        // temperature > 0 they skip it and ramble past the answer (unrelated text / emoji lists).
+        // Greedy (temperature 0) picks the end token deterministically, giving clean, self-terminating
+        // answers. Well-behaved (non-NPU / non-reasoning) models keep the user's temperature setting.
+        val forceGreedy = activeModel.framework ==
+            ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
+        val options = generationOptions(
+            contextTokens = activeModel.model.context_length,
+            modelName = activeModel.model.name,
+            forceGreedy = forceGreedy,
+        )
         val s = SettingsRepository.settings
         return options.copy(
             thinking_pattern = activeModel.model.thinking_pattern.takeIf {
@@ -649,7 +660,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    private fun generationOptions(contextTokens: Int, modelName: String): RALLMGenerationOptions {
+    private fun generationOptions(
+        contextTokens: Int,
+        modelName: String,
+        forceGreedy: Boolean = false,
+    ): RALLMGenerationOptions {
         val s = SettingsRepository.settings
         val budget = ChatGenerationBudgetPolicy.resolve(
             requestedMaxTokens = s.maxTokens,
@@ -661,13 +676,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     "${budget.effectiveMaxTokens} for $modelName",
             )
         }
-        // NPU (QHexRT) W8 reasoning bundles — e.g. Cosmos3-Edge Text — put too little probability
-        // mass on their end-of-turn token for temperature sampling to reliably select it, so at
-        // temperature > 0 they skip it and ramble past the answer (unrelated text / emoji lists).
-        // Greedy (temperature 0) picks the end token deterministically, giving clean, self-terminating
-        // answers. Well-behaved (non-NPU / non-reasoning) models keep the user's temperature setting.
-        val forceGreedy = activeModel.framework ==
-            ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
         return RALLMGenerationOptions(
             max_tokens = budget.effectiveMaxTokens,
             temperature = if (forceGreedy) 0f else s.temperature,

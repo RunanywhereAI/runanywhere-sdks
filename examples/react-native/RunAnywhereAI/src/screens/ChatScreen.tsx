@@ -26,8 +26,6 @@ import React, {
   useRef,
   useCallback,
   useEffect,
-  useMemo,
-  useSyncExternalStore,
 } from 'react';
 import {
   View,
@@ -40,10 +38,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   typography,
   useTheme,
@@ -73,7 +68,6 @@ import { getPrimaryFramework } from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import { RunAnywhere } from '@runanywhere/core';
-import { ConnectService } from '../services/ConnectService';
 import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import {
   ToolCallFormatName,
@@ -152,62 +146,11 @@ export const ChatScreen: React.FC = () => {
   // LoRA adapter management (mirrors iOS LLMViewModel.loraAdapters).
   const [showLoRASheet, setShowLoRASheet] = useState(false);
   const [loraAdapterCount, setLoraAdapterCount] = useState(0);
-  const connectState = useSyncExternalStore(
-    ConnectService.subscribe,
-    ConnectService.getSnapshot,
-    ConnectService.getSnapshot
-  );
-  const [dismissedConnectBannerKey, setDismissedConnectBannerKey] = useState<
-    string | null
-  >(null);
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
-  const activeHostedRequestIdRef = useRef<string | null>(null);
-  const hostedGenerationTokenRef = useRef(0);
-
-  // Safe area insets for header status bar handling
-  const insets = useSafeAreaInsets();
-
-  const connectBannerKey = useMemo(() => {
-    switch (connectState.status) {
-      case 'connecting':
-        return `connecting:${connectState.connectingHost?.id ?? 'unknown'}`;
-      case 'connected':
-        return `connected:${connectState.activeHost?.id}:${connectState.activeModel?.id}`;
-      case 'disconnected':
-        return `disconnected:${connectState.activeHost?.id ?? connectState.message}:${connectState.message}`;
-      case 'failed':
-        return `failed:${connectState.message}`;
-      default:
-        return null;
-    }
-  }, [
-    connectState.status,
-    connectState.connectingHost?.id,
-    connectState.activeHost?.id,
-    connectState.activeModel?.id,
-    connectState.message,
-  ]);
-
-  const shouldShowConnectBanner =
-    connectBannerKey != null && dismissedConnectBannerKey !== connectBannerKey;
-
-  useEffect(() => {
-    if (connectBannerKey == null) return;
-    setDismissedConnectBannerKey(null);
-    if (connectState.status !== 'connected') return;
-    const timer = setTimeout(() => {
-      setDismissedConnectBannerKey(connectBannerKey);
-    }, 6000);
-    return () => clearTimeout(timer);
-  }, [connectBannerKey, connectState.status]);
-
-  useEffect(() => {
-    hostedGenerationTokenRef.current += 1;
-    activeHostedRequestIdRef.current = null;
-  }, [currentConversation?.id]);
+  const generationTokenRef = useRef(0);
 
   // Initialize conversation store and create first conversation
   useEffect(() => {
@@ -247,6 +190,11 @@ export const ChatScreen: React.FC = () => {
       setRegisteredToolCount(tools.length)
     );
   }, []);
+
+  // Invalidate in-flight generation when the active conversation changes.
+  useEffect(() => {
+    generationTokenRef.current += 1;
+  }, [currentConversation?.id]);
 
   // Messages from current conversation
   const messages = currentConversation?.messages || [];
@@ -440,14 +388,7 @@ export const ChatScreen: React.FC = () => {
       const text = (
         typeof promptOverride === 'string' ? promptOverride : inputText
       ).trim();
-      const hostedModel = connectState.activeModel;
-      if (
-        isLoading ||
-        !text ||
-        !currentConversation ||
-        (!currentModel && !hostedModel)
-      )
-        return;
+      if (isLoading || !text || !currentConversation || !currentModel) return;
 
       const userMessage: Message = {
         id: generateId(),
@@ -455,18 +396,6 @@ export const ChatScreen: React.FC = () => {
         content: text,
         timestamp: new Date(),
       };
-
-      // Snapshot prior turns before appending the new user message so hosted
-      // generation receives the conversation history the host expects.
-      const priorHistory = currentConversation.messages.map((message) => ({
-        role:
-          message.role === MessageRole.User
-            ? 1
-            : message.role === MessageRole.Assistant
-              ? 2
-              : 3,
-        content: message.content,
-      }));
 
       // Add user message to conversation
       await addMessage(userMessage, currentConversation.id);
@@ -476,7 +405,7 @@ export const ChatScreen: React.FC = () => {
 
       const assistantMessageId = generateId();
       let assistantMessageInserted = false;
-      const generationToken = ++hostedGenerationTokenRef.current;
+      const generationToken = ++generationTokenRef.current;
       const conversationIdAtStart = currentConversation.id;
 
       setTimeout(() => {
@@ -492,13 +421,12 @@ export const ChatScreen: React.FC = () => {
           '[ChatScreen] Starting streaming generation for:',
           prompt,
           'model:',
-          currentModel?.id
+          currentModel.id
         );
 
         const registeredTools = await RunAnywhere.getRegisteredTools();
-        const shouldUseTools =
-          !hostedModel && toolsEnabled && registeredTools.length > 0;
-        const supportsThinking = currentModel?.supportsThinking ?? false;
+        const shouldUseTools = toolsEnabled && registeredTools.length > 0;
+        const supportsThinking = currentModel.supportsThinking ?? false;
         const wasThinkingMode = supportsThinking && options.thinkingModeEnabled;
         const disableThinking =
           supportsThinking && !options.thinkingModeEnabled;
@@ -526,14 +454,11 @@ export const ChatScreen: React.FC = () => {
           disableThinking,
         });
 
-        const activeModelId = hostedModel?.id || currentModel?.id || 'unknown';
-        const activeModelName =
-          hostedModel?.displayName || currentModel?.name || 'Unknown Model';
-        const frameworkName = hostedModel?.framework
-          ? hostedModel.framework
-          : RunAnywhere.formatFramework(
-              currentModel?.preferredFramework ?? currentModel?.framework
-            );
+        const activeModelId = currentModel.id;
+        const activeModelName = currentModel.name || 'Unknown Model';
+        const frameworkName = RunAnywhere.formatFramework(
+          currentModel.preferredFramework ?? currentModel.framework
+        );
 
         // Insert the initial empty assistant message once (matches iOS two-phase pattern).
         const initialAssistantMessage: Message = {
@@ -551,9 +476,6 @@ export const ChatScreen: React.FC = () => {
         };
         await addMessage(initialAssistantMessage, currentConversation.id);
         assistantMessageInserted = true;
-        if (hostedModel) {
-          activeHostedRequestIdRef.current = assistantMessageId;
-        }
 
         let finalMessage: Message;
         if (shouldUseTools) {
@@ -596,8 +518,8 @@ export const ChatScreen: React.FC = () => {
             thinkingContent: result.thinkingContent,
             timestamp: new Date(),
             modelInfo: {
-              modelId: currentModel?.id || 'unknown',
-              modelName: currentModel?.name || 'Unknown Model',
+              modelId: activeModelId,
+              modelName: activeModelName,
               framework: frameworkName,
               frameworkDisplayName: frameworkName,
             },
@@ -623,23 +545,12 @@ export const ChatScreen: React.FC = () => {
           // Stream tokens as they arrive — canonical cross-SDK path. We drive
           // the SDK's `aggregateStream(prompt, events, onToken)` helper exactly
           // like iOS LLMViewModel+Generation.swift.
-          const eventStream = hostedModel
-            ? ConnectService.session.generateStream({
-                prompt,
-                emitThoughts: options.thinkingModeEnabled,
-                requestId: assistantMessageId,
-                modelId: hostedModel.id,
-                conversationId: currentConversation.id,
-                metadata: {},
-                options: genOptions,
-                history: priorHistory,
-              })
-            : RunAnywhere.generateStream(prompt, genOptions);
+          const eventStream = RunAnywhere.generateStream(prompt, genOptions);
           const result = await RunAnywhere.aggregateStream(
             prompt,
             eventStream,
             async (transcript) => {
-              if (generationToken !== hostedGenerationTokenRef.current) return;
+              if (generationToken !== generationTokenRef.current) return;
               accumulatedText = transcript;
               updateMessage(
                 {
@@ -662,7 +573,7 @@ export const ChatScreen: React.FC = () => {
             }
           );
 
-          if (generationToken !== hostedGenerationTokenRef.current) return;
+          if (generationToken !== generationTokenRef.current) return;
           if (result.errorMessage) {
             throw new Error(result.errorMessage);
           }
@@ -704,7 +615,7 @@ export const ChatScreen: React.FC = () => {
         }
 
         // Apply analytics fields in-memory first, then persist once.
-        if (generationToken !== hostedGenerationTokenRef.current) return;
+        if (generationToken !== generationTokenRef.current) return;
         updateMessage(finalMessage, conversationIdAtStart);
         const latestConversation = useConversationStore
           .getState()
@@ -750,7 +661,6 @@ export const ChatScreen: React.FC = () => {
         }
       } finally {
         generationAbortRef.current = null;
-        activeHostedRequestIdRef.current = null;
         setIsLoading(false);
       }
     },
@@ -759,7 +669,6 @@ export const ChatScreen: React.FC = () => {
       inputText,
       currentConversation,
       currentModel,
-      connectState.activeModel,
       toolsEnabled,
       addMessage,
       updateMessage,
@@ -769,14 +678,8 @@ export const ChatScreen: React.FC = () => {
 
   const handleStopGeneration = useCallback(() => {
     generationAbortRef.current?.abort();
-    const hostedRequestId = activeHostedRequestIdRef.current;
-    if (hostedRequestId) {
-      ConnectService.cancelGeneration(hostedRequestId);
-    } else {
-      RunAnywhere.cancelGeneration().catch(() => undefined);
-    }
-    hostedGenerationTokenRef.current += 1;
-    activeHostedRequestIdRef.current = null;
+    RunAnywhere.cancelGeneration().catch(() => undefined);
+    generationTokenRef.current += 1;
     setIsLoading(false);
   }, []);
 
@@ -845,8 +748,8 @@ export const ChatScreen: React.FC = () => {
    */
   const renderHeader = () => (
     <ChatHeader
-      modelName={connectState.activeModel?.displayName || currentModel?.name}
-      ready={!!currentModel || connectState.status === 'connected'}
+      modelName={currentModel?.name}
+      ready={!!currentModel}
       generating={isLoading}
       hasMessages={messages.length > 0}
       onModelPress={handleSelectModel}
@@ -856,81 +759,12 @@ export const ChatScreen: React.FC = () => {
     />
   );
 
-  const hasUsableModel = !!currentModel || connectState.status === 'connected';
+  const hasUsableModel = !!currentModel;
   const showOverlay = !hasUsableModel && !isModelLoading;
-
-  const connectBannerPresentation = useMemo(() => {
-    switch (connectState.status) {
-      case 'connected':
-        return {
-          title: connectState.activeHost?.displayName ?? 'Connected to Host',
-          subtitle:
-            connectState.activeModel?.displayName ?? 'Hosted model ready',
-          icon: 'checkmark-circle' as const,
-          tint: colors.success,
-        };
-      case 'connecting':
-        return {
-          title: `Connecting to ${connectState.connectingHost?.displayName ?? 'host'}`,
-          subtitle: 'Checking the selected model',
-          icon: 'sync' as const,
-          tint: colors.primary,
-        };
-      case 'failed':
-        return {
-          title: 'Couldn\'t connect',
-          subtitle:
-            connectState.message ??
-            'Check the host and your local network',
-          icon: 'alert-circle-outline' as const,
-          tint: colors.error,
-        };
-      case 'disconnected':
-        return {
-          title: 'Host connection lost',
-          subtitle:
-            connectState.message ?? 'Choose a local model or reconnect',
-          icon: 'alert-circle-outline' as const,
-          tint: colors.error,
-        };
-      default:
-        return null;
-    }
-  }, [connectState, colors.error, colors.primary, colors.success]);
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       {renderHeader()}
-
-      {shouldShowConnectBanner && connectBannerPresentation && (
-        <View style={[styles.connectBanner, { top: insets.top + 64 }]}>
-          <View
-            style={[
-              styles.connectBannerIcon,
-              { backgroundColor: connectBannerPresentation.tint },
-            ]}
-          >
-            <Icon
-              name={connectBannerPresentation.icon}
-              size={24}
-              color={colors.onPrimary}
-            />
-          </View>
-          <View style={styles.connectBannerText}>
-            <Text style={styles.connectBannerTitle} numberOfLines={1}>
-              {connectBannerPresentation.title}
-            </Text>
-            <Text style={styles.connectBannerSubtitle} numberOfLines={1}>
-              {connectBannerPresentation.subtitle}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => setDismissedConnectBannerKey(connectBannerKey)}
-          >
-            <Icon name="close" size={22} color={colors.onSurfaceVariant} />
-          </TouchableOpacity>
-        </View>
-      )}
 
       {showOverlay ? (
         <ModelRequiredOverlay
@@ -955,14 +789,12 @@ export const ChatScreen: React.FC = () => {
           />
 
           {/* Tool Calling Badge (shows when tools are enabled) */}
-          {currentModel &&
-            connectState.status !== 'connected' &&
-            registeredToolCount > 0 && (
-              <ToolCallingBadge toolCount={registeredToolCount} />
-            )}
+          {currentModel && registeredToolCount > 0 && (
+            <ToolCallingBadge toolCount={registeredToolCount} />
+          )}
 
           {/* LoRA pill (mirrors iOS ChatMessageListView's LoRA row above input) */}
-          {currentModel && connectState.status !== 'connected' && (
+          {currentModel && (
             <View style={styles.loraRow}>
               <TouchableOpacity
                 style={[
@@ -995,9 +827,7 @@ export const ChatScreen: React.FC = () => {
           {/* Example prompts (mode follows tool/LoRA state), shown on an empty chat */}
           {hasUsableModel && messages.length === 0 && (
             <PromptSuggestions
-              toolsEnabled={
-                connectState.status === 'connected' ? false : toolsEnabled
-              }
+              toolsEnabled={toolsEnabled}
               loraActive={loraAdapterCount > 0}
               onSelect={(p) => {
                 handleSend(p).catch(() => undefined);
@@ -1013,14 +843,8 @@ export const ChatScreen: React.FC = () => {
             onStop={handleStopGeneration}
             disabled={!hasUsableModel || !currentConversation}
             isLoading={isLoading}
-            toolsEnabled={
-              connectState.status === 'connected' ? false : toolsEnabled
-            }
-            onToggleTools={
-              currentModel && connectState.status !== 'connected'
-                ? handleToggleTools
-                : undefined
-            }
+            toolsEnabled={toolsEnabled}
+            onToggleTools={currentModel ? handleToggleTools : undefined}
             placeholder={
               hasUsableModel
                 ? 'Type a message...'
@@ -1075,57 +899,6 @@ const createStyles = (colors: ColorScheme) =>
     container: {
       flex: 1,
       backgroundColor: colors.background,
-    },
-    connectBanner: {
-      position: 'absolute',
-      left: 16,
-      right: 16,
-      zIndex: 50,
-      minHeight: 68,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderRadius: 24,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.outlineVariant,
-      shadowColor: '#000000',
-      shadowOpacity: 0.14,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 8 },
-      elevation: 8,
-    },
-    connectBannerIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    connectBannerText: {
-      flex: 1,
-    },
-    connectBannerTitle: {
-      ...typography.titleMedium,
-      color: colors.onSurface,
-    },
-    connectBannerSubtitle: {
-      ...typography.labelSmall,
-      color: colors.onSurfaceVariant,
-      marginTop: 2,
-    },
-    connectBannerAction: {
-      paddingHorizontal: 10,
-      paddingVertical: 7,
-      borderRadius: 999,
-      backgroundColor: colors.surfaceContainer,
-    },
-    connectBannerActionText: {
-      ...typography.labelSmall,
-      color: colors.error,
-      fontWeight: '600',
     },
     list: {
       flex: 1,

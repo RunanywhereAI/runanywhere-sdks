@@ -174,7 +174,7 @@ struct ConnectHostManagementView: View {
                     statusBadge
                 }
 
-                Text("Use a language model on this Mac from iPhone and iPad devices on the same local network.")
+                Text("Use a language model on this Mac from iPhone, iPad, and Android devices on the same local network.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

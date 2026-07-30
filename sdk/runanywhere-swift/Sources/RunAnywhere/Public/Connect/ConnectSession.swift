@@ -151,7 +151,10 @@ public final class ConnectSession: ObservableObject {
     public func startBrowsing() async throws {
         try requireInitialized()
         try await RunAnywhere.ensureServicesReady()
+        // Compile-time guard for Apple Network.framework browsing APIs; commons
+        // `platformPolicy` remains the runtime authority for client admission.
         #if os(iOS)
+        try requireClientRoleEnabled(for: currentClientPlatform())
         lastError = nil
         transport.startBrowsing()
         if status != .connected {
@@ -181,7 +184,10 @@ public final class ConnectSession: ObservableObject {
     ) async throws {
         try requireInitialized()
         try await RunAnywhere.ensureServicesReady()
+        // Compile-time guard for macOS listener/Bonjour APIs; commons
+        // `platformPolicy` remains the runtime authority for host admission.
         #if os(macOS)
+        try requireHostRoleEnabled(for: .macos)
         if status == .hosting || transport.isHosting {
             throw SDKException(
                 code: .invalidState,
@@ -242,13 +248,15 @@ public final class ConnectSession: ObservableObject {
         try requireInitialized()
         try await RunAnywhere.ensureServicesReady()
         #if os(iOS)
+        let platform = currentClientPlatform()
+        try requireClientRoleEnabled(for: platform)
         lastError = nil
         connectingHost = host
         status = .connecting
 
         var request = RAConnectClientStartRequest()
         request.displayName = sanitizedDisplayName(UIDevice.current.name)
-        request.platform = UIDevice.current.userInterfaceIdiom == .pad ? .ipados : .ios
+        request.platform = platform
         request.protocolVersion = ConnectTransport.protocolVersion
 
         do {
@@ -258,14 +266,20 @@ public final class ConnectSession: ObservableObject {
             if hello.protocolVersion > 0 {
                 request.protocolVersion = hello.protocolVersion
             }
+            // Capture sendable/transport locals only — do not close over
+            // @MainActor `self` inside the TaskGroup's `sending` child tasks.
+            let transport = self.transport
+            let connectHost = host
+            let connectHello = hello
+            let hostDisplayName = host.displayName
             let response = try await withThrowingTaskGroup(of: RAConnectHandshakeResponse.self) { group in
                 group.addTask {
-                    try await self.transport.connect(to: host, hello: hello)
+                    try await transport.connect(to: connectHost, hello: connectHello)
                 }
                 group.addTask {
                     try await Task.sleep(nanoseconds: 5_000_000_000)
                     throw ConnectTransportError.network(
-                        "Timed out connecting to \(host.displayName)."
+                        "Timed out connecting to \(hostDisplayName)."
                     )
                 }
                 let value = try await group.next()!
@@ -451,6 +465,44 @@ public final class ConnectSession: ObservableObject {
                 message: "Initialize the SDK before starting a Connect session",
                 category: .internal
             )
+        }
+    }
+
+    private func requireHostRoleEnabled(for platform: RAConnectPlatform) throws {
+        var request = RAConnectPlatformPolicyRequest()
+        request.platform = platform
+        let policy = try CppBridge.Connect.platformPolicy(request)
+        guard policy.hostRole == .enabled else {
+            throw unsupported("Connect host support is not enabled for \(platformName(platform)).")
+        }
+    }
+
+    private func requireClientRoleEnabled(for platform: RAConnectPlatform) throws {
+        var request = RAConnectPlatformPolicyRequest()
+        request.platform = platform
+        let policy = try CppBridge.Connect.platformPolicy(request)
+        guard policy.clientRole == .enabled else {
+            throw unsupported("Connect client support is not enabled for \(platformName(platform)).")
+        }
+    }
+
+    #if os(iOS)
+    private func currentClientPlatform() -> RAConnectPlatform {
+        UIDevice.current.userInterfaceIdiom == .pad ? .ipados : .ios
+    }
+    #endif
+
+    private func platformName(_ platform: RAConnectPlatform) -> String {
+        switch platform {
+        case .macos: return "macOS"
+        case .ios: return "iOS"
+        case .ipados: return "iPadOS"
+        case .android: return "Android"
+        case .reactNative: return "React Native"
+        case .flutter: return "Flutter"
+        case .web: return "Web"
+        case .windows: return "Windows"
+        case .unspecified, .UNRECOGNIZED: return "this platform"
         }
     }
 

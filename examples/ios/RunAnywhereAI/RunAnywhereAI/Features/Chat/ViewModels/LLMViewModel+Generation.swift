@@ -172,16 +172,20 @@ extension LLMViewModel {
         return try await RunAnywhere.generateStream(request)
     }
 
-    #if os(iOS)
+    /// Stamp Connect request/conversation IDs when the phone is using a host.
+    /// On macOS hosting this is a no-op (`isUsingConnect` stays false).
     private func connectAwareRequest(_ request: RALLMGenerateRequest, messageIndex: Int) -> RALLMGenerateRequest {
+        #if os(iOS)
         guard isUsingConnect, messageIndex < messagesValue.count else { return request }
         var updated = request
         updated.requestID = messagesValue[messageIndex].id.uuidString
         updated.conversationID = currentConversation?.id ?? ""
         activeHostedRequestID = updated.requestID
         return updated
+        #else
+        return request
+        #endif
     }
-    #endif
 
     // MARK: - Message Updates
 
@@ -250,10 +254,18 @@ extension LLMViewModel {
             modelInfo = nil
         }
 
+        // Keep the longer of streamed UI text vs terminal result.text. Connect
+        // finals have been observed with a short/empty aggregate that would
+        // otherwise wipe a good in-progress transcript.
+        let mergedContent =
+            result.text.count >= currentMessage.content.count
+            ? result.text
+            : currentMessage.content
+
         let updatedMessage = Message(
             id: currentMessage.id,
             role: currentMessage.role,
-            content: result.text,
+            content: mergedContent,
             thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
             timestamp: currentMessage.timestamp,
             analytics: analytics,

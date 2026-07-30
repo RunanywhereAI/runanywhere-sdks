@@ -43,7 +43,6 @@ import {
   Battery,
   Calculator,
   Zap,
-  Monitor,
 } from 'lucide-react-native';
 
 const ICONS = {
@@ -83,7 +82,6 @@ const ICONS = {
   battery: Battery,
   calculator: Calculator,
   bolt: Zap,
-  host: Monitor,
 } as const;
 
 export type IconName = keyof typeof ICONS;

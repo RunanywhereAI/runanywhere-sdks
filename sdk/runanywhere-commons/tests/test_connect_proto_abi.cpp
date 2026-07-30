@@ -109,9 +109,11 @@ void test_platform_role_policy() {
     check_policy(v1::CONNECT_PLATFORM_ANDROID, v1::CONNECT_ROLE_AVAILABILITY_DISABLED,
                  v1::CONNECT_ROLE_AVAILABILITY_ENABLED, "Android is enabled as client only");
     check_policy(v1::CONNECT_PLATFORM_REACT_NATIVE, v1::CONNECT_ROLE_AVAILABILITY_DISABLED,
-                 v1::CONNECT_ROLE_AVAILABILITY_ENABLED, "React Native is enabled as client only");
+                 v1::CONNECT_ROLE_AVAILABILITY_DISABLED,
+                 "React Native Connect client is reserved but not shipped");
     check_policy(v1::CONNECT_PLATFORM_FLUTTER, v1::CONNECT_ROLE_AVAILABILITY_DISABLED,
-                 v1::CONNECT_ROLE_AVAILABILITY_ENABLED, "Flutter is enabled as client only");
+                 v1::CONNECT_ROLE_AVAILABILITY_DISABLED,
+                 "Flutter Connect client is reserved but not shipped");
     check_policy(v1::CONNECT_PLATFORM_WEB, v1::CONNECT_ROLE_AVAILABILITY_DISABLED,
                  v1::CONNECT_ROLE_AVAILABILITY_PLANNED, "Web client remains planned");
     check_policy(v1::CONNECT_PLATFORM_WINDOWS, v1::CONNECT_ROLE_AVAILABILITY_PLANNED,
@@ -126,21 +128,21 @@ void test_platform_role_policy() {
 
 void test_client_admission() {
     for (const v1::ConnectPlatform platform :
-         {v1::CONNECT_PLATFORM_IOS, v1::CONNECT_PLATFORM_IPADOS, v1::CONNECT_PLATFORM_ANDROID,
-          v1::CONNECT_PLATFORM_REACT_NATIVE, v1::CONNECT_PLATFORM_FLUTTER}) {
+         {v1::CONNECT_PLATFORM_IOS, v1::CONNECT_PLATFORM_IPADOS, v1::CONNECT_PLATFORM_ANDROID}) {
         v1::ConnectClientStartRequest request;
         request.set_display_name("Portable Client");
         request.set_platform(platform);
         request.set_protocol_version(1);
         v1::ConnectClientHello hello;
         CHECK(call_proto(rac_connect_client_create_hello_proto, request, &hello) == RAC_SUCCESS,
-              "Enabled mobile client can create a hello");
+              "Enabled native mobile client can create a hello");
         CHECK(!hello.instance_id().empty(), "Commons assigns an ephemeral client instance id");
         CHECK(hello.platform() == platform, "Client hello preserves platform identity");
     }
 
     for (const v1::ConnectPlatform platform :
-         {v1::CONNECT_PLATFORM_MACOS, v1::CONNECT_PLATFORM_WEB, v1::CONNECT_PLATFORM_WINDOWS}) {
+         {v1::CONNECT_PLATFORM_MACOS, v1::CONNECT_PLATFORM_REACT_NATIVE, v1::CONNECT_PLATFORM_FLUTTER,
+          v1::CONNECT_PLATFORM_WEB, v1::CONNECT_PLATFORM_WINDOWS}) {
         v1::ConnectClientStartRequest request;
         request.set_display_name("Unsupported Client");
         request.set_platform(platform);

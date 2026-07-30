@@ -89,7 +89,9 @@ final class LLMViewModel {
     private var isViewModelInitialized = false
     #if os(iOS)
     /// Tracks the in-flight hosted request so Stop can cancel by id.
-    private(set) var activeHostedRequestID: String?
+    /// Written from generation helpers in `LLMViewModel+Generation` (other file),
+    /// so this cannot use `private(set)` — that setter is file-private in Swift.
+    var activeHostedRequestID: String?
     #endif
 
     // MARK: - Internal Accessors for Extensions
@@ -117,11 +119,19 @@ final class LLMViewModel {
     }
 
     #if os(iOS)
+    /// Hosted Connect model identity used for message analytics when no local
+    /// `ModelListViewModel.currentModel` is loaded (Android already builds
+    /// `GenerationStats` from the Connect model descriptor).
+    private(set) var activeConnectModelId: String?
+    private(set) var activeConnectFramework: String?
+
     func activateConnectModel(_ model: ConnectModel, hostName: String) {
         isUsingConnect = true
         connectedHostName = hostName
         updateModelLoadedState(isLoaded: true)
         loadedModelName = model.displayName
+        activeConnectModelId = model.id
+        activeConnectFramework = model.framework
         loadedModelSupportsThinking = false
         selectedFramework = nil
         setModelSupportsStreaming(model.supportsStreaming)
@@ -132,6 +142,8 @@ final class LLMViewModel {
         guard isUsingConnect else { return }
         isUsingConnect = false
         connectedHostName = nil
+        activeConnectModelId = nil
+        activeConnectFramework = nil
         await checkModelStatusFromSDK()
         updateSystemMessageAfterModelLoad()
     }

@@ -78,9 +78,7 @@
     "react-native-blob-util": ">=0.19.0",
     "react-native-device-info": ">=11.0.0",
     "react-native-fs": ">=2.20.0",
-    "react-native-nitro-modules": "^0.33.9",
-    "react-native-tcp-socket": ">=6.4.1",
-    "react-native-zeroconf": ">=0.14.0"
+    "react-native-nitro-modules": "^0.33.9"
   },
   "peerDependenciesMeta": {
     "react-native-blob-util": {
@@ -102,8 +100,6 @@
     "react": "19.2.3",
     "react-native": "0.85.3",
     "react-native-nitro-modules": "^0.33.9",
-    "react-native-tcp-socket": "^6.4.1",
-    "react-native-zeroconf": "^0.14.0",
     "ts-jest": "^29.1.2",
     "typescript": "^5.9.3"
   },
