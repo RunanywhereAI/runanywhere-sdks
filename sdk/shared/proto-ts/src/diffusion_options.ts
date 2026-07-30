@@ -10,16 +10,6 @@ import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSO
 
 export const protobufPackage = "runanywhere.v1";
 
-/**
- * ---------------------------------------------------------------------------
- * Generation mode. Sources pre-IDL (identical across all surfaces):
- *   Swift   DiffusionTypes.swift:257    (textToImage / imageToImage / inpainting)
- *   Kotlin  DiffusionTypes.kt:188       (TEXT_TO_IMAGE / IMAGE_TO_IMAGE / INPAINTING)
- *   RN      DiffusionTypes.ts:73        (TextToImage / ImageToImage / Inpainting)
- *   Web     DiffusionTypes.ts:23        (TextToImage / ImageToImage / Inpainting)
- *   C ABI   rac_diffusion_types.h:59    (RAC_DIFFUSION_MODE_*)
- * ---------------------------------------------------------------------------
- */
 export enum DiffusionMode {
   DIFFUSION_MODE_UNSPECIFIED = 0,
   DIFFUSION_MODE_TEXT_TO_IMAGE = 1,
@@ -65,59 +55,20 @@ export function diffusionModeToJSON(object: DiffusionMode): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Scheduler / sampler algorithm — *forward-looking union*.
- *
- * Pre-IDL sources all expose the same eight cases (DPM++ 2M Karras, DPM++ 2M,
- * DPM++ 2M SDE, DDIM, Euler, Euler Ancestral, PNDM, LMS); see:
- *   Swift   DiffusionTypes.swift:184    (.dpmPP2MKarras .. .lms)
- *   Kotlin  DiffusionTypes.kt:155       (DPM_PP_2M_KARRAS .. LMS)
- *   RN      DiffusionTypes.ts:48        (DPMPP2MKarras .. LMS)
- *   Web     DiffusionTypes.ts:3         (numeric DPM_PP_2M_Karras .. LMS, matches C ABI)
- *   C ABI   rac_diffusion_types.h:31    (RAC_DIFFUSION_SCHEDULER_*)
- *
- * This proto enum extends that with two values that downstream backends are
- * expected to grow into but no SDK exposes yet:
- *   - DDPM   — original Ho et al. 2020 sampler
- *   - LCM    — Latent Consistency Model sampler (paired with the LCM model
- *              variant; today Swift/Kotlin reuse DPM++ 2M Karras for LCM
- *              models because no LCM scheduler case exists).
- * And it intentionally omits DPMPP_2M_SDE, which exists in every SDK today
- * but is being collapsed back into DPMPP_2M for the v1 IDL surface (the SDE
- * variant is purely an algorithmic toggle on DPM++ 2M; backends accept
- * either tag).
- *
- * Drift reconciliation:
- *   - Swift/Kotlin/RN/Web/C-ABI carriers of DPMPP_2M_SDE must round-trip
- *     that case to DIFFUSION_SCHEDULER_DPMPP_2M (lossy in name, equivalent
- *     in semantics — the SDE flag is a backend implementation detail).
- *   - DDPM and LCM are *new* slots; SDKs that don't yet recognize them must
- *     fall back to DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS (the recommended
- *     default).
- * ---------------------------------------------------------------------------
- */
+/** DDPM and LCM are forward-looking; no SDK exposes them. */
 export enum DiffusionScheduler {
   DIFFUSION_SCHEDULER_UNSPECIFIED = 0,
-  /** DIFFUSION_SCHEDULER_DPMPP_2M - Swift/Kotlin/RN/Web/C-ABI */
   DIFFUSION_SCHEDULER_DPMPP_2M = 1,
-  /** DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS - Swift/Kotlin/RN/Web/C-ABI (recommended default) */
+  /** DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS - recommended default */
   DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS = 2,
-  /** DIFFUSION_SCHEDULER_DDIM - Swift/Kotlin/RN/Web/C-ABI */
   DIFFUSION_SCHEDULER_DDIM = 3,
-  /** DIFFUSION_SCHEDULER_DDPM - forward-looking — no SDK exposes this yet */
   DIFFUSION_SCHEDULER_DDPM = 4,
-  /** DIFFUSION_SCHEDULER_EULER - Swift/Kotlin/RN/Web/C-ABI */
   DIFFUSION_SCHEDULER_EULER = 5,
-  /** DIFFUSION_SCHEDULER_EULER_A - Swift/Kotlin/RN/Web/C-ABI ("Euler Ancestral") */
+  /** DIFFUSION_SCHEDULER_EULER_A - Euler Ancestral */
   DIFFUSION_SCHEDULER_EULER_A = 6,
-  /** DIFFUSION_SCHEDULER_PNDM - Swift/Kotlin/RN/Web/C-ABI */
   DIFFUSION_SCHEDULER_PNDM = 7,
-  /** DIFFUSION_SCHEDULER_LMS - Swift/Kotlin/RN/Web/C-ABI */
   DIFFUSION_SCHEDULER_LMS = 8,
-  /** DIFFUSION_SCHEDULER_LCM - forward-looking — pairs with the LCM model variant */
   DIFFUSION_SCHEDULER_LCM = 9,
-  /** DIFFUSION_SCHEDULER_DPMPP_2M_SDE - Swift/Kotlin/RN/Web/C-ABI */
   DIFFUSION_SCHEDULER_DPMPP_2M_SDE = 10,
   UNRECOGNIZED = -1,
 }
@@ -194,16 +145,6 @@ export function diffusionSchedulerToJSON(object: DiffusionScheduler): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Stable Diffusion model variant. Sources pre-IDL (identical 6 cases):
- *   Swift  DiffusionTypes.swift:92     (sd15 / sd21 / sdxl / sdxlTurbo / sdxs / lcm)
- *   Kotlin DiffusionTypes.kt:85        (SD15 / SD21 / SDXL / SDXL_TURBO / SDXS / LCM)
- *   RN     DiffusionTypes.ts:28        (SD15 / SD21 / SDXL / SDXLTurbo / SDXS / LCM)
- *   Web    DiffusionTypes.ts:14        (numeric SD_1_5 / SD_2_1 / SDXL / SDXL_Turbo / SDXS / LCM)
- *   C ABI  rac_diffusion_types.h:47    (RAC_DIFFUSION_MODEL_*)
- * ---------------------------------------------------------------------------
- */
 export enum DiffusionModelVariant {
   DIFFUSION_MODEL_VARIANT_UNSPECIFIED = 0,
   DIFFUSION_MODEL_VARIANT_SD_1_5 = 1,
@@ -268,28 +209,14 @@ export function diffusionModelVariantToJSON(object: DiffusionModelVariant): stri
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Tokenizer source kind. Apple's compiled CoreML SD models do not bundle
- * vocab.json / merges.txt, so the tokenizer must be downloaded from a
- * HuggingFace repo (or a developer-supplied URL).
- * Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:18     (.sd15 / .sd2 / .sdxl / .custom(baseURL:))
- *   Kotlin DiffusionTypes.kt:31        (Sd15 / Sd2 / Sdxl / Custom(customBaseUrl))
- *   RN     DiffusionTypes.ts:17        ({kind:'sd15'|'sd2'|'sdxl'|'custom'} discriminated union)
- *   Web    — n/a (the llamacpp Web package doesn't expose tokenizer source)
- *   C ABI  rac_diffusion_types.h:79    (RAC_DIFFUSION_TOKENIZER_SD_1_5 / SD_2_X / SDXL / CUSTOM)
- * ---------------------------------------------------------------------------
- */
 export enum DiffusionTokenizerSourceKind {
   DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED = 0,
-  /** DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15 - CLIP ViT-L/14 (runwayml/stable-diffusion-v1-5) */
+  /** DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15 - CLIP ViT-L/14 */
   DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15 = 1,
-  /** DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD2 - OpenCLIP ViT-H/14 (stabilityai/stable-diffusion-2-1) */
+  /** DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD2 - OpenCLIP ViT-H/14 */
   DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD2 = 2,
-  /** DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SDXL - dual tokenizers (stabilityai/stable-diffusion-xl-base-1.0) */
+  /** DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SDXL - dual tokenizers */
   DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SDXL = 3,
-  /** DIFFUSION_TOKENIZER_SOURCE_KIND_CUSTOM - developer-supplied base URL */
   DIFFUSION_TOKENIZER_SOURCE_KIND_CUSTOM = 4,
   UNRECOGNIZED = -1,
 }
@@ -393,162 +320,46 @@ export function diffusionStreamEventKindToJSON(object: DiffusionStreamEventKind)
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Tokenizer source descriptor. `kind` is the preset; `custom_path` is only
- * meaningful when kind == CUSTOM and points at a directory URL containing
- * vocab.json + merges.txt (the SDK appends those filenames itself).
- * ---------------------------------------------------------------------------
- */
 export interface DiffusionTokenizerSource {
   kind: DiffusionTokenizerSourceKind;
-  /**
-   * Only set when kind == DIFFUSION_TOKENIZER_SOURCE_KIND_CUSTOM. Empty /
-   * unset for the bundled presets.
-   */
-  customPath?:
-    | string
-    | undefined;
-  /**
-   * Automatically download missing tokenizer files. Defaults to backend
-   * policy when unset/false.
-   */
+  customPath?: string | undefined;
   autoDownload: boolean;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Diffusion component configuration — the static, lifetime-of-component
- * settings handed to the diffusion service at initialize() time.
- * Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:279    (DiffusionConfiguration)
- *   Kotlin DiffusionTypes.kt:204       (DiffusionConfiguration)
- *   RN     DiffusionTypes.ts:86        (DiffusionConfiguration)
- *   Web    — n/a (config is implicit in the llamacpp service ctor)
- *   C ABI  rac_diffusion_types.h:144   (rac_diffusion_config_t)
- *
- * `max_memory_mb` is the single portable working-set control; backends
- * interpret 0 as "no cap / engine default" and a positive value as a hard
- * MiB ceiling.
- * ---------------------------------------------------------------------------
- */
 export interface DiffusionConfiguration {
-  /**
-   * Stable Diffusion model variant (selects the default resolution, step
-   * count, guidance scale, and tokenizer preset).
-   */
   modelVariant: DiffusionModelVariant;
-  /**
-   * Tokenizer download source (CoreML SD models don't bundle the
-   * tokenizer files — the runtime must fetch vocab.json + merges.txt).
-   */
-  tokenizerSource?:
-    | DiffusionTokenizerSource
-    | undefined;
-  /**
-   * Run NSFW safety checker on the decoded latent before returning the
-   * image. Default in every SDK is true.
-   */
+  tokenizerSource?: DiffusionTokenizerSource | undefined;
   enableSafetyChecker: boolean;
-  /**
-   * Maximum working-set memory the diffusion runtime is allowed to use,
-   * in MiB. 0 = no cap (engine default).
-   */
   maxMemoryMb: number;
-  /** C ABI / SDK component fields that identify and route the component. */
   modelId?: string | undefined;
   preferredFramework?: InferenceFramework | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Canonical load-model wrapper used by SDKs that require a single argument
- * for diffusion model lifecycle calls.
- * ---------------------------------------------------------------------------
- */
-export interface DiffusionConfig {
-  modelPath: string;
-  modelId: string;
-  modelName: string;
-  configuration?: DiffusionConfiguration | undefined;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Per-call generation options. Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:341    (DiffusionGenerationOptions)
- *   Kotlin DiffusionTypes.kt:230       (DiffusionGenerationOptions)
- *   RN     DiffusionTypes.ts:114       (DiffusionGenerationOptions)
- *   Web    DiffusionTypes.ts:29        (DiffusionGenerationOptions)
- *   C ABI  rac_diffusion_types.h:187   (rac_diffusion_options_t)
- *
- * Drift note: pre-IDL Swift/Kotlin/RN carry additional fields that the v1
- * IDL deliberately drops from this message in favor of more general /
- * future carriers:
- *   - input_image / mask_image (bytes)         → flows through a separate
- *                                                input artifact message in
- *                                                the service IDL
- *   - denoise_strength (float)                 → deferred (img2img-only,
- *                                                not in spec)
- *   - report_intermediate_images / progress_stride → covered by
- *                                                DiffusionProgress
- *                                                streaming semantics
- * ---------------------------------------------------------------------------
- */
 export interface DiffusionGenerationOptions {
-  /** Text prompt describing the desired image. Required. */
   prompt: string;
-  /** Things to avoid in the image. Empty = no negative prompt. */
   negativePrompt: string;
-  /**
-   * Output image width  in pixels.  0 = use variant default
-   * (512 for SD 1.5 / SDXS / LCM, 768 for SD 2.1, 1024 for SDXL / Turbo).
-   */
+  /** 0 = backend default, for width, height, steps, and guidance_scale. */
   width: number;
-  /** Output image height in pixels.  0 = use variant default. */
   height: number;
-  /**
-   * Number of denoising steps (industry short name `steps`). Range 1–50
-   * (variant-dependent: SDXS=1, SDXL_Turbo / LCM=4, SD*=20–28). 0 = use
-   * variant default. Was `num_inference_steps`.
-   */
   steps: number;
-  /**
-   * Classifier-free guidance scale. 0.0 = no CFG (required for SDXS /
-   * SDXL_Turbo). Typical SD range 1.0–20.0.
-   */
   guidanceScale: number;
-  /** RNG seed for reproducibility. -1 = pick a random seed. */
+  /** -1 = random. */
   seed: number;
-  /**
-   * Sampler algorithm. UNSPECIFIED = backend picks (recommended:
-   * DPMPP_2M_KARRAS).
-   */
   scheduler: DiffusionScheduler;
-  /**
-   * Generation mode (txt2img / img2img / inpainting). UNSPECIFIED =
-   * TEXT_TO_IMAGE.
-   */
   mode: DiffusionMode;
-  /** Image-to-image / inpainting payloads from rac_diffusion_options_t. */
+  /** For IMAGE_TO_IMAGE and INPAINTING. */
   inputImage?: Uint8Array | undefined;
   maskImage?: Uint8Array | undefined;
   denoiseStrength: number;
-  /** Progress reporting controls. */
   reportIntermediateImages: boolean;
   progressStride: number;
-  /**
-   * Dimensions for raw input_image payloads when the backend cannot infer
-   * them from an encoded container.
-   */
   inputImageWidth: number;
   inputImageHeight: number;
-  /** Input image/mask media hints. Empty = backend infer/default. */
   inputImageMediaType?: string | undefined;
   maskImageMediaType?:
     | string
     | undefined;
-  /** 0 = one image/backend default */
+  /** 0 = one image. */
   batchSize: number;
   returnLatents: boolean;
 }
@@ -565,35 +376,12 @@ export interface DiffusionGenerationRequest_MetadataEntry {
   value: string;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Streamed progress event. Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:511    (DiffusionProgress)
- *   Kotlin DiffusionTypes.kt:337       (DiffusionProgress)
- *   RN     DiffusionTypes.ts:163       (DiffusionProgress)
- *   Web    DiffusionTypes.ts:69        (callback signature, not a struct)
- *   C ABI  rac_diffusion_types.h:279   (rac_diffusion_progress_t)
- * ---------------------------------------------------------------------------
- */
 export interface DiffusionProgress {
-  /** Fraction of denoising completed in [0.0, 1.0]. */
   progressPercent: number;
-  /** 1-based current step number. */
   currentStep: number;
-  /** Total number of steps the engine plans to execute. */
   totalSteps: number;
-  /** Free-form stage name ("Encoding", "Denoising", "Decoding", …). */
   stage: string;
-  /**
-   * Optional intermediate image bytes (PNG when surfaced by
-   * Swift/Kotlin/RN; raw RGBA when surfaced by the C ABI). Present only
-   * when the caller requested intermediate-image reporting and the
-   * engine has produced one for this step.
-   */
-  intermediateImageData?:
-    | Uint8Array
-    | undefined;
-  /** Dimensions for intermediate_image_data when it is raw pixel data. */
+  intermediateImageData?: Uint8Array | undefined;
   intermediateImageWidth: number;
   intermediateImageHeight: number;
   timestampMs: number;
@@ -601,108 +389,20 @@ export interface DiffusionProgress {
   intermediateImageMediaType?: string | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Final generation result. Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:560    (DiffusionResult)
- *   Kotlin DiffusionTypes.kt:355       (DiffusionResult)
- *   RN     DiffusionTypes.ts:185       (DiffusionResult)
- *   Web    DiffusionTypes.ts:54        (DiffusionGenerationResult)
- *   C ABI  rac_diffusion_types.h:314   (rac_diffusion_result_t)
- *
- * Drift note: pre-IDL Swift/Kotlin/RN/Web all name the wall-clock field
- * `generation_time_ms`. The v1 IDL renames it to `total_time_ms` per the
- * spec — round-trip is a pure rename. `used_scheduler` is *new* in the IDL
- * (no pre-IDL surface echoes back which scheduler actually ran when the
- * caller sent UNSPECIFIED); it lets clients log which sampler the engine
- * chose.
- * ---------------------------------------------------------------------------
- */
 export interface DiffusionResult {
-  /**
-   * Encoded image. PNG bytes on Swift/Kotlin/RN; raw RGBA bytes on the
-   * C ABI / Web llamacpp surface. (Encoding is a property of the
-   * backend's vtable, not of this message.)
-   */
   imageData: Uint8Array;
-  /** Final image width  in pixels. */
   width: number;
-  /** Final image height in pixels. */
   height: number;
-  /** Seed actually used (resolved if the caller passed -1 for random). */
+  /** The resolved seed, so a run can be reproduced when seed was -1. */
   seedUsed: number;
-  /**
-   * Total wall-clock generation time in milliseconds (renamed from
-   * pre-IDL `generation_time_ms`).
-   */
   totalTimeMs: number;
-  /**
-   * Whether the safety checker flagged the image as NSFW. False if the
-   * checker was disabled in DiffusionConfiguration.
-   */
   safetyFlag: boolean;
-  /**
-   * Scheduler the engine actually ran. Useful when the caller passed
-   * DIFFUSION_SCHEDULER_UNSPECIFIED.
-   */
   usedScheduler: DiffusionScheduler;
-  /** Failure details for result-envelope APIs. */
   errorMessage?: string | undefined;
   errorCode: number;
-  /** Output image media type, e.g. "image/png" or "image/raw-rgba". */
   imageMediaType?: string | undefined;
   batchImages: Uint8Array[];
   imagesGenerated: number;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Capability descriptor for the loaded diffusion backend / model. Sources
- * pre-IDL:
- *   Swift  DiffusionCapabilities (OptionSet bit flags — supportsTextToImage,
- *          supportsImageToImage, supportsInpainting, supportsIntermediateImages,
- *          supportsSafetyChecker)
- *   Kotlin DiffusionTypes.kt:378       (DiffusionCapabilities, mirror of Swift)
- *   RN     DiffusionTypes.ts:210       (interface with supportedVariants /
- *          supportedSchedulers / supportedModes / maxWidth / maxHeight /
- *          supportsIntermediateImages)
- *   Web    — n/a
- *   C ABI  rac_diffusion_types.h:352   (rac_diffusion_info_t — flags +
- *          max_width / max_height)
- *
- * The IDL takes the RN-style "what can the backend do?" shape (lists of
- * supported enums + a single max-resolution scalar) since it carries the
- * most information; SDKs whose pre-IDL surface is a bit-flag set must map
- * each flag to populating / leaving the corresponding repeated field.
- * `max_resolution_px` represents the larger of width/height the backend can
- * produce in a single call (RN/C-ABI carry width and height separately —
- * for square SD models they're equal; for the IDL we fold them to the
- * shared cap and document that asymmetric caps would need a future
- * `max_width_px` / `max_height_px` split).
- * ---------------------------------------------------------------------------
- */
-export interface DiffusionCapabilities {
-  /** Stable Diffusion model variants this backend can load. */
-  supportedVariants: DiffusionModelVariant[];
-  /** Sampler algorithms this backend implements. */
-  supportedSchedulers: DiffusionScheduler[];
-  /**
-   * Largest image edge (in pixels) the backend can produce in a single
-   * generation. 0 = unknown / not advertised.
-   */
-  maxResolutionPx: number;
-  /** Generation modes this backend supports. */
-  supportedModes: DiffusionMode[];
-  /** Asymmetric maximum dimensions when known. 0 = unknown. */
-  maxWidthPx: number;
-  maxHeightPx: number;
-  supportsIntermediateImages: boolean;
-  supportsSafetyChecker: boolean;
-  isReady: boolean;
-  currentModel?: string | undefined;
-  safetyCheckerEnabled: boolean;
-  supportsBatchGeneration: boolean;
-  supportedOutputMediaTypes: string[];
 }
 
 export interface DiffusionStreamEvent {
@@ -712,16 +412,6 @@ export interface DiffusionStreamEvent {
   kind: DiffusionStreamEventKind;
   progress?: DiffusionProgress | undefined;
   result?: DiffusionResult | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
-}
-
-export interface DiffusionServiceState {
-  isReady: boolean;
-  currentModel?: string | undefined;
-  capabilities?: DiffusionCapabilities | undefined;
-  isGenerating: boolean;
-  activeRequestId?: string | undefined;
   errorMessage?: string | undefined;
   errorCode: number;
 }
@@ -995,128 +685,6 @@ export const DiffusionConfiguration: MessageFns<DiffusionConfiguration> = {
     message.maxMemoryMb = object.maxMemoryMb ?? 0;
     message.modelId = object.modelId ?? undefined;
     message.preferredFramework = object.preferredFramework ?? undefined;
-    return message;
-  },
-};
-
-function createBaseDiffusionConfig(): DiffusionConfig {
-  return { modelPath: "", modelId: "", modelName: "", configuration: undefined };
-}
-
-export const DiffusionConfig: MessageFns<DiffusionConfig> = {
-  encode(message: DiffusionConfig, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.modelPath !== "") {
-      writer.uint32(10).string(message.modelPath);
-    }
-    if (message.modelId !== "") {
-      writer.uint32(18).string(message.modelId);
-    }
-    if (message.modelName !== "") {
-      writer.uint32(26).string(message.modelName);
-    }
-    if (message.configuration !== undefined) {
-      DiffusionConfiguration.encode(message.configuration, writer.uint32(34).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): DiffusionConfig {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseDiffusionConfig();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.modelPath = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.modelId = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.modelName = reader.string();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.configuration = DiffusionConfiguration.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): DiffusionConfig {
-    return {
-      modelPath: isSet(object.modelPath)
-        ? globalThis.String(object.modelPath)
-        : isSet(object.model_path)
-        ? globalThis.String(object.model_path)
-        : "",
-      modelId: isSet(object.modelId)
-        ? globalThis.String(object.modelId)
-        : isSet(object.model_id)
-        ? globalThis.String(object.model_id)
-        : "",
-      modelName: isSet(object.modelName)
-        ? globalThis.String(object.modelName)
-        : isSet(object.model_name)
-        ? globalThis.String(object.model_name)
-        : "",
-      configuration: isSet(object.configuration) ? DiffusionConfiguration.fromJSON(object.configuration) : undefined,
-    };
-  },
-
-  toJSON(message: DiffusionConfig): unknown {
-    const obj: any = {};
-    if (message.modelPath !== "") {
-      obj.modelPath = message.modelPath;
-    }
-    if (message.modelId !== "") {
-      obj.modelId = message.modelId;
-    }
-    if (message.modelName !== "") {
-      obj.modelName = message.modelName;
-    }
-    if (message.configuration !== undefined) {
-      obj.configuration = DiffusionConfiguration.toJSON(message.configuration);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<DiffusionConfig>, I>>(base?: I): DiffusionConfig {
-    return DiffusionConfig.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<DiffusionConfig>, I>>(object: I): DiffusionConfig {
-    const message = createBaseDiffusionConfig();
-    message.modelPath = object.modelPath ?? "";
-    message.modelId = object.modelId ?? "";
-    message.modelName = object.modelName ?? "";
-    message.configuration = (object.configuration !== undefined && object.configuration !== null)
-      ? DiffusionConfiguration.fromPartial(object.configuration)
-      : undefined;
     return message;
   },
 };
@@ -2321,360 +1889,6 @@ export const DiffusionResult: MessageFns<DiffusionResult> = {
   },
 };
 
-function createBaseDiffusionCapabilities(): DiffusionCapabilities {
-  return {
-    supportedVariants: [],
-    supportedSchedulers: [],
-    maxResolutionPx: 0,
-    supportedModes: [],
-    maxWidthPx: 0,
-    maxHeightPx: 0,
-    supportsIntermediateImages: false,
-    supportsSafetyChecker: false,
-    isReady: false,
-    currentModel: undefined,
-    safetyCheckerEnabled: false,
-    supportsBatchGeneration: false,
-    supportedOutputMediaTypes: [],
-  };
-}
-
-export const DiffusionCapabilities: MessageFns<DiffusionCapabilities> = {
-  encode(message: DiffusionCapabilities, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    writer.uint32(10).fork();
-    for (const v of message.supportedVariants) {
-      writer.int32(v);
-    }
-    writer.join();
-    writer.uint32(18).fork();
-    for (const v of message.supportedSchedulers) {
-      writer.int32(v);
-    }
-    writer.join();
-    if (message.maxResolutionPx !== 0) {
-      writer.uint32(24).int32(message.maxResolutionPx);
-    }
-    writer.uint32(34).fork();
-    for (const v of message.supportedModes) {
-      writer.int32(v);
-    }
-    writer.join();
-    if (message.maxWidthPx !== 0) {
-      writer.uint32(40).int32(message.maxWidthPx);
-    }
-    if (message.maxHeightPx !== 0) {
-      writer.uint32(48).int32(message.maxHeightPx);
-    }
-    if (message.supportsIntermediateImages !== false) {
-      writer.uint32(56).bool(message.supportsIntermediateImages);
-    }
-    if (message.supportsSafetyChecker !== false) {
-      writer.uint32(64).bool(message.supportsSafetyChecker);
-    }
-    if (message.isReady !== false) {
-      writer.uint32(72).bool(message.isReady);
-    }
-    if (message.currentModel !== undefined) {
-      writer.uint32(82).string(message.currentModel);
-    }
-    if (message.safetyCheckerEnabled !== false) {
-      writer.uint32(88).bool(message.safetyCheckerEnabled);
-    }
-    if (message.supportsBatchGeneration !== false) {
-      writer.uint32(96).bool(message.supportsBatchGeneration);
-    }
-    for (const v of message.supportedOutputMediaTypes) {
-      writer.uint32(106).string(v!);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): DiffusionCapabilities {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseDiffusionCapabilities();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag === 8) {
-            message.supportedVariants.push(reader.int32() as any);
-
-            continue;
-          }
-
-          if (tag === 10) {
-            const end2 = reader.uint32() + reader.pos;
-            while (reader.pos < end2) {
-              message.supportedVariants.push(reader.int32() as any);
-            }
-
-            continue;
-          }
-
-          break;
-        }
-        case 2: {
-          if (tag === 16) {
-            message.supportedSchedulers.push(reader.int32() as any);
-
-            continue;
-          }
-
-          if (tag === 18) {
-            const end2 = reader.uint32() + reader.pos;
-            while (reader.pos < end2) {
-              message.supportedSchedulers.push(reader.int32() as any);
-            }
-
-            continue;
-          }
-
-          break;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.maxResolutionPx = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag === 32) {
-            message.supportedModes.push(reader.int32() as any);
-
-            continue;
-          }
-
-          if (tag === 34) {
-            const end2 = reader.uint32() + reader.pos;
-            while (reader.pos < end2) {
-              message.supportedModes.push(reader.int32() as any);
-            }
-
-            continue;
-          }
-
-          break;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.maxWidthPx = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.maxHeightPx = reader.int32();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.supportsIntermediateImages = reader.bool();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.supportsSafetyChecker = reader.bool();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.isReady = reader.bool();
-          continue;
-        }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          message.currentModel = reader.string();
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.safetyCheckerEnabled = reader.bool();
-          continue;
-        }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.supportsBatchGeneration = reader.bool();
-          continue;
-        }
-        case 13: {
-          if (tag !== 106) {
-            break;
-          }
-
-          message.supportedOutputMediaTypes.push(reader.string());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): DiffusionCapabilities {
-    return {
-      supportedVariants: globalThis.Array.isArray(object?.supportedVariants)
-        ? object.supportedVariants.map((e: any) => diffusionModelVariantFromJSON(e))
-        : globalThis.Array.isArray(object?.supported_variants)
-        ? object.supported_variants.map((e: any) => diffusionModelVariantFromJSON(e))
-        : [],
-      supportedSchedulers: globalThis.Array.isArray(object?.supportedSchedulers)
-        ? object.supportedSchedulers.map((e: any) => diffusionSchedulerFromJSON(e))
-        : globalThis.Array.isArray(object?.supported_schedulers)
-        ? object.supported_schedulers.map((e: any) => diffusionSchedulerFromJSON(e))
-        : [],
-      maxResolutionPx: isSet(object.maxResolutionPx)
-        ? globalThis.Number(object.maxResolutionPx)
-        : isSet(object.max_resolution_px)
-        ? globalThis.Number(object.max_resolution_px)
-        : 0,
-      supportedModes: globalThis.Array.isArray(object?.supportedModes)
-        ? object.supportedModes.map((e: any) => diffusionModeFromJSON(e))
-        : globalThis.Array.isArray(object?.supported_modes)
-        ? object.supported_modes.map((e: any) => diffusionModeFromJSON(e))
-        : [],
-      maxWidthPx: isSet(object.maxWidthPx)
-        ? globalThis.Number(object.maxWidthPx)
-        : isSet(object.max_width_px)
-        ? globalThis.Number(object.max_width_px)
-        : 0,
-      maxHeightPx: isSet(object.maxHeightPx)
-        ? globalThis.Number(object.maxHeightPx)
-        : isSet(object.max_height_px)
-        ? globalThis.Number(object.max_height_px)
-        : 0,
-      supportsIntermediateImages: isSet(object.supportsIntermediateImages)
-        ? globalThis.Boolean(object.supportsIntermediateImages)
-        : isSet(object.supports_intermediate_images)
-        ? globalThis.Boolean(object.supports_intermediate_images)
-        : false,
-      supportsSafetyChecker: isSet(object.supportsSafetyChecker)
-        ? globalThis.Boolean(object.supportsSafetyChecker)
-        : isSet(object.supports_safety_checker)
-        ? globalThis.Boolean(object.supports_safety_checker)
-        : false,
-      isReady: isSet(object.isReady)
-        ? globalThis.Boolean(object.isReady)
-        : isSet(object.is_ready)
-        ? globalThis.Boolean(object.is_ready)
-        : false,
-      currentModel: isSet(object.currentModel)
-        ? globalThis.String(object.currentModel)
-        : isSet(object.current_model)
-        ? globalThis.String(object.current_model)
-        : undefined,
-      safetyCheckerEnabled: isSet(object.safetyCheckerEnabled)
-        ? globalThis.Boolean(object.safetyCheckerEnabled)
-        : isSet(object.safety_checker_enabled)
-        ? globalThis.Boolean(object.safety_checker_enabled)
-        : false,
-      supportsBatchGeneration: isSet(object.supportsBatchGeneration)
-        ? globalThis.Boolean(object.supportsBatchGeneration)
-        : isSet(object.supports_batch_generation)
-        ? globalThis.Boolean(object.supports_batch_generation)
-        : false,
-      supportedOutputMediaTypes: globalThis.Array.isArray(object?.supportedOutputMediaTypes)
-        ? object.supportedOutputMediaTypes.map((e: any) => globalThis.String(e))
-        : globalThis.Array.isArray(object?.supported_output_media_types)
-        ? object.supported_output_media_types.map((e: any) => globalThis.String(e))
-        : [],
-    };
-  },
-
-  toJSON(message: DiffusionCapabilities): unknown {
-    const obj: any = {};
-    if (message.supportedVariants?.length) {
-      obj.supportedVariants = message.supportedVariants.map((e) => diffusionModelVariantToJSON(e));
-    }
-    if (message.supportedSchedulers?.length) {
-      obj.supportedSchedulers = message.supportedSchedulers.map((e) => diffusionSchedulerToJSON(e));
-    }
-    if (message.maxResolutionPx !== 0) {
-      obj.maxResolutionPx = Math.round(message.maxResolutionPx);
-    }
-    if (message.supportedModes?.length) {
-      obj.supportedModes = message.supportedModes.map((e) => diffusionModeToJSON(e));
-    }
-    if (message.maxWidthPx !== 0) {
-      obj.maxWidthPx = Math.round(message.maxWidthPx);
-    }
-    if (message.maxHeightPx !== 0) {
-      obj.maxHeightPx = Math.round(message.maxHeightPx);
-    }
-    if (message.supportsIntermediateImages !== false) {
-      obj.supportsIntermediateImages = message.supportsIntermediateImages;
-    }
-    if (message.supportsSafetyChecker !== false) {
-      obj.supportsSafetyChecker = message.supportsSafetyChecker;
-    }
-    if (message.isReady !== false) {
-      obj.isReady = message.isReady;
-    }
-    if (message.currentModel !== undefined) {
-      obj.currentModel = message.currentModel;
-    }
-    if (message.safetyCheckerEnabled !== false) {
-      obj.safetyCheckerEnabled = message.safetyCheckerEnabled;
-    }
-    if (message.supportsBatchGeneration !== false) {
-      obj.supportsBatchGeneration = message.supportsBatchGeneration;
-    }
-    if (message.supportedOutputMediaTypes?.length) {
-      obj.supportedOutputMediaTypes = message.supportedOutputMediaTypes;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<DiffusionCapabilities>, I>>(base?: I): DiffusionCapabilities {
-    return DiffusionCapabilities.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<DiffusionCapabilities>, I>>(object: I): DiffusionCapabilities {
-    const message = createBaseDiffusionCapabilities();
-    message.supportedVariants = object.supportedVariants?.map((e) => e) || [];
-    message.supportedSchedulers = object.supportedSchedulers?.map((e) => e) || [];
-    message.maxResolutionPx = object.maxResolutionPx ?? 0;
-    message.supportedModes = object.supportedModes?.map((e) => e) || [];
-    message.maxWidthPx = object.maxWidthPx ?? 0;
-    message.maxHeightPx = object.maxHeightPx ?? 0;
-    message.supportsIntermediateImages = object.supportsIntermediateImages ?? false;
-    message.supportsSafetyChecker = object.supportsSafetyChecker ?? false;
-    message.isReady = object.isReady ?? false;
-    message.currentModel = object.currentModel ?? undefined;
-    message.safetyCheckerEnabled = object.safetyCheckerEnabled ?? false;
-    message.supportsBatchGeneration = object.supportsBatchGeneration ?? false;
-    message.supportedOutputMediaTypes = object.supportedOutputMediaTypes?.map((e) => e) || [];
-    return message;
-  },
-};
-
 function createBaseDiffusionStreamEvent(): DiffusionStreamEvent {
   return {
     seq: 0,
@@ -2870,196 +2084,6 @@ export const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent> = {
     message.result = (object.result !== undefined && object.result !== null)
       ? DiffusionResult.fromPartial(object.result)
       : undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
-    return message;
-  },
-};
-
-function createBaseDiffusionServiceState(): DiffusionServiceState {
-  return {
-    isReady: false,
-    currentModel: undefined,
-    capabilities: undefined,
-    isGenerating: false,
-    activeRequestId: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
-  };
-}
-
-export const DiffusionServiceState: MessageFns<DiffusionServiceState> = {
-  encode(message: DiffusionServiceState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.isReady !== false) {
-      writer.uint32(8).bool(message.isReady);
-    }
-    if (message.currentModel !== undefined) {
-      writer.uint32(18).string(message.currentModel);
-    }
-    if (message.capabilities !== undefined) {
-      DiffusionCapabilities.encode(message.capabilities, writer.uint32(26).fork()).join();
-    }
-    if (message.isGenerating !== false) {
-      writer.uint32(32).bool(message.isGenerating);
-    }
-    if (message.activeRequestId !== undefined) {
-      writer.uint32(42).string(message.activeRequestId);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(50).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(56).int32(message.errorCode);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): DiffusionServiceState {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseDiffusionServiceState();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.isReady = reader.bool();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.currentModel = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.capabilities = DiffusionCapabilities.decode(reader, reader.uint32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.isGenerating = reader.bool();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.activeRequestId = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): DiffusionServiceState {
-    return {
-      isReady: isSet(object.isReady)
-        ? globalThis.Boolean(object.isReady)
-        : isSet(object.is_ready)
-        ? globalThis.Boolean(object.is_ready)
-        : false,
-      currentModel: isSet(object.currentModel)
-        ? globalThis.String(object.currentModel)
-        : isSet(object.current_model)
-        ? globalThis.String(object.current_model)
-        : undefined,
-      capabilities: isSet(object.capabilities) ? DiffusionCapabilities.fromJSON(object.capabilities) : undefined,
-      isGenerating: isSet(object.isGenerating)
-        ? globalThis.Boolean(object.isGenerating)
-        : isSet(object.is_generating)
-        ? globalThis.Boolean(object.is_generating)
-        : false,
-      activeRequestId: isSet(object.activeRequestId)
-        ? globalThis.String(object.activeRequestId)
-        : isSet(object.active_request_id)
-        ? globalThis.String(object.active_request_id)
-        : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
-    };
-  },
-
-  toJSON(message: DiffusionServiceState): unknown {
-    const obj: any = {};
-    if (message.isReady !== false) {
-      obj.isReady = message.isReady;
-    }
-    if (message.currentModel !== undefined) {
-      obj.currentModel = message.currentModel;
-    }
-    if (message.capabilities !== undefined) {
-      obj.capabilities = DiffusionCapabilities.toJSON(message.capabilities);
-    }
-    if (message.isGenerating !== false) {
-      obj.isGenerating = message.isGenerating;
-    }
-    if (message.activeRequestId !== undefined) {
-      obj.activeRequestId = message.activeRequestId;
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<DiffusionServiceState>, I>>(base?: I): DiffusionServiceState {
-    return DiffusionServiceState.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<DiffusionServiceState>, I>>(object: I): DiffusionServiceState {
-    const message = createBaseDiffusionServiceState();
-    message.isReady = object.isReady ?? false;
-    message.currentModel = object.currentModel ?? undefined;
-    message.capabilities = (object.capabilities !== undefined && object.capabilities !== null)
-      ? DiffusionCapabilities.fromPartial(object.capabilities)
-      : undefined;
-    message.isGenerating = object.isGenerating ?? false;
-    message.activeRequestId = object.activeRequestId ?? undefined;
     message.errorMessage = object.errorMessage ?? undefined;
     message.errorCode = object.errorCode ?? 0;
     return message;

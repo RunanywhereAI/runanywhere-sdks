@@ -65,6 +65,9 @@ public class StorageDeleteRequest(
     schemaIndex = 4,
   )
   public val dry_run: Boolean = false,
+  /**
+   * Refuse to execute if the plan no longer matches current state.
+   */
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.StorageDeletePlan#ADAPTER",

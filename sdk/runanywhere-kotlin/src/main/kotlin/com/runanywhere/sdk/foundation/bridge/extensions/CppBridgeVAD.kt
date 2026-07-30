@@ -17,8 +17,8 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.SpeechActivityEvent
-import ai.runanywhere.proto.v1.VADAudioEncoding
 import ai.runanywhere.proto.v1.VADAudioSource
 import ai.runanywhere.proto.v1.VADConfiguration
 import ai.runanywhere.proto.v1.VADProcessRequest
@@ -205,7 +205,7 @@ object CppBridgeVAD {
                 audio =
                     VADAudioSource(
                         audio_data = audioBytes.toByteString(),
-                        encoding = VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE,
+                        encoding = AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
                     ),
                 options = options,
             )

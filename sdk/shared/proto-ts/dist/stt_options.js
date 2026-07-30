@@ -5,59 +5,13 @@
 //   protoc               v7.35.1
 // source: stt_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.STTLanguageDetectionResult = exports.STTServiceState = exports.STTStreamEvent = exports.STTPartialResult = exports.STTOutput = exports.TranscriptionMetadata = exports.TranscriptionAlternative = exports.WordTimestamp = exports.STTTranscriptionRequest_MetadataEntry = exports.STTTranscriptionRequest = exports.STTAudioSource = exports.STTOptions = exports.STTConfiguration = exports.STTStreamEventKind = exports.STTAudioEncoding = exports.protobufPackage = void 0;
-exports.sTTAudioEncodingFromJSON = sTTAudioEncodingFromJSON;
-exports.sTTAudioEncodingToJSON = sTTAudioEncodingToJSON;
+exports.STTServiceState = exports.STTStreamEvent = exports.STTPartialResult = exports.STTOutput = exports.TranscriptionMetadata = exports.TranscriptionAlternative = exports.WordTimestamp = exports.STTTranscriptionRequest_MetadataEntry = exports.STTTranscriptionRequest = exports.STTAudioSource = exports.STTOptions = exports.STTConfiguration = exports.STTStreamEventKind = exports.protobufPackage = void 0;
 exports.sTTStreamEventKindFromJSON = sTTStreamEventKindFromJSON;
 exports.sTTStreamEventKindToJSON = sTTStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
-var STTAudioEncoding;
-(function (STTAudioEncoding) {
-    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_UNSPECIFIED"] = 0] = "STT_AUDIO_ENCODING_UNSPECIFIED";
-    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_PCM_S16_LE"] = 1] = "STT_AUDIO_ENCODING_PCM_S16_LE";
-    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_PCM_F32_LE"] = 2] = "STT_AUDIO_ENCODING_PCM_F32_LE";
-    /** STT_AUDIO_ENCODING_CONTAINER - WAV/MP3/FLAC/etc.; see AudioFormat. */
-    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_CONTAINER"] = 3] = "STT_AUDIO_ENCODING_CONTAINER";
-    STTAudioEncoding[STTAudioEncoding["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(STTAudioEncoding || (exports.STTAudioEncoding = STTAudioEncoding = {}));
-function sTTAudioEncodingFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "STT_AUDIO_ENCODING_UNSPECIFIED":
-            return STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED;
-        case 1:
-        case "STT_AUDIO_ENCODING_PCM_S16_LE":
-            return STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE;
-        case 2:
-        case "STT_AUDIO_ENCODING_PCM_F32_LE":
-            return STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE;
-        case 3:
-        case "STT_AUDIO_ENCODING_CONTAINER":
-            return STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return STTAudioEncoding.UNRECOGNIZED;
-    }
-}
-function sTTAudioEncodingToJSON(object) {
-    switch (object) {
-        case STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED:
-            return "STT_AUDIO_ENCODING_UNSPECIFIED";
-        case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE:
-            return "STT_AUDIO_ENCODING_PCM_S16_LE";
-        case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE:
-            return "STT_AUDIO_ENCODING_PCM_F32_LE";
-        case STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER:
-            return "STT_AUDIO_ENCODING_CONTAINER";
-        case STTAudioEncoding.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 var STTStreamEventKind;
 (function (STTStreamEventKind) {
     STTStreamEventKind[STTStreamEventKind["STT_STREAM_EVENT_KIND_UNSPECIFIED"] = 0] = "STT_STREAM_EVENT_KIND_UNSPECIFIED";
@@ -782,7 +736,7 @@ exports.STTAudioSource = {
                 : isSet(object.adapter_handle)
                     ? globalThis.String(object.adapter_handle)
                     : undefined,
-            encoding: isSet(object.encoding) ? sTTAudioEncodingFromJSON(object.encoding) : 0,
+            encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : 0,
             audioFormat: isSet(object.audioFormat)
                 ? (0, model_types_1.audioFormatFromJSON)(object.audioFormat)
                 : isSet(object.audio_format)
@@ -818,7 +772,7 @@ exports.STTAudioSource = {
             obj.adapterHandle = message.adapterHandle;
         }
         if (message.encoding !== 0) {
-            obj.encoding = sTTAudioEncodingToJSON(message.encoding);
+            obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
         }
         if (message.audioFormat !== 0) {
             obj.audioFormat = (0, model_types_1.audioFormatToJSON)(message.audioFormat);
@@ -2238,91 +2192,6 @@ exports.STTServiceState = {
         message.supportedLanguageCodes = object.supportedLanguageCodes?.map((e) => e) || [];
         message.errorMessage = object.errorMessage ?? undefined;
         message.errorCode = object.errorCode ?? 0;
-        return message;
-    },
-};
-function createBaseSTTLanguageDetectionResult() {
-    return { language: "", confidence: 0, alternatives: [] };
-}
-exports.STTLanguageDetectionResult = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.language !== "") {
-            writer.uint32(42).string(message.language);
-        }
-        if (message.confidence !== 0) {
-            writer.uint32(29).float(message.confidence);
-        }
-        for (const v of message.alternatives) {
-            writer.uint32(34).string(v);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseSTTLanguageDetectionResult();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.language = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 29) {
-                        break;
-                    }
-                    message.confidence = reader.float();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.alternatives.push(reader.string());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            language: isSet(object.language) ? globalThis.String(object.language) : "",
-            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-            alternatives: globalThis.Array.isArray(object?.alternatives)
-                ? object.alternatives.map((e) => globalThis.String(e))
-                : [],
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.language !== "") {
-            obj.language = message.language;
-        }
-        if (message.confidence !== 0) {
-            obj.confidence = message.confidence;
-        }
-        if (message.alternatives?.length) {
-            obj.alternatives = message.alternatives;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.STTLanguageDetectionResult.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseSTTLanguageDetectionResult();
-        message.language = object.language ?? "";
-        message.confidence = object.confidence ?? 0;
-        message.alternatives = object.alternatives?.map((e) => e) || [];
         return message;
     },
 };

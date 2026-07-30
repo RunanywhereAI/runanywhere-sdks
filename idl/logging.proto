@@ -1,14 +1,7 @@
-// RunAnywhere IDL — cross-platform logging configuration + records.
+// RunAnywhere IDL — cross-platform logging configuration and records.
 //
-// This file is the single source of truth for the structured logging types
-// consumed by every SDK. Platform loggers add only sink-specific behavior.
-//
-// LogLevel mirrors the C ABI `rac_log_level_t`
-// (sdk/runanywhere-commons/include/rac/core/rac_types.h:196) EXACTLY, so the
-// generated enum round-trips with the platform-adapter `log` callback
-// (rac_platform_adapter.h) without a translation table. Public SDK logging
-// APIs consume this canonical enum directly; platform-local adapters preserve
-// the same trace=0..fatal=5 numeric contract.
+// None of these types reach commons today: commons owns RAC_LOG_* and the
+// platform-adapter log callback, while this config is read SDK-side only.
 
 syntax = "proto3";
 
@@ -25,12 +18,9 @@ option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// ---------------------------------------------------------------------------
-// Severity, mirroring the C ABI `rac_log_level_t`. Larger value = more severe.
-// 0 is TRACE (not UNSPECIFIED) to keep numeric parity with the C enum — the
-// same C-ABI-aligned convention used by HttpDownloadStatus (0=OK) and
-// SdkInitEnvironment (0=DEVELOPMENT).
-// ---------------------------------------------------------------------------
+// Mirrors rac_log_level_t exactly so the generated enum round-trips with the
+// platform-adapter log callback without a translation table. 0 is TRACE, not
+// UNSPECIFIED, to keep numeric parity with the C enum.
 enum LogLevel {
     LOG_LEVEL_TRACE   = 0 [(runanywhere.v1.rac_wire_string) = "trace",   (runanywhere.v1.rac_display_name) = "Trace"];
     LOG_LEVEL_DEBUG   = 1 [(runanywhere.v1.rac_wire_string) = "debug",   (runanywhere.v1.rac_display_name) = "Debug"];
@@ -40,47 +30,35 @@ enum LogLevel {
     LOG_LEVEL_FATAL   = 5 [(runanywhere.v1.rac_wire_string) = "fatal",   (runanywhere.v1.rac_display_name) = "Fatal"];
 }
 
-// ---------------------------------------------------------------------------
-// SDK logging configuration. Per-environment presets
-// (development/staging/production) stay in each SDK as factory helpers.
-// ---------------------------------------------------------------------------
+// Per-environment presets stay in each SDK as factory helpers.
 message LoggingConfiguration {
-    reserved 6;
-
-    // Write logs to the platform-local sink (os_log / Logcat / console).
+    // The platform-local sink: os_log, Logcat, or console.
     bool     enable_local_logging    = 1 [(runanywhere.v1.rac_default) = "true"];
 
-    // Minimum severity emitted. Messages below this level are dropped.
+    // Records below this level are dropped.
     LogLevel min_log_level           = 2;
 
-    // Attach file:line:function source location to each record.
     bool     include_source_location = 3;
 
-    // Attach device/build metadata (model, os version, app build) to records.
+    // Device model, OS version, app build.
     bool     include_device_metadata = 4;
 
-    // Forward records to the remote logging pipeline.
     bool     enable_remote_logging   = 5;
-
 }
 
-// ---------------------------------------------------------------------------
-// A single structured log record. Mirrors the per-SDK LogEntry shape.
-// ---------------------------------------------------------------------------
 message LogEntry {
-    int64               timestamp_unix_ms = 1;  // Wall-clock epoch milliseconds.
+    int64               timestamp_unix_ms = 1;
     LogLevel            level             = 2;
-    string              category          = 3;  // Subsystem/tag (e.g. "STT", "Download").
+    string              category          = 3;  // Subsystem tag, e.g. "STT".
     string              message           = 4;
-    map<string, string> metadata          = 5;  // Optional structured context.
+    map<string, string> metadata          = 5;
 
-    // Optional source location + context (Kotlin LogEntry carries these as
-    // first-class fields; other SDKs leave them empty). `line`/`error_code`
-    // use 0 as "unset".
+    // Kotlin carries these as first-class fields; other SDKs leave them empty.
+    // 0 means unset for line and error_code.
     string              file              = 6;
     int32               line              = 7;
     string              function          = 8;
-    int32               error_code        = 9;   // SDKError code, when the record describes an error.
+    int32               error_code        = 9;
     string              model_id          = 10;
     string              framework         = 11;
 }

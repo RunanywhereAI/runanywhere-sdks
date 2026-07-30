@@ -29,19 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Whole-device storage capacity. Reported by the platform OS (e.g. iOS
- * `URLResourceKey.volumeAvailableCapacity*`, Android `StatFs`, browser
- * `navigator.storage.estimate()`).
- *
- * `used_percent` is materialized rather than computed at the receiver so
- * every binding (Swift, Kotlin, Dart, RN, Web) reports the same number even
- * when total_bytes == 0 (in which case used_percent MUST be 0.0).
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 public class DeviceStorageInfo(
   @field:WireField(
     tag = 1,
@@ -68,7 +55,7 @@ public class DeviceStorageInfo(
   )
   public val used_bytes: Long = 0L,
   /**
-   * 0.0 — 100.0; 0.0 if total_bytes == 0
+   * 0.0 to 100.0, and 0.0 when total_bytes is 0.
    */
   @field:WireField(
     tag = 4,

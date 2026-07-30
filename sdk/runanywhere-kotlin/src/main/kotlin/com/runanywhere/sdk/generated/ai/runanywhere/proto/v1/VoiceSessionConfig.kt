@@ -31,20 +31,10 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Voice session behavior configuration.
- *
- * Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
- * Controls runtime behavior of the voice agent's session loop — silence
- * timing, speech threshold, auto-TTS playback, continuous mode, and
- * LLM thinking-mode toggle.
- * ---------------------------------------------------------------------------
+ * Commons reads silence_duration_ms and max_tokens. The remaining fields are
+ * declared but not consumed by the C++ voice agent.
  */
 public class VoiceSessionConfig(
-  /**
-   * Silence duration (milliseconds) before processing the speech
-   * buffer. Default per Swift/Kotlin: 1500 ms.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -53,10 +43,6 @@ public class VoiceSessionConfig(
     schemaIndex = 0,
   )
   public val silence_duration_ms: Int = 0,
-  /**
-   * Minimum audio level to detect speech (0.0 - 1.0). Default per
-   * Swift/Kotlin: 0.1.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -65,9 +51,6 @@ public class VoiceSessionConfig(
     schemaIndex = 1,
   )
   public val speech_threshold: Float = 0f,
-  /**
-   * Whether to auto-play TTS response after synthesis. Default true.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -76,9 +59,6 @@ public class VoiceSessionConfig(
     schemaIndex = 2,
   )
   public val auto_play_tts: Boolean = false,
-  /**
-   * Whether to auto-resume listening after TTS playback. Default true.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -87,10 +67,6 @@ public class VoiceSessionConfig(
     schemaIndex = 3,
   )
   public val continuous_mode: Boolean = false,
-  /**
-   * Whether thinking mode is enabled for the LLM (qwen3, deepseek-r1).
-   * Default false.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -99,9 +75,6 @@ public class VoiceSessionConfig(
     schemaIndex = 4,
   )
   public val thinking_mode_enabled: Boolean = false,
-  /**
-   * Optional per-turn LLM max token limit. 0 = LLM/default.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -110,9 +83,6 @@ public class VoiceSessionConfig(
     schemaIndex = 5,
   )
   public val max_tokens: Int = 0,
-  /**
-   * Maximum recording duration before forcing an end-of-turn. 0 = default.
-   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -121,9 +91,6 @@ public class VoiceSessionConfig(
     schemaIndex = 6,
   )
   public val max_recording_duration_ms: Int = 0,
-  /**
-   * Optional language/voice hints passed to STT/TTS adapters.
-   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

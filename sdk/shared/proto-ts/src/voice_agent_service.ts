@@ -9,22 +9,15 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { EventCategory, eventCategoryFromJSON, eventCategoryToJSON } from "./component_types";
 import { ErrorSeverity, errorSeverityFromJSON, errorSeverityToJSON } from "./errors";
 import { LLMGenerationOptions } from "./llm_options";
+import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON } from "./model_types";
 import { TTSOptions } from "./tts_options";
 import { VADConfiguration } from "./vad_options";
-import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON, VoiceAgentComponentStates } from "./voice_events";
+import { VoiceAgentComponentStates } from "./voice_events";
 
 export const protobufPackage = "runanywhere.v1";
 
-/**
- * Empty request type — the voice agent already has its config set via
- * `rac_voice_agent_init()` at handle creation time. The Stream rpc just
- * opens a new event subscription on an existing handle.
- */
+/** Subscription parameters for the agent's event stream. */
 export interface VoiceAgentRequest {
-  /**
-   * Optional: filter the stream to only certain VoiceEvent.payload arms
-   * (e.g. "user_said,assistant_token"). Empty = all events.
-   */
   eventFilter: string;
   sessionId: string;
   categories: EventCategory[];
@@ -33,65 +26,22 @@ export interface VoiceAgentRequest {
   includeAudio: boolean;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * One-shot voice-turn result.
- *
- * Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
- * `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
- * `rac_voice_agent_result_t` (rac/features/voice_agent/rac_voice_agent.h).
- * Returned by the `processVoiceTurn` ergonomic API where a single audio
- * blob produces transcription + assistant response + synthesized audio in
- * one call (as opposed to the streaming path served by the Stream rpc).
- * ---------------------------------------------------------------------------
- */
 export interface VoiceAgentResult {
-  /** Whether the input audio passed VAD's speech-detected check. */
   speechDetected: boolean;
-  /** Transcribed text from STT. Unset when speech_detected=false. */
-  transcription?:
-    | string
-    | undefined;
-  /**
-   * Generated assistant response text from the LLM. Unset when STT
-   * produced no transcription or LLM was skipped.
-   */
-  assistantResponse?:
-    | string
-    | undefined;
-  /**
-   * Thinking content extracted from `<think>...</think>` tags
-   * (qwen3, deepseek-r1). Unset when the active LLM does not emit
-   * a chain-of-thought trace.
-   */
-  thinkingContent?:
-    | string
-    | undefined;
-  /**
-   * Synthesized audio data from TTS. Encoding follows AudioFrameEvent
-   * conventions (typically PCM-F32-LE, sample rate per voice). Unset
-   * when TTS was skipped or auto_play_tts=false in VoiceSessionConfig.
-   */
-  synthesizedAudio?:
-    | Uint8Array
-    | undefined;
-  /**
-   * Component states captured at the end of the turn — useful for UIs
-   * surfacing readiness / partial-failure breakdowns alongside the
-   * final result. Unset when the caller does not ask for it.
-   */
+  transcription?: string | undefined;
+  assistantResponse?: string | undefined;
+  thinkingContent?: string | undefined;
+  synthesizedAudio?: Uint8Array | undefined;
   finalState?:
     | VoiceAgentComponentStates
     | undefined;
-  /**
-   * Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
-   * or unknown.
-   */
+  /** Required to interpret synthesized_audio. */
   synthesizedAudioSampleRateHz: number;
   synthesizedAudioChannels: number;
   synthesizedAudioEncoding: AudioEncoding;
   sessionId: string;
   turnId: string;
+  /** Per-stage timings, then the wall-clock total. */
   sttTimeMs: number;
   llmTimeMs: number;
   ttsTimeMs: number;
@@ -100,6 +50,7 @@ export interface VoiceAgentResult {
   errorCode: number;
 }
 
+/** One-shot turn: audio in, transcription plus response plus audio out. */
 export interface VoiceAgentTurnRequest {
   requestId: string;
   sessionId: string;
@@ -116,66 +67,30 @@ export interface VoiceAgentTurnRequest_MetadataEntry {
   value: string;
 }
 
-/**
- * One audio frame fed into a live voice-agent session. Replaces the
- * seven-scalar rac_voice_agent_feed_audio_proto signature.
- */
 export interface VoiceAgentAudioFrame {
   audioData: Uint8Array;
   sampleRate: number;
   channels: number;
   encoding: AudioEncoding;
-  /** Marks the end of the utterance (flush). */
   isFinal: boolean;
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Voice session behavior configuration.
- *
- * Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
- * Controls runtime behavior of the voice agent's session loop — silence
- * timing, speech threshold, auto-TTS playback, continuous mode, and
- * LLM thinking-mode toggle.
- * ---------------------------------------------------------------------------
+ * Commons reads silence_duration_ms and max_tokens. The remaining fields are
+ * declared but not consumed by the C++ voice agent.
  */
 export interface VoiceSessionConfig {
-  /**
-   * Silence duration (milliseconds) before processing the speech
-   * buffer. Default per Swift/Kotlin: 1500 ms.
-   */
   silenceDurationMs: number;
-  /**
-   * Minimum audio level to detect speech (0.0 - 1.0). Default per
-   * Swift/Kotlin: 0.1.
-   */
   speechThreshold: number;
-  /** Whether to auto-play TTS response after synthesis. Default true. */
   autoPlayTts: boolean;
-  /** Whether to auto-resume listening after TTS playback. Default true. */
   continuousMode: boolean;
-  /**
-   * Whether thinking mode is enabled for the LLM (qwen3, deepseek-r1).
-   * Default false.
-   */
   thinkingModeEnabled: boolean;
-  /** Optional per-turn LLM max token limit. 0 = LLM/default. */
   maxTokens: number;
-  /** Maximum recording duration before forcing an end-of-turn. 0 = default. */
   maxRecordingDurationMs: number;
-  /** Optional language/voice hints passed to STT/TTS adapters. */
   languageCode?: string | undefined;
   voiceId?: string | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Audio pipeline state-manager configuration.
- *
- * Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
- * to prevent microphone/TTS feedback loops.
- * ---------------------------------------------------------------------------
- */
 export interface AudioPipelineConfig {
   cooldownDurationMs: number;
   strictTransitions: boolean;
@@ -183,81 +98,27 @@ export interface AudioPipelineConfig {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Aggregated voice-agent compose configuration.
- *
- * Mirrors the C ABI `rac_voice_agent_config_t` and Swift
- * `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`
- * (idl/solutions.proto) is kept frozen for the SolutionConfig oneof — this
- * new message provides the fine-grained sub-component view consumed by the
- * `rac_voice_agent_initialize()` C entry-point.
- *
- * Each sub-config string field uses a "model_id" naming convention; the
- * runtime resolves IDs against the model registry. An empty string means
- * "use the currently loaded model/voice for that capability".
- * ---------------------------------------------------------------------------
+ * Each component takes a path, an id, or a name; commons resolves whichever is
+ * present through the model registry.
  */
 export interface VoiceAgentComposeConfig {
-  /**
-   * -------------------------------------------------------------------
-   * STT sub-config (mirrors rac_voice_agent_stt_config_t).
-   * -------------------------------------------------------------------
-   */
   sttModelPath?: string | undefined;
   sttModelId?: string | undefined;
-  sttModelName?:
-    | string
-    | undefined;
-  /**
-   * -------------------------------------------------------------------
-   * LLM sub-config (mirrors rac_voice_agent_llm_config_t).
-   * -------------------------------------------------------------------
-   */
+  sttModelName?: string | undefined;
   llmModelPath?: string | undefined;
   llmModelId?: string | undefined;
-  llmModelName?:
-    | string
-    | undefined;
-  /**
-   * -------------------------------------------------------------------
-   * TTS sub-config (mirrors rac_voice_agent_tts_config_t).
-   * -------------------------------------------------------------------
-   */
+  llmModelName?: string | undefined;
   ttsVoicePath?: string | undefined;
   ttsVoiceId?: string | undefined;
   ttsVoiceName?: string | undefined;
-  vadConfig?:
-    | VADConfiguration
-    | undefined;
-  /**
-   * LLM generation knobs for the response model (sampling, system prompt,
-   * reasoning). Unset = voice-agent defaults from the generated pool.
-   */
-  llmGeneration?:
-    | LLMGenerationOptions
-    | undefined;
-  /**
-   * -------------------------------------------------------------------
-   * Session-behavior sub-config. Optional so the C ABI can be invoked
-   * without runtime-behavior overrides (engine defaults applied).
-   * -------------------------------------------------------------------
-   */
-  sessionConfig?:
-    | VoiceSessionConfig
-    | undefined;
-  /**
-   * Audio state-machine behavior. Optional so defaults can be applied by
-   * the native voice-agent implementation.
-   */
-  audioPipelineConfig?:
-    | AudioPipelineConfig
-    | undefined;
-  /** Correlation and defaults for event streams and one-shot turn APIs. */
+  vadConfig?: VADConfiguration | undefined;
+  llmGeneration?: LLMGenerationOptions | undefined;
+  sessionConfig?: VoiceSessionConfig | undefined;
+  audioPipelineConfig?: AudioPipelineConfig | undefined;
   sessionId?: string | undefined;
   defaultLanguageCode?: string | undefined;
 }
 
-/** Helper-level proto requests for voice-agent sub-components. */
 export interface VoiceAgentTranscribeProtoRequest {
   audioData: Uint8Array;
   sessionId: string;

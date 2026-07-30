@@ -17,14 +17,7 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * High-level artifact classification — what KIND of bundle a model ships as.
- * Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
- * compression flavor). Sources pre-IDL:
- *   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
- *   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
- *   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
- * ---------------------------------------------------------------------------
+ * What kind of bundle a model ships as.
  */
 public enum class ModelArtifactType(
   override val `value`: Int,

@@ -1,6 +1,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ComponentLifecycleState, EventCategory } from "./component_types";
 import { ErrorCode, ErrorSeverity } from "./errors";
+import { AudioEncoding } from "./model_types";
 import { VADStreamEventKind } from "./vad_options";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum VoicePipelineComponent {
@@ -30,14 +31,6 @@ export declare enum TokenKind {
 }
 export declare function tokenKindFromJSON(object: any): TokenKind;
 export declare function tokenKindToJSON(object: TokenKind): string;
-export declare enum AudioEncoding {
-    AUDIO_ENCODING_UNSPECIFIED = 0,
-    AUDIO_ENCODING_PCM_F32_LE = 1,
-    AUDIO_ENCODING_PCM_S16_LE = 2,
-    UNRECOGNIZED = -1
-}
-export declare function audioEncodingFromJSON(object: any): AudioEncoding;
-export declare function audioEncodingToJSON(object: AudioEncoding): string;
 export declare enum InterruptReason {
     INTERRUPT_REASON_UNSPECIFIED = 0,
     INTERRUPT_REASON_USER_BARGE_IN = 1,

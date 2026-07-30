@@ -12,26 +12,16 @@ exports.reasoningModeToJSON = reasoningModeToJSON;
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
 /**
- * ---------------------------------------------------------------------------
- * The single home for reasoning/thinking control. Replaces the retired
- * per-message toggles (LLMGenerationOptions.disable_thinking,
- * ToolCallingOptions.disable_thinking, RAGQueryOptions.disable_thinking,
- * ToolCallingSessionCreateRequest.disable_thinking,
- * LLMGenerateRequest.emit_thoughts). Referenced from LLM and VLM generation
- * options; every composed surface (tool calling, RAG, voice agent) inherits
- * it through the embedded LLMGenerationOptions.
- * ---------------------------------------------------------------------------
+ * The single home for reasoning control. Composed surfaces (tool calling, RAG,
+ * voice agent) inherit it through the embedded LLMGenerationOptions.
  */
 var ReasoningMode;
 (function (ReasoningMode) {
-    /** REASONING_MODE_UNSPECIFIED - Model default: reasoning-capable models think, others don't. */
+    /** REASONING_MODE_UNSPECIFIED - Reasoning-capable models think; others don't. */
     ReasoningMode[ReasoningMode["REASONING_MODE_UNSPECIFIED"] = 0] = "REASONING_MODE_UNSPECIFIED";
-    /**
-     * REASONING_MODE_OFF - Suppress the thinking phase (commons applies the model's no-think
-     * directive at the prompt level).
-     */
+    /** REASONING_MODE_OFF - Commons applies the model's no-think directive at the prompt level. */
     ReasoningMode[ReasoningMode["REASONING_MODE_OFF"] = 1] = "REASONING_MODE_OFF";
-    /** REASONING_MODE_ON - Request the thinking phase on models where it is optional. */
+    /** REASONING_MODE_ON - Request thinking on models where it is optional. */
     ReasoningMode[ReasoningMode["REASONING_MODE_ON"] = 2] = "REASONING_MODE_ON";
     ReasoningMode[ReasoningMode["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(ReasoningMode || (exports.ReasoningMode = ReasoningMode = {}));

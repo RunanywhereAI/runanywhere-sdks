@@ -32,19 +32,10 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Result of an embed / embed_batch call. Mirrors rac_embeddings_result_t
- * (which is array-of-vectors + dimension + processing_time_ms +
- * total_tokens). `dimension` is duplicated at the result level so consumers
- * can size buffers without inspecting an arbitrary vector first.
- * ---------------------------------------------------------------------------
- */
 public class EmbeddingsResult(
   vectors: List<EmbeddingVector> = emptyList(),
   /**
-   * Vector dimension. Duplicated from each EmbeddingVector for O(1)
-   * sizing on the consumer side.
+   * Duplicated from each vector so consumers can size buffers in O(1).
    */
   @field:WireField(
     tag = 2,
@@ -53,9 +44,6 @@ public class EmbeddingsResult(
     schemaIndex = 1,
   )
   public val dimension: Int = 0,
-  /**
-   * Total wall-clock time for the embed / embed_batch call, in ms.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -65,7 +53,7 @@ public class EmbeddingsResult(
   )
   public val processing_time_ms: Long = 0L,
   /**
-   * Total tokens consumed across all inputs (post-truncation).
+   * Across all inputs, post-truncation.
    */
   @field:WireField(
     tag = 4,

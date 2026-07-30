@@ -16,12 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Whether a model runs on-device or in the cloud. The router decides which
- * of its two registered candidates to invoke based on policy.
- * ---------------------------------------------------------------------------
- */
 public enum class HybridModelType(
   override val `value`: Int,
 ) : WireEnum {

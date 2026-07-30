@@ -46,7 +46,7 @@ public class LoraAdapterImportResult(
   )
   public val error_message: String = "",
   /**
-   * stable SDK-owned path of the imported file
+   * Stable SDK-owned path of the imported file.
    */
   @field:WireField(
     tag = 3,
@@ -57,7 +57,7 @@ public class LoraAdapterImportResult(
   )
   public val local_path: String = "",
   /**
-   * a catalog entry matched and was completed
+   * Whether a catalog entry matched and was completed.
    */
   @field:WireField(
     tag = 4,
@@ -66,9 +66,6 @@ public class LoraAdapterImportResult(
     schemaIndex = 3,
   )
   public val matched: Boolean = false,
-  /**
-   * updated catalog entry when matched
-   */
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.LoraAdapterCatalogEntry#ADAPTER",

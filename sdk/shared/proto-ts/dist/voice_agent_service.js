@@ -11,6 +11,7 @@ const wire_1 = require("@bufbuild/protobuf/wire");
 const component_types_1 = require("./component_types");
 const errors_1 = require("./errors");
 const llm_options_1 = require("./llm_options");
+const model_types_1 = require("./model_types");
 const tts_options_1 = require("./tts_options");
 const vad_options_1 = require("./vad_options");
 const voice_events_1 = require("./voice_events");
@@ -423,9 +424,9 @@ exports.VoiceAgentResult = {
                     ? globalThis.Number(object.synthesized_audio_channels)
                     : 0,
             synthesizedAudioEncoding: isSet(object.synthesizedAudioEncoding)
-                ? (0, voice_events_1.audioEncodingFromJSON)(object.synthesizedAudioEncoding)
+                ? (0, model_types_1.audioEncodingFromJSON)(object.synthesizedAudioEncoding)
                 : isSet(object.synthesized_audio_encoding)
-                    ? (0, voice_events_1.audioEncodingFromJSON)(object.synthesized_audio_encoding)
+                    ? (0, model_types_1.audioEncodingFromJSON)(object.synthesized_audio_encoding)
                     : 0,
             sessionId: isSet(object.sessionId)
                 ? globalThis.String(object.sessionId)
@@ -496,7 +497,7 @@ exports.VoiceAgentResult = {
             obj.synthesizedAudioChannels = Math.round(message.synthesizedAudioChannels);
         }
         if (message.synthesizedAudioEncoding !== 0) {
-            obj.synthesizedAudioEncoding = (0, voice_events_1.audioEncodingToJSON)(message.synthesizedAudioEncoding);
+            obj.synthesizedAudioEncoding = (0, model_types_1.audioEncodingToJSON)(message.synthesizedAudioEncoding);
         }
         if (message.sessionId !== "") {
             obj.sessionId = message.sessionId;
@@ -688,7 +689,7 @@ exports.VoiceAgentTurnRequest = {
                     ? globalThis.Number(object.sample_rate_hz)
                     : 0,
             channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
-            encoding: isSet(object.encoding) ? (0, voice_events_1.audioEncodingFromJSON)(object.encoding) : 0,
+            encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : 0,
             sessionConfig: isSet(object.sessionConfig)
                 ? exports.VoiceSessionConfig.fromJSON(object.sessionConfig)
                 : isSet(object.session_config)
@@ -720,7 +721,7 @@ exports.VoiceAgentTurnRequest = {
             obj.channels = Math.round(message.channels);
         }
         if (message.encoding !== 0) {
-            obj.encoding = (0, voice_events_1.audioEncodingToJSON)(message.encoding);
+            obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
         }
         if (message.sessionConfig !== undefined) {
             obj.sessionConfig = exports.VoiceSessionConfig.toJSON(message.sessionConfig);
@@ -912,7 +913,7 @@ exports.VoiceAgentAudioFrame = {
                     ? globalThis.Number(object.sample_rate)
                     : 0,
             channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
-            encoding: isSet(object.encoding) ? (0, voice_events_1.audioEncodingFromJSON)(object.encoding) : 0,
+            encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : 0,
             isFinal: isSet(object.isFinal)
                 ? globalThis.Boolean(object.isFinal)
                 : isSet(object.is_final)
@@ -932,7 +933,7 @@ exports.VoiceAgentAudioFrame = {
             obj.channels = Math.round(message.channels);
         }
         if (message.encoding !== 0) {
-            obj.encoding = (0, voice_events_1.audioEncodingToJSON)(message.encoding);
+            obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
         }
         if (message.isFinal !== false) {
             obj.isFinal = message.isFinal;
@@ -1718,7 +1719,7 @@ exports.VoiceAgentTranscribeProtoRequest = {
                     ? globalThis.String(object.language_hint)
                     : "",
             channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
-            encoding: isSet(object.encoding) ? (0, voice_events_1.audioEncodingFromJSON)(object.encoding) : 0,
+            encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : 0,
         };
     },
     toJSON(message) {
@@ -1739,7 +1740,7 @@ exports.VoiceAgentTranscribeProtoRequest = {
             obj.channels = Math.round(message.channels);
         }
         if (message.encoding !== 0) {
-            obj.encoding = (0, voice_events_1.audioEncodingToJSON)(message.encoding);
+            obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
         }
         return obj;
     },

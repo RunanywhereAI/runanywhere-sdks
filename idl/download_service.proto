@@ -210,16 +210,3 @@ message DownloadResumeResult {
     string           resume_token     = 6;
     DownloadFailureReason failure_reason = 7;  // structured companion to error_message
 }
-
-service Download {
-    rpc Plan(DownloadPlanRequest) returns (DownloadPlanResult);
-    rpc Start(DownloadStartRequest) returns (DownloadStartResult);
-
-    // Server-streaming: emits a DownloadProgress message every time
-    // bytes_downloaded crosses a per-engine reporting threshold (currently
-    // every 64 KiB) until state ∈ {COMPLETED, FAILED, CANCELLED}.
-    rpc Subscribe(DownloadSubscribeRequest) returns (stream DownloadProgress);
-
-    rpc Cancel(DownloadCancelRequest) returns (DownloadCancelResult);
-    rpc Resume(DownloadResumeRequest) returns (DownloadResumeResult);
-}

@@ -29,18 +29,9 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Phoneme-level timestamp.
- *
- * Mirrors the C ABI rac_tts_phoneme_timestamp_t exactly. Time units are
- * **milliseconds** on the wire (matches C ABI). Swift / Kotlin / Dart bindings
- * expose seconds (double) and convert at the binding boundary.
- * ---------------------------------------------------------------------------
- */
 public class TTSPhonemeTimestamp(
   /**
-   * The phoneme symbol (IPA or engine-specific).
+   * IPA or engine-specific symbol.
    */
   @field:WireField(
     tag = 1,
@@ -50,7 +41,7 @@ public class TTSPhonemeTimestamp(
   )
   public val phoneme: String = "",
   /**
-   * Start time within the synthesized audio, in milliseconds.
+   * Offsets within the synthesized audio.
    */
   @field:WireField(
     tag = 2,
@@ -60,9 +51,6 @@ public class TTSPhonemeTimestamp(
     schemaIndex = 1,
   )
   public val start_ms: Long = 0L,
-  /**
-   * End time within the synthesized audio, in milliseconds.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",

@@ -16,11 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
- * ---------------------------------------------------------------------------
- */
 public enum class EmbeddingsNormalizeMode(
   override val `value`: Int,
 ) : WireEnum {

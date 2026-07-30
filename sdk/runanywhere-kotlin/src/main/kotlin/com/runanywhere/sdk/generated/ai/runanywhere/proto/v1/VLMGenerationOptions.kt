@@ -32,37 +32,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * The rac_default annotations on VLMGenerationOptions are the single
- * declaration of the VLM sampling defaults, and RAC_VLM_OPTIONS_DEFAULT is
- * generated from them. Four SDKs previously kept their own tables and had
- * drifted to three different max_tokens values (Swift 128,
- * Kotlin/Flutter/Web 256) against the C layer's 2048, while all four set
- * top_k=40 where C said 0. The C values win.
- *
- * Detached from the message on purpose; see the same note in llm_options.proto.
- * ---------------------------------------------------------------------------
- * VLM generation options — per-request sampling + prompt parameters.
- * Sources pre-IDL:
- *   Kotlin VLMTypes.kt:103        (maxTokens, temperature, topP, systemPrompt,
- *                                  maxImageSize, nThreads, useGpu)
- *   Dart   vlm_types.dart:127     (maxTokens, temperature, topP, systemPrompt,
- *                                  maxImageSize, nThreads, useGpu)
- *   RN     VLMTypes.ts:21         (maxTokens, temperature, topP)
- *   Web    VLMTypes.ts:28         (maxTokens, temperature, topP, systemPrompt,
- *                                  modelFamily, streaming)
- *   C ABI  rac_vlm_types.h:143    (max_tokens, temperature, top_p,
- *                                  stop_sequences, num_stop_sequences,
- *                                  streaming_enabled, system_prompt,
- *                                  max_image_size, n_threads, use_gpu,
- *                                  model_family, custom_chat_template,
- *                                  image_marker_override)
- *
- * top_k is included to align with the other text generation services
- * (LLM / chat) even though no current VLM SDK exposes it; the C ABI's
- * llama.cpp backend already supports top_k internally.
- * ---------------------------------------------------------------------------
- */
 public class VLMGenerationOptions(
   @field:WireField(
     tag = 1,
@@ -153,6 +122,10 @@ public class VLMGenerationOptions(
     schemaIndex = 10,
   )
   public val model_family: VLMModelFamily = VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED,
+  /**
+   * Commons does not convert this field on the VLM proto path, so the
+   * llama.cpp template support behind it is currently unreachable from here.
+   */
   @field:WireField(
     tag = 13,
     adapter = "ai.runanywhere.proto.v1.VLMChatTemplate#ADAPTER",
@@ -167,9 +140,6 @@ public class VLMGenerationOptions(
     schemaIndex = 12,
   )
   public val image_marker_override: String? = null,
-  /**
-   * Additional llama.cpp sampling knobs and result controls.
-   */
   @field:WireField(
     tag = 15,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -204,9 +174,6 @@ public class VLMGenerationOptions(
     schemaIndex = 16,
   )
   public val emit_image_embeddings: Boolean = false,
-  /**
-   * Reasoning/thinking control — same message as LLMGenerationOptions.
-   */
   @field:WireField(
     tag = 19,
     adapter = "ai.runanywhere.proto.v1.ReasoningOptions#ADAPTER",
@@ -215,9 +182,6 @@ public class VLMGenerationOptions(
   public val reasoning: ReasoningOptions? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMGenerationOptions, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Full rac_vlm_options_t coverage.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

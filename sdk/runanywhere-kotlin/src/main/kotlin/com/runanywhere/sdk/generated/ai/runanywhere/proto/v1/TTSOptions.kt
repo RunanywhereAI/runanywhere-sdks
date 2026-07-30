@@ -30,21 +30,9 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Per-call TTS synthesis options.
- *
- * Mirrors the C ABI rac_tts_options_t exactly. Field names match Swift
- * TTSOptions / Kotlin TTSOptions / Dart TTSOptions.
- *
- * Note: `voice` is optional at the source (Swift `String?`, C `const char* =
- * NULL`). On the wire, an empty string MUST be interpreted as "use the
- * component's configured voice".
- * ---------------------------------------------------------------------------
- */
 public class TTSOptions(
   /**
-   * Voice override (empty = use component default).
+   * Empty = use the component's configured voice.
    */
   @field:WireField(
     tag = 1,
@@ -54,7 +42,7 @@ public class TTSOptions(
   )
   public val voice: String = "",
   /**
-   * Language override (BCP-47). Empty = use component default.
+   * BCP-47. Empty = use the component default.
    */
   @RacDefaultOption("en-US")
   @field:WireField(
@@ -66,9 +54,7 @@ public class TTSOptions(
   )
   public val language_code: String = "",
   /**
-   * Speech speed multiplier (1.0 = normal). Industry name (OpenAI
-   * /audio/speech `speed`); replaces the rate/speaking_rate/speakingRate
-   * split across the C ABI and SDKs.
+   * Speed multiplier, matching OpenAI /audio/speech `speed`.
    */
   @RacDefaultOption("1.0")
   @RacMinFloatOption(0.5)
@@ -81,7 +67,7 @@ public class TTSOptions(
   )
   public val speed: Float = 0f,
   /**
-   * Speech pitch (0.5 – 2.0; 1.0 is normal).
+   * 0.5 - 2.0.
    */
   @RacDefaultOption("1.0")
   @field:WireField(
@@ -92,7 +78,7 @@ public class TTSOptions(
   )
   public val pitch: Float = 0f,
   /**
-   * Speech volume (0.0 – 1.0).
+   * 0.0 - 1.0.
    */
   @RacDefaultOption("1.0")
   @field:WireField(
@@ -103,9 +89,7 @@ public class TTSOptions(
   )
   public val volume: Float = 0f,
   /**
-   * Whether the input contains SSML markup. C ABI: `use_ssml`, Swift:
-   * `useSSML`, Kotlin: `useSSML`, Dart: `useSSML`. Canonicalized to
-   * `enable_ssml` for consistency with TTSConfiguration.
+   * Whether the input carries SSML markup.
    */
   @field:WireField(
     tag = 6,
@@ -115,9 +99,6 @@ public class TTSOptions(
     schemaIndex = 5,
   )
   public val enable_ssml: Boolean = false,
-  /**
-   * Output audio format.
-   */
   @RacDefaultOption("AUDIO_FORMAT_PCM")
   @field:WireField(
     tag = 7,
@@ -128,8 +109,7 @@ public class TTSOptions(
   )
   public val audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED,
   /**
-   * Output sample rate override in Hz. 0 = component/default sample rate.
-   * Present in rac_tts_options_t and several SDK option structs.
+   * 0 = component default.
    */
   @RacDefaultOption("22050")
   @field:WireField(
@@ -141,8 +121,7 @@ public class TTSOptions(
   )
   public val sample_rate: Int = 0,
   /**
-   * Speaker index for multi-speaker voices. -1/0 = backend default
-   * depending on model convention.
+   * For multi-speaker voices. -1 or 0 = backend default, per model convention.
    */
   @field:WireField(
     tag = 9,
@@ -153,7 +132,7 @@ public class TTSOptions(
   )
   public val speaker_id: Int = 0,
   /**
-   * Optional style/emotion hint for voices that support style transfer.
+   * Style or emotion hint for voices supporting style transfer.
    */
   @field:WireField(
     tag = 11,

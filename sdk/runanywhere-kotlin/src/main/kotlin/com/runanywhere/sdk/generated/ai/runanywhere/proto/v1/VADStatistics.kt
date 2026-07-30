@@ -30,29 +30,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Internal VAD statistics, exposed for debugging / waveform UIs.
- * Sources pre-IDL:
- *   Swift  VADTypes.swift:174               (current, threshold, ambient,
- *                                            recentAvg, recentMax)
- *   Kotlin VADTypes.kt:123                  (same five fields)
- *   Dart   none — Dart bridge does not surface statistics yet.
- *   RN     VADTypes.ts —                    (none)
- *   Web    VADTypes.ts —                    (none)
- *   C ABI  rac_vad_types.h:194 (rac_vad_statistics_t)
- *                                           (current_threshold, ambient_noise_level,
- *                                            total_speech_segments, total_speech_duration_ms,
- *                                            average_energy, peak_energy)
- *
- * We canonicalize on the Swift/Kotlin shape because it is the most widely
- * used. The richer C ABI fields (segment counts, totals) belong on a future
- * VADAnalytics message and are intentionally NOT included here.
- * ---------------------------------------------------------------------------
+ * Exposed for debugging and waveform UIs.
  */
 public class VADStatistics(
-  /**
-   * Current instantaneous energy level. (Swift/Kotlin: `current`)
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -61,10 +41,6 @@ public class VADStatistics(
     schemaIndex = 0,
   )
   public val current_energy: Float = 0f,
-  /**
-   * Energy threshold currently in use. (Swift/Kotlin: `threshold`;
-   * C ABI: rac_vad_statistics_t::current_threshold)
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -74,8 +50,7 @@ public class VADStatistics(
   )
   public val current_threshold: Float = 0f,
   /**
-   * Ambient noise level captured by calibration. (Swift/Kotlin: `ambient`;
-   * C ABI: rac_vad_statistics_t::ambient_noise_level)
+   * Ambient noise level captured by calibration.
    */
   @field:WireField(
     tag = 3,
@@ -86,7 +61,7 @@ public class VADStatistics(
   )
   public val ambient_level: Float = 0f,
   /**
-   * Recent moving-window average energy. (Swift/Kotlin: `recentAvg`)
+   * Moving-window average and peak.
    */
   @field:WireField(
     tag = 4,
@@ -96,9 +71,6 @@ public class VADStatistics(
     schemaIndex = 3,
   )
   public val recent_avg: Float = 0f,
-  /**
-   * Recent moving-window peak energy. (Swift/Kotlin: `recentMax`)
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -108,8 +80,7 @@ public class VADStatistics(
   )
   public val recent_max: Float = 0f,
   /**
-   * Richer service-level counters from rac_vad_statistics_t. Zero = unset
-   * for energy-only implementations.
+   * Zero = unset for energy-only implementations.
    */
   @field:WireField(
     tag = 6,

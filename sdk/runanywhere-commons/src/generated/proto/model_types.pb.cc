@@ -83,8 +83,6 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_model_5ftypes_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::CurrentModelResult
         {&::_pbi::kDescriptorMethods, &::descriptor_table_model_5ftypes_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::ModelDeleteRequest
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_model_5ftypes_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::ModelDeleteResult
         {&::_pbi::kDescriptorMethods, &::descriptor_table_model_5ftypes_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::ModelCompatibilityRequest
@@ -305,7 +303,7 @@ constexpr auto RegisterModelFromUrlRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[38],
+      &file_reflection_data[37],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -978,7 +976,7 @@ constexpr auto ModelRegistryFetchAssignmentsRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[35],
+      &file_reflection_data[34],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -1747,7 +1745,7 @@ constexpr auto ModelInfoMakeRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[37],
+      &file_reflection_data[36],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -2041,7 +2039,7 @@ constexpr auto ModelFormatFromUrlResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[32],
+      &file_reflection_data[31],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -2187,7 +2185,7 @@ constexpr auto ModelFormatFromUrlRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[31],
+      &file_reflection_data[30],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -2614,7 +2612,7 @@ constexpr auto ModelDeleteResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[28],
+      &file_reflection_data[27],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -2661,173 +2659,6 @@ const ::_pbi::ClassData* ModelDeleteResult_get_class_data() {
   return ModelDeleteResult_globals_.GetClassData();
 #else
   return ModelDeleteResult_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class ModelDeleteRequest::_Internal {
- public:
-  using HasBits = decltype(::std::declval<ModelDeleteRequest>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_._has_bits_);
-};
-
-constexpr ModelDeleteRequest::ParseTableT_ ModelDeleteRequest::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_._has_bits_),
-      0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::ModelDeleteRequest>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // bool unload_if_loaded = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ModelDeleteRequest, _impl_.unload_if_loaded_), 3>(),
-       {32, 3, 0,
-        PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_.unload_if_loaded_)}},
-      // string model_id = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_.model_id_)}},
-      // bool delete_files = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ModelDeleteRequest, _impl_.delete_files_), 1>(),
-       {16, 1, 0,
-        PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_.delete_files_)}},
-      // bool unregister = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ModelDeleteRequest, _impl_.unregister_), 2>(),
-       {24, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_.unregister_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string model_id = 1;
-      {PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // bool delete_files = 2;
-      {PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_.delete_files_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool unregister = 3;
-      {PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_.unregister_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool unload_if_loaded = 4;
-      {PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_.unload_if_loaded_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    }},
-    // no aux_entries
-    {{
-      "\41\10\0\0\0\0\0\0"
-      "runanywhere.v1.ModelDeleteRequest"
-      "model_id"
-    }},
-  };
-}
-
-
-inline constexpr ModelDeleteRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        model_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        delete_files_{false},
-        unregister_{false},
-        unload_if_loaded_{false} {}
-
-template <typename>
-constexpr ModelDeleteRequest::ModelDeleteRequest(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL ModelDeleteRequest::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) ModelDeleteRequest(arena);
-}
-constexpr auto ModelDeleteRequest::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ModelDeleteRequest), alignof(ModelDeleteRequest));
-}
-constexpr auto ModelDeleteRequest::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &ModelDeleteRequest::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<ModelDeleteRequest>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &ModelDeleteRequest::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<ModelDeleteRequest>(), &ModelDeleteRequest::ByteSizeLong,
-              &ModelDeleteRequest::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[27],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_model_5ftypes_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct ModelDeleteRequestGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr ModelDeleteRequestGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 ModelDeleteRequest_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(ModelDeleteRequest::InternalGenerateClassData_(
-            _default, &ModelDeleteRequest_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<ModelDeleteRequest>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~ModelDeleteRequestGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) ModelDeleteRequest _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<ModelDeleteRequest>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(ModelDeleteRequestGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ModelDeleteRequestGlobalsTypeInternal ModelDeleteRequest_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* ModelDeleteRequest_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return ModelDeleteRequest_globals_.GetClassData();
-#else
-  return ModelDeleteRequest_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -3021,7 +2852,7 @@ constexpr auto ModelCompatibilityResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[30],
+      &file_reflection_data[29],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -3354,7 +3185,7 @@ constexpr auto ArtifactInferFromUrlResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[34],
+      &file_reflection_data[33],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -3510,7 +3341,7 @@ constexpr auto ArtifactInferFromUrlRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[33],
+      &file_reflection_data[32],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -3759,7 +3590,7 @@ constexpr auto RegisterMultiFileModelRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[39],
+      &file_reflection_data[38],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -4881,7 +4712,7 @@ constexpr auto ModelCompatibilityRequest::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[29],
+      &file_reflection_data[28],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -7437,7 +7268,7 @@ constexpr auto ModelRegistryFetchAssignmentsResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[36],
+      &file_reflection_data[35],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_model_5ftypes_2eproto,
@@ -7896,7 +7727,7 @@ const ::_pbi::ClassData* ModelDiscoveryResult_get_class_data() {
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_model_5ftypes_2eproto[14];
+    file_level_enum_descriptors_model_5ftypes_2eproto[15];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_model_5ftypes_2eproto = nullptr;
 const ::uint32_t
@@ -8348,17 +8179,6 @@ const ::uint32_t
         3,
         0,
         0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelDeleteRequest, _impl_._has_bits_),
-        7, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelDeleteRequest, _impl_.model_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelDeleteRequest, _impl_.delete_files_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelDeleteRequest, _impl_.unregister_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelDeleteRequest, _impl_.unload_if_loaded_),
-        0,
-        1,
-        2,
-        3,
-        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelDeleteResult, _impl_._has_bits_),
         11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelDeleteResult, _impl_.success_),
@@ -8577,19 +8397,18 @@ static const ::_pbi::MigrationSchema
         {402, sizeof(::runanywhere::v1::ModelUnloadResult)},
         {415, sizeof(::runanywhere::v1::CurrentModelRequest)},
         {424, sizeof(::runanywhere::v1::CurrentModelResult)},
-        {445, sizeof(::runanywhere::v1::ModelDeleteRequest)},
-        {456, sizeof(::runanywhere::v1::ModelDeleteResult)},
-        {475, sizeof(::runanywhere::v1::ModelCompatibilityRequest)},
-        {490, sizeof(::runanywhere::v1::ModelCompatibilityResult)},
-        {517, sizeof(::runanywhere::v1::ModelFormatFromUrlRequest)},
-        {522, sizeof(::runanywhere::v1::ModelFormatFromUrlResult)},
-        {529, sizeof(::runanywhere::v1::ArtifactInferFromUrlRequest)},
-        {536, sizeof(::runanywhere::v1::ArtifactInferFromUrlResult)},
-        {549, sizeof(::runanywhere::v1::ModelRegistryFetchAssignmentsRequest)},
-        {558, sizeof(::runanywhere::v1::ModelRegistryFetchAssignmentsResult)},
-        {573, sizeof(::runanywhere::v1::ModelInfoMakeRequest)},
-        {586, sizeof(::runanywhere::v1::RegisterModelFromUrlRequest)},
-        {615, sizeof(::runanywhere::v1::RegisterMultiFileModelRequest)},
+        {445, sizeof(::runanywhere::v1::ModelDeleteResult)},
+        {464, sizeof(::runanywhere::v1::ModelCompatibilityRequest)},
+        {479, sizeof(::runanywhere::v1::ModelCompatibilityResult)},
+        {506, sizeof(::runanywhere::v1::ModelFormatFromUrlRequest)},
+        {511, sizeof(::runanywhere::v1::ModelFormatFromUrlResult)},
+        {518, sizeof(::runanywhere::v1::ArtifactInferFromUrlRequest)},
+        {525, sizeof(::runanywhere::v1::ArtifactInferFromUrlResult)},
+        {538, sizeof(::runanywhere::v1::ModelRegistryFetchAssignmentsRequest)},
+        {547, sizeof(::runanywhere::v1::ModelRegistryFetchAssignmentsResult)},
+        {562, sizeof(::runanywhere::v1::ModelInfoMakeRequest)},
+        {575, sizeof(::runanywhere::v1::RegisterModelFromUrlRequest)},
+        {604, sizeof(::runanywhere::v1::RegisterMultiFileModelRequest)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -8620,7 +8439,6 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::runanywhere::v1::ModelUnloadResult_globals_,
         &::runanywhere::v1::CurrentModelRequest_globals_,
         &::runanywhere::v1::CurrentModelResult_globals_,
-        &::runanywhere::v1::ModelDeleteRequest_globals_,
         &::runanywhere::v1::ModelDeleteResult_globals_,
         &::runanywhere::v1::ModelCompatibilityRequest_globals_,
         &::runanywhere::v1::ModelCompatibilityResult_globals_,
@@ -8817,7 +8635,7 @@ const char descriptor_table_protodef_model_5ftypes_2eproto[] ABSL_ATTRIBUTE_SECT
     "anywhere.v1.ModelCategoryH\000\210\001\001\022:\n\tframew"
     "ork\030\002 \001(\0162\".runanywhere.v1.InferenceFram"
     "eworkH\001\210\001\001\022\036\n\026include_model_metadata\030\003 \001"
-    "(\010B\013\n\t_categoryB\014\n\n_framework\"\327\002\n\022Curren"
+    "(\010B\013\n\t_categoryB\014\n\n_framework\"\321\002\n\022Curren"
     "tModelResult\022\020\n\010model_id\030\002 \001(\t\022(\n\005model\030"
     "\003 \001(\0132\031.runanywhere.v1.ModelInfo\022\031\n\021load"
     "ed_at_unix_ms\030\004 \001(\003\022\r\n\005found\030\005 \001(\010\022\025\n\rer"
@@ -8826,231 +8644,215 @@ const char descriptor_table_protodef_model_5ftypes_2eproto[] ABSL_ATTRIBUTE_SECT
     "\010 \001(\0162\".runanywhere.v1.InferenceFramewor"
     "k\022\025\n\rresolved_path\030\t \001(\t\022\?\n\022resolved_art"
     "ifacts\030\n \003(\0132#.runanywhere.v1.ModelFileD"
-    "escriptorJ\004\010\001\020\002\"j\n\022ModelDeleteRequest\022\020\n"
-    "\010model_id\030\001 \001(\t\022\024\n\014delete_files\030\002 \001(\010\022\022\n"
-    "\nunregister\030\003 \001(\010\022\030\n\020unload_if_loaded\030\004 "
-    "\001(\010\"\273\001\n\021ModelDeleteResult\022\017\n\007success\030\001 \001"
-    "(\010\022\020\n\010model_id\030\002 \001(\t\022\025\n\rdeleted_bytes\030\003 "
-    "\001(\003\022\025\n\rfiles_deleted\030\004 \001(\010\022\030\n\020registry_u"
-    "pdated\030\005 \001(\010\022\022\n\nwas_loaded\030\006 \001(\010\022\025\n\rerro"
-    "r_message\030\007 \001(\t\022\020\n\010warnings\030\010 \003(\t\"\206\003\n\031Mo"
-    "delCompatibilityRequest\022\020\n\010model_id\030\001 \001("
-    "\t\022>\n\020hardware_profile\030\002 \001(\0132\037.runanywher"
-    "e.v1.HardwareProfileH\000\210\001\001\022\033\n\023available_r"
-    "am_bytes\030\003 \001(\003\022\037\n\027available_storage_byte"
-    "s\030\004 \001(\003\022K\n\026accelerator_preference\030\005 \001(\0162"
-    "&.runanywhere.v1.AccelerationPreferenceH"
-    "\001\210\001\001\022D\n\023preferred_framework\030\006 \001(\0162\".runa"
-    "nywhere.v1.InferenceFrameworkH\002\210\001\001B\023\n\021_h"
-    "ardware_profileB\031\n\027_accelerator_preferen"
-    "ceB\026\n\024_preferred_framework\"\301\002\n\030ModelComp"
-    "atibilityResult\022\025\n\ris_compatible\030\001 \001(\010\022\017"
-    "\n\007can_run\030\002 \001(\010\022\017\n\007can_fit\030\003 \001(\010\022\035\n\025requ"
-    "ired_memory_bytes\030\004 \001(\003\022\036\n\026available_mem"
-    "ory_bytes\030\005 \001(\003\022\036\n\026required_storage_byte"
-    "s\030\006 \001(\003\022\037\n\027available_storage_bytes\030\007 \001(\003"
-    "\022\017\n\007reasons\030\010 \003(\t\022\036\n\026suggested_alternati"
-    "ves\030\t \003(\t\022\020\n\010model_id\030\n \001(\t\022\022\n\nerror_cod"
-    "e\030\013 \001(\005\022\025\n\rerror_message\030\014 \001(\t\"(\n\031ModelF"
-    "ormatFromUrlRequest\022\013\n\003url\030\001 \001(\t\"z\n\030Mode"
-    "lFormatFromUrlResult\022+\n\006format\030\001 \001(\0162\033.r"
-    "unanywhere.v1.ModelFormat\0221\n\014inner_forma"
-    "t\030\002 \001(\0162\033.runanywhere.v1.ModelFormat\"<\n\033"
-    "ArtifactInferFromUrlRequest\022\013\n\003url\030\001 \001(\t"
-    "\022\020\n\010model_id\030\002 \001(\t\"\222\002\n\032ArtifactInferFrom"
-    "UrlResult\0228\n\rartifact_type\030\001 \001(\0162!.runan"
-    "ywhere.v1.ModelArtifactType\0221\n\014archive_t"
-    "ype\030\002 \001(\0162\033.runanywhere.v1.ArchiveType\022;"
-    "\n\021archive_structure\030\003 \001(\0162 .runanywhere."
-    "v1.ArchiveStructure\022\027\n\017primary_relpath\030\004"
-    " \001(\t\0221\n\014inner_format\030\005 \001(\0162\033.runanywhere"
-    ".v1.ModelFormat\"\232\001\n$ModelRegistryFetchAs"
-    "signmentsRequest\022\021\n\tdevice_id\030\001 \001(\t\0228\n\013e"
-    "nvironment\030\002 \001(\0162\036.runanywhere.v1.SDKEnv"
-    "ironmentH\000\210\001\001\022\025\n\rforce_refresh\030\003 \001(\010B\016\n\014"
-    "_environment\"\301\001\n#ModelRegistryFetchAssig"
-    "nmentsResult\022\017\n\007success\030\001 \001(\010\022-\n\006models\030"
-    "\002 \001(\0132\035.runanywhere.v1.ModelInfoList\022\023\n\013"
-    "model_count\030\003 \001(\005\022\032\n\022fetched_at_unix_ms\030"
-    "\004 \001(\003\022\022\n\nerror_code\030\005 \001(\005\022\025\n\rerror_messa"
-    "ge\030\006 \001(\t\"\373\001\n\024ModelInfoMakeRequest\022\013\n\003url"
-    "\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022:\n\tframework\030\003 \001(\0162"
-    "\".runanywhere.v1.InferenceFrameworkH\000\210\001\001"
-    "\0224\n\010category\030\004 \001(\0162\035.runanywhere.v1.Mode"
-    "lCategoryH\001\210\001\001\0220\n\006source\030\005 \001(\0162\033.runanyw"
-    "here.v1.ModelSourceH\002\210\001\001B\014\n\n_frameworkB\013"
-    "\n\t_categoryB\t\n\007_source\"\241\005\n\033RegisterModel"
-    "FromUrlRequest\022\013\n\003url\030\001 \001(\t\022\014\n\004name\030\002 \001("
-    "\t\022:\n\tframework\030\003 \001(\0162\".runanywhere.v1.In"
-    "ferenceFrameworkH\000\210\001\001\0224\n\010category\030\004 \001(\0162"
-    "\035.runanywhere.v1.ModelCategoryH\001\210\001\001\0220\n\006s"
-    "ource\030\005 \001(\0162\033.runanywhere.v1.ModelSource"
-    "H\002\210\001\001\022\"\n\025memory_required_bytes\030\006 \001(\003H\003\210\001"
-    "\001\022\036\n\021supports_thinking\030\007 \001(\010H\004\210\001\001\022\032\n\rsup"
-    "ports_lora\030\010 \001(\010H\005\210\001\001\022=\n\rartifact_type\030\t"
-    " \001(\0162!.runanywhere.v1.ModelArtifactTypeH"
-    "\006\210\001\001\022\033\n\016context_length\030\n \001(\005H\007\210\001\001\022\030\n\013des"
-    "cription\030\013 \001(\tH\010\210\001\001\022 \n\023download_size_byt"
-    "es\030\014 \001(\003H\t\210\001\001\022\017\n\002id\030\r \001(\tH\n\210\001\001B\014\n\n_frame"
-    "workB\013\n\t_categoryB\t\n\007_sourceB\030\n\026_memory_"
-    "required_bytesB\024\n\022_supports_thinkingB\020\n\016"
-    "_supports_loraB\020\n\016_artifact_typeB\021\n\017_con"
-    "text_lengthB\016\n\014_descriptionB\026\n\024_download"
-    "_size_bytesB\005\n\003_id\"\227\005\n\035RegisterMultiFile"
-    "ModelRequest\022\n\n\002id\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\0225"
-    "\n\tframework\030\003 \001(\0162\".runanywhere.v1.Infer"
-    "enceFramework\0222\n\005files\030\004 \003(\0132#.runanywhe"
-    "re.v1.ModelFileDescriptor\0224\n\010category\030\005 "
-    "\001(\0162\035.runanywhere.v1.ModelCategoryH\000\210\001\001\022"
-    "0\n\006format\030\006 \001(\0162\033.runanywhere.v1.ModelFo"
-    "rmatH\001\210\001\001\022\"\n\025memory_required_bytes\030\007 \001(\003"
-    "H\002\210\001\001\022 \n\023download_size_bytes\030\010 \001(\003H\003\210\001\001\022"
-    "\033\n\016context_length\030\t \001(\005H\004\210\001\001\022\036\n\021supports"
-    "_thinking\030\n \001(\010H\005\210\001\001\022\032\n\rsupports_lora\030\013 "
-    "\001(\010H\006\210\001\001\022\030\n\013description\030\014 \001(\tH\007\210\001\001\0220\n\006so"
-    "urce\030\r \001(\0162\033.runanywhere.v1.ModelSourceH"
-    "\010\210\001\001B\013\n\t_categoryB\t\n\007_formatB\030\n\026_memory_"
-    "required_bytesB\026\n\024_download_size_bytesB\021"
-    "\n\017_context_lengthB\024\n\022_supports_thinkingB"
-    "\020\n\016_supports_loraB\016\n\014_descriptionB\t\n\007_so"
-    "urce*\343\002\n\013AudioFormat\022-\n\030AUDIO_FORMAT_UNS"
-    "PECIFIED\020\000\032\017\342\265\030\013unspecified\022\035\n\020AUDIO_FOR"
-    "MAT_PCM\020\001\032\007\342\265\030\003pcm\022\035\n\020AUDIO_FORMAT_WAV\020\002"
-    "\032\007\342\265\030\003wav\022\035\n\020AUDIO_FORMAT_MP3\020\003\032\007\342\265\030\003mp3"
-    "\022\037\n\021AUDIO_FORMAT_OPUS\020\004\032\010\342\265\030\004opus\022\035\n\020AUD"
-    "IO_FORMAT_AAC\020\005\032\007\342\265\030\003aac\022\037\n\021AUDIO_FORMAT"
-    "_FLAC\020\006\032\010\342\265\030\004flac\022\035\n\020AUDIO_FORMAT_OGG\020\007\032"
-    "\007\342\265\030\003ogg\022\035\n\020AUDIO_FORMAT_M4A\020\010\032\007\342\265\030\003m4a\022"
-    ")\n\026AUDIO_FORMAT_PCM_S16LE\020\t\032\r\342\265\030\tpcm_s16"
-    "le*\247\003\n\013ModelFormat\022\034\n\030MODEL_FORMAT_UNSPE"
-    "CIFIED\020\000\022\025\n\021MODEL_FORMAT_GGUF\020\001\022\025\n\021MODEL"
-    "_FORMAT_GGML\020\002\022\025\n\021MODEL_FORMAT_ONNX\020\003\022\024\n"
-    "\020MODEL_FORMAT_ORT\020\004\022\024\n\020MODEL_FORMAT_BIN\020"
-    "\005\022\027\n\023MODEL_FORMAT_COREML\020\006\022\030\n\024MODEL_FORM"
-    "AT_MLMODEL\020\007\022\032\n\026MODEL_FORMAT_MLPACKAGE\020\010"
-    "\022\027\n\023MODEL_FORMAT_TFLITE\020\t\022\034\n\030MODEL_FORMA"
-    "T_SAFETENSORS\020\n\022\034\n\030MODEL_FORMAT_QNN_CONT"
-    "EXT\020\013\022\024\n\020MODEL_FORMAT_ZIP\020\014\022\027\n\023MODEL_FOR"
-    "MAT_FOLDER\020\r\022\034\n\030MODEL_FORMAT_PROPRIETARY"
-    "\020\016\022\030\n\024MODEL_FORMAT_UNKNOWN\020\017*\337\005\n\022Inferen"
-    "ceFramework\022#\n\037INFERENCE_FRAMEWORK_UNSPE"
-    "CIFIED\020\000\022\034\n\030INFERENCE_FRAMEWORK_ONNX\020\001\022!"
-    "\n\035INFERENCE_FRAMEWORK_LLAMA_CPP\020\002\022)\n%INF"
-    "ERENCE_FRAMEWORK_FOUNDATION_MODELS\020\003\022\"\n\036"
-    "INFERENCE_FRAMEWORK_SYSTEM_TTS\020\004\022#\n\037INFE"
-    "RENCE_FRAMEWORK_FLUID_AUDIO\020\005\022\036\n\032INFEREN"
-    "CE_FRAMEWORK_COREML\020\006\022\033\n\027INFERENCE_FRAME"
-    "WORK_MLX\020\007\022\036\n\032INFERENCE_FRAMEWORK_TFLITE"
-    "\020\013\022\"\n\036INFERENCE_FRAMEWORK_EXECUTORCH\020\014\022!"
-    "\n\035INFERENCE_FRAMEWORK_MEDIAPIPE\020\r\022\033\n\027INF"
-    "ERENCE_FRAMEWORK_MLC\020\016\022 \n\034INFERENCE_FRAM"
-    "EWORK_PICO_LLM\020\017\022!\n\035INFERENCE_FRAMEWORK_"
-    "PIPER_TTS\020\020\022*\n&INFERENCE_FRAMEWORK_SWIFT"
-    "_TRANSFORMERS\020\023\022 \n\034INFERENCE_FRAMEWORK_B"
-    "UILT_IN\020\024\022\034\n\030INFERENCE_FRAMEWORK_NONE\020\025\022"
-    "\037\n\033INFERENCE_FRAMEWORK_UNKNOWN\020\026\022\036\n\032INFE"
-    "RENCE_FRAMEWORK_SHERPA\020\027\022\036\n\032INFERENCE_FR"
-    "AMEWORK_QHEXRT\020\030\"\004\010\010\020\010\"\004\010\t\020\t\"\004\010\n\020\n\"\004\010\021\020\021"
-    "\"\004\010\022\020\022*\231\005\n\rModelCategory\022/\n\032MODEL_CATEGO"
-    "RY_UNSPECIFIED\020\000\032\017\342\265\030\013unspecified\022)\n\027MOD"
-    "EL_CATEGORY_LANGUAGE\020\001\032\014\342\265\030\010language\022=\n!"
-    "MODEL_CATEGORY_SPEECH_RECOGNITION\020\002\032\026\342\265\030"
-    "\022speech-recognition\0229\n\037MODEL_CATEGORY_SP"
-    "EECH_SYNTHESIS\020\003\032\024\342\265\030\020speech-synthesis\022%"
-    "\n\025MODEL_CATEGORY_VISION\020\004\032\n\342\265\030\006vision\0229\n"
-    "\037MODEL_CATEGORY_IMAGE_GENERATION\020\005\032\024\342\265\030\020"
-    "image-generation\022-\n\031MODEL_CATEGORY_MULTI"
-    "MODAL\020\006\032\016\342\265\030\nmultimodal\022#\n\024MODEL_CATEGOR"
-    "Y_AUDIO\020\007\032\t\342\265\030\005audio\022+\n\030MODEL_CATEGORY_E"
-    "MBEDDING\020\010\032\r\342\265\030\tembedding\022I\n\'MODEL_CATEG"
-    "ORY_VOICE_ACTIVITY_DETECTION\020\t\032\034\342\265\030\030voic"
-    "e-activity-detection\022\?\n\"MODEL_CATEGORY_S"
-    "PEAKER_DIARIZATION\020\n\032\027\342\265\030\023speaker-diariz"
-    "ation\022C\n$MODEL_CATEGORY_SEMANTIC_SEGMENT"
-    "ATION\020\013\032\031\342\265\030\025semantic-segmentation*\303\001\n\016S"
-    "DKEnvironment\0220\n\033SDK_ENVIRONMENT_UNSPECI"
-    "FIED\020\000\032\017\342\265\030\013unspecified\0220\n\033SDK_ENVIRONME"
-    "NT_DEVELOPMENT\020\001\032\017\342\265\030\013development\022.\n\032SDK"
-    "_ENVIRONMENT_PRODUCTION\020\003\032\016\342\265\030\nproductio"
-    "n\"\004\010\002\020\002*\027SDK_ENVIRONMENT_STAGING*\255\001\n\013Mod"
-    "elSource\022-\n\030MODEL_SOURCE_UNSPECIFIED\020\000\032\017"
-    "\342\265\030\013unspecified\022#\n\023MODEL_SOURCE_REMOTE\020\001"
-    "\032\n\342\265\030\006remote\022!\n\022MODEL_SOURCE_LOCAL\020\002\032\t\342\265"
-    "\030\005local\022\'\n\025MODEL_SOURCE_BUILT_IN\020\003\032\014\342\265\030\010"
-    "built-in*\215\001\n\013ArchiveType\022\034\n\030ARCHIVE_TYPE"
-    "_UNSPECIFIED\020\000\022\024\n\020ARCHIVE_TYPE_ZIP\020\001\022\030\n\024"
-    "ARCHIVE_TYPE_TAR_BZ2\020\002\022\027\n\023ARCHIVE_TYPE_T"
-    "AR_GZ\020\003\022\027\n\023ARCHIVE_TYPE_TAR_XZ\020\004*\252\002\n\020Arc"
-    "hiveStructure\0222\n\035ARCHIVE_STRUCTURE_UNSPE"
-    "CIFIED\020\000\032\017\342\265\030\013unspecified\022>\n$ARCHIVE_STR"
-    "UCTURE_SINGLE_FILE_NESTED\020\001\032\024\342\265\030\020singleF"
-    "ileNested\0229\n!ARCHIVE_STRUCTURE_DIRECTORY"
-    "_BASED\020\002\032\022\342\265\030\016directoryBased\022;\n\"ARCHIVE_"
-    "STRUCTURE_NESTED_DIRECTORY\020\003\032\023\342\265\030\017nested"
-    "Directory\022*\n\031ARCHIVE_STRUCTURE_UNKNOWN\020\004"
-    "\032\013\342\265\030\007unknown*\245\003\n\021ModelArtifactType\022#\n\037M"
-    "ODEL_ARTIFACT_TYPE_UNSPECIFIED\020\000\022#\n\037MODE"
-    "L_ARTIFACT_TYPE_SINGLE_FILE\020\001\022&\n\"MODEL_A"
-    "RTIFACT_TYPE_TAR_GZ_ARCHIVE\020\002\022!\n\035MODEL_A"
-    "RTIFACT_TYPE_DIRECTORY\020\003\022#\n\037MODEL_ARTIFA"
-    "CT_TYPE_ZIP_ARCHIVE\020\004\022\036\n\032MODEL_ARTIFACT_"
-    "TYPE_CUSTOM\020\005\022\037\n\033MODEL_ARTIFACT_TYPE_ARC"
-    "HIVE\020\006\022\"\n\036MODEL_ARTIFACT_TYPE_MULTI_FILE"
-    "\020\007\022 \n\034MODEL_ARTIFACT_TYPE_BUILT_IN\020\010\022\'\n#"
-    "MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE\020\t\022&\n"
-    "\"MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE\020\n*\225\002"
-    "\n\023ModelRegistryStatus\022%\n!MODEL_REGISTRY_"
-    "STATUS_UNSPECIFIED\020\000\022$\n MODEL_REGISTRY_S"
-    "TATUS_REGISTERED\020\001\022%\n!MODEL_REGISTRY_STA"
-    "TUS_DOWNLOADING\020\002\022$\n MODEL_REGISTRY_STAT"
-    "US_DOWNLOADED\020\003\022!\n\035MODEL_REGISTRY_STATUS"
-    "_LOADING\020\004\022 \n\034MODEL_REGISTRY_STATUS_LOAD"
-    "ED\020\005\022\037\n\033MODEL_REGISTRY_STATUS_ERROR\020\006*\305\002"
-    "\n\023ModelQuerySortField\022&\n\"MODEL_QUERY_SOR"
-    "T_FIELD_UNSPECIFIED\020\000\022\037\n\033MODEL_QUERY_SOR"
-    "T_FIELD_NAME\020\001\022-\n)MODEL_QUERY_SORT_FIELD"
-    "_CREATED_AT_UNIX_MS\020\002\022-\n)MODEL_QUERY_SOR"
-    "T_FIELD_UPDATED_AT_UNIX_MS\020\003\022.\n*MODEL_QU"
-    "ERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES\020\004\022/\n+"
-    "MODEL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX"
-    "_MS\020\005\022&\n\"MODEL_QUERY_SORT_FIELD_USAGE_CO"
-    "UNT\020\006*\212\001\n\023ModelQuerySortOrder\022&\n\"MODEL_Q"
-    "UERY_SORT_ORDER_UNSPECIFIED\020\000\022$\n MODEL_Q"
-    "UERY_SORT_ORDER_ASCENDING\020\001\022%\n!MODEL_QUE"
-    "RY_SORT_ORDER_DESCENDING\020\002*\253\002\n\rModelFile"
-    "Role\022\037\n\033MODEL_FILE_ROLE_UNSPECIFIED\020\000\022!\n"
-    "\035MODEL_FILE_ROLE_PRIMARY_MODEL\020\001\022\035\n\031MODE"
-    "L_FILE_ROLE_COMPANION\020\002\022$\n MODEL_FILE_RO"
-    "LE_VISION_PROJECTOR\020\003\022\035\n\031MODEL_FILE_ROLE"
-    "_TOKENIZER\020\004\022\032\n\026MODEL_FILE_ROLE_CONFIG\020\005"
-    "\022\036\n\032MODEL_FILE_ROLE_VOCABULARY\020\006\022\032\n\026MODE"
-    "L_FILE_ROLE_MERGES\020\007\022\032\n\026MODEL_FILE_ROLE_"
-    "LABELS\020\010*\325\001\n\rRoutingPolicy\022\036\n\032ROUTING_PO"
-    "LICY_UNSPECIFIED\020\000\022\037\n\033ROUTING_POLICY_PRE"
-    "FER_LOCAL\020\001\022\037\n\033ROUTING_POLICY_PREFER_CLO"
-    "UD\020\002\022!\n\035ROUTING_POLICY_COST_OPTIMIZED\020\003\022"
-    "$\n ROUTING_POLICY_LATENCY_OPTIMIZED\020\004\022\031\n"
-    "\025ROUTING_POLICY_MANUAL\020\0052\203\005\n\rModelRegist"
-    "ry\022@\n\010Register\022\031.runanywhere.v1.ModelInf"
-    "o\032\031.runanywhere.v1.ModelInfo\022>\n\006Update\022\031"
-    ".runanywhere.v1.ModelInfo\032\031.runanywhere."
-    "v1.ModelInfo\022F\n\003Get\022\037.runanywhere.v1.Mod"
-    "elGetRequest\032\036.runanywhere.v1.ModelGetRe"
-    "sult\022I\n\004List\022 .runanywhere.v1.ModelListR"
-    "equest\032\037.runanywhere.v1.ModelListResult\022"
-    "O\n\006Remove\022\".runanywhere.v1.ModelDeleteRe"
-    "quest\032!.runanywhere.v1.ModelDeleteResult"
-    "\022O\n\006Import\022\".runanywhere.v1.ModelImportR"
-    "equest\032!.runanywhere.v1.ModelImportResul"
-    "t\022W\n\010Discover\022%.runanywhere.v1.ModelDisc"
-    "overyRequest\032$.runanywhere.v1.ModelDisco"
-    "veryResult\022b\n\007Refresh\022+.runanywhere.v1.M"
-    "odelRegistryRefreshRequest\032*.runanywhere"
-    ".v1.ModelRegistryRefreshResultB\212\001\n\027ai.ru"
-    "nanywhere.proto.v1B\017ModelTypesProtoP\001Z<g"
-    "ithub.com/runanywhere/runanywhere-sdks/i"
-    "dl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywh"
-    "ere.V1\272\002\002RAb\006proto3"
+    "escriptor\"\273\001\n\021ModelDeleteResult\022\017\n\007succe"
+    "ss\030\001 \001(\010\022\020\n\010model_id\030\002 \001(\t\022\025\n\rdeleted_by"
+    "tes\030\003 \001(\003\022\025\n\rfiles_deleted\030\004 \001(\010\022\030\n\020regi"
+    "stry_updated\030\005 \001(\010\022\022\n\nwas_loaded\030\006 \001(\010\022\025"
+    "\n\rerror_message\030\007 \001(\t\022\020\n\010warnings\030\010 \003(\t\""
+    "\206\003\n\031ModelCompatibilityRequest\022\020\n\010model_i"
+    "d\030\001 \001(\t\022>\n\020hardware_profile\030\002 \001(\0132\037.runa"
+    "nywhere.v1.HardwareProfileH\000\210\001\001\022\033\n\023avail"
+    "able_ram_bytes\030\003 \001(\003\022\037\n\027available_storag"
+    "e_bytes\030\004 \001(\003\022K\n\026accelerator_preference\030"
+    "\005 \001(\0162&.runanywhere.v1.AccelerationPrefe"
+    "renceH\001\210\001\001\022D\n\023preferred_framework\030\006 \001(\0162"
+    "\".runanywhere.v1.InferenceFrameworkH\002\210\001\001"
+    "B\023\n\021_hardware_profileB\031\n\027_accelerator_pr"
+    "eferenceB\026\n\024_preferred_framework\"\301\002\n\030Mod"
+    "elCompatibilityResult\022\025\n\ris_compatible\030\001"
+    " \001(\010\022\017\n\007can_run\030\002 \001(\010\022\017\n\007can_fit\030\003 \001(\010\022\035"
+    "\n\025required_memory_bytes\030\004 \001(\003\022\036\n\026availab"
+    "le_memory_bytes\030\005 \001(\003\022\036\n\026required_storag"
+    "e_bytes\030\006 \001(\003\022\037\n\027available_storage_bytes"
+    "\030\007 \001(\003\022\017\n\007reasons\030\010 \003(\t\022\036\n\026suggested_alt"
+    "ernatives\030\t \003(\t\022\020\n\010model_id\030\n \001(\t\022\022\n\nerr"
+    "or_code\030\013 \001(\005\022\025\n\rerror_message\030\014 \001(\t\"(\n\031"
+    "ModelFormatFromUrlRequest\022\013\n\003url\030\001 \001(\t\"z"
+    "\n\030ModelFormatFromUrlResult\022+\n\006format\030\001 \001"
+    "(\0162\033.runanywhere.v1.ModelFormat\0221\n\014inner"
+    "_format\030\002 \001(\0162\033.runanywhere.v1.ModelForm"
+    "at\"<\n\033ArtifactInferFromUrlRequest\022\013\n\003url"
+    "\030\001 \001(\t\022\020\n\010model_id\030\002 \001(\t\"\222\002\n\032ArtifactInf"
+    "erFromUrlResult\0228\n\rartifact_type\030\001 \001(\0162!"
+    ".runanywhere.v1.ModelArtifactType\0221\n\014arc"
+    "hive_type\030\002 \001(\0162\033.runanywhere.v1.Archive"
+    "Type\022;\n\021archive_structure\030\003 \001(\0162 .runany"
+    "where.v1.ArchiveStructure\022\027\n\017primary_rel"
+    "path\030\004 \001(\t\0221\n\014inner_format\030\005 \001(\0162\033.runan"
+    "ywhere.v1.ModelFormat\"\232\001\n$ModelRegistryF"
+    "etchAssignmentsRequest\022\021\n\tdevice_id\030\001 \001("
+    "\t\0228\n\013environment\030\002 \001(\0162\036.runanywhere.v1."
+    "SDKEnvironmentH\000\210\001\001\022\025\n\rforce_refresh\030\003 \001"
+    "(\010B\016\n\014_environment\"\301\001\n#ModelRegistryFetc"
+    "hAssignmentsResult\022\017\n\007success\030\001 \001(\010\022-\n\006m"
+    "odels\030\002 \001(\0132\035.runanywhere.v1.ModelInfoLi"
+    "st\022\023\n\013model_count\030\003 \001(\005\022\032\n\022fetched_at_un"
+    "ix_ms\030\004 \001(\003\022\022\n\nerror_code\030\005 \001(\005\022\025\n\rerror"
+    "_message\030\006 \001(\t\"\373\001\n\024ModelInfoMakeRequest\022"
+    "\013\n\003url\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022:\n\tframework\030"
+    "\003 \001(\0162\".runanywhere.v1.InferenceFramewor"
+    "kH\000\210\001\001\0224\n\010category\030\004 \001(\0162\035.runanywhere.v"
+    "1.ModelCategoryH\001\210\001\001\0220\n\006source\030\005 \001(\0162\033.r"
+    "unanywhere.v1.ModelSourceH\002\210\001\001B\014\n\n_frame"
+    "workB\013\n\t_categoryB\t\n\007_source\"\241\005\n\033Registe"
+    "rModelFromUrlRequest\022\013\n\003url\030\001 \001(\t\022\014\n\004nam"
+    "e\030\002 \001(\t\022:\n\tframework\030\003 \001(\0162\".runanywhere"
+    ".v1.InferenceFrameworkH\000\210\001\001\0224\n\010category\030"
+    "\004 \001(\0162\035.runanywhere.v1.ModelCategoryH\001\210\001"
+    "\001\0220\n\006source\030\005 \001(\0162\033.runanywhere.v1.Model"
+    "SourceH\002\210\001\001\022\"\n\025memory_required_bytes\030\006 \001"
+    "(\003H\003\210\001\001\022\036\n\021supports_thinking\030\007 \001(\010H\004\210\001\001\022"
+    "\032\n\rsupports_lora\030\010 \001(\010H\005\210\001\001\022=\n\rartifact_"
+    "type\030\t \001(\0162!.runanywhere.v1.ModelArtifac"
+    "tTypeH\006\210\001\001\022\033\n\016context_length\030\n \001(\005H\007\210\001\001\022"
+    "\030\n\013description\030\013 \001(\tH\010\210\001\001\022 \n\023download_si"
+    "ze_bytes\030\014 \001(\003H\t\210\001\001\022\017\n\002id\030\r \001(\tH\n\210\001\001B\014\n\n"
+    "_frameworkB\013\n\t_categoryB\t\n\007_sourceB\030\n\026_m"
+    "emory_required_bytesB\024\n\022_supports_thinki"
+    "ngB\020\n\016_supports_loraB\020\n\016_artifact_typeB\021"
+    "\n\017_context_lengthB\016\n\014_descriptionB\026\n\024_do"
+    "wnload_size_bytesB\005\n\003_id\"\227\005\n\035RegisterMul"
+    "tiFileModelRequest\022\n\n\002id\030\001 \001(\t\022\014\n\004name\030\002"
+    " \001(\t\0225\n\tframework\030\003 \001(\0162\".runanywhere.v1"
+    ".InferenceFramework\0222\n\005files\030\004 \003(\0132#.run"
+    "anywhere.v1.ModelFileDescriptor\0224\n\010categ"
+    "ory\030\005 \001(\0162\035.runanywhere.v1.ModelCategory"
+    "H\000\210\001\001\0220\n\006format\030\006 \001(\0162\033.runanywhere.v1.M"
+    "odelFormatH\001\210\001\001\022\"\n\025memory_required_bytes"
+    "\030\007 \001(\003H\002\210\001\001\022 \n\023download_size_bytes\030\010 \001(\003"
+    "H\003\210\001\001\022\033\n\016context_length\030\t \001(\005H\004\210\001\001\022\036\n\021su"
+    "pports_thinking\030\n \001(\010H\005\210\001\001\022\032\n\rsupports_l"
+    "ora\030\013 \001(\010H\006\210\001\001\022\030\n\013description\030\014 \001(\tH\007\210\001\001"
+    "\0220\n\006source\030\r \001(\0162\033.runanywhere.v1.ModelS"
+    "ourceH\010\210\001\001B\013\n\t_categoryB\t\n\007_formatB\030\n\026_m"
+    "emory_required_bytesB\026\n\024_download_size_b"
+    "ytesB\021\n\017_context_lengthB\024\n\022_supports_thi"
+    "nkingB\020\n\016_supports_loraB\016\n\014_descriptionB"
+    "\t\n\007_source*\343\002\n\013AudioFormat\022-\n\030AUDIO_FORM"
+    "AT_UNSPECIFIED\020\000\032\017\342\265\030\013unspecified\022\035\n\020AUD"
+    "IO_FORMAT_PCM\020\001\032\007\342\265\030\003pcm\022\035\n\020AUDIO_FORMAT"
+    "_WAV\020\002\032\007\342\265\030\003wav\022\035\n\020AUDIO_FORMAT_MP3\020\003\032\007\342"
+    "\265\030\003mp3\022\037\n\021AUDIO_FORMAT_OPUS\020\004\032\010\342\265\030\004opus\022"
+    "\035\n\020AUDIO_FORMAT_AAC\020\005\032\007\342\265\030\003aac\022\037\n\021AUDIO_"
+    "FORMAT_FLAC\020\006\032\010\342\265\030\004flac\022\035\n\020AUDIO_FORMAT_"
+    "OGG\020\007\032\007\342\265\030\003ogg\022\035\n\020AUDIO_FORMAT_M4A\020\010\032\007\342\265"
+    "\030\003m4a\022)\n\026AUDIO_FORMAT_PCM_S16LE\020\t\032\r\342\265\030\tp"
+    "cm_s16le*\213\001\n\rAudioEncoding\022\036\n\032AUDIO_ENCO"
+    "DING_UNSPECIFIED\020\000\022\035\n\031AUDIO_ENCODING_PCM"
+    "_F32_LE\020\001\022\035\n\031AUDIO_ENCODING_PCM_S16_LE\020\002"
+    "\022\034\n\030AUDIO_ENCODING_CONTAINER\020\003*\247\003\n\013Model"
+    "Format\022\034\n\030MODEL_FORMAT_UNSPECIFIED\020\000\022\025\n\021"
+    "MODEL_FORMAT_GGUF\020\001\022\025\n\021MODEL_FORMAT_GGML"
+    "\020\002\022\025\n\021MODEL_FORMAT_ONNX\020\003\022\024\n\020MODEL_FORMA"
+    "T_ORT\020\004\022\024\n\020MODEL_FORMAT_BIN\020\005\022\027\n\023MODEL_F"
+    "ORMAT_COREML\020\006\022\030\n\024MODEL_FORMAT_MLMODEL\020\007"
+    "\022\032\n\026MODEL_FORMAT_MLPACKAGE\020\010\022\027\n\023MODEL_FO"
+    "RMAT_TFLITE\020\t\022\034\n\030MODEL_FORMAT_SAFETENSOR"
+    "S\020\n\022\034\n\030MODEL_FORMAT_QNN_CONTEXT\020\013\022\024\n\020MOD"
+    "EL_FORMAT_ZIP\020\014\022\027\n\023MODEL_FORMAT_FOLDER\020\r"
+    "\022\034\n\030MODEL_FORMAT_PROPRIETARY\020\016\022\030\n\024MODEL_"
+    "FORMAT_UNKNOWN\020\017*\337\005\n\022InferenceFramework\022"
+    "#\n\037INFERENCE_FRAMEWORK_UNSPECIFIED\020\000\022\034\n\030"
+    "INFERENCE_FRAMEWORK_ONNX\020\001\022!\n\035INFERENCE_"
+    "FRAMEWORK_LLAMA_CPP\020\002\022)\n%INFERENCE_FRAME"
+    "WORK_FOUNDATION_MODELS\020\003\022\"\n\036INFERENCE_FR"
+    "AMEWORK_SYSTEM_TTS\020\004\022#\n\037INFERENCE_FRAMEW"
+    "ORK_FLUID_AUDIO\020\005\022\036\n\032INFERENCE_FRAMEWORK"
+    "_COREML\020\006\022\033\n\027INFERENCE_FRAMEWORK_MLX\020\007\022\036"
+    "\n\032INFERENCE_FRAMEWORK_TFLITE\020\013\022\"\n\036INFERE"
+    "NCE_FRAMEWORK_EXECUTORCH\020\014\022!\n\035INFERENCE_"
+    "FRAMEWORK_MEDIAPIPE\020\r\022\033\n\027INFERENCE_FRAME"
+    "WORK_MLC\020\016\022 \n\034INFERENCE_FRAMEWORK_PICO_L"
+    "LM\020\017\022!\n\035INFERENCE_FRAMEWORK_PIPER_TTS\020\020\022"
+    "*\n&INFERENCE_FRAMEWORK_SWIFT_TRANSFORMER"
+    "S\020\023\022 \n\034INFERENCE_FRAMEWORK_BUILT_IN\020\024\022\034\n"
+    "\030INFERENCE_FRAMEWORK_NONE\020\025\022\037\n\033INFERENCE"
+    "_FRAMEWORK_UNKNOWN\020\026\022\036\n\032INFERENCE_FRAMEW"
+    "ORK_SHERPA\020\027\022\036\n\032INFERENCE_FRAMEWORK_QHEX"
+    "RT\020\030\"\004\010\010\020\010\"\004\010\t\020\t\"\004\010\n\020\n\"\004\010\021\020\021\"\004\010\022\020\022*\231\005\n\rM"
+    "odelCategory\022/\n\032MODEL_CATEGORY_UNSPECIFI"
+    "ED\020\000\032\017\342\265\030\013unspecified\022)\n\027MODEL_CATEGORY_"
+    "LANGUAGE\020\001\032\014\342\265\030\010language\022=\n!MODEL_CATEGO"
+    "RY_SPEECH_RECOGNITION\020\002\032\026\342\265\030\022speech-reco"
+    "gnition\0229\n\037MODEL_CATEGORY_SPEECH_SYNTHES"
+    "IS\020\003\032\024\342\265\030\020speech-synthesis\022%\n\025MODEL_CATE"
+    "GORY_VISION\020\004\032\n\342\265\030\006vision\0229\n\037MODEL_CATEG"
+    "ORY_IMAGE_GENERATION\020\005\032\024\342\265\030\020image-genera"
+    "tion\022-\n\031MODEL_CATEGORY_MULTIMODAL\020\006\032\016\342\265\030"
+    "\nmultimodal\022#\n\024MODEL_CATEGORY_AUDIO\020\007\032\t\342"
+    "\265\030\005audio\022+\n\030MODEL_CATEGORY_EMBEDDING\020\010\032\r"
+    "\342\265\030\tembedding\022I\n\'MODEL_CATEGORY_VOICE_AC"
+    "TIVITY_DETECTION\020\t\032\034\342\265\030\030voice-activity-d"
+    "etection\022\?\n\"MODEL_CATEGORY_SPEAKER_DIARI"
+    "ZATION\020\n\032\027\342\265\030\023speaker-diarization\022C\n$MOD"
+    "EL_CATEGORY_SEMANTIC_SEGMENTATION\020\013\032\031\342\265\030"
+    "\025semantic-segmentation*\244\001\n\016SDKEnvironmen"
+    "t\0220\n\033SDK_ENVIRONMENT_UNSPECIFIED\020\000\032\017\342\265\030\013"
+    "unspecified\0220\n\033SDK_ENVIRONMENT_DEVELOPME"
+    "NT\020\001\032\017\342\265\030\013development\022.\n\032SDK_ENVIRONMENT"
+    "_PRODUCTION\020\003\032\016\342\265\030\nproduction*\255\001\n\013ModelS"
+    "ource\022-\n\030MODEL_SOURCE_UNSPECIFIED\020\000\032\017\342\265\030"
+    "\013unspecified\022#\n\023MODEL_SOURCE_REMOTE\020\001\032\n\342"
+    "\265\030\006remote\022!\n\022MODEL_SOURCE_LOCAL\020\002\032\t\342\265\030\005l"
+    "ocal\022\'\n\025MODEL_SOURCE_BUILT_IN\020\003\032\014\342\265\030\010bui"
+    "lt-in*\215\001\n\013ArchiveType\022\034\n\030ARCHIVE_TYPE_UN"
+    "SPECIFIED\020\000\022\024\n\020ARCHIVE_TYPE_ZIP\020\001\022\030\n\024ARC"
+    "HIVE_TYPE_TAR_BZ2\020\002\022\027\n\023ARCHIVE_TYPE_TAR_"
+    "GZ\020\003\022\027\n\023ARCHIVE_TYPE_TAR_XZ\020\004*\252\002\n\020Archiv"
+    "eStructure\0222\n\035ARCHIVE_STRUCTURE_UNSPECIF"
+    "IED\020\000\032\017\342\265\030\013unspecified\022>\n$ARCHIVE_STRUCT"
+    "URE_SINGLE_FILE_NESTED\020\001\032\024\342\265\030\020singleFile"
+    "Nested\0229\n!ARCHIVE_STRUCTURE_DIRECTORY_BA"
+    "SED\020\002\032\022\342\265\030\016directoryBased\022;\n\"ARCHIVE_STR"
+    "UCTURE_NESTED_DIRECTORY\020\003\032\023\342\265\030\017nestedDir"
+    "ectory\022*\n\031ARCHIVE_STRUCTURE_UNKNOWN\020\004\032\013\342"
+    "\265\030\007unknown*\245\003\n\021ModelArtifactType\022#\n\037MODE"
+    "L_ARTIFACT_TYPE_UNSPECIFIED\020\000\022#\n\037MODEL_A"
+    "RTIFACT_TYPE_SINGLE_FILE\020\001\022&\n\"MODEL_ARTI"
+    "FACT_TYPE_TAR_GZ_ARCHIVE\020\002\022!\n\035MODEL_ARTI"
+    "FACT_TYPE_DIRECTORY\020\003\022#\n\037MODEL_ARTIFACT_"
+    "TYPE_ZIP_ARCHIVE\020\004\022\036\n\032MODEL_ARTIFACT_TYP"
+    "E_CUSTOM\020\005\022\037\n\033MODEL_ARTIFACT_TYPE_ARCHIV"
+    "E\020\006\022\"\n\036MODEL_ARTIFACT_TYPE_MULTI_FILE\020\007\022"
+    " \n\034MODEL_ARTIFACT_TYPE_BUILT_IN\020\010\022\'\n#MOD"
+    "EL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE\020\t\022&\n\"MO"
+    "DEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE\020\n*\225\002\n\023M"
+    "odelRegistryStatus\022%\n!MODEL_REGISTRY_STA"
+    "TUS_UNSPECIFIED\020\000\022$\n MODEL_REGISTRY_STAT"
+    "US_REGISTERED\020\001\022%\n!MODEL_REGISTRY_STATUS"
+    "_DOWNLOADING\020\002\022$\n MODEL_REGISTRY_STATUS_"
+    "DOWNLOADED\020\003\022!\n\035MODEL_REGISTRY_STATUS_LO"
+    "ADING\020\004\022 \n\034MODEL_REGISTRY_STATUS_LOADED\020"
+    "\005\022\037\n\033MODEL_REGISTRY_STATUS_ERROR\020\006*\305\002\n\023M"
+    "odelQuerySortField\022&\n\"MODEL_QUERY_SORT_F"
+    "IELD_UNSPECIFIED\020\000\022\037\n\033MODEL_QUERY_SORT_F"
+    "IELD_NAME\020\001\022-\n)MODEL_QUERY_SORT_FIELD_CR"
+    "EATED_AT_UNIX_MS\020\002\022-\n)MODEL_QUERY_SORT_F"
+    "IELD_UPDATED_AT_UNIX_MS\020\003\022.\n*MODEL_QUERY"
+    "_SORT_FIELD_DOWNLOAD_SIZE_BYTES\020\004\022/\n+MOD"
+    "EL_QUERY_SORT_FIELD_LAST_USED_AT_UNIX_MS"
+    "\020\005\022&\n\"MODEL_QUERY_SORT_FIELD_USAGE_COUNT"
+    "\020\006*\212\001\n\023ModelQuerySortOrder\022&\n\"MODEL_QUER"
+    "Y_SORT_ORDER_UNSPECIFIED\020\000\022$\n MODEL_QUER"
+    "Y_SORT_ORDER_ASCENDING\020\001\022%\n!MODEL_QUERY_"
+    "SORT_ORDER_DESCENDING\020\002*\253\002\n\rModelFileRol"
+    "e\022\037\n\033MODEL_FILE_ROLE_UNSPECIFIED\020\000\022!\n\035MO"
+    "DEL_FILE_ROLE_PRIMARY_MODEL\020\001\022\035\n\031MODEL_F"
+    "ILE_ROLE_COMPANION\020\002\022$\n MODEL_FILE_ROLE_"
+    "VISION_PROJECTOR\020\003\022\035\n\031MODEL_FILE_ROLE_TO"
+    "KENIZER\020\004\022\032\n\026MODEL_FILE_ROLE_CONFIG\020\005\022\036\n"
+    "\032MODEL_FILE_ROLE_VOCABULARY\020\006\022\032\n\026MODEL_F"
+    "ILE_ROLE_MERGES\020\007\022\032\n\026MODEL_FILE_ROLE_LAB"
+    "ELS\020\010*\325\001\n\rRoutingPolicy\022\036\n\032ROUTING_POLIC"
+    "Y_UNSPECIFIED\020\000\022\037\n\033ROUTING_POLICY_PREFER"
+    "_LOCAL\020\001\022\037\n\033ROUTING_POLICY_PREFER_CLOUD\020"
+    "\002\022!\n\035ROUTING_POLICY_COST_OPTIMIZED\020\003\022$\n "
+    "ROUTING_POLICY_LATENCY_OPTIMIZED\020\004\022\031\n\025RO"
+    "UTING_POLICY_MANUAL\020\005B\212\001\n\027ai.runanywhere"
+    ".proto.v1B\017ModelTypesProtoP\001Z<github.com"
+    "/runanywhere/runanywhere-sdks/idl/v1;run"
+    "anywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002"
+    "RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_model_5ftypes_2eproto_deps[3] = {
@@ -9062,13 +8864,13 @@ static ::absl::once_flag descriptor_table_model_5ftypes_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_model_5ftypes_2eproto = {
     false,
     false,
-    16579,
+    15930,
     descriptor_table_protodef_model_5ftypes_2eproto,
     "model_types.proto",
     &descriptor_table_model_5ftypes_2eproto_once,
     descriptor_table_model_5ftypes_2eproto_deps,
     3,
-    40,
+    39,
     schemas,
     file_message_globals,
     TableStruct_model_5ftypes_2eproto::offsets,
@@ -9085,93 +8887,100 @@ AudioFormat_descriptor() {
 PROTOBUF_CONSTINIT const uint32_t AudioFormat_internal_data_[] = {
     655360u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-ModelFormat_descriptor() {
+AudioEncoding_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
   return file_level_enum_descriptors_model_5ftypes_2eproto[1];
+}
+PROTOBUF_CONSTINIT const uint32_t AudioEncoding_internal_data_[] = {
+    262144u, 0u, };
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+ModelFormat_descriptor() {
+  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
+  return file_level_enum_descriptors_model_5ftypes_2eproto[2];
 }
 PROTOBUF_CONSTINIT const uint32_t ModelFormat_internal_data_[] = {
     1048576u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 InferenceFramework_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[2];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[3];
 }
 PROTOBUF_CONSTINIT const uint32_t InferenceFramework_internal_data_[] = {
     524288u, 32u, 129528u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ModelCategory_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[3];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[4];
 }
 PROTOBUF_CONSTINIT const uint32_t ModelCategory_internal_data_[] = {
     786432u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 SDKEnvironment_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[4];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[5];
 }
 PROTOBUF_CONSTINIT const uint32_t SDKEnvironment_internal_data_[] = {
     131072u, 32u, 2u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ModelSource_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[5];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[6];
 }
 PROTOBUF_CONSTINIT const uint32_t ModelSource_internal_data_[] = {
     262144u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ArchiveType_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[6];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[7];
 }
 PROTOBUF_CONSTINIT const uint32_t ArchiveType_internal_data_[] = {
     327680u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ArchiveStructure_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[7];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[8];
 }
 PROTOBUF_CONSTINIT const uint32_t ArchiveStructure_internal_data_[] = {
     327680u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ModelArtifactType_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[8];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[9];
 }
 PROTOBUF_CONSTINIT const uint32_t ModelArtifactType_internal_data_[] = {
     720896u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ModelRegistryStatus_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[9];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[10];
 }
 PROTOBUF_CONSTINIT const uint32_t ModelRegistryStatus_internal_data_[] = {
     458752u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ModelQuerySortField_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[10];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[11];
 }
 PROTOBUF_CONSTINIT const uint32_t ModelQuerySortField_internal_data_[] = {
     458752u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ModelQuerySortOrder_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[11];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[12];
 }
 PROTOBUF_CONSTINIT const uint32_t ModelQuerySortOrder_internal_data_[] = {
     196608u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 ModelFileRole_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[12];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[13];
 }
 PROTOBUF_CONSTINIT const uint32_t ModelFileRole_internal_data_[] = {
     589824u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 RoutingPolicy_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_model_5ftypes_2eproto);
-  return file_level_enum_descriptors_model_5ftypes_2eproto[13];
+  return file_level_enum_descriptors_model_5ftypes_2eproto[14];
 }
 PROTOBUF_CONSTINIT const uint32_t RoutingPolicy_internal_data_[] = {
     393216u, 0u, };
@@ -19346,305 +19155,6 @@ void CurrentModelResult::InternalSwap(CurrentModelResult* PROTOBUF_RESTRICT PROT
 }
 
 ::google::protobuf::Metadata CurrentModelResult::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-ModelDeleteRequest::ModelDeleteRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, ModelDeleteRequest_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.ModelDeleteRequest)
-}
-PROTOBUF_NDEBUG_INLINE ModelDeleteRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::ModelDeleteRequest& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        model_id_(arena, from.model_id_) {}
-
-ModelDeleteRequest::ModelDeleteRequest(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const ModelDeleteRequest& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, ModelDeleteRequest_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  ModelDeleteRequest* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, delete_files_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, delete_files_),
-           offsetof(Impl_, unload_if_loaded_) -
-               offsetof(Impl_, delete_files_) +
-               sizeof(Impl_::unload_if_loaded_));
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ModelDeleteRequest)
-}
-PROTOBUF_NDEBUG_INLINE ModelDeleteRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        model_id_(arena) {}
-
-inline void ModelDeleteRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, delete_files_),
-           0,
-           offsetof(Impl_, unload_if_loaded_) -
-               offsetof(Impl_, delete_files_) +
-               sizeof(Impl_::unload_if_loaded_));
-}
-ModelDeleteRequest::~ModelDeleteRequest() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.ModelDeleteRequest)
-  SharedDtor(*this);
-}
-inline void ModelDeleteRequest::SharedDtor(MessageLite& self) {
-  ModelDeleteRequest& this_ = static_cast<ModelDeleteRequest&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.model_id_.Destroy();
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull ModelDeleteRequest_class_data_ =
-        ModelDeleteRequest::InternalGenerateClassData_(ModelDeleteRequest_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-ModelDeleteRequest::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&ModelDeleteRequest_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(ModelDeleteRequest_class_data_.tc_table);
-  return ModelDeleteRequest_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-ModelDeleteRequest::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&ModelDeleteRequest_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&ModelDeleteRequest_globals_));
-  return ModelDeleteRequest_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const ModelDeleteRequest::ParseTableT_
-    ModelDeleteRequest::_table_ =
-        ModelDeleteRequest::InternalGenerateParseTable_(ModelDeleteRequest_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void ModelDeleteRequest::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.ModelDeleteRequest)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    _impl_.model_id_.ClearNonDefaultToEmpty();
-  }
-  ::memset(&_impl_.delete_files_, 0, static_cast<::size_t>(
-      reinterpret_cast<char*>(&_impl_.unload_if_loaded_) -
-      reinterpret_cast<char*>(&_impl_.delete_files_)) + sizeof(_impl_.unload_if_loaded_));
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL ModelDeleteRequest::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const ModelDeleteRequest& this_ = static_cast<const ModelDeleteRequest&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL ModelDeleteRequest::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const ModelDeleteRequest& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.ModelDeleteRequest)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // string model_id = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_model_id().empty()) {
-      const ::std::string& _s = this_._internal_model_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ModelDeleteRequest.model_id");
-      target = stream->WriteStringMaybeAliased(1, _s, target);
-    }
-  }
-
-  // bool delete_files = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (this_._internal_delete_files() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          2, this_._internal_delete_files(), target);
-    }
-  }
-
-  // bool unregister = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_unregister() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          3, this_._internal_unregister(), target);
-    }
-  }
-
-  // bool unload_if_loaded = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_unload_if_loaded() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          4, this_._internal_unload_if_loaded(), target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.ModelDeleteRequest)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t ModelDeleteRequest::ByteSizeLong(const MessageLite& base) {
-  const ModelDeleteRequest& this_ = static_cast<const ModelDeleteRequest&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t ModelDeleteRequest::ByteSizeLong() const {
-  const ModelDeleteRequest& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.ModelDeleteRequest)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    // string model_id = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_model_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_model_id());
-      }
-    }
-    // bool delete_files = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (this_._internal_delete_files() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool unregister = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_unregister() != 0) {
-        total_size += 2;
-      }
-    }
-    // bool unload_if_loaded = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_unload_if_loaded() != 0) {
-        total_size += 2;
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void ModelDeleteRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<ModelDeleteRequest*>(&to_msg);
-  auto& from = static_cast<const ModelDeleteRequest&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.ModelDeleteRequest)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_model_id().empty()) {
-        _this->_internal_set_model_id(from._internal_model_id());
-      } else {
-        if (_this->_impl_.model_id_.IsDefault()) {
-          _this->_internal_set_model_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (from._internal_delete_files() != 0) {
-        _this->_impl_.delete_files_ = from._impl_.delete_files_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_unregister() != 0) {
-        _this->_impl_.unregister_ = from._impl_.unregister_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_unload_if_loaded() != 0) {
-        _this->_impl_.unload_if_loaded_ = from._impl_.unload_if_loaded_;
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void ModelDeleteRequest::CopyFrom(const ModelDeleteRequest& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.ModelDeleteRequest)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void ModelDeleteRequest::InternalSwap(ModelDeleteRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_.unload_if_loaded_)
-      + sizeof(ModelDeleteRequest::_impl_.unload_if_loaded_)
-      - PROTOBUF_FIELD_OFFSET(ModelDeleteRequest, _impl_.delete_files_)>(
-          reinterpret_cast<char*>(&_impl_.delete_files_),
-          reinterpret_cast<char*>(&other->_impl_.delete_files_));
-}
-
-::google::protobuf::Metadata ModelDeleteRequest::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================

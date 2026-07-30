@@ -38,8 +38,8 @@ import type {
   VoiceAgentRequest,
   VoiceAgentResult,
 } from '@runanywhere/proto-ts/voice_agent_service';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
-  AudioEncoding,
   PipelineState,
   TokenKind,
   VoicePipelineComponent,

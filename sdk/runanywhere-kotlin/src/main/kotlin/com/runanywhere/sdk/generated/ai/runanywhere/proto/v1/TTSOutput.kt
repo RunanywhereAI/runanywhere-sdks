@@ -32,19 +32,9 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Full TTS output: synthesized audio plus metadata.
- *
- * Mirrors the C ABI rac_tts_output_t. `audio_data` is opaque bytes; bindings
- * adapt to native buffers (Swift Data, Kotlin ByteArray, Dart Uint8List,
- * JS ArrayBuffer/Float32Array, C void*). Sample rate is required because PCM
- * payloads are otherwise unparseable.
- * ---------------------------------------------------------------------------
- */
 public class TTSOutput(
   /**
-   * Synthesized audio bytes, encoded per `audio_format`.
+   * Encoded per audio_format.
    */
   @field:WireField(
     tag = 1,
@@ -54,9 +44,6 @@ public class TTSOutput(
     schemaIndex = 0,
   )
   public val audio_data: ByteString = ByteString.EMPTY,
-  /**
-   * Audio format of the bytes in `audio_data`.
-   */
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.AudioFormat#ADAPTER",
@@ -66,9 +53,8 @@ public class TTSOutput(
   )
   public val audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED,
   /**
-   * Sample rate in Hz. For PCM payloads this is required to interpret the
-   * bytes; for compressed formats (mp3, opus, …) it reflects the synthesis
-   * sample rate, not the container rate.
+   * Required to interpret PCM payloads. For compressed formats this is the
+   * synthesis rate, not the container rate.
    */
   @field:WireField(
     tag = 3,
@@ -78,9 +64,6 @@ public class TTSOutput(
     schemaIndex = 2,
   )
   public val sample_rate: Int = 0,
-  /**
-   * Audio duration in milliseconds (matches C ABI `duration_ms`).
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -90,9 +73,6 @@ public class TTSOutput(
   )
   public val duration_ms: Long = 0L,
   phoneme_timestamps: List<TTSPhonemeTimestamp> = emptyList(),
-  /**
-   * Per-pass synthesis metadata.
-   */
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.TTSSynthesisMetadata#ADAPTER",
@@ -101,8 +81,7 @@ public class TTSOutput(
   )
   public val metadata: TTSSynthesisMetadata? = null,
   /**
-   * Wall-clock timestamp when the output was produced
-   * (milliseconds since UNIX epoch). Mirrors C ABI `timestamp_ms`.
+   * Milliseconds since epoch.
    */
   @field:WireField(
     tag = 7,
@@ -113,8 +92,7 @@ public class TTSOutput(
   )
   public val timestamp_ms: Long = 0L,
   /**
-   * Stream chunk metadata. For one-shot synthesis, chunk_index=0 and
-   * is_final=true when set by the producer.
+   * For one-shot synthesis, chunk_index=0 and is_final=true.
    */
   @field:WireField(
     tag = 8,
@@ -140,9 +118,6 @@ public class TTSOutput(
     schemaIndex = 9,
   )
   public val audio_size_bytes: Long = 0L,
-  /**
-   * Terminal error details for result-envelope APIs.
-   */
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -161,7 +136,7 @@ public class TTSOutput(
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSOutput, Nothing>(ADAPTER, unknownFields) {
   /**
-   * Phoneme-level timestamps, if the engine produced them. May be empty.
+   * Empty unless the engine produced them.
    */
   @field:WireField(
     tag = 5,

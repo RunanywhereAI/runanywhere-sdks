@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CurrentModelResult } from '@runanywhere/proto-ts/model_types';
+import { AudioEncoding, CurrentModelResult } from '@runanywhere/proto-ts/model_types';
 import {
-  VADAudioEncoding,
   VADConfiguration,
   VADProcessRequest,
   VADResult,
@@ -213,7 +212,7 @@ describe('canonical lifecycle VAD facade', () => {
     expect(counters.configurations[0]?.threshold).toBeCloseTo(0.2);
     const request = counters.requests[0];
     expect(request?.audio).toMatchObject({
-      encoding: VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE,
+      encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
       sampleRate: 16_000,
       channels: 1,
     });

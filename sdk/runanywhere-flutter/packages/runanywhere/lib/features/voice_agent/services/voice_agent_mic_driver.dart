@@ -28,6 +28,7 @@ import 'dart:typed_data';
 import 'package:runanywhere/features/stt/services/audio_capture_manager.dart';
 import 'package:runanywhere/features/tts/services/audio_playback_manager.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pbenum.dart' as model_pb;
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/voice_agent_service.pb.dart'
     as voice_agent_pb;
@@ -206,14 +207,14 @@ class VoiceAgentMicDriver {
     _processing = true;
     final ttsPcm = BytesBuilder();
     var ttsSampleRate = 0;
-    var ttsEncoding = voice_events_pb.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED;
+    var ttsEncoding = model_pb.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED;
     try {
       final request = voice_agent_pb.VoiceAgentTurnRequest(
         requestId: 'turn-${DateTime.now().microsecondsSinceEpoch}',
         audioData: audio,
         sampleRateHz: _sampleRateHz,
         channels: 1,
-        encoding: voice_events_pb.AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
+        encoding: model_pb.AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
       );
       _logger.info('Submitting voice turn (${audio.length} bytes)');
 
@@ -229,7 +230,7 @@ class VoiceAgentMicDriver {
             ttsSampleRate = ev.audio.sampleRateHz;
           }
           if (ev.audio.encoding !=
-              voice_events_pb.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+              model_pb.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
             ttsEncoding = ev.audio.encoding;
           }
         }
@@ -254,14 +255,14 @@ class VoiceAgentMicDriver {
   Future<void> _playTts(
     Uint8List pcm,
     int sampleRateHz,
-    voice_events_pb.AudioEncoding encoding,
+    model_pb.AudioEncoding encoding,
   ) async {
     if (pcm.isEmpty || _stopped) return;
     final sampleRate = sampleRateHz > 0 ? sampleRateHz : _defaultTtsSampleRateHz;
     // TTS backends emit f32 LE by default (AudioFrameEvent contract); only
     // convert as PCM16 when the frame explicitly says so.
     final wav =
-        encoding == voice_events_pb.AudioEncoding.AUDIO_ENCODING_PCM_S16_LE
+        encoding == model_pb.AudioEncoding.AUDIO_ENCODING_PCM_S16_LE
             ? DartBridgeAudio.int16ToWav(pcm, sampleRate)
             : DartBridgeAudio.float32ToWav(pcm, sampleRate);
     if (wav == null || wav.isEmpty) {

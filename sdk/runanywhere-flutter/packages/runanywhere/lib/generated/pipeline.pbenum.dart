@@ -45,16 +45,10 @@ class DeviceAffinity extends $pb.ProtobufEnum {
 class EdgePolicy extends $pb.ProtobufEnum {
   static const EdgePolicy EDGE_POLICY_UNSPECIFIED =
       EdgePolicy._(0, _omitEnumNames ? '' : 'EDGE_POLICY_UNSPECIFIED');
-
-  /// Producer blocks when channel is full (default, safest).
   static const EdgePolicy EDGE_POLICY_BLOCK =
       EdgePolicy._(1, _omitEnumNames ? '' : 'EDGE_POLICY_BLOCK');
-
-  /// Oldest item is dropped when channel is full (audio routing only).
   static const EdgePolicy EDGE_POLICY_DROP_OLDEST =
       EdgePolicy._(2, _omitEnumNames ? '' : 'EDGE_POLICY_DROP_OLDEST');
-
-  /// Newest item is dropped when channel is full (pager coalescing).
   static const EdgePolicy EDGE_POLICY_DROP_NEWEST =
       EdgePolicy._(3, _omitEnumNames ? '' : 'EDGE_POLICY_DROP_NEWEST');
 
@@ -71,31 +65,6 @@ class EdgePolicy extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const EdgePolicy._(super.value, super.name);
-}
-
-/// ---------------------------------------------------------------------------
-/// Pipeline lifecycle status — shared by compile/start/stop results.
-/// ---------------------------------------------------------------------------
-class PipelineStatus extends $pb.ProtobufEnum {
-  static const PipelineStatus PIPELINE_STATUS_UNSPECIFIED =
-      PipelineStatus._(0, _omitEnumNames ? '' : 'PIPELINE_STATUS_UNSPECIFIED');
-  static const PipelineStatus PIPELINE_STATUS_OK =
-      PipelineStatus._(1, _omitEnumNames ? '' : 'PIPELINE_STATUS_OK');
-  static const PipelineStatus PIPELINE_STATUS_FAILED =
-      PipelineStatus._(2, _omitEnumNames ? '' : 'PIPELINE_STATUS_FAILED');
-
-  static const $core.List<PipelineStatus> values = <PipelineStatus>[
-    PIPELINE_STATUS_UNSPECIFIED,
-    PIPELINE_STATUS_OK,
-    PIPELINE_STATUS_FAILED,
-  ];
-
-  static final $core.List<PipelineStatus?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static PipelineStatus? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const PipelineStatus._(super.value, super.name);
 }
 
 const $core.bool _omitEnumNames =

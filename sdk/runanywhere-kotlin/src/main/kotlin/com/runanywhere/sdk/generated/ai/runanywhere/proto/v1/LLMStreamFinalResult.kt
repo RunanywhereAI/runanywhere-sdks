@@ -33,11 +33,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * Aggregate terminal payload emitted by LLMStreamEvent. It intentionally keeps
- * stream-native token, timing, and error fields distinct from the unary
- * LLMGenerationResult shape.
- */
 public class LLMStreamFinalResult(
   @field:WireField(
     tag = 1,
@@ -145,12 +140,6 @@ public class LLMStreamFinalResult(
   tool_results: List<ToolResult> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMStreamFinalResult, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Tool calls actually executed during the streaming session (mirrors
-   * LLMGenerationResult.tool_calls / .tool_results in llm_options.proto).
-   * Populated only on terminal events when the backend completed at least
-   * one tool call.
-   */
   @field:WireField(
     tag = 14,
     adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",

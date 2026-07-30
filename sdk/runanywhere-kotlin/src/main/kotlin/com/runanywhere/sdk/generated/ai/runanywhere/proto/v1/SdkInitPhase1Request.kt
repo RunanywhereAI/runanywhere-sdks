@@ -30,15 +30,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Phase 1 input — synchronous core initialization. Carries the only
- * platform-supplied values commons cannot derive on its own: API credentials
- * + environment + device id (resolved by platform Keychain/Keystore lookup).
- *
- * Platform adapter callbacks (file I/O, secure storage, HTTP transport, log,
- * memory) are registered separately via rac_platform_adapter_t prior to
- * calling this entry point. This message is purely the data envelope.
- * ---------------------------------------------------------------------------
+ * The only platform-supplied values commons cannot derive itself. Platform
+ * adapter callbacks are registered separately through rac_platform_adapter_t
+ * before this call; this message is purely the data envelope.
  */
 public class SdkInitPhase1Request(
   @field:WireField(
@@ -71,7 +65,7 @@ public class SdkInitPhase1Request(
   )
   public val base_url: String = "",
   /**
-   * Resolved by platform (Keychain UUID, etc.).
+   * Platform-resolved, e.g. a Keychain UUID.
    */
   @field:WireField(
     tag = 4,
@@ -81,9 +75,6 @@ public class SdkInitPhase1Request(
     schemaIndex = 3,
   )
   public val device_id: String = "",
-  /**
-   * SDK/platform identity used in auth/device metadata.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -91,9 +82,6 @@ public class SdkInitPhase1Request(
     schemaIndex = 4,
   )
   public val platform: String = "",
-  /**
-   * SDK version reported to backend services.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

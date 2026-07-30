@@ -31,15 +31,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Aggregate storage view: device capacity + app footprint + per-model rows.
- * `total_models` and `total_models_bytes` are denormalized for receivers that
- * would otherwise re-iterate `models` to compute them (Web binding, RN host).
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 public class StorageInfo(
   @field:WireField(
     tag = 1,

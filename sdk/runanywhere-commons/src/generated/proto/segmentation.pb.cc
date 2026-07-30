@@ -994,13 +994,10 @@ const char descriptor_table_protodef_segmentation_2eproto[] ABSL_ATTRIBUTE_SECTI
     "_UNSPECIFIED\020\000\022\"\n\036SEGMENTATION_PIXEL_FOR"
     "MAT_RGB8\020\001\022#\n\037SEGMENTATION_PIXEL_FORMAT_"
     "RGBA8\020\002\022#\n\037SEGMENTATION_PIXEL_FORMAT_BGR"
-    "A8\020\0032j\n\024SemanticSegmentation\022R\n\007Segment\022"
-    "#.runanywhere.v1.SegmentationRequest\032\".r"
-    "unanywhere.v1.SegmentationResultB\214\001\n\027ai."
-    "runanywhere.proto.v1B\021SegmentationProtoP"
-    "\001Z<github.com/runanywhere/runanywhere-sd"
-    "ks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runa"
-    "nywhere.V1\272\002\002RAb\006proto3"
+    "A8\020\003B\214\001\n\027ai.runanywhere.proto.v1B\021Segmen"
+    "tationProtoP\001Z<github.com/runanywhere/ru"
+    "nanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002"
+    "\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_segmentation_2eproto_deps[1] = {
@@ -1010,7 +1007,7 @@ static ::absl::once_flag descriptor_table_segmentation_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_segmentation_2eproto = {
     false,
     false,
-    1223,
+    1115,
     descriptor_table_protodef_segmentation_2eproto,
     "segmentation.proto",
     &descriptor_table_segmentation_2eproto_once,

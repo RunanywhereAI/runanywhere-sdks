@@ -394,7 +394,7 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     stt_request.set_request_id("stt-1");
     auto* stt_audio = stt_request.mutable_audio();
     stt_audio->set_audio_data(reinterpret_cast<const char*>(stt_samples), sizeof(stt_samples));
-    stt_audio->set_encoding(runanywhere::v1::STT_AUDIO_ENCODING_PCM_S16_LE);
+    stt_audio->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
     stt_audio->set_audio_format(runanywhere::v1::AUDIO_FORMAT_PCM);
     stt_audio->set_sample_rate(16000);
     stt_request.mutable_options()->set_language("en-US");
@@ -478,7 +478,7 @@ int test_lifecycle_proto_operations(rac_model_registry_handle_t registry) {
     vad_request.set_request_id("vad-1");
     auto* vad_audio = vad_request.mutable_audio();
     vad_audio->set_audio_data(reinterpret_cast<const char*>(vad_samples), sizeof(vad_samples));
-    vad_audio->set_encoding(runanywhere::v1::VAD_AUDIO_ENCODING_PCM_F32_LE);
+    vad_audio->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
     vad_audio->set_sample_rate(16000);
     vad_audio->set_channels(1);
     vad_request.mutable_options()->set_activation_threshold(0.1f);

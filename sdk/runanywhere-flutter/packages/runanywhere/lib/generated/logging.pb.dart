@@ -21,10 +21,7 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'logging.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// SDK logging configuration. Per-environment presets
-/// (development/staging/production) stay in each SDK as factory helpers.
-/// ---------------------------------------------------------------------------
+/// Per-environment presets stay in each SDK as factory helpers.
 class LoggingConfiguration extends $pb.GeneratedMessage {
   factory LoggingConfiguration({
     $core.bool? enableLocalLogging,
@@ -86,7 +83,7 @@ class LoggingConfiguration extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LoggingConfiguration>(create);
   static LoggingConfiguration? _defaultInstance;
 
-  /// Write logs to the platform-local sink (os_log / Logcat / console).
+  /// The platform-local sink: os_log, Logcat, or console.
   @$pb.TagNumber(1)
   $core.bool get enableLocalLogging => $_getBF(0);
   @$pb.TagNumber(1)
@@ -96,7 +93,7 @@ class LoggingConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearEnableLocalLogging() => $_clearField(1);
 
-  /// Minimum severity emitted. Messages below this level are dropped.
+  /// Records below this level are dropped.
   @$pb.TagNumber(2)
   LogLevel get minLogLevel => $_getN(1);
   @$pb.TagNumber(2)
@@ -106,7 +103,6 @@ class LoggingConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearMinLogLevel() => $_clearField(2);
 
-  /// Attach file:line:function source location to each record.
   @$pb.TagNumber(3)
   $core.bool get includeSourceLocation => $_getBF(2);
   @$pb.TagNumber(3)
@@ -116,7 +112,7 @@ class LoggingConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearIncludeSourceLocation() => $_clearField(3);
 
-  /// Attach device/build metadata (model, os version, app build) to records.
+  /// Device model, OS version, app build.
   @$pb.TagNumber(4)
   $core.bool get includeDeviceMetadata => $_getBF(3);
   @$pb.TagNumber(4)
@@ -126,7 +122,6 @@ class LoggingConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearIncludeDeviceMetadata() => $_clearField(4);
 
-  /// Forward records to the remote logging pipeline.
   @$pb.TagNumber(5)
   $core.bool get enableRemoteLogging => $_getBF(4);
   @$pb.TagNumber(5)
@@ -137,9 +132,6 @@ class LoggingConfiguration extends $pb.GeneratedMessage {
   void clearEnableRemoteLogging() => $_clearField(5);
 }
 
-/// ---------------------------------------------------------------------------
-/// A single structured log record. Mirrors the per-SDK LogEntry shape.
-/// ---------------------------------------------------------------------------
 class LogEntry extends $pb.GeneratedMessage {
   factory LogEntry({
     $fixnum.Int64? timestampUnixMs,
@@ -257,9 +249,8 @@ class LogEntry extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
 
-  /// Optional source location + context (Kotlin LogEntry carries these as
-  /// first-class fields; other SDKs leave them empty). `line`/`error_code`
-  /// use 0 as "unset".
+  /// Kotlin carries these as first-class fields; other SDKs leave them empty.
+  /// 0 means unset for line and error_code.
   @$pb.TagNumber(6)
   $core.String get file => $_getSZ(5);
   @$pb.TagNumber(6)

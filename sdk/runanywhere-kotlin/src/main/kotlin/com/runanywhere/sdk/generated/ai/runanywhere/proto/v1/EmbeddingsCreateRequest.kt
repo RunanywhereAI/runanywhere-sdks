@@ -29,16 +29,9 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Session/handle creation request envelope shared by every SDK.
- * The result carries an opaque uint64 handle the SDK uses for subsequent
- * embed / embed_batch invocations.
- * ---------------------------------------------------------------------------
- */
 public class EmbeddingsCreateRequest(
   /**
-   * Required. Model identifier (registry id) or absolute model path.
+   * Registry id or absolute model path.
    */
   @field:WireField(
     tag = 1,
@@ -49,9 +42,7 @@ public class EmbeddingsCreateRequest(
   )
   public val model_id: String = "",
   /**
-   * Optional component configuration. When unset, commons applies its
-   * defaults (RAC_EMBEDDINGS_*); when set, the named fields override
-   * the per-component defaults at create time.
+   * Unset = commons defaults; set fields override per-component defaults.
    */
   @field:WireField(
     tag = 2,
@@ -60,8 +51,7 @@ public class EmbeddingsCreateRequest(
   )
   public val configuration: EmbeddingsConfiguration? = null,
   /**
-   * Provider-specific JSON config for backends that need companion file
-   * paths (e.g. {"vocab_path":"..."}).
+   * For backends needing companion file paths, e.g. {"vocab_path":"..."}.
    */
   @field:WireField(
     tag = 3,

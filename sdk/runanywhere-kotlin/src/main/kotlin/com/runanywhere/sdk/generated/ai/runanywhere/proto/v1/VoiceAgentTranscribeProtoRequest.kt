@@ -29,9 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * Helper-level proto requests for voice-agent sub-components.
- */
 public class VoiceAgentTranscribeProtoRequest(
   @field:WireField(
     tag = 1,

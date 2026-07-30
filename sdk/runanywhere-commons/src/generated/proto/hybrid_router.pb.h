@@ -59,8 +59,6 @@ namespace runanywhere {
 namespace v1 {
 enum HybridBackendKind : int;
 extern const uint32_t HybridBackendKind_internal_data_[];
-enum HybridCapability : int;
-extern const uint32_t HybridCapability_internal_data_[];
 enum HybridModelType : int;
 extern const uint32_t HybridModelType_internal_data_[];
 enum HybridRank : int;
@@ -177,9 +175,6 @@ template <>
 internal::EnumTraitsT<::runanywhere::v1::HybridBackendKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::HybridBackendKind>;
 template <>
-internal::EnumTraitsT<::runanywhere::v1::HybridCapability_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::HybridCapability>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::HybridModelType_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::HybridModelType>;
 template <>
@@ -190,50 +185,6 @@ internal::EnumTraitsT<::runanywhere::v1::HybridRank_internal_data_>
 
 namespace runanywhere {
 namespace v1 {
-enum HybridCapability : int {
-  HYBRID_CAPABILITY_UNSPECIFIED = 0,
-  HYBRID_CAPABILITY_LLM = 1,
-  HYBRID_CAPABILITY_VLM = 2,
-  HYBRID_CAPABILITY_STT = 3,
-  HYBRID_CAPABILITY_TTS = 4,
-  HYBRID_CAPABILITY_VAD = 5,
-  HybridCapability_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  HybridCapability_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t HybridCapability_internal_data_[];
-inline constexpr HybridCapability HybridCapability_MIN =
-    static_cast<HybridCapability>(0);
-inline constexpr HybridCapability HybridCapability_MAX =
-    static_cast<HybridCapability>(5);
-[[nodiscard]] inline bool HybridCapability_IsValid(int value) {
-  return 0 <= value && value <= 5;
-}
-inline constexpr int HybridCapability_ARRAYSIZE = 5 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridCapability_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(HybridCapability) {
-  return HybridCapability_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& HybridCapability_Name(T value) {
-  static_assert(::std::is_same<T, HybridCapability>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to HybridCapability_Name().");
-  return HybridCapability_Name(static_cast<HybridCapability>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& HybridCapability_Name(HybridCapability value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<HybridCapability_descriptor, 0, 5>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool HybridCapability_Parse(
-    ::absl::string_view name, HybridCapability* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<HybridCapability>(HybridCapability_descriptor(), name,
-                                           value);
-}
 enum HybridBackendKind : int {
   HYBRID_BACKEND_UNSPECIFIED = 0,
   HYBRID_BACKEND_LLAMACPP = 1,
@@ -5646,12 +5597,6 @@ inline void HybridSttTranscribeResponse::set_allocated_error_msg(::std::string* 
 namespace google {
 namespace protobuf {
 
-template <>
-struct is_proto_enum<::runanywhere::v1::HybridCapability> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HybridCapability>() {
-  return ::runanywhere::v1::HybridCapability_descriptor();
-}
 template <>
 struct is_proto_enum<::runanywhere::v1::HybridBackendKind> : std::true_type {};
 template <>

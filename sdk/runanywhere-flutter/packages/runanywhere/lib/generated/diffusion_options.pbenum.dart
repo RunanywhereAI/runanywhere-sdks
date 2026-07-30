@@ -14,14 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// Generation mode. Sources pre-IDL (identical across all surfaces):
-///   Swift   DiffusionTypes.swift:257    (textToImage / imageToImage / inpainting)
-///   Kotlin  DiffusionTypes.kt:188       (TEXT_TO_IMAGE / IMAGE_TO_IMAGE / INPAINTING)
-///   RN      DiffusionTypes.ts:73        (TextToImage / ImageToImage / Inpainting)
-///   Web     DiffusionTypes.ts:23        (TextToImage / ImageToImage / Inpainting)
-///   C ABI   rac_diffusion_types.h:59    (RAC_DIFFUSION_MODE_*)
-/// ---------------------------------------------------------------------------
 class DiffusionMode extends $pb.ProtobufEnum {
   static const DiffusionMode DIFFUSION_MODE_UNSPECIFIED =
       DiffusionMode._(0, _omitEnumNames ? '' : 'DIFFUSION_MODE_UNSPECIFIED');
@@ -47,36 +39,7 @@ class DiffusionMode extends $pb.ProtobufEnum {
   const DiffusionMode._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Scheduler / sampler algorithm — *forward-looking union*.
-///
-/// Pre-IDL sources all expose the same eight cases (DPM++ 2M Karras, DPM++ 2M,
-/// DPM++ 2M SDE, DDIM, Euler, Euler Ancestral, PNDM, LMS); see:
-///   Swift   DiffusionTypes.swift:184    (.dpmPP2MKarras .. .lms)
-///   Kotlin  DiffusionTypes.kt:155       (DPM_PP_2M_KARRAS .. LMS)
-///   RN      DiffusionTypes.ts:48        (DPMPP2MKarras .. LMS)
-///   Web     DiffusionTypes.ts:3         (numeric DPM_PP_2M_Karras .. LMS, matches C ABI)
-///   C ABI   rac_diffusion_types.h:31    (RAC_DIFFUSION_SCHEDULER_*)
-///
-/// This proto enum extends that with two values that downstream backends are
-/// expected to grow into but no SDK exposes yet:
-///   - DDPM   — original Ho et al. 2020 sampler
-///   - LCM    — Latent Consistency Model sampler (paired with the LCM model
-///              variant; today Swift/Kotlin reuse DPM++ 2M Karras for LCM
-///              models because no LCM scheduler case exists).
-/// And it intentionally omits DPMPP_2M_SDE, which exists in every SDK today
-/// but is being collapsed back into DPMPP_2M for the v1 IDL surface (the SDE
-/// variant is purely an algorithmic toggle on DPM++ 2M; backends accept
-/// either tag).
-///
-/// Drift reconciliation:
-///   - Swift/Kotlin/RN/Web/C-ABI carriers of DPMPP_2M_SDE must round-trip
-///     that case to DIFFUSION_SCHEDULER_DPMPP_2M (lossy in name, equivalent
-///     in semantics — the SDE flag is a backend implementation detail).
-///   - DDPM and LCM are *new* slots; SDKs that don't yet recognize them must
-///     fall back to DIFFUSION_SCHEDULER_DPMPP_2M_KARRAS (the recommended
-///     default).
-/// ---------------------------------------------------------------------------
+/// DDPM and LCM are forward-looking; no SDK exposes them.
 class DiffusionScheduler extends $pb.ProtobufEnum {
   static const DiffusionScheduler DIFFUSION_SCHEDULER_UNSPECIFIED =
       DiffusionScheduler._(
@@ -129,14 +92,6 @@ class DiffusionScheduler extends $pb.ProtobufEnum {
   const DiffusionScheduler._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Stable Diffusion model variant. Sources pre-IDL (identical 6 cases):
-///   Swift  DiffusionTypes.swift:92     (sd15 / sd21 / sdxl / sdxlTurbo / sdxs / lcm)
-///   Kotlin DiffusionTypes.kt:85        (SD15 / SD21 / SDXL / SDXL_TURBO / SDXS / LCM)
-///   RN     DiffusionTypes.ts:28        (SD15 / SD21 / SDXL / SDXLTurbo / SDXS / LCM)
-///   Web    DiffusionTypes.ts:14        (numeric SD_1_5 / SD_2_1 / SDXL / SDXL_Turbo / SDXS / LCM)
-///   C ABI  rac_diffusion_types.h:47    (RAC_DIFFUSION_MODEL_*)
-/// ---------------------------------------------------------------------------
 class DiffusionModelVariant extends $pb.ProtobufEnum {
   static const DiffusionModelVariant DIFFUSION_MODEL_VARIANT_UNSPECIFIED =
       DiffusionModelVariant._(
@@ -179,17 +134,6 @@ class DiffusionModelVariant extends $pb.ProtobufEnum {
   const DiffusionModelVariant._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Tokenizer source kind. Apple's compiled CoreML SD models do not bundle
-/// vocab.json / merges.txt, so the tokenizer must be downloaded from a
-/// HuggingFace repo (or a developer-supplied URL).
-/// Sources pre-IDL:
-///   Swift  DiffusionTypes.swift:18     (.sd15 / .sd2 / .sdxl / .custom(baseURL:))
-///   Kotlin DiffusionTypes.kt:31        (Sd15 / Sd2 / Sdxl / Custom(customBaseUrl))
-///   RN     DiffusionTypes.ts:17        ({kind:'sd15'|'sd2'|'sdxl'|'custom'} discriminated union)
-///   Web    — n/a (the llamacpp Web package doesn't expose tokenizer source)
-///   C ABI  rac_diffusion_types.h:79    (RAC_DIFFUSION_TOKENIZER_SD_1_5 / SD_2_X / SDXL / CUSTOM)
-/// ---------------------------------------------------------------------------
 class DiffusionTokenizerSourceKind extends $pb.ProtobufEnum {
   static const DiffusionTokenizerSourceKind
       DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED =

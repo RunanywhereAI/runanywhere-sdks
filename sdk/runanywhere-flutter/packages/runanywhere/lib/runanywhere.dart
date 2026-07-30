@@ -59,22 +59,31 @@ export 'public/hybrid/hybrid_routing_policy.dart'
 export 'public/hybrid/hybrid_stt_router.dart'
     show HybridSttRouter, HybridTranscribeException;
 export 'public/runanywhere.dart' show RunAnywhere;
-// Generated protobuf types stay reachable, minus the names the v3 public API
-// types shadow. Those messages remain available through the prefixed
-// `runanywhere_protos.dart` import.
+// Only the generated messages the public API actually hands back or takes in.
+// Everything else stays behind a prefixed `runanywhere_protos.dart` import.
 export 'runanywhere_protos.dart'
-    hide
-        AudioEncoding,
-        ChatMessage,
-        DiarizationApi,
-        EmbeddingsApi,
-        DiarizationOptions,
-        DiarizationResult,
-        DownloadEvent,
-        GenerationEvent,
-        HybridCascade,
-        HybridFilter,
-        HybridRoutingPolicy,
-        ReasoningOptions,
-        TokenKind,
-        VoiceEvent;
+    show
+        ArchiveStructure,
+        ArchiveType,
+        HybridRoutedMetadata,
+        HybridSttTranscribeOptions,
+        InferenceFramework,
+        LoRAAdapterConfig,
+        LoRAAdapterInfo,
+        LoRAState,
+        LoraAdapterCatalogEntry,
+        LoraCompatibilityResult,
+        MessageRole,
+        ModelCategory,
+        ModelFileDescriptor,
+        ModelFormat,
+        ModelInfo,
+        ModelSource,
+        RegisterModelFromUrlRequest,
+        ThinkingTagPattern,
+        ToolCall,
+        ToolDefinition,
+        ToolParameter,
+        ToolParameterType,
+        ToolResult,
+        ToolValue;

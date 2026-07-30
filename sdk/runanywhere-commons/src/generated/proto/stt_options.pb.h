@@ -62,8 +62,6 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_stt_
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum STTAudioEncoding : int;
-extern const uint32_t STTAudioEncoding_internal_data_[];
 enum STTStreamEventKind : int;
 extern const uint32_t STTStreamEventKind_internal_data_[];
 class STTAudioSource;
@@ -81,14 +79,6 @@ extern STTConfigurationGlobalsTypeInternal STTConfiguration_globals_;
 extern const ::google::protobuf::internal::ClassDataFull STTConfiguration_class_data_;
 #else
 extern const STTConfigurationGlobalsTypeInternal STTConfiguration_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-class STTLanguageDetectionResult;
-struct STTLanguageDetectionResultGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern STTLanguageDetectionResultGlobalsTypeInternal STTLanguageDetectionResult_globals_;
-extern const ::google::protobuf::internal::ClassDataFull STTLanguageDetectionResult_class_data_;
-#else
-extern const STTLanguageDetectionResultGlobalsTypeInternal STTLanguageDetectionResult_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 class STTOptions;
 struct STTOptionsGlobalsTypeInternal;
@@ -175,9 +165,6 @@ extern const WordTimestampGlobalsTypeInternal WordTimestamp_globals_;
 namespace google {
 namespace protobuf {
 template <>
-internal::EnumTraitsT<::runanywhere::v1::STTAudioEncoding_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::STTAudioEncoding>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::STTStreamEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::STTStreamEventKind>;
 }  // namespace protobuf
@@ -185,48 +172,6 @@ internal::EnumTraitsT<::runanywhere::v1::STTStreamEventKind_internal_data_>
 
 namespace runanywhere {
 namespace v1 {
-enum STTAudioEncoding : int {
-  STT_AUDIO_ENCODING_UNSPECIFIED = 0,
-  STT_AUDIO_ENCODING_PCM_S16_LE = 1,
-  STT_AUDIO_ENCODING_PCM_F32_LE = 2,
-  STT_AUDIO_ENCODING_CONTAINER = 3,
-  STTAudioEncoding_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  STTAudioEncoding_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t STTAudioEncoding_internal_data_[];
-inline constexpr STTAudioEncoding STTAudioEncoding_MIN =
-    static_cast<STTAudioEncoding>(0);
-inline constexpr STTAudioEncoding STTAudioEncoding_MAX =
-    static_cast<STTAudioEncoding>(3);
-[[nodiscard]] inline bool STTAudioEncoding_IsValid(int value) {
-  return 0 <= value && value <= 3;
-}
-inline constexpr int STTAudioEncoding_ARRAYSIZE = 3 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-STTAudioEncoding_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(STTAudioEncoding) {
-  return STTAudioEncoding_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& STTAudioEncoding_Name(T value) {
-  static_assert(::std::is_same<T, STTAudioEncoding>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to STTAudioEncoding_Name().");
-  return STTAudioEncoding_Name(static_cast<STTAudioEncoding>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& STTAudioEncoding_Name(STTAudioEncoding value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<STTAudioEncoding_descriptor, 0, 3>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool STTAudioEncoding_Parse(
-    ::absl::string_view name, STTAudioEncoding* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<STTAudioEncoding>(STTAudioEncoding_descriptor(), name,
-                                           value);
-}
 enum STTStreamEventKind : int {
   STT_STREAM_EVENT_KIND_UNSPECIFIED = 0,
   STT_STREAM_EVENT_KIND_STARTED = 1,
@@ -1480,253 +1425,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOptions final : public ::google:
 };
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTLanguageDetectionResult final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.STTLanguageDetectionResult) */ {
- public:
-  inline STTLanguageDetectionResult() : STTLanguageDetectionResult(nullptr) {}
-  ~STTLanguageDetectionResult() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(STTLanguageDetectionResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(STTLanguageDetectionResult));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr STTLanguageDetectionResult(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline STTLanguageDetectionResult(const STTLanguageDetectionResult& from) : STTLanguageDetectionResult(nullptr, from) {}
-  inline STTLanguageDetectionResult(STTLanguageDetectionResult&& from) noexcept : STTLanguageDetectionResult(nullptr, ::std::move(from)) {}
-  inline STTLanguageDetectionResult& operator=(const STTLanguageDetectionResult& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline STTLanguageDetectionResult& operator=(STTLanguageDetectionResult&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const STTLanguageDetectionResult& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<STTLanguageDetectionResult>(&STTLanguageDetectionResult_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 12;
-  friend void swap(STTLanguageDetectionResult& a, STTLanguageDetectionResult& b) { a.Swap(&b); }
-  inline void Swap(STTLanguageDetectionResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(STTLanguageDetectionResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] STTLanguageDetectionResult* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<STTLanguageDetectionResult>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const STTLanguageDetectionResult& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const STTLanguageDetectionResult& from) { STTLanguageDetectionResult::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(STTLanguageDetectionResult* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.STTLanguageDetectionResult"; }
-
-  explicit STTLanguageDetectionResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  STTLanguageDetectionResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const STTLanguageDetectionResult& from);
-  STTLanguageDetectionResult(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, STTLanguageDetectionResult&& from) noexcept
-      : STTLanguageDetectionResult(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kAlternativesFieldNumber = 4,
-    kLanguageFieldNumber = 5,
-    kConfidenceFieldNumber = 3,
-  };
-  // repeated string alternatives = 4;
-  [[nodiscard]] int alternatives_size()
-      const;
-  private:
-  int _internal_alternatives_size() const;
-
-  public:
-  void clear_alternatives() ;
-  [[nodiscard]] const ::std::string& alternatives(int index) const;
-  ::std::string* PROTOBUF_NONNULL mutable_alternatives(int index);
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_alternatives(int index, Arg_&& value, Args_... args);
-  ::std::string* PROTOBUF_NONNULL add_alternatives();
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void add_alternatives(Arg_&& value, Args_... args);
-  [[nodiscard]] const
-      ::google::protobuf::RepeatedPtrField<::std::string>&
-      alternatives() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>*
-      PROTOBUF_NONNULL
-      mutable_alternatives();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_alternatives() const;
-  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_alternatives();
-
-  public:
-  // string language = 5;
-  void clear_language() ;
-  [[nodiscard]] const ::std::string& language() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_language(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_language();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language();
-  void set_allocated_language(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_language() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_language(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_language();
-
-  public:
-  // float confidence = 3;
-  void clear_confidence() ;
-  [[nodiscard]] float confidence() const;
-  void set_confidence(float value);
-
-  private:
-  float _internal_confidence() const;
-  void _internal_set_confidence(float value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.STTLanguageDetectionResult)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 3,
-                          0, 70,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const STTLanguageDetectionResult& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField<::std::string> alternatives_;
-    ::google::protobuf::internal::ArenaStringPtr language_;
-    float confidence_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_stt_5foptions_2eproto;
-};
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTConfiguration final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.STTConfiguration) */ {
  public:
@@ -2243,14 +1941,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTAudioSource final : public ::goo
     kFileUriFieldNumber = 2,
     kAdapterHandleFieldNumber = 3,
   };
-  // .runanywhere.v1.STTAudioEncoding encoding = 4;
+  // .runanywhere.v1.AudioEncoding encoding = 4;
   void clear_encoding() ;
-  [[nodiscard]] ::runanywhere::v1::STTAudioEncoding encoding() const;
-  void set_encoding(::runanywhere::v1::STTAudioEncoding value);
+  [[nodiscard]] ::runanywhere::v1::AudioEncoding encoding() const;
+  void set_encoding(::runanywhere::v1::AudioEncoding value);
 
   private:
-  ::runanywhere::v1::STTAudioEncoding _internal_encoding() const;
-  void _internal_set_encoding(::runanywhere::v1::STTAudioEncoding value);
+  ::runanywhere::v1::AudioEncoding _internal_encoding() const;
+  void _internal_set_encoding(::runanywhere::v1::AudioEncoding value);
 
   public:
   // .runanywhere.v1.AudioFormat audio_format = 5;
@@ -5029,26 +4727,26 @@ inline void STTAudioSource::set_allocated_adapter_handle(::std::string* PROTOBUF
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTAudioSource.adapter_handle)
 }
 
-// .runanywhere.v1.STTAudioEncoding encoding = 4;
+// .runanywhere.v1.AudioEncoding encoding = 4;
 inline void STTAudioSource::clear_encoding() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.encoding_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
-inline ::runanywhere::v1::STTAudioEncoding STTAudioSource::encoding() const {
+inline ::runanywhere::v1::AudioEncoding STTAudioSource::encoding() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTAudioSource.encoding)
   return _internal_encoding();
 }
-inline void STTAudioSource::set_encoding(::runanywhere::v1::STTAudioEncoding value) {
+inline void STTAudioSource::set_encoding(::runanywhere::v1::AudioEncoding value) {
   _internal_set_encoding(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTAudioSource.encoding)
 }
-inline ::runanywhere::v1::STTAudioEncoding STTAudioSource::_internal_encoding() const {
+inline ::runanywhere::v1::AudioEncoding STTAudioSource::_internal_encoding() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::STTAudioEncoding>(_impl_.encoding_);
+  return static_cast<::runanywhere::v1::AudioEncoding>(_impl_.encoding_);
 }
-inline void STTAudioSource::_internal_set_encoding(::runanywhere::v1::STTAudioEncoding value) {
+inline void STTAudioSource::_internal_set_encoding(::runanywhere::v1::AudioEncoding value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.encoding_ = value;
 }
@@ -7811,170 +7509,6 @@ inline void STTServiceState::_internal_set_error_code(::int32_t value) {
   _impl_.error_code_ = value;
 }
 
-// -------------------------------------------------------------------
-
-// STTLanguageDetectionResult
-
-// string language = 5;
-inline void STTLanguageDetectionResult::clear_language() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& STTLanguageDetectionResult::language() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTLanguageDetectionResult.language)
-  return _internal_language();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTLanguageDetectionResult::set_language(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.language_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTLanguageDetectionResult.language)
-}
-inline ::std::string* PROTOBUF_NONNULL STTLanguageDetectionResult::mutable_language()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_language();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTLanguageDetectionResult.language)
-  return _s;
-}
-inline const ::std::string& STTLanguageDetectionResult::_internal_language() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.language_.Get();
-}
-inline void STTLanguageDetectionResult::_internal_set_language(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.language_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL STTLanguageDetectionResult::_internal_mutable_language() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.language_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTLanguageDetectionResult::release_language() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTLanguageDetectionResult.language)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.language_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.language_.Set("", GetArena());
-  }
-  return released;
-}
-inline void STTLanguageDetectionResult::set_allocated_language(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.language_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_.IsDefault()) {
-    _impl_.language_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTLanguageDetectionResult.language)
-}
-
-// float confidence = 3;
-inline void STTLanguageDetectionResult::clear_confidence() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.confidence_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline float STTLanguageDetectionResult::confidence() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTLanguageDetectionResult.confidence)
-  return _internal_confidence();
-}
-inline void STTLanguageDetectionResult::set_confidence(float value) {
-  _internal_set_confidence(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTLanguageDetectionResult.confidence)
-}
-inline float STTLanguageDetectionResult::_internal_confidence() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.confidence_;
-}
-inline void STTLanguageDetectionResult::_internal_set_confidence(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.confidence_ = value;
-}
-
-// repeated string alternatives = 4;
-inline int STTLanguageDetectionResult::_internal_alternatives_size() const {
-  return _internal_alternatives().size();
-}
-inline int STTLanguageDetectionResult::alternatives_size() const {
-  return _internal_alternatives_size();
-}
-inline void STTLanguageDetectionResult::clear_alternatives() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.alternatives_.Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline ::std::string* PROTOBUF_NONNULL STTLanguageDetectionResult::add_alternatives()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::std::string* _s =
-      _internal_mutable_alternatives()->InternalAddWithArena(
-          ::google::protobuf::MessageLite::internal_visibility(), GetArena());
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add_mutable:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-  return _s;
-}
-inline const ::std::string& STTLanguageDetectionResult::alternatives(int index) const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-  return _internal_alternatives().Get(index);
-}
-inline ::std::string* PROTOBUF_NONNULL STTLanguageDetectionResult::mutable_alternatives(int index)
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-  return _internal_mutable_alternatives()->Mutable(index);
-}
-template <typename Arg_, typename... Args_>
-inline void STTLanguageDetectionResult::set_alternatives(int index, Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::AssignToString(
-      *_internal_mutable_alternatives()->Mutable(index),
-      ::std::forward<Arg_>(value), args... );
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-}
-template <typename Arg_, typename... Args_>
-inline void STTLanguageDetectionResult::add_alternatives(Arg_&& value, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::google::protobuf::internal::AddToRepeatedPtrField(
-      ::google::protobuf::MessageLite::internal_visibility(), GetArena(),
-      *_internal_mutable_alternatives(), ::std::forward<Arg_>(value),
-      args... );
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_add:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>& STTLanguageDetectionResult::alternatives()
-    const ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_list:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-  return _internal_alternatives();
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-STTLanguageDetectionResult::mutable_alternatives() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.STTLanguageDetectionResult.alternatives)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _internal_mutable_alternatives();
-}
-inline const ::google::protobuf::RepeatedPtrField<::std::string>&
-STTLanguageDetectionResult::_internal_alternatives() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.alternatives_;
-}
-inline ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL
-STTLanguageDetectionResult::_internal_mutable_alternatives() {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return &_impl_.alternatives_;
-}
-
 #ifdef __GNUC__
 #pragma GCC diagnostic pop
 #endif  // __GNUC__
@@ -7987,12 +7521,6 @@ STTLanguageDetectionResult::_internal_mutable_alternatives() {
 namespace google {
 namespace protobuf {
 
-template <>
-struct is_proto_enum<::runanywhere::v1::STTAudioEncoding> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::STTAudioEncoding>() {
-  return ::runanywhere::v1::STTAudioEncoding_descriptor();
-}
 template <>
 struct is_proto_enum<::runanywhere::v1::STTStreamEventKind> : std::true_type {};
 template <>

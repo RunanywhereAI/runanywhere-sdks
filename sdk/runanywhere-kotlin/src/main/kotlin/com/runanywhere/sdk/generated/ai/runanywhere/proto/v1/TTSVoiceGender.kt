@@ -16,14 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Voice gender — union across SDKs.
- * Sources pre-IDL:
- *   RN     TTSTypes.ts:117    ('male' | 'female' | 'neutral')
- * (Other SDKs did not expose voice listing pre-IDL; canonicalized here.)
- * ---------------------------------------------------------------------------
- */
 public enum class TTSVoiceGender(
   override val `value`: Int,
 ) : WireEnum {

@@ -1802,7 +1802,7 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
     }
     output.set_timestamp_ms(rac_get_current_time_ms());
     const size_t sample_width =
-        request.audio().encoding() == runanywhere::v1::STT_AUDIO_ENCODING_PCM_F32_LE
+        request.audio().encoding() == runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE
             ? sizeof(float)
             : RAC_STT_BYTES_PER_SAMPLE;
     const int64_t duration_ms =
@@ -1957,7 +1957,7 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
             : request.request_id();
 
     const size_t sample_width =
-        request.audio().encoding() == runanywhere::v1::STT_AUDIO_ENCODING_PCM_F32_LE
+        request.audio().encoding() == runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE
             ? sizeof(float)
             : RAC_STT_BYTES_PER_SAMPLE;
 

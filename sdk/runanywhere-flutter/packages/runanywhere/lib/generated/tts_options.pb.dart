@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -23,24 +22,6 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'tts_options.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// Component-level TTS configuration.
-///
-/// Mirrors the C ABI rac_tts_config_t exactly (minus preferred_framework, which
-/// is a runtime hint, not part of the wire contract). Field names match Swift
-/// TTSConfiguration / Kotlin TTSConfiguration.
-///
-/// Defaults (for documentation; proto3 zero-values apply on the wire):
-///   voice              = "default"  (Kotlin) / "com.apple.ttsbundle..." (Swift)
-///   language_code      = "en-US"
-///   speed              = 1.0   (range 0.5 – 2.0)
-///   pitch              = 1.0   (range 0.5 – 2.0)
-///   volume             = 1.0   (range 0.0 – 1.0)
-///   audio_format       = AUDIO_FORMAT_PCM
-///   sample_rate        = 22050 (RAC_TTS_DEFAULT_SAMPLE_RATE)
-///   enable_neural_voice= true
-///   enable_ssml        = false
-/// ---------------------------------------------------------------------------
 class TTSConfiguration extends $pb.GeneratedMessage {
   factory TTSConfiguration({
     $core.String? modelId,
@@ -97,9 +78,8 @@ class TTSConfiguration extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<TTSConfiguration>(create);
   static TTSConfiguration? _defaultInstance;
 
-  /// Model identifier (voice model file id, e.g. piper voice). Optional —
-  /// platform TTS engines (Apple System TTS, Android TextToSpeech) don't
-  /// require a model file.
+  /// Voice model file id, e.g. a piper voice. Empty for platform TTS engines
+  /// (Apple System TTS, Android TextToSpeech), which need no model file.
   @$pb.TagNumber(1)
   $core.String get modelId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -109,7 +89,7 @@ class TTSConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearModelId() => $_clearField(1);
 
-  /// Whether to use neural / premium voice if available.
+  /// Use the neural or premium voice when available.
   @$pb.TagNumber(9)
   $core.bool get enableNeuralVoice => $_getBF(1);
   @$pb.TagNumber(9)
@@ -119,7 +99,6 @@ class TTSConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearEnableNeuralVoice() => $_clearField(9);
 
-  /// Preferred framework for the component. Absent = auto.
   @$pb.TagNumber(11)
   $0.InferenceFramework get preferredFramework => $_getN(2);
   @$pb.TagNumber(11)
@@ -129,8 +108,7 @@ class TTSConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   void clearPreferredFramework() => $_clearField(11);
 
-  /// Component-level defaults applied when a per-call TTSOptions is absent
-  /// or leaves a field unset.
+  /// Applied when a per-call TTSOptions is absent or leaves a field unset.
   @$pb.TagNumber(12)
   TTSOptions get defaultOptions => $_getN(3);
   @$pb.TagNumber(12)
@@ -143,16 +121,6 @@ class TTSConfiguration extends $pb.GeneratedMessage {
   TTSOptions ensureDefaultOptions() => $_ensure(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Per-call TTS synthesis options.
-///
-/// Mirrors the C ABI rac_tts_options_t exactly. Field names match Swift
-/// TTSOptions / Kotlin TTSOptions / Dart TTSOptions.
-///
-/// Note: `voice` is optional at the source (Swift `String?`, C `const char* =
-/// NULL`). On the wire, an empty string MUST be interpreted as "use the
-/// component's configured voice".
-/// ---------------------------------------------------------------------------
 class TTSOptions extends $pb.GeneratedMessage {
   factory TTSOptions({
     $core.String? voice,
@@ -224,7 +192,7 @@ class TTSOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<TTSOptions>(create);
   static TTSOptions? _defaultInstance;
 
-  /// Voice override (empty = use component default).
+  /// Empty = use the component's configured voice.
   @$pb.TagNumber(1)
   $core.String get voice => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -234,7 +202,7 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearVoice() => $_clearField(1);
 
-  /// Language override (BCP-47). Empty = use component default.
+  /// BCP-47. Empty = use the component default.
   @$pb.TagNumber(2)
   $core.String get languageCode => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -244,9 +212,7 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearLanguageCode() => $_clearField(2);
 
-  /// Speech speed multiplier (1.0 = normal). Industry name (OpenAI
-  /// /audio/speech `speed`); replaces the rate/speaking_rate/speakingRate
-  /// split across the C ABI and SDKs.
+  /// Speed multiplier, matching OpenAI /audio/speech `speed`.
   @$pb.TagNumber(3)
   $core.double get speed => $_getN(2);
   @$pb.TagNumber(3)
@@ -256,7 +222,7 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearSpeed() => $_clearField(3);
 
-  /// Speech pitch (0.5 – 2.0; 1.0 is normal).
+  /// 0.5 - 2.0.
   @$pb.TagNumber(4)
   $core.double get pitch => $_getN(3);
   @$pb.TagNumber(4)
@@ -266,7 +232,7 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearPitch() => $_clearField(4);
 
-  /// Speech volume (0.0 – 1.0).
+  /// 0.0 - 1.0.
   @$pb.TagNumber(5)
   $core.double get volume => $_getN(4);
   @$pb.TagNumber(5)
@@ -276,9 +242,7 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearVolume() => $_clearField(5);
 
-  /// Whether the input contains SSML markup. C ABI: `use_ssml`, Swift:
-  /// `useSSML`, Kotlin: `useSSML`, Dart: `useSSML`. Canonicalized to
-  /// `enable_ssml` for consistency with TTSConfiguration.
+  /// Whether the input carries SSML markup.
   @$pb.TagNumber(6)
   $core.bool get enableSsml => $_getBF(5);
   @$pb.TagNumber(6)
@@ -288,7 +252,6 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearEnableSsml() => $_clearField(6);
 
-  /// Output audio format.
   @$pb.TagNumber(7)
   $0.AudioFormat get audioFormat => $_getN(6);
   @$pb.TagNumber(7)
@@ -298,8 +261,7 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearAudioFormat() => $_clearField(7);
 
-  /// Output sample rate override in Hz. 0 = component/default sample rate.
-  /// Present in rac_tts_options_t and several SDK option structs.
+  /// 0 = component default.
   @$pb.TagNumber(8)
   $core.int get sampleRate => $_getIZ(7);
   @$pb.TagNumber(8)
@@ -309,8 +271,7 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearSampleRate() => $_clearField(8);
 
-  /// Speaker index for multi-speaker voices. -1/0 = backend default
-  /// depending on model convention.
+  /// For multi-speaker voices. -1 or 0 = backend default, per model convention.
   @$pb.TagNumber(9)
   $core.int get speakerId => $_getIZ(8);
   @$pb.TagNumber(9)
@@ -320,7 +281,7 @@ class TTSOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearSpeakerId() => $_clearField(9);
 
-  /// Optional style/emotion hint for voices that support style transfer.
+  /// Style or emotion hint for voices supporting style transfer.
   @$pb.TagNumber(11)
   $core.String get style => $_getSZ(9);
   @$pb.TagNumber(11)
@@ -434,13 +395,6 @@ class TTSSynthesisRequest extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// Phoneme-level timestamp.
-///
-/// Mirrors the C ABI rac_tts_phoneme_timestamp_t exactly. Time units are
-/// **milliseconds** on the wire (matches C ABI). Swift / Kotlin / Dart bindings
-/// expose seconds (double) and convert at the binding boundary.
-/// ---------------------------------------------------------------------------
 class TTSPhonemeTimestamp extends $pb.GeneratedMessage {
   factory TTSPhonemeTimestamp({
     $core.String? phoneme,
@@ -491,7 +445,7 @@ class TTSPhonemeTimestamp extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<TTSPhonemeTimestamp>(create);
   static TTSPhonemeTimestamp? _defaultInstance;
 
-  /// The phoneme symbol (IPA or engine-specific).
+  /// IPA or engine-specific symbol.
   @$pb.TagNumber(1)
   $core.String get phoneme => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -501,7 +455,7 @@ class TTSPhonemeTimestamp extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearPhoneme() => $_clearField(1);
 
-  /// Start time within the synthesized audio, in milliseconds.
+  /// Offsets within the synthesized audio.
   @$pb.TagNumber(2)
   $fixnum.Int64 get startMs => $_getI64(1);
   @$pb.TagNumber(2)
@@ -511,7 +465,6 @@ class TTSPhonemeTimestamp extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearStartMs() => $_clearField(2);
 
-  /// End time within the synthesized audio, in milliseconds.
   @$pb.TagNumber(3)
   $fixnum.Int64 get endMs => $_getI64(2);
   @$pb.TagNumber(3)
@@ -522,12 +475,6 @@ class TTSPhonemeTimestamp extends $pb.GeneratedMessage {
   void clearEndMs() => $_clearField(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Synthesis metadata.
-///
-/// Mirrors the C ABI rac_tts_synthesis_metadata_t. Time units in milliseconds
-/// and durations as int64 to match the C ABI.
-/// ---------------------------------------------------------------------------
 class TTSSynthesisMetadata extends $pb.GeneratedMessage {
   factory TTSSynthesisMetadata({
     $core.String? voiceId,
@@ -589,7 +536,6 @@ class TTSSynthesisMetadata extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<TTSSynthesisMetadata>(create);
   static TTSSynthesisMetadata? _defaultInstance;
 
-  /// Voice id used for synthesis.
   @$pb.TagNumber(1)
   $core.String get voiceId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -599,9 +545,7 @@ class TTSSynthesisMetadata extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearVoiceId() => $_clearField(1);
 
-  /// Language used for synthesis (BCP-47). Source field name varies:
-  /// C ABI: `language`, Swift: `language`, Kotlin: `language`. We use
-  /// `language_code` to match TTSConfiguration / TTSOptions.
+  /// BCP-47.
   @$pb.TagNumber(2)
   $core.String get languageCode => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -611,7 +555,6 @@ class TTSSynthesisMetadata extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearLanguageCode() => $_clearField(2);
 
-  /// Wall-clock processing time in milliseconds.
   @$pb.TagNumber(3)
   $fixnum.Int64 get processingTimeMs => $_getI64(2);
   @$pb.TagNumber(3)
@@ -621,7 +564,6 @@ class TTSSynthesisMetadata extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearProcessingTimeMs() => $_clearField(3);
 
-  /// Number of input characters synthesized.
   @$pb.TagNumber(4)
   $core.int get characterCount => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -631,9 +573,6 @@ class TTSSynthesisMetadata extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearCharacterCount() => $_clearField(4);
 
-  /// Audio duration in milliseconds. Present in C ABI rac_tts_output_t but
-  /// mirrored here so metadata is self-describing for clients that consume
-  /// metadata-only paths (e.g. TTSSpeakResult).
   @$pb.TagNumber(5)
   $fixnum.Int64 get audioDurationMs => $_getI64(4);
   @$pb.TagNumber(5)
@@ -643,8 +582,7 @@ class TTSSynthesisMetadata extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearAudioDurationMs() => $_clearField(5);
 
-  /// Characters processed per second. Some native paths expose this directly;
-  /// consumers may also compute it from character_count / processing_time_ms.
+  /// character_count / processing_time_ms, set by the producer.
   @$pb.TagNumber(6)
   $core.double get charactersPerSecond => $_getN(5);
   @$pb.TagNumber(6)
@@ -655,14 +593,6 @@ class TTSSynthesisMetadata extends $pb.GeneratedMessage {
   void clearCharactersPerSecond() => $_clearField(6);
 }
 
-/// ---------------------------------------------------------------------------
-/// Full TTS output: synthesized audio plus metadata.
-///
-/// Mirrors the C ABI rac_tts_output_t. `audio_data` is opaque bytes; bindings
-/// adapt to native buffers (Swift Data, Kotlin ByteArray, Dart Uint8List,
-/// JS ArrayBuffer/Float32Array, C void*). Sample rate is required because PCM
-/// payloads are otherwise unparseable.
-/// ---------------------------------------------------------------------------
 class TTSOutput extends $pb.GeneratedMessage {
   factory TTSOutput({
     $core.List<$core.int>? audioData,
@@ -744,7 +674,7 @@ class TTSOutput extends $pb.GeneratedMessage {
       _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TTSOutput>(create);
   static TTSOutput? _defaultInstance;
 
-  /// Synthesized audio bytes, encoded per `audio_format`.
+  /// Encoded per audio_format.
   @$pb.TagNumber(1)
   $core.List<$core.int> get audioData => $_getN(0);
   @$pb.TagNumber(1)
@@ -754,7 +684,6 @@ class TTSOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearAudioData() => $_clearField(1);
 
-  /// Audio format of the bytes in `audio_data`.
   @$pb.TagNumber(2)
   $0.AudioFormat get audioFormat => $_getN(1);
   @$pb.TagNumber(2)
@@ -764,9 +693,8 @@ class TTSOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearAudioFormat() => $_clearField(2);
 
-  /// Sample rate in Hz. For PCM payloads this is required to interpret the
-  /// bytes; for compressed formats (mp3, opus, …) it reflects the synthesis
-  /// sample rate, not the container rate.
+  /// Required to interpret PCM payloads. For compressed formats this is the
+  /// synthesis rate, not the container rate.
   @$pb.TagNumber(3)
   $core.int get sampleRate => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -776,7 +704,6 @@ class TTSOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearSampleRate() => $_clearField(3);
 
-  /// Audio duration in milliseconds (matches C ABI `duration_ms`).
   @$pb.TagNumber(4)
   $fixnum.Int64 get durationMs => $_getI64(3);
   @$pb.TagNumber(4)
@@ -786,11 +713,10 @@ class TTSOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearDurationMs() => $_clearField(4);
 
-  /// Phoneme-level timestamps, if the engine produced them. May be empty.
+  /// Empty unless the engine produced them.
   @$pb.TagNumber(5)
   $pb.PbList<TTSPhonemeTimestamp> get phonemeTimestamps => $_getList(4);
 
-  /// Per-pass synthesis metadata.
   @$pb.TagNumber(6)
   TTSSynthesisMetadata get metadata => $_getN(5);
   @$pb.TagNumber(6)
@@ -802,8 +728,7 @@ class TTSOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   TTSSynthesisMetadata ensureMetadata() => $_ensure(5);
 
-  /// Wall-clock timestamp when the output was produced
-  /// (milliseconds since UNIX epoch). Mirrors C ABI `timestamp_ms`.
+  /// Milliseconds since epoch.
   @$pb.TagNumber(7)
   $fixnum.Int64 get timestampMs => $_getI64(6);
   @$pb.TagNumber(7)
@@ -813,8 +738,7 @@ class TTSOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearTimestampMs() => $_clearField(7);
 
-  /// Stream chunk metadata. For one-shot synthesis, chunk_index=0 and
-  /// is_final=true when set by the producer.
+  /// For one-shot synthesis, chunk_index=0 and is_final=true.
   @$pb.TagNumber(8)
   $core.int get chunkIndex => $_getIZ(7);
   @$pb.TagNumber(8)
@@ -842,7 +766,6 @@ class TTSOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearAudioSizeBytes() => $_clearField(10);
 
-  /// Terminal error details for result-envelope APIs.
   @$pb.TagNumber(11)
   $core.String get errorMessage => $_getSZ(10);
   @$pb.TagNumber(11)
@@ -862,15 +785,8 @@ class TTSOutput extends $pb.GeneratedMessage {
   void clearErrorCode() => $_clearField(12);
 }
 
-/// ---------------------------------------------------------------------------
-/// Result of a `speak()` call — metadata-only view of an already-played
-/// synthesis pass. Used when the SDK plays audio internally and the caller
-/// does not need raw bytes.
-///
-/// Mirrors the C ABI rac_tts_speak_result_t. Identical to TTSOutput minus
-/// `audio_data` and `phoneme_timestamps`; `audio_size_bytes` is retained for
-/// callers that want to know how much was synthesized.
-/// ---------------------------------------------------------------------------
+/// Metadata-only view for callers that let the SDK play the audio and never
+/// need the raw bytes.
 class TTSSpeakResult extends $pb.GeneratedMessage {
   factory TTSSpeakResult({
     $0.AudioFormat? audioFormat,
@@ -938,7 +854,6 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<TTSSpeakResult>(create);
   static TTSSpeakResult? _defaultInstance;
 
-  /// Audio format used during synthesis.
   @$pb.TagNumber(1)
   $0.AudioFormat get audioFormat => $_getN(0);
   @$pb.TagNumber(1)
@@ -948,7 +863,6 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearAudioFormat() => $_clearField(1);
 
-  /// Sample rate in Hz used during synthesis.
   @$pb.TagNumber(2)
   $core.int get sampleRate => $_getIZ(1);
   @$pb.TagNumber(2)
@@ -958,7 +872,6 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearSampleRate() => $_clearField(2);
 
-  /// Audio duration in milliseconds.
   @$pb.TagNumber(3)
   $fixnum.Int64 get durationMs => $_getI64(2);
   @$pb.TagNumber(3)
@@ -968,8 +881,7 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearDurationMs() => $_clearField(3);
 
-  /// Audio size in bytes (0 for system TTS that plays directly without
-  /// exposing buffers).
+  /// 0 for system TTS that plays directly without exposing buffers.
   @$pb.TagNumber(4)
   $fixnum.Int64 get audioSizeBytes => $_getI64(3);
   @$pb.TagNumber(4)
@@ -979,7 +891,6 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearAudioSizeBytes() => $_clearField(4);
 
-  /// Per-pass synthesis metadata.
   @$pb.TagNumber(5)
   TTSSynthesisMetadata get metadata => $_getN(4);
   @$pb.TagNumber(5)
@@ -991,7 +902,7 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   TTSSynthesisMetadata ensureMetadata() => $_ensure(4);
 
-  /// Wall-clock timestamp when speech completed (ms since UNIX epoch).
+  /// Milliseconds since epoch, when speech completed.
   @$pb.TagNumber(6)
   $fixnum.Int64 get timestampMs => $_getI64(5);
   @$pb.TagNumber(6)
@@ -1020,13 +931,6 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
   void clearErrorCode() => $_clearField(8);
 }
 
-/// ---------------------------------------------------------------------------
-/// Descriptor for a TTS voice the engine can use.
-///
-/// Pre-IDL only RN exposed this (TTSTypes.ts:106). Canonicalized here so all
-/// SDKs gain a typed voice-listing API. `gender` uses an enum to avoid the
-/// string-typed drift that RN had ('male' | 'female' | 'neutral').
-/// ---------------------------------------------------------------------------
 class TTSVoiceInfo extends $pb.GeneratedMessage {
   factory TTSVoiceInfo({
     $core.String? id,
@@ -1096,8 +1000,7 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<TTSVoiceInfo>(create);
   static TTSVoiceInfo? _defaultInstance;
 
-  /// Engine-specific voice identifier (passed back as TTSOptions.voice or
-  /// TTSConfiguration.voice).
+  /// Passed back as TTSOptions.voice.
   @$pb.TagNumber(1)
   $core.String get id => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -1107,7 +1010,7 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearId() => $_clearField(1);
 
-  /// Human-readable display name (e.g. "Samantha", "Daniel").
+  /// e.g. "Samantha".
   @$pb.TagNumber(2)
   $core.String get displayName => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -1117,7 +1020,7 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearDisplayName() => $_clearField(2);
 
-  /// Language spoken by this voice (BCP-47, e.g. "en-US").
+  /// BCP-47.
   @$pb.TagNumber(3)
   $core.String get languageCode => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -1127,7 +1030,6 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearLanguageCode() => $_clearField(3);
 
-  /// Voice gender, when known.
   @$pb.TagNumber(4)
   TTSVoiceGender get gender => $_getN(3);
   @$pb.TagNumber(4)
@@ -1137,7 +1039,7 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearGender() => $_clearField(4);
 
-  /// Optional descriptive text (locale, age, style notes).
+  /// Locale, age, or style notes.
   @$pb.TagNumber(5)
   $core.String get description => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -1147,7 +1049,6 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearDescription() => $_clearField(5);
 
-  /// Additional discovery fields surfaced by system and ONNX/Piper voices.
   @$pb.TagNumber(6)
   $core.bool get isNeural => $_getBF(5);
   @$pb.TagNumber(6)
@@ -1179,9 +1080,6 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
   $pb.PbList<$core.String> get supportedStyles => $_getList(8);
 }
 
-/// Wire envelope returned by rac_tts_list_voices_lifecycle_proto. Replaces the
-/// per-voice callback pattern used by the legacy handle-based ABI so the
-/// lifecycle-driven listing call returns a single serialized message.
 class TTSVoiceList extends $pb.GeneratedMessage {
   factory TTSVoiceList({
     $core.Iterable<TTSVoiceInfo>? voices,
@@ -1406,8 +1304,7 @@ class TTSStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearErrorCode() => $_clearField(9);
 
-  /// Progress metadata for started/progress/audio_chunk/completed events.
-  /// progress is 0.0..1.0 when known; total_chunks=0 means unknown.
+  /// progress is 0.0-1.0 when known; total_chunks 0 = unknown.
   @$pb.TagNumber(10)
   $core.double get progress => $_getN(9);
   @$pb.TagNumber(10)
@@ -1556,27 +1453,6 @@ class TTSServiceState extends $pb.GeneratedMessage {
   $core.bool hasErrorCode() => $_has(5);
   @$pb.TagNumber(6)
   void clearErrorCode() => $_clearField(6);
-}
-
-/// Logical TTS service contract. Native playback, audio-session ownership,
-/// device routing, and OS TTS sessions remain platform-owned; C++ consumes
-/// only the serialized request/result/event messages defined above.
-class TTSApi {
-  final $pb.RpcClient _client;
-
-  TTSApi(this._client);
-
-  /// One-shot synthesis returning encoded audio bytes plus synthesis metadata.
-  $async.Future<TTSOutput> synthesize(
-          $pb.ClientContext? ctx, TTSSynthesisRequest request) =>
-      _client.invoke<TTSOutput>(ctx, 'TTS', 'Synthesize', request, TTSOutput());
-
-  /// Server-streaming synthesis events: started, progress, audio chunks,
-  /// phoneme timestamps, terminal completion, and errors.
-  $async.Future<TTSStreamEvent> stream(
-          $pb.ClientContext? ctx, TTSSynthesisRequest request) =>
-      _client.invoke<TTSStreamEvent>(
-          ctx, 'TTS', 'Stream', request, TTSStreamEvent());
 }
 
 const $core.bool _omitFieldNames =

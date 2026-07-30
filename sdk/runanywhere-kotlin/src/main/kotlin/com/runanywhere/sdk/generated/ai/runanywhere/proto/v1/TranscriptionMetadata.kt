@@ -30,20 +30,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Per-pass transcription metadata.
- * Sources pre-IDL:
- *   Swift  STTTypes.swift:241          TranscriptionMetadata (s + computed RTF)
- *   Kotlin STTTypes.kt:124             TranscriptionMetadata (s + computed RTF)
- *   Dart   generation_types.dart:160   TranscriptionMetadata (s + computed RTF)
- *   RN     STTTypes.ts:73              TranscriptionMetadata (s + optional RTF)
- *   C ABI  rac_stt_types.h:297         rac_transcription_metadata_t (ms + RTF)
- *
- * Canonicalize on ms (matches C ABI). real_time_factor is producer-set;
- * consumers may recompute as processing_time_ms / audio_length_ms.
- * ---------------------------------------------------------------------------
- */
 public class TranscriptionMetadata(
   @field:WireField(
     tag = 1,
@@ -69,6 +55,9 @@ public class TranscriptionMetadata(
     schemaIndex = 2,
   )
   public val audio_length_ms: Long = 0L,
+  /**
+   * processing_time_ms / audio_length_ms, set by the producer.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

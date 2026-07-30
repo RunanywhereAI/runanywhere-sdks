@@ -14,26 +14,18 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// The single home for reasoning/thinking control. Replaces the retired
-/// per-message toggles (LLMGenerationOptions.disable_thinking,
-/// ToolCallingOptions.disable_thinking, RAGQueryOptions.disable_thinking,
-/// ToolCallingSessionCreateRequest.disable_thinking,
-/// LLMGenerateRequest.emit_thoughts). Referenced from LLM and VLM generation
-/// options; every composed surface (tool calling, RAG, voice agent) inherits
-/// it through the embedded LLMGenerationOptions.
-/// ---------------------------------------------------------------------------
+/// The single home for reasoning control. Composed surfaces (tool calling, RAG,
+/// voice agent) inherit it through the embedded LLMGenerationOptions.
 class ReasoningMode extends $pb.ProtobufEnum {
-  /// Model default: reasoning-capable models think, others don't.
+  /// Reasoning-capable models think; others don't.
   static const ReasoningMode REASONING_MODE_UNSPECIFIED =
       ReasoningMode._(0, _omitEnumNames ? '' : 'REASONING_MODE_UNSPECIFIED');
 
-  /// Suppress the thinking phase (commons applies the model's no-think
-  /// directive at the prompt level).
+  /// Commons applies the model's no-think directive at the prompt level.
   static const ReasoningMode REASONING_MODE_OFF =
       ReasoningMode._(1, _omitEnumNames ? '' : 'REASONING_MODE_OFF');
 
-  /// Request the thinking phase on models where it is optional.
+  /// Request thinking on models where it is optional.
   static const ReasoningMode REASONING_MODE_ON =
       ReasoningMode._(2, _omitEnumNames ? '' : 'REASONING_MODE_ON');
 

@@ -113,72 +113,9 @@ void init_mock_voice_agent(rac_voice_agent_handle_t agent, bool stt, bool llm, b
     rac_proto_buffer_free(&out);
 }
 
-int test_stt_generated_service_contract() {
-    const google::protobuf::FileDescriptor* file =
-        runanywhere::v1::STTTranscriptionRequest::descriptor()->file();
-    const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("STT");
-    CHECK(service != nullptr, "generated STT service descriptor exists");
-    if (!service)
-        return 0;
-
-    CHECK(service->method_count() == 2, "generated STT service exposes two RPCs");
-
-    const google::protobuf::MethodDescriptor* transcribe = service->FindMethodByName("Transcribe");
-    CHECK(transcribe != nullptr, "STT Transcribe RPC exists");
-    if (transcribe) {
-        CHECK(transcribe->input_type()->full_name() == "runanywhere.v1.STTTranscriptionRequest",
-              "Transcribe accepts STTTranscriptionRequest");
-        CHECK(transcribe->output_type()->full_name() == "runanywhere.v1.STTOutput",
-              "Transcribe returns STTOutput");
-        CHECK(!transcribe->client_streaming() && !transcribe->server_streaming(),
-              "Transcribe is unary");
-    }
-
-    const google::protobuf::MethodDescriptor* stream = service->FindMethodByName("Stream");
-    CHECK(stream != nullptr, "STT Stream RPC exists");
-    if (stream) {
-        CHECK(stream->input_type()->full_name() == "runanywhere.v1.STTTranscriptionRequest",
-              "Stream accepts STTTranscriptionRequest");
-        CHECK(stream->output_type()->full_name() == "runanywhere.v1.STTStreamEvent",
-              "Stream returns STTStreamEvent");
-        CHECK(!stream->client_streaming() && stream->server_streaming(),
-              "Stream is server-streaming");
-    }
-
-    return 0;
-}
-
-int test_tts_generated_service_contract() {
+int test_tts_stream_event_shape() {
     const google::protobuf::FileDescriptor* file =
         runanywhere::v1::TTSSynthesisRequest::descriptor()->file();
-    const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("TTS");
-    CHECK(service != nullptr, "generated TTS service descriptor exists");
-    if (!service)
-        return 0;
-
-    CHECK(service->method_count() == 2, "generated TTS service exposes two RPCs");
-
-    const google::protobuf::MethodDescriptor* synthesize = service->FindMethodByName("Synthesize");
-    CHECK(synthesize != nullptr, "TTS Synthesize RPC exists");
-    if (synthesize) {
-        CHECK(synthesize->input_type()->full_name() == "runanywhere.v1.TTSSynthesisRequest",
-              "Synthesize accepts TTSSynthesisRequest");
-        CHECK(synthesize->output_type()->full_name() == "runanywhere.v1.TTSOutput",
-              "Synthesize returns TTSOutput");
-        CHECK(!synthesize->client_streaming() && !synthesize->server_streaming(),
-              "Synthesize is unary");
-    }
-
-    const google::protobuf::MethodDescriptor* stream = service->FindMethodByName("Stream");
-    CHECK(stream != nullptr, "TTS Stream RPC exists");
-    if (stream) {
-        CHECK(stream->input_type()->full_name() == "runanywhere.v1.TTSSynthesisRequest",
-              "Stream accepts TTSSynthesisRequest");
-        CHECK(stream->output_type()->full_name() == "runanywhere.v1.TTSStreamEvent",
-              "Stream returns TTSStreamEvent");
-        CHECK(!stream->client_streaming() && stream->server_streaming(),
-              "Stream is server-streaming");
-    }
 
     const google::protobuf::EnumDescriptor* kind = file->FindEnumTypeByName("TTSStreamEventKind");
     CHECK(kind != nullptr, "TTS stream event kind enum exists");
@@ -193,42 +130,6 @@ int test_tts_generated_service_contract() {
     CHECK(event->FindFieldByName("output") != nullptr,
           "TTS stream event carries audio output chunks");
     CHECK(event->FindFieldByName("progress") != nullptr, "TTS stream event carries progress");
-
-    return 0;
-}
-
-int test_vad_generated_service_contract() {
-    const google::protobuf::FileDescriptor* file =
-        runanywhere::v1::VADProcessRequest::descriptor()->file();
-    const google::protobuf::ServiceDescriptor* service = file->FindServiceByName("VAD");
-    CHECK(service != nullptr, "generated VAD service descriptor exists");
-    if (!service)
-        return 0;
-
-    CHECK(service->method_count() == 2, "generated VAD service exposes two RPCs");
-
-    const google::protobuf::MethodDescriptor* process_frame =
-        service->FindMethodByName("ProcessFrame");
-    CHECK(process_frame != nullptr, "VAD ProcessFrame RPC exists");
-    if (process_frame) {
-        CHECK(process_frame->input_type()->full_name() == "runanywhere.v1.VADProcessRequest",
-              "ProcessFrame accepts VADProcessRequest");
-        CHECK(process_frame->output_type()->full_name() == "runanywhere.v1.VADResult",
-              "ProcessFrame returns VADResult");
-        CHECK(!process_frame->client_streaming() && !process_frame->server_streaming(),
-              "ProcessFrame is unary");
-    }
-
-    const google::protobuf::MethodDescriptor* stream = service->FindMethodByName("Stream");
-    CHECK(stream != nullptr, "VAD Stream RPC exists");
-    if (stream) {
-        CHECK(stream->input_type()->full_name() == "runanywhere.v1.VADProcessRequest",
-              "Stream accepts VADProcessRequest");
-        CHECK(stream->output_type()->full_name() == "runanywhere.v1.VADStreamEvent",
-              "Stream returns VADStreamEvent");
-        CHECK(!stream->client_streaming() && stream->server_streaming(),
-              "Stream is server-streaming");
-    }
 
     return 0;
 }
@@ -725,7 +626,7 @@ int test_mocked_vad_and_activity() {
     runanywhere::v1::VADProcessRequest vad_request;
     vad_request.mutable_options()->set_activation_threshold(0.1f);
     vad_request.mutable_audio()->set_audio_data(speech, sizeof(speech));
-    vad_request.mutable_audio()->set_encoding(runanywhere::v1::VAD_AUDIO_ENCODING_PCM_F32_LE);
+    vad_request.mutable_audio()->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
     std::vector<uint8_t> bytes;
     CHECK(serialize(vad_request, &bytes), "VADProcessRequest serializes");
     rac_proto_buffer_t out;
@@ -1219,9 +1120,7 @@ int main() {
         std::fprintf(stdout, "  skip: speech proto ABI tests (no protobuf)\n");
         return 0;
 #else
-        test_stt_generated_service_contract();
-        test_tts_generated_service_contract();
-        test_vad_generated_service_contract();
+        test_tts_stream_event_shape();
         install_mock_plugin();
         test_stt_service_serializes_shared_engine();
         test_parse_failure_and_missing_component();

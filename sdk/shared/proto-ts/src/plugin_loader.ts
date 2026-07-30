@@ -19,11 +19,6 @@ export interface PluginInfo {
   path: string;
 }
 
-/** Result of the plugin-list bridge calls (registeredNames / listLoaded). */
-export interface PluginInfoList {
-  plugins: PluginInfo[];
-}
-
 function createBasePluginInfo(): PluginInfo {
   return { name: "", path: "" };
 }
@@ -96,66 +91,6 @@ export const PluginInfo: MessageFns<PluginInfo> = {
     const message = createBasePluginInfo();
     message.name = object.name ?? "";
     message.path = object.path ?? "";
-    return message;
-  },
-};
-
-function createBasePluginInfoList(): PluginInfoList {
-  return { plugins: [] };
-}
-
-export const PluginInfoList: MessageFns<PluginInfoList> = {
-  encode(message: PluginInfoList, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.plugins) {
-      PluginInfo.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): PluginInfoList {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBasePluginInfoList();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.plugins.push(PluginInfo.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): PluginInfoList {
-    return {
-      plugins: globalThis.Array.isArray(object?.plugins) ? object.plugins.map((e: any) => PluginInfo.fromJSON(e)) : [],
-    };
-  },
-
-  toJSON(message: PluginInfoList): unknown {
-    const obj: any = {};
-    if (message.plugins?.length) {
-      obj.plugins = message.plugins.map((e) => PluginInfo.toJSON(e));
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<PluginInfoList>, I>>(base?: I): PluginInfoList {
-    return PluginInfoList.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<PluginInfoList>, I>>(object: I): PluginInfoList {
-    const message = createBasePluginInfoList();
-    message.plugins = object.plugins?.map((e) => PluginInfo.fromPartial(e)) || [];
     return message;
   },
 };

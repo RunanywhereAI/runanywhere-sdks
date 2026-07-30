@@ -14,12 +14,7 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// SolutionType — discriminator for the kind of solution backing a
-/// `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
-/// oneof arms so frontends can switch on a single enum value rather than
-/// inspecting the oneof shape.
-/// ---------------------------------------------------------------------------
+/// Lets frontends switch on one enum instead of inspecting the oneof.
 class SolutionType extends $pb.ProtobufEnum {
   static const SolutionType SOLUTION_TYPE_UNSPECIFIED =
       SolutionType._(0, _omitEnumNames ? '' : 'SOLUTION_TYPE_UNSPECIFIED');

@@ -10,6 +10,7 @@ package runanywhere.v1;
 
 import "component_types.proto";
 import "errors.proto";
+import "model_types.proto";
 import "vad_options.proto";
 
 option cc_enable_arenas          = true;
@@ -128,12 +129,6 @@ message AudioFrameEvent {
     bool  is_final        = 5;
     int32 chunk_index      = 6;
     int64 duration_ms      = 7;
-}
-
-enum AudioEncoding {
-    AUDIO_ENCODING_UNSPECIFIED = 0;
-    AUDIO_ENCODING_PCM_F32_LE  = 1;
-    AUDIO_ENCODING_PCM_S16_LE  = 2;
 }
 
 // Voice Activity Detection output. Frontends usually do not need this —

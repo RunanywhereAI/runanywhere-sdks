@@ -1,19 +1,4 @@
-// RunAnywhere v2 IDL — LLM generation options + result.
-//
-// These two messages were hand-rolled in 5 SDKs:
-//   - Swift  Public/Extensions/LLM/LLMTypes.swift (LLMGenerationOptions, LLMGenerationResult)
-//   - Kotlin commonMain/.../LLMOptions.kt
-//   - Dart   lib/public/types/llm_options.dart
-//   - RN     core/src/types/llm.ts
-//   - Web    packages/core/src/llm/types.ts
-//
-// Generating from a single proto definition removes ~1,500 LOC of duplicated
-// shape definitions and locks the field names + types across all 5 SDKs.
-//
-// ABI note: LLMGenerationOptions is the user-facing knobs struct. The
-// existing rac_llm_options_t C ABI struct (Foundation/Bridge/) is the C-side
-// counterpart; codegen does NOT replace that — Swift's withCOptions() bridge
-// closure still flows fields one-by-one into the C struct.
+// RunAnywhere IDL — LLM generation options, results, and configuration.
 
 syntax = "proto3";
 
@@ -34,308 +19,119 @@ option csharp_namespace      = "Runanywhere.V1";
 option swift_prefix          = "RA";
 option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// The rac_default annotations on LLMGenerationOptions are the single
-// declaration of the LLM sampling defaults. RAC_LLM_OPTIONS_DEFAULT in
-// rac_llm_types.h is generated from them, and every SDK reads the generated
-// defaults() rather than keeping its own table (Swift, Kotlin, Flutter, and Web
-// each used to).
-//
-// On the wire, a proto3 zero still means "unset, let the engine decide". The
-// generated defaults() is for callers who want a populated options value; it
-// does not change how an unset field is interpreted.
-//
-// This block is deliberately separated from the message by a blank line. protoc
-// only attaches a comment that directly abuts an element, and notes about the
-// codegen pipeline should not be copied into the generated message in five
-// languages. Keep pipeline commentary here and wire semantics below.
-
-// ---------------------------------------------------------------------------
-// Options for a single text generation invocation.
-//
-// Field names match Swift LLMGenerationOptions exactly; consumers may treat
-// proto3 scalar defaults as "unset" (Swift handled this via Optionals — proto
-// represents optional reference fields explicitly via `optional` keyword).
-// ---------------------------------------------------------------------------
 message LLMGenerationOptions {
-    // Retired fields — never reuse these numbers:
-    //  7 streaming_enabled (streaming is chosen by the verb, not an option)
-    // 10 json_schema, 20 grammar, 21 response_format (output constraints
-    //    live exclusively in structured_output)
-    // 14 enable_real_time_tracking (telemetry toggle, not a generation knob)
-    // 25 disable_thinking (folded into reasoning)
-    reserved 7, 10, 14, 20, 21, 25;
-
-    // Maximum number of tokens to generate. 0 = unset → this default applies.
-    // 512 leaves room for a full chat answer; 100 truncated mid-sentence.
+    // 0 = unset, so the annotated default applies.
     int32  max_output_tokens   = 1 [
         (runanywhere.v1.rac_default) = "512",
         (runanywhere.v1.rac_min) = 0
     ];
 
-    // Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding.
+    // 0.0 = greedy decoding.
     float  temperature         = 2 [
         (runanywhere.v1.rac_default) = "0.7",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 2.0
     ];
 
-    // Nucleus sampling (top-p). 1.0 = no nucleus truncation.
     float  top_p               = 3 [
         (runanywhere.v1.rac_default) = "1.0",
         (runanywhere.v1.rac_min_float) = 0.0,
         (runanywhere.v1.rac_max_float) = 1.0
     ];
 
-    // Top-K sampling (Kotlin/Dart/RN field). 0 = disabled.
+    // Commons treats 0 as unset for every sampling knob below.
     int32  top_k               = 4 [
         (runanywhere.v1.rac_default) = "0",
         (runanywhere.v1.rac_min) = 0
     ];
 
-    // Repetition penalty (Kotlin/Dart/RN field). 1.0 = no penalty.
     float  repetition_penalty  = 5 [
         (runanywhere.v1.rac_default) = "1.0",
         (runanywhere.v1.rac_min_float) = 0.0
     ];
 
-    // Stop sequences. Generation halts when any of these strings appears in
-    // the output stream.
     repeated string stop_sequences = 6;
-
-    // Preferred inference framework. UNSPECIFIED = pick automatically.
     InferenceFramework preferred_framework = 8;
-
-    // System prompt to define AI behavior and formatting rules.
     optional string system_prompt = 9;
-
-    // Reasoning/thinking control (mode, emission, tag pattern). Unset =
-    // model default with thinking stripped from output.
     optional ReasoningOptions reasoning = 11;
 
-    // Routing hint: where this generation should run (on-device, cloud, or
-    // SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
+    // No consumer reads this today.
     optional ExecutionTarget execution_target = 12;
 
-    // The ONE output-constraint surface (typed or raw JSON schema, grammar,
-    // regex — see structured_output.proto).
     optional StructuredOutputOptions structured_output = 13;
-
-    // Deterministic sampling seed. 0 = backend/default random seed.
     int64 seed = 15 [(runanywhere.v1.rac_default) = "0"];
-
-    // OpenAI-compatible sampling penalties. 0.0 = disabled.
     float frequency_penalty = 16 [(runanywhere.v1.rac_default) = "0.0"];
     float presence_penalty = 17 [(runanywhere.v1.rac_default) = "0.0"];
 
-    // Repeat-penalty lookback window. 0 = backend default.
+    // No engine reads repeat_last_n or echo_prompt.
     int32 repeat_last_n = 18 [(runanywhere.v1.rac_default) = "0"];
-
-    // Minimum probability sampling. 0.0 = disabled.
     float min_p = 19 [(runanywhere.v1.rac_default) = "0.0"];
-
-    // Include prompt text in the result/stream when the backend supports echo.
     bool echo_prompt = 22;
 
-    // Per-request backend thread hint. 0 = backend/runtime default.
     int32 n_threads = 23 [(runanywhere.v1.rac_default) = "0"];
-
-    // Tool-calling contract for this generation: pure tool configuration
-    // (definitions, choice policy, loop limits). Sampling and reasoning come
-    // from THIS message — ToolCallingOptions carries none of its own.
     optional ToolCallingOptions tool_calling = 24;
 }
 
-// ---------------------------------------------------------------------------
-// Result of a single text generation shared by every SDK.
-// ---------------------------------------------------------------------------
 message LLMGenerationResult {
-    // Generated text (with thinking content removed if extracted).
     string text                = 1;
-
-    // Optional thinking/reasoning content extracted from the response.
     optional string thinking_content = 2;
-
-    // Number of input/prompt tokens (from tokenizer).
     int32  input_tokens        = 3;
-
-    // Number of output/completion tokens.
     int32  output_tokens       = 4;
-
-    // Model used for generation.
     string model_used          = 5;
-
-    // Total wall-clock generation time in milliseconds.
     double generation_time_ms  = 6;
-
-    // Time-to-first-token in milliseconds (only set in streaming mode).
     optional double ttft_ms    = 7;
-
-    // Tokens-per-second throughput.
     double tokens_per_second   = 8;
-
-    // Framework that actually performed the generation. Optional because
-    // some C ABI paths don't surface it.
     optional string framework  = 9;
-
-    // Reason the generation stopped: "stop", "length", "cancelled", "error".
-    // Empty = unset.
     string finish_reason       = 10;
-
-    // Number of tokens used for thinking/reasoning. 0 = not applicable.
     int32  thinking_tokens     = 11;
-
-    // Number of tokens in the actual response content (vs thinking).
     int32  response_tokens     = 12;
-
-    // Optional JSON output (when structured-output mode was requested).
-    // Empty = no structured output.
     optional string json_output = 13;
 
-    // Optional aggregated performance metrics. Web SDK surfaces this as a
-    // separate object alongside the result; consumers may ignore it if they
-    // already use the per-field timings above.
+    // Nothing reads performance or executed_on.
     optional PerformanceMetrics performance = 14;
-
-    // Where the generation actually ran (on-device, cloud, etc.). Useful
-    // when execution_target was AUTO and the SDK picked the route.
     optional ExecutionTarget executed_on = 15;
 
-    // Structured-output validation details, when a structured-output request
-    // was used. Mirrors the Swift/RN validation payload.
     optional StructuredOutputValidation structured_output_validation = 16;
 
-    // Total tokens consumed (prompt + completion). Some C ABI paths expose
-    // this directly; consumers may also compute it from the per-field counts.
+    // input_tokens + output_tokens.
     int32 total_tokens = 17;
 
-    // Backend error text for result-producing APIs that return a terminal
-    // result envelope instead of throwing through the host language.
     optional string error_message = 18;
-
-    // Numeric backend status code when a result envelope carries an error.
     int32 error_code = 19;
-
-    // Prompt/cache accounting surfaced by llama.cpp/CoreML-style backends.
     int32 cached_prompt_tokens = 20;
     int64 prompt_eval_time_ms = 21;
     int64 decode_time_ms = 22;
-
-    // Tool calls parsed from the final assistant response, if any.
     repeated ToolCall tool_calls = 23;
-
-    // Tool results incorporated during auto-execute loops.
     repeated ToolResult tool_results = 24;
 }
 
-// LLMGenerationRequest was deleted: LLMGenerateRequest (llm_service.proto)
-// is the single request envelope for both unary and streaming generation.
-
-enum LLMGenerationState {
-    LLM_GENERATION_STATE_UNSPECIFIED = 0;
-    LLM_GENERATION_STATE_QUEUED = 1;
-    LLM_GENERATION_STATE_PREFILLING = 2;
-    LLM_GENERATION_STATE_DECODING = 3;
-    LLM_GENERATION_STATE_TOOL_CALLING = 4;
-    LLM_GENERATION_STATE_COMPLETED = 5;
-    LLM_GENERATION_STATE_CANCELLED = 6;
-    LLM_GENERATION_STATE_FAILED = 7;
-}
-
-message LLMGenerationStatus {
-    string request_id = 1;
-    LLMGenerationState state = 2;
-    int32 prompt_tokens_processed = 3;
-    int32 completion_tokens_generated = 4;
-    float progress = 5;
-    int64 elapsed_ms = 6;
-    optional string message = 7;
-    optional string error_message = 8;
-    int32 error_code = 9;
-}
-
-// ---------------------------------------------------------------------------
-// Lightweight LLM configuration used at component-init time (Swift
-// LLMConfiguration in LLMTypes.swift:15). Distinct from LLMGenerationOptions
-// — this is the "load the model" knob set, not the per-call sampling knobs.
-// ---------------------------------------------------------------------------
 message LLMConfiguration {
-    // Retired duplicate sampling defaults (2 temperature, 3 max_tokens,
-    // 4 system_prompt, 5 streaming) — component defaults now live in
-    // default_options so there is exactly one declaration per knob.
-    reserved 2 to 5;
-
-    // Model context window length in tokens. 0 = use model default.
     int32  context_length      = 1 [(runanywhere.v1.rac_default) = "2048"];
-
-    // Model identifier/path resolved by the component loader. Present in the
-    // C ABI rac_llm_config_t and needed for generated-proto service handles.
     optional string model_id   = 6;
-
-    // Preferred inference framework for this component. UNSPECIFIED / absent
-    // means "auto".
     optional InferenceFramework preferred_framework = 7;
 
-    // Component-level defaults applied when a per-call options message is
-    // absent or leaves a field unset.
+    // Applied when a per-call LLMGenerationOptions leaves a field unset.
     optional LLMGenerationOptions default_options = 8;
 }
 
-// GenerationHints was deleted: it was a fourth partial copy of the sampling
-// knobs. Use LLMConfiguration.default_options.
-
-// ---------------------------------------------------------------------------
-// ThinkingTagPattern moved to thinking_tag_pattern.proto.
-// The canonical message with `open_tag`/`close_tag` fields is shared between
-// llm_options.proto (per-call extraction) and model_types.proto (catalog
-// metadata). Messages in this file reference it via the existing
-// `import "thinking_tag_pattern.proto";` near the top.
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
-// once per token in streaming mode.
-// ---------------------------------------------------------------------------
 message StreamToken {
-    // Decoded text fragment for this token.
     string text                = 1;
-
-    // Wall-clock timestamp (ms since Unix epoch) the token was produced.
     int64  timestamp_ms        = 2;
-
-    // Sequence index within the current generation (0-based).
     int32  index               = 3;
 }
 
-// ---------------------------------------------------------------------------
-// Aggregated performance metrics for a generation (Web SDK
-// PerformanceMetrics in types/models.ts:57). Higher-level summary that
-// rolls up the timing fields scattered across LLMGenerationResult.
-// ---------------------------------------------------------------------------
+// Referenced only by LLMGenerationResult.performance, which no SDK reads.
 message PerformanceMetrics {
-    // Total latency from request to last token, in milliseconds.
     int64  latency_ms                  = 1;
-
-    // Peak memory used by the inference engine, in bytes.
     int64  memory_bytes                = 2;
-
-    // Decode throughput in tokens/second.
     float  throughput_tokens_per_sec   = 3;
-
-    // Input (prompt) token count.
     int32  input_tokens                = 4;
-
-    // Output (completion) token count.
     int32  output_tokens               = 5;
 }
 
-// ---------------------------------------------------------------------------
-// Routing destination for a generation (Web SDK ExecutionTarget in
-// types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
-// ---------------------------------------------------------------------------
 enum ExecutionTarget {
     EXECUTION_TARGET_UNSPECIFIED = 0;
     EXECUTION_TARGET_ON_DEVICE   = 1;
     EXECUTION_TARGET_CLOUD       = 2;
-    // Let the SDK decide based on policy (cost, latency, privacy, etc.).
     EXECUTION_TARGET_AUTO        = 3;
 }

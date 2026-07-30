@@ -17,7 +17,8 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'component_types.pbenum.dart' as $0;
 import 'errors.pbenum.dart' as $1;
-import 'vad_options.pbenum.dart' as $2;
+import 'model_types.pbenum.dart' as $2;
+import 'vad_options.pbenum.dart' as $3;
 import 'voice_events.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -847,7 +848,7 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
     $core.List<$core.int>? pcm,
     $core.int? sampleRateHz,
     $core.int? channels,
-    AudioEncoding? encoding,
+    $2.AudioEncoding? encoding,
     $core.bool? isFinal,
     $core.int? chunkIndex,
     $fixnum.Int64? durationMs,
@@ -880,8 +881,8 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
         1, _omitFieldNames ? '' : 'pcm', $pb.PbFieldType.OY)
     ..aI(2, _omitFieldNames ? '' : 'sampleRateHz')
     ..aI(3, _omitFieldNames ? '' : 'channels')
-    ..aE<AudioEncoding>(4, _omitFieldNames ? '' : 'encoding',
-        enumValues: AudioEncoding.values)
+    ..aE<$2.AudioEncoding>(4, _omitFieldNames ? '' : 'encoding',
+        enumValues: $2.AudioEncoding.values)
     ..aOB(5, _omitFieldNames ? '' : 'isFinal')
     ..aI(6, _omitFieldNames ? '' : 'chunkIndex')
     ..aInt64(7, _omitFieldNames ? '' : 'durationMs')
@@ -934,9 +935,9 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
   void clearChannels() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  AudioEncoding get encoding => $_getN(3);
+  $2.AudioEncoding get encoding => $_getN(3);
   @$pb.TagNumber(4)
-  set encoding(AudioEncoding value) => $_setField(4, value);
+  set encoding($2.AudioEncoding value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasEncoding() => $_has(3);
   @$pb.TagNumber(4)
@@ -977,7 +978,7 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
 /// vad_options.proto (the hand-rolled VADEventType was deleted).
 class VADEvent extends $pb.GeneratedMessage {
   factory VADEvent({
-    $2.VADStreamEventKind? type,
+    $3.VADStreamEventKind? type,
     $fixnum.Int64? frameOffsetUs,
     $core.double? confidence,
     $core.bool? isSpeech,
@@ -1009,8 +1010,8 @@ class VADEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'VADEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aE<$2.VADStreamEventKind>(1, _omitFieldNames ? '' : 'type',
-        enumValues: $2.VADStreamEventKind.values)
+    ..aE<$3.VADStreamEventKind>(1, _omitFieldNames ? '' : 'type',
+        enumValues: $3.VADStreamEventKind.values)
     ..aInt64(2, _omitFieldNames ? '' : 'frameOffsetUs')
     ..aD(3, _omitFieldNames ? '' : 'confidence', fieldType: $pb.PbFieldType.OF)
     ..aOB(4, _omitFieldNames ? '' : 'isSpeech')
@@ -1038,9 +1039,9 @@ class VADEvent extends $pb.GeneratedMessage {
   static VADEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $2.VADStreamEventKind get type => $_getN(0);
+  $3.VADStreamEventKind get type => $_getN(0);
   @$pb.TagNumber(1)
-  set type($2.VADStreamEventKind value) => $_setField(1, value);
+  set type($3.VADStreamEventKind value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasType() => $_has(0);
   @$pb.TagNumber(1)

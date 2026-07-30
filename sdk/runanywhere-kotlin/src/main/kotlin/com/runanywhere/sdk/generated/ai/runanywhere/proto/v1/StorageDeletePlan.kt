@@ -32,6 +32,9 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
+/**
+ * Non-destructive: describes what could be reclaimed without doing it.
+ */
 public class StorageDeletePlan(
   @field:WireField(
     tag = 1,

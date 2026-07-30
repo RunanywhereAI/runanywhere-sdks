@@ -31,11 +31,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * A single parameter definition for a tool.
- * ---------------------------------------------------------------------------
- */
 public class ToolParameter(
   @field:WireField(
     tag = 1,
@@ -66,6 +61,9 @@ public class ToolParameter(
   )
   public val required: Boolean = false,
   enum_values: List<String> = emptyList(),
+  /**
+   * Escape hatch for parameters the typed shape cannot express.
+   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -82,9 +80,6 @@ public class ToolParameter(
   public val default_value: ToolValue? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolParameter, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Allowed values for enum-like parameters. Empty = unconstrained.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

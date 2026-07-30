@@ -80,29 +80,6 @@ export interface HardwareProfileResult {
     profile?: HardwareProfile | undefined;
     accelerators: AcceleratorInfo[];
 }
-/**
- * Empty request for the cached hardware profile. The native probe is owned by
- * platform adapters; this request carries no portable parameters today.
- */
-export interface HardwareProfileRequest {
-}
-/**
- * Empty request for the accelerator list. Mirrors HardwareProfileRequest:
- * platform probes own all OS-level acceleration discovery.
- */
-export interface HardwareAcceleratorsRequest {
-}
-/**
- * Result-shaped response for SetAcceleratorPreference so the service contract
- * stays consistent (every rpc returns a non-empty message).
- */
-export interface HardwareAcceleratorPreferenceRequest {
-    preference: AccelerationPreference;
-}
-export interface HardwareAcceleratorPreferenceResult {
-    success: boolean;
-    errorMessage: string;
-}
 export interface NpuCapability {
     /** Vendor SoC model (e.g. "SM8750"); empty when unknown. */
     socModel: string;
@@ -120,18 +97,10 @@ export interface NpuCapability {
      */
     archName: string;
 }
-/** Empty request for the NPU probe; mirrors HardwareProfileRequest. */
-export interface NpuProbeRequest {
-}
 export declare const HardwareProfile: MessageFns<HardwareProfile>;
 export declare const AcceleratorInfo: MessageFns<AcceleratorInfo>;
 export declare const HardwareProfileResult: MessageFns<HardwareProfileResult>;
-export declare const HardwareProfileRequest: MessageFns<HardwareProfileRequest>;
-export declare const HardwareAcceleratorsRequest: MessageFns<HardwareAcceleratorsRequest>;
-export declare const HardwareAcceleratorPreferenceRequest: MessageFns<HardwareAcceleratorPreferenceRequest>;
-export declare const HardwareAcceleratorPreferenceResult: MessageFns<HardwareAcceleratorPreferenceResult>;
 export declare const NpuCapability: MessageFns<NpuCapability>;
-export declare const NpuProbeRequest: MessageFns<NpuProbeRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

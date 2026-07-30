@@ -30,32 +30,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Result of a single VAD pass over a chunk of PCM audio.
- * Sources pre-IDL:
- *   Swift  VADTypes.swift —                 (no struct; bool returned from detectSpeech())
- *   Kotlin VADTypes.kt:152                  (isSpeech, confidence, energyLevel,
- *                                            statistics, timestamp)
- *   Dart   dart_bridge_vad.dart:290         (isSpeech, energy, speechProbability)
- *   RN     VADTypes.ts:26                   (isSpeech, probability, startTime, endTime)
- *   Web    VADTypes.ts —                    (no VADResult; only SpeechSegment)
- *   C ABI  rac_vad_types.h:151 (rac_vad_output_t)
- *                                           (is_speech_detected, energy_level, timestamp_ms)
- *
- * Drift notes:
- *   - Kotlin's `confidence` and Dart's `speechProbability` and RN's
- *     `probability` collapse onto the canonical `confidence` field.
- *   - Kotlin/RN/C all carry timing — we encode duration_ms (length of the
- *     analyzed frame). Wall-clock timestamps belong on the carrying envelope
- *     (e.g. VoiceEvent.timestamp_us in voice_events.proto).
- * ---------------------------------------------------------------------------
- */
 public class VADResult(
-  /**
-   * Whether speech was detected in this frame.
-   * Mirrors rac_vad_output_t::is_speech_detected.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -65,7 +40,7 @@ public class VADResult(
   )
   public val is_speech: Boolean = false,
   /**
-   * Confidence / probability in \[0.0, 1.0\]. Backend-dependent.
+   * \[0.0, 1.0\], backend-dependent.
    */
   @field:WireField(
     tag = 2,
@@ -75,8 +50,7 @@ public class VADResult(
   )
   public val confidence: Float = 0f,
   /**
-   * RMS energy level of the analyzed frame.
-   * Mirrors rac_vad_output_t::energy_level.
+   * RMS energy of the analyzed frame.
    */
   @field:WireField(
     tag = 3,
@@ -86,7 +60,7 @@ public class VADResult(
   )
   public val energy: Float = 0f,
   /**
-   * Length of the analyzed frame in milliseconds.
+   * Length of the analyzed frame.
    */
   @field:WireField(
     tag = 4,
@@ -97,7 +71,7 @@ public class VADResult(
   )
   public val duration_ms: Int = 0,
   /**
-   * Wall-clock timestamp for this frame/result, in milliseconds since epoch.
+   * Milliseconds since epoch.
    */
   @field:WireField(
     tag = 5,
@@ -108,7 +82,7 @@ public class VADResult(
   )
   public val timestamp_ms: Long = 0L,
   /**
-   * Optional detected segment start/end times, in milliseconds. 0 = unset.
+   * 0 = unset.
    */
   @field:WireField(
     tag = 6,
@@ -126,9 +100,6 @@ public class VADResult(
     schemaIndex = 6,
   )
   public val end_time_ms: Long = 0L,
-  /**
-   * Optional statistics snapshot and result-envelope error details.
-   */
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.VADStatistics#ADAPTER",

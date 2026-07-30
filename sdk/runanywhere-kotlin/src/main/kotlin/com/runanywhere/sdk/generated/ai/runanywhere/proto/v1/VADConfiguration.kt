@@ -31,30 +31,11 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Compile-time / load-time configuration for a VAD instance.
- * Sources pre-IDL:
- *   Swift  VADTypes.swift:15                (energyThreshold, sampleRate, frameLength,
- *                                            enableAutoCalibration, calibrationMultiplier)
- *   Kotlin VADTypes.kt:26                   (same five fields, defaults match Swift)
- *   Dart   vad_configuration.dart:5         (same five fields)
- *   RN     VADTypes.ts:12                   (sampleRate, frameLength, energyThreshold;
- *                                            no calibration fields)
- *   Web    VADTypes.ts —                    (no VADConfiguration; per-backend in WebSDK)
- *   C ABI  rac_vad_types.h:63 (rac_vad_config_t)
- *                                           (model_id, preferred_framework, energy_threshold,
- *                                            sample_rate, frame_length, enable_auto_calibration,
- *                                            calibration_multiplier)
- *
- * `frame_length_ms` is the canonical wire field — Swift/Kotlin/Dart/C use
- * seconds (float), but ms is more interoperable across protobuf consumers.
- * Generators must convert when binding to per-platform types.
- * ---------------------------------------------------------------------------
+ * Load-time configuration for a VAD instance.
  */
 public class VADConfiguration(
   /**
-   * Optional model id; empty when using the built-in energy VAD.
-   * C ABI: model_id (rac_vad_config_t::model_id, may be NULL).
+   * Empty when using the built-in energy VAD.
    */
   @field:WireField(
     tag = 1,
@@ -64,11 +45,8 @@ public class VADConfiguration(
     schemaIndex = 0,
   )
   public val model_id: String = "",
-  /**
-   * PCM sample rate in Hz. Default 16000 (RAC_VAD_DEFAULT_SAMPLE_RATE).
-   */
   @RacDefaultOption("16000")
-  @RacMinOption(1)
+  @RacMinOption(8_000)
   @RacMaxOption(48_000)
   @field:WireField(
     tag = 2,
@@ -79,11 +57,11 @@ public class VADConfiguration(
   )
   public val sample_rate: Int = 0,
   /**
-   * Frame length in milliseconds. Default 100 (Swift/Kotlin/Dart store
-   * 0.1 seconds; we canonicalize to ms on the wire).
+   * Milliseconds on the wire; Swift/Kotlin/Dart/C hold seconds, so generated
+   * bindings divide by 1000 when they bind to those types.
    */
   @RacDefaultOption("100")
-  @RacMinOption(1)
+  @RacMinOption(20)
   @RacMaxOption(1_000)
   @field:WireField(
     tag = 3,
@@ -94,8 +72,7 @@ public class VADConfiguration(
   )
   public val frame_length_ms: Int = 0,
   /**
-   * Activation (energy) threshold in \[0.0, 1.0\] for voice detection.
-   * Recommended range 0.01–0.05.
+   * Commons rejects values outside \[0, 1\] and warns below 0.002 or above 0.1.
    */
   @RacDefaultOption("0.015")
   @RacMinFloatOption(0.0)
@@ -109,9 +86,8 @@ public class VADConfiguration(
   )
   public val activation_threshold: Float = 0f,
   /**
-   * When true, the VAD performs ambient-noise calibration and uses the
-   * result as a multiplier on the threshold (see calibration_multiplier
-   * in the C ABI). Defaults to false.
+   * Calibrate against ambient noise and scale the threshold by
+   * calibration_multiplier.
    */
   @field:WireField(
     tag = 5,
@@ -122,11 +98,10 @@ public class VADConfiguration(
   )
   public val enable_auto_calibration: Boolean = false,
   /**
-   * Calibration multiplier (threshold = ambient noise * multiplier).
-   * Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
+   * threshold = ambient noise * multiplier
    */
   @RacDefaultOption("2.0")
-  @RacMinFloatOption(1.5)
+  @RacMinFloatOption(1.2)
   @RacMaxFloatOption(4.0)
   @field:WireField(
     tag = 6,
@@ -136,9 +111,6 @@ public class VADConfiguration(
     schemaIndex = 5,
   )
   public val calibration_multiplier: Float = 0f,
-  /**
-   * Preferred framework for VAD. Absent = auto.
-   */
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
@@ -147,7 +119,7 @@ public class VADConfiguration(
   )
   public val preferred_framework: InferenceFramework? = null,
   /**
-   * Optional model path for backend-specific VADs (e.g. Silero ONNX).
+   * For backend-specific VADs such as Silero ONNX.
    */
   @field:WireField(
     tag = 8,
@@ -157,8 +129,7 @@ public class VADConfiguration(
   )
   public val model_path: String? = null,
   /**
-   * Window size in samples for frame-based neural VAD backends. 0 =
-   * backend/default.
+   * 0 = backend default, for both of these.
    */
   @field:WireField(
     tag = 9,
@@ -168,10 +139,6 @@ public class VADConfiguration(
     schemaIndex = 8,
   )
   public val window_size_samples: Int = 0,
-  /**
-   * Maximum continuous speech segment duration in milliseconds. 0 =
-   * backend/default.
-   */
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

@@ -16,11 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Supported parameter types.
- * ---------------------------------------------------------------------------
- */
 public enum class ToolParameterType(
   override val `value`: Int,
 ) : WireEnum {

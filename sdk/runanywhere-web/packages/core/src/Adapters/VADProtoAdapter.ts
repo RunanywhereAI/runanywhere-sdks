@@ -1,7 +1,7 @@
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
   SpeechActivityEvent,
   VADConfiguration,
-  VADAudioEncoding,
   VADOptions,
   VADProcessRequest,
   VADResult,
@@ -117,7 +117,7 @@ export class VADProtoAdapter {
       requestId: lifecycleRequestId(),
       audio: {
         audioData: float32ToLittleEndianBytes(samples),
-        encoding: VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE,
+        encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
         sampleRate,
         channels: 1,
         frameOffsetMs: 0,
@@ -201,7 +201,7 @@ export class VADProtoAdapter {
       requestId: lifecycleRequestId(),
       audio: {
         audioData: float32ToLittleEndianBytes(samples),
-        encoding: VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE,
+        encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
         sampleRate,
         channels: 1,
         frameOffsetMs: 0,

@@ -152,7 +152,7 @@ public struct AudioInput: Sendable {
         return source
     }
 
-    var diarizationEncoding: RADiarizationAudioEncoding {
+    var diarizationEncoding: RAAudioEncoding {
         encoding == .pcm16 ? .pcmS16Le : .pcmF32Le
     }
 

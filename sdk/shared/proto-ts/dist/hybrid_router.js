@@ -5,9 +5,7 @@
 //   protoc               v7.35.1
 // source: hybrid_router.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HybridSttTranscribeResponse = exports.HybridSttTranscribeRequest = exports.HybridSttTranscribeOptions = exports.CloudSttBackendConfig = exports.HybridRoutingContext = exports.HybridRoutedMetadata = exports.HybridModelDescriptor = exports.HybridRoutingPolicy = exports.ConfidenceCascade = exports.HybridCascade = exports.CustomFilter = exports.BatteryFilter = exports.HybridFilter = exports.HybridRank = exports.HybridModelType = exports.HybridBackendKind = exports.HybridCapability = exports.protobufPackage = void 0;
-exports.hybridCapabilityFromJSON = hybridCapabilityFromJSON;
-exports.hybridCapabilityToJSON = hybridCapabilityToJSON;
+exports.HybridSttTranscribeResponse = exports.HybridSttTranscribeRequest = exports.HybridSttTranscribeOptions = exports.CloudSttBackendConfig = exports.HybridRoutingContext = exports.HybridRoutedMetadata = exports.HybridModelDescriptor = exports.HybridRoutingPolicy = exports.ConfidenceCascade = exports.HybridCascade = exports.CustomFilter = exports.BatteryFilter = exports.HybridFilter = exports.HybridRank = exports.HybridModelType = exports.HybridBackendKind = exports.protobufPackage = void 0;
 exports.hybridBackendKindFromJSON = hybridBackendKindFromJSON;
 exports.hybridBackendKindToJSON = hybridBackendKindToJSON;
 exports.hybridModelTypeFromJSON = hybridModelTypeFromJSON;
@@ -17,84 +15,12 @@ exports.hybridRankToJSON = hybridRankToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * Capability under hybrid routing. Only STT is wired today.
- * ---------------------------------------------------------------------------
- */
-var HybridCapability;
-(function (HybridCapability) {
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_UNSPECIFIED"] = 0] = "HYBRID_CAPABILITY_UNSPECIFIED";
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_LLM"] = 1] = "HYBRID_CAPABILITY_LLM";
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_VLM"] = 2] = "HYBRID_CAPABILITY_VLM";
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_STT"] = 3] = "HYBRID_CAPABILITY_STT";
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_TTS"] = 4] = "HYBRID_CAPABILITY_TTS";
-    HybridCapability[HybridCapability["HYBRID_CAPABILITY_VAD"] = 5] = "HYBRID_CAPABILITY_VAD";
-    HybridCapability[HybridCapability["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(HybridCapability || (exports.HybridCapability = HybridCapability = {}));
-function hybridCapabilityFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "HYBRID_CAPABILITY_UNSPECIFIED":
-            return HybridCapability.HYBRID_CAPABILITY_UNSPECIFIED;
-        case 1:
-        case "HYBRID_CAPABILITY_LLM":
-            return HybridCapability.HYBRID_CAPABILITY_LLM;
-        case 2:
-        case "HYBRID_CAPABILITY_VLM":
-            return HybridCapability.HYBRID_CAPABILITY_VLM;
-        case 3:
-        case "HYBRID_CAPABILITY_STT":
-            return HybridCapability.HYBRID_CAPABILITY_STT;
-        case 4:
-        case "HYBRID_CAPABILITY_TTS":
-            return HybridCapability.HYBRID_CAPABILITY_TTS;
-        case 5:
-        case "HYBRID_CAPABILITY_VAD":
-            return HybridCapability.HYBRID_CAPABILITY_VAD;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return HybridCapability.UNRECOGNIZED;
-    }
-}
-function hybridCapabilityToJSON(object) {
-    switch (object) {
-        case HybridCapability.HYBRID_CAPABILITY_UNSPECIFIED:
-            return "HYBRID_CAPABILITY_UNSPECIFIED";
-        case HybridCapability.HYBRID_CAPABILITY_LLM:
-            return "HYBRID_CAPABILITY_LLM";
-        case HybridCapability.HYBRID_CAPABILITY_VLM:
-            return "HYBRID_CAPABILITY_VLM";
-        case HybridCapability.HYBRID_CAPABILITY_STT:
-            return "HYBRID_CAPABILITY_STT";
-        case HybridCapability.HYBRID_CAPABILITY_TTS:
-            return "HYBRID_CAPABILITY_TTS";
-        case HybridCapability.HYBRID_CAPABILITY_VAD:
-            return "HYBRID_CAPABILITY_VAD";
-        case HybridCapability.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-/**
- * ---------------------------------------------------------------------------
- * Backend identity. Matches the engines/ directory entry that registers
- * the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
- * ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
- * the descriptor's `provider` field, not from a distinct enum kind.
- * ---------------------------------------------------------------------------
- */
 var HybridBackendKind;
 (function (HybridBackendKind) {
     HybridBackendKind[HybridBackendKind["HYBRID_BACKEND_UNSPECIFIED"] = 0] = "HYBRID_BACKEND_UNSPECIFIED";
     HybridBackendKind[HybridBackendKind["HYBRID_BACKEND_LLAMACPP"] = 1] = "HYBRID_BACKEND_LLAMACPP";
     HybridBackendKind[HybridBackendKind["HYBRID_BACKEND_OPENROUTER"] = 2] = "HYBRID_BACKEND_OPENROUTER";
     HybridBackendKind[HybridBackendKind["HYBRID_BACKEND_SHERPA"] = 3] = "HYBRID_BACKEND_SHERPA";
-    /**
-     * HYBRID_BACKEND_CLOUD - Renamed from HYBRID_BACKEND_SARVAM (same wire number) — the engine is now
-     * the generic "cloud_stt" backend; the provider is carried out-of-band.
-     */
     HybridBackendKind[HybridBackendKind["HYBRID_BACKEND_CLOUD"] = 4] = "HYBRID_BACKEND_CLOUD";
     HybridBackendKind[HybridBackendKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(HybridBackendKind || (exports.HybridBackendKind = HybridBackendKind = {}));
@@ -138,12 +64,6 @@ function hybridBackendKindToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-/**
- * ---------------------------------------------------------------------------
- * Whether a model runs on-device or in the cloud. The router decides which
- * of its two registered candidates to invoke based on policy.
- * ---------------------------------------------------------------------------
- */
 var HybridModelType;
 (function (HybridModelType) {
     HybridModelType[HybridModelType["HYBRID_MODEL_TYPE_UNSPECIFIED"] = 0] = "HYBRID_MODEL_TYPE_UNSPECIFIED";
@@ -181,12 +101,6 @@ function hybridModelTypeToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-/**
- * ---------------------------------------------------------------------------
- * Rank — comparator used to sort eligible candidates. Exactly one rank
- * per policy.
- * ---------------------------------------------------------------------------
- */
 var HybridRank;
 (function (HybridRank) {
     HybridRank[HybridRank["HYBRID_RANK_UNSPECIFIED"] = 0] = "HYBRID_RANK_UNSPECIFIED";

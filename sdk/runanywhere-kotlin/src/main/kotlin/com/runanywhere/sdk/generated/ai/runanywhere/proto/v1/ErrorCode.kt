@@ -17,35 +17,13 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * ErrorCode — exhaustive enumeration of every distinct numeric error code in
- * the C ABI (`rac_result_t`).
+ * proto3 forbids negative enum values, so each constant is the absolute
+ * magnitude of its C ABI code: ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>).
+ * SDKError.c_abi_code carries the signed original.
  *
- * proto3 forbids negative enum values, so the proto enum holds POSITIVE
- * values that mirror the *absolute* magnitude of each C ABI code. The signed
- * `rac_result_t` numeric value is preserved on `SDKError.c_abi_code` so
- * platforms can round-trip the original C ABI integer. The naming scheme is:
- *
- *     ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>)
- *
- * (e.g. RAC_ERROR_MODEL_NOT_FOUND = -110 → ERROR_CODE_MODEL_NOT_FOUND = 110)
- *
- * `ERROR_CODE_UNSPECIFIED = 0` covers proto3's required zero-default; the
- * C ABI's `RAC_SUCCESS = 0` is NOT an error and MUST NOT appear inside an
- * SDKError.code (an SDKError implies a failure; success is signalled by the
- * absence of an SDKError). The zero-value enum entry exists only because
- * proto3 mandates it.
- *
- * CRITICAL: Do not change the numeric values without coordinated
- * migrations across every SDK *and* the C ABI. Adding new values is safe;
- * removing or renumbering is a wire-format break.
- *
- * All values below are sourced from
- * `sdk/runanywhere-commons/include/rac/core/rac_error.h`. Aliases (codes
- * where the C ABI defines two distinct macro names for the same numeric
- * value) are documented inline; we pick one canonical name per numeric value
- * to keep proto enum values unique.
- * ---------------------------------------------------------------------------
+ * The trailing macro names below are kept because they are the cross-reference
+ * into rac_error.h; where the C ABI defines two names for one value, the alias
+ * is noted.
  */
 public enum class ErrorCode(
   override val `value`: Int,

@@ -283,7 +283,7 @@ class TranscribeNode final : public OperatorNode {
         runanywhere::v1::STTTranscriptionRequest request;
         auto* audio = request.mutable_audio();
         audio->set_audio_data(item.bytes);
-        audio->set_encoding(runanywhere::v1::STT_AUDIO_ENCODING_PCM_S16_LE);
+        audio->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
         audio->set_sample_rate(sample_rate_);
         audio->set_channels(1);
         audio->set_bits_per_sample(16);
@@ -441,7 +441,7 @@ class DetectVoiceNode final : public OperatorNode {
         runanywhere::v1::VADProcessRequest request;
         auto* audio = request.mutable_audio();
         audio->set_audio_data(item.bytes);
-        audio->set_encoding(runanywhere::v1::VAD_AUDIO_ENCODING_PCM_S16_LE);
+        audio->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
         audio->set_sample_rate(sample_rate_);
         audio->set_channels(1);
         if (threshold_ > 0.0f) {

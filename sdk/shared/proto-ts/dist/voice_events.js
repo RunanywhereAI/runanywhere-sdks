@@ -5,13 +5,11 @@
 //   protoc               v7.35.1
 // source: voice_events.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WakeWordDetectedEvent = exports.TurnLifecycleEvent = exports.SpeechTurnDetectionEvent = exports.AgentResponseCompletedEvent = exports.AgentResponseStartedEvent = exports.SessionStoppedEvent = exports.SessionStartedEvent = exports.VoiceSessionError = exports.VoiceAgentComponentStates = exports.ComponentProgressEvent = exports.AudioLevelEvent = exports.MetricsEvent = exports.ErrorEvent = exports.StateChangeEvent = exports.InterruptedEvent = exports.VADEvent = exports.AudioFrameEvent = exports.AssistantTokenEvent = exports.UserSaidEvent = exports.VoiceEvent_MetadataEntry = exports.VoiceEvent = exports.TurnLifecycleEventKind = exports.SpeechTurnDetectionEventKind = exports.PipelineState = exports.InterruptReason = exports.AudioEncoding = exports.TokenKind = exports.VoicePipelineComponent = exports.protobufPackage = void 0;
+exports.WakeWordDetectedEvent = exports.TurnLifecycleEvent = exports.SpeechTurnDetectionEvent = exports.AgentResponseCompletedEvent = exports.AgentResponseStartedEvent = exports.SessionStoppedEvent = exports.SessionStartedEvent = exports.VoiceSessionError = exports.VoiceAgentComponentStates = exports.ComponentProgressEvent = exports.AudioLevelEvent = exports.MetricsEvent = exports.ErrorEvent = exports.StateChangeEvent = exports.InterruptedEvent = exports.VADEvent = exports.AudioFrameEvent = exports.AssistantTokenEvent = exports.UserSaidEvent = exports.VoiceEvent_MetadataEntry = exports.VoiceEvent = exports.TurnLifecycleEventKind = exports.SpeechTurnDetectionEventKind = exports.PipelineState = exports.InterruptReason = exports.TokenKind = exports.VoicePipelineComponent = exports.protobufPackage = void 0;
 exports.voicePipelineComponentFromJSON = voicePipelineComponentFromJSON;
 exports.voicePipelineComponentToJSON = voicePipelineComponentToJSON;
 exports.tokenKindFromJSON = tokenKindFromJSON;
 exports.tokenKindToJSON = tokenKindToJSON;
-exports.audioEncodingFromJSON = audioEncodingFromJSON;
-exports.audioEncodingToJSON = audioEncodingToJSON;
 exports.interruptReasonFromJSON = interruptReasonFromJSON;
 exports.interruptReasonToJSON = interruptReasonToJSON;
 exports.pipelineStateFromJSON = pipelineStateFromJSON;
@@ -24,6 +22,7 @@ exports.turnLifecycleEventKindToJSON = turnLifecycleEventKindToJSON;
 const wire_1 = require("@bufbuild/protobuf/wire");
 const component_types_1 = require("./component_types");
 const errors_1 = require("./errors");
+const model_types_1 = require("./model_types");
 const vad_options_1 = require("./vad_options");
 exports.protobufPackage = "runanywhere.v1";
 var VoicePipelineComponent;
@@ -147,43 +146,6 @@ function tokenKindToJSON(object) {
         case TokenKind.TOKEN_KIND_TOOL_CALL:
             return "TOKEN_KIND_TOOL_CALL";
         case TokenKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var AudioEncoding;
-(function (AudioEncoding) {
-    AudioEncoding[AudioEncoding["AUDIO_ENCODING_UNSPECIFIED"] = 0] = "AUDIO_ENCODING_UNSPECIFIED";
-    AudioEncoding[AudioEncoding["AUDIO_ENCODING_PCM_F32_LE"] = 1] = "AUDIO_ENCODING_PCM_F32_LE";
-    AudioEncoding[AudioEncoding["AUDIO_ENCODING_PCM_S16_LE"] = 2] = "AUDIO_ENCODING_PCM_S16_LE";
-    AudioEncoding[AudioEncoding["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(AudioEncoding || (exports.AudioEncoding = AudioEncoding = {}));
-function audioEncodingFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "AUDIO_ENCODING_UNSPECIFIED":
-            return AudioEncoding.AUDIO_ENCODING_UNSPECIFIED;
-        case 1:
-        case "AUDIO_ENCODING_PCM_F32_LE":
-            return AudioEncoding.AUDIO_ENCODING_PCM_F32_LE;
-        case 2:
-        case "AUDIO_ENCODING_PCM_S16_LE":
-            return AudioEncoding.AUDIO_ENCODING_PCM_S16_LE;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return AudioEncoding.UNRECOGNIZED;
-    }
-}
-function audioEncodingToJSON(object) {
-    switch (object) {
-        case AudioEncoding.AUDIO_ENCODING_UNSPECIFIED:
-            return "AUDIO_ENCODING_UNSPECIFIED";
-        case AudioEncoding.AUDIO_ENCODING_PCM_F32_LE:
-            return "AUDIO_ENCODING_PCM_F32_LE";
-        case AudioEncoding.AUDIO_ENCODING_PCM_S16_LE:
-            return "AUDIO_ENCODING_PCM_S16_LE";
-        case AudioEncoding.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -1548,7 +1510,7 @@ exports.AudioFrameEvent = {
                     ? globalThis.Number(object.sample_rate_hz)
                     : 0,
             channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
-            encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : 0,
+            encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : 0,
             isFinal: isSet(object.isFinal)
                 ? globalThis.Boolean(object.isFinal)
                 : isSet(object.is_final)
@@ -1578,7 +1540,7 @@ exports.AudioFrameEvent = {
             obj.channels = Math.round(message.channels);
         }
         if (message.encoding !== 0) {
-            obj.encoding = audioEncodingToJSON(message.encoding);
+            obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
         }
         if (message.isFinal !== false) {
             obj.isFinal = message.isFinal;

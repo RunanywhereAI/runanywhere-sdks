@@ -35,8 +35,7 @@ import kotlin.lazy
 import okio.ByteString
 
 /**
- * Generation settings live exclusively in `options`. Reserved field numbers
- * prevent unsafe wire reuse.
+ * The single request envelope for both unary and streaming generation.
  */
 public class LLMGenerateRequest(
   @field:WireField(
@@ -71,10 +70,6 @@ public class LLMGenerateRequest(
   )
   public val conversation_id: String = "",
   metadata: Map<String, String> = emptyMap(),
-  /**
-   * Canonical generation settings. When absent, commons applies its SDK
-   * defaults; callers that need explicit controls populate this message.
-   */
   @field:WireField(
     tag = 26,
     adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
@@ -93,12 +88,8 @@ public class LLMGenerateRequest(
   public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
   /**
-   * Prior conversation turns (excludes the current `prompt`, which
-   * stays the live user turn, and `options.system_prompt`, which stays
-   * separate).
-   * Alternating user/assistant ChatMessages in chronological order. An engine
-   * that owns its chat template renders {system_prompt, history, prompt} from
-   * its model's markers; engines that don't simply ignore this field.
+   * Prior turns, excluding `prompt` (the live user turn) and
+   * options.system_prompt.
    */
   @field:WireField(
     tag = 27,

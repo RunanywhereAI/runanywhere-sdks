@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -23,11 +22,7 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'embeddings_options.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// Component-level configuration applied at service creation. Mirrors the
-/// transport-portable subset of rac_embeddings_config_t. Backend selection
-/// (preferred_framework) and pooling strategy live outside the wire schema.
-/// ---------------------------------------------------------------------------
+/// Applied at service creation.
 class EmbeddingsConfiguration extends $pb.GeneratedMessage {
   factory EmbeddingsConfiguration({
     $core.String? modelId,
@@ -96,7 +91,7 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<EmbeddingsConfiguration>(create);
   static EmbeddingsConfiguration? _defaultInstance;
 
-  /// Model identifier (registry id or local path). Required.
+  /// Registry id or local path.
   @$pb.TagNumber(1)
   $core.String get modelId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -106,8 +101,8 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearModelId() => $_clearField(1);
 
-  /// Output vector dimension. Must match the loaded model's hidden size
-  /// (e.g. 384 for all-MiniLM-L6-v2, 768 for bge-base, 1024 for bge-large).
+  /// Must match the loaded model's hidden size: 384 for all-MiniLM-L6-v2,
+  /// 768 for bge-base, 1024 for bge-large.
   @$pb.TagNumber(2)
   $core.int get embeddingDimension => $_getIZ(1);
   @$pb.TagNumber(2)
@@ -117,8 +112,7 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearEmbeddingDimension() => $_clearField(2);
 
-  /// Maximum tokens per input. Truncation/sliding window is backend-decided
-  /// when an input exceeds this length. C ABI default: 512.
+  /// Truncation or sliding window past this length is backend-decided.
   @$pb.TagNumber(3)
   $core.int get maxSequenceLength => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -128,7 +122,6 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearMaxSequenceLength() => $_clearField(3);
 
-  /// Preferred framework for the component. Absent = auto.
   @$pb.TagNumber(5)
   $0.InferenceFramework get preferredFramework => $_getN(3);
   @$pb.TagNumber(5)
@@ -138,8 +131,6 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearPreferredFramework() => $_clearField(5);
 
-  /// Vector normalization mode for the component. UNSPECIFIED = L2
-  /// (the C ABI default).
   @$pb.TagNumber(7)
   EmbeddingsNormalizeMode get normalizeMode => $_getN(4);
   @$pb.TagNumber(7)
@@ -158,7 +149,7 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearPooling() => $_clearField(8);
 
-  /// Backend-specific JSON config (e.g. tokenizer/vocab companion paths).
+  /// Backend-specific config such as tokenizer or vocab companion paths.
   @$pb.TagNumber(9)
   $core.String get configJson => $_getSZ(6);
   @$pb.TagNumber(9)
@@ -169,10 +160,7 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
   void clearConfigJson() => $_clearField(9);
 }
 
-/// ---------------------------------------------------------------------------
-/// Per-call generation options. Overrides for a single embed / embed_batch
-/// invocation; any field left unset falls back to the configuration default.
-/// ---------------------------------------------------------------------------
+/// Per-call overrides. Unset fields fall back to the component configuration.
 class EmbeddingsOptions extends $pb.GeneratedMessage {
   factory EmbeddingsOptions({
     $core.bool? truncate,
@@ -231,9 +219,8 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<EmbeddingsOptions>(create);
   static EmbeddingsOptions? _defaultInstance;
 
-  /// Truncate inputs longer than max_sequence_length instead of erroring.
-  /// Unset = backend default (currently truncate-on-overflow for ONNX,
-  /// sliding-window for llama.cpp).
+  /// Truncate over-long inputs instead of erroring. Unset = backend default,
+  /// currently truncate-on-overflow for ONNX and sliding-window for llama.cpp.
   @$pb.TagNumber(2)
   $core.bool get truncate => $_getBF(0);
   @$pb.TagNumber(2)
@@ -243,8 +230,7 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearTruncate() => $_clearField(2);
 
-  /// Override batch size for embed_batch. Unset = backend chooses
-  /// (RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE = 512, capped at 8192).
+  /// Unset = backend chooses (512, capped at 8192).
   @$pb.TagNumber(3)
   $core.int get batchSize => $_getIZ(1);
   @$pb.TagNumber(3)
@@ -254,8 +240,7 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearBatchSize() => $_clearField(3);
 
-  /// Vector normalization mode. UNSPECIFIED = use component config
-  /// (default L2).
+  /// UNSPECIFIED = use the component config.
   @$pb.TagNumber(4)
   EmbeddingsNormalizeMode get normalizeMode => $_getN(2);
   @$pb.TagNumber(4)
@@ -284,14 +269,6 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
   void clearNThreads() => $_clearField(6);
 }
 
-/// ---------------------------------------------------------------------------
-/// A single embedding produced for one input text. The C ABI ships dense
-/// floats with an associated dimension; we additionally carry the source text
-/// (helps multi-input batch consumers correlate vectors with inputs without
-/// holding the request side-by-side) and an optional pre-computed L2 norm
-/// (lets clients short-circuit cosine-similarity when both sides know the
-/// vectors are already unit-normalized).
-/// ---------------------------------------------------------------------------
 class EmbeddingVector extends $pb.GeneratedMessage {
   factory EmbeddingVector({
     $core.Iterable<$core.double>? values,
@@ -355,13 +332,12 @@ class EmbeddingVector extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<EmbeddingVector>(create);
   static EmbeddingVector? _defaultInstance;
 
-  /// Dense float vector. Length equals EmbeddingsResult.dimension.
+  /// Length equals EmbeddingsResult.dimension.
   @$pb.TagNumber(1)
   $pb.PbList<$core.double> get values => $_getList(0);
 
-  /// L2 norm of `values`. Optional — populated when the backend computes
-  /// it (typically when normalize=false and the consumer wants to score
-  /// similarity without recomputing).
+  /// Populated when the backend computes it, letting consumers score
+  /// similarity without recomputing.
   @$pb.TagNumber(2)
   $core.double get norm => $_getN(1);
   @$pb.TagNumber(2)
@@ -371,9 +347,7 @@ class EmbeddingVector extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearNorm() => $_clearField(2);
 
-  /// Source text that produced this vector. Optional — preserved for
-  /// multi-input batches where the caller wants to correlate without
-  /// tracking ordering separately.
+  /// Lets batch callers correlate vectors with inputs without tracking order.
   @$pb.TagNumber(3)
   $core.String get text => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -383,8 +357,6 @@ class EmbeddingVector extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearText() => $_clearField(3);
 
-  /// Vector dimension for consumers that need per-vector sizing without
-  /// inspecting EmbeddingsResult.dimension.
   @$pb.TagNumber(4)
   $core.int get dimension => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -394,7 +366,6 @@ class EmbeddingVector extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearDimension() => $_clearField(4);
 
-  /// Input index in the original request and optional caller metadata.
   @$pb.TagNumber(5)
   $core.int get inputIndex => $_getIZ(4);
   @$pb.TagNumber(5)
@@ -408,10 +379,7 @@ class EmbeddingVector extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(5);
 }
 
-/// ---------------------------------------------------------------------------
-/// Request envelope for service-handle APIs. One text = embed, multiple texts =
-/// embed_batch.
-/// ---------------------------------------------------------------------------
+/// One text = embed, multiple texts = embed_batch.
 class EmbeddingsRequest extends $pb.GeneratedMessage {
   factory EmbeddingsRequest({
     $core.Iterable<$core.String>? texts,
@@ -509,12 +477,6 @@ class EmbeddingsRequest extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// Result of an embed / embed_batch call. Mirrors rac_embeddings_result_t
-/// (which is array-of-vectors + dimension + processing_time_ms +
-/// total_tokens). `dimension` is duplicated at the result level so consumers
-/// can size buffers without inspecting an arbitrary vector first.
-/// ---------------------------------------------------------------------------
 class EmbeddingsResult extends $pb.GeneratedMessage {
   factory EmbeddingsResult({
     $core.Iterable<EmbeddingVector>? vectors,
@@ -585,8 +547,7 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $pb.PbList<EmbeddingVector> get vectors => $_getList(0);
 
-  /// Vector dimension. Duplicated from each EmbeddingVector for O(1)
-  /// sizing on the consumer side.
+  /// Duplicated from each vector so consumers can size buffers in O(1).
   @$pb.TagNumber(2)
   $core.int get dimension => $_getIZ(1);
   @$pb.TagNumber(2)
@@ -596,7 +557,6 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearDimension() => $_clearField(2);
 
-  /// Total wall-clock time for the embed / embed_batch call, in ms.
   @$pb.TagNumber(3)
   $fixnum.Int64 get processingTimeMs => $_getI64(2);
   @$pb.TagNumber(3)
@@ -606,7 +566,7 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearProcessingTimeMs() => $_clearField(3);
 
-  /// Total tokens consumed across all inputs (post-truncation).
+  /// Across all inputs, post-truncation.
   @$pb.TagNumber(4)
   $core.int get tokensUsed => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -653,126 +613,6 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
   void clearRequestId() => $_clearField(8);
 }
 
-class EmbeddingsServiceState extends $pb.GeneratedMessage {
-  factory EmbeddingsServiceState({
-    $core.bool? isReady,
-    $core.String? currentModel,
-    $core.int? dimension,
-    $core.int? maxTokens,
-    $core.String? errorMessage,
-    $core.int? errorCode,
-  }) {
-    final result = create();
-    if (isReady != null) result.isReady = isReady;
-    if (currentModel != null) result.currentModel = currentModel;
-    if (dimension != null) result.dimension = dimension;
-    if (maxTokens != null) result.maxTokens = maxTokens;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
-    return result;
-  }
-
-  EmbeddingsServiceState._();
-
-  factory EmbeddingsServiceState.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory EmbeddingsServiceState.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'EmbeddingsServiceState',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'isReady')
-    ..aOS(2, _omitFieldNames ? '' : 'currentModel')
-    ..aI(3, _omitFieldNames ? '' : 'dimension')
-    ..aI(4, _omitFieldNames ? '' : 'maxTokens')
-    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(6, _omitFieldNames ? '' : 'errorCode')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EmbeddingsServiceState clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EmbeddingsServiceState copyWith(
-          void Function(EmbeddingsServiceState) updates) =>
-      super.copyWith((message) => updates(message as EmbeddingsServiceState))
-          as EmbeddingsServiceState;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static EmbeddingsServiceState create() => EmbeddingsServiceState._();
-  @$core.override
-  EmbeddingsServiceState createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static EmbeddingsServiceState getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<EmbeddingsServiceState>(create);
-  static EmbeddingsServiceState? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.bool get isReady => $_getBF(0);
-  @$pb.TagNumber(1)
-  set isReady($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasIsReady() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearIsReady() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get currentModel => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set currentModel($core.String value) => $_setString(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasCurrentModel() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearCurrentModel() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.int get dimension => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set dimension($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasDimension() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearDimension() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get maxTokens => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set maxTokens($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasMaxTokens() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearMaxTokens() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.String get errorMessage => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set errorMessage($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorMessage() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearErrorMessage() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.int get errorCode => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set errorCode($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasErrorCode() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearErrorCode() => $_clearField(6);
-}
-
-/// ---------------------------------------------------------------------------
-/// Session/handle creation request envelope shared by every SDK.
-/// The result carries an opaque uint64 handle the SDK uses for subsequent
-/// embed / embed_batch invocations.
-/// ---------------------------------------------------------------------------
 class EmbeddingsCreateRequest extends $pb.GeneratedMessage {
   factory EmbeddingsCreateRequest({
     $core.String? modelId,
@@ -825,7 +665,7 @@ class EmbeddingsCreateRequest extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<EmbeddingsCreateRequest>(create);
   static EmbeddingsCreateRequest? _defaultInstance;
 
-  /// Required. Model identifier (registry id) or absolute model path.
+  /// Registry id or absolute model path.
   @$pb.TagNumber(1)
   $core.String get modelId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -835,9 +675,7 @@ class EmbeddingsCreateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearModelId() => $_clearField(1);
 
-  /// Optional component configuration. When unset, commons applies its
-  /// defaults (RAC_EMBEDDINGS_*); when set, the named fields override
-  /// the per-component defaults at create time.
+  /// Unset = commons defaults; set fields override per-component defaults.
   @$pb.TagNumber(2)
   EmbeddingsConfiguration get configuration => $_getN(1);
   @$pb.TagNumber(2)
@@ -849,8 +687,7 @@ class EmbeddingsCreateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   EmbeddingsConfiguration ensureConfiguration() => $_ensure(1);
 
-  /// Provider-specific JSON config for backends that need companion file
-  /// paths (e.g. {"vocab_path":"..."}).
+  /// For backends needing companion file paths, e.g. {"vocab_path":"..."}.
   @$pb.TagNumber(3)
   $core.String get configJson => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -922,7 +759,7 @@ class EmbeddingsCreateResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<EmbeddingsCreateResult>(create);
   static EmbeddingsCreateResult? _defaultInstance;
 
-  /// Opaque handle (rac_handle_t cast to u64). Zero on failure.
+  /// rac_handle_t cast to u64. Zero on failure.
   @$pb.TagNumber(1)
   $fixnum.Int64 get handle => $_getI64(0);
   @$pb.TagNumber(1)
@@ -932,8 +769,7 @@ class EmbeddingsCreateResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearHandle() => $_clearField(1);
 
-  /// Echo of the model id the caller requested — so JS/Swift/Kotlin can
-  /// store it next to the handle without re-parsing the request.
+  /// Echoed so callers can store it beside the handle.
   @$pb.TagNumber(2)
   $core.String get modelId => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -943,8 +779,7 @@ class EmbeddingsCreateResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearModelId() => $_clearField(2);
 
-  /// Backend-resolved dimension/max_tokens after load. 0 = unknown until
-  /// the first embed call.
+  /// Backend-resolved after load. 0 = unknown until the first embed call.
   @$pb.TagNumber(3)
   $core.int get dimension => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -963,8 +798,7 @@ class EmbeddingsCreateResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearMaxTokens() => $_clearField(4);
 
-  /// Negative on failure; mirrors rac_result_t. Empty error_message on
-  /// success.
+  /// Mirrors rac_result_t; negative on failure.
   @$pb.TagNumber(5)
   $core.int get errorCode => $_getIZ(4);
   @$pb.TagNumber(5)
@@ -982,27 +816,6 @@ class EmbeddingsCreateResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(5);
   @$pb.TagNumber(6)
   void clearErrorMessage() => $_clearField(6);
-}
-
-/// Logical Embeddings service contract. Tokenizer/model execution and native
-/// file handles remain adapter/backend-owned; C++ consumes only serialized
-/// request/result messages.
-class EmbeddingsApi {
-  final $pb.RpcClient _client;
-
-  EmbeddingsApi(this._client);
-
-  /// One-shot embedding for a single text carried in EmbeddingsRequest.texts.
-  $async.Future<EmbeddingsResult> embed(
-          $pb.ClientContext? ctx, EmbeddingsRequest request) =>
-      _client.invoke<EmbeddingsResult>(
-          ctx, 'Embeddings', 'Embed', request, EmbeddingsResult());
-
-  /// Batch embedding for multiple input texts carried in request order.
-  $async.Future<EmbeddingsResult> embedBatch(
-          $pb.ClientContext? ctx, EmbeddingsRequest request) =>
-      _client.invoke<EmbeddingsResult>(
-          ctx, 'Embeddings', 'EmbedBatch', request, EmbeddingsResult());
 }
 
 const $core.bool _omitFieldNames =

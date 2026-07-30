@@ -32,27 +32,7 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * JSON Schema property — describes a single property within a schema.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:24     JSONSchemaProperty (type, description,
- *                                       enum, format, items, properties, …)
- *
- * proto3 does not allow direct self-referential message fields without
- * `optional` / explicit handle. Recursion is expressed via:
- *   - `items_schema`     — for array element types       (handle to JSONSchema)
- *   - `object_schema`    — for nested object types       (handle to JSONSchema)
- * Deeper recursion (a property whose items are themselves objects with
- * further nested properties) is represented by repeating the same indirection
- * inside the referenced JSONSchema. Very deep schemas are uncommon and
- * supported by chaining these handles.
- * ---------------------------------------------------------------------------
- */
 public class JSONSchemaProperty(
-  /**
-   * Primitive / composite type for this property.
-   */
   @field:WireField(
     tag = 1,
     adapter = "ai.runanywhere.proto.v1.JSONSchemaType#ADAPTER",
@@ -60,9 +40,6 @@ public class JSONSchemaProperty(
     schemaIndex = 0,
   )
   public val type: JSONSchemaType = JSONSchemaType.JSON_SCHEMA_TYPE_UNSPECIFIED,
-  /**
-   * Human-readable description (`description` in JSON Schema).
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -70,10 +47,6 @@ public class JSONSchemaProperty(
   )
   public val description: String? = null,
   enum_values: List<String> = emptyList(),
-  /**
-   * String format hint (`format` in JSON Schema): "email", "uri",
-   * "date-time", etc.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -81,7 +54,7 @@ public class JSONSchemaProperty(
   )
   public val format: String? = null,
   /**
-   * Element schema when `type == JSON_SCHEMA_TYPE_ARRAY`.
+   * items_schema for arrays, object_schema for nested objects.
    */
   @field:WireField(
     tag = 5,
@@ -90,9 +63,6 @@ public class JSONSchemaProperty(
     schemaIndex = 4,
   )
   public val items_schema: JSONSchema? = null,
-  /**
-   * Nested object schema when `type == JSON_SCHEMA_TYPE_OBJECT`.
-   */
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.JSONSchema#ADAPTER",
@@ -100,9 +70,6 @@ public class JSONSchemaProperty(
     schemaIndex = 5,
   )
   public val object_schema: JSONSchema? = null,
-  /**
-   * Common validation constraints carried by RN/Web schema builders.
-   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
@@ -158,10 +125,6 @@ public class JSONSchemaProperty(
   public val default_json: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<JSONSchemaProperty, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Allowed enum values (`enum` in JSON Schema). Strings only; numeric and
-   * boolean enums are rare and serialized as strings here.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

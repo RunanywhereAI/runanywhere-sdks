@@ -37,8 +37,6 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         {&::_pbi::kDescriptorMethods, &::descriptor_table_sdk_5fevents_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::ComponentLifecycleSnapshot
         {&::_pbi::kDescriptorMethods, &::descriptor_table_sdk_5fevents_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::ComponentLifecycleSnapshotRequest
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_sdk_5fevents_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::ComponentLifecycleSnapshotResult
         {&::_pbi::kDescriptorMethods, &::descriptor_table_sdk_5fevents_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::ComponentLifecycleEvent
@@ -84,14 +82,6 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
         // ::runanywhere::v1::SDKEvent_PropertiesEntry_DoNotUse
         {&::_pbi::kDescriptorMethods, &::descriptor_table_sdk_5fevents_2eproto, /* tracker*/ nullptr,},
         // ::runanywhere::v1::SDKEvent
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_sdk_5fevents_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::SDKEventFilter
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_sdk_5fevents_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::SDKEventPublishRequest
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_sdk_5fevents_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::SDKEventPublishResult
-        {&::_pbi::kDescriptorMethods, &::descriptor_table_sdk_5fevents_2eproto, /* tracker*/ nullptr,},
-        // ::runanywhere::v1::SDKEventSubscribeRequest
         {&::_pbi::kDescriptorMethods, &::descriptor_table_sdk_5fevents_2eproto, /* tracker*/ nullptr,},
 };
 }  // namespace
@@ -410,7 +400,7 @@ constexpr auto VoiceLifecycleEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[9],
+      &file_reflection_data[8],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -547,7 +537,7 @@ constexpr auto TelemetryEvent_AttributesEntry_DoNotUse::InternalGenerateClassDat
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[22],
+      &file_reflection_data[21],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -768,7 +758,7 @@ constexpr auto StorageEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[14],
+      &file_reflection_data[13],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -966,7 +956,7 @@ constexpr auto SessionEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[7],
+      &file_reflection_data[6],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -1013,242 +1003,6 @@ const ::_pbi::ClassData* SessionEvent_get_class_data() {
   return SessionEvent_globals_.GetClassData();
 #else
   return SessionEvent_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class SDKEventFilter::_Internal {
- public:
-  using HasBits = decltype(::std::declval<SDKEventFilter>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_._has_bits_);
-};
-
-constexpr SDKEventFilter::ParseTableT_ SDKEventFilter::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_._has_bits_),
-      0, // no _extensions_
-      9, 120,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294966784,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      9,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::SDKEventFilter>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // repeated .runanywhere.v1.EventCategory categories = 1;
-      {::_pbi::TcParser::FastV32P1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.categories_)}},
-      // repeated .runanywhere.v1.SDKComponent components = 2;
-      {::_pbi::TcParser::FastV32P1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.components_)}},
-      // repeated .runanywhere.v1.EventDestination destinations = 3;
-      {::_pbi::TcParser::FastV32P1,
-       {26, 2, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.destinations_)}},
-      // .runanywhere.v1.ErrorSeverity minimum_severity = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(SDKEventFilter, _impl_.minimum_severity_), 8>(),
-       {32, 8, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.minimum_severity_)}},
-      // string session_id = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 3, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.session_id_)}},
-      // string operation_id = 6;
-      {::_pbi::TcParser::FastUS1,
-       {50, 4, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.operation_id_)}},
-      // string correlation_id = 7;
-      {::_pbi::TcParser::FastUS1,
-       {58, 5, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.correlation_id_)}},
-      // string source = 8;
-      {::_pbi::TcParser::FastUS1,
-       {66, 6, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.source_)}},
-      // string trace_id = 9;
-      {::_pbi::TcParser::FastUS1,
-       {74, 7, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.trace_id_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // repeated .runanywhere.v1.EventCategory categories = 1;
-      {PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.categories_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
-      // repeated .runanywhere.v1.SDKComponent components = 2;
-      {PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.components_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
-      // repeated .runanywhere.v1.EventDestination destinations = 3;
-      {PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.destinations_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
-      // .runanywhere.v1.ErrorSeverity minimum_severity = 4;
-      {PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.minimum_severity_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // string session_id = 5;
-      {PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.session_id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string operation_id = 6;
-      {PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.operation_id_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string correlation_id = 7;
-      {PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.correlation_id_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string source = 8;
-      {PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.source_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string trace_id = 9;
-      {PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_.trace_id_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    }},
-    // no aux_entries
-    {{
-      "\35\0\0\0\0\12\14\16\6\10\0\0\0\0\0\0"
-      "runanywhere.v1.SDKEventFilter"
-      "session_id"
-      "operation_id"
-      "correlation_id"
-      "source"
-      "trace_id"
-    }},
-  };
-}
-
-
-inline constexpr SDKEventFilter::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        categories_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::SDKEventFilter,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.categories_)>()
-         }
-        ,
-        _categories_cached_byte_size_{0},
-        components_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::SDKEventFilter,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.components_)>()
-         }
-        ,
-        _components_cached_byte_size_{0},
-        destinations_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::SDKEventFilter,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.destinations_)>()
-         }
-        ,
-        _destinations_cached_byte_size_{0},
-        session_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        operation_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        correlation_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        source_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        trace_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        minimum_severity_{static_cast< ::runanywhere::v1::ErrorSeverity >(0)} {}
-
-template <typename>
-constexpr SDKEventFilter::SDKEventFilter(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL SDKEventFilter::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) SDKEventFilter(arena);
-}
-constexpr auto SDKEventFilter::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(SDKEventFilter), alignof(SDKEventFilter));
-}
-constexpr auto SDKEventFilter::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &SDKEventFilter::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<SDKEventFilter>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &SDKEventFilter::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<SDKEventFilter>(), &SDKEventFilter::ByteSizeLong,
-              &SDKEventFilter::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(SDKEventFilter, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[28],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_sdk_5fevents_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct SDKEventFilterGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr SDKEventFilterGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 SDKEventFilter_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(SDKEventFilter::InternalGenerateClassData_(
-            _default, &SDKEventFilter_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<SDKEventFilter>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~SDKEventFilterGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) SDKEventFilter _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<SDKEventFilter>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(SDKEventFilterGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST SDKEventFilterGlobalsTypeInternal SDKEventFilter_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* SDKEventFilter_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return SDKEventFilter_globals_.GetClassData();
-#else
-  return SDKEventFilter_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -1339,7 +1093,7 @@ constexpr auto SDKEvent_PropertiesEntry_DoNotUse::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[26],
+      &file_reflection_data[25],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -1525,7 +1279,7 @@ constexpr auto PerformanceEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[21],
+      &file_reflection_data[20],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -1711,7 +1465,7 @@ constexpr auto NetworkEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[18],
+      &file_reflection_data[17],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -1983,7 +1737,7 @@ constexpr auto ModelEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[11],
+      &file_reflection_data[10],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -2572,7 +2326,7 @@ constexpr auto GenerationEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[8],
+      &file_reflection_data[7],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -2773,7 +2527,7 @@ constexpr auto FrameworkEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[19],
+      &file_reflection_data[18],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -3039,7 +2793,7 @@ constexpr auto DeviceEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[17],
+      &file_reflection_data[16],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -3324,154 +3078,6 @@ const ::_pbi::ClassData* ConfigurationEvent_get_class_data() {
   return ConfigurationEvent_globals_.GetClassData();
 #else
   return ConfigurationEvent_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class ComponentLifecycleSnapshotRequest::_Internal {
- public:
-  using HasBits = decltype(::std::declval<ComponentLifecycleSnapshotRequest>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotRequest, _impl_._has_bits_);
-};
-
-constexpr ComponentLifecycleSnapshotRequest::ParseTableT_ ComponentLifecycleSnapshotRequest::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotRequest, _impl_._has_bits_),
-      0, // no _extensions_
-      2, 8,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967292,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      2,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::ComponentLifecycleSnapshotRequest>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // bool include_model = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ComponentLifecycleSnapshotRequest, _impl_.include_model_), 1>(),
-       {16, 1, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotRequest, _impl_.include_model_)}},
-      // .runanywhere.v1.SDKComponent component = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentLifecycleSnapshotRequest, _impl_.component_), 0>(),
-       {8, 0, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotRequest, _impl_.component_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // .runanywhere.v1.SDKComponent component = 1;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotRequest, _impl_.component_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // bool include_model = 2;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotRequest, _impl_.include_model_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    }},
-    // no aux_entries
-    {{
-    }},
-  };
-}
-
-
-inline constexpr ComponentLifecycleSnapshotRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        component_{static_cast< ::runanywhere::v1::SDKComponent >(0)},
-        include_model_{false} {}
-
-template <typename>
-constexpr ComponentLifecycleSnapshotRequest::ComponentLifecycleSnapshotRequest(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL ComponentLifecycleSnapshotRequest::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) ComponentLifecycleSnapshotRequest(arena);
-}
-constexpr auto ComponentLifecycleSnapshotRequest::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(ComponentLifecycleSnapshotRequest), alignof(ComponentLifecycleSnapshotRequest));
-}
-constexpr auto ComponentLifecycleSnapshotRequest::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &ComponentLifecycleSnapshotRequest::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<ComponentLifecycleSnapshotRequest>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &ComponentLifecycleSnapshotRequest::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<ComponentLifecycleSnapshotRequest>(), &ComponentLifecycleSnapshotRequest::ByteSizeLong,
-              &ComponentLifecycleSnapshotRequest::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotRequest, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[4],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_sdk_5fevents_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct ComponentLifecycleSnapshotRequestGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr ComponentLifecycleSnapshotRequestGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 ComponentLifecycleSnapshotRequest_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(ComponentLifecycleSnapshotRequest::InternalGenerateClassData_(
-            _default, &ComponentLifecycleSnapshotRequest_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<ComponentLifecycleSnapshotRequest>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~ComponentLifecycleSnapshotRequestGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) ComponentLifecycleSnapshotRequest _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<ComponentLifecycleSnapshotRequest>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotRequestGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ComponentLifecycleSnapshotRequestGlobalsTypeInternal ComponentLifecycleSnapshotRequest_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* ComponentLifecycleSnapshotRequest_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return ComponentLifecycleSnapshotRequest_globals_.GetClassData();
-#else
-  return ComponentLifecycleSnapshotRequest_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -3927,7 +3533,7 @@ constexpr auto CapabilityOperationEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[10],
+      &file_reflection_data[9],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -4107,7 +3713,7 @@ constexpr auto CancellationEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[24],
+      &file_reflection_data[23],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -4293,7 +3899,7 @@ constexpr auto AuthEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[16],
+      &file_reflection_data[15],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -4478,7 +4084,7 @@ constexpr auto TelemetryEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[23],
+      &file_reflection_data[22],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -4525,160 +4131,6 @@ const ::_pbi::ClassData* TelemetryEvent_get_class_data() {
   return TelemetryEvent_globals_.GetClassData();
 #else
   return TelemetryEvent_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class SDKEventSubscribeRequest::_Internal {
- public:
-  using HasBits = decltype(::std::declval<SDKEventSubscribeRequest>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(SDKEventSubscribeRequest, _impl_._has_bits_);
-};
-
-constexpr SDKEventSubscribeRequest::ParseTableT_ SDKEventSubscribeRequest::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(SDKEventSubscribeRequest, _impl_._has_bits_),
-      0, // no _extensions_
-      2, 8,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967292,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      2,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::SDKEventSubscribeRequest>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // bool replay_queued_events = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SDKEventSubscribeRequest, _impl_.replay_queued_events_), 1>(),
-       {16, 1, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventSubscribeRequest, _impl_.replay_queued_events_)}},
-      // .runanywhere.v1.SDKEventFilter filter = 1;
-      {::_pbi::TcParser::FastMtS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventSubscribeRequest, _impl_.filter_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // .runanywhere.v1.SDKEventFilter filter = 1;
-      {PROTOBUF_FIELD_OFFSET(SDKEventSubscribeRequest, _impl_.filter_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // bool replay_queued_events = 2;
-      {PROTOBUF_FIELD_OFFSET(SDKEventSubscribeRequest, _impl_.replay_queued_events_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKEventFilter>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKEventFilter_globals_},
-        #endif
-    }},
-    {{
-    }},
-  };
-}
-
-
-inline constexpr SDKEventSubscribeRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        filter_{nullptr},
-        replay_queued_events_{false} {}
-
-template <typename>
-constexpr SDKEventSubscribeRequest::SDKEventSubscribeRequest(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL SDKEventSubscribeRequest::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) SDKEventSubscribeRequest(arena);
-}
-constexpr auto SDKEventSubscribeRequest::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(SDKEventSubscribeRequest), alignof(SDKEventSubscribeRequest));
-}
-constexpr auto SDKEventSubscribeRequest::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &SDKEventSubscribeRequest::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<SDKEventSubscribeRequest>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &SDKEventSubscribeRequest::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<SDKEventSubscribeRequest>(), &SDKEventSubscribeRequest::ByteSizeLong,
-              &SDKEventSubscribeRequest::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(SDKEventSubscribeRequest, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[31],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_sdk_5fevents_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct SDKEventSubscribeRequestGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr SDKEventSubscribeRequestGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 SDKEventSubscribeRequest_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(SDKEventSubscribeRequest::InternalGenerateClassData_(
-            _default, &SDKEventSubscribeRequest_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<SDKEventSubscribeRequest>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~SDKEventSubscribeRequestGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) SDKEventSubscribeRequest _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<SDKEventSubscribeRequest>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(SDKEventSubscribeRequestGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST SDKEventSubscribeRequestGlobalsTypeInternal SDKEventSubscribeRequest_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* SDKEventSubscribeRequest_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return SDKEventSubscribeRequest_globals_.GetClassData();
-#else
-  return SDKEventSubscribeRequest_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -4839,7 +4291,7 @@ constexpr auto HardwareRoutingEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[20],
+      &file_reflection_data[19],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -5055,7 +4507,7 @@ constexpr auto StorageLifecycleEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[15],
+      &file_reflection_data[14],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -5228,7 +4680,7 @@ constexpr auto FailureEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[25],
+      &file_reflection_data[24],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -5441,7 +4893,7 @@ constexpr auto DownloadEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[13],
+      &file_reflection_data[12],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -5839,7 +5291,7 @@ constexpr auto ComponentLifecycleSnapshotResult::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[5],
+      &file_reflection_data[4],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -6091,7 +5543,7 @@ constexpr auto ModelRegistryEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[12],
+      &file_reflection_data[11],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -6336,7 +5788,7 @@ constexpr auto ComponentLifecycleEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[6],
+      &file_reflection_data[5],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -6774,7 +6226,7 @@ constexpr auto SDKEvent::InternalGenerateClassData_(
           false,
       },
 #ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[27],
+      &file_reflection_data[26],
 #else   // !PROTOBUF_MESSAGE_GLOBALS
       &::_pbi::kDescriptorMethods,
       &descriptor_table_sdk_5fevents_2eproto,
@@ -6821,351 +6273,6 @@ const ::_pbi::ClassData* SDKEvent_get_class_data() {
   return SDKEvent_globals_.GetClassData();
 #else
   return SDKEvent_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class SDKEventPublishResult::_Internal {
- public:
-  using HasBits = decltype(::std::declval<SDKEventPublishResult>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_._has_bits_);
-};
-
-constexpr SDKEventPublishResult::ParseTableT_ SDKEventPublishResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_._has_bits_),
-      0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
-      2,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::SDKEventPublishResult>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // bool accepted = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SDKEventPublishResult, _impl_.accepted_), 4>(),
-       {8, 4, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.accepted_)}},
-      // string event_id = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.event_id_)}},
-      // optional .runanywhere.v1.SDKEvent normalized_event = 3;
-      {::_pbi::TcParser::FastMtS1,
-       {26, 2, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.normalized_event_)}},
-      // string error_message = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 1, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.error_message_)}},
-      // optional .runanywhere.v1.SDKError error = 5;
-      {::_pbi::TcParser::FastMtS1,
-       {42, 3, 1,
-        PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.error_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // bool accepted = 1;
-      {PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.accepted_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // string event_id = 2;
-      {PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.event_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional .runanywhere.v1.SDKEvent normalized_event = 3;
-      {PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.normalized_event_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // string error_message = 4;
-      {PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional .runanywhere.v1.SDKError error = 5;
-      {PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.error_), _Internal::kHasBitsOffset + 3, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKEvent>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKEvent_globals_},
-        #endif
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
-        #endif
-    }},
-    {{
-      "\44\0\10\0\15\0\0\0"
-      "runanywhere.v1.SDKEventPublishResult"
-      "event_id"
-      "error_message"
-    }},
-  };
-}
-
-
-inline constexpr SDKEventPublishResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        event_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        normalized_event_{nullptr},
-        error_{nullptr},
-        accepted_{false} {}
-
-template <typename>
-constexpr SDKEventPublishResult::SDKEventPublishResult(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL SDKEventPublishResult::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) SDKEventPublishResult(arena);
-}
-constexpr auto SDKEventPublishResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(SDKEventPublishResult), alignof(SDKEventPublishResult));
-}
-constexpr auto SDKEventPublishResult::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &SDKEventPublishResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<SDKEventPublishResult>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &SDKEventPublishResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<SDKEventPublishResult>(), &SDKEventPublishResult::ByteSizeLong,
-              &SDKEventPublishResult::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[30],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_sdk_5fevents_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct SDKEventPublishResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr SDKEventPublishResultGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 SDKEventPublishResult_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(SDKEventPublishResult::InternalGenerateClassData_(
-            _default, &SDKEventPublishResult_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<SDKEventPublishResult>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~SDKEventPublishResultGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) SDKEventPublishResult _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<SDKEventPublishResult>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(SDKEventPublishResultGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST SDKEventPublishResultGlobalsTypeInternal SDKEventPublishResult_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* SDKEventPublishResult_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return SDKEventPublishResult_globals_.GetClassData();
-#else
-  return SDKEventPublishResult_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class SDKEventPublishRequest::_Internal {
- public:
-  using HasBits = decltype(::std::declval<SDKEventPublishRequest>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(SDKEventPublishRequest, _impl_._has_bits_);
-};
-
-constexpr SDKEventPublishRequest::ParseTableT_ SDKEventPublishRequest::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(SDKEventPublishRequest, _impl_._has_bits_),
-      0, // no _extensions_
-      2, 8,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967292,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      2,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::SDKEventPublishRequest>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // bool normalize_envelope = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(SDKEventPublishRequest, _impl_.normalize_envelope_), 1>(),
-       {16, 1, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventPublishRequest, _impl_.normalize_envelope_)}},
-      // .runanywhere.v1.SDKEvent event = 1;
-      {::_pbi::TcParser::FastMtS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(SDKEventPublishRequest, _impl_.event_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // .runanywhere.v1.SDKEvent event = 1;
-      {PROTOBUF_FIELD_OFFSET(SDKEventPublishRequest, _impl_.event_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // bool normalize_envelope = 2;
-      {PROTOBUF_FIELD_OFFSET(SDKEventPublishRequest, _impl_.normalize_envelope_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKEvent>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKEvent_globals_},
-        #endif
-    }},
-    {{
-    }},
-  };
-}
-
-
-inline constexpr SDKEventPublishRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        event_{nullptr},
-        normalize_envelope_{false} {}
-
-template <typename>
-constexpr SDKEventPublishRequest::SDKEventPublishRequest(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL SDKEventPublishRequest::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) SDKEventPublishRequest(arena);
-}
-constexpr auto SDKEventPublishRequest::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(SDKEventPublishRequest), alignof(SDKEventPublishRequest));
-}
-constexpr auto SDKEventPublishRequest::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &SDKEventPublishRequest::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<SDKEventPublishRequest>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &SDKEventPublishRequest::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<SDKEventPublishRequest>(), &SDKEventPublishRequest::ByteSizeLong,
-              &SDKEventPublishRequest::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(SDKEventPublishRequest, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[29],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_sdk_5fevents_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct SDKEventPublishRequestGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr SDKEventPublishRequestGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 SDKEventPublishRequest_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(SDKEventPublishRequest::InternalGenerateClassData_(
-            _default, &SDKEventPublishRequest_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<SDKEventPublishRequest>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~SDKEventPublishRequestGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) SDKEventPublishRequest _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<SDKEventPublishRequest>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(SDKEventPublishRequestGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST SDKEventPublishRequestGlobalsTypeInternal SDKEventPublishRequest_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* SDKEventPublishRequest_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return SDKEventPublishRequest_globals_.GetClassData();
-#else
-  return SDKEventPublishRequest_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -7271,13 +6378,6 @@ const ::uint32_t
         2,
         9,
         3,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotRequest, _impl_._has_bits_),
-        5, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotRequest, _impl_.component_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotRequest, _impl_.include_model_),
-        0,
-        1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotResult, _impl_._has_bits_),
         6, // hasbit index offset
@@ -7865,54 +6965,6 @@ const ::uint32_t
         ~0u,
         ~0u,
         ~0u,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_._has_bits_),
-        12, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.categories_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.components_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.destinations_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.minimum_severity_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.session_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.operation_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.correlation_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.source_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.trace_id_),
-        0,
-        1,
-        2,
-        8,
-        3,
-        4,
-        5,
-        6,
-        7,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventPublishRequest, _impl_._has_bits_),
-        5, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventPublishRequest, _impl_.event_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventPublishRequest, _impl_.normalize_envelope_),
-        0,
-        1,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventPublishResult, _impl_._has_bits_),
-        8, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventPublishResult, _impl_.accepted_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventPublishResult, _impl_.event_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventPublishResult, _impl_.normalized_event_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventPublishResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventPublishResult, _impl_.error_),
-        4,
-        0,
-        2,
-        1,
-        3,
-        0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventSubscribeRequest, _impl_._has_bits_),
-        5, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventSubscribeRequest, _impl_.filter_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventSubscribeRequest, _impl_.replay_queued_events_),
-        0,
-        1,
 };
 
 static const ::_pbi::MigrationSchema
@@ -7921,34 +6973,29 @@ static const ::_pbi::MigrationSchema
         {11, sizeof(::runanywhere::v1::ConfigurationEvent)},
         {34, sizeof(::runanywhere::v1::ComponentInitializationEvent)},
         {69, sizeof(::runanywhere::v1::ComponentLifecycleSnapshot)},
-        {92, sizeof(::runanywhere::v1::ComponentLifecycleSnapshotRequest)},
-        {99, sizeof(::runanywhere::v1::ComponentLifecycleSnapshotResult)},
-        {108, sizeof(::runanywhere::v1::ComponentLifecycleEvent)},
-        {141, sizeof(::runanywhere::v1::SessionEvent)},
-        {158, sizeof(::runanywhere::v1::GenerationEvent)},
-        {229, sizeof(::runanywhere::v1::VoiceLifecycleEvent)},
-        {286, sizeof(::runanywhere::v1::CapabilityOperationEvent)},
-        {309, sizeof(::runanywhere::v1::ModelEvent)},
-        {344, sizeof(::runanywhere::v1::ModelRegistryEvent)},
-        {377, sizeof(::runanywhere::v1::DownloadEvent)},
-        {400, sizeof(::runanywhere::v1::StorageEvent)},
-        {423, sizeof(::runanywhere::v1::StorageLifecycleEvent)},
-        {446, sizeof(::runanywhere::v1::AuthEvent)},
-        {459, sizeof(::runanywhere::v1::DeviceEvent)},
-        {490, sizeof(::runanywhere::v1::NetworkEvent)},
-        {505, sizeof(::runanywhere::v1::FrameworkEvent)},
-        {524, sizeof(::runanywhere::v1::HardwareRoutingEvent)},
-        {543, sizeof(::runanywhere::v1::PerformanceEvent)},
-        {558, sizeof(::runanywhere::v1::TelemetryEvent_AttributesEntry_DoNotUse)},
-        {565, sizeof(::runanywhere::v1::TelemetryEvent)},
-        {578, sizeof(::runanywhere::v1::CancellationEvent)},
-        {591, sizeof(::runanywhere::v1::FailureEvent)},
-        {602, sizeof(::runanywhere::v1::SDKEvent_PropertiesEntry_DoNotUse)},
-        {609, sizeof(::runanywhere::v1::SDKEvent)},
-        {686, sizeof(::runanywhere::v1::SDKEventFilter)},
-        {707, sizeof(::runanywhere::v1::SDKEventPublishRequest)},
-        {714, sizeof(::runanywhere::v1::SDKEventPublishResult)},
-        {727, sizeof(::runanywhere::v1::SDKEventSubscribeRequest)},
+        {92, sizeof(::runanywhere::v1::ComponentLifecycleSnapshotResult)},
+        {101, sizeof(::runanywhere::v1::ComponentLifecycleEvent)},
+        {134, sizeof(::runanywhere::v1::SessionEvent)},
+        {151, sizeof(::runanywhere::v1::GenerationEvent)},
+        {222, sizeof(::runanywhere::v1::VoiceLifecycleEvent)},
+        {279, sizeof(::runanywhere::v1::CapabilityOperationEvent)},
+        {302, sizeof(::runanywhere::v1::ModelEvent)},
+        {337, sizeof(::runanywhere::v1::ModelRegistryEvent)},
+        {370, sizeof(::runanywhere::v1::DownloadEvent)},
+        {393, sizeof(::runanywhere::v1::StorageEvent)},
+        {416, sizeof(::runanywhere::v1::StorageLifecycleEvent)},
+        {439, sizeof(::runanywhere::v1::AuthEvent)},
+        {452, sizeof(::runanywhere::v1::DeviceEvent)},
+        {483, sizeof(::runanywhere::v1::NetworkEvent)},
+        {498, sizeof(::runanywhere::v1::FrameworkEvent)},
+        {517, sizeof(::runanywhere::v1::HardwareRoutingEvent)},
+        {536, sizeof(::runanywhere::v1::PerformanceEvent)},
+        {551, sizeof(::runanywhere::v1::TelemetryEvent_AttributesEntry_DoNotUse)},
+        {558, sizeof(::runanywhere::v1::TelemetryEvent)},
+        {571, sizeof(::runanywhere::v1::CancellationEvent)},
+        {584, sizeof(::runanywhere::v1::FailureEvent)},
+        {595, sizeof(::runanywhere::v1::SDKEvent_PropertiesEntry_DoNotUse)},
+        {602, sizeof(::runanywhere::v1::SDKEvent)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -7956,7 +7003,6 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::runanywhere::v1::ConfigurationEvent_globals_,
         &::runanywhere::v1::ComponentInitializationEvent_globals_,
         &::runanywhere::v1::ComponentLifecycleSnapshot_globals_,
-        &::runanywhere::v1::ComponentLifecycleSnapshotRequest_globals_,
         &::runanywhere::v1::ComponentLifecycleSnapshotResult_globals_,
         &::runanywhere::v1::ComponentLifecycleEvent_globals_,
         &::runanywhere::v1::SessionEvent_globals_,
@@ -7980,10 +7026,6 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
         &::runanywhere::v1::FailureEvent_globals_,
         &::runanywhere::v1::SDKEvent_PropertiesEntry_DoNotUse_globals_,
         &::runanywhere::v1::SDKEvent_globals_,
-        &::runanywhere::v1::SDKEventFilter_globals_,
-        &::runanywhere::v1::SDKEventPublishRequest_globals_,
-        &::runanywhere::v1::SDKEventPublishResult_globals_,
-        &::runanywhere::v1::SDKEventSubscribeRequest_globals_,
 };
 const char descriptor_table_protodef_sdk_5fevents_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
@@ -8027,612 +7069,585 @@ const char descriptor_table_protodef_sdk_5fevents_2eproto[] ABSL_ATTRIBUTE_SECTI
     "runanywhere.v1.InferenceFramework\022\025\n\rres"
     "olved_path\030\010 \001(\t\022\031\n\021loaded_at_unix_ms\030\t "
     "\001(\003\022(\n\005model\030\n \001(\0132\031.runanywhere.v1.Mode"
-    "lInfo\"k\n!ComponentLifecycleSnapshotReque"
-    "st\022/\n\tcomponent\030\001 \001(\0162\034.runanywhere.v1.S"
-    "DKComponent\022\025\n\rinclude_model\030\002 \001(\010\"\211\001\n C"
-    "omponentLifecycleSnapshotResult\022\017\n\007succe"
-    "ss\030\001 \001(\010\022=\n\tsnapshots\030\002 \003(\0132*.runanywher"
-    "e.v1.ComponentLifecycleSnapshot\022\025\n\rerror"
-    "_message\030\003 \001(\t\"\337\006\n\027ComponentLifecycleEve"
-    "nt\022/\n\tcomponent\030\001 \001(\0162\034.runanywhere.v1.S"
-    "DKComponent\022\?\n\016previous_state\030\002 \001(\0162\'.ru"
-    "nanywhere.v1.ComponentLifecycleState\022>\n\r"
-    "current_state\030\003 \001(\0162\'.runanywhere.v1.Com"
-    "ponentLifecycleState\022\020\n\010model_id\030\004 \001(\t\022\024"
-    "\n\014timestamp_ms\030\005 \001(\003\022<\n\021model_load_resul"
-    "t\030\n \001(\0132\037.runanywhere.v1.ModelLoadResult"
-    "H\000\022@\n\023model_unload_result\030\013 \001(\0132!.runany"
-    "where.v1.ModelUnloadResultH\000\022@\n\023model_de"
-    "lete_result\030\014 \001(\0132!.runanywhere.v1.Model"
-    "DeleteResultH\000\022=\n\021download_progress\030\r \001("
-    "\0132 .runanywhere.v1.DownloadProgressH\000\022I\n"
-    "\024storage_availability\030\016 \001(\0132).runanywher"
-    "e.v1.StorageAvailabilityResultH\000\022D\n\025stor"
-    "age_delete_result\030\017 \001(\0132#.runanywhere.v1"
-    ".StorageDeleteResultH\000\022>\n\010snapshot\030\020 \001(\013"
-    "2*.runanywhere.v1.ComponentLifecycleSnap"
-    "shotH\000\022K\n\017snapshot_result\030\021 \001(\01320.runany"
-    "where.v1.ComponentLifecycleSnapshotResul"
-    "tH\000\022@\n\023storage_delete_plan\030\022 \001(\0132!.runan"
-    "ywhere.v1.StorageDeletePlanH\000B\t\n\007payload"
-    "\"\256\001\n\014SessionEvent\022.\n\004kind\030\001 \001(\0162 .runany"
-    "where.v1.SessionEventKind\022\022\n\nsession_id\030"
-    "\002 \001(\t\022\017\n\007user_id\030\003 \001(\t\022\016\n\006reason\030\004 \001(\t\022\r"
-    "\n\005error\030\005 \001(\t\022\025\n\rstarted_at_ms\030\006 \001(\003\022\023\n\013"
-    "ended_at_ms\030\007 \001(\003\"\264\006\n\017GenerationEvent\0221\n"
-    "\004kind\030\001 \001(\0162#.runanywhere.v1.GenerationE"
-    "ventKind\022\022\n\nsession_id\030\002 \001(\t\022\016\n\006prompt\030\003"
-    " \001(\t\022\r\n\005token\030\004 \001(\t\022\026\n\016streaming_text\030\005 "
-    "\001(\t\022\024\n\014tokens_count\030\006 \001(\005\022\020\n\010response\030\007 "
-    "\001(\t\022\023\n\013tokens_used\030\010 \001(\005\022\022\n\nlatency_ms\030\t"
-    " \001(\003\022\036\n\026first_token_latency_ms\030\n \001(\003\022\r\n\005"
-    "error\030\013 \001(\t\022\020\n\010model_id\030\014 \001(\t\022\023\n\013cost_am"
-    "ount\030\r \001(\001\022\031\n\021cost_saved_amount\030\016 \001(\001\022\026\n"
-    "\016routing_target\030\017 \001(\t\022\026\n\016routing_reason\030"
-    "\020 \001(\t\022\025\n\rcancel_reason\030\021 \001(\t\022\024\n\014tool_cal"
-    "l_id\030\022 \001(\t\022\021\n\ttool_name\030\023 \001(\t\022\031\n\021tool_pa"
-    "yload_json\030\024 \001(\t\022\036\n\026structured_schema_js"
-    "on\030\025 \001(\t\022\036\n\026structured_output_json\030\026 \001(\t"
-    "\022\025\n\rthinking_text\030\027 \001(\t\022\024\n\014input_tokens\030"
-    "\030 \001(\005\022\031\n\021tokens_per_second\030\031 \001(\001\022\036\n\026time"
-    "_to_first_token_ms\030\032 \001(\003\022\024\n\014is_streaming"
-    "\030\033 \001(\010\022\023\n\013temperature\030\034 \001(\002\022\022\n\nmax_token"
-    "s\030\035 \001(\005\022\026\n\016context_length\030\036 \001(\005\022\022\n\nmodel"
-    "_name\030\037 \001(\t\022\023\n\013duration_ms\030  \001(\001\022\021\n\tfram"
-    "ework\030! \001(\005\022\033\n\023prompt_eval_time_ms\030\" \001(\003"
-    "\"\220\005\n\023VoiceLifecycleEvent\022,\n\004kind\030\001 \001(\0162\036"
-    ".runanywhere.v1.VoiceEventKind\022\022\n\nsessio"
-    "n_id\030\002 \001(\t\022\014\n\004text\030\003 \001(\t\022\022\n\nconfidence\030\004"
-    " \001(\002\022\025\n\rresponse_text\030\005 \001(\t\022\024\n\014audio_bas"
-    "e64\030\006 \001(\t\022\023\n\013duration_ms\030\007 \001(\003\022\023\n\013audio_"
-    "level\030\010 \001(\002\022\025\n\rtranscription\030\t \001(\t\022\025\n\rtu"
-    "rn_response\030\n \001(\t\022\031\n\021turn_audio_base64\030\013"
-    " \001(\t\022\r\n\005error\030\014 \001(\t\022\020\n\010model_id\030\r \001(\t\022\022\n"
-    "\nmodel_name\030\016 \001(\t\022\027\n\017audio_length_ms\030\017 \001"
-    "(\003\022\030\n\020audio_size_bytes\030\020 \001(\005\022\022\n\nword_cou"
-    "nt\030\021 \001(\005\022\030\n\020real_time_factor\030\022 \001(\001\022\020\n\010la"
-    "nguage\030\023 \001(\t\022\023\n\013sample_rate\030\024 \001(\005\022\024\n\014is_"
-    "streaming\030\025 \001(\010\022\021\n\tframework\030\026 \001(\005\022\027\n\017ch"
-    "aracter_count\030\027 \001(\005\022\031\n\021audio_duration_ms"
-    "\030\030 \001(\003\022\034\n\024audio_size_bytes_tts\030\031 \001(\005\022\036\n\026"
-    "processing_duration_ms\030\032 \001(\003\022\035\n\025characte"
-    "rs_per_second\030\033 \001(\001\"\243\002\n\030CapabilityOperat"
-    "ionEvent\022:\n\004kind\030\001 \001(\0162,.runanywhere.v1."
-    "CapabilityOperationEventKind\022/\n\tcomponen"
-    "t\030\002 \001(\0162\034.runanywhere.v1.SDKComponent\022\020\n"
-    "\010model_id\030\003 \001(\t\022\024\n\014operation_id\030\004 \001(\t\022\021\n"
-    "\toperation\030\005 \001(\t\022\020\n\010progress\030\006 \001(\002\022\023\n\013in"
-    "put_count\030\007 \001(\003\022\024\n\014output_count\030\010 \001(\003\022\023\n"
-    "\013result_json\030\t \001(\t\022\r\n\005error\030\n \001(\t\"\371\002\n\nMo"
-    "delEvent\022,\n\004kind\030\001 \001(\0162\036.runanywhere.v1."
-    "ModelEventKind\022\020\n\010model_id\030\002 \001(\t\022\017\n\007task"
-    "_id\030\003 \001(\t\022\020\n\010progress\030\004 \001(\002\022\030\n\020bytes_dow"
-    "nloaded\030\005 \001(\003\022\023\n\013total_bytes\030\006 \001(\003\022\026\n\016do"
-    "wnload_state\030\007 \001(\t\022\022\n\nlocal_path\030\010 \001(\t\022\r"
-    "\n\005error\030\t \001(\t\022\023\n\013model_count\030\n \001(\005\022\031\n\021cu"
-    "stom_model_name\030\013 \001(\t\022\030\n\020custom_model_ur"
-    "l\030\014 \001(\t\022\022\n\nmodel_name\030\r \001(\t\022\030\n\020model_siz"
-    "e_bytes\030\016 \001(\003\022\023\n\013duration_ms\030\017 \001(\003\022\021\n\tfr"
-    "amework\030\020 \001(\005\"\322\005\n\022ModelRegistryEvent\0224\n\004"
-    "kind\030\001 \001(\0162&.runanywhere.v1.ModelRegistr"
-    "yEventKind\022\020\n\010model_id\030\002 \001(\t\022\025\n\rassignme"
-    "nt_id\030\003 \001(\t\0228\n\022assigned_component\030\004 \001(\0162"
-    "\034.runanywhere.v1.SDKComponent\0225\n\tframewo"
-    "rk\030\005 \001(\0162\".runanywhere.v1.InferenceFrame"
-    "work\022\023\n\013source_path\030\006 \001(\t\022\r\n\005error\030\007 \001(\t"
-    "\022D\n\016refresh_result\030\024 \001(\0132*.runanywhere.v"
-    "1.ModelRegistryRefreshResultH\000\0226\n\013list_r"
-    "esult\030\025 \001(\0132\037.runanywhere.v1.ModelListRe"
-    "sultH\000\0224\n\nget_result\030\026 \001(\0132\036.runanywhere"
-    ".v1.ModelGetResultH\000\022:\n\rimport_result\030\027 "
-    "\001(\0132!.runanywhere.v1.ModelImportResultH\000"
-    "\022@\n\020discovery_result\030\030 \001(\0132$.runanywhere"
-    ".v1.ModelDiscoveryResultH\000\022H\n\024compatibil"
-    "ity_result\030\031 \001(\0132(.runanywhere.v1.ModelC"
-    "ompatibilityResultH\000\022B\n\024current_model_re"
-    "sult\030\032 \001(\0132\".runanywhere.v1.CurrentModel"
-    "ResultH\000B\010\n\006result\"\251\003\n\rDownloadEvent\022/\n\004"
-    "kind\030\001 \001(\0162!.runanywhere.v1.DownloadEven"
-    "tKind\022\020\n\010model_id\030\002 \001(\t\022\017\n\007task_id\030\003 \001(\t"
-    "\022\r\n\005error\030\004 \001(\t\0229\n\013plan_result\030\024 \001(\0132\".r"
-    "unanywhere.v1.DownloadPlanResultH\000\022;\n\014st"
-    "art_result\030\025 \001(\0132#.runanywhere.v1.Downlo"
-    "adStartResultH\000\0224\n\010progress\030\026 \001(\0132 .runa"
-    "nywhere.v1.DownloadProgressH\000\022=\n\rcancel_"
-    "result\030\027 \001(\0132$.runanywhere.v1.DownloadCa"
-    "ncelResultH\000\022=\n\rresume_result\030\030 \001(\0132$.ru"
-    "nanywhere.v1.DownloadResumeResultH\000B\t\n\007p"
-    "ayload\"\374\001\n\014StorageEvent\022.\n\004kind\030\001 \001(\0162 ."
-    "runanywhere.v1.StorageEventKind\022\020\n\010model"
-    "_id\030\002 \001(\t\022\r\n\005error\030\003 \001(\t\022\023\n\013total_bytes\030"
-    "\004 \001(\003\022\027\n\017available_bytes\030\005 \001(\003\022\022\n\nused_b"
-    "ytes\030\006 \001(\003\022\032\n\022stored_model_count\030\007 \001(\005\022\021"
-    "\n\tcache_key\030\010 \001(\t\022\025\n\revicted_bytes\030\t \001(\003"
-    "\022\023\n\013freed_bytes\030\n \001(\003\"\231\003\n\025StorageLifecyc"
-    "leEvent\0227\n\004kind\030\001 \001(\0162).runanywhere.v1.S"
-    "torageLifecycleEventKind\022\020\n\010model_id\030\002 \001"
-    "(\t\022\021\n\tcache_key\030\003 \001(\t\022\r\n\005bytes\030\004 \001(\003\022\r\n\005"
-    "error\030\005 \001(\t\0228\n\013info_result\030\024 \001(\0132!.runan"
-    "ywhere.v1.StorageInfoResultH\000\022H\n\023availab"
-    "ility_result\030\025 \001(\0132).runanywhere.v1.Stor"
-    "ageAvailabilityResultH\000\0228\n\013delete_plan\030\026"
-    " \001(\0132!.runanywhere.v1.StorageDeletePlanH"
-    "\000\022<\n\rdelete_result\030\027 \001(\0132#.runanywhere.v"
-    "1.StorageDeleteResultH\000B\010\n\006result\"|\n\tAut"
-    "hEvent\022+\n\004kind\030\001 \001(\0162\035.runanywhere.v1.Au"
-    "thEventKind\022\020\n\010provider\030\002 \001(\t\022\022\n\nsubject"
-    "_id\030\003 \001(\t\022\r\n\005scope\030\004 \001(\t\022\r\n\005error\030\005 \001(\t\""
-    "\274\002\n\013DeviceEvent\022-\n\004kind\030\001 \001(\0162\037.runanywh"
-    "ere.v1.DeviceEventKind\022\021\n\tdevice_id\030\002 \001("
-    "\t\022\017\n\007os_name\030\003 \001(\t\022\022\n\nos_version\030\004 \001(\t\022\r"
-    "\n\005model\030\005 \001(\t\022\r\n\005error\030\006 \001(\t\022\020\n\010property"
-    "\030\007 \001(\t\022\021\n\tnew_value\030\010 \001(\t\022\021\n\told_value\030\t"
-    " \001(\t\022\025\n\rbattery_level\030\n \001(\002\022\023\n\013is_chargi"
-    "ng\030\013 \001(\010\022\025\n\rthermal_state\030\014 \001(\t\022\024\n\014is_co"
-    "nnected\030\r \001(\010\022\027\n\017connection_type\030\016 \001(\t\"\226"
-    "\001\n\014NetworkEvent\022.\n\004kind\030\001 \001(\0162 .runanywh"
-    "ere.v1.NetworkEventKind\022\013\n\003url\030\002 \001(\t\022\023\n\013"
-    "status_code\030\003 \001(\005\022\021\n\tis_online\030\004 \001(\010\022\r\n\005"
-    "error\030\005 \001(\t\022\022\n\nlatency_ms\030\006 \001(\003\"\321\001\n\016Fram"
-    "eworkEvent\0220\n\004kind\030\001 \001(\0162\".runanywhere.v"
-    "1.FrameworkEventKind\022\021\n\tframework\030\002 \001(\005\022"
-    "\024\n\014adapter_name\030\003 \001(\t\022\025\n\radapter_count\030\004"
-    " \001(\005\022\027\n\017framework_count\030\005 \001(\005\022\023\n\013model_c"
-    "ount\030\006 \001(\005\022\020\n\010modality\030\007 \001(\t\022\r\n\005error\030\010 "
-    "\001(\t\"\271\002\n\024HardwareRoutingEvent\0226\n\004kind\030\001 \001"
-    "(\0162(.runanywhere.v1.HardwareRoutingEvent"
-    "Kind\022/\n\tcomponent\030\002 \001(\0162\034.runanywhere.v1"
-    ".SDKComponent\0225\n\tframework\030\003 \001(\0162\".runan"
-    "ywhere.v1.InferenceFramework\022\022\n\ncapabili"
-    "ty\030\004 \001(\t\022\r\n\005route\030\005 \001(\t\022\016\n\006reason\030\006 \001(\t\022"
-    "\r\n\005error\030\007 \001(\t\022\?\n\020hardware_profile\030\024 \001(\013"
-    "2%.runanywhere.v1.HardwareProfileResult\""
-    "\267\001\n\020PerformanceEvent\0222\n\004kind\030\001 \001(\0162$.run"
-    "anywhere.v1.PerformanceEventKind\022\024\n\014memo"
-    "ry_bytes\030\002 \001(\003\022\025\n\rthermal_state\030\003 \001(\t\022\021\n"
-    "\toperation\030\004 \001(\t\022\024\n\014milliseconds\030\005 \001(\003\022\031"
-    "\n\021tokens_per_second\030\006 \001(\001\"\344\001\n\016TelemetryE"
-    "vent\0220\n\004kind\030\001 \001(\0162\".runanywhere.v1.Tele"
-    "metryEventKind\022\014\n\004name\030\002 \001(\t\022B\n\nattribut"
-    "es\030\003 \003(\0132..runanywhere.v1.TelemetryEvent"
-    ".AttributesEntry\022\r\n\005value\030\004 \001(\001\022\014\n\004unit\030"
-    "\005 \001(\t\0321\n\017AttributesEntry\022\013\n\003key\030\001 \001(\t\022\r\n"
-    "\005value\030\002 \001(\t:\0028\001\"\267\001\n\021CancellationEvent\0223"
-    "\n\004kind\030\001 \001(\0162%.runanywhere.v1.Cancellati"
-    "onEventKind\022/\n\tcomponent\030\002 \001(\0162\034.runanyw"
-    "here.v1.SDKComponent\022\024\n\014operation_id\030\003 \001"
-    "(\t\022\016\n\006reason\030\004 \001(\t\022\026\n\016user_initiated\030\005 \001"
-    "(\010\"\220\001\n\014FailureEvent\022/\n\tcomponent\030\001 \001(\0162\034"
-    ".runanywhere.v1.SDKComponent\022\021\n\toperatio"
-    "n\030\002 \001(\t\022\'\n\005error\030\003 \001(\0132\030.runanywhere.v1."
-    "SDKError\022\023\n\013recoverable\030\004 \001(\010\"\233\016\n\010SDKEve"
-    "nt\022\024\n\014timestamp_ms\030\001 \001(\003\022/\n\010severity\030\002 \001"
-    "(\0162\035.runanywhere.v1.ErrorSeverity\022/\n\010cat"
-    "egory\030\024 \001(\0162\035.runanywhere.v1.EventCatego"
-    "ry\022/\n\tcomponent\030\025 \001(\0162\034.runanywhere.v1.S"
-    "DKComponent\022,\n\005error\030\026 \001(\0132\030.runanywhere"
-    ".v1.SDKErrorH\001\210\001\001\022\n\n\002id\030\r \001(\t\022\022\n\nsession"
-    "_id\030\016 \001(\t\0225\n\013destination\030\017 \001(\0162 .runanyw"
-    "here.v1.EventDestination\022<\n\nproperties\030\020"
-    " \003(\0132(.runanywhere.v1.SDKEvent.Propertie"
-    "sEntry\022\024\n\014operation_id\030! \001(\t\022\026\n\016correlat"
-    "ion_id\030\" \001(\t\022\016\n\006source\030# \001(\t\022\020\n\010trace_id"
-    "\030$ \001(\t\022=\n\016initialization\030\003 \001(\0132#.runanyw"
-    "here.v1.InitializationEventH\000\022;\n\rconfigu"
-    "ration\030\004 \001(\0132\".runanywhere.v1.Configurat"
-    "ionEventH\000\0225\n\ngeneration\030\005 \001(\0132\037.runanyw"
-    "here.v1.GenerationEventH\000\022+\n\005model\030\006 \001(\013"
-    "2\032.runanywhere.v1.ModelEventH\000\0227\n\013perfor"
-    "mance\030\007 \001(\0132 .runanywhere.v1.Performance"
-    "EventH\000\022/\n\007network\030\010 \001(\0132\034.runanywhere.v"
-    "1.NetworkEventH\000\022/\n\007storage\030\t \001(\0132\034.runa"
-    "nywhere.v1.StorageEventH\000\0223\n\tframework\030\n"
-    " \001(\0132\036.runanywhere.v1.FrameworkEventH\000\022-"
-    "\n\006device\030\013 \001(\0132\033.runanywhere.v1.DeviceEv"
-    "entH\000\022F\n\016component_init\030\014 \001(\0132,.runanywh"
-    "ere.v1.ComponentInitializationEventH\000\0224\n"
-    "\005voice\030\021 \001(\0132#.runanywhere.v1.VoiceLifec"
-    "ycleEventH\000\0224\n\016voice_pipeline\030\022 \001(\0132\032.ru"
-    "nanywhere.v1.VoiceEventH\000\022F\n\023component_l"
-    "ifecycle\030\023 \001(\0132\'.runanywhere.v1.Componen"
-    "tLifecycleEventH\000\022/\n\007session\030\027 \001(\0132\034.run"
-    "anywhere.v1.SessionEventH\000\022)\n\004auth\030\030 \001(\013"
-    "2\031.runanywhere.v1.AuthEventH\000\022<\n\016model_r"
-    "egistry\030\031 \001(\0132\".runanywhere.v1.ModelRegi"
-    "stryEventH\000\0221\n\010download\030\032 \001(\0132\035.runanywh"
-    "ere.v1.DownloadEventH\000\022B\n\021storage_lifecy"
-    "cle\030\033 \001(\0132%.runanywhere.v1.StorageLifecy"
-    "cleEventH\000\022@\n\020hardware_routing\030\034 \001(\0132$.r"
-    "unanywhere.v1.HardwareRoutingEventH\000\022>\n\n"
-    "capability\030\035 \001(\0132(.runanywhere.v1.Capabi"
-    "lityOperationEventH\000\0223\n\ttelemetry\030\036 \001(\0132"
-    "\036.runanywhere.v1.TelemetryEventH\000\0229\n\014can"
-    "cellation\030\037 \001(\0132!.runanywhere.v1.Cancell"
-    "ationEventH\000\022/\n\007failure\030  \001(\0132\034.runanywh"
-    "ere.v1.FailureEventH\000\0321\n\017PropertiesEntry"
-    "\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\007\n\005even"
-    "tB\010\n\006_error\"\312\002\n\016SDKEventFilter\0221\n\ncatego"
-    "ries\030\001 \003(\0162\035.runanywhere.v1.EventCategor"
-    "y\0220\n\ncomponents\030\002 \003(\0162\034.runanywhere.v1.S"
-    "DKComponent\0226\n\014destinations\030\003 \003(\0162 .runa"
-    "nywhere.v1.EventDestination\0227\n\020minimum_s"
-    "everity\030\004 \001(\0162\035.runanywhere.v1.ErrorSeve"
-    "rity\022\022\n\nsession_id\030\005 \001(\t\022\024\n\014operation_id"
-    "\030\006 \001(\t\022\026\n\016correlation_id\030\007 \001(\t\022\016\n\006source"
-    "\030\010 \001(\t\022\020\n\010trace_id\030\t \001(\t\"]\n\026SDKEventPubl"
-    "ishRequest\022\'\n\005event\030\001 \001(\0132\030.runanywhere."
-    "v1.SDKEvent\022\032\n\022normalize_envelope\030\002 \001(\010\""
-    "\330\001\n\025SDKEventPublishResult\022\020\n\010accepted\030\001 "
-    "\001(\010\022\020\n\010event_id\030\002 \001(\t\0227\n\020normalized_even"
-    "t\030\003 \001(\0132\030.runanywhere.v1.SDKEventH\000\210\001\001\022\025"
-    "\n\rerror_message\030\004 \001(\t\022,\n\005error\030\005 \001(\0132\030.r"
-    "unanywhere.v1.SDKErrorH\001\210\001\001B\023\n\021_normaliz"
-    "ed_eventB\010\n\006_error\"h\n\030SDKEventSubscribeR"
-    "equest\022.\n\006filter\030\001 \001(\0132\036.runanywhere.v1."
-    "SDKEventFilter\022\034\n\024replay_queued_events\030\002"
-    " \001(\010*\227\003\n\014SDKComponent\022\035\n\031SDK_COMPONENT_U"
-    "NSPECIFIED\020\000\022\025\n\021SDK_COMPONENT_STT\020\001\022\025\n\021S"
-    "DK_COMPONENT_TTS\020\002\022\025\n\021SDK_COMPONENT_VAD\020"
-    "\003\022\025\n\021SDK_COMPONENT_LLM\020\004\022\025\n\021SDK_COMPONEN"
-    "T_VLM\020\005\022\033\n\027SDK_COMPONENT_DIFFUSION\020\006\022\025\n\021"
-    "SDK_COMPONENT_RAG\020\007\022\034\n\030SDK_COMPONENT_EMB"
-    "EDDINGS\020\010\022\035\n\031SDK_COMPONENT_VOICE_AGENT\020\t"
-    "\022\032\n\026SDK_COMPONENT_WAKEWORD\020\n\022%\n!SDK_COMP"
-    "ONENT_SPEAKER_DIARIZATION\020\013\022\'\n#SDK_COMPO"
-    "NENT_SEMANTIC_SEGMENTATION\020\014\022\030\n\024SDK_COMP"
-    "ONENT_RERANK\020\r*\252\001\n\020EventDestination\022!\n\035E"
-    "VENT_DESTINATION_UNSPECIFIED\020\000\022\034\n\030EVENT_"
-    "DESTINATION_PUBLIC\020\001\022\037\n\033EVENT_DESTINATIO"
-    "N_TELEMETRY\020\002\022\031\n\025EVENT_DESTINATION_ALL\020\003"
-    "\022\031\n\025EVENT_DESTINATION_LOG\020\004*\244\002\n\023Initiali"
-    "zationStage\022$\n INITIALIZATION_STAGE_UNSP"
-    "ECIFIED\020\000\022 \n\034INITIALIZATION_STAGE_STARTE"
-    "D\020\001\022-\n)INITIALIZATION_STAGE_CONFIGURATIO"
-    "N_LOADED\020\002\022.\n*INITIALIZATION_STAGE_SERVI"
-    "CES_BOOTSTRAPPED\020\003\022\"\n\036INITIALIZATION_STA"
-    "GE_COMPLETED\020\004\022\037\n\033INITIALIZATION_STAGE_F"
-    "AILED\020\005\022!\n\035INITIALIZATION_STAGE_SHUTDOWN"
-    "\020\006*\223\007\n\026ConfigurationEventKind\022(\n$CONFIGU"
-    "RATION_EVENT_KIND_UNSPECIFIED\020\000\022*\n&CONFI"
-    "GURATION_EVENT_KIND_FETCH_STARTED\020\001\022,\n(C"
-    "ONFIGURATION_EVENT_KIND_FETCH_COMPLETED\020"
-    "\002\022)\n%CONFIGURATION_EVENT_KIND_FETCH_FAIL"
-    "ED\020\003\022#\n\037CONFIGURATION_EVENT_KIND_LOADED\020"
-    "\004\022$\n CONFIGURATION_EVENT_KIND_UPDATED\020\005\022"
-    ")\n%CONFIGURATION_EVENT_KIND_SYNC_STARTED"
-    "\020\006\022+\n\'CONFIGURATION_EVENT_KIND_SYNC_COMP"
-    "LETED\020\007\022(\n$CONFIGURATION_EVENT_KIND_SYNC"
-    "_FAILED\020\010\022+\n\'CONFIGURATION_EVENT_KIND_SY"
-    "NC_REQUESTED\020\t\022/\n+CONFIGURATION_EVENT_KI"
-    "ND_SETTINGS_REQUESTED\020\n\022/\n+CONFIGURATION"
-    "_EVENT_KIND_SETTINGS_RETRIEVED\020\013\0225\n1CONF"
-    "IGURATION_EVENT_KIND_ROUTING_POLICY_REQU"
-    "ESTED\020\014\0225\n1CONFIGURATION_EVENT_KIND_ROUT"
-    "ING_POLICY_RETRIEVED\020\r\0223\n/CONFIGURATION_"
-    "EVENT_KIND_PRIVACY_MODE_REQUESTED\020\016\0223\n/C"
-    "ONFIGURATION_EVENT_KIND_PRIVACY_MODE_RET"
-    "RIEVED\020\017\0227\n3CONFIGURATION_EVENT_KIND_ANA"
-    "LYTICS_STATUS_REQUESTED\020\020\0227\n3CONFIGURATI"
-    "ON_EVENT_KIND_ANALYTICS_STATUS_RETRIEVED"
-    "\020\021\022$\n CONFIGURATION_EVENT_KIND_CHANGED\020\022"
-    "*\372\006\n ComponentInitializationEventKind\022)\n"
-    "%COMPONENT_INIT_EVENT_KIND_UNSPECIFIED\020\000"
-    "\0224\n0COMPONENT_INIT_EVENT_KIND_INITIALIZA"
-    "TION_STARTED\020\001\0226\n2COMPONENT_INIT_EVENT_K"
-    "IND_INITIALIZATION_COMPLETED\020\002\0225\n1COMPON"
-    "ENT_INIT_EVENT_KIND_COMPONENT_STATE_CHAN"
-    "GED\020\003\0220\n,COMPONENT_INIT_EVENT_KIND_COMPO"
-    "NENT_CHECKING\020\004\0229\n5COMPONENT_INIT_EVENT_"
-    "KIND_COMPONENT_DOWNLOAD_REQUIRED\020\005\0228\n4CO"
-    "MPONENT_INIT_EVENT_KIND_COMPONENT_DOWNLO"
-    "AD_STARTED\020\006\0229\n5COMPONENT_INIT_EVENT_KIN"
-    "D_COMPONENT_DOWNLOAD_PROGRESS\020\007\022:\n6COMPO"
-    "NENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_"
-    "COMPLETED\020\010\0224\n0COMPONENT_INIT_EVENT_KIND"
-    "_COMPONENT_INITIALIZING\020\t\022-\n)COMPONENT_I"
-    "NIT_EVENT_KIND_COMPONENT_READY\020\n\022.\n*COMP"
-    "ONENT_INIT_EVENT_KIND_COMPONENT_FAILED\020\013"
-    "\0223\n/COMPONENT_INIT_EVENT_KIND_PARALLEL_I"
-    "NIT_STARTED\020\014\0225\n1COMPONENT_INIT_EVENT_KI"
-    "ND_SEQUENTIAL_INIT_STARTED\020\r\0222\n.COMPONEN"
-    "T_INIT_EVENT_KIND_ALL_COMPONENTS_READY\020\016"
-    "\0223\n/COMPONENT_INIT_EVENT_KIND_SOME_COMPO"
-    "NENTS_READY\020\017*\222\002\n\020SessionEventKind\022\"\n\036SE"
-    "SSION_EVENT_KIND_UNSPECIFIED\020\000\022\036\n\032SESSIO"
-    "N_EVENT_KIND_CREATED\020\001\022\036\n\032SESSION_EVENT_"
-    "KIND_STARTED\020\002\022\036\n\032SESSION_EVENT_KIND_RES"
-    "UMED\020\003\022\035\n\031SESSION_EVENT_KIND_PAUSED\020\004\022\034\n"
-    "\030SESSION_EVENT_KIND_ENDED\020\005\022\036\n\032SESSION_E"
-    "VENT_KIND_EXPIRED\020\006\022\035\n\031SESSION_EVENT_KIN"
-    "D_FAILED\020\007*\324\010\n\023GenerationEventKind\022%\n!GE"
-    "NERATION_EVENT_KIND_UNSPECIFIED\020\000\022)\n%GEN"
-    "ERATION_EVENT_KIND_SESSION_STARTED\020\001\022\'\n#"
-    "GENERATION_EVENT_KIND_SESSION_ENDED\020\002\022!\n"
-    "\035GENERATION_EVENT_KIND_STARTED\020\003\022/\n+GENE"
-    "RATION_EVENT_KIND_FIRST_TOKEN_GENERATED\020"
-    "\004\022)\n%GENERATION_EVENT_KIND_TOKEN_GENERAT"
-    "ED\020\005\022*\n&GENERATION_EVENT_KIND_STREAMING_"
-    "UPDATE\020\006\022#\n\037GENERATION_EVENT_KIND_COMPLE"
-    "TED\020\007\022 \n\034GENERATION_EVENT_KIND_FAILED\020\010\022"
-    "&\n\"GENERATION_EVENT_KIND_MODEL_LOADED\020\t\022"
-    "(\n$GENERATION_EVENT_KIND_MODEL_UNLOADED\020"
-    "\n\022)\n%GENERATION_EVENT_KIND_COST_CALCULAT"
-    "ED\020\013\022*\n&GENERATION_EVENT_KIND_ROUTING_DE"
-    "CISION\020\014\022*\n&GENERATION_EVENT_KIND_STREAM"
-    "_COMPLETED\020\r\022*\n&GENERATION_EVENT_KIND_CA"
-    "NCEL_REQUESTED\020\016\022#\n\037GENERATION_EVENT_KIN"
-    "D_CANCELLED\020\017\022+\n\'GENERATION_EVENT_KIND_T"
-    "OOL_CALL_STARTED\020\020\022-\n)GENERATION_EVENT_K"
-    "IND_TOOL_CALL_COMPLETED\020\021\022*\n&GENERATION_"
-    "EVENT_KIND_TOOL_CALL_FAILED\020\022\0223\n/GENERAT"
-    "ION_EVENT_KIND_STRUCTURED_OUTPUT_STARTED"
-    "\020\023\0225\n1GENERATION_EVENT_KIND_STRUCTURED_O"
-    "UTPUT_COMPLETED\020\024\0222\n.GENERATION_EVENT_KI"
-    "ND_STRUCTURED_OUTPUT_FAILED\020\025\022*\n&GENERAT"
-    "ION_EVENT_KIND_THINKING_STARTED\020\026\022(\n$GEN"
-    "ERATION_EVENT_KIND_THINKING_DELTA\020\027\022,\n(G"
-    "ENERATION_EVENT_KIND_THINKING_COMPLETED\020"
-    "\030*\332\017\n\016VoiceEventKind\022 \n\034VOICE_EVENT_KIND"
-    "_UNSPECIFIED\020\000\022&\n\"VOICE_EVENT_KIND_LISTE"
-    "NING_STARTED\020\001\022$\n VOICE_EVENT_KIND_LISTE"
-    "NING_ENDED\020\002\022$\n VOICE_EVENT_KIND_SPEECH_"
-    "DETECTED\020\003\022*\n&VOICE_EVENT_KIND_TRANSCRIP"
-    "TION_STARTED\020\004\022*\n&VOICE_EVENT_KIND_TRANS"
-    "CRIPTION_PARTIAL\020\005\022(\n$VOICE_EVENT_KIND_T"
-    "RANSCRIPTION_FINAL\020\006\022\'\n#VOICE_EVENT_KIND"
-    "_RESPONSE_GENERATED\020\007\022&\n\"VOICE_EVENT_KIN"
-    "D_SYNTHESIS_STARTED\020\010\022$\n VOICE_EVENT_KIN"
-    "D_AUDIO_GENERATED\020\t\022(\n$VOICE_EVENT_KIND_"
-    "SYNTHESIS_COMPLETED\020\n\022%\n!VOICE_EVENT_KIN"
-    "D_SYNTHESIS_FAILED\020\013\022%\n!VOICE_EVENT_KIND"
-    "_PIPELINE_STARTED\020\014\022\'\n#VOICE_EVENT_KIND_"
-    "PIPELINE_COMPLETED\020\r\022#\n\037VOICE_EVENT_KIND"
-    "_PIPELINE_ERROR\020\016\022 \n\034VOICE_EVENT_KIND_VA"
-    "D_STARTED\020\017\022!\n\035VOICE_EVENT_KIND_VAD_DETE"
-    "CTED\020\020\022\036\n\032VOICE_EVENT_KIND_VAD_ENDED\020\021\022$"
-    "\n VOICE_EVENT_KIND_VAD_INITIALIZED\020\022\022 \n\034"
-    "VOICE_EVENT_KIND_VAD_STOPPED\020\023\022#\n\037VOICE_"
-    "EVENT_KIND_VAD_CLEANED_UP\020\024\022#\n\037VOICE_EVE"
-    "NT_KIND_SPEECH_STARTED\020\025\022!\n\035VOICE_EVENT_"
-    "KIND_SPEECH_ENDED\020\026\022#\n\037VOICE_EVENT_KIND_"
-    "STT_PROCESSING\020\027\022\'\n#VOICE_EVENT_KIND_STT"
-    "_PARTIAL_RESULT\020\030\022\"\n\036VOICE_EVENT_KIND_ST"
-    "T_COMPLETED\020\031\022\037\n\033VOICE_EVENT_KIND_STT_FA"
-    "ILED\020\032\022#\n\037VOICE_EVENT_KIND_LLM_PROCESSIN"
-    "G\020\033\022#\n\037VOICE_EVENT_KIND_TTS_PROCESSING\020\034"
-    "\022&\n\"VOICE_EVENT_KIND_RECORDING_STARTED\020\035"
-    "\022&\n\"VOICE_EVENT_KIND_RECORDING_STOPPED\020\036"
-    "\022%\n!VOICE_EVENT_KIND_PLAYBACK_STARTED\020\037\022"
-    "\'\n#VOICE_EVENT_KIND_PLAYBACK_COMPLETED\020 "
-    "\022%\n!VOICE_EVENT_KIND_PLAYBACK_STOPPED\020!\022"
-    "$\n VOICE_EVENT_KIND_PLAYBACK_PAUSED\020\"\022%\n"
-    "!VOICE_EVENT_KIND_PLAYBACK_RESUMED\020#\022$\n "
-    "VOICE_EVENT_KIND_PLAYBACK_FAILED\020$\022*\n&VO"
-    "ICE_EVENT_KIND_VOICE_SESSION_STARTED\020%\022,"
-    "\n(VOICE_EVENT_KIND_VOICE_SESSION_LISTENI"
-    "NG\020&\0221\n-VOICE_EVENT_KIND_VOICE_SESSION_S"
-    "PEECH_STARTED\020\'\022/\n+VOICE_EVENT_KIND_VOIC"
-    "E_SESSION_SPEECH_ENDED\020(\022-\n)VOICE_EVENT_"
-    "KIND_VOICE_SESSION_PROCESSING\020)\022.\n*VOICE"
-    "_EVENT_KIND_VOICE_SESSION_TRANSCRIBED\020*\022"
-    ",\n(VOICE_EVENT_KIND_VOICE_SESSION_RESPON"
-    "DED\020+\022+\n\'VOICE_EVENT_KIND_VOICE_SESSION_"
-    "SPEAKING\020,\0221\n-VOICE_EVENT_KIND_VOICE_SES"
-    "SION_TURN_COMPLETED\020-\022*\n&VOICE_EVENT_KIN"
-    "D_VOICE_SESSION_STOPPED\020.\022(\n$VOICE_EVENT"
-    "_KIND_VOICE_SESSION_ERROR\020/\022\037\n\033VOICE_EVE"
-    "NT_KIND_VAD_PAUSED\0200\022 \n\034VOICE_EVENT_KIND"
-    "_VAD_RESUMED\0201*\231\010\n\034CapabilityOperationEv"
-    "entKind\022/\n+CAPABILITY_OPERATION_EVENT_KI"
-    "ND_UNSPECIFIED\020\000\022/\n+CAPABILITY_OPERATION"
-    "_EVENT_KIND_VLM_STARTED\020\001\0221\n-CAPABILITY_"
-    "OPERATION_EVENT_KIND_VLM_COMPLETED\020\002\022.\n*"
-    "CAPABILITY_OPERATION_EVENT_KIND_VLM_FAIL"
-    "ED\020\003\0225\n1CAPABILITY_OPERATION_EVENT_KIND_"
-    "DIFFUSION_STARTED\020\004\0226\n2CAPABILITY_OPERAT"
-    "ION_EVENT_KIND_DIFFUSION_PROGRESS\020\005\0227\n3C"
-    "APABILITY_OPERATION_EVENT_KIND_DIFFUSION"
-    "_COMPLETED\020\006\0224\n0CAPABILITY_OPERATION_EVE"
-    "NT_KIND_DIFFUSION_FAILED\020\007\0226\n2CAPABILITY"
-    "_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED"
-    "\020\010\0228\n4CAPABILITY_OPERATION_EVENT_KIND_EM"
-    "BEDDINGS_COMPLETED\020\t\0225\n1CAPABILITY_OPERA"
-    "TION_EVENT_KIND_EMBEDDINGS_FAILED\020\n\0229\n5C"
-    "APABILITY_OPERATION_EVENT_KIND_RAG_INGES"
-    "TION_STARTED\020\013\022;\n7CAPABILITY_OPERATION_E"
-    "VENT_KIND_RAG_INGESTION_COMPLETED\020\014\0225\n1C"
-    "APABILITY_OPERATION_EVENT_KIND_RAG_QUERY"
-    "_STARTED\020\r\0227\n3CAPABILITY_OPERATION_EVENT"
-    "_KIND_RAG_QUERY_COMPLETED\020\016\022.\n*CAPABILIT"
-    "Y_OPERATION_EVENT_KIND_RAG_FAILED\020\017\0221\n-C"
-    "APABILITY_OPERATION_EVENT_KIND_LORA_ATTA"
-    "CHED\020\020\0221\n-CAPABILITY_OPERATION_EVENT_KIN"
-    "D_LORA_DETACHED\020\021\022/\n+CAPABILITY_OPERATIO"
-    "N_EVENT_KIND_LORA_FAILED\020\022*\361\007\n\016ModelEven"
-    "tKind\022 \n\034MODEL_EVENT_KIND_UNSPECIFIED\020\000\022"
-    "!\n\035MODEL_EVENT_KIND_LOAD_STARTED\020\001\022\"\n\036MO"
-    "DEL_EVENT_KIND_LOAD_PROGRESS\020\002\022#\n\037MODEL_"
-    "EVENT_KIND_LOAD_COMPLETED\020\003\022 \n\034MODEL_EVE"
-    "NT_KIND_LOAD_FAILED\020\004\022#\n\037MODEL_EVENT_KIN"
-    "D_UNLOAD_STARTED\020\005\022%\n!MODEL_EVENT_KIND_U"
-    "NLOAD_COMPLETED\020\006\022\"\n\036MODEL_EVENT_KIND_UN"
-    "LOAD_FAILED\020\007\022%\n!MODEL_EVENT_KIND_DOWNLO"
-    "AD_STARTED\020\010\022&\n\"MODEL_EVENT_KIND_DOWNLOA"
-    "D_PROGRESS\020\t\022\'\n#MODEL_EVENT_KIND_DOWNLOA"
-    "D_COMPLETED\020\n\022$\n MODEL_EVENT_KIND_DOWNLO"
-    "AD_FAILED\020\013\022\'\n#MODEL_EVENT_KIND_DOWNLOAD"
-    "_CANCELLED\020\014\022#\n\037MODEL_EVENT_KIND_LIST_RE"
-    "QUESTED\020\r\022#\n\037MODEL_EVENT_KIND_LIST_COMPL"
-    "ETED\020\016\022 \n\034MODEL_EVENT_KIND_LIST_FAILED\020\017"
-    "\022#\n\037MODEL_EVENT_KIND_CATALOG_LOADED\020\020\022#\n"
-    "\037MODEL_EVENT_KIND_DELETE_STARTED\020\021\022%\n!MO"
-    "DEL_EVENT_KIND_DELETE_COMPLETED\020\022\022\"\n\036MOD"
-    "EL_EVENT_KIND_DELETE_FAILED\020\023\022\'\n#MODEL_E"
-    "VENT_KIND_CUSTOM_MODEL_ADDED\020\024\022(\n$MODEL_"
-    "EVENT_KIND_BUILT_IN_REGISTERED\020\025\022\'\n#MODE"
-    "L_EVENT_KIND_EXTRACTION_STARTED\020\026\022(\n$MOD"
-    "EL_EVENT_KIND_EXTRACTION_PROGRESS\020\027\022)\n%M"
-    "ODEL_EVENT_KIND_EXTRACTION_COMPLETED\020\030\022&"
-    "\n\"MODEL_EVENT_KIND_EXTRACTION_FAILED\020\031*\303"
-    "\007\n\026ModelRegistryEventKind\022)\n%MODEL_REGIS"
-    "TRY_EVENT_KIND_UNSPECIFIED\020\000\022-\n)MODEL_RE"
-    "GISTRY_EVENT_KIND_REFRESH_STARTED\020\001\022/\n+M"
-    "ODEL_REGISTRY_EVENT_KIND_REFRESH_COMPLET"
-    "ED\020\002\022,\n(MODEL_REGISTRY_EVENT_KIND_REFRES"
-    "H_FAILED\020\003\0220\n,MODEL_REGISTRY_EVENT_KIND_"
-    "ASSIGNMENT_STARTED\020\004\0222\n.MODEL_REGISTRY_E"
-    "VENT_KIND_ASSIGNMENT_COMPLETED\020\005\022/\n+MODE"
-    "L_REGISTRY_EVENT_KIND_ASSIGNMENT_FAILED\020"
-    "\006\022,\n(MODEL_REGISTRY_EVENT_KIND_IMPORT_ST"
-    "ARTED\020\007\022.\n*MODEL_REGISTRY_EVENT_KIND_IMP"
-    "ORT_COMPLETED\020\010\022+\n\'MODEL_REGISTRY_EVENT_"
-    "KIND_IMPORT_FAILED\020\t\022/\n+MODEL_REGISTRY_E"
-    "VENT_KIND_DISCOVERY_STARTED\020\n\0221\n-MODEL_R"
-    "EGISTRY_EVENT_KIND_DISCOVERY_COMPLETED\020\013"
-    "\022.\n*MODEL_REGISTRY_EVENT_KIND_DISCOVERY_"
-    "FAILED\020\014\0223\n/MODEL_REGISTRY_EVENT_KIND_CU"
-    "RRENT_MODEL_CHANGED\020\r\022*\n&MODEL_REGISTRY_"
-    "EVENT_KIND_LIST_STARTED\020\016\022,\n(MODEL_REGIS"
-    "TRY_EVENT_KIND_LIST_COMPLETED\020\017\022)\n%MODEL"
-    "_REGISTRY_EVENT_KIND_LIST_FAILED\020\020\022)\n%MO"
-    "DEL_REGISTRY_EVENT_KIND_GET_STARTED\020\021\022+\n"
-    "\'MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED"
-    "\020\022\022(\n$MODEL_REGISTRY_EVENT_KIND_GET_FAIL"
-    "ED\020\023*\230\004\n\021DownloadEventKind\022#\n\037DOWNLOAD_E"
-    "VENT_KIND_UNSPECIFIED\020\000\022$\n DOWNLOAD_EVEN"
-    "T_KIND_PLAN_STARTED\020\001\022&\n\"DOWNLOAD_EVENT_"
-    "KIND_PLAN_COMPLETED\020\002\022#\n\037DOWNLOAD_EVENT_"
-    "KIND_PLAN_FAILED\020\003\022\037\n\033DOWNLOAD_EVENT_KIN"
-    "D_STARTED\020\004\022 \n\034DOWNLOAD_EVENT_KIND_PROGR"
-    "ESS\020\005\022(\n$DOWNLOAD_EVENT_KIND_CANCEL_REQU"
-    "ESTED\020\006\022!\n\035DOWNLOAD_EVENT_KIND_CANCELLED"
-    "\020\007\022(\n$DOWNLOAD_EVENT_KIND_RESUME_REQUEST"
-    "ED\020\010\022\037\n\033DOWNLOAD_EVENT_KIND_RESUMED\020\t\022!\n"
-    "\035DOWNLOAD_EVENT_KIND_COMPLETED\020\n\022\036\n\032DOWN"
-    "LOAD_EVENT_KIND_FAILED\020\013\022\036\n\032DOWNLOAD_EVE"
-    "NT_KIND_PAUSED\020\014\022-\n)DOWNLOAD_EVENT_KIND_"
-    "PARTIAL_BYTES_DELETED\020\r*\355\005\n\020StorageEvent"
-    "Kind\022\"\n\036STORAGE_EVENT_KIND_UNSPECIFIED\020\000"
-    "\022%\n!STORAGE_EVENT_KIND_INFO_REQUESTED\020\001\022"
-    "%\n!STORAGE_EVENT_KIND_INFO_RETRIEVED\020\002\022\'"
-    "\n#STORAGE_EVENT_KIND_MODELS_REQUESTED\020\003\022"
-    "\'\n#STORAGE_EVENT_KIND_MODELS_RETRIEVED\020\004"
-    "\022*\n&STORAGE_EVENT_KIND_CLEAR_CACHE_START"
-    "ED\020\005\022,\n(STORAGE_EVENT_KIND_CLEAR_CACHE_C"
-    "OMPLETED\020\006\022)\n%STORAGE_EVENT_KIND_CLEAR_C"
-    "ACHE_FAILED\020\007\022)\n%STORAGE_EVENT_KIND_CLEA"
-    "N_TEMP_STARTED\020\010\022+\n\'STORAGE_EVENT_KIND_C"
-    "LEAN_TEMP_COMPLETED\020\t\022(\n$STORAGE_EVENT_K"
-    "IND_CLEAN_TEMP_FAILED\020\n\022+\n\'STORAGE_EVENT"
-    "_KIND_DELETE_MODEL_STARTED\020\013\022-\n)STORAGE_"
-    "EVENT_KIND_DELETE_MODEL_COMPLETED\020\014\022*\n&S"
-    "TORAGE_EVENT_KIND_DELETE_MODEL_FAILED\020\r\022"
-    " \n\034STORAGE_EVENT_KIND_CACHE_HIT\020\016\022!\n\035STO"
-    "RAGE_EVENT_KIND_CACHE_MISS\020\017\022\037\n\033STORAGE_"
-    "EVENT_KIND_EVICTION\020\020\022 \n\034STORAGE_EVENT_K"
-    "IND_DISK_FULL\020\021*\371\005\n\031StorageLifecycleEven"
-    "tKind\022,\n(STORAGE_LIFECYCLE_EVENT_KIND_UN"
-    "SPECIFIED\020\000\022-\n)STORAGE_LIFECYCLE_EVENT_K"
-    "IND_INFO_STARTED\020\001\022/\n+STORAGE_LIFECYCLE_"
-    "EVENT_KIND_INFO_COMPLETED\020\002\0225\n1STORAGE_L"
-    "IFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED"
-    "\020\003\0224\n0STORAGE_LIFECYCLE_EVENT_KIND_DELET"
-    "E_PLAN_CREATED\020\004\022/\n+STORAGE_LIFECYCLE_EV"
-    "ENT_KIND_DELETE_STARTED\020\005\0221\n-STORAGE_LIF"
-    "ECYCLE_EVENT_KIND_DELETE_COMPLETED\020\006\022.\n*"
-    "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAIL"
-    "ED\020\007\0226\n2STORAGE_LIFECYCLE_EVENT_KIND_CAC"
-    "HE_CLEANUP_STARTED\020\010\0228\n4STORAGE_LIFECYCL"
-    "E_EVENT_KIND_CACHE_CLEANUP_COMPLETED\020\t\0225"
-    "\n1STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLE"
-    "ANUP_FAILED\020\n\0224\n0STORAGE_LIFECYCLE_EVENT"
-    "_KIND_AVAILABILITY_FAILED\020\013\0223\n/STORAGE_L"
-    "IFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED\020\014"
-    "\0229\n5STORAGE_LIFECYCLE_EVENT_KIND_DELETE_"
-    "DRY_RUN_COMPLETED\020\r*\251\002\n\rAuthEventKind\022\037\n"
-    "\033AUTH_EVENT_KIND_UNSPECIFIED\020\000\022\035\n\031AUTH_E"
-    "VENT_KIND_REQUESTED\020\001\022\035\n\031AUTH_EVENT_KIND"
-    "_SUCCEEDED\020\002\022\032\n\026AUTH_EVENT_KIND_FAILED\020\003"
-    "\022#\n\037AUTH_EVENT_KIND_TOKEN_REFRESHED\020\004\022!\n"
-    "\035AUTH_EVENT_KIND_TOKEN_EXPIRED\020\005\022%\n!AUTH"
-    "_EVENT_KIND_DEVICE_REGISTERED\020\006\022.\n*AUTH_"
-    "EVENT_KIND_DEVICE_REGISTRATION_FAILED\020\007*"
-    "\325\004\n\017DeviceEventKind\022!\n\035DEVICE_EVENT_KIND"
-    "_UNSPECIFIED\020\000\022+\n\'DEVICE_EVENT_KIND_DEVI"
-    "CE_INFO_COLLECTED\020\001\0223\n/DEVICE_EVENT_KIND"
-    "_DEVICE_INFO_COLLECTION_FAILED\020\002\022+\n\'DEVI"
-    "CE_EVENT_KIND_DEVICE_INFO_REFRESHED\020\003\022.\n"
-    "*DEVICE_EVENT_KIND_DEVICE_INFO_SYNC_STAR"
-    "TED\020\004\0220\n,DEVICE_EVENT_KIND_DEVICE_INFO_S"
-    "YNC_COMPLETED\020\005\022-\n)DEVICE_EVENT_KIND_DEV"
-    "ICE_INFO_SYNC_FAILED\020\006\022*\n&DEVICE_EVENT_K"
-    "IND_DEVICE_STATE_CHANGED\020\007\022%\n!DEVICE_EVE"
-    "NT_KIND_BATTERY_CHANGED\020\010\022%\n!DEVICE_EVEN"
-    "T_KIND_THERMAL_CHANGED\020\t\022*\n&DEVICE_EVENT"
-    "_KIND_CONNECTIVITY_CHANGED\020\n\022\'\n#DEVICE_E"
-    "VENT_KIND_DEVICE_REGISTERED\020\013\0220\n,DEVICE_"
-    "EVENT_KIND_DEVICE_REGISTRATION_FAILED\020\014*"
-    "\204\002\n\020NetworkEventKind\022\"\n\036NETWORK_EVENT_KI"
-    "ND_UNSPECIFIED\020\000\022&\n\"NETWORK_EVENT_KIND_R"
-    "EQUEST_STARTED\020\001\022(\n$NETWORK_EVENT_KIND_R"
-    "EQUEST_COMPLETED\020\002\022%\n!NETWORK_EVENT_KIND"
-    "_REQUEST_FAILED\020\003\022&\n\"NETWORK_EVENT_KIND_"
-    "REQUEST_TIMEOUT\020\004\022+\n\'NETWORK_EVENT_KIND_"
-    "CONNECTIVITY_CHANGED\020\005*\272\005\n\022FrameworkEven"
-    "tKind\022$\n FRAMEWORK_EVENT_KIND_UNSPECIFIE"
-    "D\020\000\022+\n\'FRAMEWORK_EVENT_KIND_ADAPTER_REGI"
-    "STERED\020\001\022-\n)FRAMEWORK_EVENT_KIND_ADAPTER"
-    "_UNREGISTERED\020\002\022+\n\'FRAMEWORK_EVENT_KIND_"
-    "ADAPTERS_REQUESTED\020\003\022+\n\'FRAMEWORK_EVENT_"
-    "KIND_ADAPTERS_RETRIEVED\020\004\022-\n)FRAMEWORK_E"
-    "VENT_KIND_FRAMEWORKS_REQUESTED\020\005\022-\n)FRAM"
-    "EWORK_EVENT_KIND_FRAMEWORKS_RETRIEVED\020\006\022"
-    "/\n+FRAMEWORK_EVENT_KIND_AVAILABILITY_REQ"
-    "UESTED\020\007\022/\n+FRAMEWORK_EVENT_KIND_AVAILAB"
-    "ILITY_RETRIEVED\020\010\0227\n3FRAMEWORK_EVENT_KIN"
-    "D_MODELS_FOR_FRAMEWORK_REQUESTED\020\t\0227\n3FR"
-    "AMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK_"
-    "RETRIEVED\020\n\022:\n6FRAMEWORK_EVENT_KIND_FRAM"
-    "EWORKS_FOR_MODALITY_REQUESTED\020\013\022:\n6FRAME"
-    "WORK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_"
-    "RETRIEVED\020\014\022\036\n\032FRAMEWORK_EVENT_KIND_ERRO"
-    "R\020\r*\267\003\n\030HardwareRoutingEventKind\022+\n\'HARD"
-    "WARE_ROUTING_EVENT_KIND_UNSPECIFIED\020\000\022/\n"
-    "+HARDWARE_ROUTING_EVENT_KIND_PROFILE_STA"
-    "RTED\020\001\0221\n-HARDWARE_ROUTING_EVENT_KIND_PR"
-    "OFILE_COMPLETED\020\002\022.\n*HARDWARE_ROUTING_EV"
-    "ENT_KIND_PROFILE_FAILED\020\003\022.\n*HARDWARE_RO"
-    "UTING_EVENT_KIND_ROUTE_SELECTED\020\004\022-\n)HAR"
-    "DWARE_ROUTING_EVENT_KIND_ROUTE_CHANGED\020\005"
-    "\022=\n9HARDWARE_ROUTING_EVENT_KIND_FRAMEWOR"
-    "K_CAPABILITY_DETECTED\020\006\022<\n8HARDWARE_ROUT"
-    "ING_EVENT_KIND_FRAMEWORK_CAPABILITY_MISS"
-    "ING\020\007*\370\001\n\024PerformanceEventKind\022&\n\"PERFOR"
-    "MANCE_EVENT_KIND_UNSPECIFIED\020\000\022)\n%PERFOR"
-    "MANCE_EVENT_KIND_MEMORY_WARNING\020\001\0220\n,PER"
-    "FORMANCE_EVENT_KIND_THERMAL_STATE_CHANGE"
-    "D\020\002\022+\n\'PERFORMANCE_EVENT_KIND_LATENCY_ME"
-    "ASURED\020\003\022.\n*PERFORMANCE_EVENT_KIND_THROU"
-    "GHPUT_MEASURED\020\004*\300\001\n\022TelemetryEventKind\022"
-    "$\n TELEMETRY_EVENT_KIND_UNSPECIFIED\020\000\022 \n"
-    "\034TELEMETRY_EVENT_KIND_COUNTER\020\001\022\036\n\032TELEM"
-    "ETRY_EVENT_KIND_GAUGE\020\002\022\"\n\036TELEMETRY_EVE"
-    "NT_KIND_HISTOGRAM\020\003\022\036\n\032TELEMETRY_EVENT_K"
-    "IND_TRACE\020\004*\334\001\n\025CancellationEventKind\022\'\n"
-    "#CANCELLATION_EVENT_KIND_UNSPECIFIED\020\000\022%"
-    "\n!CANCELLATION_EVENT_KIND_REQUESTED\020\001\022(\n"
-    "$CANCELLATION_EVENT_KIND_ACKNOWLEDGED\020\002\022"
-    "%\n!CANCELLATION_EVENT_KIND_COMPLETED\020\003\022\""
-    "\n\036CANCELLATION_EVENT_KIND_FAILED\020\0042\270\001\n\tS"
-    "DKEvents\022X\n\007Publish\022&.runanywhere.v1.SDK"
-    "EventPublishRequest\032%.runanywhere.v1.SDK"
-    "EventPublishResult\022Q\n\tSubscribe\022(.runany"
-    "where.v1.SDKEventSubscribeRequest\032\030.runa"
-    "nywhere.v1.SDKEvent0\001B\211\001\n\027ai.runanywhere"
-    ".proto.v1B\016SdkEventsProtoP\001Z<github.com/"
-    "runanywhere/runanywhere-sdks/idl/v1;runa"
-    "nywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002R"
-    "Ab\006proto3"
+    "lInfo\"\211\001\n ComponentLifecycleSnapshotResu"
+    "lt\022\017\n\007success\030\001 \001(\010\022=\n\tsnapshots\030\002 \003(\0132*"
+    ".runanywhere.v1.ComponentLifecycleSnapsh"
+    "ot\022\025\n\rerror_message\030\003 \001(\t\"\337\006\n\027ComponentL"
+    "ifecycleEvent\022/\n\tcomponent\030\001 \001(\0162\034.runan"
+    "ywhere.v1.SDKComponent\022\?\n\016previous_state"
+    "\030\002 \001(\0162\'.runanywhere.v1.ComponentLifecyc"
+    "leState\022>\n\rcurrent_state\030\003 \001(\0162\'.runanyw"
+    "here.v1.ComponentLifecycleState\022\020\n\010model"
+    "_id\030\004 \001(\t\022\024\n\014timestamp_ms\030\005 \001(\003\022<\n\021model"
+    "_load_result\030\n \001(\0132\037.runanywhere.v1.Mode"
+    "lLoadResultH\000\022@\n\023model_unload_result\030\013 \001"
+    "(\0132!.runanywhere.v1.ModelUnloadResultH\000\022"
+    "@\n\023model_delete_result\030\014 \001(\0132!.runanywhe"
+    "re.v1.ModelDeleteResultH\000\022=\n\021download_pr"
+    "ogress\030\r \001(\0132 .runanywhere.v1.DownloadPr"
+    "ogressH\000\022I\n\024storage_availability\030\016 \001(\0132)"
+    ".runanywhere.v1.StorageAvailabilityResul"
+    "tH\000\022D\n\025storage_delete_result\030\017 \001(\0132#.run"
+    "anywhere.v1.StorageDeleteResultH\000\022>\n\010sna"
+    "pshot\030\020 \001(\0132*.runanywhere.v1.ComponentLi"
+    "fecycleSnapshotH\000\022K\n\017snapshot_result\030\021 \001"
+    "(\01320.runanywhere.v1.ComponentLifecycleSn"
+    "apshotResultH\000\022@\n\023storage_delete_plan\030\022 "
+    "\001(\0132!.runanywhere.v1.StorageDeletePlanH\000"
+    "B\t\n\007payload\"\256\001\n\014SessionEvent\022.\n\004kind\030\001 \001"
+    "(\0162 .runanywhere.v1.SessionEventKind\022\022\n\n"
+    "session_id\030\002 \001(\t\022\017\n\007user_id\030\003 \001(\t\022\016\n\006rea"
+    "son\030\004 \001(\t\022\r\n\005error\030\005 \001(\t\022\025\n\rstarted_at_m"
+    "s\030\006 \001(\003\022\023\n\013ended_at_ms\030\007 \001(\003\"\264\006\n\017Generat"
+    "ionEvent\0221\n\004kind\030\001 \001(\0162#.runanywhere.v1."
+    "GenerationEventKind\022\022\n\nsession_id\030\002 \001(\t\022"
+    "\016\n\006prompt\030\003 \001(\t\022\r\n\005token\030\004 \001(\t\022\026\n\016stream"
+    "ing_text\030\005 \001(\t\022\024\n\014tokens_count\030\006 \001(\005\022\020\n\010"
+    "response\030\007 \001(\t\022\023\n\013tokens_used\030\010 \001(\005\022\022\n\nl"
+    "atency_ms\030\t \001(\003\022\036\n\026first_token_latency_m"
+    "s\030\n \001(\003\022\r\n\005error\030\013 \001(\t\022\020\n\010model_id\030\014 \001(\t"
+    "\022\023\n\013cost_amount\030\r \001(\001\022\031\n\021cost_saved_amou"
+    "nt\030\016 \001(\001\022\026\n\016routing_target\030\017 \001(\t\022\026\n\016rout"
+    "ing_reason\030\020 \001(\t\022\025\n\rcancel_reason\030\021 \001(\t\022"
+    "\024\n\014tool_call_id\030\022 \001(\t\022\021\n\ttool_name\030\023 \001(\t"
+    "\022\031\n\021tool_payload_json\030\024 \001(\t\022\036\n\026structure"
+    "d_schema_json\030\025 \001(\t\022\036\n\026structured_output"
+    "_json\030\026 \001(\t\022\025\n\rthinking_text\030\027 \001(\t\022\024\n\014in"
+    "put_tokens\030\030 \001(\005\022\031\n\021tokens_per_second\030\031 "
+    "\001(\001\022\036\n\026time_to_first_token_ms\030\032 \001(\003\022\024\n\014i"
+    "s_streaming\030\033 \001(\010\022\023\n\013temperature\030\034 \001(\002\022\022"
+    "\n\nmax_tokens\030\035 \001(\005\022\026\n\016context_length\030\036 \001"
+    "(\005\022\022\n\nmodel_name\030\037 \001(\t\022\023\n\013duration_ms\030  "
+    "\001(\001\022\021\n\tframework\030! \001(\005\022\033\n\023prompt_eval_ti"
+    "me_ms\030\" \001(\003\"\220\005\n\023VoiceLifecycleEvent\022,\n\004k"
+    "ind\030\001 \001(\0162\036.runanywhere.v1.VoiceEventKin"
+    "d\022\022\n\nsession_id\030\002 \001(\t\022\014\n\004text\030\003 \001(\t\022\022\n\nc"
+    "onfidence\030\004 \001(\002\022\025\n\rresponse_text\030\005 \001(\t\022\024"
+    "\n\014audio_base64\030\006 \001(\t\022\023\n\013duration_ms\030\007 \001("
+    "\003\022\023\n\013audio_level\030\010 \001(\002\022\025\n\rtranscription\030"
+    "\t \001(\t\022\025\n\rturn_response\030\n \001(\t\022\031\n\021turn_aud"
+    "io_base64\030\013 \001(\t\022\r\n\005error\030\014 \001(\t\022\020\n\010model_"
+    "id\030\r \001(\t\022\022\n\nmodel_name\030\016 \001(\t\022\027\n\017audio_le"
+    "ngth_ms\030\017 \001(\003\022\030\n\020audio_size_bytes\030\020 \001(\005\022"
+    "\022\n\nword_count\030\021 \001(\005\022\030\n\020real_time_factor\030"
+    "\022 \001(\001\022\020\n\010language\030\023 \001(\t\022\023\n\013sample_rate\030\024"
+    " \001(\005\022\024\n\014is_streaming\030\025 \001(\010\022\021\n\tframework\030"
+    "\026 \001(\005\022\027\n\017character_count\030\027 \001(\005\022\031\n\021audio_"
+    "duration_ms\030\030 \001(\003\022\034\n\024audio_size_bytes_tt"
+    "s\030\031 \001(\005\022\036\n\026processing_duration_ms\030\032 \001(\003\022"
+    "\035\n\025characters_per_second\030\033 \001(\001\"\243\002\n\030Capab"
+    "ilityOperationEvent\022:\n\004kind\030\001 \001(\0162,.runa"
+    "nywhere.v1.CapabilityOperationEventKind\022"
+    "/\n\tcomponent\030\002 \001(\0162\034.runanywhere.v1.SDKC"
+    "omponent\022\020\n\010model_id\030\003 \001(\t\022\024\n\014operation_"
+    "id\030\004 \001(\t\022\021\n\toperation\030\005 \001(\t\022\020\n\010progress\030"
+    "\006 \001(\002\022\023\n\013input_count\030\007 \001(\003\022\024\n\014output_cou"
+    "nt\030\010 \001(\003\022\023\n\013result_json\030\t \001(\t\022\r\n\005error\030\n"
+    " \001(\t\"\371\002\n\nModelEvent\022,\n\004kind\030\001 \001(\0162\036.runa"
+    "nywhere.v1.ModelEventKind\022\020\n\010model_id\030\002 "
+    "\001(\t\022\017\n\007task_id\030\003 \001(\t\022\020\n\010progress\030\004 \001(\002\022\030"
+    "\n\020bytes_downloaded\030\005 \001(\003\022\023\n\013total_bytes\030"
+    "\006 \001(\003\022\026\n\016download_state\030\007 \001(\t\022\022\n\nlocal_p"
+    "ath\030\010 \001(\t\022\r\n\005error\030\t \001(\t\022\023\n\013model_count\030"
+    "\n \001(\005\022\031\n\021custom_model_name\030\013 \001(\t\022\030\n\020cust"
+    "om_model_url\030\014 \001(\t\022\022\n\nmodel_name\030\r \001(\t\022\030"
+    "\n\020model_size_bytes\030\016 \001(\003\022\023\n\013duration_ms\030"
+    "\017 \001(\003\022\021\n\tframework\030\020 \001(\005\"\322\005\n\022ModelRegist"
+    "ryEvent\0224\n\004kind\030\001 \001(\0162&.runanywhere.v1.M"
+    "odelRegistryEventKind\022\020\n\010model_id\030\002 \001(\t\022"
+    "\025\n\rassignment_id\030\003 \001(\t\0228\n\022assigned_compo"
+    "nent\030\004 \001(\0162\034.runanywhere.v1.SDKComponent"
+    "\0225\n\tframework\030\005 \001(\0162\".runanywhere.v1.Inf"
+    "erenceFramework\022\023\n\013source_path\030\006 \001(\t\022\r\n\005"
+    "error\030\007 \001(\t\022D\n\016refresh_result\030\024 \001(\0132*.ru"
+    "nanywhere.v1.ModelRegistryRefreshResultH"
+    "\000\0226\n\013list_result\030\025 \001(\0132\037.runanywhere.v1."
+    "ModelListResultH\000\0224\n\nget_result\030\026 \001(\0132\036."
+    "runanywhere.v1.ModelGetResultH\000\022:\n\rimpor"
+    "t_result\030\027 \001(\0132!.runanywhere.v1.ModelImp"
+    "ortResultH\000\022@\n\020discovery_result\030\030 \001(\0132$."
+    "runanywhere.v1.ModelDiscoveryResultH\000\022H\n"
+    "\024compatibility_result\030\031 \001(\0132(.runanywher"
+    "e.v1.ModelCompatibilityResultH\000\022B\n\024curre"
+    "nt_model_result\030\032 \001(\0132\".runanywhere.v1.C"
+    "urrentModelResultH\000B\010\n\006result\"\251\003\n\rDownlo"
+    "adEvent\022/\n\004kind\030\001 \001(\0162!.runanywhere.v1.D"
+    "ownloadEventKind\022\020\n\010model_id\030\002 \001(\t\022\017\n\007ta"
+    "sk_id\030\003 \001(\t\022\r\n\005error\030\004 \001(\t\0229\n\013plan_resul"
+    "t\030\024 \001(\0132\".runanywhere.v1.DownloadPlanRes"
+    "ultH\000\022;\n\014start_result\030\025 \001(\0132#.runanywher"
+    "e.v1.DownloadStartResultH\000\0224\n\010progress\030\026"
+    " \001(\0132 .runanywhere.v1.DownloadProgressH\000"
+    "\022=\n\rcancel_result\030\027 \001(\0132$.runanywhere.v1"
+    ".DownloadCancelResultH\000\022=\n\rresume_result"
+    "\030\030 \001(\0132$.runanywhere.v1.DownloadResumeRe"
+    "sultH\000B\t\n\007payload\"\374\001\n\014StorageEvent\022.\n\004ki"
+    "nd\030\001 \001(\0162 .runanywhere.v1.StorageEventKi"
+    "nd\022\020\n\010model_id\030\002 \001(\t\022\r\n\005error\030\003 \001(\t\022\023\n\013t"
+    "otal_bytes\030\004 \001(\003\022\027\n\017available_bytes\030\005 \001("
+    "\003\022\022\n\nused_bytes\030\006 \001(\003\022\032\n\022stored_model_co"
+    "unt\030\007 \001(\005\022\021\n\tcache_key\030\010 \001(\t\022\025\n\revicted_"
+    "bytes\030\t \001(\003\022\023\n\013freed_bytes\030\n \001(\003\"\231\003\n\025Sto"
+    "rageLifecycleEvent\0227\n\004kind\030\001 \001(\0162).runan"
+    "ywhere.v1.StorageLifecycleEventKind\022\020\n\010m"
+    "odel_id\030\002 \001(\t\022\021\n\tcache_key\030\003 \001(\t\022\r\n\005byte"
+    "s\030\004 \001(\003\022\r\n\005error\030\005 \001(\t\0228\n\013info_result\030\024 "
+    "\001(\0132!.runanywhere.v1.StorageInfoResultH\000"
+    "\022H\n\023availability_result\030\025 \001(\0132).runanywh"
+    "ere.v1.StorageAvailabilityResultH\000\0228\n\013de"
+    "lete_plan\030\026 \001(\0132!.runanywhere.v1.Storage"
+    "DeletePlanH\000\022<\n\rdelete_result\030\027 \001(\0132#.ru"
+    "nanywhere.v1.StorageDeleteResultH\000B\010\n\006re"
+    "sult\"|\n\tAuthEvent\022+\n\004kind\030\001 \001(\0162\035.runany"
+    "where.v1.AuthEventKind\022\020\n\010provider\030\002 \001(\t"
+    "\022\022\n\nsubject_id\030\003 \001(\t\022\r\n\005scope\030\004 \001(\t\022\r\n\005e"
+    "rror\030\005 \001(\t\"\274\002\n\013DeviceEvent\022-\n\004kind\030\001 \001(\016"
+    "2\037.runanywhere.v1.DeviceEventKind\022\021\n\tdev"
+    "ice_id\030\002 \001(\t\022\017\n\007os_name\030\003 \001(\t\022\022\n\nos_vers"
+    "ion\030\004 \001(\t\022\r\n\005model\030\005 \001(\t\022\r\n\005error\030\006 \001(\t\022"
+    "\020\n\010property\030\007 \001(\t\022\021\n\tnew_value\030\010 \001(\t\022\021\n\t"
+    "old_value\030\t \001(\t\022\025\n\rbattery_level\030\n \001(\002\022\023"
+    "\n\013is_charging\030\013 \001(\010\022\025\n\rthermal_state\030\014 \001"
+    "(\t\022\024\n\014is_connected\030\r \001(\010\022\027\n\017connection_t"
+    "ype\030\016 \001(\t\"\226\001\n\014NetworkEvent\022.\n\004kind\030\001 \001(\016"
+    "2 .runanywhere.v1.NetworkEventKind\022\013\n\003ur"
+    "l\030\002 \001(\t\022\023\n\013status_code\030\003 \001(\005\022\021\n\tis_onlin"
+    "e\030\004 \001(\010\022\r\n\005error\030\005 \001(\t\022\022\n\nlatency_ms\030\006 \001"
+    "(\003\"\321\001\n\016FrameworkEvent\0220\n\004kind\030\001 \001(\0162\".ru"
+    "nanywhere.v1.FrameworkEventKind\022\021\n\tframe"
+    "work\030\002 \001(\005\022\024\n\014adapter_name\030\003 \001(\t\022\025\n\radap"
+    "ter_count\030\004 \001(\005\022\027\n\017framework_count\030\005 \001(\005"
+    "\022\023\n\013model_count\030\006 \001(\005\022\020\n\010modality\030\007 \001(\t\022"
+    "\r\n\005error\030\010 \001(\t\"\271\002\n\024HardwareRoutingEvent\022"
+    "6\n\004kind\030\001 \001(\0162(.runanywhere.v1.HardwareR"
+    "outingEventKind\022/\n\tcomponent\030\002 \001(\0162\034.run"
+    "anywhere.v1.SDKComponent\0225\n\tframework\030\003 "
+    "\001(\0162\".runanywhere.v1.InferenceFramework\022"
+    "\022\n\ncapability\030\004 \001(\t\022\r\n\005route\030\005 \001(\t\022\016\n\006re"
+    "ason\030\006 \001(\t\022\r\n\005error\030\007 \001(\t\022\?\n\020hardware_pr"
+    "ofile\030\024 \001(\0132%.runanywhere.v1.HardwarePro"
+    "fileResult\"\267\001\n\020PerformanceEvent\0222\n\004kind\030"
+    "\001 \001(\0162$.runanywhere.v1.PerformanceEventK"
+    "ind\022\024\n\014memory_bytes\030\002 \001(\003\022\025\n\rthermal_sta"
+    "te\030\003 \001(\t\022\021\n\toperation\030\004 \001(\t\022\024\n\014milliseco"
+    "nds\030\005 \001(\003\022\031\n\021tokens_per_second\030\006 \001(\001\"\344\001\n"
+    "\016TelemetryEvent\0220\n\004kind\030\001 \001(\0162\".runanywh"
+    "ere.v1.TelemetryEventKind\022\014\n\004name\030\002 \001(\t\022"
+    "B\n\nattributes\030\003 \003(\0132..runanywhere.v1.Tel"
+    "emetryEvent.AttributesEntry\022\r\n\005value\030\004 \001"
+    "(\001\022\014\n\004unit\030\005 \001(\t\0321\n\017AttributesEntry\022\013\n\003k"
+    "ey\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\267\001\n\021Cancella"
+    "tionEvent\0223\n\004kind\030\001 \001(\0162%.runanywhere.v1"
+    ".CancellationEventKind\022/\n\tcomponent\030\002 \001("
+    "\0162\034.runanywhere.v1.SDKComponent\022\024\n\014opera"
+    "tion_id\030\003 \001(\t\022\016\n\006reason\030\004 \001(\t\022\026\n\016user_in"
+    "itiated\030\005 \001(\010\"\220\001\n\014FailureEvent\022/\n\tcompon"
+    "ent\030\001 \001(\0162\034.runanywhere.v1.SDKComponent\022"
+    "\021\n\toperation\030\002 \001(\t\022\'\n\005error\030\003 \001(\0132\030.runa"
+    "nywhere.v1.SDKError\022\023\n\013recoverable\030\004 \001(\010"
+    "\"\233\016\n\010SDKEvent\022\024\n\014timestamp_ms\030\001 \001(\003\022/\n\010s"
+    "everity\030\002 \001(\0162\035.runanywhere.v1.ErrorSeve"
+    "rity\022/\n\010category\030\024 \001(\0162\035.runanywhere.v1."
+    "EventCategory\022/\n\tcomponent\030\025 \001(\0162\034.runan"
+    "ywhere.v1.SDKComponent\022,\n\005error\030\026 \001(\0132\030."
+    "runanywhere.v1.SDKErrorH\001\210\001\001\022\n\n\002id\030\r \001(\t"
+    "\022\022\n\nsession_id\030\016 \001(\t\0225\n\013destination\030\017 \001("
+    "\0162 .runanywhere.v1.EventDestination\022<\n\np"
+    "roperties\030\020 \003(\0132(.runanywhere.v1.SDKEven"
+    "t.PropertiesEntry\022\024\n\014operation_id\030! \001(\t\022"
+    "\026\n\016correlation_id\030\" \001(\t\022\016\n\006source\030# \001(\t\022"
+    "\020\n\010trace_id\030$ \001(\t\022=\n\016initialization\030\003 \001("
+    "\0132#.runanywhere.v1.InitializationEventH\000"
+    "\022;\n\rconfiguration\030\004 \001(\0132\".runanywhere.v1"
+    ".ConfigurationEventH\000\0225\n\ngeneration\030\005 \001("
+    "\0132\037.runanywhere.v1.GenerationEventH\000\022+\n\005"
+    "model\030\006 \001(\0132\032.runanywhere.v1.ModelEventH"
+    "\000\0227\n\013performance\030\007 \001(\0132 .runanywhere.v1."
+    "PerformanceEventH\000\022/\n\007network\030\010 \001(\0132\034.ru"
+    "nanywhere.v1.NetworkEventH\000\022/\n\007storage\030\t"
+    " \001(\0132\034.runanywhere.v1.StorageEventH\000\0223\n\t"
+    "framework\030\n \001(\0132\036.runanywhere.v1.Framewo"
+    "rkEventH\000\022-\n\006device\030\013 \001(\0132\033.runanywhere."
+    "v1.DeviceEventH\000\022F\n\016component_init\030\014 \001(\013"
+    "2,.runanywhere.v1.ComponentInitializatio"
+    "nEventH\000\0224\n\005voice\030\021 \001(\0132#.runanywhere.v1"
+    ".VoiceLifecycleEventH\000\0224\n\016voice_pipeline"
+    "\030\022 \001(\0132\032.runanywhere.v1.VoiceEventH\000\022F\n\023"
+    "component_lifecycle\030\023 \001(\0132\'.runanywhere."
+    "v1.ComponentLifecycleEventH\000\022/\n\007session\030"
+    "\027 \001(\0132\034.runanywhere.v1.SessionEventH\000\022)\n"
+    "\004auth\030\030 \001(\0132\031.runanywhere.v1.AuthEventH\000"
+    "\022<\n\016model_registry\030\031 \001(\0132\".runanywhere.v"
+    "1.ModelRegistryEventH\000\0221\n\010download\030\032 \001(\013"
+    "2\035.runanywhere.v1.DownloadEventH\000\022B\n\021sto"
+    "rage_lifecycle\030\033 \001(\0132%.runanywhere.v1.St"
+    "orageLifecycleEventH\000\022@\n\020hardware_routin"
+    "g\030\034 \001(\0132$.runanywhere.v1.HardwareRouting"
+    "EventH\000\022>\n\ncapability\030\035 \001(\0132(.runanywher"
+    "e.v1.CapabilityOperationEventH\000\0223\n\ttelem"
+    "etry\030\036 \001(\0132\036.runanywhere.v1.TelemetryEve"
+    "ntH\000\0229\n\014cancellation\030\037 \001(\0132!.runanywhere"
+    ".v1.CancellationEventH\000\022/\n\007failure\030  \001(\013"
+    "2\034.runanywhere.v1.FailureEventH\000\0321\n\017Prop"
+    "ertiesEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:"
+    "\0028\001B\007\n\005eventB\010\n\006_error*\227\003\n\014SDKComponent\022"
+    "\035\n\031SDK_COMPONENT_UNSPECIFIED\020\000\022\025\n\021SDK_CO"
+    "MPONENT_STT\020\001\022\025\n\021SDK_COMPONENT_TTS\020\002\022\025\n\021"
+    "SDK_COMPONENT_VAD\020\003\022\025\n\021SDK_COMPONENT_LLM"
+    "\020\004\022\025\n\021SDK_COMPONENT_VLM\020\005\022\033\n\027SDK_COMPONE"
+    "NT_DIFFUSION\020\006\022\025\n\021SDK_COMPONENT_RAG\020\007\022\034\n"
+    "\030SDK_COMPONENT_EMBEDDINGS\020\010\022\035\n\031SDK_COMPO"
+    "NENT_VOICE_AGENT\020\t\022\032\n\026SDK_COMPONENT_WAKE"
+    "WORD\020\n\022%\n!SDK_COMPONENT_SPEAKER_DIARIZAT"
+    "ION\020\013\022\'\n#SDK_COMPONENT_SEMANTIC_SEGMENTA"
+    "TION\020\014\022\030\n\024SDK_COMPONENT_RERANK\020\r*\252\001\n\020Eve"
+    "ntDestination\022!\n\035EVENT_DESTINATION_UNSPE"
+    "CIFIED\020\000\022\034\n\030EVENT_DESTINATION_PUBLIC\020\001\022\037"
+    "\n\033EVENT_DESTINATION_TELEMETRY\020\002\022\031\n\025EVENT"
+    "_DESTINATION_ALL\020\003\022\031\n\025EVENT_DESTINATION_"
+    "LOG\020\004*\244\002\n\023InitializationStage\022$\n INITIAL"
+    "IZATION_STAGE_UNSPECIFIED\020\000\022 \n\034INITIALIZ"
+    "ATION_STAGE_STARTED\020\001\022-\n)INITIALIZATION_"
+    "STAGE_CONFIGURATION_LOADED\020\002\022.\n*INITIALI"
+    "ZATION_STAGE_SERVICES_BOOTSTRAPPED\020\003\022\"\n\036"
+    "INITIALIZATION_STAGE_COMPLETED\020\004\022\037\n\033INIT"
+    "IALIZATION_STAGE_FAILED\020\005\022!\n\035INITIALIZAT"
+    "ION_STAGE_SHUTDOWN\020\006*\223\007\n\026ConfigurationEv"
+    "entKind\022(\n$CONFIGURATION_EVENT_KIND_UNSP"
+    "ECIFIED\020\000\022*\n&CONFIGURATION_EVENT_KIND_FE"
+    "TCH_STARTED\020\001\022,\n(CONFIGURATION_EVENT_KIN"
+    "D_FETCH_COMPLETED\020\002\022)\n%CONFIGURATION_EVE"
+    "NT_KIND_FETCH_FAILED\020\003\022#\n\037CONFIGURATION_"
+    "EVENT_KIND_LOADED\020\004\022$\n CONFIGURATION_EVE"
+    "NT_KIND_UPDATED\020\005\022)\n%CONFIGURATION_EVENT"
+    "_KIND_SYNC_STARTED\020\006\022+\n\'CONFIGURATION_EV"
+    "ENT_KIND_SYNC_COMPLETED\020\007\022(\n$CONFIGURATI"
+    "ON_EVENT_KIND_SYNC_FAILED\020\010\022+\n\'CONFIGURA"
+    "TION_EVENT_KIND_SYNC_REQUESTED\020\t\022/\n+CONF"
+    "IGURATION_EVENT_KIND_SETTINGS_REQUESTED\020"
+    "\n\022/\n+CONFIGURATION_EVENT_KIND_SETTINGS_R"
+    "ETRIEVED\020\013\0225\n1CONFIGURATION_EVENT_KIND_R"
+    "OUTING_POLICY_REQUESTED\020\014\0225\n1CONFIGURATI"
+    "ON_EVENT_KIND_ROUTING_POLICY_RETRIEVED\020\r"
+    "\0223\n/CONFIGURATION_EVENT_KIND_PRIVACY_MOD"
+    "E_REQUESTED\020\016\0223\n/CONFIGURATION_EVENT_KIN"
+    "D_PRIVACY_MODE_RETRIEVED\020\017\0227\n3CONFIGURAT"
+    "ION_EVENT_KIND_ANALYTICS_STATUS_REQUESTE"
+    "D\020\020\0227\n3CONFIGURATION_EVENT_KIND_ANALYTIC"
+    "S_STATUS_RETRIEVED\020\021\022$\n CONFIGURATION_EV"
+    "ENT_KIND_CHANGED\020\022*\372\006\n ComponentInitiali"
+    "zationEventKind\022)\n%COMPONENT_INIT_EVENT_"
+    "KIND_UNSPECIFIED\020\000\0224\n0COMPONENT_INIT_EVE"
+    "NT_KIND_INITIALIZATION_STARTED\020\001\0226\n2COMP"
+    "ONENT_INIT_EVENT_KIND_INITIALIZATION_COM"
+    "PLETED\020\002\0225\n1COMPONENT_INIT_EVENT_KIND_CO"
+    "MPONENT_STATE_CHANGED\020\003\0220\n,COMPONENT_INI"
+    "T_EVENT_KIND_COMPONENT_CHECKING\020\004\0229\n5COM"
+    "PONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOA"
+    "D_REQUIRED\020\005\0228\n4COMPONENT_INIT_EVENT_KIN"
+    "D_COMPONENT_DOWNLOAD_STARTED\020\006\0229\n5COMPON"
+    "ENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_P"
+    "ROGRESS\020\007\022:\n6COMPONENT_INIT_EVENT_KIND_C"
+    "OMPONENT_DOWNLOAD_COMPLETED\020\010\0224\n0COMPONE"
+    "NT_INIT_EVENT_KIND_COMPONENT_INITIALIZIN"
+    "G\020\t\022-\n)COMPONENT_INIT_EVENT_KIND_COMPONE"
+    "NT_READY\020\n\022.\n*COMPONENT_INIT_EVENT_KIND_"
+    "COMPONENT_FAILED\020\013\0223\n/COMPONENT_INIT_EVE"
+    "NT_KIND_PARALLEL_INIT_STARTED\020\014\0225\n1COMPO"
+    "NENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STA"
+    "RTED\020\r\0222\n.COMPONENT_INIT_EVENT_KIND_ALL_"
+    "COMPONENTS_READY\020\016\0223\n/COMPONENT_INIT_EVE"
+    "NT_KIND_SOME_COMPONENTS_READY\020\017*\222\002\n\020Sess"
+    "ionEventKind\022\"\n\036SESSION_EVENT_KIND_UNSPE"
+    "CIFIED\020\000\022\036\n\032SESSION_EVENT_KIND_CREATED\020\001"
+    "\022\036\n\032SESSION_EVENT_KIND_STARTED\020\002\022\036\n\032SESS"
+    "ION_EVENT_KIND_RESUMED\020\003\022\035\n\031SESSION_EVEN"
+    "T_KIND_PAUSED\020\004\022\034\n\030SESSION_EVENT_KIND_EN"
+    "DED\020\005\022\036\n\032SESSION_EVENT_KIND_EXPIRED\020\006\022\035\n"
+    "\031SESSION_EVENT_KIND_FAILED\020\007*\324\010\n\023Generat"
+    "ionEventKind\022%\n!GENERATION_EVENT_KIND_UN"
+    "SPECIFIED\020\000\022)\n%GENERATION_EVENT_KIND_SES"
+    "SION_STARTED\020\001\022\'\n#GENERATION_EVENT_KIND_"
+    "SESSION_ENDED\020\002\022!\n\035GENERATION_EVENT_KIND"
+    "_STARTED\020\003\022/\n+GENERATION_EVENT_KIND_FIRS"
+    "T_TOKEN_GENERATED\020\004\022)\n%GENERATION_EVENT_"
+    "KIND_TOKEN_GENERATED\020\005\022*\n&GENERATION_EVE"
+    "NT_KIND_STREAMING_UPDATE\020\006\022#\n\037GENERATION"
+    "_EVENT_KIND_COMPLETED\020\007\022 \n\034GENERATION_EV"
+    "ENT_KIND_FAILED\020\010\022&\n\"GENERATION_EVENT_KI"
+    "ND_MODEL_LOADED\020\t\022(\n$GENERATION_EVENT_KI"
+    "ND_MODEL_UNLOADED\020\n\022)\n%GENERATION_EVENT_"
+    "KIND_COST_CALCULATED\020\013\022*\n&GENERATION_EVE"
+    "NT_KIND_ROUTING_DECISION\020\014\022*\n&GENERATION"
+    "_EVENT_KIND_STREAM_COMPLETED\020\r\022*\n&GENERA"
+    "TION_EVENT_KIND_CANCEL_REQUESTED\020\016\022#\n\037GE"
+    "NERATION_EVENT_KIND_CANCELLED\020\017\022+\n\'GENER"
+    "ATION_EVENT_KIND_TOOL_CALL_STARTED\020\020\022-\n)"
+    "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETE"
+    "D\020\021\022*\n&GENERATION_EVENT_KIND_TOOL_CALL_F"
+    "AILED\020\022\0223\n/GENERATION_EVENT_KIND_STRUCTU"
+    "RED_OUTPUT_STARTED\020\023\0225\n1GENERATION_EVENT"
+    "_KIND_STRUCTURED_OUTPUT_COMPLETED\020\024\0222\n.G"
+    "ENERATION_EVENT_KIND_STRUCTURED_OUTPUT_F"
+    "AILED\020\025\022*\n&GENERATION_EVENT_KIND_THINKIN"
+    "G_STARTED\020\026\022(\n$GENERATION_EVENT_KIND_THI"
+    "NKING_DELTA\020\027\022,\n(GENERATION_EVENT_KIND_T"
+    "HINKING_COMPLETED\020\030*\332\017\n\016VoiceEventKind\022 "
+    "\n\034VOICE_EVENT_KIND_UNSPECIFIED\020\000\022&\n\"VOIC"
+    "E_EVENT_KIND_LISTENING_STARTED\020\001\022$\n VOIC"
+    "E_EVENT_KIND_LISTENING_ENDED\020\002\022$\n VOICE_"
+    "EVENT_KIND_SPEECH_DETECTED\020\003\022*\n&VOICE_EV"
+    "ENT_KIND_TRANSCRIPTION_STARTED\020\004\022*\n&VOIC"
+    "E_EVENT_KIND_TRANSCRIPTION_PARTIAL\020\005\022(\n$"
+    "VOICE_EVENT_KIND_TRANSCRIPTION_FINAL\020\006\022\'"
+    "\n#VOICE_EVENT_KIND_RESPONSE_GENERATED\020\007\022"
+    "&\n\"VOICE_EVENT_KIND_SYNTHESIS_STARTED\020\010\022"
+    "$\n VOICE_EVENT_KIND_AUDIO_GENERATED\020\t\022(\n"
+    "$VOICE_EVENT_KIND_SYNTHESIS_COMPLETED\020\n\022"
+    "%\n!VOICE_EVENT_KIND_SYNTHESIS_FAILED\020\013\022%"
+    "\n!VOICE_EVENT_KIND_PIPELINE_STARTED\020\014\022\'\n"
+    "#VOICE_EVENT_KIND_PIPELINE_COMPLETED\020\r\022#"
+    "\n\037VOICE_EVENT_KIND_PIPELINE_ERROR\020\016\022 \n\034V"
+    "OICE_EVENT_KIND_VAD_STARTED\020\017\022!\n\035VOICE_E"
+    "VENT_KIND_VAD_DETECTED\020\020\022\036\n\032VOICE_EVENT_"
+    "KIND_VAD_ENDED\020\021\022$\n VOICE_EVENT_KIND_VAD"
+    "_INITIALIZED\020\022\022 \n\034VOICE_EVENT_KIND_VAD_S"
+    "TOPPED\020\023\022#\n\037VOICE_EVENT_KIND_VAD_CLEANED"
+    "_UP\020\024\022#\n\037VOICE_EVENT_KIND_SPEECH_STARTED"
+    "\020\025\022!\n\035VOICE_EVENT_KIND_SPEECH_ENDED\020\026\022#\n"
+    "\037VOICE_EVENT_KIND_STT_PROCESSING\020\027\022\'\n#VO"
+    "ICE_EVENT_KIND_STT_PARTIAL_RESULT\020\030\022\"\n\036V"
+    "OICE_EVENT_KIND_STT_COMPLETED\020\031\022\037\n\033VOICE"
+    "_EVENT_KIND_STT_FAILED\020\032\022#\n\037VOICE_EVENT_"
+    "KIND_LLM_PROCESSING\020\033\022#\n\037VOICE_EVENT_KIN"
+    "D_TTS_PROCESSING\020\034\022&\n\"VOICE_EVENT_KIND_R"
+    "ECORDING_STARTED\020\035\022&\n\"VOICE_EVENT_KIND_R"
+    "ECORDING_STOPPED\020\036\022%\n!VOICE_EVENT_KIND_P"
+    "LAYBACK_STARTED\020\037\022\'\n#VOICE_EVENT_KIND_PL"
+    "AYBACK_COMPLETED\020 \022%\n!VOICE_EVENT_KIND_P"
+    "LAYBACK_STOPPED\020!\022$\n VOICE_EVENT_KIND_PL"
+    "AYBACK_PAUSED\020\"\022%\n!VOICE_EVENT_KIND_PLAY"
+    "BACK_RESUMED\020#\022$\n VOICE_EVENT_KIND_PLAYB"
+    "ACK_FAILED\020$\022*\n&VOICE_EVENT_KIND_VOICE_S"
+    "ESSION_STARTED\020%\022,\n(VOICE_EVENT_KIND_VOI"
+    "CE_SESSION_LISTENING\020&\0221\n-VOICE_EVENT_KI"
+    "ND_VOICE_SESSION_SPEECH_STARTED\020\'\022/\n+VOI"
+    "CE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED"
+    "\020(\022-\n)VOICE_EVENT_KIND_VOICE_SESSION_PRO"
+    "CESSING\020)\022.\n*VOICE_EVENT_KIND_VOICE_SESS"
+    "ION_TRANSCRIBED\020*\022,\n(VOICE_EVENT_KIND_VO"
+    "ICE_SESSION_RESPONDED\020+\022+\n\'VOICE_EVENT_K"
+    "IND_VOICE_SESSION_SPEAKING\020,\0221\n-VOICE_EV"
+    "ENT_KIND_VOICE_SESSION_TURN_COMPLETED\020-\022"
+    "*\n&VOICE_EVENT_KIND_VOICE_SESSION_STOPPE"
+    "D\020.\022(\n$VOICE_EVENT_KIND_VOICE_SESSION_ER"
+    "ROR\020/\022\037\n\033VOICE_EVENT_KIND_VAD_PAUSED\0200\022 "
+    "\n\034VOICE_EVENT_KIND_VAD_RESUMED\0201*\231\010\n\034Cap"
+    "abilityOperationEventKind\022/\n+CAPABILITY_"
+    "OPERATION_EVENT_KIND_UNSPECIFIED\020\000\022/\n+CA"
+    "PABILITY_OPERATION_EVENT_KIND_VLM_STARTE"
+    "D\020\001\0221\n-CAPABILITY_OPERATION_EVENT_KIND_V"
+    "LM_COMPLETED\020\002\022.\n*CAPABILITY_OPERATION_E"
+    "VENT_KIND_VLM_FAILED\020\003\0225\n1CAPABILITY_OPE"
+    "RATION_EVENT_KIND_DIFFUSION_STARTED\020\004\0226\n"
+    "2CAPABILITY_OPERATION_EVENT_KIND_DIFFUSI"
+    "ON_PROGRESS\020\005\0227\n3CAPABILITY_OPERATION_EV"
+    "ENT_KIND_DIFFUSION_COMPLETED\020\006\0224\n0CAPABI"
+    "LITY_OPERATION_EVENT_KIND_DIFFUSION_FAIL"
+    "ED\020\007\0226\n2CAPABILITY_OPERATION_EVENT_KIND_"
+    "EMBEDDINGS_STARTED\020\010\0228\n4CAPABILITY_OPERA"
+    "TION_EVENT_KIND_EMBEDDINGS_COMPLETED\020\t\0225"
+    "\n1CAPABILITY_OPERATION_EVENT_KIND_EMBEDD"
+    "INGS_FAILED\020\n\0229\n5CAPABILITY_OPERATION_EV"
+    "ENT_KIND_RAG_INGESTION_STARTED\020\013\022;\n7CAPA"
+    "BILITY_OPERATION_EVENT_KIND_RAG_INGESTIO"
+    "N_COMPLETED\020\014\0225\n1CAPABILITY_OPERATION_EV"
+    "ENT_KIND_RAG_QUERY_STARTED\020\r\0227\n3CAPABILI"
+    "TY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLE"
+    "TED\020\016\022.\n*CAPABILITY_OPERATION_EVENT_KIND"
+    "_RAG_FAILED\020\017\0221\n-CAPABILITY_OPERATION_EV"
+    "ENT_KIND_LORA_ATTACHED\020\020\0221\n-CAPABILITY_O"
+    "PERATION_EVENT_KIND_LORA_DETACHED\020\021\022/\n+C"
+    "APABILITY_OPERATION_EVENT_KIND_LORA_FAIL"
+    "ED\020\022*\361\007\n\016ModelEventKind\022 \n\034MODEL_EVENT_K"
+    "IND_UNSPECIFIED\020\000\022!\n\035MODEL_EVENT_KIND_LO"
+    "AD_STARTED\020\001\022\"\n\036MODEL_EVENT_KIND_LOAD_PR"
+    "OGRESS\020\002\022#\n\037MODEL_EVENT_KIND_LOAD_COMPLE"
+    "TED\020\003\022 \n\034MODEL_EVENT_KIND_LOAD_FAILED\020\004\022"
+    "#\n\037MODEL_EVENT_KIND_UNLOAD_STARTED\020\005\022%\n!"
+    "MODEL_EVENT_KIND_UNLOAD_COMPLETED\020\006\022\"\n\036M"
+    "ODEL_EVENT_KIND_UNLOAD_FAILED\020\007\022%\n!MODEL"
+    "_EVENT_KIND_DOWNLOAD_STARTED\020\010\022&\n\"MODEL_"
+    "EVENT_KIND_DOWNLOAD_PROGRESS\020\t\022\'\n#MODEL_"
+    "EVENT_KIND_DOWNLOAD_COMPLETED\020\n\022$\n MODEL"
+    "_EVENT_KIND_DOWNLOAD_FAILED\020\013\022\'\n#MODEL_E"
+    "VENT_KIND_DOWNLOAD_CANCELLED\020\014\022#\n\037MODEL_"
+    "EVENT_KIND_LIST_REQUESTED\020\r\022#\n\037MODEL_EVE"
+    "NT_KIND_LIST_COMPLETED\020\016\022 \n\034MODEL_EVENT_"
+    "KIND_LIST_FAILED\020\017\022#\n\037MODEL_EVENT_KIND_C"
+    "ATALOG_LOADED\020\020\022#\n\037MODEL_EVENT_KIND_DELE"
+    "TE_STARTED\020\021\022%\n!MODEL_EVENT_KIND_DELETE_"
+    "COMPLETED\020\022\022\"\n\036MODEL_EVENT_KIND_DELETE_F"
+    "AILED\020\023\022\'\n#MODEL_EVENT_KIND_CUSTOM_MODEL"
+    "_ADDED\020\024\022(\n$MODEL_EVENT_KIND_BUILT_IN_RE"
+    "GISTERED\020\025\022\'\n#MODEL_EVENT_KIND_EXTRACTIO"
+    "N_STARTED\020\026\022(\n$MODEL_EVENT_KIND_EXTRACTI"
+    "ON_PROGRESS\020\027\022)\n%MODEL_EVENT_KIND_EXTRAC"
+    "TION_COMPLETED\020\030\022&\n\"MODEL_EVENT_KIND_EXT"
+    "RACTION_FAILED\020\031*\303\007\n\026ModelRegistryEventK"
+    "ind\022)\n%MODEL_REGISTRY_EVENT_KIND_UNSPECI"
+    "FIED\020\000\022-\n)MODEL_REGISTRY_EVENT_KIND_REFR"
+    "ESH_STARTED\020\001\022/\n+MODEL_REGISTRY_EVENT_KI"
+    "ND_REFRESH_COMPLETED\020\002\022,\n(MODEL_REGISTRY"
+    "_EVENT_KIND_REFRESH_FAILED\020\003\0220\n,MODEL_RE"
+    "GISTRY_EVENT_KIND_ASSIGNMENT_STARTED\020\004\0222"
+    "\n.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_C"
+    "OMPLETED\020\005\022/\n+MODEL_REGISTRY_EVENT_KIND_"
+    "ASSIGNMENT_FAILED\020\006\022,\n(MODEL_REGISTRY_EV"
+    "ENT_KIND_IMPORT_STARTED\020\007\022.\n*MODEL_REGIS"
+    "TRY_EVENT_KIND_IMPORT_COMPLETED\020\010\022+\n\'MOD"
+    "EL_REGISTRY_EVENT_KIND_IMPORT_FAILED\020\t\022/"
+    "\n+MODEL_REGISTRY_EVENT_KIND_DISCOVERY_ST"
+    "ARTED\020\n\0221\n-MODEL_REGISTRY_EVENT_KIND_DIS"
+    "COVERY_COMPLETED\020\013\022.\n*MODEL_REGISTRY_EVE"
+    "NT_KIND_DISCOVERY_FAILED\020\014\0223\n/MODEL_REGI"
+    "STRY_EVENT_KIND_CURRENT_MODEL_CHANGED\020\r\022"
+    "*\n&MODEL_REGISTRY_EVENT_KIND_LIST_STARTE"
+    "D\020\016\022,\n(MODEL_REGISTRY_EVENT_KIND_LIST_CO"
+    "MPLETED\020\017\022)\n%MODEL_REGISTRY_EVENT_KIND_L"
+    "IST_FAILED\020\020\022)\n%MODEL_REGISTRY_EVENT_KIN"
+    "D_GET_STARTED\020\021\022+\n\'MODEL_REGISTRY_EVENT_"
+    "KIND_GET_COMPLETED\020\022\022(\n$MODEL_REGISTRY_E"
+    "VENT_KIND_GET_FAILED\020\023*\230\004\n\021DownloadEvent"
+    "Kind\022#\n\037DOWNLOAD_EVENT_KIND_UNSPECIFIED\020"
+    "\000\022$\n DOWNLOAD_EVENT_KIND_PLAN_STARTED\020\001\022"
+    "&\n\"DOWNLOAD_EVENT_KIND_PLAN_COMPLETED\020\002\022"
+    "#\n\037DOWNLOAD_EVENT_KIND_PLAN_FAILED\020\003\022\037\n\033"
+    "DOWNLOAD_EVENT_KIND_STARTED\020\004\022 \n\034DOWNLOA"
+    "D_EVENT_KIND_PROGRESS\020\005\022(\n$DOWNLOAD_EVEN"
+    "T_KIND_CANCEL_REQUESTED\020\006\022!\n\035DOWNLOAD_EV"
+    "ENT_KIND_CANCELLED\020\007\022(\n$DOWNLOAD_EVENT_K"
+    "IND_RESUME_REQUESTED\020\010\022\037\n\033DOWNLOAD_EVENT"
+    "_KIND_RESUMED\020\t\022!\n\035DOWNLOAD_EVENT_KIND_C"
+    "OMPLETED\020\n\022\036\n\032DOWNLOAD_EVENT_KIND_FAILED"
+    "\020\013\022\036\n\032DOWNLOAD_EVENT_KIND_PAUSED\020\014\022-\n)DO"
+    "WNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED\020"
+    "\r*\355\005\n\020StorageEventKind\022\"\n\036STORAGE_EVENT_"
+    "KIND_UNSPECIFIED\020\000\022%\n!STORAGE_EVENT_KIND"
+    "_INFO_REQUESTED\020\001\022%\n!STORAGE_EVENT_KIND_"
+    "INFO_RETRIEVED\020\002\022\'\n#STORAGE_EVENT_KIND_M"
+    "ODELS_REQUESTED\020\003\022\'\n#STORAGE_EVENT_KIND_"
+    "MODELS_RETRIEVED\020\004\022*\n&STORAGE_EVENT_KIND"
+    "_CLEAR_CACHE_STARTED\020\005\022,\n(STORAGE_EVENT_"
+    "KIND_CLEAR_CACHE_COMPLETED\020\006\022)\n%STORAGE_"
+    "EVENT_KIND_CLEAR_CACHE_FAILED\020\007\022)\n%STORA"
+    "GE_EVENT_KIND_CLEAN_TEMP_STARTED\020\010\022+\n\'ST"
+    "ORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED\020\t\022"
+    "(\n$STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED\020"
+    "\n\022+\n\'STORAGE_EVENT_KIND_DELETE_MODEL_STA"
+    "RTED\020\013\022-\n)STORAGE_EVENT_KIND_DELETE_MODE"
+    "L_COMPLETED\020\014\022*\n&STORAGE_EVENT_KIND_DELE"
+    "TE_MODEL_FAILED\020\r\022 \n\034STORAGE_EVENT_KIND_"
+    "CACHE_HIT\020\016\022!\n\035STORAGE_EVENT_KIND_CACHE_"
+    "MISS\020\017\022\037\n\033STORAGE_EVENT_KIND_EVICTION\020\020\022"
+    " \n\034STORAGE_EVENT_KIND_DISK_FULL\020\021*\371\005\n\031St"
+    "orageLifecycleEventKind\022,\n(STORAGE_LIFEC"
+    "YCLE_EVENT_KIND_UNSPECIFIED\020\000\022-\n)STORAGE"
+    "_LIFECYCLE_EVENT_KIND_INFO_STARTED\020\001\022/\n+"
+    "STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLE"
+    "TED\020\002\0225\n1STORAGE_LIFECYCLE_EVENT_KIND_AV"
+    "AILABILITY_CHECKED\020\003\0224\n0STORAGE_LIFECYCL"
+    "E_EVENT_KIND_DELETE_PLAN_CREATED\020\004\022/\n+ST"
+    "ORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTE"
+    "D\020\005\0221\n-STORAGE_LIFECYCLE_EVENT_KIND_DELE"
+    "TE_COMPLETED\020\006\022.\n*STORAGE_LIFECYCLE_EVEN"
+    "T_KIND_DELETE_FAILED\020\007\0226\n2STORAGE_LIFECY"
+    "CLE_EVENT_KIND_CACHE_CLEANUP_STARTED\020\010\0228"
+    "\n4STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLE"
+    "ANUP_COMPLETED\020\t\0225\n1STORAGE_LIFECYCLE_EV"
+    "ENT_KIND_CACHE_CLEANUP_FAILED\020\n\0224\n0STORA"
+    "GE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAI"
+    "LED\020\013\0223\n/STORAGE_LIFECYCLE_EVENT_KIND_DE"
+    "LETE_PLAN_FAILED\020\014\0229\n5STORAGE_LIFECYCLE_"
+    "EVENT_KIND_DELETE_DRY_RUN_COMPLETED\020\r*\251\002"
+    "\n\rAuthEventKind\022\037\n\033AUTH_EVENT_KIND_UNSPE"
+    "CIFIED\020\000\022\035\n\031AUTH_EVENT_KIND_REQUESTED\020\001\022"
+    "\035\n\031AUTH_EVENT_KIND_SUCCEEDED\020\002\022\032\n\026AUTH_E"
+    "VENT_KIND_FAILED\020\003\022#\n\037AUTH_EVENT_KIND_TO"
+    "KEN_REFRESHED\020\004\022!\n\035AUTH_EVENT_KIND_TOKEN"
+    "_EXPIRED\020\005\022%\n!AUTH_EVENT_KIND_DEVICE_REG"
+    "ISTERED\020\006\022.\n*AUTH_EVENT_KIND_DEVICE_REGI"
+    "STRATION_FAILED\020\007*\325\004\n\017DeviceEventKind\022!\n"
+    "\035DEVICE_EVENT_KIND_UNSPECIFIED\020\000\022+\n\'DEVI"
+    "CE_EVENT_KIND_DEVICE_INFO_COLLECTED\020\001\0223\n"
+    "/DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTIO"
+    "N_FAILED\020\002\022+\n\'DEVICE_EVENT_KIND_DEVICE_I"
+    "NFO_REFRESHED\020\003\022.\n*DEVICE_EVENT_KIND_DEV"
+    "ICE_INFO_SYNC_STARTED\020\004\0220\n,DEVICE_EVENT_"
+    "KIND_DEVICE_INFO_SYNC_COMPLETED\020\005\022-\n)DEV"
+    "ICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED\020\006"
+    "\022*\n&DEVICE_EVENT_KIND_DEVICE_STATE_CHANG"
+    "ED\020\007\022%\n!DEVICE_EVENT_KIND_BATTERY_CHANGE"
+    "D\020\010\022%\n!DEVICE_EVENT_KIND_THERMAL_CHANGED"
+    "\020\t\022*\n&DEVICE_EVENT_KIND_CONNECTIVITY_CHA"
+    "NGED\020\n\022\'\n#DEVICE_EVENT_KIND_DEVICE_REGIS"
+    "TERED\020\013\0220\n,DEVICE_EVENT_KIND_DEVICE_REGI"
+    "STRATION_FAILED\020\014*\204\002\n\020NetworkEventKind\022\""
+    "\n\036NETWORK_EVENT_KIND_UNSPECIFIED\020\000\022&\n\"NE"
+    "TWORK_EVENT_KIND_REQUEST_STARTED\020\001\022(\n$NE"
+    "TWORK_EVENT_KIND_REQUEST_COMPLETED\020\002\022%\n!"
+    "NETWORK_EVENT_KIND_REQUEST_FAILED\020\003\022&\n\"N"
+    "ETWORK_EVENT_KIND_REQUEST_TIMEOUT\020\004\022+\n\'N"
+    "ETWORK_EVENT_KIND_CONNECTIVITY_CHANGED\020\005"
+    "*\272\005\n\022FrameworkEventKind\022$\n FRAMEWORK_EVE"
+    "NT_KIND_UNSPECIFIED\020\000\022+\n\'FRAMEWORK_EVENT"
+    "_KIND_ADAPTER_REGISTERED\020\001\022-\n)FRAMEWORK_"
+    "EVENT_KIND_ADAPTER_UNREGISTERED\020\002\022+\n\'FRA"
+    "MEWORK_EVENT_KIND_ADAPTERS_REQUESTED\020\003\022+"
+    "\n\'FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVE"
+    "D\020\004\022-\n)FRAMEWORK_EVENT_KIND_FRAMEWORKS_R"
+    "EQUESTED\020\005\022-\n)FRAMEWORK_EVENT_KIND_FRAME"
+    "WORKS_RETRIEVED\020\006\022/\n+FRAMEWORK_EVENT_KIN"
+    "D_AVAILABILITY_REQUESTED\020\007\022/\n+FRAMEWORK_"
+    "EVENT_KIND_AVAILABILITY_RETRIEVED\020\010\0227\n3F"
+    "RAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK"
+    "_REQUESTED\020\t\0227\n3FRAMEWORK_EVENT_KIND_MOD"
+    "ELS_FOR_FRAMEWORK_RETRIEVED\020\n\022:\n6FRAMEWO"
+    "RK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RE"
+    "QUESTED\020\013\022:\n6FRAMEWORK_EVENT_KIND_FRAMEW"
+    "ORKS_FOR_MODALITY_RETRIEVED\020\014\022\036\n\032FRAMEWO"
+    "RK_EVENT_KIND_ERROR\020\r*\267\003\n\030HardwareRoutin"
+    "gEventKind\022+\n\'HARDWARE_ROUTING_EVENT_KIN"
+    "D_UNSPECIFIED\020\000\022/\n+HARDWARE_ROUTING_EVEN"
+    "T_KIND_PROFILE_STARTED\020\001\0221\n-HARDWARE_ROU"
+    "TING_EVENT_KIND_PROFILE_COMPLETED\020\002\022.\n*H"
+    "ARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILE"
+    "D\020\003\022.\n*HARDWARE_ROUTING_EVENT_KIND_ROUTE"
+    "_SELECTED\020\004\022-\n)HARDWARE_ROUTING_EVENT_KI"
+    "ND_ROUTE_CHANGED\020\005\022=\n9HARDWARE_ROUTING_E"
+    "VENT_KIND_FRAMEWORK_CAPABILITY_DETECTED\020"
+    "\006\022<\n8HARDWARE_ROUTING_EVENT_KIND_FRAMEWO"
+    "RK_CAPABILITY_MISSING\020\007*\370\001\n\024PerformanceE"
+    "ventKind\022&\n\"PERFORMANCE_EVENT_KIND_UNSPE"
+    "CIFIED\020\000\022)\n%PERFORMANCE_EVENT_KIND_MEMOR"
+    "Y_WARNING\020\001\0220\n,PERFORMANCE_EVENT_KIND_TH"
+    "ERMAL_STATE_CHANGED\020\002\022+\n\'PERFORMANCE_EVE"
+    "NT_KIND_LATENCY_MEASURED\020\003\022.\n*PERFORMANC"
+    "E_EVENT_KIND_THROUGHPUT_MEASURED\020\004*\300\001\n\022T"
+    "elemetryEventKind\022$\n TELEMETRY_EVENT_KIN"
+    "D_UNSPECIFIED\020\000\022 \n\034TELEMETRY_EVENT_KIND_"
+    "COUNTER\020\001\022\036\n\032TELEMETRY_EVENT_KIND_GAUGE\020"
+    "\002\022\"\n\036TELEMETRY_EVENT_KIND_HISTOGRAM\020\003\022\036\n"
+    "\032TELEMETRY_EVENT_KIND_TRACE\020\004*\334\001\n\025Cancel"
+    "lationEventKind\022\'\n#CANCELLATION_EVENT_KI"
+    "ND_UNSPECIFIED\020\000\022%\n!CANCELLATION_EVENT_K"
+    "IND_REQUESTED\020\001\022(\n$CANCELLATION_EVENT_KI"
+    "ND_ACKNOWLEDGED\020\002\022%\n!CANCELLATION_EVENT_"
+    "KIND_COMPLETED\020\003\022\"\n\036CANCELLATION_EVENT_K"
+    "IND_FAILED\020\004B\211\001\n\027ai.runanywhere.proto.v1"
+    "B\016SdkEventsProtoP\001Z<github.com/runanywhe"
+    "re/runanywhere-sdks/idl/v1;runanywherev1"
+    "\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_sdk_5fevents_2eproto_deps[7] = {
@@ -8648,13 +7663,13 @@ static ::absl::once_flag descriptor_table_sdk_5fevents_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_sdk_5fevents_2eproto = {
     false,
     false,
-    25809,
+    24760,
     descriptor_table_protodef_sdk_5fevents_2eproto,
     "sdk_events.proto",
     &descriptor_table_sdk_5fevents_2eproto_once,
     descriptor_table_sdk_5fevents_2eproto_deps,
     7,
-    32,
+    27,
     schemas,
     file_message_globals,
     TableStruct_sdk_5fevents_2eproto::offsets,
@@ -10776,233 +9791,6 @@ void ComponentLifecycleSnapshot::InternalSwap(ComponentLifecycleSnapshot* PROTOB
 }
 
 ::google::protobuf::Metadata ComponentLifecycleSnapshot::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-ComponentLifecycleSnapshotRequest::ComponentLifecycleSnapshotRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, ComponentLifecycleSnapshotRequest_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.ComponentLifecycleSnapshotRequest)
-}
-ComponentLifecycleSnapshotRequest::ComponentLifecycleSnapshotRequest(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ComponentLifecycleSnapshotRequest& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, ComponentLifecycleSnapshotRequest_get_class_data()),
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena),
-#endif  // PROTOBUF_CUSTOM_VTABLE
-      _impl_(from._impl_) {
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-PROTOBUF_NDEBUG_INLINE ComponentLifecycleSnapshotRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0} {}
-
-inline void ComponentLifecycleSnapshotRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, component_),
-           0,
-           offsetof(Impl_, include_model_) -
-               offsetof(Impl_, component_) +
-               sizeof(Impl_::include_model_));
-}
-ComponentLifecycleSnapshotRequest::~ComponentLifecycleSnapshotRequest() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.ComponentLifecycleSnapshotRequest)
-  SharedDtor(*this);
-}
-inline void ComponentLifecycleSnapshotRequest::SharedDtor(MessageLite& self) {
-  ComponentLifecycleSnapshotRequest& this_ = static_cast<ComponentLifecycleSnapshotRequest&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull ComponentLifecycleSnapshotRequest_class_data_ =
-        ComponentLifecycleSnapshotRequest::InternalGenerateClassData_(ComponentLifecycleSnapshotRequest_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-ComponentLifecycleSnapshotRequest::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&ComponentLifecycleSnapshotRequest_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(ComponentLifecycleSnapshotRequest_class_data_.tc_table);
-  return ComponentLifecycleSnapshotRequest_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-ComponentLifecycleSnapshotRequest::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&ComponentLifecycleSnapshotRequest_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&ComponentLifecycleSnapshotRequest_globals_));
-  return ComponentLifecycleSnapshotRequest_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const ComponentLifecycleSnapshotRequest::ParseTableT_
-    ComponentLifecycleSnapshotRequest::_table_ =
-        ComponentLifecycleSnapshotRequest::InternalGenerateParseTable_(ComponentLifecycleSnapshotRequest_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void ComponentLifecycleSnapshotRequest::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.ComponentLifecycleSnapshotRequest)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    ::memset(&_impl_.component_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.include_model_) -
-        reinterpret_cast<char*>(&_impl_.component_)) + sizeof(_impl_.include_model_));
-  }
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL ComponentLifecycleSnapshotRequest::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const ComponentLifecycleSnapshotRequest& this_ = static_cast<const ComponentLifecycleSnapshotRequest&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL ComponentLifecycleSnapshotRequest::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const ComponentLifecycleSnapshotRequest& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.ComponentLifecycleSnapshotRequest)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.SDKComponent component = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (this_._internal_component() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          1, this_._internal_component(), target);
-    }
-  }
-
-  // bool include_model = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (this_._internal_include_model() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          2, this_._internal_include_model(), target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.ComponentLifecycleSnapshotRequest)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t ComponentLifecycleSnapshotRequest::ByteSizeLong(const MessageLite& base) {
-  const ComponentLifecycleSnapshotRequest& this_ = static_cast<const ComponentLifecycleSnapshotRequest&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t ComponentLifecycleSnapshotRequest::ByteSizeLong() const {
-  const ComponentLifecycleSnapshotRequest& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.ComponentLifecycleSnapshotRequest)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    // .runanywhere.v1.SDKComponent component = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (this_._internal_component() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_component());
-      }
-    }
-    // bool include_model = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (this_._internal_include_model() != 0) {
-        total_size += 2;
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void ComponentLifecycleSnapshotRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<ComponentLifecycleSnapshotRequest*>(&to_msg);
-  auto& from = static_cast<const ComponentLifecycleSnapshotRequest&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.ComponentLifecycleSnapshotRequest)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (from._internal_component() != 0) {
-        _this->_impl_.component_ = from._impl_.component_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (from._internal_include_model() != 0) {
-        _this->_impl_.include_model_ = from._impl_.include_model_;
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void ComponentLifecycleSnapshotRequest::CopyFrom(const ComponentLifecycleSnapshotRequest& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.ComponentLifecycleSnapshotRequest)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void ComponentLifecycleSnapshotRequest::InternalSwap(ComponentLifecycleSnapshotRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotRequest, _impl_.include_model_)
-      + sizeof(ComponentLifecycleSnapshotRequest::_impl_.include_model_)
-      - PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotRequest, _impl_.component_)>(
-          reinterpret_cast<char*>(&_impl_.component_),
-          reinterpret_cast<char*>(&other->_impl_.component_));
-}
-
-::google::protobuf::Metadata ComponentLifecycleSnapshotRequest::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
@@ -23681,1336 +22469,6 @@ void SDKEvent::InternalSwap(SDKEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) 
 }
 
 ::google::protobuf::Metadata SDKEvent::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-SDKEventFilter::SDKEventFilter(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, SDKEventFilter_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.SDKEventFilter)
-}
-PROTOBUF_NDEBUG_INLINE SDKEventFilter::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::SDKEventFilter& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        categories_ {
-          visibility, ::_pbi::InternalMetadataOffset::Build<
-              ::runanywhere::v1::SDKEventFilter,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.categories_)>()
-          , from.categories_
-        }
-        ,
-        _categories_cached_byte_size_{0},
-        components_ {
-          visibility, ::_pbi::InternalMetadataOffset::Build<
-              ::runanywhere::v1::SDKEventFilter,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.components_)>()
-          , from.components_
-        }
-        ,
-        _components_cached_byte_size_{0},
-        destinations_ {
-          visibility, ::_pbi::InternalMetadataOffset::Build<
-              ::runanywhere::v1::SDKEventFilter,
-              PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.destinations_)>()
-          , from.destinations_
-        }
-        ,
-        _destinations_cached_byte_size_{0},
-        session_id_(arena, from.session_id_),
-        operation_id_(arena, from.operation_id_),
-        correlation_id_(arena, from.correlation_id_),
-        source_(arena, from.source_),
-        trace_id_(arena, from.trace_id_) {}
-
-SDKEventFilter::SDKEventFilter(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const SDKEventFilter& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, SDKEventFilter_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SDKEventFilter* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  _impl_.minimum_severity_ = from._impl_.minimum_severity_;
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SDKEventFilter)
-}
-PROTOBUF_NDEBUG_INLINE SDKEventFilter::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        categories_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::SDKEventFilter,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.categories_)>()
-         }
-        ,
-        _categories_cached_byte_size_{0},
-        components_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::SDKEventFilter,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.components_)>()
-         }
-        ,
-        _components_cached_byte_size_{0},
-        destinations_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::SDKEventFilter,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SDKEventFilter, _impl_.destinations_)>()
-         }
-        ,
-        _destinations_cached_byte_size_{0},
-        session_id_(arena),
-        operation_id_(arena),
-        correlation_id_(arena),
-        source_(arena),
-        trace_id_(arena) {}
-
-inline void SDKEventFilter::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.minimum_severity_ = {};
-}
-SDKEventFilter::~SDKEventFilter() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.SDKEventFilter)
-  SharedDtor(*this);
-}
-inline void SDKEventFilter::SharedDtor(MessageLite& self) {
-  SDKEventFilter& this_ = static_cast<SDKEventFilter&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.session_id_.Destroy();
-  this_._impl_.operation_id_.Destroy();
-  this_._impl_.correlation_id_.Destroy();
-  this_._impl_.source_.Destroy();
-  this_._impl_.trace_id_.Destroy();
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull SDKEventFilter_class_data_ =
-        SDKEventFilter::InternalGenerateClassData_(SDKEventFilter_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-SDKEventFilter::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&SDKEventFilter_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(SDKEventFilter_class_data_.tc_table);
-  return SDKEventFilter_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-SDKEventFilter::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&SDKEventFilter_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&SDKEventFilter_globals_));
-  return SDKEventFilter_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const SDKEventFilter::ParseTableT_
-    SDKEventFilter::_table_ =
-        SDKEventFilter::InternalGenerateParseTable_(SDKEventFilter_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void SDKEventFilter::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.SDKEventFilter)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.categories_.Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.components_.Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.destinations_.Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _impl_.session_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _impl_.operation_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      _impl_.correlation_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      _impl_.source_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      _impl_.trace_id_.ClearNonDefaultToEmpty();
-    }
-  }
-  _impl_.minimum_severity_ = 0;
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL SDKEventFilter::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const SDKEventFilter& this_ = static_cast<const SDKEventFilter&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL SDKEventFilter::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const SDKEventFilter& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.SDKEventFilter)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // repeated .runanywhere.v1.EventCategory categories = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    {
-      ::size_t byte_size = this_._impl_._categories_cached_byte_size_.Get();
-      if (byte_size > 0) {
-        target = stream->WriteEnumPacked(
-            1, this_._internal_categories(), byte_size, target);
-      }
-    }
-  }
-
-  // repeated .runanywhere.v1.SDKComponent components = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    {
-      ::size_t byte_size = this_._impl_._components_cached_byte_size_.Get();
-      if (byte_size > 0) {
-        target = stream->WriteEnumPacked(
-            2, this_._internal_components(), byte_size, target);
-      }
-    }
-  }
-
-  // repeated .runanywhere.v1.EventDestination destinations = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    {
-      ::size_t byte_size = this_._impl_._destinations_cached_byte_size_.Get();
-      if (byte_size > 0) {
-        target = stream->WriteEnumPacked(
-            3, this_._internal_destinations(), byte_size, target);
-      }
-    }
-  }
-
-  // .runanywhere.v1.ErrorSeverity minimum_severity = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (this_._internal_minimum_severity() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          4, this_._internal_minimum_severity(), target);
-    }
-  }
-
-  // string session_id = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (!this_._internal_session_id().empty()) {
-      const ::std::string& _s = this_._internal_session_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SDKEventFilter.session_id");
-      target = stream->WriteStringMaybeAliased(5, _s, target);
-    }
-  }
-
-  // string operation_id = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (!this_._internal_operation_id().empty()) {
-      const ::std::string& _s = this_._internal_operation_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SDKEventFilter.operation_id");
-      target = stream->WriteStringMaybeAliased(6, _s, target);
-    }
-  }
-
-  // string correlation_id = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (!this_._internal_correlation_id().empty()) {
-      const ::std::string& _s = this_._internal_correlation_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SDKEventFilter.correlation_id");
-      target = stream->WriteStringMaybeAliased(7, _s, target);
-    }
-  }
-
-  // string source = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (!this_._internal_source().empty()) {
-      const ::std::string& _s = this_._internal_source();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SDKEventFilter.source");
-      target = stream->WriteStringMaybeAliased(8, _s, target);
-    }
-  }
-
-  // string trace_id = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-    if (!this_._internal_trace_id().empty()) {
-      const ::std::string& _s = this_._internal_trace_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SDKEventFilter.trace_id");
-      target = stream->WriteStringMaybeAliased(9, _s, target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.SDKEventFilter)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t SDKEventFilter::ByteSizeLong(const MessageLite& base) {
-  const SDKEventFilter& this_ = static_cast<const SDKEventFilter&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t SDKEventFilter::ByteSizeLong() const {
-  const SDKEventFilter& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.SDKEventFilter)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    // repeated .runanywhere.v1.EventCategory categories = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size += ::_pbi::WireFormatLite::EnumSizeWithPackedTagSize(
-          this_._internal_categories(), 1, this_._impl_._categories_cached_byte_size_);
-    }
-    // repeated .runanywhere.v1.SDKComponent components = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      total_size += ::_pbi::WireFormatLite::EnumSizeWithPackedTagSize(
-          this_._internal_components(), 1, this_._impl_._components_cached_byte_size_);
-    }
-    // repeated .runanywhere.v1.EventDestination destinations = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += ::_pbi::WireFormatLite::EnumSizeWithPackedTagSize(
-          this_._internal_destinations(), 1, this_._impl_._destinations_cached_byte_size_);
-    }
-    // string session_id = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (!this_._internal_session_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_session_id());
-      }
-    }
-    // string operation_id = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (!this_._internal_operation_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_operation_id());
-      }
-    }
-    // string correlation_id = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (!this_._internal_correlation_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_correlation_id());
-      }
-    }
-    // string source = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (!this_._internal_source().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_source());
-      }
-    }
-    // string trace_id = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (!this_._internal_trace_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_trace_id());
-      }
-    }
-  }
-   {
-    // .runanywhere.v1.ErrorSeverity minimum_severity = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (this_._internal_minimum_severity() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_minimum_severity());
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void SDKEventFilter::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<SDKEventFilter*>(&to_msg);
-  auto& from = static_cast<const SDKEventFilter&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.SDKEventFilter)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _this->_internal_mutable_categories()->MergeFrom(from._internal_categories());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _this->_internal_mutable_components()->MergeFrom(from._internal_components());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_mutable_destinations()->MergeFrom(from._internal_destinations());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (!from._internal_session_id().empty()) {
-        _this->_internal_set_session_id(from._internal_session_id());
-      } else {
-        if (_this->_impl_.session_id_.IsDefault()) {
-          _this->_internal_set_session_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (!from._internal_operation_id().empty()) {
-        _this->_internal_set_operation_id(from._internal_operation_id());
-      } else {
-        if (_this->_impl_.operation_id_.IsDefault()) {
-          _this->_internal_set_operation_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (!from._internal_correlation_id().empty()) {
-        _this->_internal_set_correlation_id(from._internal_correlation_id());
-      } else {
-        if (_this->_impl_.correlation_id_.IsDefault()) {
-          _this->_internal_set_correlation_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (!from._internal_source().empty()) {
-        _this->_internal_set_source(from._internal_source());
-      } else {
-        if (_this->_impl_.source_.IsDefault()) {
-          _this->_internal_set_source("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (!from._internal_trace_id().empty()) {
-        _this->_internal_set_trace_id(from._internal_trace_id());
-      } else {
-        if (_this->_impl_.trace_id_.IsDefault()) {
-          _this->_internal_set_trace_id("");
-        }
-      }
-    }
-  }
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (from._internal_minimum_severity() != 0) {
-      _this->_impl_.minimum_severity_ = from._impl_.minimum_severity_;
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void SDKEventFilter::CopyFrom(const SDKEventFilter& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.SDKEventFilter)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void SDKEventFilter::InternalSwap(SDKEventFilter* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  _impl_.categories_.InternalSwap(&other->_impl_.categories_);
-  _impl_.components_.InternalSwap(&other->_impl_.components_);
-  _impl_.destinations_.InternalSwap(&other->_impl_.destinations_);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.session_id_, &other->_impl_.session_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.operation_id_, &other->_impl_.operation_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.correlation_id_, &other->_impl_.correlation_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.source_, &other->_impl_.source_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.trace_id_, &other->_impl_.trace_id_, arena);
-  swap(_impl_.minimum_severity_, other->_impl_.minimum_severity_);
-}
-
-::google::protobuf::Metadata SDKEventFilter::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-SDKEventPublishRequest::SDKEventPublishRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, SDKEventPublishRequest_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.SDKEventPublishRequest)
-}
-PROTOBUF_NDEBUG_INLINE SDKEventPublishRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::SDKEventPublishRequest& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0} {}
-
-SDKEventPublishRequest::SDKEventPublishRequest(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const SDKEventPublishRequest& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, SDKEventPublishRequest_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SDKEventPublishRequest* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.event_ = (CheckHasBit(cached_has_bits, 0x00000001U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.event_)
-                : nullptr;
-  _impl_.normalize_envelope_ = from._impl_.normalize_envelope_;
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SDKEventPublishRequest)
-}
-PROTOBUF_NDEBUG_INLINE SDKEventPublishRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0} {}
-
-inline void SDKEventPublishRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, event_),
-           0,
-           offsetof(Impl_, normalize_envelope_) -
-               offsetof(Impl_, event_) +
-               sizeof(Impl_::normalize_envelope_));
-}
-SDKEventPublishRequest::~SDKEventPublishRequest() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.SDKEventPublishRequest)
-  SharedDtor(*this);
-}
-inline void SDKEventPublishRequest::SharedDtor(MessageLite& self) {
-  SDKEventPublishRequest& this_ = static_cast<SDKEventPublishRequest&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  delete this_._impl_.event_;
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull SDKEventPublishRequest_class_data_ =
-        SDKEventPublishRequest::InternalGenerateClassData_(SDKEventPublishRequest_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-SDKEventPublishRequest::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&SDKEventPublishRequest_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(SDKEventPublishRequest_class_data_.tc_table);
-  return SDKEventPublishRequest_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-SDKEventPublishRequest::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&SDKEventPublishRequest_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&SDKEventPublishRequest_globals_));
-  return SDKEventPublishRequest_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const SDKEventPublishRequest::ParseTableT_
-    SDKEventPublishRequest::_table_ =
-        SDKEventPublishRequest::InternalGenerateParseTable_(SDKEventPublishRequest_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void SDKEventPublishRequest::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.SDKEventPublishRequest)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    ABSL_DCHECK(_impl_.event_ != nullptr);
-    _impl_.event_->Clear();
-  }
-  _impl_.normalize_envelope_ = false;
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL SDKEventPublishRequest::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const SDKEventPublishRequest& this_ = static_cast<const SDKEventPublishRequest&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL SDKEventPublishRequest::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const SDKEventPublishRequest& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.SDKEventPublishRequest)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.SDKEvent event = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        1, *this_._impl_.event_, this_._impl_.event_->GetCachedSize(), target,
-        stream);
-  }
-
-  // bool normalize_envelope = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (this_._internal_normalize_envelope() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          2, this_._internal_normalize_envelope(), target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.SDKEventPublishRequest)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t SDKEventPublishRequest::ByteSizeLong(const MessageLite& base) {
-  const SDKEventPublishRequest& this_ = static_cast<const SDKEventPublishRequest&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t SDKEventPublishRequest::ByteSizeLong() const {
-  const SDKEventPublishRequest& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.SDKEventPublishRequest)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    // .runanywhere.v1.SDKEvent event = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.event_);
-    }
-    // bool normalize_envelope = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (this_._internal_normalize_envelope() != 0) {
-        total_size += 2;
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void SDKEventPublishRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<SDKEventPublishRequest*>(&to_msg);
-  auto& from = static_cast<const SDKEventPublishRequest&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.SDKEventPublishRequest)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      ABSL_DCHECK(from._impl_.event_ != nullptr);
-      if (_this->_impl_.event_ == nullptr) {
-        _this->_impl_.event_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.event_);
-      } else {
-        _this->_impl_.event_->MergeFrom(*from._impl_.event_);
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (from._internal_normalize_envelope() != 0) {
-        _this->_impl_.normalize_envelope_ = from._impl_.normalize_envelope_;
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void SDKEventPublishRequest::CopyFrom(const SDKEventPublishRequest& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.SDKEventPublishRequest)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void SDKEventPublishRequest::InternalSwap(SDKEventPublishRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SDKEventPublishRequest, _impl_.normalize_envelope_)
-      + sizeof(SDKEventPublishRequest::_impl_.normalize_envelope_)
-      - PROTOBUF_FIELD_OFFSET(SDKEventPublishRequest, _impl_.event_)>(
-          reinterpret_cast<char*>(&_impl_.event_),
-          reinterpret_cast<char*>(&other->_impl_.event_));
-}
-
-::google::protobuf::Metadata SDKEventPublishRequest::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-void SDKEventPublishResult::clear_error() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-SDKEventPublishResult::SDKEventPublishResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, SDKEventPublishResult_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.SDKEventPublishResult)
-}
-PROTOBUF_NDEBUG_INLINE SDKEventPublishResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::SDKEventPublishResult& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0},
-        event_id_(arena, from.event_id_),
-        error_message_(arena, from.error_message_) {}
-
-SDKEventPublishResult::SDKEventPublishResult(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const SDKEventPublishResult& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, SDKEventPublishResult_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SDKEventPublishResult* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.normalized_event_ = (CheckHasBit(cached_has_bits, 0x00000004U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.normalized_event_)
-                : nullptr;
-  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000008U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
-                : nullptr;
-  _impl_.accepted_ = from._impl_.accepted_;
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SDKEventPublishResult)
-}
-PROTOBUF_NDEBUG_INLINE SDKEventPublishResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0},
-        event_id_(arena),
-        error_message_(arena) {}
-
-inline void SDKEventPublishResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, normalized_event_),
-           0,
-           offsetof(Impl_, accepted_) -
-               offsetof(Impl_, normalized_event_) +
-               sizeof(Impl_::accepted_));
-}
-SDKEventPublishResult::~SDKEventPublishResult() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.SDKEventPublishResult)
-  SharedDtor(*this);
-}
-inline void SDKEventPublishResult::SharedDtor(MessageLite& self) {
-  SDKEventPublishResult& this_ = static_cast<SDKEventPublishResult&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.event_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
-  delete this_._impl_.normalized_event_;
-  delete this_._impl_.error_;
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull SDKEventPublishResult_class_data_ =
-        SDKEventPublishResult::InternalGenerateClassData_(SDKEventPublishResult_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-SDKEventPublishResult::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&SDKEventPublishResult_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(SDKEventPublishResult_class_data_.tc_table);
-  return SDKEventPublishResult_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-SDKEventPublishResult::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&SDKEventPublishResult_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&SDKEventPublishResult_globals_));
-  return SDKEventPublishResult_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const SDKEventPublishResult::ParseTableT_
-    SDKEventPublishResult::_table_ =
-        SDKEventPublishResult::InternalGenerateParseTable_(SDKEventPublishResult_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void SDKEventPublishResult::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.SDKEventPublishResult)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      _impl_.event_id_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      ABSL_DCHECK(_impl_.normalized_event_ != nullptr);
-      _impl_.normalized_event_->Clear();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      ABSL_DCHECK(_impl_.error_ != nullptr);
-      _impl_.error_->Clear();
-    }
-  }
-  _impl_.accepted_ = false;
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL SDKEventPublishResult::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const SDKEventPublishResult& this_ = static_cast<const SDKEventPublishResult&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL SDKEventPublishResult::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const SDKEventPublishResult& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.SDKEventPublishResult)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // bool accepted = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_accepted() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          1, this_._internal_accepted(), target);
-    }
-  }
-
-  // string event_id = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    if (!this_._internal_event_id().empty()) {
-      const ::std::string& _s = this_._internal_event_id();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SDKEventPublishResult.event_id");
-      target = stream->WriteStringMaybeAliased(2, _s, target);
-    }
-  }
-
-  // optional .runanywhere.v1.SDKEvent normalized_event = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        3, *this_._impl_.normalized_event_, this_._impl_.normalized_event_->GetCachedSize(), target,
-        stream);
-  }
-
-  // string error_message = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_error_message().empty()) {
-      const ::std::string& _s = this_._internal_error_message();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SDKEventPublishResult.error_message");
-      target = stream->WriteStringMaybeAliased(4, _s, target);
-    }
-  }
-
-  // optional .runanywhere.v1.SDKError error = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        5, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
-        stream);
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.SDKEventPublishResult)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t SDKEventPublishResult::ByteSizeLong(const MessageLite& base) {
-  const SDKEventPublishResult& this_ = static_cast<const SDKEventPublishResult&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t SDKEventPublishResult::ByteSizeLong() const {
-  const SDKEventPublishResult& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.SDKEventPublishResult)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    // string event_id = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!this_._internal_event_id().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_event_id());
-      }
-    }
-    // string error_message = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_error_message().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_error_message());
-      }
-    }
-    // optional .runanywhere.v1.SDKEvent normalized_event = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.normalized_event_);
-    }
-    // optional .runanywhere.v1.SDKError error = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
-    }
-    // bool accepted = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_accepted() != 0) {
-        total_size += 2;
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void SDKEventPublishResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<SDKEventPublishResult*>(&to_msg);
-  auto& from = static_cast<const SDKEventPublishResult&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.SDKEventPublishResult)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      if (!from._internal_event_id().empty()) {
-        _this->_internal_set_event_id(from._internal_event_id());
-      } else {
-        if (_this->_impl_.event_id_.IsDefault()) {
-          _this->_internal_set_event_id("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_error_message().empty()) {
-        _this->_internal_set_error_message(from._internal_error_message());
-      } else {
-        if (_this->_impl_.error_message_.IsDefault()) {
-          _this->_internal_set_error_message("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      ABSL_DCHECK(from._impl_.normalized_event_ != nullptr);
-      if (_this->_impl_.normalized_event_ == nullptr) {
-        _this->_impl_.normalized_event_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.normalized_event_);
-      } else {
-        _this->_impl_.normalized_event_->MergeFrom(*from._impl_.normalized_event_);
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      ABSL_DCHECK(from._impl_.error_ != nullptr);
-      if (_this->_impl_.error_ == nullptr) {
-        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
-      } else {
-        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_accepted() != 0) {
-        _this->_impl_.accepted_ = from._impl_.accepted_;
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void SDKEventPublishResult::CopyFrom(const SDKEventPublishResult& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.SDKEventPublishResult)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void SDKEventPublishResult::InternalSwap(SDKEventPublishResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.event_id_, &other->_impl_.event_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.accepted_)
-      + sizeof(SDKEventPublishResult::_impl_.accepted_)
-      - PROTOBUF_FIELD_OFFSET(SDKEventPublishResult, _impl_.normalized_event_)>(
-          reinterpret_cast<char*>(&_impl_.normalized_event_),
-          reinterpret_cast<char*>(&other->_impl_.normalized_event_));
-}
-
-::google::protobuf::Metadata SDKEventPublishResult::GetMetadata() const {
-  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
-}
-// ===================================================================
-
-SDKEventSubscribeRequest::SDKEventSubscribeRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, SDKEventSubscribeRequest_get_class_data()) {
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SharedCtor(arena);
-  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.SDKEventSubscribeRequest)
-}
-PROTOBUF_NDEBUG_INLINE SDKEventSubscribeRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-    [[maybe_unused]] const ::runanywhere::v1::SDKEventSubscribeRequest& from_msg)
-      : _has_bits_{from._has_bits_},
-        _cached_size_{0} {}
-
-SDKEventSubscribeRequest::SDKEventSubscribeRequest(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
-    const SDKEventSubscribeRequest& from)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, SDKEventSubscribeRequest_get_class_data()) {
-
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena) {
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  SDKEventSubscribeRequest* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.filter_ = (CheckHasBit(cached_has_bits, 0x00000001U))
-                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.filter_)
-                : nullptr;
-  _impl_.replay_queued_events_ = from._impl_.replay_queued_events_;
-
-  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SDKEventSubscribeRequest)
-}
-PROTOBUF_NDEBUG_INLINE SDKEventSubscribeRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0} {}
-
-inline void SDKEventSubscribeRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
-  new (&_impl_) Impl_(internal_visibility(), arena);
-  ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, filter_),
-           0,
-           offsetof(Impl_, replay_queued_events_) -
-               offsetof(Impl_, filter_) +
-               sizeof(Impl_::replay_queued_events_));
-}
-SDKEventSubscribeRequest::~SDKEventSubscribeRequest() {
-  // @@protoc_insertion_point(destructor:runanywhere.v1.SDKEventSubscribeRequest)
-  SharedDtor(*this);
-}
-inline void SDKEventSubscribeRequest::SharedDtor(MessageLite& self) {
-  SDKEventSubscribeRequest& this_ = static_cast<SDKEventSubscribeRequest&>(self);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
-  ABSL_DCHECK(this_.GetArena() == nullptr);
-  delete this_._impl_.filter_;
-  this_._impl_.~Impl_();
-}
-
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
-    ::google::protobuf::internal::ClassDataFull SDKEventSubscribeRequest_class_data_ =
-        SDKEventSubscribeRequest::InternalGenerateClassData_(SDKEventSubscribeRequest_globals_._default);
-
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-SDKEventSubscribeRequest::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&SDKEventSubscribeRequest_class_data_);
-  ::google::protobuf::internal::PrefetchToLocalCache(SDKEventSubscribeRequest_class_data_.tc_table);
-  return SDKEventSubscribeRequest_class_data_.base();
-}
-#else
-PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-SDKEventSubscribeRequest::GetClassData() const {
-  ::google::protobuf::internal::PrefetchToLocalCache(&SDKEventSubscribeRequest_globals_);
-  ::google::protobuf::internal::PrefetchToLocalCache(
-      ::google::protobuf::internal::MessageGlobalsBase::ToParseTableBase(&SDKEventSubscribeRequest_globals_));
-  return SDKEventSubscribeRequest_globals_.GetClassData();
-}
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_CONSTINIT
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const SDKEventSubscribeRequest::ParseTableT_
-    SDKEventSubscribeRequest::_table_ =
-        SDKEventSubscribeRequest::InternalGenerateParseTable_(SDKEventSubscribeRequest_class_data_.base());
-#endif  // !PROTOBUF_MESSAGE_GLOBALS
-PROTOBUF_NOINLINE void SDKEventSubscribeRequest::Clear() {
-// @@protoc_insertion_point(message_clear_start:runanywhere.v1.SDKEventSubscribeRequest)
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void) cached_has_bits;
-
-  cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    ABSL_DCHECK(_impl_.filter_ != nullptr);
-    _impl_.filter_->Clear();
-  }
-  _impl_.replay_queued_events_ = false;
-  _impl_._has_bits_.Clear();
-  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::uint8_t* PROTOBUF_NONNULL SDKEventSubscribeRequest::_InternalSerialize(
-    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
-  const SDKEventSubscribeRequest& this_ = static_cast<const SDKEventSubscribeRequest&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::uint8_t* PROTOBUF_NONNULL SDKEventSubscribeRequest::_InternalSerialize(
-    ::uint8_t* PROTOBUF_NONNULL target,
-    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-  const SDKEventSubscribeRequest& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    this_.CheckHasBitConsistency();
-  }
-  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.SDKEventSubscribeRequest)
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.SDKEventFilter filter = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
-        1, *this_._impl_.filter_, this_._impl_.filter_->GetCachedSize(), target,
-        stream);
-  }
-
-  // bool replay_queued_events = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (this_._internal_replay_queued_events() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          2, this_._internal_replay_queued_events(), target);
-    }
-  }
-
-  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
-    target =
-        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
-            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
-  }
-  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.SDKEventSubscribeRequest)
-  return target;
-}
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-::size_t SDKEventSubscribeRequest::ByteSizeLong(const MessageLite& base) {
-  const SDKEventSubscribeRequest& this_ = static_cast<const SDKEventSubscribeRequest&>(base);
-#else   // PROTOBUF_CUSTOM_VTABLE
-::size_t SDKEventSubscribeRequest::ByteSizeLong() const {
-  const SDKEventSubscribeRequest& this_ = *this;
-#endif  // PROTOBUF_CUSTOM_VTABLE
-  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.SDKEventSubscribeRequest)
-  ::size_t total_size = 0;
-
-  ::uint32_t cached_has_bits = 0;
-  // Prevent compiler warnings about cached_has_bits being unused
-  (void)cached_has_bits;
-
-  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
-  cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    // .runanywhere.v1.SDKEventFilter filter = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      total_size += 1 +
-                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.filter_);
-    }
-    // bool replay_queued_events = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (this_._internal_replay_queued_events() != 0) {
-        total_size += 2;
-      }
-    }
-  }
-  return this_.MaybeComputeUnknownFieldsSize(total_size,
-                                             &this_._impl_._cached_size_);
-}
-
-void SDKEventSubscribeRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
-                      const ::google::protobuf::MessageLite& from_msg) {
-   auto* const _this = static_cast<SDKEventSubscribeRequest*>(&to_msg);
-  auto& from = static_cast<const SDKEventSubscribeRequest&>(from_msg);
-  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
-    from.CheckHasBitConsistency();
-  }
-  ::google::protobuf::Arena* arena = _this->GetArena();
-  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.SDKEventSubscribeRequest)
-  ABSL_DCHECK_NE(&from, _this);
-  ::uint32_t cached_has_bits = 0;
-  (void)cached_has_bits;
-
-  cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-      ABSL_DCHECK(from._impl_.filter_ != nullptr);
-      if (_this->_impl_.filter_ == nullptr) {
-        _this->_impl_.filter_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.filter_);
-      } else {
-        _this->_impl_.filter_->MergeFrom(*from._impl_.filter_);
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (from._internal_replay_queued_events() != 0) {
-        _this->_impl_.replay_queued_events_ = from._impl_.replay_queued_events_;
-      }
-    }
-  }
-  _this->_impl_._has_bits_[0] |= cached_has_bits;
-  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-}
-
-void SDKEventSubscribeRequest::CopyFrom(const SDKEventSubscribeRequest& from) {
-  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.SDKEventSubscribeRequest)
-  if (&from == this) return;
-  Clear();
-  MergeFrom(from);
-}
-
-
-void SDKEventSubscribeRequest::InternalSwap(SDKEventSubscribeRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
-  using ::std::swap;
-  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
-  ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SDKEventSubscribeRequest, _impl_.replay_queued_events_)
-      + sizeof(SDKEventSubscribeRequest::_impl_.replay_queued_events_)
-      - PROTOBUF_FIELD_OFFSET(SDKEventSubscribeRequest, _impl_.filter_)>(
-          reinterpret_cast<char*>(&_impl_.filter_),
-          reinterpret_cast<char*>(&other->_impl_.filter_));
-}
-
-::google::protobuf::Metadata SDKEventSubscribeRequest::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

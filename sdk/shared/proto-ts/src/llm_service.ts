@@ -82,30 +82,19 @@ export function lLMStreamEventKindToJSON(object: LLMStreamEventKind): string {
   }
 }
 
-/**
- * Generation settings live exclusively in `options`. Reserved field numbers
- * prevent unsafe wire reuse.
- */
+/** The single request envelope for both unary and streaming generation. */
 export interface LLMGenerateRequest {
   prompt: string;
   requestId: string;
   modelId: string;
   conversationId: string;
   metadata: { [key: string]: string };
-  /**
-   * Canonical generation settings. When absent, commons applies its SDK
-   * defaults; callers that need explicit controls populate this message.
-   */
   options?:
     | LLMGenerationOptions
     | undefined;
   /**
-   * Prior conversation turns (excludes the current `prompt`, which
-   * stays the live user turn, and `options.system_prompt`, which stays
-   * separate).
-   * Alternating user/assistant ChatMessages in chronological order. An engine
-   * that owns its chat template renders {system_prompt, history, prompt} from
-   * its model's markers; engines that don't simply ignore this field.
+   * Prior turns, excluding `prompt` (the live user turn) and
+   * options.system_prompt.
    */
   history: ChatMessage[];
 }
@@ -115,11 +104,6 @@ export interface LLMGenerateRequest_MetadataEntry {
   value: string;
 }
 
-/**
- * Aggregate terminal payload emitted by LLMStreamEvent. It intentionally keeps
- * stream-native token, timing, and error fields distinct from the unary
- * LLMGenerationResult shape.
- */
 export interface LLMStreamFinalResult {
   text: string;
   thinkingContent?: string | undefined;
@@ -134,152 +118,61 @@ export interface LLMStreamFinalResult {
   errorMessage: string;
   promptEvalTimeMs: number;
   decodeTimeMs: number;
-  /**
-   * Tool calls actually executed during the streaming session (mirrors
-   * LLMGenerationResult.tool_calls / .tool_results in llm_options.proto).
-   * Populated only on terminal events when the backend completed at least
-   * one tool call.
-   */
   toolCalls: ToolCall[];
   toolResults: ToolResult[];
 }
 
-/**
- * Unified per-token streaming event. Replaces
- * LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
- * callbackFlow / StreamController / tokenQueue. One serialized event
- * per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
- * from voice_events.proto so frontends can reuse gap-detection logic.
- */
+/** `result` is populated only on the terminal event. */
 export interface LLMStreamEvent {
-  /**
-   * Monotonic per-process sequence number. Useful for frontends that
-   * need to detect gaps or out-of-order delivery.
-   */
   seq: number;
-  /**
-   * Wall-clock timestamp captured at the C++ edge, in microseconds
-   * since Unix epoch. Frontends may re-timestamp for UI display.
-   */
   timestampUs: number;
-  /**
-   * Generated token text. Empty on terminal events where only
-   * finish_reason or error_message is populated.
-   */
   token: string;
-  /** True on the last event of a generation. */
   isFinal: boolean;
-  /**
-   * Token semantic category (answer / thought / tool-call).
-   * Canonical TokenKind from voice_events.proto.
-   */
   kind: TokenKind;
-  /**
-   * Backend-provided token id when the engine exposes it; 0 = unset
-   * (proto3 scalar default).
-   */
   tokenId: number;
-  /** Per-token log-probability when supported; 0.0 = unset. */
   logprob: number;
-  /**
-   * Reason the stream stopped: "stop", "length", "cancelled", "error",
-   * "" = unset (proto3 scalar default). Only populated when is_final.
-   */
   finishReason: string;
-  /**
-   * Error message on failure events (kind may be unset, is_final true).
-   * Empty on success.
-   */
   errorMessage: string;
-  /**
-   * Final aggregate result. Only populated on terminal events
-   * (is_final=true) when the backend can report result metrics.
-   */
-  result?:
-    | LLMStreamFinalResult
-    | undefined;
-  /**
-   * Numeric backend status code when the terminal event represents a
-   * failure. 0 = unset/success.
-   */
+  result?: LLMStreamFinalResult | undefined;
   errorCode: number;
-  /** Event classification distinct from token semantic kind. */
   eventKind: LLMStreamEventKind;
-  /** Request/session correlation fields. */
   requestId: string;
   conversationId: string;
-  /** Running counters for progress UIs. */
   promptTokensProcessed: number;
   completionTokensGenerated: number;
   elapsedMs: number;
-  /**
-   * Structured tool-call payload emitted when event_kind is
-   * LLM_STREAM_EVENT_KIND_TOOL_CALL.
-   */
   toolCall?: ToolCall | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Tool-calling session / run-loop envelopes. They live here (not in
- * tool_calling.proto) because they carry an LLMGenerationOptions and
- * llm_options.proto already imports tool_calling.proto — the reverse import
- * would be a cycle. Moving them ended the inline re-declaration of sampling
- * knobs the old ToolCallingSessionCreateRequest carried.
- * ---------------------------------------------------------------------------
- */
+/** Tool-driven streaming uses this session path, not LLMGenerateRequest. */
 export interface ToolCallingSessionCreateRequest {
-  /** The live user turn. */
   prompt: string;
-  /**
-   * Sampling, reasoning, system prompt — the same canonical knobs as any
-   * other generation. tools/tool_choice policy travels in
-   * generation.tool_calling.
-   */
   generation?:
     | LLMGenerationOptions
     | undefined;
-  /**
-   * proto3 `optional` enables presence detection. When unset, commons
-   * defaults to validate_calls=true so unknown tool calls short-circuit
-   * before host execution. Callers that delegate validation to their
-   * executor must explicitly set false.
-   */
-  validateCalls?:
-    | boolean
-    | undefined;
-  /**
-   * Prior conversation turns (excluding `prompt`), same contract as
-   * LLMGenerateRequest.history.
-   */
+  /** Unset preserves commons' secure default of validate=true. */
+  validateCalls?: boolean | undefined;
   history: ChatMessage[];
 }
 
-export interface ToolCallingSessionCreateResult {
-  sessionHandle: number;
-}
-
 export interface ToolCallingSessionEvent {
-  /** serialized LLMStreamEvent proto */
+  /** serialized LLMStreamEvent */
   llmStreamEventBytes?: Uint8Array | undefined;
   toolCall?: ToolCall | undefined;
   finalResult?:
     | ToolCallingResult
     | undefined;
-  /** serialized SDKError proto */
+  /** serialized SDKError */
   errorBytes?: Uint8Array | undefined;
   seq: number;
 }
 
+/** Hands a caller-executed tool result back into a running session. */
 export interface ToolCallingSessionStepWithResultRequest {
   sessionHandle: number;
   toolCallId: string;
   resultJson: string;
   error?: string | undefined;
-}
-
-export interface ToolCallingSessionDestroyRequest {
-  sessionHandle: number;
 }
 
 function createBaseLLMGenerateRequest(): LLMGenerateRequest {
@@ -1438,72 +1331,6 @@ export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreat
   },
 };
 
-function createBaseToolCallingSessionCreateResult(): ToolCallingSessionCreateResult {
-  return { sessionHandle: 0 };
-}
-
-export const ToolCallingSessionCreateResult: MessageFns<ToolCallingSessionCreateResult> = {
-  encode(message: ToolCallingSessionCreateResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sessionHandle !== 0) {
-      writer.uint32(8).uint64(message.sessionHandle);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionCreateResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseToolCallingSessionCreateResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.sessionHandle = longToNumber(reader.uint64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ToolCallingSessionCreateResult {
-    return {
-      sessionHandle: isSet(object.sessionHandle)
-        ? globalThis.Number(object.sessionHandle)
-        : isSet(object.session_handle)
-        ? globalThis.Number(object.session_handle)
-        : 0,
-    };
-  },
-
-  toJSON(message: ToolCallingSessionCreateResult): unknown {
-    const obj: any = {};
-    if (message.sessionHandle !== 0) {
-      obj.sessionHandle = Math.round(message.sessionHandle);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(base?: I): ToolCallingSessionCreateResult {
-    return ToolCallingSessionCreateResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(
-    object: I,
-  ): ToolCallingSessionCreateResult {
-    const message = createBaseToolCallingSessionCreateResult();
-    message.sessionHandle = object.sessionHandle ?? 0;
-    return message;
-  },
-};
-
 function createBaseToolCallingSessionEvent(): ToolCallingSessionEvent {
   return { llmStreamEventBytes: undefined, toolCall: undefined, finalResult: undefined, errorBytes: undefined, seq: 0 };
 }
@@ -1768,74 +1595,6 @@ export const ToolCallingSessionStepWithResultRequest: MessageFns<ToolCallingSess
     message.toolCallId = object.toolCallId ?? "";
     message.resultJson = object.resultJson ?? "";
     message.error = object.error ?? undefined;
-    return message;
-  },
-};
-
-function createBaseToolCallingSessionDestroyRequest(): ToolCallingSessionDestroyRequest {
-  return { sessionHandle: 0 };
-}
-
-export const ToolCallingSessionDestroyRequest: MessageFns<ToolCallingSessionDestroyRequest> = {
-  encode(message: ToolCallingSessionDestroyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sessionHandle !== 0) {
-      writer.uint32(8).uint64(message.sessionHandle);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionDestroyRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseToolCallingSessionDestroyRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.sessionHandle = longToNumber(reader.uint64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ToolCallingSessionDestroyRequest {
-    return {
-      sessionHandle: isSet(object.sessionHandle)
-        ? globalThis.Number(object.sessionHandle)
-        : isSet(object.session_handle)
-        ? globalThis.Number(object.session_handle)
-        : 0,
-    };
-  },
-
-  toJSON(message: ToolCallingSessionDestroyRequest): unknown {
-    const obj: any = {};
-    if (message.sessionHandle !== 0) {
-      obj.sessionHandle = Math.round(message.sessionHandle);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(
-    base?: I,
-  ): ToolCallingSessionDestroyRequest {
-    return ToolCallingSessionDestroyRequest.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(
-    object: I,
-  ): ToolCallingSessionDestroyRequest {
-    const message = createBaseToolCallingSessionDestroyRequest();
-    message.sessionHandle = object.sessionHandle ?? 0;
     return message;
   },
 };

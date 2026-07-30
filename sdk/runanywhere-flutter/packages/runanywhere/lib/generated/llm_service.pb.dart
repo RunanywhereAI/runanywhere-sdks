@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -26,8 +25,7 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'llm_service.pbenum.dart';
 
-/// Generation settings live exclusively in `options`. Reserved field numbers
-/// prevent unsafe wire reuse.
+/// The single request envelope for both unary and streaming generation.
 class LLMGenerateRequest extends $pb.GeneratedMessage {
   factory LLMGenerateRequest({
     $core.String? prompt,
@@ -135,8 +133,6 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(25)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
 
-  /// Canonical generation settings. When absent, commons applies its SDK
-  /// defaults; callers that need explicit controls populate this message.
   @$pb.TagNumber(26)
   $0.LLMGenerationOptions get options => $_getN(5);
   @$pb.TagNumber(26)
@@ -148,19 +144,12 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(26)
   $0.LLMGenerationOptions ensureOptions() => $_ensure(5);
 
-  /// Prior conversation turns (excludes the current `prompt`, which
-  /// stays the live user turn, and `options.system_prompt`, which stays
-  /// separate).
-  /// Alternating user/assistant ChatMessages in chronological order. An engine
-  /// that owns its chat template renders {system_prompt, history, prompt} from
-  /// its model's markers; engines that don't simply ignore this field.
+  /// Prior turns, excluding `prompt` (the live user turn) and
+  /// options.system_prompt.
   @$pb.TagNumber(27)
   $pb.PbList<$1.ChatMessage> get history => $_getList(6);
 }
 
-/// Aggregate terminal payload emitted by LLMStreamEvent. It intentionally keeps
-/// stream-native token, timing, and error fields distinct from the unary
-/// LLMGenerationResult shape.
 class LLMStreamFinalResult extends $pb.GeneratedMessage {
   factory LLMStreamFinalResult({
     $core.String? text,
@@ -368,10 +357,6 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearDecodeTimeMs() => $_clearField(13);
 
-  /// Tool calls actually executed during the streaming session (mirrors
-  /// LLMGenerationResult.tool_calls / .tool_results in llm_options.proto).
-  /// Populated only on terminal events when the backend completed at least
-  /// one tool call.
   @$pb.TagNumber(14)
   $pb.PbList<$2.ToolCall> get toolCalls => $_getList(13);
 
@@ -379,11 +364,7 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   $pb.PbList<$2.ToolResult> get toolResults => $_getList(14);
 }
 
-/// Unified per-token streaming event. Replaces
-/// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
-/// callbackFlow / StreamController / tokenQueue. One serialized event
-/// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
-/// from voice_events.proto so frontends can reuse gap-detection logic.
+/// `result` is populated only on the terminal event.
 class LLMStreamEvent extends $pb.GeneratedMessage {
   factory LLMStreamEvent({
     $fixnum.Int64? seq,
@@ -486,8 +467,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LLMStreamEvent>(create);
   static LLMStreamEvent? _defaultInstance;
 
-  /// Monotonic per-process sequence number. Useful for frontends that
-  /// need to detect gaps or out-of-order delivery.
   @$pb.TagNumber(1)
   $fixnum.Int64 get seq => $_getI64(0);
   @$pb.TagNumber(1)
@@ -497,8 +476,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearSeq() => $_clearField(1);
 
-  /// Wall-clock timestamp captured at the C++ edge, in microseconds
-  /// since Unix epoch. Frontends may re-timestamp for UI display.
   @$pb.TagNumber(2)
   $fixnum.Int64 get timestampUs => $_getI64(1);
   @$pb.TagNumber(2)
@@ -508,8 +485,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearTimestampUs() => $_clearField(2);
 
-  /// Generated token text. Empty on terminal events where only
-  /// finish_reason or error_message is populated.
   @$pb.TagNumber(3)
   $core.String get token => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -519,7 +494,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearToken() => $_clearField(3);
 
-  /// True on the last event of a generation.
   @$pb.TagNumber(4)
   $core.bool get isFinal => $_getBF(3);
   @$pb.TagNumber(4)
@@ -529,8 +503,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearIsFinal() => $_clearField(4);
 
-  /// Token semantic category (answer / thought / tool-call).
-  /// Canonical TokenKind from voice_events.proto.
   @$pb.TagNumber(5)
   $3.TokenKind get kind => $_getN(4);
   @$pb.TagNumber(5)
@@ -540,8 +512,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearKind() => $_clearField(5);
 
-  /// Backend-provided token id when the engine exposes it; 0 = unset
-  /// (proto3 scalar default).
   @$pb.TagNumber(6)
   $core.int get tokenId => $_getIZ(5);
   @$pb.TagNumber(6)
@@ -551,7 +521,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearTokenId() => $_clearField(6);
 
-  /// Per-token log-probability when supported; 0.0 = unset.
   @$pb.TagNumber(7)
   $core.double get logprob => $_getN(6);
   @$pb.TagNumber(7)
@@ -561,8 +530,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearLogprob() => $_clearField(7);
 
-  /// Reason the stream stopped: "stop", "length", "cancelled", "error",
-  /// "" = unset (proto3 scalar default). Only populated when is_final.
   @$pb.TagNumber(8)
   $core.String get finishReason => $_getSZ(7);
   @$pb.TagNumber(8)
@@ -572,8 +539,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearFinishReason() => $_clearField(8);
 
-  /// Error message on failure events (kind may be unset, is_final true).
-  /// Empty on success.
   @$pb.TagNumber(9)
   $core.String get errorMessage => $_getSZ(8);
   @$pb.TagNumber(9)
@@ -583,8 +548,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearErrorMessage() => $_clearField(9);
 
-  /// Final aggregate result. Only populated on terminal events
-  /// (is_final=true) when the backend can report result metrics.
   @$pb.TagNumber(10)
   LLMStreamFinalResult get result => $_getN(9);
   @$pb.TagNumber(10)
@@ -596,8 +559,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   LLMStreamFinalResult ensureResult() => $_ensure(9);
 
-  /// Numeric backend status code when the terminal event represents a
-  /// failure. 0 = unset/success.
   @$pb.TagNumber(11)
   $core.int get errorCode => $_getIZ(10);
   @$pb.TagNumber(11)
@@ -607,7 +568,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   void clearErrorCode() => $_clearField(11);
 
-  /// Event classification distinct from token semantic kind.
   @$pb.TagNumber(12)
   LLMStreamEventKind get eventKind => $_getN(11);
   @$pb.TagNumber(12)
@@ -617,7 +577,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearEventKind() => $_clearField(12);
 
-  /// Request/session correlation fields.
   @$pb.TagNumber(13)
   $core.String get requestId => $_getSZ(12);
   @$pb.TagNumber(13)
@@ -636,7 +595,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   void clearConversationId() => $_clearField(14);
 
-  /// Running counters for progress UIs.
   @$pb.TagNumber(15)
   $core.int get promptTokensProcessed => $_getIZ(14);
   @$pb.TagNumber(15)
@@ -664,8 +622,6 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   void clearElapsedMs() => $_clearField(17);
 
-  /// Structured tool-call payload emitted when event_kind is
-  /// LLM_STREAM_EVENT_KIND_TOOL_CALL.
   @$pb.TagNumber(18)
   $2.ToolCall get toolCall => $_getN(17);
   @$pb.TagNumber(18)
@@ -678,13 +634,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   $2.ToolCall ensureToolCall() => $_ensure(17);
 }
 
-/// ---------------------------------------------------------------------------
-/// Tool-calling session / run-loop envelopes. They live here (not in
-/// tool_calling.proto) because they carry an LLMGenerationOptions and
-/// llm_options.proto already imports tool_calling.proto — the reverse import
-/// would be a cycle. Moving them ended the inline re-declaration of sampling
-/// knobs the old ToolCallingSessionCreateRequest carried.
-/// ---------------------------------------------------------------------------
+/// Tool-driven streaming uses this session path, not LLMGenerateRequest.
 class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   factory ToolCallingSessionCreateRequest({
     $core.String? prompt,
@@ -744,7 +694,6 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
           create);
   static ToolCallingSessionCreateRequest? _defaultInstance;
 
-  /// The live user turn.
   @$pb.TagNumber(1)
   $core.String get prompt => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -754,9 +703,6 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearPrompt() => $_clearField(1);
 
-  /// Sampling, reasoning, system prompt — the same canonical knobs as any
-  /// other generation. tools/tool_choice policy travels in
-  /// generation.tool_calling.
   @$pb.TagNumber(2)
   $0.LLMGenerationOptions get generation => $_getN(1);
   @$pb.TagNumber(2)
@@ -768,10 +714,7 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   $0.LLMGenerationOptions ensureGeneration() => $_ensure(1);
 
-  /// proto3 `optional` enables presence detection. When unset, commons
-  /// defaults to validate_calls=true so unknown tool calls short-circuit
-  /// before host execution. Callers that delegate validation to their
-  /// executor must explicitly set false.
+  /// Unset preserves commons' secure default of validate=true.
   @$pb.TagNumber(3)
   $core.bool get validateCalls => $_getBF(2);
   @$pb.TagNumber(3)
@@ -781,69 +724,8 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearValidateCalls() => $_clearField(3);
 
-  /// Prior conversation turns (excluding `prompt`), same contract as
-  /// LLMGenerateRequest.history.
   @$pb.TagNumber(4)
   $pb.PbList<$1.ChatMessage> get history => $_getList(3);
-}
-
-class ToolCallingSessionCreateResult extends $pb.GeneratedMessage {
-  factory ToolCallingSessionCreateResult({
-    $fixnum.Int64? sessionHandle,
-  }) {
-    final result = create();
-    if (sessionHandle != null) result.sessionHandle = sessionHandle;
-    return result;
-  }
-
-  ToolCallingSessionCreateResult._();
-
-  factory ToolCallingSessionCreateResult.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory ToolCallingSessionCreateResult.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ToolCallingSessionCreateResult',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..a<$fixnum.Int64>(
-        1, _omitFieldNames ? '' : 'sessionHandle', $pb.PbFieldType.OU6,
-        defaultOrMaker: $fixnum.Int64.ZERO)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ToolCallingSessionCreateResult clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ToolCallingSessionCreateResult copyWith(
-          void Function(ToolCallingSessionCreateResult) updates) =>
-      super.copyWith(
-              (message) => updates(message as ToolCallingSessionCreateResult))
-          as ToolCallingSessionCreateResult;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ToolCallingSessionCreateResult create() =>
-      ToolCallingSessionCreateResult._();
-  @$core.override
-  ToolCallingSessionCreateResult createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static ToolCallingSessionCreateResult getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ToolCallingSessionCreateResult>(create);
-  static ToolCallingSessionCreateResult? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $fixnum.Int64 get sessionHandle => $_getI64(0);
-  @$pb.TagNumber(1)
-  set sessionHandle($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSessionHandle() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSessionHandle() => $_clearField(1);
 }
 
 enum ToolCallingSessionEvent_Kind {
@@ -988,6 +870,7 @@ class ToolCallingSessionEvent extends $pb.GeneratedMessage {
   void clearSeq() => $_clearField(5);
 }
 
+/// Hands a caller-executed tool result back into a running session.
 class ToolCallingSessionStepWithResultRequest extends $pb.GeneratedMessage {
   factory ToolCallingSessionStepWithResultRequest({
     $fixnum.Int64? sessionHandle,
@@ -1083,84 +966,6 @@ class ToolCallingSessionStepWithResultRequest extends $pb.GeneratedMessage {
   $core.bool hasError() => $_has(3);
   @$pb.TagNumber(4)
   void clearError() => $_clearField(4);
-}
-
-class ToolCallingSessionDestroyRequest extends $pb.GeneratedMessage {
-  factory ToolCallingSessionDestroyRequest({
-    $fixnum.Int64? sessionHandle,
-  }) {
-    final result = create();
-    if (sessionHandle != null) result.sessionHandle = sessionHandle;
-    return result;
-  }
-
-  ToolCallingSessionDestroyRequest._();
-
-  factory ToolCallingSessionDestroyRequest.fromBuffer(
-          $core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory ToolCallingSessionDestroyRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ToolCallingSessionDestroyRequest',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..a<$fixnum.Int64>(
-        1, _omitFieldNames ? '' : 'sessionHandle', $pb.PbFieldType.OU6,
-        defaultOrMaker: $fixnum.Int64.ZERO)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ToolCallingSessionDestroyRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ToolCallingSessionDestroyRequest copyWith(
-          void Function(ToolCallingSessionDestroyRequest) updates) =>
-      super.copyWith(
-              (message) => updates(message as ToolCallingSessionDestroyRequest))
-          as ToolCallingSessionDestroyRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ToolCallingSessionDestroyRequest create() =>
-      ToolCallingSessionDestroyRequest._();
-  @$core.override
-  ToolCallingSessionDestroyRequest createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static ToolCallingSessionDestroyRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ToolCallingSessionDestroyRequest>(
-          create);
-  static ToolCallingSessionDestroyRequest? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $fixnum.Int64 get sessionHandle => $_getI64(0);
-  @$pb.TagNumber(1)
-  set sessionHandle($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSessionHandle() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSessionHandle() => $_clearField(1);
-}
-
-class LLMApi {
-  final $pb.RpcClient _client;
-
-  LLMApi(this._client);
-
-  /// Server-streaming: emits one LLMStreamEvent per generated token
-  /// until is_final=true. Cancellation aborts the underlying generation
-  /// via the existing rac_llm_cancel() C ABI.
-  ///
-  /// Tool-driven streaming is not supported on this entry point even when
-  /// options.tool_calling is populated. Use the tool-calling session path.
-  $async.Future<LLMStreamEvent> generate(
-          $pb.ClientContext? ctx, LLMGenerateRequest request) =>
-      _client.invoke<LLMStreamEvent>(
-          ctx, 'LLM', 'Generate', request, LLMStreamEvent());
 }
 
 const $core.bool _omitFieldNames =

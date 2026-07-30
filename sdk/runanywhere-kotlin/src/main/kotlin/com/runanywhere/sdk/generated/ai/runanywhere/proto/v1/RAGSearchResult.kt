@@ -33,15 +33,7 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * RAGSearchResult — a single retrieved document chunk with similarity score.
- * ---------------------------------------------------------------------------
- */
 public class RAGSearchResult(
-  /**
-   * Unique identifier of the chunk (assigned at ingestion time).
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -50,9 +42,6 @@ public class RAGSearchResult(
     schemaIndex = 0,
   )
   public val chunk_id: String = "",
-  /**
-   * Text content of the chunk (the actual snippet shown to the LLM).
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -60,9 +49,6 @@ public class RAGSearchResult(
     schemaIndex = 1,
   )
   public val text: String = "",
-  /**
-   * Cosine similarity score (0.0–1.0). Higher = more relevant.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -71,10 +57,6 @@ public class RAGSearchResult(
     schemaIndex = 2,
   )
   public val similarity_score: Float = 0f,
-  /**
-   * Optional source document identifier (filename, URL, or document ID).
-   * Set when the chunk's origin is tracked at ingestion time.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -90,6 +72,9 @@ public class RAGSearchResult(
     schemaIndex = 5,
   )
   public val rank: Int = 0,
+  /**
+   * Character offsets into the source document.
+   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -116,10 +101,6 @@ public class RAGSearchResult(
   public val token_count: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGSearchResult, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Free-form metadata associated with the chunk (e.g. page number, section,
-   * ingestion timestamp).
-   */
   @field:WireField(
     tag = 5,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",

@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -18,6 +17,7 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'diarization.pbenum.dart';
 import 'errors.pb.dart' as $0;
+import 'model_types.pbenum.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -27,7 +27,7 @@ class DiarizationOptions extends $pb.GeneratedMessage {
   factory DiarizationOptions({
     $core.int? sampleRate,
     $core.int? channels,
-    DiarizationAudioEncoding? encoding,
+    $1.AudioEncoding? encoding,
     $core.double? threshold,
     $fixnum.Int64? minimumDurationMs,
     $fixnum.Int64? mergeGapMs,
@@ -57,8 +57,8 @@ class DiarizationOptions extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'sampleRate')
     ..aI(2, _omitFieldNames ? '' : 'channels')
-    ..aE<DiarizationAudioEncoding>(3, _omitFieldNames ? '' : 'encoding',
-        enumValues: DiarizationAudioEncoding.values)
+    ..aE<$1.AudioEncoding>(3, _omitFieldNames ? '' : 'encoding',
+        enumValues: $1.AudioEncoding.values)
     ..aD(4, _omitFieldNames ? '' : 'threshold', fieldType: $pb.PbFieldType.OF)
     ..aInt64(5, _omitFieldNames ? '' : 'minimumDurationMs')
     ..aInt64(6, _omitFieldNames ? '' : 'mergeGapMs')
@@ -101,10 +101,12 @@ class DiarizationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearChannels() => $_clearField(2);
 
+  /// Commons normalizes either PCM representation to float samples before
+  /// dispatching to an engine.
   @$pb.TagNumber(3)
-  DiarizationAudioEncoding get encoding => $_getN(2);
+  $1.AudioEncoding get encoding => $_getN(2);
   @$pb.TagNumber(3)
-  set encoding(DiarizationAudioEncoding value) => $_setField(3, value);
+  set encoding($1.AudioEncoding value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasEncoding() => $_has(2);
   @$pb.TagNumber(3)
@@ -521,25 +523,6 @@ class DiarizationStreamEvent extends $pb.GeneratedMessage {
   void clearError() => $_clearField(6);
   @$pb.TagNumber(6)
   $0.SDKError ensureError() => $_ensure(5);
-}
-
-/// Logical capability contract. Native SDKs use the proto-byte C ABI; this
-/// declaration keeps generated API documentation and future transports aligned.
-/// For Stream, each client message is one audio feed and closing the client side
-/// requests the final snapshot; transport cancellation cancels the session.
-class DiarizationApi {
-  final $pb.RpcClient _client;
-
-  DiarizationApi(this._client);
-
-  $async.Future<DiarizationResult> diarize(
-          $pb.ClientContext? ctx, DiarizationRequest request) =>
-      _client.invoke<DiarizationResult>(
-          ctx, 'Diarization', 'Diarize', request, DiarizationResult());
-  $async.Future<DiarizationStreamEvent> stream(
-          $pb.ClientContext? ctx, DiarizationRequest request) =>
-      _client.invoke<DiarizationStreamEvent>(
-          ctx, 'Diarization', 'Stream', request, DiarizationStreamEvent());
 }
 
 const $core.bool _omitFieldNames =

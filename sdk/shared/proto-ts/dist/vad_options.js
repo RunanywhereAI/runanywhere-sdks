@@ -5,33 +5,17 @@
 //   protoc               v7.35.1
 // source: vad_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.VADServiceState = exports.VADStreamEvent = exports.SpeechActivityEvent = exports.VADStatistics = exports.VADResult = exports.VADProcessRequest_MetadataEntry = exports.VADProcessRequest = exports.VADAudioSource = exports.VADOptions = exports.VADConfiguration = exports.VADStreamEventKind = exports.VADAudioEncoding = exports.SpeechActivityKind = exports.protobufPackage = void 0;
+exports.VADServiceState = exports.VADStreamEvent = exports.SpeechActivityEvent = exports.VADStatistics = exports.VADResult = exports.VADProcessRequest_MetadataEntry = exports.VADProcessRequest = exports.VADAudioSource = exports.VADOptions = exports.VADConfiguration = exports.VADStreamEventKind = exports.SpeechActivityKind = exports.protobufPackage = void 0;
 exports.speechActivityKindFromJSON = speechActivityKindFromJSON;
 exports.speechActivityKindToJSON = speechActivityKindToJSON;
-exports.vADAudioEncodingFromJSON = vADAudioEncodingFromJSON;
-exports.vADAudioEncodingToJSON = vADAudioEncodingToJSON;
 exports.vADStreamEventKindFromJSON = vADStreamEventKindFromJSON;
 exports.vADStreamEventKindToJSON = vADStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * Speech-activity lifecycle kind.
- * Sources pre-IDL:
- *   Swift  VADTypes.swift:235               (started, ended)
- *   Kotlin VADTypes.kt:171                  (STARTED, ENDED)
- *   Dart   runanywhere_vad.dart:28          (started, ended)
- *   RN     VADTypes.ts:43                   ('started' | 'ended')
- *   Web    VADTypes.ts:8                    (Started, Ended, Ongoing)   ← only SDK with ONGOING
- *   C ABI  rac_vad_types.h:107              (RAC_SPEECH_STARTED, RAC_SPEECH_ENDED, RAC_SPEECH_ONGOING)
- * Canonical union: STARTED, ENDED, ONGOING.
- * ---------------------------------------------------------------------------
- */
 var SpeechActivityKind;
 (function (SpeechActivityKind) {
-    /** SPEECH_ACTIVITY_KIND_UNSPECIFIED - Reserved (proto3 default) */
     SpeechActivityKind[SpeechActivityKind["SPEECH_ACTIVITY_KIND_UNSPECIFIED"] = 0] = "SPEECH_ACTIVITY_KIND_UNSPECIFIED";
     SpeechActivityKind[SpeechActivityKind["SPEECH_ACTIVITY_KIND_SPEECH_STARTED"] = 1] = "SPEECH_ACTIVITY_KIND_SPEECH_STARTED";
     SpeechActivityKind[SpeechActivityKind["SPEECH_ACTIVITY_KIND_SPEECH_ENDED"] = 2] = "SPEECH_ACTIVITY_KIND_SPEECH_ENDED";
@@ -73,43 +57,6 @@ function speechActivityKindToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-var VADAudioEncoding;
-(function (VADAudioEncoding) {
-    VADAudioEncoding[VADAudioEncoding["VAD_AUDIO_ENCODING_UNSPECIFIED"] = 0] = "VAD_AUDIO_ENCODING_UNSPECIFIED";
-    VADAudioEncoding[VADAudioEncoding["VAD_AUDIO_ENCODING_PCM_F32_LE"] = 1] = "VAD_AUDIO_ENCODING_PCM_F32_LE";
-    VADAudioEncoding[VADAudioEncoding["VAD_AUDIO_ENCODING_PCM_S16_LE"] = 2] = "VAD_AUDIO_ENCODING_PCM_S16_LE";
-    VADAudioEncoding[VADAudioEncoding["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(VADAudioEncoding || (exports.VADAudioEncoding = VADAudioEncoding = {}));
-function vADAudioEncodingFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "VAD_AUDIO_ENCODING_UNSPECIFIED":
-            return VADAudioEncoding.VAD_AUDIO_ENCODING_UNSPECIFIED;
-        case 1:
-        case "VAD_AUDIO_ENCODING_PCM_F32_LE":
-            return VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE;
-        case 2:
-        case "VAD_AUDIO_ENCODING_PCM_S16_LE":
-            return VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_S16_LE;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return VADAudioEncoding.UNRECOGNIZED;
-    }
-}
-function vADAudioEncodingToJSON(object) {
-    switch (object) {
-        case VADAudioEncoding.VAD_AUDIO_ENCODING_UNSPECIFIED:
-            return "VAD_AUDIO_ENCODING_UNSPECIFIED";
-        case VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE:
-            return "VAD_AUDIO_ENCODING_PCM_F32_LE";
-        case VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_S16_LE:
-            return "VAD_AUDIO_ENCODING_PCM_S16_LE";
-        case VADAudioEncoding.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 var VADStreamEventKind;
 (function (VADStreamEventKind) {
     VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_UNSPECIFIED"] = 0] = "VAD_STREAM_EVENT_KIND_UNSPECIFIED";
@@ -120,10 +67,8 @@ var VADStreamEventKind;
     VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_STOPPED"] = 5] = "VAD_STREAM_EVENT_KIND_STOPPED";
     VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_ERROR"] = 6] = "VAD_STREAM_EVENT_KIND_ERROR";
     /**
-     * VAD_STREAM_EVENT_KIND_BARGE_IN - Pipeline-level barge-in signal previously carried by the
-     * deleted VADEventType enum. Emitted when the VAD detects speech that
-     * interrupts active assistant playback; downstream pipeline typically
-     * routes this through InterruptedEvent/InterruptReason as well.
+     * VAD_STREAM_EVENT_KIND_BARGE_IN - Speech that interrupts active assistant playback. Downstream pipeline
+     * also routes this through InterruptedEvent/InterruptReason.
      */
     VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_BARGE_IN"] = 7] = "VAD_STREAM_EVENT_KIND_BARGE_IN";
     VADStreamEventKind[VADStreamEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
@@ -675,7 +620,7 @@ exports.VADAudioSource = {
                 : isSet(object.adapter_handle)
                     ? globalThis.String(object.adapter_handle)
                     : undefined,
-            encoding: isSet(object.encoding) ? vADAudioEncodingFromJSON(object.encoding) : 0,
+            encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : 0,
             sampleRate: isSet(object.sampleRate)
                 ? globalThis.Number(object.sampleRate)
                 : isSet(object.sample_rate)
@@ -698,7 +643,7 @@ exports.VADAudioSource = {
             obj.adapterHandle = message.adapterHandle;
         }
         if (message.encoding !== 0) {
-            obj.encoding = vADAudioEncodingToJSON(message.encoding);
+            obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
         }
         if (message.sampleRate !== 0) {
             obj.sampleRate = Math.round(message.sampleRate);

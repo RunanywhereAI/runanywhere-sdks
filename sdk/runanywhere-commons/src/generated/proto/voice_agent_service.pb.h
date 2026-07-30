@@ -36,9 +36,9 @@
 #include "google/protobuf/unknown_field_set.h"
 #include "component_types.pb.h"
 #include "errors.pb.h"
+#include "model_types.pb.h"
 #include "voice_events.pb.h"
 #include "tts_options.pb.h"
-#include "stt_options.pb.h"
 #include "vad_options.pb.h"
 #include "llm_options.pb.h"
 // @@protoc_insertion_point(includes)

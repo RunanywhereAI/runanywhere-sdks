@@ -150,8 +150,12 @@ sdk/runanywhere-kotlin/.idea/
 *.swo
 *~
 
-# Claude
-.claude/
+# Claude. Local session state stays ignored, but the handoff bundle is tracked
+# so a fresh machine can pick the work up. Uses `.claude/*` rather than
+# `.claude/` because git will not descend into an excluded directory, which
+# would make the negation below unreachable.
+.claude/*
+!.claude/handoff/
 
 # Playwright MCP
 .playwright-mcp/

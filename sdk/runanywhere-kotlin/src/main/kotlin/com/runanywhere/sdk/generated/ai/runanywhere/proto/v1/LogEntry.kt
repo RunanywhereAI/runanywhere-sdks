@@ -32,15 +32,7 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * A single structured log record. Mirrors the per-SDK LogEntry shape.
- * ---------------------------------------------------------------------------
- */
 public class LogEntry(
-  /**
-   * Wall-clock epoch milliseconds.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -57,7 +49,7 @@ public class LogEntry(
   )
   public val level: LogLevel = LogLevel.LOG_LEVEL_TRACE,
   /**
-   * Subsystem/tag (e.g. "STT", "Download").
+   * Subsystem tag, e.g. "STT".
    */
   @field:WireField(
     tag = 3,
@@ -75,9 +67,8 @@ public class LogEntry(
   public val message: String = "",
   metadata: Map<String, String> = emptyMap(),
   /**
-   * Optional source location + context (Kotlin LogEntry carries these as
-   * first-class fields; other SDKs leave them empty). `line`/`error_code`
-   * use 0 as "unset".
+   * Kotlin carries these as first-class fields; other SDKs leave them empty.
+   * 0 means unset for line and error_code.
    */
   @field:WireField(
     tag = 6,
@@ -101,9 +92,6 @@ public class LogEntry(
     schemaIndex = 7,
   )
   public val function: String = "",
-  /**
-   * SDKError code, when the record describes an error.
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -129,9 +117,6 @@ public class LogEntry(
   public val framework: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LogEntry, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Optional structured context.
-   */
   @field:WireField(
     tag = 5,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",

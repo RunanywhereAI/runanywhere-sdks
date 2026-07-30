@@ -1,9 +1,8 @@
 // RunAnywhere IDL — model / framework / audio / environment / artifact types.
 //
-// Every enum below is the *union* of cases currently declared by hand across
-// Swift, Kotlin, Dart, React Native, and Web SDKs. The pre-IDL drift table
-// is what motivated
-// this schema. Every SDK consumes generated output; nothing is hand-written.
+// ModelInfo and its artifact subgraph are the only messages persisted to disk
+// (.rac-manifest.binpb), so their field numbers and the enum values they
+// reference must never be reused. The `reserved` entries below enforce that.
 
 syntax = "proto3";
 
@@ -22,15 +21,7 @@ option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
-// ---------------------------------------------------------------------------
-// Audio format — union of all cases currently defined across SDKs.
-// Sources pre-IDL:
-//   Kotlin  AudioTypes.kt:12          (pcm, wav, mp3, opus, aac, flac, ogg, pcm_16bit)
-//   Kotlin  ComponentTypes.kt:39      (pcm, wav, mp3, aac, ogg, opus, flac)  ← duplicate
-//   Swift   AudioTypes.swift:17       (pcm, wav, mp3, opus, aac, flac)
-//   Dart    audio_format.dart:3       (wav, mp3, m4a, flac, pcm, opus)
-//   RN      TTSTypes.ts:36            ('pcm' | 'wav' | 'mp3')
-// ---------------------------------------------------------------------------
+// Container format of an audio payload.
 enum AudioFormat {
     AUDIO_FORMAT_UNSPECIFIED = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
     AUDIO_FORMAT_PCM         = 1  [(runanywhere.v1.rac_wire_string) = "pcm"];
@@ -44,16 +35,22 @@ enum AudioFormat {
     AUDIO_FORMAT_PCM_S16LE   = 9  [(runanywhere.v1.rac_wire_string) = "pcm_s16le"];   // Android "pcm_16bit" — signed 16-bit LE PCM
 }
 
-// ---------------------------------------------------------------------------
-// Model file format — union across all SDKs.
-// Sources pre-IDL:
-//   Swift  ModelTypes.swift:27        (onnx, ort, gguf, bin, coreml, unknown)
-//   Kotlin ModelTypes.kt:41           (ONNX, ORT, GGUF, BIN, QNN_CONTEXT, UNKNOWN)
-//   Dart   model_types.dart:34        (onnx, ort, gguf, bin, unknown)
-//   RN     enums.ts:115               (12-case superset incl. MLModel, MLPackage, TFLite,
-//                                       SafeTensors, Zip, Folder, Proprietary)
-//   Web    enums.ts:56                (copy of RN)
-// ---------------------------------------------------------------------------
+// Sample layout of a raw audio payload, as opposed to AudioFormat above, which
+// names the container. CONTAINER means the bytes carry their own header and the
+// companion AudioFormat field says which one.
+//
+// This is the single encoding enum for STT, VAD, diarization, and the voice
+// agent. STT previously numbered PCM_S16_LE=1 and PCM_F32_LE=2, the reverse of
+// everywhere else; it now follows the ordering below.
+enum AudioEncoding {
+    AUDIO_ENCODING_UNSPECIFIED = 0;
+    AUDIO_ENCODING_PCM_F32_LE  = 1;
+    AUDIO_ENCODING_PCM_S16_LE  = 2;
+    AUDIO_ENCODING_CONTAINER   = 3;
+}
+
+// On-disk file format, as opposed to ModelArtifactType (bundle kind) or
+// ArchiveType (compression).
 enum ModelFormat {
     MODEL_FORMAT_UNSPECIFIED = 0;
     MODEL_FORMAT_GGUF        = 1;
@@ -73,16 +70,8 @@ enum ModelFormat {
     MODEL_FORMAT_UNKNOWN     = 15;
 }
 
-// ---------------------------------------------------------------------------
-// Inference framework / runtime. Same name used across all SDKs (RN names it
-// LLMFramework; we canonicalize on InferenceFramework).
-// Sources pre-IDL:
-//   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
-//   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
-//   Dart   model_types.dart:106       (9 cases, matches Kotlin)
-//   RN     enums.ts:30 (LLMFramework) (16 cases)
-//   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
-// ---------------------------------------------------------------------------
+// Engine that executes a model. Reached from ModelInfo.framework, so the
+// reserved values below are manifest-critical.
 enum InferenceFramework {
     INFERENCE_FRAMEWORK_UNSPECIFIED        = 0;
     INFERENCE_FRAMEWORK_ONNX               = 1;
@@ -108,14 +97,8 @@ enum InferenceFramework {
     reserved 8, 9, 10, 17, 18;
 }
 
-// ---------------------------------------------------------------------------
-// Model category / modality class. Sources pre-IDL:
-//   Swift ModelTypes.swift:39         (9 cases incl. voiceActivityDetection + audio)
-//   Kotlin ModelTypes.kt:147          (8 cases, no VAD)
-//   Dart  model_types.dart:55         (8 cases, no VAD)
-//   RN    enums.ts:75                 (8 cases, no VAD, Audio labeled as VAD)
-//   Web   enums.ts:39                 (7 cases, Audio labeled as VAD)
-// ---------------------------------------------------------------------------
+// What a model does. There is no RERANK member, which is why the rerank
+// primitive cannot auto-load a model.
 enum ModelCategory {
     MODEL_CATEGORY_UNSPECIFIED              = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
     MODEL_CATEGORY_LANGUAGE                 = 1  [(runanywhere.v1.rac_wire_string) = "language"];
@@ -140,9 +123,6 @@ enum SDKEnvironment {
     SDK_ENVIRONMENT_UNSPECIFIED = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
     SDK_ENVIRONMENT_DEVELOPMENT = 1  [(runanywhere.v1.rac_wire_string) = "development"];
     SDK_ENVIRONMENT_PRODUCTION  = 3  [(runanywhere.v1.rac_wire_string) = "production"];
-
-    reserved 2;
-    reserved "SDK_ENVIRONMENT_STAGING";
 }
 
 // ---------------------------------------------------------------------------
@@ -155,12 +135,7 @@ enum ModelSource {
     MODEL_SOURCE_BUILT_IN    = 3  [(runanywhere.v1.rac_wire_string) = "built-in"];   // Platform/system model with no portable download artifact
 }
 
-// ---------------------------------------------------------------------------
-// Archive types for multi-file model packages. Sources pre-IDL:
-//   Swift  ModelTypes.swift:195       (zip, tarBz2, tarGz, tarXz)
-//   Kotlin ModelTypes.kt:176          (ZIP, TAR_BZ2, TAR_GZ, TAR_XZ)
-//   Dart   model_types.dart:141       (zip, tarBz2, tarGz, tarXz)
-// ---------------------------------------------------------------------------
+// Compression flavor of a multi-file model package.
 enum ArchiveType {
     ARCHIVE_TYPE_UNSPECIFIED = 0;
     ARCHIVE_TYPE_ZIP         = 1;
@@ -177,14 +152,7 @@ enum ArchiveStructure {
     ARCHIVE_STRUCTURE_UNKNOWN            = 4  [(runanywhere.v1.rac_wire_string) = "unknown"];
 }
 
-// ---------------------------------------------------------------------------
-// High-level artifact classification — what KIND of bundle a model ships as.
-// Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
-// compression flavor). Sources pre-IDL:
-//   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
-//   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
-//   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
-// ---------------------------------------------------------------------------
+// What kind of bundle a model ships as.
 enum ModelArtifactType {
     MODEL_ARTIFACT_TYPE_UNSPECIFIED   = 0;
     MODEL_ARTIFACT_TYPE_SINGLE_FILE   = 1;
@@ -199,14 +167,8 @@ enum ModelArtifactType {
     MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE  = 10;
 }
 
-// ---------------------------------------------------------------------------
-// Model registry lifecycle state. This is durable/catalog state, not a live
-// transfer progress stream. Per-download byte counters and transient progress
-// events stay in download_service.proto.
-// Sources pre-IDL:
-//   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
-//   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
-// ---------------------------------------------------------------------------
+// Durable catalog state, not a live transfer stream. Byte counters and
+// progress events live in download_service.proto.
 enum ModelRegistryStatus {
     MODEL_REGISTRY_STATUS_UNSPECIFIED = 0;
     MODEL_REGISTRY_STATUS_REGISTERED  = 1;
@@ -248,24 +210,10 @@ enum ModelFileRole {
     MODEL_FILE_ROLE_LABELS           = 8;
 }
 
-// ---------------------------------------------------------------------------
-// AccelerationPreference enum moved to hardware_profile.proto.
-// Hardware preference is a pure hardware concern; consolidating it
-// there avoids cyclic proto imports and collapses the prior duplicate
-// AcceleratorPreference (ANE/GPU/CPU/AUTO) with the richer AccelerationPreference
-// (AUTO/CPU/GPU/NPU/WEBGPU/METAL/VULKAN) into a single enum. Messages in this
-// file reference it via the existing `import "hardware_profile.proto";`.
-// ---------------------------------------------------------------------------
+// AccelerationPreference lives in hardware_profile.proto, imported above.
 
-// ---------------------------------------------------------------------------
-// Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
-//   Web    enums.ts (RoutingPolicy)
-//          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
-//          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
-//   Swift  extensions (RoutingPolicy)
-// Canonical short-form below; specific PreferLocal/PreferCloud cover the
-// "preferred" cases, MANUAL covers explicit user override.
-// ---------------------------------------------------------------------------
+// On-device versus cloud routing. PREFER_LOCAL and PREFER_CLOUD cover the
+// "preferred" cases; MANUAL is an explicit user override.
 enum RoutingPolicy {
     ROUTING_POLICY_UNSPECIFIED       = 0;
     ROUTING_POLICY_PREFER_LOCAL      = 1;
@@ -294,14 +242,8 @@ message ModelRuntimeCompatibility {
     repeated ModelFormat        compatible_formats    = 2;
 }
 
-// ---------------------------------------------------------------------------
-// Core metadata for a model entry.
-// Sources pre-IDL:
-//   Swift  ModelTypes.swift:393       (16 fields)
-//   Kotlin ModelTypes.kt:332          (16 fields, Long vs Int drift on download size)
-//   Dart   model_types.dart:335       (similar shape, nullable divergences)
-//   RN     HybridRunAnywhereCore.cpp:995-1010 (13 fields, string-typed category/format)
-// ---------------------------------------------------------------------------
+// Core metadata for a model entry. This message is persisted verbatim to
+// .rac-manifest.binpb, so field numbers here are permanent.
 message ModelInfo {
     string             id                  = 1;
     string             name                = 2;
@@ -446,13 +388,8 @@ message MultiFileArtifact {
     repeated ModelFileDescriptor files = 1;
 }
 
-// ---------------------------------------------------------------------------
-// Declarative manifest of files a multi-file / directory model is expected
-// to contain on disk after download/extraction. Used for verification before
-// hand-off to the inference framework. Sources pre-IDL:
-//   Flutter core/types/model_types.dart:420
-//   Swift   ModelTypes.swift:~300
-// ---------------------------------------------------------------------------
+// What a multi-file model should contain on disk after extraction. Verified
+// before hand-off to the inference framework.
 message ExpectedModelFiles {
     repeated ModelFileDescriptor files          = 1;
     optional string              root_directory = 2;
@@ -478,16 +415,10 @@ message ModelQuery {
     optional ModelRegistryStatus registry_status = 11;
 }
 
-// ---------------------------------------------------------------------------
-// Registry and model-lifecycle operation contracts.
-//
-// These messages describe C++-owned workflow decisions and results that SDKs
-// can expose directly as generated public API types. Platform-owned inputs
-// such as Android content URIs, iOS security-scoped bookmarks, browser
-// FileSystemHandle objects, auth/session cookies, and HTTP client handles
-// remain outside this schema. Platform adapters normalize those handles into
-// paths, URLs, manifests, or callbacks before invoking the C++ workflow.
-// ---------------------------------------------------------------------------
+// Registry and lifecycle workflow contracts. Platform-owned inputs (Android
+// content URIs, iOS security-scoped bookmarks, browser FileSystemHandles, auth
+// cookies) stay outside this schema; adapters normalize them into paths, URLs,
+// or manifests first.
 
 message ModelRegistryRefreshRequest {
     // Fetch or merge a remote catalog through the platform/network adapter.
@@ -664,7 +595,6 @@ message CurrentModelRequest {
 }
 
 message CurrentModelResult {
-    reserved 1;
     string    model_id          = 2;
     ModelInfo model             = 3;
     int64     loaded_at_unix_ms = 4;
@@ -674,13 +604,6 @@ message CurrentModelResult {
     InferenceFramework framework = 8;
     string    resolved_path     = 9;
     repeated ModelFileDescriptor resolved_artifacts = 10;
-}
-
-message ModelDeleteRequest {
-    string model_id         = 1;
-    bool   delete_files     = 2;
-    bool   unregister       = 3;
-    bool   unload_if_loaded = 4;
 }
 
 message ModelDeleteResult {
@@ -940,35 +863,4 @@ message RegisterMultiFileModelRequest {
     optional bool                supports_lora         = 11;
     optional string              description           = 12;
     optional ModelSource         source                = 13;
-}
-
-// Logical ModelRegistry service contract. Platform adapters remain
-// responsible for native file handles, sandbox permissions, HTTP execution,
-// and destructive filesystem operations. This service carries only the
-// portable registry metadata and workflow messages owned by the IDL/C++ layer.
-service ModelRegistry {
-    // Register new model metadata and return the normalized saved entry.
-    rpc Register(ModelInfo) returns (ModelInfo);
-
-    // Update an existing model metadata entry and return the normalized entry.
-    rpc Update(ModelInfo) returns (ModelInfo);
-
-    // Fetch a single registry entry by id.
-    rpc Get(ModelGetRequest) returns (ModelGetResult);
-
-    // List entries, optionally filtered by ModelListRequest.query.
-    rpc List(ModelListRequest) returns (ModelListResult);
-
-    // Remove a registry entry. File deletion/unload work remains platform or
-    // lifecycle owned even when ModelDeleteRequest flags are populated.
-    rpc Remove(ModelDeleteRequest) returns (ModelDeleteResult);
-
-    // Import stable, platform-normalized local metadata into the registry.
-    rpc Import(ModelImportRequest) returns (ModelImportResult);
-
-    // Discover models from normalized roots supplied by platform adapters.
-    rpc Discover(ModelDiscoveryRequest) returns (ModelDiscoveryResult);
-
-    // Refresh registry state from assignment/cache/local reconciliation inputs.
-    rpc Refresh(ModelRegistryRefreshRequest) returns (ModelRegistryRefreshResult);
 }

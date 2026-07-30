@@ -30,20 +30,10 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Result of a `speak()` call — metadata-only view of an already-played
- * synthesis pass. Used when the SDK plays audio internally and the caller
- * does not need raw bytes.
- *
- * Mirrors the C ABI rac_tts_speak_result_t. Identical to TTSOutput minus
- * `audio_data` and `phoneme_timestamps`; `audio_size_bytes` is retained for
- * callers that want to know how much was synthesized.
- * ---------------------------------------------------------------------------
+ * Metadata-only view for callers that let the SDK play the audio and never
+ * need the raw bytes.
  */
 public class TTSSpeakResult(
-  /**
-   * Audio format used during synthesis.
-   */
   @field:WireField(
     tag = 1,
     adapter = "ai.runanywhere.proto.v1.AudioFormat#ADAPTER",
@@ -52,9 +42,6 @@ public class TTSSpeakResult(
     schemaIndex = 0,
   )
   public val audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED,
-  /**
-   * Sample rate in Hz used during synthesis.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -63,9 +50,6 @@ public class TTSSpeakResult(
     schemaIndex = 1,
   )
   public val sample_rate: Int = 0,
-  /**
-   * Audio duration in milliseconds.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -75,8 +59,7 @@ public class TTSSpeakResult(
   )
   public val duration_ms: Long = 0L,
   /**
-   * Audio size in bytes (0 for system TTS that plays directly without
-   * exposing buffers).
+   * 0 for system TTS that plays directly without exposing buffers.
    */
   @field:WireField(
     tag = 4,
@@ -86,9 +69,6 @@ public class TTSSpeakResult(
     schemaIndex = 3,
   )
   public val audio_size_bytes: Long = 0L,
-  /**
-   * Per-pass synthesis metadata.
-   */
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.TTSSynthesisMetadata#ADAPTER",
@@ -97,7 +77,7 @@ public class TTSSpeakResult(
   )
   public val metadata: TTSSynthesisMetadata? = null,
   /**
-   * Wall-clock timestamp when speech completed (ms since UNIX epoch).
+   * Milliseconds since epoch, when speech completed.
    */
   @field:WireField(
     tag = 6,

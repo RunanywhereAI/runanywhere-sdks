@@ -31,27 +31,10 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Activity transition emitted by the VAD as it watches a stream.
- * Sources pre-IDL:
- *   Swift  VADTypes.swift:235               (SpeechActivityEvent enum: started/ended)
- *   Kotlin VADTypes.kt:171                  (SpeechActivityEvent enum: STARTED/ENDED)
- *   Dart   runanywhere_vad.dart:28          (SpeechActivityEvent enum: started/ended)
- *   RN     VADTypes.ts:43                   ('started' | 'ended' string union)
- *   Web    VADTypes.ts:8                    (SpeechActivity enum: Started/Ended/Ongoing)
- *   C ABI  rac_vad_types.h:107 (rac_speech_activity_t)
- *                                           (RAC_SPEECH_STARTED/ENDED/ONGOING)
- *
- * Distinct from voice_events.proto's `VADEvent`, which carries the broader
- * pipeline-level taxonomy (BARGE_IN, END_OF_UTTERANCE, etc) via
- * `VADStreamEventKind`. `SpeechActivityEvent` here is the narrow
- * component-level transition.
- * ---------------------------------------------------------------------------
+ * Narrow component-level transition. voice_events.proto's VADEvent carries the
+ * broader pipeline taxonomy (BARGE_IN, END_OF_UTTERANCE) via VADStreamEventKind.
  */
 public class SpeechActivityEvent(
-  /**
-   * Which transition happened.
-   */
   @field:WireField(
     tag = 1,
     adapter = "ai.runanywhere.proto.v1.SpeechActivityKind#ADAPTER",
@@ -61,8 +44,7 @@ public class SpeechActivityEvent(
   )
   public val event_type: SpeechActivityKind = SpeechActivityKind.SPEECH_ACTIVITY_KIND_UNSPECIFIED,
   /**
-   * Wall-clock time of the transition, in milliseconds since epoch.
-   * Aligns with rac_vad_output_t::timestamp_ms.
+   * Milliseconds since epoch.
    */
   @field:WireField(
     tag = 2,
@@ -73,9 +55,8 @@ public class SpeechActivityEvent(
   )
   public val timestamp_ms: Long = 0L,
   /**
-   * Optional duration of the speech / silence that triggered this event,
-   * in milliseconds. Set on SPEECH_ENDED to communicate the just-finished
-   * utterance length; left zero on SPEECH_STARTED.
+   * Length of the just-finished utterance on SPEECH_ENDED; zero on
+   * SPEECH_STARTED.
    */
   @field:WireField(
     tag = 3,

@@ -34,22 +34,11 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * A single embedding produced for one input text. The C ABI ships dense
- * floats with an associated dimension; we additionally carry the source text
- * (helps multi-input batch consumers correlate vectors with inputs without
- * holding the request side-by-side) and an optional pre-computed L2 norm
- * (lets clients short-circuit cosine-similarity when both sides know the
- * vectors are already unit-normalized).
- * ---------------------------------------------------------------------------
- */
 public class EmbeddingVector(
   values: List<Float> = emptyList(),
   /**
-   * L2 norm of `values`. Optional — populated when the backend computes
-   * it (typically when normalize=false and the consumer wants to score
-   * similarity without recomputing).
+   * Populated when the backend computes it, letting consumers score
+   * similarity without recomputing.
    */
   @field:WireField(
     tag = 2,
@@ -58,9 +47,7 @@ public class EmbeddingVector(
   )
   public val norm: Float? = null,
   /**
-   * Source text that produced this vector. Optional — preserved for
-   * multi-input batches where the caller wants to correlate without
-   * tracking ordering separately.
+   * Lets batch callers correlate vectors with inputs without tracking order.
    */
   @field:WireField(
     tag = 3,
@@ -68,10 +55,6 @@ public class EmbeddingVector(
     schemaIndex = 2,
   )
   public val text: String? = null,
-  /**
-   * Vector dimension for consumers that need per-vector sizing without
-   * inspecting EmbeddingsResult.dimension.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -79,9 +62,6 @@ public class EmbeddingVector(
     schemaIndex = 3,
   )
   public val dimension: Int = 0,
-  /**
-   * Input index in the original request and optional caller metadata.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -94,7 +74,7 @@ public class EmbeddingVector(
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<EmbeddingVector, Nothing>(ADAPTER, unknownFields) {
   /**
-   * Dense float vector. Length equals EmbeddingsResult.dimension.
+   * Length equals EmbeddingsResult.dimension.
    */
   @field:WireField(
     tag = 1,

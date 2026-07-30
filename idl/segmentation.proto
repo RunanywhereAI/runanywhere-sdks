@@ -65,7 +65,3 @@ message SegmentationResult {
     int64 processing_time_ms = 6;
     string model_id = 7;
 }
-
-service SemanticSegmentation {
-    rpc Segment(SegmentationRequest) returns (SegmentationResult);
-}

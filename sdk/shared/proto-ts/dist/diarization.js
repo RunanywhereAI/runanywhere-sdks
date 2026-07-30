@@ -5,57 +5,14 @@
 //   protoc               v7.35.1
 // source: diarization.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DiarizationStreamEvent = exports.DiarizationResult = exports.DiarizationSegment = exports.DiarizationRequest = exports.DiarizationOptions = exports.DiarizationStreamEventKind = exports.DiarizationAudioEncoding = exports.protobufPackage = void 0;
-exports.diarizationAudioEncodingFromJSON = diarizationAudioEncodingFromJSON;
-exports.diarizationAudioEncodingToJSON = diarizationAudioEncodingToJSON;
+exports.DiarizationStreamEvent = exports.DiarizationResult = exports.DiarizationSegment = exports.DiarizationRequest = exports.DiarizationOptions = exports.DiarizationStreamEventKind = exports.protobufPackage = void 0;
 exports.diarizationStreamEventKindFromJSON = diarizationStreamEventKindFromJSON;
 exports.diarizationStreamEventKindToJSON = diarizationStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 const errors_1 = require("./errors");
+const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * Raw PCM encodings accepted at the SDK boundary. Commons validates complete
- * sample frames and normalizes either representation to float samples before
- * dispatching to an engine.
- */
-var DiarizationAudioEncoding;
-(function (DiarizationAudioEncoding) {
-    DiarizationAudioEncoding[DiarizationAudioEncoding["DIARIZATION_AUDIO_ENCODING_UNSPECIFIED"] = 0] = "DIARIZATION_AUDIO_ENCODING_UNSPECIFIED";
-    DiarizationAudioEncoding[DiarizationAudioEncoding["DIARIZATION_AUDIO_ENCODING_PCM_F32_LE"] = 1] = "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE";
-    DiarizationAudioEncoding[DiarizationAudioEncoding["DIARIZATION_AUDIO_ENCODING_PCM_S16_LE"] = 2] = "DIARIZATION_AUDIO_ENCODING_PCM_S16_LE";
-    DiarizationAudioEncoding[DiarizationAudioEncoding["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(DiarizationAudioEncoding || (exports.DiarizationAudioEncoding = DiarizationAudioEncoding = {}));
-function diarizationAudioEncodingFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "DIARIZATION_AUDIO_ENCODING_UNSPECIFIED":
-            return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_UNSPECIFIED;
-        case 1:
-        case "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE":
-            return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
-        case 2:
-        case "DIARIZATION_AUDIO_ENCODING_PCM_S16_LE":
-            return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return DiarizationAudioEncoding.UNRECOGNIZED;
-    }
-}
-function diarizationAudioEncodingToJSON(object) {
-    switch (object) {
-        case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_UNSPECIFIED:
-            return "DIARIZATION_AUDIO_ENCODING_UNSPECIFIED";
-        case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE:
-            return "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE";
-        case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE:
-            return "DIARIZATION_AUDIO_ENCODING_PCM_S16_LE";
-        case DiarizationAudioEncoding.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 var DiarizationStreamEventKind;
 (function (DiarizationStreamEventKind) {
     DiarizationStreamEventKind[DiarizationStreamEventKind["DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED"] = 0] = "DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED";
@@ -202,7 +159,7 @@ exports.DiarizationOptions = {
                     ? globalThis.Number(object.sample_rate)
                     : undefined,
             channels: isSet(object.channels) ? globalThis.Number(object.channels) : undefined,
-            encoding: isSet(object.encoding) ? diarizationAudioEncodingFromJSON(object.encoding) : undefined,
+            encoding: isSet(object.encoding) ? (0, model_types_1.audioEncodingFromJSON)(object.encoding) : undefined,
             threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : undefined,
             minimumDurationMs: isSet(object.minimumDurationMs)
                 ? globalThis.Number(object.minimumDurationMs)
@@ -225,7 +182,7 @@ exports.DiarizationOptions = {
             obj.channels = Math.round(message.channels);
         }
         if (message.encoding !== undefined) {
-            obj.encoding = diarizationAudioEncodingToJSON(message.encoding);
+            obj.encoding = (0, model_types_1.audioEncodingToJSON)(message.encoding);
         }
         if (message.threshold !== undefined) {
             obj.threshold = message.threshold;

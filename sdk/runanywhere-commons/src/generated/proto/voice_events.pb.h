@@ -37,6 +37,7 @@
 #include "google/protobuf/unknown_field_set.h"
 #include "component_types.pb.h"
 #include "errors.pb.h"
+#include "model_types.pb.h"
 #include "vad_options.pb.h"
 // @@protoc_insertion_point(includes)
 
@@ -63,8 +64,6 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_voic
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum AudioEncoding : int;
-extern const uint32_t AudioEncoding_internal_data_[];
 enum InterruptReason : int;
 extern const uint32_t InterruptReason_internal_data_[];
 enum PipelineState : int;
@@ -250,9 +249,6 @@ extern const WakeWordDetectedEventGlobalsTypeInternal WakeWordDetectedEvent_glob
 namespace google {
 namespace protobuf {
 template <>
-internal::EnumTraitsT<::runanywhere::v1::AudioEncoding_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::AudioEncoding>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::InterruptReason_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::InterruptReason>;
 template <>
@@ -363,47 +359,6 @@ template <>
 [[nodiscard]] inline bool TokenKind_Parse(
     ::absl::string_view name, TokenKind* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<TokenKind>(TokenKind_descriptor(), name,
-                                           value);
-}
-enum AudioEncoding : int {
-  AUDIO_ENCODING_UNSPECIFIED = 0,
-  AUDIO_ENCODING_PCM_F32_LE = 1,
-  AUDIO_ENCODING_PCM_S16_LE = 2,
-  AudioEncoding_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  AudioEncoding_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t AudioEncoding_internal_data_[];
-inline constexpr AudioEncoding AudioEncoding_MIN =
-    static_cast<AudioEncoding>(0);
-inline constexpr AudioEncoding AudioEncoding_MAX =
-    static_cast<AudioEncoding>(2);
-[[nodiscard]] inline bool AudioEncoding_IsValid(int value) {
-  return 0 <= value && value <= 2;
-}
-inline constexpr int AudioEncoding_ARRAYSIZE = 2 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-AudioEncoding_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(AudioEncoding) {
-  return AudioEncoding_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& AudioEncoding_Name(T value) {
-  static_assert(::std::is_same<T, AudioEncoding>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to AudioEncoding_Name().");
-  return AudioEncoding_Name(static_cast<AudioEncoding>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& AudioEncoding_Name(AudioEncoding value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<AudioEncoding_descriptor, 0, 2>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool AudioEncoding_Parse(
-    ::absl::string_view name, AudioEncoding* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<AudioEncoding>(AudioEncoding_descriptor(), name,
                                            value);
 }
 enum InterruptReason : int {
@@ -11814,12 +11769,6 @@ struct is_proto_enum<::runanywhere::v1::TokenKind> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::TokenKind>() {
   return ::runanywhere::v1::TokenKind_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::AudioEncoding> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::AudioEncoding>() {
-  return ::runanywhere::v1::AudioEncoding_descriptor();
 }
 template <>
 struct is_proto_enum<::runanywhere::v1::InterruptReason> : std::true_type {};

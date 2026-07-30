@@ -30,26 +30,10 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Aggregated voice-agent compose configuration.
- *
- * Mirrors the C ABI `rac_voice_agent_config_t` and Swift
- * `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`
- * (idl/solutions.proto) is kept frozen for the SolutionConfig oneof — this
- * new message provides the fine-grained sub-component view consumed by the
- * `rac_voice_agent_initialize()` C entry-point.
- *
- * Each sub-config string field uses a "model_id" naming convention; the
- * runtime resolves IDs against the model registry. An empty string means
- * "use the currently loaded model/voice for that capability".
- * ---------------------------------------------------------------------------
+ * Each component takes a path, an id, or a name; commons resolves whichever is
+ * present through the model registry.
  */
 public class VoiceAgentComposeConfig(
-  /**
-   * -------------------------------------------------------------------
-   * STT sub-config (mirrors rac_voice_agent_stt_config_t).
-   * -------------------------------------------------------------------
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -71,11 +55,6 @@ public class VoiceAgentComposeConfig(
     schemaIndex = 2,
   )
   public val stt_model_name: String? = null,
-  /**
-   * -------------------------------------------------------------------
-   * LLM sub-config (mirrors rac_voice_agent_llm_config_t).
-   * -------------------------------------------------------------------
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -97,11 +76,6 @@ public class VoiceAgentComposeConfig(
     schemaIndex = 5,
   )
   public val llm_model_name: String? = null,
-  /**
-   * -------------------------------------------------------------------
-   * TTS sub-config (mirrors rac_voice_agent_tts_config_t).
-   * -------------------------------------------------------------------
-   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -130,10 +104,6 @@ public class VoiceAgentComposeConfig(
     schemaIndex = 9,
   )
   public val vad_config: VADConfiguration? = null,
-  /**
-   * LLM generation knobs for the response model (sampling, system prompt,
-   * reasoning). Unset = voice-agent defaults from the generated pool.
-   */
   @field:WireField(
     tag = 25,
     adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
@@ -141,12 +111,6 @@ public class VoiceAgentComposeConfig(
     schemaIndex = 10,
   )
   public val llm_generation: LLMGenerationOptions? = null,
-  /**
-   * -------------------------------------------------------------------
-   * Session-behavior sub-config. Optional so the C ABI can be invoked
-   * without runtime-behavior overrides (engine defaults applied).
-   * -------------------------------------------------------------------
-   */
   @field:WireField(
     tag = 20,
     adapter = "ai.runanywhere.proto.v1.VoiceSessionConfig#ADAPTER",
@@ -154,10 +118,6 @@ public class VoiceAgentComposeConfig(
     schemaIndex = 11,
   )
   public val session_config: VoiceSessionConfig? = null,
-  /**
-   * Audio state-machine behavior. Optional so defaults can be applied by
-   * the native voice-agent implementation.
-   */
   @field:WireField(
     tag = 21,
     adapter = "ai.runanywhere.proto.v1.AudioPipelineConfig#ADAPTER",
@@ -165,9 +125,6 @@ public class VoiceAgentComposeConfig(
     schemaIndex = 12,
   )
   public val audio_pipeline_config: AudioPipelineConfig? = null,
-  /**
-   * Correlation and defaults for event streams and one-shot turn APIs.
-   */
   @field:WireField(
     tag = 22,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

@@ -28,12 +28,8 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Per-request routing context — caller-supplied hints only.
- *
- * Device state lives behind the rac_hybrid_device_state C ABI vtable in
- * commons; callers do not serialize platform state into this message.
- * ---------------------------------------------------------------------------
+ * Device state lives behind the rac_hybrid_device_state vtable in commons, so
+ * callers never serialize platform state into this message.
  */
 public class HybridRoutingContext(
   unknownFields: ByteString = ByteString.EMPTY,

@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -391,17 +390,6 @@ class RerankResult extends $pb.GeneratedMessage {
   $core.bool hasModelId() => $_has(2);
   @$pb.TagNumber(3)
   void clearModelId() => $_clearField(3);
-}
-
-class RerankingApi {
-  final $pb.RpcClient _client;
-
-  RerankingApi(this._client);
-
-  $async.Future<RerankResult> rerank(
-          $pb.ClientContext? ctx, RerankRequest request) =>
-      _client.invoke<RerankResult>(
-          ctx, 'Reranking', 'Rerank', request, RerankResult());
 }
 
 const $core.bool _omitFieldNames =

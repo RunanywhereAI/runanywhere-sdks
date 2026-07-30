@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -194,14 +193,8 @@ enum ModelInfo_Artifact {
   notSet
 }
 
-/// ---------------------------------------------------------------------------
-/// Core metadata for a model entry.
-/// Sources pre-IDL:
-///   Swift  ModelTypes.swift:393       (16 fields)
-///   Kotlin ModelTypes.kt:332          (16 fields, Long vs Int drift on download size)
-///   Dart   model_types.dart:335       (similar shape, nullable divergences)
-///   RN     HybridRunAnywhereCore.cpp:995-1010 (13 fields, string-typed category/format)
-/// ---------------------------------------------------------------------------
+/// Core metadata for a model entry. This message is persisted verbatim to
+/// .rac-manifest.binpb, so field numbers here are permanent.
 class ModelInfo extends $pb.GeneratedMessage {
   factory ModelInfo({
     $core.String? id,
@@ -1193,13 +1186,8 @@ class MultiFileArtifact extends $pb.GeneratedMessage {
   $pb.PbList<ModelFileDescriptor> get files => $_getList(0);
 }
 
-/// ---------------------------------------------------------------------------
-/// Declarative manifest of files a multi-file / directory model is expected
-/// to contain on disk after download/extraction. Used for verification before
-/// hand-off to the inference framework. Sources pre-IDL:
-///   Flutter core/types/model_types.dart:420
-///   Swift   ModelTypes.swift:~300
-/// ---------------------------------------------------------------------------
+/// What a multi-file model should contain on disk after extraction. Verified
+/// before hand-off to the inference framework.
 class ExpectedModelFiles extends $pb.GeneratedMessage {
   factory ExpectedModelFiles({
     $core.Iterable<ModelFileDescriptor>? files,
@@ -3431,96 +3419,6 @@ class CurrentModelResult extends $pb.GeneratedMessage {
   $pb.PbList<ModelFileDescriptor> get resolvedArtifacts => $_getList(8);
 }
 
-class ModelDeleteRequest extends $pb.GeneratedMessage {
-  factory ModelDeleteRequest({
-    $core.String? modelId,
-    $core.bool? deleteFiles,
-    $core.bool? unregister,
-    $core.bool? unloadIfLoaded,
-  }) {
-    final result = create();
-    if (modelId != null) result.modelId = modelId;
-    if (deleteFiles != null) result.deleteFiles = deleteFiles;
-    if (unregister != null) result.unregister = unregister;
-    if (unloadIfLoaded != null) result.unloadIfLoaded = unloadIfLoaded;
-    return result;
-  }
-
-  ModelDeleteRequest._();
-
-  factory ModelDeleteRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory ModelDeleteRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ModelDeleteRequest',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOB(2, _omitFieldNames ? '' : 'deleteFiles')
-    ..aOB(3, _omitFieldNames ? '' : 'unregister')
-    ..aOB(4, _omitFieldNames ? '' : 'unloadIfLoaded')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ModelDeleteRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ModelDeleteRequest copyWith(void Function(ModelDeleteRequest) updates) =>
-      super.copyWith((message) => updates(message as ModelDeleteRequest))
-          as ModelDeleteRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ModelDeleteRequest create() => ModelDeleteRequest._();
-  @$core.override
-  ModelDeleteRequest createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static ModelDeleteRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ModelDeleteRequest>(create);
-  static ModelDeleteRequest? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get modelId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set modelId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasModelId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearModelId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.bool get deleteFiles => $_getBF(1);
-  @$pb.TagNumber(2)
-  set deleteFiles($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasDeleteFiles() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearDeleteFiles() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get unregister => $_getBF(2);
-  @$pb.TagNumber(3)
-  set unregister($core.bool value) => $_setBool(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasUnregister() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearUnregister() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.bool get unloadIfLoaded => $_getBF(3);
-  @$pb.TagNumber(4)
-  set unloadIfLoaded($core.bool value) => $_setBool(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasUnloadIfLoaded() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearUnloadIfLoaded() => $_clearField(4);
-}
-
 class ModelDeleteResult extends $pb.GeneratedMessage {
   factory ModelDeleteResult({
     $core.bool? success,
@@ -5097,64 +4995,6 @@ class RegisterMultiFileModelRequest extends $pb.GeneratedMessage {
   $core.bool hasSource() => $_has(12);
   @$pb.TagNumber(13)
   void clearSource() => $_clearField(13);
-}
-
-/// Logical ModelRegistry service contract. Platform adapters remain
-/// responsible for native file handles, sandbox permissions, HTTP execution,
-/// and destructive filesystem operations. This service carries only the
-/// portable registry metadata and workflow messages owned by the IDL/C++ layer.
-class ModelRegistryApi {
-  final $pb.RpcClient _client;
-
-  ModelRegistryApi(this._client);
-
-  /// Register new model metadata and return the normalized saved entry.
-  $async.Future<ModelInfo> register(
-          $pb.ClientContext? ctx, ModelInfo request) =>
-      _client.invoke<ModelInfo>(
-          ctx, 'ModelRegistry', 'Register', request, ModelInfo());
-
-  /// Update an existing model metadata entry and return the normalized entry.
-  $async.Future<ModelInfo> update($pb.ClientContext? ctx, ModelInfo request) =>
-      _client.invoke<ModelInfo>(
-          ctx, 'ModelRegistry', 'Update', request, ModelInfo());
-
-  /// Fetch a single registry entry by id.
-  $async.Future<ModelGetResult> get(
-          $pb.ClientContext? ctx, ModelGetRequest request) =>
-      _client.invoke<ModelGetResult>(
-          ctx, 'ModelRegistry', 'Get', request, ModelGetResult());
-
-  /// List entries, optionally filtered by ModelListRequest.query.
-  $async.Future<ModelListResult> list(
-          $pb.ClientContext? ctx, ModelListRequest request) =>
-      _client.invoke<ModelListResult>(
-          ctx, 'ModelRegistry', 'List', request, ModelListResult());
-
-  /// Remove a registry entry. File deletion/unload work remains platform or
-  /// lifecycle owned even when ModelDeleteRequest flags are populated.
-  $async.Future<ModelDeleteResult> remove(
-          $pb.ClientContext? ctx, ModelDeleteRequest request) =>
-      _client.invoke<ModelDeleteResult>(
-          ctx, 'ModelRegistry', 'Remove', request, ModelDeleteResult());
-
-  /// Import stable, platform-normalized local metadata into the registry.
-  $async.Future<ModelImportResult> import(
-          $pb.ClientContext? ctx, ModelImportRequest request) =>
-      _client.invoke<ModelImportResult>(
-          ctx, 'ModelRegistry', 'Import', request, ModelImportResult());
-
-  /// Discover models from normalized roots supplied by platform adapters.
-  $async.Future<ModelDiscoveryResult> discover(
-          $pb.ClientContext? ctx, ModelDiscoveryRequest request) =>
-      _client.invoke<ModelDiscoveryResult>(
-          ctx, 'ModelRegistry', 'Discover', request, ModelDiscoveryResult());
-
-  /// Refresh registry state from assignment/cache/local reconciliation inputs.
-  $async.Future<ModelRegistryRefreshResult> refresh(
-          $pb.ClientContext? ctx, ModelRegistryRefreshRequest request) =>
-      _client.invoke<ModelRegistryRefreshResult>(ctx, 'ModelRegistry',
-          'Refresh', request, ModelRegistryRefreshResult());
 }
 
 const $core.bool _omitFieldNames =

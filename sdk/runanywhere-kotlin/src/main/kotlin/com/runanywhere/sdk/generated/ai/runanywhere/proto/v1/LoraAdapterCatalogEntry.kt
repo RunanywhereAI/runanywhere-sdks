@@ -34,21 +34,7 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Catalog entry for a LoRA adapter registered with the SDK.
- * Apps register entries at startup; SDKs query "which adapters work with this
- * model" without reinventing detection logic per platform.
- *
- * `author` is not present in any current SDK shape (Swift, Kotlin, Dart, RN,
- * Web, C ABI) — it is encoded as `proto3 optional` so codegen produces a
- * nullable / has-bit-tracked field.
- * ---------------------------------------------------------------------------
- */
 public class LoraAdapterCatalogEntry(
-  /**
-   * unique adapter identifier
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -56,9 +42,6 @@ public class LoraAdapterCatalogEntry(
     schemaIndex = 0,
   )
   public val id: String = "",
-  /**
-   * human-readable display name
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -66,9 +49,6 @@ public class LoraAdapterCatalogEntry(
     schemaIndex = 1,
   )
   public val name: String = "",
-  /**
-   * short description
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -77,7 +57,7 @@ public class LoraAdapterCatalogEntry(
   )
   public val description: String = "",
   /**
-   * direct download URL (.gguf)
+   * Direct .gguf download URL, and the filename to save it as.
    */
   @field:WireField(
     tag = 4,
@@ -86,9 +66,6 @@ public class LoraAdapterCatalogEntry(
     schemaIndex = 3,
   )
   public val url: String = "",
-  /**
-   * filename to save as on disk
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -98,7 +75,7 @@ public class LoraAdapterCatalogEntry(
   public val filename: String = "",
   compatible_models: List<String> = emptyList(),
   /**
-   * file size, 0 if unknown
+   * 0 if unknown.
    */
   @field:WireField(
     tag = 7,
@@ -108,18 +85,12 @@ public class LoraAdapterCatalogEntry(
     schemaIndex = 6,
   )
   public val size_bytes: Long = 0L,
-  /**
-   * optional adapter author
-   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     schemaIndex = 7,
   )
   public val author: String? = null,
-  /**
-   * recommended adapter scale
-   */
   @RacDefaultOption("1.0")
   @field:WireField(
     tag = 9,
@@ -130,7 +101,7 @@ public class LoraAdapterCatalogEntry(
   )
   public val default_scale: Float = 0f,
   /**
-   * lowercase hex SHA-256
+   * Lowercase hex.
    */
   @field:WireField(
     tag = 10,
@@ -148,8 +119,7 @@ public class LoraAdapterCatalogEntry(
   tags: List<String> = emptyList(),
   metadata: Map<String, String> = emptyMap(),
   /**
-   * Stable platform-normalized local artifact path after native/Web has
-   * completed download/import and reported the result back to commons.
+   * Local artifact state, persisted only after the platform reports success.
    */
   @field:WireField(
     tag = 14,
@@ -189,7 +159,7 @@ public class LoraAdapterCatalogEntry(
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoraAdapterCatalogEntry, Nothing>(ADAPTER, unknownFields) {
   /**
-   * explicit base model IDs
+   * Explicit base model ids this adapter works with.
    */
   @field:WireField(
     tag = 6,

@@ -29,6 +29,9 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * Below this on-device confidence, the router escalates to cloud.
+ */
 public class ConfidenceCascade(
   @field:WireField(
     tag = 1,

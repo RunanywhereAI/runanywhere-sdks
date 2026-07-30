@@ -21,35 +21,8 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'errors.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// ErrorContext — debugging metadata captured at the throw site.
-///
-/// Sources pre-IDL:
-///   C ABI   rac_structured_error.h:102  rac_error_t fields source_file,
-///                                       source_line, source_function plus a
-///                                       rac_stack_frame_t[32] fixed-size
-///                                       stack capture and 3 custom k/v slots
-///                                       (custom_key1..3 / custom_value1..3).
-///                                       The fixed-shape custom slots flatten
-///                                       to a `metadata` map<string,string> in
-///                                       proto.
-///   Swift   ErrorContext.swift          (matches Dart equivalent).
-///   Kotlin  SDKError.kt                 No ErrorContext — uses Throwable.cause
-///                                       only. Will pick up source location
-///                                       from this proto on regeneration.
-///   Dart    error_context.dart:4        StackTrace? stackTrace, String file,
-///                                       int line, String function, DateTime
-///                                       timestamp, String threadInfo.
-///   RN      ErrorContext.ts:11          stackTrace[], file, line, function,
-///                                       timestamp, threadInfo.
-///   Web     ErrorTypes.ts               (no context type).
-///
-/// Stack traces are intentionally NOT modeled here — they are platform-shaped
-/// (string lines on RN/Dart, rac_stack_frame_t[] on C, StackTrace on Dart) and
-/// belong in a platform-local logging path, not in the wire IDL. If the C ABI
-/// ever ships symbolicated frames, add a `repeated StackFrame frames` field
-/// guarded by a feature flag.
-/// ---------------------------------------------------------------------------
+/// Debugging metadata captured at the throw site. Stack traces are deliberately
+/// absent: they are platform-shaped and belong in platform-local logging.
 class ErrorContext extends $pb.GeneratedMessage {
   factory ErrorContext({
     $core.Iterable<$core.MapEntry<$core.String, $core.String>>? metadata,
@@ -110,13 +83,10 @@ class ErrorContext extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ErrorContext>(create);
   static ErrorContext? _defaultInstance;
 
-  /// Free-form key/value pairs for telemetry tagging. Maps onto the C ABI's
-  /// three custom_key/custom_value slots and Dart's `Map<String, dynamic>`
-  /// (after string-coercion).
+  /// Telemetry tagging.
   @$pb.TagNumber(1)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(0);
 
-  /// __FILE__ at the throw site. C ABI cap is RAC_MAX_METADATA_STRING (256).
   @$pb.TagNumber(2)
   $core.String get sourceFile => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -126,7 +96,6 @@ class ErrorContext extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearSourceFile() => $_clearField(2);
 
-  /// __LINE__ at the throw site.
   @$pb.TagNumber(3)
   $core.int get sourceLine => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -136,11 +105,8 @@ class ErrorContext extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearSourceLine() => $_clearField(3);
 
-  /// Logical operation name ("loadModel", "generate", "transcribeStream",
-  /// ...). Lets clients route on operation without parsing free-text.
-  /// Maps roughly onto Dart's `function` field and C ABI's source_function;
-  /// we use the more generic "operation" name because some platforms (C++,
-  /// Swift) symbolicate the function name from the stack frame instead.
+  /// Logical operation ("loadModel", "generate", "transcribeStream"), so
+  /// clients can route without parsing free text.
   @$pb.TagNumber(4)
   $core.String get operation => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -150,10 +116,8 @@ class ErrorContext extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearOperation() => $_clearField(4);
 
-  /// The structured field path a validation error refers to
-  /// ("<Message>.<field>"). First-class replacement for the
-  /// metadata["field_path"] magic key all five SDKs read/write today; the
-  /// generated convenience validate() already emits this path.
+  /// "<Message>.<field>" for validation errors. The generated validate()
+  /// emits this.
   @$pb.TagNumber(5)
   $core.String get fieldPath => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -164,53 +128,11 @@ class ErrorContext extends $pb.GeneratedMessage {
   void clearFieldPath() => $_clearField(5);
 }
 
-/// ---------------------------------------------------------------------------
-/// SDKError — the unified error payload every SDK throws / returns.
+/// The unified error payload every SDK throws or returns.
 ///
-/// Sources pre-IDL:
-///   C ABI   rac_structured_error.h:102  rac_error_t (code, category, message,
-///                                       source location, stack trace,
-///                                       underlying_code, underlying_message,
-///                                       model_id, framework, session_id,
-///                                       timestamp_ms, 3 custom k/v slots).
-///   Swift   (no concrete SDKError type was located; Swift code uses
-///           ErrorCode + ErrorCategory + a SDKErrorProtocol shape that
-///           matches this message; the migrated Swift SDK in sdk/swift/ will
-///           be regenerated from this proto).
-///   Kotlin  SDKError.kt:27              data class (code, category, message,
-///                                       cause).
-///   Dart    sdk_error.dart:13           class SDKError (message, type,
-///                                       underlyingError, context).
-///   RN      SDKError.ts:147             class SDKError (code, legacyCode?,
-///                                       category, underlyingError, context,
-///                                       details?).
-///   Web     ErrorTypes.ts:68            class SDKError (code, details?).
-///
-/// Wire contract:
-///   * `code` — required. Always non-zero (zero indicates success and there
-///     should be no SDKError to begin with). Codegen MUST refuse to emit
-///     ERROR_CODE_UNSPECIFIED at runtime.
-///   * `category` — required. Coarse routing bucket. May be UNSPECIFIED only
-///     when `code` itself doesn't fit any bucket cleanly (rare).
-///   * `message` — required, human-readable, non-localized. Localization is a
-///     consumer concern.
-///   * `context` — optional. Source location + telemetry metadata.
-///   * `c_abi_code` — optional. Negative `rac_result_t` integer from the C ABI
-///     (e.g. -110 for MODEL_NOT_FOUND). Allows lossless round-trip with the
-///     C ABI even when intermediate platforms (Kotlin, Dart, RN) use a
-///     positive-numbered local enum. If `code` is set, `c_abi_code` MUST
-///     equal `-int32(code)` for codes ≤ 899; for the Web-only WASM codes
-///     (≥ 900) `c_abi_code` is unset because no canonical C ABI value exists.
-///   * `nested_message` — optional. Underlying-error message as captured at
-///     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
-///     and Kotlin's Throwable.cause.message.
-///   * `retryable` — canonical retry hint. This is business-policy metadata
-///     owned by the portable layer; the platform adapter still decides how to
-///     schedule the retry through native/background APIs when appropriate.
-///   * `correlation_id` — stable cross-event/request correlation key. SDKEvent
-///     also carries this field so callers can join success/progress/failure
-///     events without parsing free-form properties.
-/// ---------------------------------------------------------------------------
+/// `code` is always non-zero: an SDKError implies failure, and success is
+/// signalled by its absence. `message` is non-localized; localization is a
+/// consumer concern.
 class SDKError extends $pb.GeneratedMessage {
   factory SDKError({
     ErrorCode? code,
@@ -329,9 +251,9 @@ class SDKError extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   ErrorContext ensureContext() => $_ensure(3);
 
-  /// Negative rac_result_t value from the C ABI. May be negative; preserved
-  /// via int32 (proto3 int32 is signed). Unset when the failure originated
-  /// outside the C ABI (e.g. a pure-Web WASM failure).
+  /// Signed rac_result_t. Equals -code for codes <= 899. Unset for the
+  /// Web-only WASM codes (>= 900), which have no C ABI counterpart, and for
+  /// failures originating outside the C ABI.
   @$pb.TagNumber(5)
   $core.int get cAbiCode => $_getIZ(4);
   @$pb.TagNumber(5)
@@ -341,7 +263,7 @@ class SDKError extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearCAbiCode() => $_clearField(5);
 
-  /// Underlying error's message (the "caused by" chain), if any.
+  /// The "caused by" chain.
   @$pb.TagNumber(6)
   $core.String get nestedMessage => $_getSZ(5);
   @$pb.TagNumber(6)
@@ -351,9 +273,8 @@ class SDKError extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearNestedMessage() => $_clearField(6);
 
-  /// Envelope metadata for canonical error emission. `component` is a stable
-  /// lowercase component key ("llm", "stt", "tts", "vad", "vlm", "rag",
-  /// "download", "storage", ...); SDKEvent carries the enum-typed component.
+  /// `component` is a stable lowercase key ("llm", "stt", "rag", "download").
+  /// SDKEvent carries the enum-typed component instead.
   @$pb.TagNumber(7)
   $fixnum.Int64 get timestampMs => $_getI64(6);
   @$pb.TagNumber(7)

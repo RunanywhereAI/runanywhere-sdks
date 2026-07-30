@@ -661,31 +661,30 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 const char descriptor_table_protodef_logging_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\rlogging.proto\022\016runanywhere.v1\032\021rac_opt"
-    "ions.proto\"\326\001\n\024LoggingConfiguration\022&\n\024e"
+    "ions.proto\"\320\001\n\024LoggingConfiguration\022&\n\024e"
     "nable_local_logging\030\001 \001(\010B\010\212\265\030\004true\022/\n\rm"
     "in_log_level\030\002 \001(\0162\030.runanywhere.v1.LogL"
     "evel\022\037\n\027include_source_location\030\003 \001(\010\022\037\n"
     "\027include_device_metadata\030\004 \001(\010\022\035\n\025enable"
-    "_remote_logging\030\005 \001(\010J\004\010\006\020\007\"\303\002\n\010LogEntry"
-    "\022\031\n\021timestamp_unix_ms\030\001 \001(\003\022\'\n\005level\030\002 \001"
-    "(\0162\030.runanywhere.v1.LogLevel\022\020\n\010category"
-    "\030\003 \001(\t\022\017\n\007message\030\004 \001(\t\0228\n\010metadata\030\005 \003("
-    "\0132&.runanywhere.v1.LogEntry.MetadataEntr"
-    "y\022\014\n\004file\030\006 \001(\t\022\014\n\004line\030\007 \001(\005\022\020\n\010functio"
-    "n\030\010 \001(\t\022\022\n\nerror_code\030\t \001(\005\022\020\n\010model_id\030"
-    "\n \001(\t\022\021\n\tframework\030\013 \001(\t\032/\n\rMetadataEntr"
-    "y\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001*\203\002\n\010Lo"
-    "gLevel\022\'\n\017LOG_LEVEL_TRACE\020\000\032\022\322\265\030\005Trace\342\265"
-    "\030\005trace\022\'\n\017LOG_LEVEL_DEBUG\020\001\032\022\322\265\030\005Debug\342"
-    "\265\030\005debug\022$\n\016LOG_LEVEL_INFO\020\002\032\020\322\265\030\004Info\342\265"
-    "\030\004info\022-\n\021LOG_LEVEL_WARNING\020\003\032\026\322\265\030\007Warni"
-    "ng\342\265\030\007warning\022\'\n\017LOG_LEVEL_ERROR\020\004\032\022\322\265\030\005"
-    "Error\342\265\030\005error\022\'\n\017LOG_LEVEL_FATAL\020\005\032\022\322\265\030"
-    "\005Fatal\342\265\030\005fatalB\207\001\n\027ai.runanywhere.proto"
-    ".v1B\014LoggingProtoP\001Z<github.com/runanywh"
-    "ere/runanywhere-sdks/idl/v1;runanywherev"
-    "1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto"
-    "3"
+    "_remote_logging\030\005 \001(\010\"\303\002\n\010LogEntry\022\031\n\021ti"
+    "mestamp_unix_ms\030\001 \001(\003\022\'\n\005level\030\002 \001(\0162\030.r"
+    "unanywhere.v1.LogLevel\022\020\n\010category\030\003 \001(\t"
+    "\022\017\n\007message\030\004 \001(\t\0228\n\010metadata\030\005 \003(\0132&.ru"
+    "nanywhere.v1.LogEntry.MetadataEntry\022\014\n\004f"
+    "ile\030\006 \001(\t\022\014\n\004line\030\007 \001(\005\022\020\n\010function\030\010 \001("
+    "\t\022\022\n\nerror_code\030\t \001(\005\022\020\n\010model_id\030\n \001(\t\022"
+    "\021\n\tframework\030\013 \001(\t\032/\n\rMetadataEntry\022\013\n\003k"
+    "ey\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001*\203\002\n\010LogLevel"
+    "\022\'\n\017LOG_LEVEL_TRACE\020\000\032\022\322\265\030\005Trace\342\265\030\005trac"
+    "e\022\'\n\017LOG_LEVEL_DEBUG\020\001\032\022\322\265\030\005Debug\342\265\030\005deb"
+    "ug\022$\n\016LOG_LEVEL_INFO\020\002\032\020\322\265\030\004Info\342\265\030\004info"
+    "\022-\n\021LOG_LEVEL_WARNING\020\003\032\026\322\265\030\007Warning\342\265\030\007"
+    "warning\022\'\n\017LOG_LEVEL_ERROR\020\004\032\022\322\265\030\005Error\342"
+    "\265\030\005error\022\'\n\017LOG_LEVEL_FATAL\020\005\032\022\322\265\030\005Fatal"
+    "\342\265\030\005fatalB\207\001\n\027ai.runanywhere.proto.v1B\014L"
+    "oggingProtoP\001Z<github.com/runanywhere/ru"
+    "nanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002"
+    "\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_logging_2eproto_deps[1] = {
@@ -695,7 +694,7 @@ static ::absl::once_flag descriptor_table_logging_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_logging_2eproto = {
     false,
     false,
-    1001,
+    995,
     descriptor_table_protodef_logging_2eproto,
     "logging.proto",
     &descriptor_table_logging_2eproto_once,

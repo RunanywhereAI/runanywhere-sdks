@@ -33,13 +33,8 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Declarative manifest of files a multi-file / directory model is expected
- * to contain on disk after download/extraction. Used for verification before
- * hand-off to the inference framework. Sources pre-IDL:
- *   Flutter core/types/model_types.dart:420
- *   Swift   ModelTypes.swift:~300
- * ---------------------------------------------------------------------------
+ * What a multi-file model should contain on disk after extraction. Verified
+ * before hand-off to the inference framework.
  */
 public class ExpectedModelFiles(
   files: List<ModelFileDescriptor> = emptyList(),

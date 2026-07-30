@@ -18,8 +18,8 @@ import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
-  STTAudioEncoding,
   type STTOptions,
   type STTOutput,
   type STTPartialResult,
@@ -81,7 +81,7 @@ function buildSTTRequestBytes(
     requestId: nextSTTRequestId(),
     audio: STTAudioSource.fromPartial({
       audioData: audio,
-      encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
+      encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
       sampleRate: audioCaptureDefaults.micSampleRateHz,
       channels: 1,
       bitsPerSample: 16,

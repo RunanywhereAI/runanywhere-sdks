@@ -15,7 +15,7 @@ import kotlin.`annotation`.Retention
 import kotlin.`annotation`.Target
 
 /**
- * Inclusive numeric minimum used by validate() for float/double fields.
+ * Inclusive bounds for float/double fields.
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(

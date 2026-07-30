@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -23,21 +22,8 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'stt_options.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// STT component configuration (init-time settings).
-/// Sources pre-IDL:
-///   Swift  STTTypes.swift:15           STTConfiguration
-///   Kotlin STTTypes.kt:27              STTConfiguration
-///   Dart   stt_configuration.dart:9    STTConfiguration
-///   C ABI  rac_stt_types.h:76          rac_stt_config_t
-///
-/// Note: max_alternatives, enable_punctuation, enable_diarization, and
-/// enable_timestamps appear in the pre-IDL configs but are runtime knobs
-/// in the canonical model. They live on STTOptions; STTConfiguration
-/// keeps only true init-time fields (model id, language, sample rate,
-/// VAD toggle, audio format). Producers should mirror runtime knobs into
-/// STTOptions when constructing requests.
-/// ---------------------------------------------------------------------------
+/// Init-time settings. Per-call knobs live on STTOptions; adapters mirror the
+/// transcription defaults below into STTOptions when building a request.
 class STTConfiguration extends $pb.GeneratedMessage {
   factory STTConfiguration({
     $core.String? modelId,
@@ -152,8 +138,6 @@ class STTConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearAudioFormat() => $_clearField(5);
 
-  /// C ABI / legacy SDK config-level transcription defaults. These may be
-  /// mirrored into STTOptions by adapters for per-call overrides.
   @$pb.TagNumber(6)
   $core.bool get enablePunctuation => $_getBF(4);
   @$pb.TagNumber(6)
@@ -193,7 +177,6 @@ class STTConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearEnableWordTimestamps() => $_clearField(10);
 
-  /// Preferred framework for the component. Absent = auto.
   @$pb.TagNumber(11)
   $0.InferenceFramework get preferredFramework => $_getN(9);
   @$pb.TagNumber(11)
@@ -203,7 +186,6 @@ class STTConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   void clearPreferredFramework() => $_clearField(11);
 
-  /// Default input language, BCP-47 / ISO-639-1. Unset/empty = auto-detect.
   @$pb.TagNumber(13)
   $core.String get language => $_getSZ(10);
   @$pb.TagNumber(13)
@@ -214,22 +196,7 @@ class STTConfiguration extends $pb.GeneratedMessage {
   void clearLanguage() => $_clearField(13);
 }
 
-/// ---------------------------------------------------------------------------
-/// STT runtime transcription options (per-call overrides).
-/// Sources pre-IDL:
-///   Swift  STTTypes.swift:64           STTOptions  (10 fields)
-///   Kotlin STTTypes.kt:65              STTOptions  (10 fields)
-///   Dart   generation_types.dart:78    STTOptions  (10 fields)
-///   RN     STTTypes.ts:12              STTOptions  (5 fields, narrower)
-///   Web    STTTypes.ts:25              STTTranscribeOptions (2 fields)
-///   C ABI  rac_stt_types.h:130         rac_stt_options_t (8 fields)
-///
-/// Per spec, this canonical message exposes: language, enable_punctuation,
-/// enable_diarization, max_speakers, vocabulary_list, enable_word_timestamps,
-/// beam_size. Other pre-IDL fields (audio_format, sample_rate, detect_language,
-/// preferred_framework) are part of STTConfiguration or implied by
-/// STT_LANGUAGE_AUTO.
-/// ---------------------------------------------------------------------------
+/// Per-call overrides.
 class STTOptions extends $pb.GeneratedMessage {
   factory STTOptions({
     $core.bool? enablePunctuation,
@@ -347,6 +314,7 @@ class STTOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearEnableWordTimestamps() => $_clearField(6);
 
+  /// 0 = backend default, for all four of these.
   @$pb.TagNumber(7)
   $core.int get beamSize => $_getIZ(5);
   @$pb.TagNumber(7)
@@ -356,7 +324,6 @@ class STTOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearBeamSize() => $_clearField(7);
 
-  /// Maximum number of alternatives to return. 0 = backend/default.
   @$pb.TagNumber(12)
   $core.int get maxAlternatives => $_getIZ(6);
   @$pb.TagNumber(12)
@@ -366,7 +333,6 @@ class STTOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearMaxAlternatives() => $_clearField(12);
 
-  /// Streaming/endpointer controls. 0 = backend/default.
   @$pb.TagNumber(13)
   $core.int get chunkDurationMs => $_getIZ(7);
   @$pb.TagNumber(13)
@@ -403,8 +369,6 @@ class STTOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   void clearTranslateToEnglish() => $_clearField(16);
 
-  /// Input language as a BCP-47 / ISO-639-1 tag ("en", "en-US", "hi").
-  /// Unset or empty = auto-detect. Matches the industry `language` param.
   @$pb.TagNumber(17)
   $core.String get language => $_getSZ(11);
   @$pb.TagNumber(17)
@@ -422,7 +386,7 @@ class STTAudioSource extends $pb.GeneratedMessage {
     $core.List<$core.int>? audioData,
     $core.String? fileUri,
     $core.String? adapterHandle,
-    STTAudioEncoding? encoding,
+    $0.AudioEncoding? encoding,
     $0.AudioFormat? audioFormat,
     $core.int? sampleRate,
     $core.int? channels,
@@ -467,8 +431,8 @@ class STTAudioSource extends $pb.GeneratedMessage {
         1, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
     ..aOS(2, _omitFieldNames ? '' : 'fileUri')
     ..aOS(3, _omitFieldNames ? '' : 'adapterHandle')
-    ..aE<STTAudioEncoding>(4, _omitFieldNames ? '' : 'encoding',
-        enumValues: STTAudioEncoding.values)
+    ..aE<$0.AudioEncoding>(4, _omitFieldNames ? '' : 'encoding',
+        enumValues: $0.AudioEncoding.values)
     ..aE<$0.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat',
         enumValues: $0.AudioFormat.values)
     ..aI(6, _omitFieldNames ? '' : 'sampleRate')
@@ -534,9 +498,9 @@ class STTAudioSource extends $pb.GeneratedMessage {
   void clearAdapterHandle() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  STTAudioEncoding get encoding => $_getN(3);
+  $0.AudioEncoding get encoding => $_getN(3);
   @$pb.TagNumber(4)
-  set encoding(STTAudioEncoding value) => $_setField(4, value);
+  set encoding($0.AudioEncoding value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasEncoding() => $_has(3);
   @$pb.TagNumber(4)
@@ -683,18 +647,6 @@ class STTTranscriptionRequest extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Word-level timestamp.
-/// Sources pre-IDL:
-///   Swift  STTTypes.swift:260          WordTimestamp (TimeInterval seconds)
-///   Kotlin STTTypes.kt:141             WordTimestamp (Double seconds)
-///   Dart   generation_types.dart:124   WordTimestamp (double seconds, conf?)
-///   RN     STTTypes.ts:55              WordTimestamp (number seconds)
-///   Web    STTTypes.ts:18              STTWord       (number ms)
-///   C ABI  rac_stt_types.h:175         rac_stt_word_t (int64 ms)
-///
-/// Canonicalize on int64 *_ms (matches C ABI and Web).
-/// ---------------------------------------------------------------------------
 class WordTimestamp extends $pb.GeneratedMessage {
   factory WordTimestamp({
     $core.String? word,
@@ -797,19 +749,7 @@ class WordTimestamp extends $pb.GeneratedMessage {
   void clearSpeakerId() => $_clearField(5);
 }
 
-/// ---------------------------------------------------------------------------
-/// Alternative transcription hypothesis (n-best).
-/// Sources pre-IDL:
-///   Swift  STTTypes.swift:275          TranscriptionAlternative (text, confidence)
-///   Kotlin STTTypes.kt:155             TranscriptionAlternative (text, confidence)
-///   Dart   generation_types.dart:146   TranscriptionAlternative (transcript, confidence)
-///   RN     STTTypes.ts:65              STTAlternative (text, confidence)
-///   C ABI  rac_stt_types.h:320         rac_transcription_alternative_t (text, confidence)
-///
-/// Drift: Dart uses `transcript` while everyone else uses `text`. Canonical
-/// field name is `text`. Per-word breakdown is OPTIONAL (only some backends
-/// emit it for alternatives).
-/// ---------------------------------------------------------------------------
+/// One n-best hypothesis. Per-word breakdown only when the backend emits it.
 class TranscriptionAlternative extends $pb.GeneratedMessage {
   factory TranscriptionAlternative({
     $core.String? text,
@@ -884,18 +824,6 @@ class TranscriptionAlternative extends $pb.GeneratedMessage {
   $pb.PbList<WordTimestamp> get words => $_getList(2);
 }
 
-/// ---------------------------------------------------------------------------
-/// Per-pass transcription metadata.
-/// Sources pre-IDL:
-///   Swift  STTTypes.swift:241          TranscriptionMetadata (s + computed RTF)
-///   Kotlin STTTypes.kt:124             TranscriptionMetadata (s + computed RTF)
-///   Dart   generation_types.dart:160   TranscriptionMetadata (s + computed RTF)
-///   RN     STTTypes.ts:73              TranscriptionMetadata (s + optional RTF)
-///   C ABI  rac_stt_types.h:297         rac_transcription_metadata_t (ms + RTF)
-///
-/// Canonicalize on ms (matches C ABI). real_time_factor is producer-set;
-/// consumers may recompute as processing_time_ms / audio_length_ms.
-/// ---------------------------------------------------------------------------
 class TranscriptionMetadata extends $pb.GeneratedMessage {
   factory TranscriptionMetadata({
     $core.String? modelId,
@@ -978,6 +906,7 @@ class TranscriptionMetadata extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearAudioLengthMs() => $_clearField(3);
 
+  /// processing_time_ms / audio_length_ms, set by the producer.
   @$pb.TagNumber(4)
   $core.double get realTimeFactor => $_getN(3);
   @$pb.TagNumber(4)
@@ -988,20 +917,6 @@ class TranscriptionMetadata extends $pb.GeneratedMessage {
   void clearRealTimeFactor() => $_clearField(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// Final STT output.
-/// Sources pre-IDL:
-///   Swift  STTTypes.swift:147          STTOutput (text, conf, words, lang, alts, meta, ts)
-///   Kotlin STTTypes.kt:100             STTOutput (text, conf, words, lang, alts, meta, ts)
-///   Dart   generation_types.dart:218   STTResult / STTOutput (text, conf, durMs, lang, words, alts, meta, ts)
-///   RN     STTTypes.ts:32              STTOutput (text, conf, words, lang, alts, meta)
-///   Web    STTTypes.ts:9               STTTranscriptionResult (text, conf, lang, procMs, words)
-///   C ABI  rac_stt_types.h:338         rac_stt_output_t (text, conf, words, lang, alts, meta, ts_ms)
-///
-/// Drift reconciled:
-///   - language: detected language. Promoted to STTLanguage enum.
-///   - durationMs (Dart) / processingTimeMs (Web) → captured in metadata.
-/// ---------------------------------------------------------------------------
 class STTOutput extends $pb.GeneratedMessage {
   factory STTOutput({
     $core.String? text,
@@ -1116,7 +1031,7 @@ class STTOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   TranscriptionMetadata ensureMetadata() => $_ensure(4);
 
-  /// Wall-clock output timestamp in milliseconds since Unix epoch.
+  /// Milliseconds since epoch.
   @$pb.TagNumber(8)
   $fixnum.Int64 get timestampMs => $_getI64(5);
   @$pb.TagNumber(8)
@@ -1126,7 +1041,6 @@ class STTOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearTimestampMs() => $_clearField(8);
 
-  /// Audio duration in milliseconds for SDKs that expose duration directly.
   /// Often duplicates metadata.audio_length_ms.
   @$pb.TagNumber(9)
   $fixnum.Int64 get durationMs => $_getI64(6);
@@ -1137,11 +1051,9 @@ class STTOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearDurationMs() => $_clearField(9);
 
-  /// Diarization summary when available.
   @$pb.TagNumber(10)
   $pb.PbList<$core.String> get speakerIds => $_getList(7);
 
-  /// Terminal error details for result-envelope APIs.
   @$pb.TagNumber(11)
   $core.String get errorMessage => $_getSZ(8);
   @$pb.TagNumber(11)
@@ -1160,7 +1072,7 @@ class STTOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearErrorCode() => $_clearField(12);
 
-  /// Segment index for long-running/streaming transcription.
+  /// For long-running or streaming transcription.
   @$pb.TagNumber(13)
   $core.int get segmentIndex => $_getIZ(10);
   @$pb.TagNumber(13)
@@ -1170,7 +1082,7 @@ class STTOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearSegmentIndex() => $_clearField(13);
 
-  /// Detected language, BCP-47 (preserves regional variants). Empty = unknown.
+  /// Detected language, BCP-47. Empty = unknown.
   @$pb.TagNumber(14)
   $core.String get language => $_getSZ(11);
   @$pb.TagNumber(14)
@@ -1181,19 +1093,6 @@ class STTOutput extends $pb.GeneratedMessage {
   void clearLanguage() => $_clearField(14);
 }
 
-/// ---------------------------------------------------------------------------
-/// Streaming partial result emitted during live transcription.
-/// Sources pre-IDL:
-///   Dart   generation_types.dart:184   STTPartialResult (transcript, conf, isFinal, lang, ts, alts)
-///   RN     STTTypes.ts:90              STTPartialResult (transcript, conf, ts, lang, alts, isFinal)
-///   C ABI  rac_stt_types.h:240         rac_stt_stream_callback_t (partial_text, is_final)
-///   Web    STTTypes.ts:31              STTStreamCallback (text, isFinal)
-///
-/// Canonical minimal shape per spec: text, is_final, stability. Full word
-/// timestamps + alternatives flow through STTOutput on the terminal event.
-/// `stability` is the Whisper-style hypothesis stability score (0.0-1.0);
-/// 0.0 when backend does not provide one.
-/// ---------------------------------------------------------------------------
 class STTPartialResult extends $pb.GeneratedMessage {
   factory STTPartialResult({
     $core.String? text,
@@ -1291,6 +1190,7 @@ class STTPartialResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearIsFinal() => $_clearField(2);
 
+  /// Whisper-style hypothesis stability, 0.0-1.0. 0.0 when unsupported.
   @$pb.TagNumber(3)
   $core.double get stability => $_getN(2);
   @$pb.TagNumber(3)
@@ -1300,7 +1200,6 @@ class STTPartialResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearStability() => $_clearField(3);
 
-  /// Additional partial-hypothesis fields carried by Dart/RN live streams.
   @$pb.TagNumber(4)
   $core.double get confidence => $_getN(3);
   @$pb.TagNumber(4)
@@ -1322,7 +1221,6 @@ class STTPartialResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   $pb.PbList<TranscriptionAlternative> get alternatives => $_getList(5);
 
-  /// Streaming correlation and endpointing metadata.
   @$pb.TagNumber(9)
   $core.String get requestId => $_getSZ(6);
   @$pb.TagNumber(9)
@@ -1633,103 +1531,6 @@ class STTServiceState extends $pb.GeneratedMessage {
   $core.bool hasErrorCode() => $_has(5);
   @$pb.TagNumber(6)
   void clearErrorCode() => $_clearField(6);
-}
-
-class STTLanguageDetectionResult extends $pb.GeneratedMessage {
-  factory STTLanguageDetectionResult({
-    $core.double? confidence,
-    $core.Iterable<$core.String>? alternatives,
-    $core.String? language,
-  }) {
-    final result = create();
-    if (confidence != null) result.confidence = confidence;
-    if (alternatives != null) result.alternatives.addAll(alternatives);
-    if (language != null) result.language = language;
-    return result;
-  }
-
-  STTLanguageDetectionResult._();
-
-  factory STTLanguageDetectionResult.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory STTLanguageDetectionResult.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'STTLanguageDetectionResult',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aD(3, _omitFieldNames ? '' : 'confidence', fieldType: $pb.PbFieldType.OF)
-    ..pPS(4, _omitFieldNames ? '' : 'alternatives')
-    ..aOS(5, _omitFieldNames ? '' : 'language')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  STTLanguageDetectionResult clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  STTLanguageDetectionResult copyWith(
-          void Function(STTLanguageDetectionResult) updates) =>
-      super.copyWith(
-              (message) => updates(message as STTLanguageDetectionResult))
-          as STTLanguageDetectionResult;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static STTLanguageDetectionResult create() => STTLanguageDetectionResult._();
-  @$core.override
-  STTLanguageDetectionResult createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static STTLanguageDetectionResult getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<STTLanguageDetectionResult>(create);
-  static STTLanguageDetectionResult? _defaultInstance;
-
-  @$pb.TagNumber(3)
-  $core.double get confidence => $_getN(0);
-  @$pb.TagNumber(3)
-  set confidence($core.double value) => $_setFloat(0, value);
-  @$pb.TagNumber(3)
-  $core.bool hasConfidence() => $_has(0);
-  @$pb.TagNumber(3)
-  void clearConfidence() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $pb.PbList<$core.String> get alternatives => $_getList(1);
-
-  /// Detected language, BCP-47.
-  @$pb.TagNumber(5)
-  $core.String get language => $_getSZ(2);
-  @$pb.TagNumber(5)
-  set language($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(5)
-  $core.bool hasLanguage() => $_has(2);
-  @$pb.TagNumber(5)
-  void clearLanguage() => $_clearField(5);
-}
-
-/// Logical STT service contract. Platform adapters remain responsible for
-/// native capture, file access, and stream plumbing; C++ consumes only the
-/// serialized request/event messages defined above.
-class STTApi {
-  final $pb.RpcClient _client;
-
-  STTApi(this._client);
-
-  /// One-shot transcription. The request may carry audio bytes or a logical
-  /// adapter-provided handle; native file/capture I/O stays outside this IDL.
-  $async.Future<STTOutput> transcribe(
-          $pb.ClientContext? ctx, STTTranscriptionRequest request) =>
-      _client.invoke<STTOutput>(ctx, 'STT', 'Transcribe', request, STTOutput());
-
-  /// Server-streaming transcription events: started, partial hypotheses,
-  /// terminal final output, endpoint notifications, and errors.
-  $async.Future<STTStreamEvent> stream(
-          $pb.ClientContext? ctx, STTTranscriptionRequest request) =>
-      _client.invoke<STTStreamEvent>(
-          ctx, 'STT', 'Stream', request, STTStreamEvent());
 }
 
 const $core.bool _omitFieldNames =

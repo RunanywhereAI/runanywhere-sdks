@@ -1,12 +1,9 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export declare const protobufPackage = "runanywhere.v1";
 /**
- * ---------------------------------------------------------------------------
- * Severity, mirroring the C ABI `rac_log_level_t`. Larger value = more severe.
- * 0 is TRACE (not UNSPECIFIED) to keep numeric parity with the C enum — the
- * same C-ABI-aligned convention used by HttpDownloadStatus (0=OK) and
- * SdkInitEnvironment (0=DEVELOPMENT).
- * ---------------------------------------------------------------------------
+ * Mirrors rac_log_level_t exactly so the generated enum round-trips with the
+ * platform-adapter log callback without a translation table. 0 is TRACE, not
+ * UNSPECIFIED, to keep numeric parity with the C enum.
  */
 export declare enum LogLevel {
     LOG_LEVEL_TRACE = 0,
@@ -19,49 +16,33 @@ export declare enum LogLevel {
 }
 export declare function logLevelFromJSON(object: any): LogLevel;
 export declare function logLevelToJSON(object: LogLevel): string;
-/**
- * ---------------------------------------------------------------------------
- * SDK logging configuration. Per-environment presets
- * (development/staging/production) stay in each SDK as factory helpers.
- * ---------------------------------------------------------------------------
- */
+/** Per-environment presets stay in each SDK as factory helpers. */
 export interface LoggingConfiguration {
-    /** Write logs to the platform-local sink (os_log / Logcat / console). */
+    /** The platform-local sink: os_log, Logcat, or console. */
     enableLocalLogging: boolean;
-    /** Minimum severity emitted. Messages below this level are dropped. */
+    /** Records below this level are dropped. */
     minLogLevel: LogLevel;
-    /** Attach file:line:function source location to each record. */
     includeSourceLocation: boolean;
-    /** Attach device/build metadata (model, os version, app build) to records. */
+    /** Device model, OS version, app build. */
     includeDeviceMetadata: boolean;
-    /** Forward records to the remote logging pipeline. */
     enableRemoteLogging: boolean;
 }
-/**
- * ---------------------------------------------------------------------------
- * A single structured log record. Mirrors the per-SDK LogEntry shape.
- * ---------------------------------------------------------------------------
- */
 export interface LogEntry {
-    /** Wall-clock epoch milliseconds. */
     timestampUnixMs: number;
     level: LogLevel;
-    /** Subsystem/tag (e.g. "STT", "Download"). */
+    /** Subsystem tag, e.g. "STT". */
     category: string;
     message: string;
-    /** Optional structured context. */
     metadata: {
         [key: string]: string;
     };
     /**
-     * Optional source location + context (Kotlin LogEntry carries these as
-     * first-class fields; other SDKs leave them empty). `line`/`error_code`
-     * use 0 as "unset".
+     * Kotlin carries these as first-class fields; other SDKs leave them empty.
+     * 0 means unset for line and error_code.
      */
     file: string;
     line: number;
     function: string;
-    /** SDKError code, when the record describes an error. */
     errorCode: number;
     modelId: string;
     framework: string;

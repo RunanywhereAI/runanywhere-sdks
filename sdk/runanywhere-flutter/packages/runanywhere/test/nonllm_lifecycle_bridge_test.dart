@@ -3,6 +3,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/generated/diffusion_options.pb.dart';
 import 'package:runanywhere/generated/embeddings_options.pb.dart';
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show AudioEncoding;
 import 'package:runanywhere/generated/stt_options.pb.dart';
 import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/generated/vad_options.pb.dart';
@@ -32,7 +34,7 @@ void main() {
       STTTranscriptionRequest(
         audio: STTAudioSource(
           audioData: [1, 2, 3, 4],
-          encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
+          encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
           sampleRate: 16000,
           channels: 1,
         ),
@@ -75,7 +77,7 @@ void main() {
       VADProcessRequest(
         audio: VADAudioSource(
           audioData: [0, 0, 1, 0],
-          encoding: VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_S16_LE,
+          encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
           sampleRate: 16000,
           channels: 1,
         ),

@@ -31,7 +31,7 @@ import okio.ByteString
 
 public class ToolCallingSessionEvent(
   /**
-   * serialized LLMStreamEvent proto
+   * serialized LLMStreamEvent
    */
   @field:WireField(
     tag = 1,
@@ -58,7 +58,7 @@ public class ToolCallingSessionEvent(
   )
   public val final_result: ToolCallingResult? = null,
   /**
-   * serialized SDKError proto
+   * serialized SDKError
    */
   @field:WireField(
     tag = 4,

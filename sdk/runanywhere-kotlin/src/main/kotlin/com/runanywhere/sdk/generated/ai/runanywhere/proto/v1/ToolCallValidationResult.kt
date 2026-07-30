@@ -48,6 +48,9 @@ public class ToolCallValidationResult(
     schemaIndex = 2,
   )
   public val matched_tool: ToolDefinition? = null,
+  /**
+   * Arguments coerced to the matched tool's parameter types.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

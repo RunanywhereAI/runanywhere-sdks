@@ -30,32 +30,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Per-call generation options. Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:341    (DiffusionGenerationOptions)
- *   Kotlin DiffusionTypes.kt:230       (DiffusionGenerationOptions)
- *   RN     DiffusionTypes.ts:114       (DiffusionGenerationOptions)
- *   Web    DiffusionTypes.ts:29        (DiffusionGenerationOptions)
- *   C ABI  rac_diffusion_types.h:187   (rac_diffusion_options_t)
- *
- * Drift note: pre-IDL Swift/Kotlin/RN carry additional fields that the v1
- * IDL deliberately drops from this message in favor of more general /
- * future carriers:
- *   - input_image / mask_image (bytes)         → flows through a separate
- *                                                input artifact message in
- *                                                the service IDL
- *   - denoise_strength (float)                 → deferred (img2img-only,
- *                                                not in spec)
- *   - report_intermediate_images / progress_stride → covered by
- *                                                DiffusionProgress
- *                                                streaming semantics
- * ---------------------------------------------------------------------------
- */
 public class DiffusionGenerationOptions(
-  /**
-   * Text prompt describing the desired image. Required.
-   */
   @RacRequiredOption(true)
   @field:WireField(
     tag = 1,
@@ -64,9 +39,6 @@ public class DiffusionGenerationOptions(
     schemaIndex = 0,
   )
   public val prompt: String = "",
-  /**
-   * Things to avoid in the image. Empty = no negative prompt.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -76,8 +48,7 @@ public class DiffusionGenerationOptions(
   )
   public val negative_prompt: String = "",
   /**
-   * Output image width  in pixels.  0 = use variant default
-   * (512 for SD 1.5 / SDXS / LCM, 768 for SD 2.1, 1024 for SDXL / Turbo).
+   * 0 = backend default, for width, height, steps, and guidance_scale.
    */
   @RacDefaultOption("0")
   @field:WireField(
@@ -87,9 +58,6 @@ public class DiffusionGenerationOptions(
     schemaIndex = 2,
   )
   public val width: Int = 0,
-  /**
-   * Output image height in pixels.  0 = use variant default.
-   */
   @RacDefaultOption("0")
   @field:WireField(
     tag = 4,
@@ -98,11 +66,6 @@ public class DiffusionGenerationOptions(
     schemaIndex = 3,
   )
   public val height: Int = 0,
-  /**
-   * Number of denoising steps (industry short name `steps`). Range 1–50
-   * (variant-dependent: SDXS=1, SDXL_Turbo / LCM=4, SD*=20–28). 0 = use
-   * variant default. Was `num_inference_steps`.
-   */
   @RacDefaultOption("0")
   @RacMinOption(0)
   @RacMaxOption(50)
@@ -113,10 +76,6 @@ public class DiffusionGenerationOptions(
     schemaIndex = 4,
   )
   public val steps: Int = 0,
-  /**
-   * Classifier-free guidance scale. 0.0 = no CFG (required for SDXS /
-   * SDXL_Turbo). Typical SD range 1.0–20.0.
-   */
   @RacDefaultOption("0.0")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(20.0)
@@ -129,7 +88,7 @@ public class DiffusionGenerationOptions(
   )
   public val guidance_scale: Float = 0f,
   /**
-   * RNG seed for reproducibility. -1 = pick a random seed.
+   * -1 = random.
    */
   @RacDefaultOption("-1")
   @field:WireField(
@@ -139,10 +98,6 @@ public class DiffusionGenerationOptions(
     schemaIndex = 6,
   )
   public val seed: Long = 0L,
-  /**
-   * Sampler algorithm. UNSPECIFIED = backend picks (recommended:
-   * DPMPP_2M_KARRAS).
-   */
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.DiffusionScheduler#ADAPTER",
@@ -150,10 +105,6 @@ public class DiffusionGenerationOptions(
     schemaIndex = 7,
   )
   public val scheduler: DiffusionScheduler = DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED,
-  /**
-   * Generation mode (txt2img / img2img / inpainting). UNSPECIFIED =
-   * TEXT_TO_IMAGE.
-   */
   @field:WireField(
     tag = 9,
     adapter = "ai.runanywhere.proto.v1.DiffusionMode#ADAPTER",
@@ -162,7 +113,7 @@ public class DiffusionGenerationOptions(
   )
   public val mode: DiffusionMode = DiffusionMode.DIFFUSION_MODE_UNSPECIFIED,
   /**
-   * Image-to-image / inpainting payloads from rac_diffusion_options_t.
+   * For IMAGE_TO_IMAGE and INPAINTING.
    */
   @field:WireField(
     tag = 10,
@@ -189,9 +140,6 @@ public class DiffusionGenerationOptions(
     schemaIndex = 11,
   )
   public val denoise_strength: Float = 0f,
-  /**
-   * Progress reporting controls.
-   */
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -208,10 +156,6 @@ public class DiffusionGenerationOptions(
     schemaIndex = 13,
   )
   public val progress_stride: Int = 0,
-  /**
-   * Dimensions for raw input_image payloads when the backend cannot infer
-   * them from an encoded container.
-   */
   @field:WireField(
     tag = 15,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -228,9 +172,6 @@ public class DiffusionGenerationOptions(
     schemaIndex = 15,
   )
   public val input_image_height: Int = 0,
-  /**
-   * Input image/mask media hints. Empty = backend infer/default.
-   */
   @field:WireField(
     tag = 17,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -246,7 +187,7 @@ public class DiffusionGenerationOptions(
   )
   public val mask_image_media_type: String? = null,
   /**
-   * 0 = one image/backend default
+   * 0 = one image.
    */
   @field:WireField(
     tag = 19,

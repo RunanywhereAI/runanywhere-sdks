@@ -14,12 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// Voice gender — union across SDKs.
-/// Sources pre-IDL:
-///   RN     TTSTypes.ts:117    ('male' | 'female' | 'neutral')
-/// (Other SDKs did not expose voice listing pre-IDL; canonicalized here.)
-/// ---------------------------------------------------------------------------
 class TTSVoiceGender extends $pb.ProtobufEnum {
   static const TTSVoiceGender TTS_VOICE_GENDER_UNSPECIFIED =
       TTSVoiceGender._(0, _omitEnumNames ? '' : 'TTS_VOICE_GENDER_UNSPECIFIED');

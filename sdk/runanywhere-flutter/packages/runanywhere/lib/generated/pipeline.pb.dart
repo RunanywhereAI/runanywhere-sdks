@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
@@ -21,9 +20,6 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'pipeline.pbenum.dart';
 
-/// A pipeline is a labelled DAG of operators connected by typed edges. There
-/// are no cycles. Every input edge has a resolvable producer; every output
-/// edge has at least one consumer.
 class PipelineSpec extends $pb.GeneratedMessage {
   factory PipelineSpec({
     $core.String? name,
@@ -80,6 +76,7 @@ class PipelineSpec extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<PipelineSpec>(create);
   static PipelineSpec? _defaultInstance;
 
+  /// e.g. "voice_agent_basic".
   @$pb.TagNumber(1)
   $core.String get name => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -171,8 +168,6 @@ class OperatorSpec extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<OperatorSpec>(create);
   static OperatorSpec? _defaultInstance;
 
-  /// Unique within the spec, used as the prefix in edge endpoints like
-  /// "stt.final" or "llm.token".
   @$pb.TagNumber(1)
   $core.String get name => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -182,10 +177,6 @@ class OperatorSpec extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearName() => $_clearField(1);
 
-  /// The primitive the operator implements: "generate_text", "transcribe",
-  /// "synthesize", "detect_voice", "embed", "rerank", "tokenize", "window",
-  /// or a solution-declared custom operator ("AudioSource", "AudioSink",
-  /// "SentenceDetector", "VectorSearch", "ContextBuild").
   @$pb.TagNumber(2)
   $core.String get type => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -195,13 +186,10 @@ class OperatorSpec extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearType() => $_clearField(2);
 
-  /// Free-form parameters interpreted by the operator. The C++ loader
-  /// validates required keys per type before instantiating.
   @$pb.TagNumber(3)
   $pb.PbMap<$core.String, $core.String> get params => $_getMap(2);
 
-  /// Optional override of the engine that will serve this operator. When
-  /// empty, the L3 router picks based on capability + model format.
+  /// Bypasses priority-based engine selection.
   @$pb.TagNumber(4)
   $core.String get pinnedEngine => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -211,7 +199,6 @@ class OperatorSpec extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearPinnedEngine() => $_clearField(4);
 
-  /// Optional model identifier (resolved against the model registry).
   @$pb.TagNumber(5)
   $core.String get modelId => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -221,8 +208,6 @@ class OperatorSpec extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearModelId() => $_clearField(5);
 
-  /// Affinity hint: run this operator on CPU, GPU, or Neural Engine. The
-  /// scheduler may override if the requested device is unavailable.
   @$pb.TagNumber(6)
   DeviceAffinity get device => $_getN(5);
   @$pb.TagNumber(6)
@@ -286,10 +271,6 @@ class EdgeSpec extends $pb.GeneratedMessage {
       _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<EdgeSpec>(create);
   static EdgeSpec? _defaultInstance;
 
-  /// Endpoints are formatted "<operator_name>.<port_name>".
-  /// Source port names are operator-specific output channels; sink port
-  /// names are operator-specific input channels. Typing is enforced by the
-  /// pipeline validator.
   @$pb.TagNumber(1)
   $core.String get from => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -308,11 +289,7 @@ class EdgeSpec extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearTo() => $_clearField(2);
 
-  /// Channel depth override. Proto3 scalars have no presence bit, so the
-  /// sentinel value 0 means "use the per-edge default (16 for PCM, 256 for
-  /// tokens, 32 for sentences)". uint32 keeps the wire representation
-  /// identical to int32 on the happy path while making negative inputs
-  /// statically unrepresentable.
+  /// Queue depth, and what happens when it fills.
   @$pb.TagNumber(3)
   $core.int get capacity => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -382,8 +359,6 @@ class PipelineOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<PipelineOptions>(create);
   static PipelineOptions? _defaultInstance;
 
-  /// Maximum end-to-end latency budget in milliseconds. The pipeline emits
-  /// a MetricsEvent with is_over_budget=true if exceeded.
   @$pb.TagNumber(1)
   $core.int get latencyBudgetMs => $_getIZ(0);
   @$pb.TagNumber(1)
@@ -393,8 +368,6 @@ class PipelineOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearLatencyBudgetMs() => $_clearField(1);
 
-  /// When true, the pipeline emits MetricsEvent on every VAD barge-in and
-  /// on pipeline stop.
   @$pb.TagNumber(2)
   $core.bool get emitMetrics => $_getBF(1);
   @$pb.TagNumber(2)
@@ -404,8 +377,7 @@ class PipelineOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearEmitMetrics() => $_clearField(2);
 
-  /// When true, the pipeline validates the DAG for deadlocks and
-  /// disconnected edges before running.
+  /// Reject a spec with unknown operators instead of skipping them.
   @$pb.TagNumber(3)
   $core.bool get strictValidation => $_getBF(2);
   @$pb.TagNumber(3)
@@ -414,357 +386,6 @@ class PipelineOptions extends $pb.GeneratedMessage {
   $core.bool hasStrictValidation() => $_has(2);
   @$pb.TagNumber(3)
   void clearStrictValidation() => $_clearField(3);
-}
-
-/// Result of compiling a PipelineSpec into a runnable graph.
-class PipelineCompileResult extends $pb.GeneratedMessage {
-  factory PipelineCompileResult({
-    $core.String? handleId,
-    PipelineStatus? status,
-    $core.String? errorMessage,
-    $core.int? errorCode,
-  }) {
-    final result = create();
-    if (handleId != null) result.handleId = handleId;
-    if (status != null) result.status = status;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
-    return result;
-  }
-
-  PipelineCompileResult._();
-
-  factory PipelineCompileResult.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory PipelineCompileResult.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'PipelineCompileResult',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'handleId')
-    ..aE<PipelineStatus>(2, _omitFieldNames ? '' : 'status',
-        enumValues: PipelineStatus.values)
-    ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(4, _omitFieldNames ? '' : 'errorCode')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PipelineCompileResult clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PipelineCompileResult copyWith(
-          void Function(PipelineCompileResult) updates) =>
-      super.copyWith((message) => updates(message as PipelineCompileResult))
-          as PipelineCompileResult;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static PipelineCompileResult create() => PipelineCompileResult._();
-  @$core.override
-  PipelineCompileResult createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static PipelineCompileResult getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<PipelineCompileResult>(create);
-  static PipelineCompileResult? _defaultInstance;
-
-  /// Opaque compiled-graph identifier. Empty on failure.
-  @$pb.TagNumber(1)
-  $core.String get handleId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set handleId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasHandleId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearHandleId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  PipelineStatus get status => $_getN(1);
-  @$pb.TagNumber(2)
-  set status(PipelineStatus value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasStatus() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearStatus() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.String get errorMessage => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set errorMessage($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasErrorMessage() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearErrorMessage() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get errorCode => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set errorCode($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasErrorCode() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearErrorCode() => $_clearField(4);
-}
-
-/// Request to start a previously compiled pipeline.
-class PipelineStartRequest extends $pb.GeneratedMessage {
-  factory PipelineStartRequest({
-    $core.String? handleId,
-  }) {
-    final result = create();
-    if (handleId != null) result.handleId = handleId;
-    return result;
-  }
-
-  PipelineStartRequest._();
-
-  factory PipelineStartRequest.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory PipelineStartRequest.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'PipelineStartRequest',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'handleId')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PipelineStartRequest clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PipelineStartRequest copyWith(void Function(PipelineStartRequest) updates) =>
-      super.copyWith((message) => updates(message as PipelineStartRequest))
-          as PipelineStartRequest;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static PipelineStartRequest create() => PipelineStartRequest._();
-  @$core.override
-  PipelineStartRequest createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static PipelineStartRequest getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<PipelineStartRequest>(create);
-  static PipelineStartRequest? _defaultInstance;
-
-  /// Identifier returned by Compile. Required.
-  @$pb.TagNumber(1)
-  $core.String get handleId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set handleId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasHandleId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearHandleId() => $_clearField(1);
-}
-
-/// Live pipeline instance handle.
-class PipelineHandle extends $pb.GeneratedMessage {
-  factory PipelineHandle({
-    $core.String? handleId,
-    PipelineStatus? status,
-    $core.String? state,
-  }) {
-    final result = create();
-    if (handleId != null) result.handleId = handleId;
-    if (status != null) result.status = status;
-    if (state != null) result.state = state;
-    return result;
-  }
-
-  PipelineHandle._();
-
-  factory PipelineHandle.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory PipelineHandle.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'PipelineHandle',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'handleId')
-    ..aE<PipelineStatus>(2, _omitFieldNames ? '' : 'status',
-        enumValues: PipelineStatus.values)
-    ..aOS(3, _omitFieldNames ? '' : 'state')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PipelineHandle clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PipelineHandle copyWith(void Function(PipelineHandle) updates) =>
-      super.copyWith((message) => updates(message as PipelineHandle))
-          as PipelineHandle;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static PipelineHandle create() => PipelineHandle._();
-  @$core.override
-  PipelineHandle createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static PipelineHandle getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<PipelineHandle>(create);
-  static PipelineHandle? _defaultInstance;
-
-  /// Stable identifier for the started pipeline instance.
-  @$pb.TagNumber(1)
-  $core.String get handleId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set handleId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasHandleId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearHandleId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  PipelineStatus get status => $_getN(1);
-  @$pb.TagNumber(2)
-  set status(PipelineStatus value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasStatus() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearStatus() => $_clearField(2);
-
-  /// Optional engine-specific state string (e.g. "running", "stopped").
-  @$pb.TagNumber(3)
-  $core.String get state => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set state($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasState() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearState() => $_clearField(3);
-}
-
-/// Result of stopping a pipeline instance.
-class PipelineStopResult extends $pb.GeneratedMessage {
-  factory PipelineStopResult({
-    $core.String? handleId,
-    PipelineStatus? status,
-    $core.String? errorMessage,
-    $core.int? errorCode,
-  }) {
-    final result = create();
-    if (handleId != null) result.handleId = handleId;
-    if (status != null) result.status = status;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
-    return result;
-  }
-
-  PipelineStopResult._();
-
-  factory PipelineStopResult.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory PipelineStopResult.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'PipelineStopResult',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'handleId')
-    ..aE<PipelineStatus>(2, _omitFieldNames ? '' : 'status',
-        enumValues: PipelineStatus.values)
-    ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(4, _omitFieldNames ? '' : 'errorCode')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PipelineStopResult clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  PipelineStopResult copyWith(void Function(PipelineStopResult) updates) =>
-      super.copyWith((message) => updates(message as PipelineStopResult))
-          as PipelineStopResult;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static PipelineStopResult create() => PipelineStopResult._();
-  @$core.override
-  PipelineStopResult createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static PipelineStopResult getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<PipelineStopResult>(create);
-  static PipelineStopResult? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get handleId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set handleId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasHandleId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearHandleId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  PipelineStatus get status => $_getN(1);
-  @$pb.TagNumber(2)
-  set status(PipelineStatus value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasStatus() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearStatus() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.String get errorMessage => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set errorMessage($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasErrorMessage() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearErrorMessage() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get errorCode => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set errorCode($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasErrorCode() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearErrorCode() => $_clearField(4);
-}
-
-/// Logical pipeline service contract. Frontends pass a PipelineSpec, receive a
-/// compiled-graph handle, then start and stop the live instance. Backend
-/// execution, native runtime scheduling, and side effects remain adapter-owned.
-class PipelineApi {
-  final $pb.RpcClient _client;
-
-  PipelineApi(this._client);
-
-  /// Validate + compile a PipelineSpec into a runnable graph.
-  $async.Future<PipelineCompileResult> compile(
-          $pb.ClientContext? ctx, PipelineSpec request) =>
-      _client.invoke<PipelineCompileResult>(
-          ctx, 'Pipeline', 'Compile', request, PipelineCompileResult());
-
-  /// Start a compiled pipeline; returns a live instance handle.
-  $async.Future<PipelineHandle> start(
-          $pb.ClientContext? ctx, PipelineStartRequest request) =>
-      _client.invoke<PipelineHandle>(
-          ctx, 'Pipeline', 'Start', request, PipelineHandle());
-
-  /// Stop a running pipeline instance.
-  $async.Future<PipelineStopResult> stop(
-          $pb.ClientContext? ctx, PipelineHandle request) =>
-      _client.invoke<PipelineStopResult>(
-          ctx, 'Pipeline', 'Stop', request, PipelineStopResult());
 }
 
 const $core.bool _omitFieldNames =

@@ -49,13 +49,17 @@ public class DiarizationOptions(
     schemaIndex = 1,
   )
   public val channels: Int? = null,
-  @RacDefaultOption("DIARIZATION_AUDIO_ENCODING_PCM_F32_LE")
+  /**
+   * Commons normalizes either PCM representation to float samples before
+   * dispatching to an engine.
+   */
+  @RacDefaultOption("AUDIO_ENCODING_PCM_F32_LE")
   @field:WireField(
     tag = 3,
-    adapter = "ai.runanywhere.proto.v1.DiarizationAudioEncoding#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.AudioEncoding#ADAPTER",
     schemaIndex = 2,
   )
-  public val encoding: DiarizationAudioEncoding? = null,
+  public val encoding: AudioEncoding? = null,
   @RacDefaultOption("0.5")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(1.0)
@@ -133,7 +137,7 @@ public class DiarizationOptions(
   public fun copy(
     sample_rate: Int? = this.sample_rate,
     channels: Int? = this.channels,
-    encoding: DiarizationAudioEncoding? = this.encoding,
+    encoding: AudioEncoding? = this.encoding,
     threshold: Float? = this.threshold,
     minimum_duration_ms: Long = this.minimum_duration_ms,
     merge_gap_ms: Long = this.merge_gap_ms,
@@ -155,7 +159,7 @@ public class DiarizationOptions(
         var size = value.unknownFields.size
         size += ProtoAdapter.INT32.encodedSizeWithTag(1, value.sample_rate)
         size += ProtoAdapter.INT32.encodedSizeWithTag(2, value.channels)
-        size += DiarizationAudioEncoding.ADAPTER.encodedSizeWithTag(3, value.encoding)
+        size += AudioEncoding.ADAPTER.encodedSizeWithTag(3, value.encoding)
         size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.threshold)
         if (value.minimum_duration_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(5, value.minimum_duration_ms)
@@ -169,7 +173,7 @@ public class DiarizationOptions(
       override fun encode(writer: ProtoWriter, `value`: DiarizationOptions) {
         ProtoAdapter.INT32.encodeWithTag(writer, 1, value.sample_rate)
         ProtoAdapter.INT32.encodeWithTag(writer, 2, value.channels)
-        DiarizationAudioEncoding.ADAPTER.encodeWithTag(writer, 3, value.encoding)
+        AudioEncoding.ADAPTER.encodeWithTag(writer, 3, value.encoding)
         ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.threshold)
         if (value.minimum_duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 5, value.minimum_duration_ms)
@@ -189,7 +193,7 @@ public class DiarizationOptions(
           ProtoAdapter.INT64.encodeWithTag(writer, 5, value.minimum_duration_ms)
         }
         ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.threshold)
-        DiarizationAudioEncoding.ADAPTER.encodeWithTag(writer, 3, value.encoding)
+        AudioEncoding.ADAPTER.encodeWithTag(writer, 3, value.encoding)
         ProtoAdapter.INT32.encodeWithTag(writer, 2, value.channels)
         ProtoAdapter.INT32.encodeWithTag(writer, 1, value.sample_rate)
       }
@@ -197,7 +201,7 @@ public class DiarizationOptions(
       override fun decode(reader: ProtoReader): DiarizationOptions {
         var sample_rate: Int? = null
         var channels: Int? = null
-        var encoding: DiarizationAudioEncoding? = null
+        var encoding: AudioEncoding? = null
         var threshold: Float? = null
         var minimum_duration_ms: Long = 0L
         var merge_gap_ms: Long = 0L
@@ -206,7 +210,7 @@ public class DiarizationOptions(
             1 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             2 -> channels = ProtoAdapter.INT32.decode(reader)
             3 -> try {
-              encoding = DiarizationAudioEncoding.ADAPTER.decode(reader)
+              encoding = AudioEncoding.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

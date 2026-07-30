@@ -29,6 +29,9 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * Hands a caller-executed tool result back into a running session.
+ */
 public class ToolCallingSessionStepWithResultRequest(
   @field:WireField(
     tag = 1,

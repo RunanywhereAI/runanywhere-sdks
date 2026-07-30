@@ -16,14 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Backend identity. Matches the engines/ directory entry that registers
- * the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
- * ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
- * the descriptor's `provider` field, not from a distinct enum kind.
- * ---------------------------------------------------------------------------
- */
 public enum class HybridBackendKind(
   override val `value`: Int,
 ) : WireEnum {
@@ -31,10 +23,6 @@ public enum class HybridBackendKind(
   HYBRID_BACKEND_LLAMACPP(1),
   HYBRID_BACKEND_OPENROUTER(2),
   HYBRID_BACKEND_SHERPA(3),
-  /**
-   * Renamed from HYBRID_BACKEND_SARVAM (same wire number) — the engine is now
-   * the generic "cloud_stt" backend; the provider is carried out-of-band.
-   */
   HYBRID_BACKEND_CLOUD(4),
   ;
 

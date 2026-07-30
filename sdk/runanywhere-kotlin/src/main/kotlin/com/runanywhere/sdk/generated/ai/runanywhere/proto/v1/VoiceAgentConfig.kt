@@ -29,16 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * VoiceAgent — the canonical streaming voice AI loop.
- * ---------------------------------------------------------------------------
- */
 public class VoiceAgentConfig(
-  /**
-   * Model identifiers — resolved against the model registry.
-   * e.g. "qwen3-4b-q4_k_m"
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -47,9 +38,6 @@ public class VoiceAgentConfig(
     schemaIndex = 0,
   )
   public val llm_model_id: String = "",
-  /**
-   * e.g. "whisper-base"
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -58,9 +46,6 @@ public class VoiceAgentConfig(
     schemaIndex = 1,
   )
   public val stt_model_id: String = "",
-  /**
-   * e.g. "kokoro"
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -69,9 +54,6 @@ public class VoiceAgentConfig(
     schemaIndex = 2,
   )
   public val tts_model_id: String = "",
-  /**
-   * e.g. "silero-v5"
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -80,14 +62,6 @@ public class VoiceAgentConfig(
     schemaIndex = 3,
   )
   public val vad_model_id: String = "",
-  /**
-   * pass3-syn-025/030: explicit TTS voice id for multi-voice TTS engines
-   * (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice). When unset, callers
-   * fall back to using tts_model_id as the voice id — correct for
-   * single-voice engines, wrong for multi-voice. Aligns the caller-facing
-   * VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
-   * (voice_agent_service.proto:214) which already exposes tts_voice_id.
-   */
   @field:WireField(
     tag = 17,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -96,10 +70,6 @@ public class VoiceAgentConfig(
     schemaIndex = 4,
   )
   public val tts_voice_id: String = "",
-  /**
-   * Audio configuration.
-   * default 16000
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -108,9 +78,6 @@ public class VoiceAgentConfig(
     schemaIndex = 5,
   )
   public val sample_rate_hz: Int = 0,
-  /**
-   * default 20
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -119,6 +86,9 @@ public class VoiceAgentConfig(
     schemaIndex = 6,
   )
   public val chunk_ms: Int = 0,
+  /**
+   * audio_file_path applies when audio_source is FILE.
+   */
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.AudioSource#ADAPTER",
@@ -127,10 +97,6 @@ public class VoiceAgentConfig(
     schemaIndex = 7,
   )
   public val audio_source: AudioSource = AudioSource.AUDIO_SOURCE_UNSPECIFIED,
-  /**
-   * Absolute path to an audio file. Required when `audio_source` is
-   * `AUDIO_SOURCE_FILE`; ignored for MICROPHONE / CALLBACK sources.
-   */
   @field:WireField(
     tag = 15,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -140,8 +106,7 @@ public class VoiceAgentConfig(
   )
   public val audio_file_path: String = "",
   /**
-   * Barge-in behavior.
-   * default true when unset
+   * Unset means enabled.
    */
   @field:WireField(
     tag = 8,
@@ -150,9 +115,6 @@ public class VoiceAgentConfig(
     schemaIndex = 9,
   )
   public val enable_barge_in: Boolean? = null,
-  /**
-   * default 200
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -176,7 +138,7 @@ public class VoiceAgentConfig(
   )
   public val max_context_tokens: Int = 0,
   /**
-   * Emit partial transcripts as UserSaidEvent{is_final=false}.
+   * Emit partial transcripts as non-final user-said events.
    */
   @field:WireField(
     tag = 13,
@@ -186,11 +148,6 @@ public class VoiceAgentConfig(
     schemaIndex = 13,
   )
   public val emit_partials: Boolean = false,
-  /**
-   * Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
-   * oneof arm; provided so callers that pass this message standalone (or
-   * log it) can read a single discriminator. Defaults to UNSPECIFIED.
-   */
   @field:WireField(
     tag = 16,
     adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",

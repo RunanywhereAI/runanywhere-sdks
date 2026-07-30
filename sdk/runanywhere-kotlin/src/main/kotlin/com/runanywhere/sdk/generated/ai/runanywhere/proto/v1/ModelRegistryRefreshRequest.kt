@@ -30,16 +30,10 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Registry and model-lifecycle operation contracts.
- *
- * These messages describe C++-owned workflow decisions and results that SDKs
- * can expose directly as generated public API types. Platform-owned inputs
- * such as Android content URIs, iOS security-scoped bookmarks, browser
- * FileSystemHandle objects, auth/session cookies, and HTTP client handles
- * remain outside this schema. Platform adapters normalize those handles into
- * paths, URLs, manifests, or callbacks before invoking the C++ workflow.
- * ---------------------------------------------------------------------------
+ * Registry and lifecycle workflow contracts. Platform-owned inputs (Android
+ * content URIs, iOS security-scoped bookmarks, browser FileSystemHandles, auth
+ * cookies) stay outside this schema; adapters normalize them into paths, URLs,
+ * or manifests first.
  */
 public class ModelRegistryRefreshRequest(
   /**

@@ -598,10 +598,6 @@ export interface ComponentLifecycleSnapshot {
     loadedAtUnixMs: number;
     model?: ModelInfo | undefined;
 }
-export interface ComponentLifecycleSnapshotRequest {
-    component: SDKComponent;
-    includeModel: boolean;
-}
 export interface ComponentLifecycleSnapshotResult {
     success: boolean;
     snapshots: ComponentLifecycleSnapshot[];
@@ -1173,57 +1169,10 @@ export interface SDKEvent_PropertiesEntry {
     key: string;
     value: string;
 }
-/**
- * Subscription-side filter for the canonical SDKEvent stream. Empty fields are
- * wildcards; implementations match populated fields against the envelope fields
- * above without interpreting payload-specific data.
- */
-export interface SDKEventFilter {
-    categories: EventCategory[];
-    components: SDKComponent[];
-    destinations: EventDestination[];
-    minimumSeverity: ErrorSeverity;
-    sessionId: string;
-    operationId: string;
-    correlationId: string;
-    source: string;
-    traceId: string;
-}
-export interface SDKEventPublishRequest {
-    event?: SDKEvent | undefined;
-    /**
-     * When true, the portable event layer fills missing envelope metadata such
-     * as id, timestamp, destination, category/component defaults, source, and
-     * correlation fields before routing the event.
-     */
-    normalizeEnvelope: boolean;
-}
-export interface SDKEventPublishResult {
-    accepted: boolean;
-    eventId: string;
-    /**
-     * The event as accepted by the portable layer after optional envelope
-     * normalization. This is the same typed payload that serialized-proto
-     * bridges publish to subscribers.
-     */
-    normalizedEvent?: SDKEvent | undefined;
-    errorMessage: string;
-    error?: SDKError | undefined;
-}
-export interface SDKEventSubscribeRequest {
-    filter?: SDKEventFilter | undefined;
-    /**
-     * Replays queued events before following live events when the backing
-     * bridge has a poll queue. Implementations without retention may ignore it
-     * and continue with live events only.
-     */
-    replayQueuedEvents: boolean;
-}
 export declare const InitializationEvent: MessageFns<InitializationEvent>;
 export declare const ConfigurationEvent: MessageFns<ConfigurationEvent>;
 export declare const ComponentInitializationEvent: MessageFns<ComponentInitializationEvent>;
 export declare const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot>;
-export declare const ComponentLifecycleSnapshotRequest: MessageFns<ComponentLifecycleSnapshotRequest>;
 export declare const ComponentLifecycleSnapshotResult: MessageFns<ComponentLifecycleSnapshotResult>;
 export declare const ComponentLifecycleEvent: MessageFns<ComponentLifecycleEvent>;
 export declare const SessionEvent: MessageFns<SessionEvent>;
@@ -1247,10 +1196,6 @@ export declare const CancellationEvent: MessageFns<CancellationEvent>;
 export declare const FailureEvent: MessageFns<FailureEvent>;
 export declare const SDKEvent: MessageFns<SDKEvent>;
 export declare const SDKEvent_PropertiesEntry: MessageFns<SDKEvent_PropertiesEntry>;
-export declare const SDKEventFilter: MessageFns<SDKEventFilter>;
-export declare const SDKEventPublishRequest: MessageFns<SDKEventPublishRequest>;
-export declare const SDKEventPublishResult: MessageFns<SDKEventPublishResult>;
-export declare const SDKEventSubscribeRequest: MessageFns<SDKEventSubscribeRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

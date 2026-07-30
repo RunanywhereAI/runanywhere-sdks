@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: llm_service.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ToolCallingSessionDestroyRequest = exports.ToolCallingSessionStepWithResultRequest = exports.ToolCallingSessionEvent = exports.ToolCallingSessionCreateResult = exports.ToolCallingSessionCreateRequest = exports.LLMStreamEvent = exports.LLMStreamFinalResult = exports.LLMGenerateRequest_MetadataEntry = exports.LLMGenerateRequest = exports.LLMStreamEventKind = exports.protobufPackage = void 0;
+exports.ToolCallingSessionStepWithResultRequest = exports.ToolCallingSessionEvent = exports.ToolCallingSessionCreateRequest = exports.LLMStreamEvent = exports.LLMStreamFinalResult = exports.LLMGenerateRequest_MetadataEntry = exports.LLMGenerateRequest = exports.LLMStreamEventKind = exports.protobufPackage = void 0;
 exports.lLMStreamEventKindFromJSON = lLMStreamEventKindFromJSON;
 exports.lLMStreamEventKindToJSON = lLMStreamEventKindToJSON;
 /* eslint-disable */
@@ -1150,63 +1150,6 @@ exports.ToolCallingSessionCreateRequest = {
         return message;
     },
 };
-function createBaseToolCallingSessionCreateResult() {
-    return { sessionHandle: 0 };
-}
-exports.ToolCallingSessionCreateResult = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.sessionHandle !== 0) {
-            writer.uint32(8).uint64(message.sessionHandle);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseToolCallingSessionCreateResult();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.sessionHandle = longToNumber(reader.uint64());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            sessionHandle: isSet(object.sessionHandle)
-                ? globalThis.Number(object.sessionHandle)
-                : isSet(object.session_handle)
-                    ? globalThis.Number(object.session_handle)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.sessionHandle !== 0) {
-            obj.sessionHandle = Math.round(message.sessionHandle);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.ToolCallingSessionCreateResult.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseToolCallingSessionCreateResult();
-        message.sessionHandle = object.sessionHandle ?? 0;
-        return message;
-    },
-};
 function createBaseToolCallingSessionEvent() {
     return { llmStreamEventBytes: undefined, toolCall: undefined, finalResult: undefined, errorBytes: undefined, seq: 0 };
 }
@@ -1447,63 +1390,6 @@ exports.ToolCallingSessionStepWithResultRequest = {
         message.toolCallId = object.toolCallId ?? "";
         message.resultJson = object.resultJson ?? "";
         message.error = object.error ?? undefined;
-        return message;
-    },
-};
-function createBaseToolCallingSessionDestroyRequest() {
-    return { sessionHandle: 0 };
-}
-exports.ToolCallingSessionDestroyRequest = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.sessionHandle !== 0) {
-            writer.uint32(8).uint64(message.sessionHandle);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseToolCallingSessionDestroyRequest();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.sessionHandle = longToNumber(reader.uint64());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            sessionHandle: isSet(object.sessionHandle)
-                ? globalThis.Number(object.sessionHandle)
-                : isSet(object.session_handle)
-                    ? globalThis.Number(object.session_handle)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.sessionHandle !== 0) {
-            obj.sessionHandle = Math.round(message.sessionHandle);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.ToolCallingSessionDestroyRequest.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseToolCallingSessionDestroyRequest();
-        message.sessionHandle = object.sessionHandle ?? 0;
         return message;
     },
 };

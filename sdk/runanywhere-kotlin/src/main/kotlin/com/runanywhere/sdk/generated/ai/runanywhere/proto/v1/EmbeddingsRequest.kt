@@ -34,10 +34,7 @@ import kotlin.lazy
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Request envelope for service-handle APIs. One text = embed, multiple texts =
- * embed_batch.
- * ---------------------------------------------------------------------------
+ * One text = embed, multiple texts = embed_batch.
  */
 public class EmbeddingsRequest(
   texts: List<String> = emptyList(),

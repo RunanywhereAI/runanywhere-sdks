@@ -27,10 +27,8 @@ public enum class VADStreamEventKind(
   VAD_STREAM_EVENT_KIND_STOPPED(5),
   VAD_STREAM_EVENT_KIND_ERROR(6),
   /**
-   * Pipeline-level barge-in signal previously carried by the
-   * deleted VADEventType enum. Emitted when the VAD detects speech that
-   * interrupts active assistant playback; downstream pipeline typically
-   * routes this through InterruptedEvent/InterruptReason as well.
+   * Speech that interrupts active assistant playback. Downstream pipeline
+   * also routes this through InterruptedEvent/InterruptReason.
    */
   VAD_STREAM_EVENT_KIND_BARGE_IN(7),
   ;

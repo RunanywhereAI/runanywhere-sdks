@@ -17,12 +17,7 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * SolutionType — discriminator for the kind of solution backing a
- * `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
- * oneof arms so frontends can switch on a single enum value rather than
- * inspecting the oneof shape.
- * ---------------------------------------------------------------------------
+ * Lets frontends switch on one enum instead of inspecting the oneof.
  */
 public enum class SolutionType(
   override val `value`: Int,

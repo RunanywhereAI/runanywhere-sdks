@@ -22,11 +22,7 @@ export 'hybrid_router.pbenum.dart';
 
 enum HybridFilter_Kind { network, qualityTier, battery, custom, notSet }
 
-/// ---------------------------------------------------------------------------
-/// Hard filter — drops a candidate from consideration when the predicate
-/// fails. Filters compose with AND semantics. The wire kinds match
-/// thoughts/file.txt's Routing Conditions list verbatim.
-/// ---------------------------------------------------------------------------
+/// A candidate must pass every hard filter to stay in the running.
 class HybridFilter extends $pb.GeneratedMessage {
   factory HybridFilter({
     $core.bool? network,
@@ -102,8 +98,6 @@ class HybridFilter extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearKind() => $_clearField($_whichOneof(0));
 
-  /// True iff the host has working network. Disqualifies online
-  /// candidates when false; offline candidates are unaffected.
   @$pb.TagNumber(1)
   $core.bool get network => $_getBF(0);
   @$pb.TagNumber(1)
@@ -113,8 +107,7 @@ class HybridFilter extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearNetwork() => $_clearField(1);
 
-  /// Discrete quality tier required from the candidate. Candidates
-  /// declaring a lower tier in their descriptor are filtered out.
+  /// Documented as a no-op in the Dart policy.
   @$pb.TagNumber(3)
   $core.int get qualityTier => $_getIZ(1);
   @$pb.TagNumber(3)
@@ -124,8 +117,6 @@ class HybridFilter extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearQualityTier() => $_clearField(3);
 
-  /// Disqualifies cloud candidates when the device is below the
-  /// given battery percent (0–100).
   @$pb.TagNumber(4)
   BatteryFilter get battery => $_getN(2);
   @$pb.TagNumber(4)
@@ -137,8 +128,6 @@ class HybridFilter extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   BatteryFilter ensureBattery() => $_ensure(2);
 
-  /// Caller-supplied predicate, evaluated host-side via the
-  /// registered custom-filter callback table.
   @$pb.TagNumber(5)
   CustomFilter get custom => $_getN(3);
   @$pb.TagNumber(5)
@@ -273,10 +262,6 @@ class CustomFilter extends $pb.GeneratedMessage {
 
 enum HybridCascade_Kind { confidence, notSet }
 
-/// ---------------------------------------------------------------------------
-/// Cascade — triggers fallback from the primary candidate to the next
-/// candidate mid-request. Matches the file.txt Confidence policy.
-/// ---------------------------------------------------------------------------
 class HybridCascade extends $pb.GeneratedMessage {
   factory HybridCascade({
     ConfidenceCascade? confidence,
@@ -333,9 +318,6 @@ class HybridCascade extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearKind() => $_clearField($_whichOneof(0));
 
-  /// Cascade when the primary's confidence/logprob signal falls below
-  /// `threshold`, or when the primary returns an error (treated as
-  /// "no confidence").
   @$pb.TagNumber(1)
   ConfidenceCascade get confidence => $_getN(0);
   @$pb.TagNumber(1)
@@ -348,6 +330,7 @@ class HybridCascade extends $pb.GeneratedMessage {
   ConfidenceCascade ensureConfidence() => $_ensure(0);
 }
 
+/// Below this on-device confidence, the router escalates to cloud.
 class ConfidenceCascade extends $pb.GeneratedMessage {
   factory ConfidenceCascade({
     $core.double? threshold,
@@ -402,10 +385,6 @@ class ConfidenceCascade extends $pb.GeneratedMessage {
   void clearThreshold() => $_clearField(1);
 }
 
-/// ---------------------------------------------------------------------------
-/// Full routing policy attached to a model pair. `simple` mode collapses
-/// to a single filter; `advanced` mode allows composition.
-/// ---------------------------------------------------------------------------
 class HybridRoutingPolicy extends $pb.GeneratedMessage {
   factory HybridRoutingPolicy({
     $core.Iterable<HybridFilter>? hardFilters,
@@ -483,9 +462,6 @@ class HybridRoutingPolicy extends $pb.GeneratedMessage {
   void clearRank() => $_clearField(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Descriptor for a single registered model on one side of the pair.
-/// ---------------------------------------------------------------------------
 class HybridModelDescriptor extends $pb.GeneratedMessage {
   factory HybridModelDescriptor({
     $core.String? modelId,
@@ -569,9 +545,6 @@ class HybridModelDescriptor extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearBackend() => $_clearField(3);
 
-  /// Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-  /// "sarvam"). The cloud_stt engine reads it from config_json["provider"];
-  /// empty defaults to "sarvam". Ignored for non-cloud backends.
   @$pb.TagNumber(4)
   $core.String get provider => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -582,10 +555,7 @@ class HybridModelDescriptor extends $pb.GeneratedMessage {
   void clearProvider() => $_clearField(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// Metadata returned alongside the capability result describing what the
-/// router did. Always populated even on success.
-/// ---------------------------------------------------------------------------
+/// What the router actually did, including the failed primary attempt.
 class HybridRoutedMetadata extends $pb.GeneratedMessage {
   factory HybridRoutedMetadata({
     $core.String? chosenModelId,
@@ -677,8 +647,6 @@ class HybridRoutedMetadata extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearAttemptCount() => $_clearField(3);
 
-  /// Why the router fell back to the secondary. Zero (RAC_SUCCESS) when
-  /// the primary served the request or no fallback occurred.
   @$pb.TagNumber(4)
   $core.int get primaryErrorCode => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -697,8 +665,6 @@ class HybridRoutedMetadata extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearPrimaryErrorMessage() => $_clearField(5);
 
-  /// Final confidence of the result that was actually returned. NaN when
-  /// the engine does not surface a quality signal (e.g. sherpa-onnx Whisper).
   @$pb.TagNumber(6)
   $core.double get confidence => $_getN(5);
   @$pb.TagNumber(6)
@@ -708,9 +674,6 @@ class HybridRoutedMetadata extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearConfidence() => $_clearField(6);
 
-  /// Primary's confidence captured BEFORE cascading to the secondary.
-  /// Populated only when `was_fallback = true` AND the fallback fired on
-  /// confidence (not on an error). NaN otherwise.
   @$pb.TagNumber(7)
   $core.double get primaryConfidence => $_getN(6);
   @$pb.TagNumber(7)
@@ -721,12 +684,8 @@ class HybridRoutedMetadata extends $pb.GeneratedMessage {
   void clearPrimaryConfidence() => $_clearField(7);
 }
 
-/// ---------------------------------------------------------------------------
-/// Per-request routing context — caller-supplied hints only.
-///
-/// Device state lives behind the rac_hybrid_device_state C ABI vtable in
-/// commons; callers do not serialize platform state into this message.
-/// ---------------------------------------------------------------------------
+/// Device state lives behind the rac_hybrid_device_state vtable in commons, so
+/// callers never serialize platform state into this message.
 class HybridRoutingContext extends $pb.GeneratedMessage {
   factory HybridRoutingContext() => create();
 
@@ -765,16 +724,6 @@ class HybridRoutingContext extends $pb.GeneratedMessage {
   static HybridRoutingContext? _defaultInstance;
 }
 
-/// ---------------------------------------------------------------------------
-/// Cloud STT backend registration config. Replaces the hand-built
-/// `config_json` string that Swift (CloudSTT.swift), Kotlin (CloudModelEntry /
-/// HybridRouterBridgeAdapter), Flutter (CloudModelEntry.toConfigJson), RN
-/// (CloudSTT.configJSON), and Web (CloudSTT) each assemble identically and pass
-/// across the FFI/JNI boundary as `config_json`. The cloud_stt engine reads
-/// these fields when a model's backend == HYBRID_BACKEND_CLOUD; today it parses
-/// the same keys out of the JSON blob (`config_json["provider"]` etc., see
-/// HybridModelDescriptor.provider).
-/// ---------------------------------------------------------------------------
 class CloudSttBackendConfig extends $pb.GeneratedMessage {
   factory CloudSttBackendConfig({
     $core.String? provider,
@@ -835,7 +784,6 @@ class CloudSttBackendConfig extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<CloudSttBackendConfig>(create);
   static CloudSttBackendConfig? _defaultInstance;
 
-  /// HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam".
   @$pb.TagNumber(1)
   $core.String get provider => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -845,7 +793,6 @@ class CloudSttBackendConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearProvider() => $_clearField(1);
 
-  /// Provider-side model id (e.g. "saarika:v2").
   @$pb.TagNumber(2)
   $core.String get model => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -855,7 +802,6 @@ class CloudSttBackendConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearModel() => $_clearField(2);
 
-  /// Provider API key / credential.
   @$pb.TagNumber(3)
   $core.String get apiKey => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -865,7 +811,6 @@ class CloudSttBackendConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearApiKey() => $_clearField(3);
 
-  /// BCP-47 language hint forwarded to the provider (empty = auto-detect).
   @$pb.TagNumber(4)
   $core.String get languageCode => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -875,7 +820,6 @@ class CloudSttBackendConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearLanguageCode() => $_clearField(4);
 
-  /// Override the provider base URL (empty = provider default).
   @$pb.TagNumber(5)
   $core.String get baseUrl => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -885,7 +829,6 @@ class CloudSttBackendConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearBaseUrl() => $_clearField(5);
 
-  /// Request timeout in milliseconds (0 = engine default).
   @$pb.TagNumber(6)
   $core.int get timeoutMs => $_getIZ(5);
   @$pb.TagNumber(6)
@@ -896,11 +839,6 @@ class CloudSttBackendConfig extends $pb.GeneratedMessage {
   void clearTimeoutMs() => $_clearField(6);
 }
 
-/// ---------------------------------------------------------------------------
-/// STT transcription options carried through the router. Sample rate and
-/// audio_format mirror the C `rac_stt_options_t` knobs; `language` is the
-/// caller-supplied BCP-47 hint (empty = backend auto-detect).
-/// ---------------------------------------------------------------------------
 class HybridSttTranscribeOptions extends $pb.GeneratedMessage {
   factory HybridSttTranscribeOptions({
     $core.String? language,
@@ -971,7 +909,7 @@ class HybridSttTranscribeOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearSampleRate() => $_clearField(2);
 
-  /// Matches rac_audio_format_enum_t: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC.
+  /// Untyped: every other file uses the AudioFormat enum here.
   @$pb.TagNumber(3)
   $core.int get audioFormat => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -982,12 +920,6 @@ class HybridSttTranscribeOptions extends $pb.GeneratedMessage {
   void clearAudioFormat() => $_clearField(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Request handed to the JNI transcribe thunk. Audio bytes are passed
-/// verbatim to the chosen backend; each engine is responsible for parsing
-/// the encoded format (the cloud provider, e.g. Sarvam, reads the multipart
-/// file part; sherpa decodes the WAV/PCM bytes).
-/// ---------------------------------------------------------------------------
 class HybridSttTranscribeRequest extends $pb.GeneratedMessage {
   factory HybridSttTranscribeRequest({
     $core.List<$core.int>? audioBytes,
@@ -1075,11 +1007,6 @@ class HybridSttTranscribeRequest extends $pb.GeneratedMessage {
   HybridSttTranscribeOptions ensureOptions() => $_ensure(2);
 }
 
-/// ---------------------------------------------------------------------------
-/// Response returned by the JNI transcribe thunk. Carries the transcript,
-/// the detected (or hinted) language, the routing decision metadata, the
-/// native rc, and a human-readable error message when rc != 0.
-/// ---------------------------------------------------------------------------
 class HybridSttTranscribeResponse extends $pb.GeneratedMessage {
   factory HybridSttTranscribeResponse({
     $core.int? rc,

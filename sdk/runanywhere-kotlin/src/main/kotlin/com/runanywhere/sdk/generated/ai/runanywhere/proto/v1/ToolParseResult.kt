@@ -42,6 +42,9 @@ public class ToolParseResult(
   )
   public val has_tool_call: Boolean = false,
   tool_calls: List<ToolCall> = emptyList(),
+  /**
+   * Model text left over after the calls were extracted.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

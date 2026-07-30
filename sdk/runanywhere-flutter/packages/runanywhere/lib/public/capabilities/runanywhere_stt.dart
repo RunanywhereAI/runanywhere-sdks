@@ -15,6 +15,8 @@ import 'package:runanywhere/generated/convenience/ra_convenience.dart'
 import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show AudioEncoding;
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
@@ -271,7 +273,7 @@ class RunAnywhereSTT {
     return _transcribeAudioData(
       byteData.buffer.asUint8List(),
       _effectiveOptions(options ?? STTOptions()),
-      encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE,
+      encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
     );
   }
 
@@ -287,7 +289,7 @@ class RunAnywhereSTT {
   Future<STTOutput> _transcribeAudioData(
     Uint8List audio,
     STTOptions options, {
-    STTAudioEncoding? encoding,
+    AudioEncoding? encoding,
   }) async {
     final modelId = await _requireLoadedModelId();
     final opts = _effectiveOptions(options);
@@ -295,7 +297,7 @@ class RunAnywhereSTT {
     // capture path produces raw PCM; container formats (WAV/MP3/...) are
     // detected by commons from the bytes themselves.
     final sourceEncoding =
-        encoding ?? STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER;
+        encoding ?? AudioEncoding.AUDIO_ENCODING_CONTAINER;
 
     final request = STTTranscriptionRequest(
       audio: STTAudioSource(
@@ -346,14 +348,14 @@ class RunAnywhereSTT {
     return opts;
   }
 
-  int _bitsPerSample(STTAudioEncoding encoding) {
+  int _bitsPerSample(AudioEncoding encoding) {
     switch (encoding) {
-      case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE:
+      case AudioEncoding.AUDIO_ENCODING_PCM_F32_LE:
         return 32;
-      case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE:
+      case AudioEncoding.AUDIO_ENCODING_PCM_S16_LE:
         return 16;
-      case STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED:
-      case STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER:
+      case AudioEncoding.AUDIO_ENCODING_UNSPECIFIED:
+      case AudioEncoding.AUDIO_ENCODING_CONTAINER:
         return 0;
       default:
         return 0;

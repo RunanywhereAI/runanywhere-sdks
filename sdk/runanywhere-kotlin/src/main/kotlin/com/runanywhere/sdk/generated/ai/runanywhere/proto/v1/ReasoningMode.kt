@@ -17,30 +17,22 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * The single home for reasoning/thinking control. Replaces the retired
- * per-message toggles (LLMGenerationOptions.disable_thinking,
- * ToolCallingOptions.disable_thinking, RAGQueryOptions.disable_thinking,
- * ToolCallingSessionCreateRequest.disable_thinking,
- * LLMGenerateRequest.emit_thoughts). Referenced from LLM and VLM generation
- * options; every composed surface (tool calling, RAG, voice agent) inherits
- * it through the embedded LLMGenerationOptions.
- * ---------------------------------------------------------------------------
+ * The single home for reasoning control. Composed surfaces (tool calling, RAG,
+ * voice agent) inherit it through the embedded LLMGenerationOptions.
  */
 public enum class ReasoningMode(
   override val `value`: Int,
 ) : WireEnum {
   /**
-   * Model default: reasoning-capable models think, others don't.
+   * Reasoning-capable models think; others don't.
    */
   REASONING_MODE_UNSPECIFIED(0),
   /**
-   * Suppress the thinking phase (commons applies the model's no-think
-   * directive at the prompt level).
+   * Commons applies the model's no-think directive at the prompt level.
    */
   REASONING_MODE_OFF(1),
   /**
-   * Request the thinking phase on models where it is optional.
+   * Request thinking on models where it is optional.
    */
   REASONING_MODE_ON(2),
   ;

@@ -47,6 +47,9 @@ public class StorageAvailabilityRequest(
     schemaIndex = 1,
   )
   public val required_bytes: Long = 0L,
+  /**
+   * Headroom multiplier applied on top of required_bytes.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
@@ -55,6 +58,9 @@ public class StorageAvailabilityRequest(
     schemaIndex = 2,
   )
   public val safety_margin: Double = 0.0,
+  /**
+   * Count bytes already occupied by this model as reclaimable.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

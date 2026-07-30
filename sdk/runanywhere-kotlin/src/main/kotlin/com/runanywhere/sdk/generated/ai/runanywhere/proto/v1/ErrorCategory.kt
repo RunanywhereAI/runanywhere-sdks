@@ -17,33 +17,9 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * ErrorCategory — coarse-grained logical grouping for filtering / analytics.
- *
- * This is the union of all categories declared across SDKs, condensed to the
- * minimum stable set. The task spec pins a 9-case enum (UNSPECIFIED, NETWORK,
- * VALIDATION, MODEL, COMPONENT, IO, AUTH, INTERNAL, CONFIGURATION); that set
- * covers every category currently in use except for the per-modality ones
- * (STT, TTS, LLM, VAD, VLM, etc.) which are intentionally folded into
- * COMPONENT. Per-modality routing is recovered at runtime from the source
- * of the failure (the `c_abi_code` numeric value uniquely identifies the
- * component) and from `ErrorContext.operation` — there is no need to encode
- * modality twice.
- *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:46  rac_error_category_t — 15 cases incl.
- *                                      stt/tts/llm/vad/vlm/etc.
- *   Swift   ErrorCategory.swift:11     16 cases incl. rag.
- *   Kotlin  ErrorCategory.kt:19        18 cases incl. CONFIGURATION,
- *                                      INITIALIZATION, FILE_RESOURCE,
- *                                      OPERATION, PLATFORM (no per-modality).
- *   Dart    error_category.dart:3      27 cases (superset).
- *   RN      ErrorCategory.ts:10        12 cases.
- *   Web     ErrorTypes.ts              (none — only SDKErrorCode exists).
- *
- * The drift here is severe — every SDK uses a different category vocabulary.
- * Codegen MUST collapse to the 9 canonical buckets below.
- * ---------------------------------------------------------------------------
+ * Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
+ * into COMPONENT; the modality is recoverable from c_abi_code and
+ * ErrorContext.operation, so it is not encoded twice.
  */
 public enum class ErrorCategory(
   override val `value`: Int,

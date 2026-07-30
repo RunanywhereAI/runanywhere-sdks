@@ -10,11 +10,6 @@ import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSO
 
 export const protobufPackage = "runanywhere.v1";
 
-/**
- * ---------------------------------------------------------------------------
- * Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
- * ---------------------------------------------------------------------------
- */
 export enum EmbeddingsNormalizeMode {
   EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED = 0,
   EMBEDDINGS_NORMALIZE_MODE_NONE = 1,
@@ -54,11 +49,6 @@ export function embeddingsNormalizeModeToJSON(object: EmbeddingsNormalizeMode): 
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
- * ---------------------------------------------------------------------------
- */
 export enum EmbeddingsPoolingStrategy {
   EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0,
   EMBEDDINGS_POOLING_STRATEGY_MEAN = 1,
@@ -104,107 +94,57 @@ export function embeddingsPoolingStrategyToJSON(object: EmbeddingsPoolingStrateg
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Component-level configuration applied at service creation. Mirrors the
- * transport-portable subset of rac_embeddings_config_t. Backend selection
- * (preferred_framework) and pooling strategy live outside the wire schema.
- * ---------------------------------------------------------------------------
- */
+/** Applied at service creation. */
 export interface EmbeddingsConfiguration {
-  /** Model identifier (registry id or local path). Required. */
+  /** Registry id or local path. */
   modelId: string;
   /**
-   * Output vector dimension. Must match the loaded model's hidden size
-   * (e.g. 384 for all-MiniLM-L6-v2, 768 for bge-base, 1024 for bge-large).
+   * Must match the loaded model's hidden size: 384 for all-MiniLM-L6-v2,
+   * 768 for bge-base, 1024 for bge-large.
    */
   embeddingDimension: number;
-  /**
-   * Maximum tokens per input. Truncation/sliding window is backend-decided
-   * when an input exceeds this length. C ABI default: 512.
-   */
+  /** Truncation or sliding window past this length is backend-decided. */
   maxSequenceLength: number;
-  /** Preferred framework for the component. Absent = auto. */
-  preferredFramework?:
-    | InferenceFramework
-    | undefined;
-  /**
-   * Vector normalization mode for the component. UNSPECIFIED = L2
-   * (the C ABI default).
-   */
+  preferredFramework?: InferenceFramework | undefined;
   normalizeMode: EmbeddingsNormalizeMode;
   pooling: EmbeddingsPoolingStrategy;
-  /** Backend-specific JSON config (e.g. tokenizer/vocab companion paths). */
+  /** Backend-specific config such as tokenizer or vocab companion paths. */
   configJson?: string | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Per-call generation options. Overrides for a single embed / embed_batch
- * invocation; any field left unset falls back to the configuration default.
- * ---------------------------------------------------------------------------
- */
+/** Per-call overrides. Unset fields fall back to the component configuration. */
 export interface EmbeddingsOptions {
   /**
-   * Truncate inputs longer than max_sequence_length instead of erroring.
-   * Unset = backend default (currently truncate-on-overflow for ONNX,
-   * sliding-window for llama.cpp).
+   * Truncate over-long inputs instead of erroring. Unset = backend default,
+   * currently truncate-on-overflow for ONNX and sliding-window for llama.cpp.
    */
   truncate?:
     | boolean
     | undefined;
-  /**
-   * Override batch size for embed_batch. Unset = backend chooses
-   * (RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE = 512, capped at 8192).
-   */
+  /** Unset = backend chooses (512, capped at 8192). */
   batchSize?:
     | number
     | undefined;
-  /**
-   * Vector normalization mode. UNSPECIFIED = use component config
-   * (default L2).
-   */
+  /** UNSPECIFIED = use the component config. */
   normalizeMode: EmbeddingsNormalizeMode;
   pooling: EmbeddingsPoolingStrategy;
   /** 0 = auto */
   nThreads: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * A single embedding produced for one input text. The C ABI ships dense
- * floats with an associated dimension; we additionally carry the source text
- * (helps multi-input batch consumers correlate vectors with inputs without
- * holding the request side-by-side) and an optional pre-computed L2 norm
- * (lets clients short-circuit cosine-similarity when both sides know the
- * vectors are already unit-normalized).
- * ---------------------------------------------------------------------------
- */
 export interface EmbeddingVector {
-  /** Dense float vector. Length equals EmbeddingsResult.dimension. */
+  /** Length equals EmbeddingsResult.dimension. */
   values: number[];
   /**
-   * L2 norm of `values`. Optional — populated when the backend computes
-   * it (typically when normalize=false and the consumer wants to score
-   * similarity without recomputing).
+   * Populated when the backend computes it, letting consumers score
+   * similarity without recomputing.
    */
   norm?:
     | number
     | undefined;
-  /**
-   * Source text that produced this vector. Optional — preserved for
-   * multi-input batches where the caller wants to correlate without
-   * tracking ordering separately.
-   */
-  text?:
-    | string
-    | undefined;
-  /**
-   * Vector dimension for consumers that need per-vector sizing without
-   * inspecting EmbeddingsResult.dimension.
-   */
+  /** Lets batch callers correlate vectors with inputs without tracking order. */
+  text?: string | undefined;
   dimension: number;
-  /** Input index in the original request and optional caller metadata. */
   inputIndex: number;
   metadata: { [key: string]: string };
 }
@@ -214,12 +154,7 @@ export interface EmbeddingVector_MetadataEntry {
   value: string;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Request envelope for service-handle APIs. One text = embed, multiple texts =
- * embed_batch.
- * ---------------------------------------------------------------------------
- */
+/** One text = embed, multiple texts = embed_batch. */
 export interface EmbeddingsRequest {
   texts: string[];
   options?: EmbeddingsOptions | undefined;
@@ -233,25 +168,13 @@ export interface EmbeddingsRequest_MetadataEntry {
   value: string;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Result of an embed / embed_batch call. Mirrors rac_embeddings_result_t
- * (which is array-of-vectors + dimension + processing_time_ms +
- * total_tokens). `dimension` is duplicated at the result level so consumers
- * can size buffers without inspecting an arbitrary vector first.
- * ---------------------------------------------------------------------------
- */
 export interface EmbeddingsResult {
   /** One vector per input text, in input order. */
   vectors: EmbeddingVector[];
-  /**
-   * Vector dimension. Duplicated from each EmbeddingVector for O(1)
-   * sizing on the consumer side.
-   */
+  /** Duplicated from each vector so consumers can size buffers in O(1). */
   dimension: number;
-  /** Total wall-clock time for the embed / embed_batch call, in ms. */
   processingTimeMs: number;
-  /** Total tokens consumed across all inputs (post-truncation). */
+  /** Across all inputs, post-truncation. */
   tokensUsed: number;
   modelId?: string | undefined;
   errorMessage?: string | undefined;
@@ -259,58 +182,26 @@ export interface EmbeddingsResult {
   requestId: string;
 }
 
-export interface EmbeddingsServiceState {
-  isReady: boolean;
-  currentModel?: string | undefined;
-  dimension: number;
-  maxTokens: number;
-  errorMessage?: string | undefined;
-  errorCode: number;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Session/handle creation request envelope shared by every SDK.
- * The result carries an opaque uint64 handle the SDK uses for subsequent
- * embed / embed_batch invocations.
- * ---------------------------------------------------------------------------
- */
 export interface EmbeddingsCreateRequest {
-  /** Required. Model identifier (registry id) or absolute model path. */
+  /** Registry id or absolute model path. */
   modelId: string;
-  /**
-   * Optional component configuration. When unset, commons applies its
-   * defaults (RAC_EMBEDDINGS_*); when set, the named fields override
-   * the per-component defaults at create time.
-   */
+  /** Unset = commons defaults; set fields override per-component defaults. */
   configuration?:
     | EmbeddingsConfiguration
     | undefined;
-  /**
-   * Provider-specific JSON config for backends that need companion file
-   * paths (e.g. {"vocab_path":"..."}).
-   */
+  /** For backends needing companion file paths, e.g. {"vocab_path":"..."}. */
   configJson?: string | undefined;
 }
 
 export interface EmbeddingsCreateResult {
-  /** Opaque handle (rac_handle_t cast to u64). Zero on failure. */
+  /** rac_handle_t cast to u64. Zero on failure. */
   handle: number;
-  /**
-   * Echo of the model id the caller requested — so JS/Swift/Kotlin can
-   * store it next to the handle without re-parsing the request.
-   */
+  /** Echoed so callers can store it beside the handle. */
   modelId: string;
-  /**
-   * Backend-resolved dimension/max_tokens after load. 0 = unknown until
-   * the first embed call.
-   */
+  /** Backend-resolved after load. 0 = unknown until the first embed call. */
   dimension: number;
   maxTokens: number;
-  /**
-   * Negative on failure; mirrors rac_result_t. Empty error_message on
-   * success.
-   */
+  /** Mirrors rac_result_t; negative on failure. */
   errorCode: number;
   errorMessage: string;
 }
@@ -1338,166 +1229,6 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
     message.errorMessage = object.errorMessage ?? undefined;
     message.errorCode = object.errorCode ?? 0;
     message.requestId = object.requestId ?? "";
-    return message;
-  },
-};
-
-function createBaseEmbeddingsServiceState(): EmbeddingsServiceState {
-  return { isReady: false, currentModel: undefined, dimension: 0, maxTokens: 0, errorMessage: undefined, errorCode: 0 };
-}
-
-export const EmbeddingsServiceState: MessageFns<EmbeddingsServiceState> = {
-  encode(message: EmbeddingsServiceState, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.isReady !== false) {
-      writer.uint32(8).bool(message.isReady);
-    }
-    if (message.currentModel !== undefined) {
-      writer.uint32(18).string(message.currentModel);
-    }
-    if (message.dimension !== 0) {
-      writer.uint32(24).int32(message.dimension);
-    }
-    if (message.maxTokens !== 0) {
-      writer.uint32(32).int32(message.maxTokens);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(42).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(48).int32(message.errorCode);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): EmbeddingsServiceState {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseEmbeddingsServiceState();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.isReady = reader.bool();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.currentModel = reader.string();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.dimension = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.maxTokens = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): EmbeddingsServiceState {
-    return {
-      isReady: isSet(object.isReady)
-        ? globalThis.Boolean(object.isReady)
-        : isSet(object.is_ready)
-        ? globalThis.Boolean(object.is_ready)
-        : false,
-      currentModel: isSet(object.currentModel)
-        ? globalThis.String(object.currentModel)
-        : isSet(object.current_model)
-        ? globalThis.String(object.current_model)
-        : undefined,
-      dimension: isSet(object.dimension) ? globalThis.Number(object.dimension) : 0,
-      maxTokens: isSet(object.maxTokens)
-        ? globalThis.Number(object.maxTokens)
-        : isSet(object.max_tokens)
-        ? globalThis.Number(object.max_tokens)
-        : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
-    };
-  },
-
-  toJSON(message: EmbeddingsServiceState): unknown {
-    const obj: any = {};
-    if (message.isReady !== false) {
-      obj.isReady = message.isReady;
-    }
-    if (message.currentModel !== undefined) {
-      obj.currentModel = message.currentModel;
-    }
-    if (message.dimension !== 0) {
-      obj.dimension = Math.round(message.dimension);
-    }
-    if (message.maxTokens !== 0) {
-      obj.maxTokens = Math.round(message.maxTokens);
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<EmbeddingsServiceState>, I>>(base?: I): EmbeddingsServiceState {
-    return EmbeddingsServiceState.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<EmbeddingsServiceState>, I>>(object: I): EmbeddingsServiceState {
-    const message = createBaseEmbeddingsServiceState();
-    message.isReady = object.isReady ?? false;
-    message.currentModel = object.currentModel ?? undefined;
-    message.dimension = object.dimension ?? 0;
-    message.maxTokens = object.maxTokens ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };

@@ -29,17 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * RAGStatistics — index-level counters for the RAG pipeline.
- *
- * Returned by RunAnywhere.rag.statistics() / ragGetStatistics().
- * ---------------------------------------------------------------------------
- */
 public class RAGStatistics(
-  /**
-   * Total number of documents ever ingested into the index.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -48,9 +38,6 @@ public class RAGStatistics(
     schemaIndex = 0,
   )
   public val indexed_documents: Long = 0L,
-  /**
-   * Total number of chunks across all indexed documents.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -59,9 +46,6 @@ public class RAGStatistics(
     schemaIndex = 1,
   )
   public val indexed_chunks: Long = 0L,
-  /**
-   * Approximate total token count across all indexed chunks.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -70,10 +54,6 @@ public class RAGStatistics(
     schemaIndex = 2,
   )
   public val total_tokens_indexed: Long = 0L,
-  /**
-   * Wall-clock timestamp of the most recent ingestion, in milliseconds
-   * since Unix epoch. 0 = no ingestion yet.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -82,10 +62,6 @@ public class RAGStatistics(
     schemaIndex = 3,
   )
   public val last_updated_ms: Long = 0L,
-  /**
-   * Filesystem path to the on-disk index, when applicable. Unset for
-   * in-memory-only indexes.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -93,10 +69,6 @@ public class RAGStatistics(
     schemaIndex = 4,
   )
   public val index_path: String? = null,
-  /**
-   * Raw backend statistics JSON for implementations that cannot yet project
-   * every counter into typed fields.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -104,9 +76,6 @@ public class RAGStatistics(
     schemaIndex = 5,
   )
   public val stats_json: String? = null,
-  /**
-   * Approximate vector-store footprint in bytes, when known.
-   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",

@@ -67,7 +67,7 @@ public typealias RASegmentationClassSummary = ai.runanywhere.proto.v1.Segmentati
 public typealias RASegmentationResult = ai.runanywhere.proto.v1.SegmentationResult
 
 // Speaker Diarization
-public typealias RADiarizationAudioEncoding = ai.runanywhere.proto.v1.DiarizationAudioEncoding
+public typealias RAAudioEncoding = ai.runanywhere.proto.v1.AudioEncoding
 public typealias RADiarizationOptions = ai.runanywhere.proto.v1.DiarizationOptions
 public typealias RADiarizationRequest = ai.runanywhere.proto.v1.DiarizationRequest
 public typealias RADiarizationSegment = ai.runanywhere.proto.v1.DiarizationSegment

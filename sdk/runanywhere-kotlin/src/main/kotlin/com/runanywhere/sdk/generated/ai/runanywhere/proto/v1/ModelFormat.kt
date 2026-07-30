@@ -17,16 +17,8 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * ---------------------------------------------------------------------------
- * Model file format — union across all SDKs.
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:27        (onnx, ort, gguf, bin, coreml, unknown)
- *   Kotlin ModelTypes.kt:41           (ONNX, ORT, GGUF, BIN, QNN_CONTEXT, UNKNOWN)
- *   Dart   model_types.dart:34        (onnx, ort, gguf, bin, unknown)
- *   RN     enums.ts:115               (12-case superset incl. MLModel, MLPackage, TFLite,
- *                                       SafeTensors, Zip, Folder, Proprietary)
- *   Web    enums.ts:56                (copy of RN)
- * ---------------------------------------------------------------------------
+ * On-disk file format, as opposed to ModelArtifactType (bundle kind) or
+ * ArchiveType (compression).
  */
 public enum class ModelFormat(
   override val `value`: Int,

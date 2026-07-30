@@ -29,27 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Diffusion component configuration — the static, lifetime-of-component
- * settings handed to the diffusion service at initialize() time.
- * Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:279    (DiffusionConfiguration)
- *   Kotlin DiffusionTypes.kt:204       (DiffusionConfiguration)
- *   RN     DiffusionTypes.ts:86        (DiffusionConfiguration)
- *   Web    — n/a (config is implicit in the llamacpp service ctor)
- *   C ABI  rac_diffusion_types.h:144   (rac_diffusion_config_t)
- *
- * `max_memory_mb` is the single portable working-set control; backends
- * interpret 0 as "no cap / engine default" and a positive value as a hard
- * MiB ceiling.
- * ---------------------------------------------------------------------------
- */
 public class DiffusionConfiguration(
-  /**
-   * Stable Diffusion model variant (selects the default resolution, step
-   * count, guidance scale, and tokenizer preset).
-   */
   @field:WireField(
     tag = 1,
     adapter = "ai.runanywhere.proto.v1.DiffusionModelVariant#ADAPTER",
@@ -59,10 +39,6 @@ public class DiffusionConfiguration(
   )
   public val model_variant:
       DiffusionModelVariant = DiffusionModelVariant.DIFFUSION_MODEL_VARIANT_UNSPECIFIED,
-  /**
-   * Tokenizer download source (CoreML SD models don't bundle the
-   * tokenizer files — the runtime must fetch vocab.json + merges.txt).
-   */
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.DiffusionTokenizerSource#ADAPTER",
@@ -71,10 +47,6 @@ public class DiffusionConfiguration(
     schemaIndex = 1,
   )
   public val tokenizer_source: DiffusionTokenizerSource? = null,
-  /**
-   * Run NSFW safety checker on the decoded latent before returning the
-   * image. Default in every SDK is true.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -83,10 +55,6 @@ public class DiffusionConfiguration(
     schemaIndex = 2,
   )
   public val enable_safety_checker: Boolean = false,
-  /**
-   * Maximum working-set memory the diffusion runtime is allowed to use,
-   * in MiB. 0 = no cap (engine default).
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -95,9 +63,6 @@ public class DiffusionConfiguration(
     schemaIndex = 3,
   )
   public val max_memory_mb: Int = 0,
-  /**
-   * C ABI / SDK component fields that identify and route the component.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

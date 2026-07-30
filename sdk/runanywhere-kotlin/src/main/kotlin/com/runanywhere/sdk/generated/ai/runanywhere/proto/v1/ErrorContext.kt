@@ -33,41 +33,11 @@ import kotlin.lazy
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * ErrorContext — debugging metadata captured at the throw site.
- *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:102  rac_error_t fields source_file,
- *                                       source_line, source_function plus a
- *                                       rac_stack_frame_t\[32\] fixed-size
- *                                       stack capture and 3 custom k/v slots
- *                                       (custom_key1..3 / custom_value1..3).
- *                                       The fixed-shape custom slots flatten
- *                                       to a `metadata` map<string,string> in
- *                                       proto.
- *   Swift   ErrorContext.swift          (matches Dart equivalent).
- *   Kotlin  SDKError.kt                 No ErrorContext — uses Throwable.cause
- *                                       only. Will pick up source location
- *                                       from this proto on regeneration.
- *   Dart    error_context.dart:4        StackTrace? stackTrace, String file,
- *                                       int line, String function, DateTime
- *                                       timestamp, String threadInfo.
- *   RN      ErrorContext.ts:11          stackTrace\[\], file, line, function,
- *                                       timestamp, threadInfo.
- *   Web     ErrorTypes.ts               (no context type).
- *
- * Stack traces are intentionally NOT modeled here — they are platform-shaped
- * (string lines on RN/Dart, rac_stack_frame_t\[\] on C, StackTrace on Dart) and
- * belong in a platform-local logging path, not in the wire IDL. If the C ABI
- * ever ships symbolicated frames, add a `repeated StackFrame frames` field
- * guarded by a feature flag.
- * ---------------------------------------------------------------------------
+ * Debugging metadata captured at the throw site. Stack traces are deliberately
+ * absent: they are platform-shaped and belong in platform-local logging.
  */
 public class ErrorContext(
   metadata: Map<String, String> = emptyMap(),
-  /**
-   * __FILE__ at the throw site. C ABI cap is RAC_MAX_METADATA_STRING (256).
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -75,9 +45,6 @@ public class ErrorContext(
     schemaIndex = 1,
   )
   public val source_file: String? = null,
-  /**
-   * __LINE__ at the throw site.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -86,11 +53,8 @@ public class ErrorContext(
   )
   public val source_line: Int? = null,
   /**
-   * Logical operation name ("loadModel", "generate", "transcribeStream",
-   * ...). Lets clients route on operation without parsing free-text.
-   * Maps roughly onto Dart's `function` field and C ABI's source_function;
-   * we use the more generic "operation" name because some platforms (C++,
-   * Swift) symbolicate the function name from the stack frame instead.
+   * Logical operation ("loadModel", "generate", "transcribeStream"), so
+   * clients can route without parsing free text.
    */
   @field:WireField(
     tag = 4,
@@ -99,10 +63,8 @@ public class ErrorContext(
   )
   public val operation: String? = null,
   /**
-   * The structured field path a validation error refers to
-   * ("<Message>.<field>"). First-class replacement for the
-   * metadata\["field_path"\] magic key all five SDKs read/write today; the
-   * generated convenience validate() already emits this path.
+   * "<Message>.<field>" for validation errors. The generated validate()
+   * emits this.
    */
   @field:WireField(
     tag = 5,
@@ -114,9 +76,7 @@ public class ErrorContext(
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ErrorContext, Nothing>(ADAPTER, unknownFields) {
   /**
-   * Free-form key/value pairs for telemetry tagging. Maps onto the C ABI's
-   * three custom_key/custom_value slots and Dart's `Map<String, dynamic>`
-   * (after string-coercion).
+   * Telemetry tagging.
    */
   @field:WireField(
     tag = 1,

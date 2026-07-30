@@ -14,9 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
-/// ---------------------------------------------------------------------------
 class EmbeddingsNormalizeMode extends $pb.ProtobufEnum {
   static const EmbeddingsNormalizeMode EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED =
       EmbeddingsNormalizeMode._(
@@ -43,9 +40,6 @@ class EmbeddingsNormalizeMode extends $pb.ProtobufEnum {
   const EmbeddingsNormalizeMode._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
-/// ---------------------------------------------------------------------------
 class EmbeddingsPoolingStrategy extends $pb.ProtobufEnum {
   static const EmbeddingsPoolingStrategy
       EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = EmbeddingsPoolingStrategy._(

@@ -28,10 +28,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * One audio frame fed into a live voice-agent session. Replaces the
- * seven-scalar rac_voice_agent_feed_audio_proto signature.
- */
 public class VoiceAgentAudioFrame(
   @field:WireField(
     tag = 1,
@@ -63,9 +59,6 @@ public class VoiceAgentAudioFrame(
     schemaIndex = 3,
   )
   public val encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
-  /**
-   * Marks the end of the utterance (flush).
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

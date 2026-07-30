@@ -16,38 +16,22 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Tokenizer source kind. Apple's compiled CoreML SD models do not bundle
- * vocab.json / merges.txt, so the tokenizer must be downloaded from a
- * HuggingFace repo (or a developer-supplied URL).
- * Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:18     (.sd15 / .sd2 / .sdxl / .custom(baseURL:))
- *   Kotlin DiffusionTypes.kt:31        (Sd15 / Sd2 / Sdxl / Custom(customBaseUrl))
- *   RN     DiffusionTypes.ts:17        ({kind:'sd15'|'sd2'|'sdxl'|'custom'} discriminated union)
- *   Web    — n/a (the llamacpp Web package doesn't expose tokenizer source)
- *   C ABI  rac_diffusion_types.h:79    (RAC_DIFFUSION_TOKENIZER_SD_1_5 / SD_2_X / SDXL / CUSTOM)
- * ---------------------------------------------------------------------------
- */
 public enum class DiffusionTokenizerSourceKind(
   override val `value`: Int,
 ) : WireEnum {
   DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED(0),
   /**
-   * CLIP ViT-L/14 (runwayml/stable-diffusion-v1-5)
+   * CLIP ViT-L/14
    */
   DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15(1),
   /**
-   * OpenCLIP ViT-H/14 (stabilityai/stable-diffusion-2-1)
+   * OpenCLIP ViT-H/14
    */
   DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD2(2),
   /**
-   * dual tokenizers (stabilityai/stable-diffusion-xl-base-1.0)
+   * dual tokenizers
    */
   DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SDXL(3),
-  /**
-   * developer-supplied base URL
-   */
   DIFFUSION_TOKENIZER_SOURCE_KIND_CUSTOM(4),
   ;
 

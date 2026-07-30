@@ -43,7 +43,7 @@ public extension RunAnywhere {
             options: DiarizationOptions? = nil,
             sampleRate: Int = 16000,
             channels: Int = 1,
-            encoding: RADiarizationAudioEncoding = .pcmF32Le
+            encoding: RAAudioEncoding = .pcmF32Le
         ) async throws -> AsyncThrowingStream<DiarizationResult, Error> {
             let snapshot = try RunAnywhere.requireDiarizationModel()
             try await RunAnywhere.ensureServicesReady()

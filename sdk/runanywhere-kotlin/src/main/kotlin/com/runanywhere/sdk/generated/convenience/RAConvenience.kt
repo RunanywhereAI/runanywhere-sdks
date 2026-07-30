@@ -17,8 +17,8 @@
 package com.runanywhere.sdk.generated.convenience
 
 import ai.runanywhere.proto.v1.ArchiveStructure
+import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.AudioFormat
-import ai.runanywhere.proto.v1.DiarizationAudioEncoding
 import ai.runanywhere.proto.v1.DiarizationOptions
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.EmbeddingsConfiguration
@@ -272,7 +272,7 @@ public fun DiarizationOptions.Companion.defaults(): DiarizationOptions =
     DiarizationOptions(
         sample_rate = 16000,
         channels = 1,
-        encoding = DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE,
+        encoding = AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
         threshold = 0.5f,
     )
 
@@ -408,16 +408,16 @@ public fun VADConfiguration.Companion.defaults(): VADConfiguration =
 
 /** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
 public fun VADConfiguration.validate() {
-    if (sample_rate < 1 || sample_rate > 48000) {
+    if (sample_rate < 8000 || sample_rate > 48000) {
         throw SDKException.validationFailed(
             fieldPath = "VADConfiguration.sample_rate",
-            message = "sample_rate must be in 1...48000 (got ${sample_rate})",
+            message = "sample_rate must be in 8000...48000 (got ${sample_rate})",
         )
     }
-    if (frame_length_ms < 1 || frame_length_ms > 1000) {
+    if (frame_length_ms < 20 || frame_length_ms > 1000) {
         throw SDKException.validationFailed(
             fieldPath = "VADConfiguration.frame_length_ms",
-            message = "frame_length_ms must be in 1...1000 (got ${frame_length_ms})",
+            message = "frame_length_ms must be in 20...1000 (got ${frame_length_ms})",
         )
     }
     if (!activation_threshold.isFinite() || activation_threshold < 0.0 || activation_threshold > 1.0) {
@@ -426,10 +426,10 @@ public fun VADConfiguration.validate() {
             message = "activation_threshold must be in 0.0...1.0 (got ${activation_threshold})",
         )
     }
-    if (!calibration_multiplier.isFinite() || calibration_multiplier < 1.5 || calibration_multiplier > 4.0) {
+    if (!calibration_multiplier.isFinite() || calibration_multiplier < 1.2 || calibration_multiplier > 4.0) {
         throw SDKException.validationFailed(
             fieldPath = "VADConfiguration.calibration_multiplier",
-            message = "calibration_multiplier must be in 1.5...4.0 (got ${calibration_multiplier})",
+            message = "calibration_multiplier must be in 1.2...4.0 (got ${calibration_multiplier})",
         )
     }
 }

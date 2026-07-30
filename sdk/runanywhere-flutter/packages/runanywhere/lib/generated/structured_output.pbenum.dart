@@ -14,15 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// JSON Schema primitive type — union across SDKs.
-/// Sources pre-IDL:
-///   RN  StructuredOutputTypes.ts:12     ('string'|'number'|'integer'|
-///                                        'boolean'|'object'|'array'|'null')
-///   Web (delegates to llamacpp pkg; no own enum)
-///   Swift / Kotlin / Dart represent schema as a serialized JSON string today,
-///     so this enum canonicalizes the RN-defined union.
-/// ---------------------------------------------------------------------------
 class JSONSchemaType extends $pb.ProtobufEnum {
   static const JSONSchemaType JSON_SCHEMA_TYPE_UNSPECIFIED =
       JSONSchemaType._(0, _omitEnumNames ? '' : 'JSON_SCHEMA_TYPE_UNSPECIFIED');
@@ -58,41 +49,6 @@ class JSONSchemaType extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const JSONSchemaType._(super.value, super.name);
-}
-
-/// ---------------------------------------------------------------------------
-/// Sentiment label — union across SDKs.
-/// Sources pre-IDL:
-///   RN  StructuredOutputTypes.ts:131    ('positive'|'negative'|'neutral')
-///   (Other SDKs do not yet define a Sentiment type; MIXED is added for
-///    completeness — common in industry sentiment APIs.)
-/// ---------------------------------------------------------------------------
-class Sentiment extends $pb.ProtobufEnum {
-  static const Sentiment SENTIMENT_UNSPECIFIED =
-      Sentiment._(0, _omitEnumNames ? '' : 'SENTIMENT_UNSPECIFIED');
-  static const Sentiment SENTIMENT_POSITIVE =
-      Sentiment._(1, _omitEnumNames ? '' : 'SENTIMENT_POSITIVE');
-  static const Sentiment SENTIMENT_NEGATIVE =
-      Sentiment._(2, _omitEnumNames ? '' : 'SENTIMENT_NEGATIVE');
-  static const Sentiment SENTIMENT_NEUTRAL =
-      Sentiment._(3, _omitEnumNames ? '' : 'SENTIMENT_NEUTRAL');
-  static const Sentiment SENTIMENT_MIXED =
-      Sentiment._(4, _omitEnumNames ? '' : 'SENTIMENT_MIXED');
-
-  static const $core.List<Sentiment> values = <Sentiment>[
-    SENTIMENT_UNSPECIFIED,
-    SENTIMENT_POSITIVE,
-    SENTIMENT_NEGATIVE,
-    SENTIMENT_NEUTRAL,
-    SENTIMENT_MIXED,
-  ];
-
-  static final $core.List<Sentiment?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 4);
-  static Sentiment? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const Sentiment._(super.value, super.name);
 }
 
 class StructuredOutputMode extends $pb.ProtobufEnum {

@@ -14,24 +14,9 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// VLM image input format — union across all SDKs and the C ABI.
-///
-/// SDK ↔ proto enum mapping pre-IDL:
-///   C ABI  / Kotlin / RN / Web all expose three numeric formats (FILE_PATH=0,
-///          RGB_PIXELS=1, BASE64=2). Mapped to FILE_PATH, RAW_RGB, BASE64.
-///   Swift  Format enum adds Apple-only cases uiImage / pixelBuffer that are
-///          flattened to RAW_RGB before crossing the C ABI (see VLMTypes.swift
-///          lines 70-89). RAW_RGBA is reserved for SDKs that pass straight
-///          RGBA pixel buffers without the BGRA→RGB downsample step.
-///   Dart   sealed class with the same three formats (filePath / rgbPixels /
-///          base64); Flutter adapter passes RGB pixels through to the C ABI.
-///
-/// JPEG / PNG / WEBP are container hints carried in the encoded `bytes`
-/// payload (no current SDK declares these as enum cases — they are
-/// reserved here so we can disambiguate decoded vs encoded sources without a
-/// schema migration once a backend exposes container detection).
-/// ---------------------------------------------------------------------------
+/// The JPEG/PNG/WEBP and RAW_RGBA values are reserved: no backend detects
+/// containers yet, and no SDK passes straight RGBA. Swift's Apple-only uiImage
+/// and pixelBuffer cases flatten to RAW_RGB before crossing the C ABI.
 class VLMImageFormat extends $pb.ProtobufEnum {
   static const VLMImageFormat VLM_IMAGE_FORMAT_UNSPECIFIED =
       VLMImageFormat._(0, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_UNSPECIFIED');
@@ -43,21 +28,10 @@ class VLMImageFormat extends $pb.ProtobufEnum {
       VLMImageFormat._(3, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_WEBP');
   static const VLMImageFormat VLM_IMAGE_FORMAT_RAW_RGB =
       VLMImageFormat._(4, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_RAW_RGB');
-
-  /// RN RGBPixels / Web RGBPixels /
-  /// C ABI RAC_VLM_IMAGE_FORMAT_RGB_PIXELS
   static const VLMImageFormat VLM_IMAGE_FORMAT_RAW_RGBA =
       VLMImageFormat._(5, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_RAW_RGBA');
-
-  /// (Swift UIImage path produces RGBA
-  /// before downsample; pre-IDL no SDK
-  /// exposes RGBA over the C ABI)
   static const VLMImageFormat VLM_IMAGE_FORMAT_BASE64 =
       VLMImageFormat._(6, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_BASE64');
-
-  /// Dart base64 / RN Base64 /
-  /// Web Base64 /
-  /// C ABI RAC_VLM_IMAGE_FORMAT_BASE64
   static const VLMImageFormat VLM_IMAGE_FORMAT_FILE_PATH =
       VLMImageFormat._(7, _omitEnumNames ? '' : 'VLM_IMAGE_FORMAT_FILE_PATH');
 
@@ -80,10 +54,6 @@ class VLMImageFormat extends $pb.ProtobufEnum {
   const VLMImageFormat._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// VLM model family for chat-template selection.
-/// Mirrors rac_vlm_model_family_t.
-/// ---------------------------------------------------------------------------
 class VLMModelFamily extends $pb.ProtobufEnum {
   static const VLMModelFamily VLM_MODEL_FAMILY_UNSPECIFIED =
       VLMModelFamily._(0, _omitEnumNames ? '' : 'VLM_MODEL_FAMILY_UNSPECIFIED');

@@ -31,12 +31,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Full routing policy attached to a model pair. `simple` mode collapses
- * to a single filter; `advanced` mode allows composition.
- * ---------------------------------------------------------------------------
- */
 public class HybridRoutingPolicy(
   hard_filters: List<HybridFilter> = emptyList(),
   @field:WireField(

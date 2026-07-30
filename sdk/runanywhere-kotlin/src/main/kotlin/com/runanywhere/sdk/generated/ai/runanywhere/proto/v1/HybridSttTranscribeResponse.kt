@@ -29,13 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Response returned by the JNI transcribe thunk. Carries the transcript,
- * the detected (or hinted) language, the routing decision metadata, the
- * native rc, and a human-readable error message when rc != 0.
- * ---------------------------------------------------------------------------
- */
 public class HybridSttTranscribeResponse(
   @field:WireField(
     tag = 1,

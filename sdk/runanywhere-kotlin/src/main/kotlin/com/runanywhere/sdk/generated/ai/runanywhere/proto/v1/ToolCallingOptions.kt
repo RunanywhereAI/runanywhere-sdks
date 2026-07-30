@@ -32,19 +32,10 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Options for tool-enabled generation.
- * ---------------------------------------------------------------------------
- * Pure tool configuration. Sampling, system prompt, and reasoning control
- * come from the enclosing LLMGenerationOptions — this message deliberately
- * carries none of its own (fields 4-6 and 17 are retired duplicates).
- */
 public class ToolCallingOptions(
   tools: List<ToolDefinition> = emptyList(),
   /**
-   * Whether to auto-execute tools or hand them back to the caller.
-   * Unset = true (the pre-v2 session default).
+   * Run tools automatically rather than handing calls back to the caller.
    */
   @RacDefaultOption("true")
   @field:WireField(
@@ -54,10 +45,6 @@ public class ToolCallingOptions(
     schemaIndex = 1,
   )
   public val auto_execute: Boolean? = null,
-  /**
-   * If true, replaces the system prompt entirely (no auto-injected
-   * tool instructions).
-   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -67,8 +54,7 @@ public class ToolCallingOptions(
   )
   public val replace_system_prompt: Boolean = false,
   /**
-   * If true, keeps tool definitions available across multiple sequential
-   * tool calls in one generation.
+   * Keep offering tools after the first call resolves.
    */
   @field:WireField(
     tag = 8,
@@ -78,9 +64,6 @@ public class ToolCallingOptions(
     schemaIndex = 3,
   )
   public val keep_tools_available: Boolean = false,
-  /**
-   * Typed tool-call format. Unset lets commons select the model default.
-   */
   @field:WireField(
     tag = 10,
     adapter = "ai.runanywhere.proto.v1.ToolCallFormatName#ADAPTER",
@@ -88,8 +71,7 @@ public class ToolCallingOptions(
   )
   public val format: ToolCallFormatName? = null,
   /**
-   * Maximum tool calls in one conversation turn. Unset = default (5) —
-   * the single declaration; SDKs must not hardcode their own copy.
+   * Iteration cap on the run loop.
    */
   @RacDefaultOption("5")
   @RacMinOption(1)
@@ -100,6 +82,9 @@ public class ToolCallingOptions(
     schemaIndex = 5,
   )
   public val max_tool_calls: Int? = null,
+  /**
+   * forced_tool_name applies when tool_choice is SPECIFIC.
+   */
   @field:WireField(
     tag = 13,
     adapter = "ai.runanywhere.proto.v1.ToolChoiceMode#ADAPTER",
@@ -126,8 +111,7 @@ public class ToolCallingOptions(
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingOptions, Nothing>(ADAPTER, unknownFields) {
   /**
-   * Available tools for this generation. If empty, the SDK falls back to
-   * its registered tools (per-SDK convention).
+   * Empty means the SDK falls back to its registered tools.
    */
   @field:WireField(
     tag = 1,

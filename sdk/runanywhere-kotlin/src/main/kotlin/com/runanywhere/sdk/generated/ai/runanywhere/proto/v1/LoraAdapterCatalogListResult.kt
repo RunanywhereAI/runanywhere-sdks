@@ -49,6 +49,9 @@ public class LoraAdapterCatalogListResult(
     schemaIndex = 2,
   )
   public val error_message: String = "",
+  /**
+   * total_count is unfiltered; filtered_count reflects the query.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

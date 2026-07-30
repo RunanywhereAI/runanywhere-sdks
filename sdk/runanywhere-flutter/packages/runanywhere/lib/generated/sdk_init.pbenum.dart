@@ -14,11 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// Phase identifiers — used by SdkInitResult.phase to indicate which phase the
-/// result describes. Mirrors the SDK_INIT_* analytics events (started /
-/// completed / failed) that exist in sdk_events.proto.
-/// ---------------------------------------------------------------------------
 class SdkInitPhase extends $pb.ProtobufEnum {
   static const SdkInitPhase SDK_INIT_PHASE_UNSPECIFIED =
       SdkInitPhase._(0, _omitEnumNames ? '' : 'SDK_INIT_PHASE_UNSPECIFIED');
@@ -44,13 +39,8 @@ class SdkInitPhase extends $pb.ProtobufEnum {
   const SdkInitPhase._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Environment values — must match RAC_ENV_* in
-/// sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
-/// (development=0, production=2). Numeric values are part of the wire format;
-/// do not reorder. Number 1 was formerly SDK_INIT_ENVIRONMENT_STAGING and is
-/// reserved so PRODUCTION stays at 2 (shipped commons / xcframework layout).
-/// ---------------------------------------------------------------------------
+/// PRODUCTION is 2 because 1 was a staging value in shipped commons and
+/// xcframework builds. Do not renumber.
 class SdkInitEnvironment extends $pb.ProtobufEnum {
   static const SdkInitEnvironment SDK_INIT_ENVIRONMENT_DEVELOPMENT =
       SdkInitEnvironment._(

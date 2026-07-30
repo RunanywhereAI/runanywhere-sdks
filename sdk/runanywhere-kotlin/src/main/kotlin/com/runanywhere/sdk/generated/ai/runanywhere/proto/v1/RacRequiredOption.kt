@@ -15,7 +15,7 @@ import kotlin.`annotation`.Retention
 import kotlin.`annotation`.Target
 
 /**
- * When true, validate() rejects this field's proto3-zero value.
+ * validate() rejects this field's proto3-zero value.
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(

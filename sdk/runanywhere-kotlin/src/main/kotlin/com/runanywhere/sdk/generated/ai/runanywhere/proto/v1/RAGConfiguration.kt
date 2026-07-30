@@ -30,22 +30,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * RAGConfiguration — low-level pipeline config.
- *
- * This message carries *model ids*, not filesystem paths.
- * The commons RAG session ABI (rac_rag_session_create_proto) is responsible
- * for resolving those ids to on-disk paths through the canonical model
- * registry. SDK callers MUST register the embedding / LLM / reranker models
- * first and pass only their ids here.
- * ---------------------------------------------------------------------------
- */
 public class RAGConfiguration(
-  /**
-   * Registered id of the embedding model (required, e.g. "bge-small-en-v1.5").
-   * Commons resolves this to the primary artifact path via the model registry.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -54,10 +39,6 @@ public class RAGConfiguration(
     schemaIndex = 0,
   )
   public val embedding_model_id: String = "",
-  /**
-   * Registered id of the LLM model (e.g. "qwen3-4b-q4_k_m"). Optional —
-   * leave empty to create an embed-only / retrieval-only pipeline.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -66,14 +47,6 @@ public class RAGConfiguration(
     schemaIndex = 1,
   )
   public val llm_model_id: String = "",
-  /**
-   * Embedding vector dimension — must match the embedding model.
-   * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-   * Leave UNSET: commons derives the dimension from the loaded embedding
-   * model at session create (rac_embeddings_get_info). Set only to
-   * override. No rac_default on purpose — a generated defaults() that
-   * stamped 384 would mark the field present and defeat the derivation.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -82,8 +55,7 @@ public class RAGConfiguration(
   )
   public val embedding_dimension: Int? = null,
   /**
-   * Number of top chunks to retrieve per query.
-   * Optional so callers can distinguish "unset" from an explicit value.
+   * Retrieval depth, not sampling top_k.
    */
   @RacDefaultOption("5")
   @RacMinOption(1)
@@ -94,18 +66,6 @@ public class RAGConfiguration(
     schemaIndex = 3,
   )
   public val top_k: Int? = null,
-  /**
-   * Minimum cosine similarity threshold (0.0–1.0). Chunks below this
-   * score are discarded before being passed to the LLM as context.
-   * Optional so callers can distinguish "unset" from explicit 0.0
-   * (accept-everything) without losing the canonical default.
-   * Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
-   * produce cosine similarities that rarely exceed ~0.5 even for relevant
-   * chunks, and chunking a document lowers each chunk's similarity further, so
-   * any positive floor filters out real matches — a multi-chunk document then
-   * retrieves nothing and the answer model reports "no information". top_k
-   * bounds the result count instead of a similarity floor.
-   */
   @RacDefaultOption("0.0")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(1.0)
@@ -117,8 +77,7 @@ public class RAGConfiguration(
   )
   public val similarity_threshold: Float? = null,
   /**
-   * Tokens per chunk when splitting documents during ingestion.
-   * Optional so callers can distinguish "unset" from an explicit value.
+   * Tokens per chunk, and the overlap carried between adjacent chunks.
    */
   @RacDefaultOption("512")
   @RacMinOption(1)
@@ -129,11 +88,6 @@ public class RAGConfiguration(
     schemaIndex = 5,
   )
   public val chunk_size: Int? = null,
-  /**
-   * Overlap tokens between consecutive chunks. Must be < chunk_size.
-   * Optional so callers can explicitly request zero overlap (no overlap)
-   * without it being silently replaced by the canonical default of 64.
-   */
   @RacDefaultOption("64")
   @RacMinOption(0)
   @field:WireField(
@@ -143,10 +97,6 @@ public class RAGConfiguration(
     schemaIndex = 6,
   )
   public val chunk_overlap: Int? = null,
-  /**
-   * Maximum tokens of retrieved context passed to the LLM.
-   * Optional so callers can distinguish "unset" from an explicit value.
-   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -154,9 +104,6 @@ public class RAGConfiguration(
     schemaIndex = 7,
   )
   public val max_context_tokens: Int? = null,
-  /**
-   * Prompt template with `{context}` and `{query}` placeholders.
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -164,9 +111,6 @@ public class RAGConfiguration(
     schemaIndex = 8,
   )
   public val prompt_template: String? = null,
-  /**
-   * Backend-specific config JSON passed to the embedding model/provider.
-   */
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -174,9 +118,6 @@ public class RAGConfiguration(
     schemaIndex = 9,
   )
   public val embedding_config_json: String? = null,
-  /**
-   * Backend-specific config JSON passed to the LLM provider.
-   */
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -185,7 +126,7 @@ public class RAGConfiguration(
   )
   public val llm_config_json: String? = null,
   /**
-   * Index persistence and retrieval behavior. Empty path = in-memory index.
+   * Where the vector index lives, and whether it survives the session.
    */
   @field:WireField(
     tag = 12,
@@ -210,9 +151,6 @@ public class RAGConfiguration(
     schemaIndex = 13,
   )
   public val rerank_results: Boolean = false,
-  /**
-   * Registered id of the reranker model (optional).
-   */
   @field:WireField(
     tag = 15,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

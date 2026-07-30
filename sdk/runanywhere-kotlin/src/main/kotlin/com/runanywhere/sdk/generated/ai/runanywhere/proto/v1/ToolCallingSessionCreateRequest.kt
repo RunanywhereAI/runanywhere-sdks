@@ -33,18 +33,9 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Tool-calling session / run-loop envelopes. They live here (not in
- * tool_calling.proto) because they carry an LLMGenerationOptions and
- * llm_options.proto already imports tool_calling.proto — the reverse import
- * would be a cycle. Moving them ended the inline re-declaration of sampling
- * knobs the old ToolCallingSessionCreateRequest carried.
- * ---------------------------------------------------------------------------
+ * Tool-driven streaming uses this session path, not LLMGenerateRequest.
  */
 public class ToolCallingSessionCreateRequest(
-  /**
-   * The live user turn.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -52,11 +43,6 @@ public class ToolCallingSessionCreateRequest(
     schemaIndex = 0,
   )
   public val prompt: String = "",
-  /**
-   * Sampling, reasoning, system prompt — the same canonical knobs as any
-   * other generation. tools/tool_choice policy travels in
-   * generation.tool_calling.
-   */
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
@@ -64,10 +50,7 @@ public class ToolCallingSessionCreateRequest(
   )
   public val generation: LLMGenerationOptions? = null,
   /**
-   * proto3 `optional` enables presence detection. When unset, commons
-   * defaults to validate_calls=true so unknown tool calls short-circuit
-   * before host execution. Callers that delegate validation to their
-   * executor must explicitly set false.
+   * Unset preserves commons' secure default of validate=true.
    */
   @field:WireField(
     tag = 3,
@@ -79,10 +62,6 @@ public class ToolCallingSessionCreateRequest(
   history: List<ChatMessage> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingSessionCreateRequest, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Prior conversation turns (excluding `prompt`), same contract as
-   * LLMGenerateRequest.history.
-   */
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.ChatMessage#ADAPTER",

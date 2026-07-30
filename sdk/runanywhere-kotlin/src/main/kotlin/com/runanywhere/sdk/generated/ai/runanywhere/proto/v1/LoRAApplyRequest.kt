@@ -42,6 +42,9 @@ public class LoRAApplyRequest(
   )
   public val request_id: String = "",
   adapters: List<LoRAAdapterConfig> = emptyList(),
+  /**
+   * Drop currently-applied adapters instead of stacking.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

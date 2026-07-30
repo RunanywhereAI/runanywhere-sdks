@@ -30,15 +30,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * RAG — retrieve → rerank → prompt → LLM.
- * ---------------------------------------------------------------------------
- */
 public class RAGConfig(
-  /**
-   * e.g. "bge-small-en-v1.5"
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -47,9 +39,6 @@ public class RAGConfig(
     schemaIndex = 0,
   )
   public val embed_model_id: String = "",
-  /**
-   * e.g. "bge-reranker-v2-m3"
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -66,9 +55,6 @@ public class RAGConfig(
     schemaIndex = 2,
   )
   public val llm_model_id: String = "",
-  /**
-   * Vector store — USearch (in-process HNSW, default) or remote pgvector.
-   */
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.VectorStore#ADAPTER",
@@ -77,9 +63,6 @@ public class RAGConfig(
     schemaIndex = 3,
   )
   public val vector_store: VectorStore = VectorStore.VECTOR_STORE_UNSPECIFIED,
-  /**
-   * Local path for USearch index
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -89,7 +72,7 @@ public class RAGConfig(
   )
   public val vector_store_path: String = "",
   /**
-   * default 24
+   * Retrieve this many candidates, then keep this many after reranking.
    */
   @field:WireField(
     tag = 6,
@@ -99,9 +82,6 @@ public class RAGConfig(
     schemaIndex = 5,
   )
   public val retrieve_k: Int = 0,
-  /**
-   * default 6
-   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -111,8 +91,7 @@ public class RAGConfig(
   )
   public val rerank_top: Int = 0,
   /**
-   * BM25 parameters.
-   * default 1.2
+   * BM25 term-saturation and length-normalization parameters.
    */
   @field:WireField(
     tag = 8,
@@ -122,9 +101,6 @@ public class RAGConfig(
     schemaIndex = 7,
   )
   public val bm25_k1: Float = 0f,
-  /**
-   * default 0.75
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -134,8 +110,7 @@ public class RAGConfig(
   )
   public val bm25_b: Float = 0f,
   /**
-   * RRF fusion parameter.
-   * default 60
+   * Reciprocal-rank-fusion smoothing constant.
    */
   @field:WireField(
     tag = 10,
@@ -145,9 +120,6 @@ public class RAGConfig(
     schemaIndex = 9,
   )
   public val rrf_k: Int = 0,
-  /**
-   * Prompt template. Supports {{context}} and {{query}} placeholders.
-   */
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -156,9 +128,6 @@ public class RAGConfig(
     schemaIndex = 10,
   )
   public val prompt_template: String = "",
-  /**
-   * Optional explicit solution-kind tag. See `SolutionType`.
-   */
   @field:WireField(
     tag = 12,
     adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",

@@ -30,53 +30,11 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * SDKError — the unified error payload every SDK throws / returns.
+ * The unified error payload every SDK throws or returns.
  *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:102  rac_error_t (code, category, message,
- *                                       source location, stack trace,
- *                                       underlying_code, underlying_message,
- *                                       model_id, framework, session_id,
- *                                       timestamp_ms, 3 custom k/v slots).
- *   Swift   (no concrete SDKError type was located; Swift code uses
- *           ErrorCode + ErrorCategory + a SDKErrorProtocol shape that
- *           matches this message; the migrated Swift SDK in sdk/swift/ will
- *           be regenerated from this proto).
- *   Kotlin  SDKError.kt:27              data class (code, category, message,
- *                                       cause).
- *   Dart    sdk_error.dart:13           class SDKError (message, type,
- *                                       underlyingError, context).
- *   RN      SDKError.ts:147             class SDKError (code, legacyCode?,
- *                                       category, underlyingError, context,
- *                                       details?).
- *   Web     ErrorTypes.ts:68            class SDKError (code, details?).
- *
- * Wire contract:
- *   * `code` — required. Always non-zero (zero indicates success and there
- *     should be no SDKError to begin with). Codegen MUST refuse to emit
- *     ERROR_CODE_UNSPECIFIED at runtime.
- *   * `category` — required. Coarse routing bucket. May be UNSPECIFIED only
- *     when `code` itself doesn't fit any bucket cleanly (rare).
- *   * `message` — required, human-readable, non-localized. Localization is a
- *     consumer concern.
- *   * `context` — optional. Source location + telemetry metadata.
- *   * `c_abi_code` — optional. Negative `rac_result_t` integer from the C ABI
- *     (e.g. -110 for MODEL_NOT_FOUND). Allows lossless round-trip with the
- *     C ABI even when intermediate platforms (Kotlin, Dart, RN) use a
- *     positive-numbered local enum. If `code` is set, `c_abi_code` MUST
- *     equal `-int32(code)` for codes ≤ 899; for the Web-only WASM codes
- *     (≥ 900) `c_abi_code` is unset because no canonical C ABI value exists.
- *   * `nested_message` — optional. Underlying-error message as captured at
- *     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
- *     and Kotlin's Throwable.cause.message.
- *   * `retryable` — canonical retry hint. This is business-policy metadata
- *     owned by the portable layer; the platform adapter still decides how to
- *     schedule the retry through native/background APIs when appropriate.
- *   * `correlation_id` — stable cross-event/request correlation key. SDKEvent
- *     also carries this field so callers can join success/progress/failure
- *     events without parsing free-form properties.
- * ---------------------------------------------------------------------------
+ * `code` is always non-zero: an SDKError implies failure, and success is
+ * signalled by its absence. `message` is non-localized; localization is a
+ * consumer concern.
  */
 public class SDKError(
   @field:WireField(
@@ -107,9 +65,9 @@ public class SDKError(
   )
   public val context: ErrorContext? = null,
   /**
-   * Negative rac_result_t value from the C ABI. May be negative; preserved
-   * via int32 (proto3 int32 is signed). Unset when the failure originated
-   * outside the C ABI (e.g. a pure-Web WASM failure).
+   * Signed rac_result_t. Equals -code for codes <= 899. Unset for the
+   * Web-only WASM codes (>= 900), which have no C ABI counterpart, and for
+   * failures originating outside the C ABI.
    */
   @field:WireField(
     tag = 5,
@@ -119,7 +77,7 @@ public class SDKError(
   )
   public val c_abi_code: Int? = null,
   /**
-   * Underlying error's message (the "caused by" chain), if any.
+   * The "caused by" chain.
    */
   @field:WireField(
     tag = 6,
@@ -129,9 +87,8 @@ public class SDKError(
   )
   public val nested_message: String? = null,
   /**
-   * Envelope metadata for canonical error emission. `component` is a stable
-   * lowercase component key ("llm", "stt", "tts", "vad", "vlm", "rag",
-   * "download", "storage", ...); SDKEvent carries the enum-typed component.
+   * `component` is a stable lowercase key ("llm", "stt", "rag", "download").
+   * SDKEvent carries the enum-typed component instead.
    */
   @field:WireField(
     tag = 7,

@@ -12,7 +12,7 @@
 import { SDKLogger } from '../Foundation/SDKLogger.js';
 import { processVoiceTurn } from '../Public/Extensions/RunAnywhere+VoiceAgent.js';
 import type { VoiceAgentResult } from '@runanywhere/proto-ts/voice_agent_service';
-import { AudioEncoding } from '@runanywhere/proto-ts/voice_events';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import { AudioCapture } from './AudioCapture.js';
 import { AudioPlayback } from './AudioPlayback.js';
 import { voiceAgentDefaults } from '@runanywhere/proto-ts/defaults/pool';

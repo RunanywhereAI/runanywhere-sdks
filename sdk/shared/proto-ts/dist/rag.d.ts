@@ -13,102 +13,32 @@ export declare enum RAGStreamEventKind {
 }
 export declare function rAGStreamEventKindFromJSON(object: any): RAGStreamEventKind;
 export declare function rAGStreamEventKindToJSON(object: RAGStreamEventKind): string;
-/**
- * ---------------------------------------------------------------------------
- * RAGConfiguration — low-level pipeline config.
- *
- * This message carries *model ids*, not filesystem paths.
- * The commons RAG session ABI (rac_rag_session_create_proto) is responsible
- * for resolving those ids to on-disk paths through the canonical model
- * registry. SDK callers MUST register the embedding / LLM / reranker models
- * first and pass only their ids here.
- * ---------------------------------------------------------------------------
- */
 export interface RAGConfiguration {
-    /**
-     * Registered id of the embedding model (required, e.g. "bge-small-en-v1.5").
-     * Commons resolves this to the primary artifact path via the model registry.
-     */
     embeddingModelId: string;
-    /**
-     * Registered id of the LLM model (e.g. "qwen3-4b-q4_k_m"). Optional —
-     * leave empty to create an embed-only / retrieval-only pipeline.
-     */
     llmModelId: string;
-    /**
-     * Embedding vector dimension — must match the embedding model.
-     * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-     * Leave UNSET: commons derives the dimension from the loaded embedding
-     * model at session create (rac_embeddings_get_info). Set only to
-     * override. No rac_default on purpose — a generated defaults() that
-     * stamped 384 would mark the field present and defeat the derivation.
-     */
     embeddingDimension?: number | undefined;
-    /**
-     * Number of top chunks to retrieve per query.
-     * Optional so callers can distinguish "unset" from an explicit value.
-     */
+    /** Retrieval depth, not sampling top_k. */
     topK?: number | undefined;
-    /**
-     * Minimum cosine similarity threshold (0.0–1.0). Chunks below this
-     * score are discarded before being passed to the LLM as context.
-     * Optional so callers can distinguish "unset" from explicit 0.0
-     * (accept-everything) without losing the canonical default.
-     * Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
-     * produce cosine similarities that rarely exceed ~0.5 even for relevant
-     * chunks, and chunking a document lowers each chunk's similarity further, so
-     * any positive floor filters out real matches — a multi-chunk document then
-     * retrieves nothing and the answer model reports "no information". top_k
-     * bounds the result count instead of a similarity floor.
-     */
     similarityThreshold?: number | undefined;
-    /**
-     * Tokens per chunk when splitting documents during ingestion.
-     * Optional so callers can distinguish "unset" from an explicit value.
-     */
+    /** Tokens per chunk, and the overlap carried between adjacent chunks. */
     chunkSize?: number | undefined;
-    /**
-     * Overlap tokens between consecutive chunks. Must be < chunk_size.
-     * Optional so callers can explicitly request zero overlap (no overlap)
-     * without it being silently replaced by the canonical default of 64.
-     */
     chunkOverlap?: number | undefined;
-    /**
-     * Maximum tokens of retrieved context passed to the LLM.
-     * Optional so callers can distinguish "unset" from an explicit value.
-     */
     maxContextTokens?: number | undefined;
-    /** Prompt template with `{context}` and `{query}` placeholders. */
     promptTemplate?: string | undefined;
-    /** Backend-specific config JSON passed to the embedding model/provider. */
     embeddingConfigJson?: string | undefined;
-    /** Backend-specific config JSON passed to the LLM provider. */
     llmConfigJson?: string | undefined;
-    /** Index persistence and retrieval behavior. Empty path = in-memory index. */
+    /** Where the vector index lives, and whether it survives the session. */
     indexPath?: string | undefined;
     persistIndex: boolean;
     rerankResults: boolean;
-    /** Registered id of the reranker model (optional). */
     rerankerModelId?: string | undefined;
 }
-/**
- * ---------------------------------------------------------------------------
- * RAGDocument — batch-ingest input item.
- * ---------------------------------------------------------------------------
- */
 export interface RAGDocument {
-    /** Optional caller-supplied document id. */
     id: string;
-    /** Plain text content to chunk/embed. */
     text: string;
-    /** Typed metadata map for generated-proto callers. */
     metadata: {
         [key: string]: string;
     };
-    /**
-     * Adapter-normalized document source. Pickers, sandbox bookmarks, and
-     * platform file access remain SDK-owned.
-     */
     sourceUri?: string | undefined;
     adapterHandle?: string | undefined;
     mediaType?: string | undefined;
@@ -118,93 +48,29 @@ export interface RAGDocument_MetadataEntry {
     key: string;
     value: string;
 }
-export interface RAGIngestRequest {
-    requestId: string;
-    documents: RAGDocument[];
-    replaceExisting: boolean;
-    metadata: {
-        [key: string]: string;
-    };
-}
-export interface RAGIngestRequest_MetadataEntry {
-    key: string;
-    value: string;
-}
-/**
- * ---------------------------------------------------------------------------
- * RAGQueryOptions — per-query sampling and prompt overrides.
- * ---------------------------------------------------------------------------
- */
 export interface RAGQueryOptions {
-    /** The user question to answer. Required (empty = no-op). */
     question: string;
-    /**
-     * Answer-generation knobs (sampling, system prompt, reasoning). Unset =
-     * pipeline defaults. RAG-appropriate defaults (e.g. max_output_tokens
-     * 512, temperature 0.7) are applied by the pipeline when unset, not
-     * re-declared here.
-     */
     generation?: LLMGenerationOptions | undefined;
-    /** Retrieval overrides. 0/unset = use RAGConfiguration defaults. */
+    /** Retrieval depth for this call, overriding RAGConfiguration.top_k. */
     retrievalTopK: number;
-    /**
-     * Per-query similarity floor. `optional` so an explicit 0.0 (accept
-     * everything) is distinguishable from "unset" and can override a positive
-     * session-level default; unset falls back to RAGConfiguration.
-     */
     similarityThreshold?: number | undefined;
     stream: boolean;
-    /**
-     * Multi-query expansion: when true, the answer LLM rewrites the question
-     * into `multi_query_count` variants; retrieval runs for the original plus
-     * each variant and the rankings are RRF-fused before rerank. Falls back to
-     * a single query if expansion yields nothing.
-     */
+    /** Expand the question into several queries and merge the results. */
     enableMultiQuery: boolean;
     multiQueryCount?: number | undefined;
-    /**
-     * Scoped retrieval: when set, only chunks whose document id begins with
-     * this prefix are eligible (e.g. a chat/collection namespace). Unset =
-     * search the whole index.
-     */
+    /** Restrict retrieval to chunks whose source matches this prefix. */
     scopePrefix?: string | undefined;
 }
-export interface RAGQueryRequest {
-    requestId: string;
-    options?: RAGQueryOptions | undefined;
-    metadata: {
-        [key: string]: string;
-    };
-}
-export interface RAGQueryRequest_MetadataEntry {
-    key: string;
-    value: string;
-}
-/**
- * ---------------------------------------------------------------------------
- * RAGSearchResult — a single retrieved document chunk with similarity score.
- * ---------------------------------------------------------------------------
- */
 export interface RAGSearchResult {
-    /** Unique identifier of the chunk (assigned at ingestion time). */
     chunkId: string;
-    /** Text content of the chunk (the actual snippet shown to the LLM). */
     text: string;
-    /** Cosine similarity score (0.0–1.0). Higher = more relevant. */
     similarityScore: number;
-    /**
-     * Optional source document identifier (filename, URL, or document ID).
-     * Set when the chunk's origin is tracked at ingestion time.
-     */
     sourceDocument?: string | undefined;
-    /**
-     * Free-form metadata associated with the chunk (e.g. page number, section,
-     * ingestion timestamp).
-     */
     metadata: {
         [key: string]: string;
     };
     rank: number;
+    /** Character offsets into the source document. */
     startOffset: number;
     endOffset: number;
     tokenCount: number;
@@ -213,83 +79,35 @@ export interface RAGSearchResult_MetadataEntry {
     key: string;
     value: string;
 }
-/**
- * ---------------------------------------------------------------------------
- * RAGResult — the full result of a RAG query.
- * ---------------------------------------------------------------------------
- */
 export interface RAGResult {
-    /** The LLM-generated answer grounded in the retrieved context. */
     answer: string;
-    /**
-     * Document chunks retrieved during vector search and used as context.
-     * Order matches retrieval rank (highest similarity first).
-     */
     retrievedChunks: RAGSearchResult[];
-    /**
-     * Full context string passed to the LLM (chunks joined into a prompt).
-     * May be empty for queries with no matching chunks.
-     */
     contextUsed: string;
-    /** Time spent in the retrieval phase (vector search), in milliseconds. */
     retrievalTimeMs: number;
-    /** Time spent in the LLM generation phase, in milliseconds. */
     generationTimeMs: number;
-    /**
-     * Total end-to-end query time (retrieval + generation + overhead),
-     * in milliseconds.
-     */
     totalTimeMs: number;
+    /**
+     * These use the OpenAI legacy names; everything else in the IDL says
+     * input_tokens / output_tokens.
+     */
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
     errorMessage?: string | undefined;
     errorCode: number;
     requestId: string;
-    /** Optional thinking/reasoning content extracted from the answer. */
     thinkingContent?: string | undefined;
 }
-/**
- * ---------------------------------------------------------------------------
- * RAGStatistics — index-level counters for the RAG pipeline.
- *
- * Returned by RunAnywhere.rag.statistics() / ragGetStatistics().
- * ---------------------------------------------------------------------------
- */
 export interface RAGStatistics {
-    /** Total number of documents ever ingested into the index. */
     indexedDocuments: number;
-    /** Total number of chunks across all indexed documents. */
     indexedChunks: number;
-    /** Approximate total token count across all indexed chunks. */
     totalTokensIndexed: number;
-    /**
-     * Wall-clock timestamp of the most recent ingestion, in milliseconds
-     * since Unix epoch. 0 = no ingestion yet.
-     */
     lastUpdatedMs: number;
-    /**
-     * Filesystem path to the on-disk index, when applicable. Unset for
-     * in-memory-only indexes.
-     */
     indexPath?: string | undefined;
-    /**
-     * Raw backend statistics JSON for implementations that cannot yet project
-     * every counter into typed fields.
-     */
     statsJson?: string | undefined;
-    /** Approximate vector-store footprint in bytes, when known. */
     vectorStoreSizeBytes: number;
     isPersistent: boolean;
     lastQueryMs: number;
-    errorMessage?: string | undefined;
-    errorCode: number;
-}
-export interface RAGIngestResult {
-    requestId: string;
-    documentsIngested: number;
-    chunksIngested: number;
-    statistics?: RAGStatistics | undefined;
     errorMessage?: string | undefined;
     errorCode: number;
 }
@@ -304,30 +122,15 @@ export interface RAGStreamEvent {
     errorMessage?: string | undefined;
     errorCode: number;
 }
-export interface RAGServiceState {
-    isReady: boolean;
-    statistics?: RAGStatistics | undefined;
-    isIndexing: boolean;
-    isQuerying: boolean;
-    activeRequestId?: string | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
-}
 export declare const RAGConfiguration: MessageFns<RAGConfiguration>;
 export declare const RAGDocument: MessageFns<RAGDocument>;
 export declare const RAGDocument_MetadataEntry: MessageFns<RAGDocument_MetadataEntry>;
-export declare const RAGIngestRequest: MessageFns<RAGIngestRequest>;
-export declare const RAGIngestRequest_MetadataEntry: MessageFns<RAGIngestRequest_MetadataEntry>;
 export declare const RAGQueryOptions: MessageFns<RAGQueryOptions>;
-export declare const RAGQueryRequest: MessageFns<RAGQueryRequest>;
-export declare const RAGQueryRequest_MetadataEntry: MessageFns<RAGQueryRequest_MetadataEntry>;
 export declare const RAGSearchResult: MessageFns<RAGSearchResult>;
 export declare const RAGSearchResult_MetadataEntry: MessageFns<RAGSearchResult_MetadataEntry>;
 export declare const RAGResult: MessageFns<RAGResult>;
 export declare const RAGStatistics: MessageFns<RAGStatistics>;
-export declare const RAGIngestResult: MessageFns<RAGIngestResult>;
 export declare const RAGStreamEvent: MessageFns<RAGStreamEvent>;
-export declare const RAGServiceState: MessageFns<RAGServiceState>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

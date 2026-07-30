@@ -127,8 +127,8 @@ rac_result_t diarize_with_service(rac_handle_t service, const char* model_id,
     }
 
     rac_diarization_options_t options = RAC_DIARIZATION_OPTIONS_DEFAULT;
-    runanywhere::v1::DiarizationAudioEncoding encoding =
-        runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
+    runanywhere::v1::AudioEncoding encoding =
+        runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE;
     rac_result_t rc = rac::diarization::options_from_proto(
         request.has_options() ? &request.options() : nullptr, &options, &encoding);
     if (rc != RAC_SUCCESS) {
@@ -290,13 +290,13 @@ void set_component_operation_admitted_test_hook(ComponentOperationAdmittedTestHo
 
 rac_result_t options_from_proto(const runanywhere::v1::DiarizationOptions* proto,
                                 rac_diarization_options_t* out_options,
-                                runanywhere::v1::DiarizationAudioEncoding* out_encoding) {
+                                runanywhere::v1::AudioEncoding* out_encoding) {
     if (!out_options || !out_encoding) {
         return RAC_ERROR_NULL_POINTER;
     }
 
     *out_options = RAC_DIARIZATION_OPTIONS_DEFAULT;
-    *out_encoding = runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
+    *out_encoding = runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE;
     if (proto) {
         if (proto->has_sample_rate()) {
             out_options->sample_rate_hz = proto->sample_rate();
@@ -325,8 +325,8 @@ rac_result_t options_from_proto(const runanywhere::v1::DiarizationOptions* proto
     if (out_options->channel_count != 1) {
         return RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED;
     }
-    if (*out_encoding != runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_F32_LE &&
-        *out_encoding != runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE) {
+    if (*out_encoding != runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE &&
+        *out_encoding != runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE) {
         return RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED;
     }
     // The Sortformer mel frontend is fixed at 16 kHz and commons does not
@@ -341,7 +341,7 @@ rac_result_t options_from_proto(const runanywhere::v1::DiarizationOptions* proto
 }
 
 rac_result_t decode_audio(const uint8_t* bytes, size_t size,
-                          runanywhere::v1::DiarizationAudioEncoding encoding, int32_t channel_count,
+                          runanywhere::v1::AudioEncoding encoding, int32_t channel_count,
                           bool require_nonempty, std::vector<float>* out_samples) {
     if (!out_samples) {
         return RAC_ERROR_NULL_POINTER;
@@ -359,10 +359,10 @@ rac_result_t decode_audio(const uint8_t* bytes, size_t size,
 
     size_t sample_width = 0;
     switch (encoding) {
-        case runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_F32_LE:
+        case runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE:
             sample_width = sizeof(float);
             break;
-        case runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE:
+        case runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE:
             sample_width = sizeof(int16_t);
             break;
         default:
@@ -380,7 +380,7 @@ rac_result_t decode_audio(const uint8_t* bytes, size_t size,
     }
     for (size_t i = 0; i < count; ++i) {
         const uint8_t* p = bytes + i * sample_width;
-        if (encoding == runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE) {
+        if (encoding == runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE) {
             const uint16_t raw = static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8U);
             const int16_t sample = static_cast<int16_t>(raw);
             (*out_samples)[i] = static_cast<float>(sample) / 32768.0f;

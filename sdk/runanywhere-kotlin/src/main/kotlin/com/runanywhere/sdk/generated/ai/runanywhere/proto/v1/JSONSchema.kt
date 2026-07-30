@@ -34,19 +34,7 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * JSON Schema definition — top-level schema for structured output.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:59     JSONSchema (extends JSONSchemaProperty
- *                                       with $schema, $id, title, definitions,
- *                                       $ref, allOf/anyOf/oneOf/not)
- * ---------------------------------------------------------------------------
- */
 public class JSONSchema(
-  /**
-   * Root type for this schema (commonly OBJECT or ARRAY).
-   */
   @field:WireField(
     tag = 1,
     adapter = "ai.runanywhere.proto.v1.JSONSchemaType#ADAPTER",
@@ -56,18 +44,12 @@ public class JSONSchema(
   public val type: JSONSchemaType = JSONSchemaType.JSON_SCHEMA_TYPE_UNSPECIFIED,
   properties: Map<String, JSONSchemaProperty> = emptyMap(),
   required: List<String> = emptyList(),
-  /**
-   * Element schema when the root `type == JSON_SCHEMA_TYPE_ARRAY`.
-   */
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.JSONSchemaProperty#ADAPTER",
     schemaIndex = 3,
   )
   public val items: JSONSchemaProperty? = null,
-  /**
-   * Whether properties not declared in `properties` are allowed.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -75,10 +57,6 @@ public class JSONSchema(
     schemaIndex = 4,
   )
   public val additional_properties: Boolean? = null,
-  /**
-   * JSON Schema document metadata / composition fields. Field names avoid
-   * `$` in generated APIs while preserving JSON names for serializers.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -123,6 +101,9 @@ public class JSONSchema(
     schemaIndex = 14,
   )
   public val not_schema: JSONSchema? = null,
+  /**
+   * Escape hatch for schemas the typed shape above cannot express.
+   */
   @field:WireField(
     tag = 16,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -132,9 +113,6 @@ public class JSONSchema(
   public val raw_json: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<JSONSchema, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Map of property name -> property definition.
-   */
   @field:WireField(
     tag = 2,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -143,9 +121,6 @@ public class JSONSchema(
   )
   public val properties: Map<String, JSONSchemaProperty> = immutableCopyOf("properties", properties)
 
-  /**
-   * Names of required properties (`required` in JSON Schema).
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

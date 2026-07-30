@@ -29,9 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * Top-level union dispatched to the matching solution loader.
- */
 public class SolutionConfig(
   @field:WireField(
     tag = 1,

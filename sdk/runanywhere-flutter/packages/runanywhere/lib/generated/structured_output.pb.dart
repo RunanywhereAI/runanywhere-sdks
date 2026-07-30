@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -22,21 +21,6 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'structured_output.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// JSON Schema property — describes a single property within a schema.
-/// Sources pre-IDL:
-///   RN  StructuredOutputTypes.ts:24     JSONSchemaProperty (type, description,
-///                                       enum, format, items, properties, …)
-///
-/// proto3 does not allow direct self-referential message fields without
-/// `optional` / explicit handle. Recursion is expressed via:
-///   - `items_schema`     — for array element types       (handle to JSONSchema)
-///   - `object_schema`    — for nested object types       (handle to JSONSchema)
-/// Deeper recursion (a property whose items are themselves objects with
-/// further nested properties) is represented by repeating the same indirection
-/// inside the referenced JSONSchema. Very deep schemas are uncommon and
-/// supported by chaining these handles.
-/// ---------------------------------------------------------------------------
 class JSONSchemaProperty extends $pb.GeneratedMessage {
   factory JSONSchemaProperty({
     JSONSchemaType? type,
@@ -123,7 +107,6 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<JSONSchemaProperty>(create);
   static JSONSchemaProperty? _defaultInstance;
 
-  /// Primitive / composite type for this property.
   @$pb.TagNumber(1)
   JSONSchemaType get type => $_getN(0);
   @$pb.TagNumber(1)
@@ -133,7 +116,6 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearType() => $_clearField(1);
 
-  /// Human-readable description (`description` in JSON Schema).
   @$pb.TagNumber(2)
   $core.String get description => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -143,13 +125,9 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearDescription() => $_clearField(2);
 
-  /// Allowed enum values (`enum` in JSON Schema). Strings only; numeric and
-  /// boolean enums are rare and serialized as strings here.
   @$pb.TagNumber(3)
   $pb.PbList<$core.String> get enumValues => $_getList(2);
 
-  /// String format hint (`format` in JSON Schema): "email", "uri",
-  /// "date-time", etc.
   @$pb.TagNumber(4)
   $core.String get format => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -159,7 +137,7 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearFormat() => $_clearField(4);
 
-  /// Element schema when `type == JSON_SCHEMA_TYPE_ARRAY`.
+  /// items_schema for arrays, object_schema for nested objects.
   @$pb.TagNumber(5)
   JSONSchema get itemsSchema => $_getN(4);
   @$pb.TagNumber(5)
@@ -171,7 +149,6 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   JSONSchema ensureItemsSchema() => $_ensure(4);
 
-  /// Nested object schema when `type == JSON_SCHEMA_TYPE_OBJECT`.
   @$pb.TagNumber(6)
   JSONSchema get objectSchema => $_getN(5);
   @$pb.TagNumber(6)
@@ -183,7 +160,6 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   JSONSchema ensureObjectSchema() => $_ensure(5);
 
-  /// Common validation constraints carried by RN/Web schema builders.
   @$pb.TagNumber(7)
   $core.double get minimum => $_getN(6);
   @$pb.TagNumber(7)
@@ -257,13 +233,6 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
   void clearDefaultJson() => $_clearField(14);
 }
 
-/// ---------------------------------------------------------------------------
-/// JSON Schema definition — top-level schema for structured output.
-/// Sources pre-IDL:
-///   RN  StructuredOutputTypes.ts:59     JSONSchema (extends JSONSchemaProperty
-///                                       with $schema, $id, title, definitions,
-///                                       $ref, allOf/anyOf/oneOf/not)
-/// ---------------------------------------------------------------------------
 class JSONSchema extends $pb.GeneratedMessage {
   factory JSONSchema({
     JSONSchemaType? type,
@@ -373,7 +342,6 @@ class JSONSchema extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<JSONSchema>(create);
   static JSONSchema? _defaultInstance;
 
-  /// Root type for this schema (commonly OBJECT or ARRAY).
   @$pb.TagNumber(1)
   JSONSchemaType get type => $_getN(0);
   @$pb.TagNumber(1)
@@ -383,15 +351,12 @@ class JSONSchema extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearType() => $_clearField(1);
 
-  /// Map of property name -> property definition.
   @$pb.TagNumber(2)
   $pb.PbMap<$core.String, JSONSchemaProperty> get properties => $_getMap(1);
 
-  /// Names of required properties (`required` in JSON Schema).
   @$pb.TagNumber(3)
   $pb.PbList<$core.String> get required => $_getList(2);
 
-  /// Element schema when the root `type == JSON_SCHEMA_TYPE_ARRAY`.
   @$pb.TagNumber(4)
   JSONSchemaProperty get items => $_getN(3);
   @$pb.TagNumber(4)
@@ -403,7 +368,6 @@ class JSONSchema extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   JSONSchemaProperty ensureItems() => $_ensure(3);
 
-  /// Whether properties not declared in `properties` are allowed.
   @$pb.TagNumber(5)
   $core.bool get additionalProperties => $_getBF(4);
   @$pb.TagNumber(5)
@@ -413,8 +377,6 @@ class JSONSchema extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearAdditionalProperties() => $_clearField(5);
 
-  /// JSON Schema document metadata / composition fields. Field names avoid
-  /// `$` in generated APIs while preserving JSON names for serializers.
   @$pb.TagNumber(6)
   $core.String get schemaUri => $_getSZ(5);
   @$pb.TagNumber(6)
@@ -483,6 +445,7 @@ class JSONSchema extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   JSONSchema ensureNotSchema() => $_ensure(14);
 
+  /// Escape hatch for schemas the typed shape above cannot express.
   @$pb.TagNumber(16)
   $core.String get rawJson => $_getSZ(15);
   @$pb.TagNumber(16)
@@ -495,19 +458,6 @@ class JSONSchema extends $pb.GeneratedMessage {
 
 enum StructuredOutputOptions_SchemaSource { schema, jsonSchema, notSet }
 
-/// ---------------------------------------------------------------------------
-/// Structured output options — request-side configuration for a structured
-/// generation call. Wraps a JSONSchema plus generation flags.
-/// Sources pre-IDL:
-///   Swift  LLMTypes.swift:533           StructuredOutputConfig
-///   Kotlin LLMTypes.kt:242              StructuredOutputConfig
-///   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
-///   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
-/// ---------------------------------------------------------------------------
-/// The ONE output-constraint surface. The retired loose fields on
-/// LLMGenerationOptions (json_schema, grammar, response_format) all fold in
-/// here: schema-shaped output via `schema_source`, low-level constrained
-/// decoding via `grammar`/`regex_pattern`.
 class StructuredOutputOptions extends $pb.GeneratedMessage {
   factory StructuredOutputOptions({
     JSONSchema? schema,
@@ -609,7 +559,6 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   JSONSchema ensureSchema() => $_ensure(0);
 
-  /// Whether to embed the schema text in the LLM prompt.
   @$pb.TagNumber(2)
   $core.bool get includeSchemaInPrompt => $_getBF(1);
   @$pb.TagNumber(2)
@@ -619,7 +568,7 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearIncludeSchemaInPrompt() => $_clearField(2);
 
-  /// Strict schema adherence — rejects outputs that don't fully validate.
+  /// Not read by commons.
   @$pb.TagNumber(3)
   $core.bool get strictMode => $_getBF(2);
   @$pb.TagNumber(3)
@@ -638,7 +587,7 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearJsonSchema() => $_clearField(4);
 
-  /// Name for the schema/output type (OpenAI json_schema.name).
+  /// Matches OpenAI's json_schema.name.
   @$pb.TagNumber(6)
   $core.String get name => $_getSZ(4);
   @$pb.TagNumber(6)
@@ -675,6 +624,7 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearGrammar() => $_clearField(9);
 
+  /// Attempt to repair malformed JSON before failing.
   @$pb.TagNumber(10)
   $core.bool get repairJson => $_getBF(8);
   @$pb.TagNumber(10)
@@ -694,13 +644,6 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
   void clearMaxRetries() => $_clearField(11);
 }
 
-/// ---------------------------------------------------------------------------
-/// Structured output validation result — populated after the model returns.
-/// Sources pre-IDL:
-///   Swift  LLMTypes.swift:585           StructuredOutputValidation
-///   Kotlin LLMTypes.kt:278              StructuredOutputValidation
-///   Dart   structured_output_types.dart StructuredOutputValidation
-/// ---------------------------------------------------------------------------
 class StructuredOutputValidation extends $pb.GeneratedMessage {
   factory StructuredOutputValidation({
     $core.bool? isValid,
@@ -766,7 +709,6 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<StructuredOutputValidation>(create);
   static StructuredOutputValidation? _defaultInstance;
 
-  /// Whether the parsed output validates against the requested schema.
   @$pb.TagNumber(1)
   $core.bool get isValid => $_getBF(0);
   @$pb.TagNumber(1)
@@ -776,7 +718,6 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearIsValid() => $_clearField(1);
 
-  /// Whether the raw text contained any parseable JSON object.
   @$pb.TagNumber(2)
   $core.bool get containsJson => $_getBF(1);
   @$pb.TagNumber(2)
@@ -786,7 +727,6 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearContainsJson() => $_clearField(2);
 
-  /// Validation / parse error message when `is_valid == false`.
   @$pb.TagNumber(3)
   $core.String get errorMessage => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -796,7 +736,6 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearErrorMessage() => $_clearField(3);
 
-  /// Original raw model output (for debugging / fallback parsing).
   @$pb.TagNumber(4)
   $core.String get rawOutput => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -806,8 +745,6 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearRawOutput() => $_clearField(4);
 
-  /// JSON substring extracted from raw_output before validation, when the
-  /// extractor found one.
   @$pb.TagNumber(5)
   $core.String get extractedJson => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -830,16 +767,6 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
   void clearValidationTimeMs() => $_clearField(7);
 }
 
-/// ---------------------------------------------------------------------------
-/// Structured output result — generic envelope returned by structured calls.
-/// `parsed_json` is a UTF-8 JSON-encoded byte payload to keep the result
-/// language-agnostic; SDKs deserialize into their concrete typed value.
-/// Sources pre-IDL:
-///   RN     StructuredOutputTypes.ts:93  StructuredOutputResult<T> (data, raw,
-///                                       success, error)
-///   Dart   structured_output_types.dart StructuredOutputResult<T> (result,
-///                                       rawText, metrics)
-/// ---------------------------------------------------------------------------
 class StructuredOutputResult extends $pb.GeneratedMessage {
   factory StructuredOutputResult({
     $core.List<$core.int>? parsedJson,
@@ -899,7 +826,6 @@ class StructuredOutputResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<StructuredOutputResult>(create);
   static StructuredOutputResult? _defaultInstance;
 
-  /// JSON-encoded parsed value (UTF-8 bytes).
   @$pb.TagNumber(1)
   $core.List<$core.int> get parsedJson => $_getN(0);
   @$pb.TagNumber(1)
@@ -909,7 +835,6 @@ class StructuredOutputResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearParsedJson() => $_clearField(1);
 
-  /// Validation / parse outcome.
   @$pb.TagNumber(2)
   StructuredOutputValidation get validation => $_getN(1);
   @$pb.TagNumber(2)
@@ -921,7 +846,6 @@ class StructuredOutputResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   StructuredOutputValidation ensureValidation() => $_ensure(1);
 
-  /// Raw model text prior to parsing (optional, useful for retries).
   @$pb.TagNumber(3)
   $core.String get rawText => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -1512,12 +1436,7 @@ class StructuredOutputStreamEvent extends $pb.GeneratedMessage {
   void clearErrorCode() => $_clearField(10);
 }
 
-/// ---------------------------------------------------------------------------
-/// Named entity — single span identified within input text.
-/// Sources pre-IDL:
-///   RN  StructuredOutputTypes.ts:143    NamedEntity (text, type, startOffset,
-///                                       endOffset, confidence)
-/// ---------------------------------------------------------------------------
+/// Character offsets into the source text.
 class NamedEntity extends $pb.GeneratedMessage {
   factory NamedEntity({
     $core.String? text,
@@ -1574,7 +1493,6 @@ class NamedEntity extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<NamedEntity>(create);
   static NamedEntity? _defaultInstance;
 
-  /// Surface form of the entity exactly as it appeared in input.
   @$pb.TagNumber(1)
   $core.String get text => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -1584,7 +1502,6 @@ class NamedEntity extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearText() => $_clearField(1);
 
-  /// Entity class label, e.g. "PERSON", "ORG", "LOCATION".
   @$pb.TagNumber(2)
   $core.String get entityType => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -1594,7 +1511,6 @@ class NamedEntity extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearEntityType() => $_clearField(2);
 
-  /// UTF-16 / character start offset (inclusive) within input text.
   @$pb.TagNumber(3)
   $core.int get startOffset => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -1604,7 +1520,6 @@ class NamedEntity extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearStartOffset() => $_clearField(3);
 
-  /// UTF-16 / character end offset (exclusive) within input text.
   @$pb.TagNumber(4)
   $core.int get endOffset => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -1614,7 +1529,6 @@ class NamedEntity extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearEndOffset() => $_clearField(4);
 
-  /// Model confidence in [0.0, 1.0].
   @$pb.TagNumber(5)
   $core.double get confidence => $_getN(4);
   @$pb.TagNumber(5)
@@ -1623,418 +1537,6 @@ class NamedEntity extends $pb.GeneratedMessage {
   $core.bool hasConfidence() => $_has(4);
   @$pb.TagNumber(5)
   void clearConfidence() => $_clearField(5);
-}
-
-/// ---------------------------------------------------------------------------
-/// Entity extraction result — list of entities pulled from a document.
-/// Sources pre-IDL:
-///   RN  StructuredOutputTypes.ts:110    EntityExtractionResult<T>
-///                                       (entities, confidence)
-/// Note: RN's per-result `confidence` is dropped in favor of per-entity
-/// confidence on `NamedEntity`, which is the more granular and useful form.
-/// ---------------------------------------------------------------------------
-class EntityExtractionResult extends $pb.GeneratedMessage {
-  factory EntityExtractionResult({
-    $core.Iterable<NamedEntity>? entities,
-  }) {
-    final result = create();
-    if (entities != null) result.entities.addAll(entities);
-    return result;
-  }
-
-  EntityExtractionResult._();
-
-  factory EntityExtractionResult.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory EntityExtractionResult.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'EntityExtractionResult',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..pPM<NamedEntity>(1, _omitFieldNames ? '' : 'entities',
-        subBuilder: NamedEntity.create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EntityExtractionResult clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  EntityExtractionResult copyWith(
-          void Function(EntityExtractionResult) updates) =>
-      super.copyWith((message) => updates(message as EntityExtractionResult))
-          as EntityExtractionResult;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static EntityExtractionResult create() => EntityExtractionResult._();
-  @$core.override
-  EntityExtractionResult createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static EntityExtractionResult getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<EntityExtractionResult>(create);
-  static EntityExtractionResult? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $pb.PbList<NamedEntity> get entities => $_getList(0);
-}
-
-/// ---------------------------------------------------------------------------
-/// Classification candidate — alternative label considered.
-/// Sources pre-IDL:
-///   RN  StructuredOutputTypes.ts:118    ClassificationResult.alternatives item
-/// ---------------------------------------------------------------------------
-class ClassificationCandidate extends $pb.GeneratedMessage {
-  factory ClassificationCandidate({
-    $core.String? label,
-    $core.double? confidence,
-  }) {
-    final result = create();
-    if (label != null) result.label = label;
-    if (confidence != null) result.confidence = confidence;
-    return result;
-  }
-
-  ClassificationCandidate._();
-
-  factory ClassificationCandidate.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory ClassificationCandidate.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ClassificationCandidate',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'label')
-    ..aD(2, _omitFieldNames ? '' : 'confidence', fieldType: $pb.PbFieldType.OF)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ClassificationCandidate clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ClassificationCandidate copyWith(
-          void Function(ClassificationCandidate) updates) =>
-      super.copyWith((message) => updates(message as ClassificationCandidate))
-          as ClassificationCandidate;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ClassificationCandidate create() => ClassificationCandidate._();
-  @$core.override
-  ClassificationCandidate createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static ClassificationCandidate getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ClassificationCandidate>(create);
-  static ClassificationCandidate? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get label => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set label($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasLabel() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearLabel() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.double get confidence => $_getN(1);
-  @$pb.TagNumber(2)
-  set confidence($core.double value) => $_setFloat(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasConfidence() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearConfidence() => $_clearField(2);
-}
-
-/// ---------------------------------------------------------------------------
-/// Classification result — top label plus optional alternatives.
-/// Sources pre-IDL:
-///   RN  StructuredOutputTypes.ts:118    ClassificationResult (category,
-///                                       confidence, alternatives)
-/// Note: RN names the field `category`; canonicalized here to `label`, which
-/// matches industry classifier APIs (HuggingFace, OpenAI, etc.).
-/// ---------------------------------------------------------------------------
-class ClassificationResult extends $pb.GeneratedMessage {
-  factory ClassificationResult({
-    $core.String? label,
-    $core.double? confidence,
-    $core.Iterable<ClassificationCandidate>? alternatives,
-  }) {
-    final result = create();
-    if (label != null) result.label = label;
-    if (confidence != null) result.confidence = confidence;
-    if (alternatives != null) result.alternatives.addAll(alternatives);
-    return result;
-  }
-
-  ClassificationResult._();
-
-  factory ClassificationResult.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory ClassificationResult.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'ClassificationResult',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'label')
-    ..aD(2, _omitFieldNames ? '' : 'confidence', fieldType: $pb.PbFieldType.OF)
-    ..pPM<ClassificationCandidate>(3, _omitFieldNames ? '' : 'alternatives',
-        subBuilder: ClassificationCandidate.create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ClassificationResult clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  ClassificationResult copyWith(void Function(ClassificationResult) updates) =>
-      super.copyWith((message) => updates(message as ClassificationResult))
-          as ClassificationResult;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ClassificationResult create() => ClassificationResult._();
-  @$core.override
-  ClassificationResult createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static ClassificationResult getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<ClassificationResult>(create);
-  static ClassificationResult? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get label => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set label($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasLabel() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearLabel() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.double get confidence => $_getN(1);
-  @$pb.TagNumber(2)
-  set confidence($core.double value) => $_setFloat(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasConfidence() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearConfidence() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $pb.PbList<ClassificationCandidate> get alternatives => $_getList(2);
-}
-
-/// ---------------------------------------------------------------------------
-/// Sentiment analysis result — overall sentiment plus per-class scores.
-/// Sources pre-IDL:
-///   RN  StructuredOutputTypes.ts:130    SentimentResult (sentiment, score,
-///                                       aspects)
-/// ---------------------------------------------------------------------------
-class SentimentResult extends $pb.GeneratedMessage {
-  factory SentimentResult({
-    Sentiment? sentiment,
-    $core.double? confidence,
-    $core.double? positiveScore,
-    $core.double? negativeScore,
-    $core.double? neutralScore,
-  }) {
-    final result = create();
-    if (sentiment != null) result.sentiment = sentiment;
-    if (confidence != null) result.confidence = confidence;
-    if (positiveScore != null) result.positiveScore = positiveScore;
-    if (negativeScore != null) result.negativeScore = negativeScore;
-    if (neutralScore != null) result.neutralScore = neutralScore;
-    return result;
-  }
-
-  SentimentResult._();
-
-  factory SentimentResult.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory SentimentResult.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'SentimentResult',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aE<Sentiment>(1, _omitFieldNames ? '' : 'sentiment',
-        enumValues: Sentiment.values)
-    ..aD(2, _omitFieldNames ? '' : 'confidence', fieldType: $pb.PbFieldType.OF)
-    ..aD(3, _omitFieldNames ? '' : 'positiveScore',
-        fieldType: $pb.PbFieldType.OF)
-    ..aD(4, _omitFieldNames ? '' : 'negativeScore',
-        fieldType: $pb.PbFieldType.OF)
-    ..aD(5, _omitFieldNames ? '' : 'neutralScore',
-        fieldType: $pb.PbFieldType.OF)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  SentimentResult clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  SentimentResult copyWith(void Function(SentimentResult) updates) =>
-      super.copyWith((message) => updates(message as SentimentResult))
-          as SentimentResult;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static SentimentResult create() => SentimentResult._();
-  @$core.override
-  SentimentResult createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static SentimentResult getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<SentimentResult>(create);
-  static SentimentResult? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  Sentiment get sentiment => $_getN(0);
-  @$pb.TagNumber(1)
-  set sentiment(Sentiment value) => $_setField(1, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSentiment() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSentiment() => $_clearField(1);
-
-  /// Aggregate confidence in the chosen sentiment label, [0.0, 1.0].
-  @$pb.TagNumber(2)
-  $core.double get confidence => $_getN(1);
-  @$pb.TagNumber(2)
-  set confidence($core.double value) => $_setFloat(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasConfidence() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearConfidence() => $_clearField(2);
-
-  /// Per-class soft scores (optional). Absent fields are unscored.
-  @$pb.TagNumber(3)
-  $core.double get positiveScore => $_getN(2);
-  @$pb.TagNumber(3)
-  set positiveScore($core.double value) => $_setFloat(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasPositiveScore() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearPositiveScore() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.double get negativeScore => $_getN(3);
-  @$pb.TagNumber(4)
-  set negativeScore($core.double value) => $_setFloat(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasNegativeScore() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearNegativeScore() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.double get neutralScore => $_getN(4);
-  @$pb.TagNumber(5)
-  set neutralScore($core.double value) => $_setFloat(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasNeutralScore() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearNeutralScore() => $_clearField(5);
-}
-
-/// ---------------------------------------------------------------------------
-/// Named entity recognition result — alias-style wrapper carrying entities.
-/// Equivalent in shape to `EntityExtractionResult`; both are kept so SDKs that
-/// distinguish "extraction" (instruction-driven) from "NER" (model-native)
-/// can route to the appropriate type without ambiguity.
-/// Sources pre-IDL:
-///   RN  StructuredOutputTypes.ts:154    NERResult (entities)
-/// ---------------------------------------------------------------------------
-class NERResult extends $pb.GeneratedMessage {
-  factory NERResult({
-    $core.Iterable<NamedEntity>? entities,
-  }) {
-    final result = create();
-    if (entities != null) result.entities.addAll(entities);
-    return result;
-  }
-
-  NERResult._();
-
-  factory NERResult.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory NERResult.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'NERResult',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..pPM<NamedEntity>(1, _omitFieldNames ? '' : 'entities',
-        subBuilder: NamedEntity.create)
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  NERResult clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  NERResult copyWith(void Function(NERResult) updates) =>
-      super.copyWith((message) => updates(message as NERResult)) as NERResult;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static NERResult create() => NERResult._();
-  @$core.override
-  NERResult createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static NERResult getDefault() =>
-      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<NERResult>(create);
-  static NERResult? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $pb.PbList<NamedEntity> get entities => $_getList(0);
-}
-
-/// Logical structured-output service contract. Model execution, retries, UI
-/// callbacks, and platform-specific JSON parser choices remain adapter-owned;
-/// this service describes portable prompt preparation, extraction/parsing,
-/// and validation semantics over generated messages.
-///
-/// Generation entry points (rac_structured_output_generate_proto /
-/// rac_structured_output_generate_stream_proto) are intentionally NOT modeled
-/// as service RPCs here — they are first-class C ABI calls that consume
-/// StructuredOutputRequest and emit StructuredOutputResult /
-/// StructuredOutputStreamEvent directly without a service descriptor.
-/// The cross-SDK contract (test_structured_output_service_proto_abi.cpp) pins
-/// the service surface to exactly three RPCs: PreparePrompt / Validate / Parse.
-class StructuredOutputApi {
-  final $pb.RpcClient _client;
-
-  StructuredOutputApi(this._client);
-
-  $async.Future<StructuredOutputPromptResult> preparePrompt(
-          $pb.ClientContext? ctx, StructuredOutputRequest request) =>
-      _client.invoke<StructuredOutputPromptResult>(ctx, 'StructuredOutput',
-          'PreparePrompt', request, StructuredOutputPromptResult());
-  $async.Future<StructuredOutputValidation> validate(
-          $pb.ClientContext? ctx, StructuredOutputValidationRequest request) =>
-      _client.invoke<StructuredOutputValidation>(ctx, 'StructuredOutput',
-          'Validate', request, StructuredOutputValidation());
-  $async.Future<StructuredOutputResult> parse(
-          $pb.ClientContext? ctx, StructuredOutputParseRequest request) =>
-      _client.invoke<StructuredOutputResult>(
-          ctx, 'StructuredOutput', 'Parse', request, StructuredOutputResult());
 }
 
 const $core.bool _omitFieldNames =

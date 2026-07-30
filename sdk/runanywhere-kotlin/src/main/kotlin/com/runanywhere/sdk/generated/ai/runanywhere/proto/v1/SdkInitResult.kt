@@ -30,22 +30,14 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Result envelope returned by Phase 1 / Phase 2 / retryHTTP. Mirrors the
- * Swift RunAnywhere.swift Phase 2 logging shape (phase + duration + outcome
- * counts) so each SDK reports the same structured result to its consumer.
+ * Returned by Phase 1, Phase 2, and retryHTTP.
  *
- * success = true when the phase reached its terminal step. Even successful
- * Phase 2 results may carry warnings: HTTP/auth setup is allowed to fail in
- * offline mode; the SDK continues with cached/local models. In that case
- * success=true, http_configured=false, and warning carries the offline-mode
- * notice.
- * ---------------------------------------------------------------------------
+ * A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
+ * to fail in offline mode, in which case success=true, http_configured=false,
+ * and warning holds the offline notice while the SDK continues on cached
+ * models.
  */
 public class SdkInitResult(
-  /**
-   * Which phase produced this result.
-   */
   @field:WireField(
     tag = 1,
     adapter = "ai.runanywhere.proto.v1.SdkInitPhase#ADAPTER",
@@ -54,7 +46,7 @@ public class SdkInitResult(
   )
   public val phase: SdkInitPhase = SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED,
   /**
-   * True when the phase reached its terminal step.
+   * The phase reached its terminal step.
    */
   @field:WireField(
     tag = 2,
@@ -63,9 +55,6 @@ public class SdkInitResult(
     schemaIndex = 1,
   )
   public val success: Boolean = false,
-  /**
-   * Set when success=false (validation/init failure).
-   */
   @field:WireField(
     tag = 3,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
@@ -74,7 +63,7 @@ public class SdkInitResult(
   )
   public val error: SDKError? = null,
   /**
-   * Phase 2 / retryHTTP: HTTP transport wired up.
+   * HTTP transport wired at this call site.
    */
   @field:WireField(
     tag = 4,
@@ -84,9 +73,6 @@ public class SdkInitResult(
     schemaIndex = 3,
   )
   public val http_configured: Boolean = false,
-  /**
-   * Phase 2: device registration callback returned RAC_SUCCESS.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -96,7 +82,7 @@ public class SdkInitResult(
   )
   public val device_registered: Boolean = false,
   /**
-   * Phase 2: count of registry rows that linked to local files.
+   * Registry rows that linked to local files.
    */
   @field:WireField(
     tag = 6,
@@ -107,7 +93,7 @@ public class SdkInitResult(
   )
   public val linked_models_count: Int = 0,
   /**
-   * Phase 2: count of on-disk folders without registry rows.
+   * On-disk folders with no registry row.
    */
   @field:WireField(
     tag = 7,
@@ -117,9 +103,6 @@ public class SdkInitResult(
     schemaIndex = 6,
   )
   public val discovered_orphans: Int = 0,
-  /**
-   * Optional non-fatal note (e.g. "offline mode", "auth deferred").
-   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -127,9 +110,6 @@ public class SdkInitResult(
     schemaIndex = 7,
   )
   public val warning: String = "",
-  /**
-   * Wall-clock duration for this phase.
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -139,18 +119,9 @@ public class SdkInitResult(
   )
   public val duration_ms: Long = 0L,
   /**
-   * Explicit two-phase HTTP-setup completion flag,
-   * decoupled from services-init completion so SDKs that initialize
-   * offline (no connectivity) can still report success=true with
-   * has_completed_http_setup=false and retry HTTP later via the
-   * SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
-   * (`internal static var hasCompletedHTTPSetup`) and is the canonical
-   * signal Flutter / Web / RN consume to decide whether the next
-   * download/authenticated call can proceed without a retryHTTP step.
-   *
-   * Distinct from `http_configured` (field 4) which historically meant
-   * "HTTP transport wired up at this phase's call site"; this field is
-   * the cross-phase latched bit that survives between phase calls.
+   * The cross-phase latched bit that survives between calls, as opposed to
+   * http_configured, which describes only the calling phase. SDKs read this
+   * to decide whether an authenticated call can proceed without a retryHTTP.
    */
   @field:WireField(
     tag = 10,
@@ -161,10 +132,9 @@ public class SdkInitResult(
   )
   public val has_completed_http_setup: Boolean = false,
   /**
-   * True when this SDK configuration has a usable network credential/url
-   * pair and therefore HTTP/auth setup can eventually succeed. Local-only
-   * development builds without baked-in Supabase config set this false so
-   * platform SDKs do not retry HTTP on every guarded API call.
+   * Whether this configuration has a usable credential and URL pair at all.
+   * Local-only development builds set it false so platform SDKs stop
+   * retrying HTTP on every guarded call.
    */
   @field:WireField(
     tag = 11,

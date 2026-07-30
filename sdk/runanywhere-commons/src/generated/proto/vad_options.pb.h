@@ -64,8 +64,6 @@ namespace runanywhere {
 namespace v1 {
 enum SpeechActivityKind : int;
 extern const uint32_t SpeechActivityKind_internal_data_[];
-enum VADAudioEncoding : int;
-extern const uint32_t VADAudioEncoding_internal_data_[];
 enum VADStreamEventKind : int;
 extern const uint32_t VADStreamEventKind_internal_data_[];
 class SpeechActivityEvent;
@@ -156,9 +154,6 @@ template <>
 internal::EnumTraitsT<::runanywhere::v1::SpeechActivityKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::SpeechActivityKind>;
 template <>
-internal::EnumTraitsT<::runanywhere::v1::VADAudioEncoding_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::VADAudioEncoding>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::VADStreamEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::VADStreamEventKind>;
 }  // namespace protobuf
@@ -206,47 +201,6 @@ template <>
 [[nodiscard]] inline bool SpeechActivityKind_Parse(
     ::absl::string_view name, SpeechActivityKind* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<SpeechActivityKind>(SpeechActivityKind_descriptor(), name,
-                                           value);
-}
-enum VADAudioEncoding : int {
-  VAD_AUDIO_ENCODING_UNSPECIFIED = 0,
-  VAD_AUDIO_ENCODING_PCM_F32_LE = 1,
-  VAD_AUDIO_ENCODING_PCM_S16_LE = 2,
-  VADAudioEncoding_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  VADAudioEncoding_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t VADAudioEncoding_internal_data_[];
-inline constexpr VADAudioEncoding VADAudioEncoding_MIN =
-    static_cast<VADAudioEncoding>(0);
-inline constexpr VADAudioEncoding VADAudioEncoding_MAX =
-    static_cast<VADAudioEncoding>(2);
-[[nodiscard]] inline bool VADAudioEncoding_IsValid(int value) {
-  return 0 <= value && value <= 2;
-}
-inline constexpr int VADAudioEncoding_ARRAYSIZE = 2 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-VADAudioEncoding_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(VADAudioEncoding) {
-  return VADAudioEncoding_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& VADAudioEncoding_Name(T value) {
-  static_assert(::std::is_same<T, VADAudioEncoding>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to VADAudioEncoding_Name().");
-  return VADAudioEncoding_Name(static_cast<VADAudioEncoding>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& VADAudioEncoding_Name(VADAudioEncoding value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<VADAudioEncoding_descriptor, 0, 2>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool VADAudioEncoding_Parse(
-    ::absl::string_view name, VADAudioEncoding* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<VADAudioEncoding>(VADAudioEncoding_descriptor(), name,
                                            value);
 }
 enum VADStreamEventKind : int {
@@ -1400,7 +1354,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_path();
 
   public:
-  // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 48000];
+  // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
   void clear_sample_rate() ;
   [[nodiscard]] ::int32_t sample_rate() const;
   void set_sample_rate(::int32_t value);
@@ -1410,7 +1364,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   void _internal_set_sample_rate(::int32_t value);
 
   public:
-  // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1000];
+  // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 20, (.runanywhere.v1.rac_max) = 1000];
   void clear_frame_length_ms() ;
   [[nodiscard]] ::int32_t frame_length_ms() const;
   void set_frame_length_ms(::int32_t value);
@@ -1440,7 +1394,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   void _internal_set_enable_auto_calibration(bool value);
 
   public:
-  // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
+  // float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.2, (.runanywhere.v1.rac_max_float) = 4];
   void clear_calibration_multiplier() ;
   [[nodiscard]] float calibration_multiplier() const;
   void set_calibration_multiplier(float value);
@@ -1692,14 +1646,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADAudioSource final : public ::goo
     kAudioDataFieldNumber = 1,
     kAdapterHandleFieldNumber = 2,
   };
-  // .runanywhere.v1.VADAudioEncoding encoding = 3;
+  // .runanywhere.v1.AudioEncoding encoding = 3;
   void clear_encoding() ;
-  [[nodiscard]] ::runanywhere::v1::VADAudioEncoding encoding() const;
-  void set_encoding(::runanywhere::v1::VADAudioEncoding value);
+  [[nodiscard]] ::runanywhere::v1::AudioEncoding encoding() const;
+  void set_encoding(::runanywhere::v1::AudioEncoding value);
 
   private:
-  ::runanywhere::v1::VADAudioEncoding _internal_encoding() const;
-  void _internal_set_encoding(::runanywhere::v1::VADAudioEncoding value);
+  ::runanywhere::v1::AudioEncoding _internal_encoding() const;
+  void _internal_set_encoding(::runanywhere::v1::AudioEncoding value);
 
   public:
   // int32 sample_rate = 4;
@@ -3085,7 +3039,7 @@ inline void VADConfiguration::set_allocated_model_id(::std::string* PROTOBUF_NUL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADConfiguration.model_id)
 }
 
-// int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 48000];
+// int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
 inline void VADConfiguration::clear_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.sample_rate_ = 0;
@@ -3109,7 +3063,7 @@ inline void VADConfiguration::_internal_set_sample_rate(::int32_t value) {
   _impl_.sample_rate_ = value;
 }
 
-// int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1000];
+// int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 20, (.runanywhere.v1.rac_max) = 1000];
 inline void VADConfiguration::clear_frame_length_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.frame_length_ms_ = 0;
@@ -3181,7 +3135,7 @@ inline void VADConfiguration::_internal_set_enable_auto_calibration(bool value) 
   _impl_.enable_auto_calibration_ = value;
 }
 
-// float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.5, (.runanywhere.v1.rac_max_float) = 4];
+// float calibration_multiplier = 6 [(.runanywhere.v1.rac_default) = "2.0", (.runanywhere.v1.rac_min_float) = 1.2, (.runanywhere.v1.rac_max_float) = 4];
 inline void VADConfiguration::clear_calibration_multiplier() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.calibration_multiplier_ = 0;
@@ -3659,26 +3613,26 @@ inline void VADAudioSource::set_allocated_adapter_handle(::std::string* PROTOBUF
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADAudioSource.adapter_handle)
 }
 
-// .runanywhere.v1.VADAudioEncoding encoding = 3;
+// .runanywhere.v1.AudioEncoding encoding = 3;
 inline void VADAudioSource::clear_encoding() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.encoding_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
-inline ::runanywhere::v1::VADAudioEncoding VADAudioSource::encoding() const {
+inline ::runanywhere::v1::AudioEncoding VADAudioSource::encoding() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADAudioSource.encoding)
   return _internal_encoding();
 }
-inline void VADAudioSource::set_encoding(::runanywhere::v1::VADAudioEncoding value) {
+inline void VADAudioSource::set_encoding(::runanywhere::v1::AudioEncoding value) {
   _internal_set_encoding(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADAudioSource.encoding)
 }
-inline ::runanywhere::v1::VADAudioEncoding VADAudioSource::_internal_encoding() const {
+inline ::runanywhere::v1::AudioEncoding VADAudioSource::_internal_encoding() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::VADAudioEncoding>(_impl_.encoding_);
+  return static_cast<::runanywhere::v1::AudioEncoding>(_impl_.encoding_);
 }
-inline void VADAudioSource::_internal_set_encoding(::runanywhere::v1::VADAudioEncoding value) {
+inline void VADAudioSource::_internal_set_encoding(::runanywhere::v1::AudioEncoding value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.encoding_ = value;
 }
@@ -5736,12 +5690,6 @@ struct is_proto_enum<::runanywhere::v1::SpeechActivityKind> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::SpeechActivityKind>() {
   return ::runanywhere::v1::SpeechActivityKind_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::VADAudioEncoding> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::VADAudioEncoding>() {
-  return ::runanywhere::v1::VADAudioEncoding_descriptor();
 }
 template <>
 struct is_proto_enum<::runanywhere::v1::VADStreamEventKind> : std::true_type {};

@@ -29,25 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * GenerationHints was deleted: it was a fourth partial copy of the sampling
- * knobs. Use LLMConfiguration.default_options.
- * ---------------------------------------------------------------------------
- * ThinkingTagPattern moved to thinking_tag_pattern.proto.
- * The canonical message with `open_tag`/`close_tag` fields is shared between
- * llm_options.proto (per-call extraction) and model_types.proto (catalog
- * metadata). Messages in this file reference it via the existing
- * `import "thinking_tag_pattern.proto";` near the top.
- * ---------------------------------------------------------------------------
- * ---------------------------------------------------------------------------
- * Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
- * once per token in streaming mode.
- * ---------------------------------------------------------------------------
- */
 public class StreamToken(
-  /**
-   * Decoded text fragment for this token.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -55,9 +37,6 @@ public class StreamToken(
     schemaIndex = 0,
   )
   public val text: String = "",
-  /**
-   * Wall-clock timestamp (ms since Unix epoch) the token was produced.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -66,9 +45,6 @@ public class StreamToken(
     schemaIndex = 1,
   )
   public val timestamp_ms: Long = 0L,
-  /**
-   * Sequence index within the current generation (0-based).
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

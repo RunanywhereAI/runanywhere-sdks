@@ -69,6 +69,9 @@ public class StorageDeleteCandidate(
     schemaIndex = 4,
   )
   public val local_path: String = "",
+  /**
+   * Deleting this needs an unload first, or a platform-side delete.
+   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

@@ -16,12 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Rank — comparator used to sort eligible candidates. Exactly one rank
- * per policy.
- * ---------------------------------------------------------------------------
- */
 public enum class HybridRank(
   override val `value`: Int,
 ) : WireEnum {

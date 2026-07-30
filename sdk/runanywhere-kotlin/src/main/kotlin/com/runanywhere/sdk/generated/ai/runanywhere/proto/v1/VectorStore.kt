@@ -21,11 +21,11 @@ public enum class VectorStore(
 ) : WireEnum {
   VECTOR_STORE_UNSPECIFIED(0),
   /**
-   * default, in-process HNSW
+   * in-process HNSW
    */
   VECTOR_STORE_USEARCH(1),
   /**
-   * remote, server deployments only
+   * server deployments only, no on-device path
    */
   VECTOR_STORE_PGVECTOR(2),
   ;

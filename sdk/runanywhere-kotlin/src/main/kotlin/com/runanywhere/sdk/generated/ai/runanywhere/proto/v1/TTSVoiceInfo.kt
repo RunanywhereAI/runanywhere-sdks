@@ -31,19 +31,9 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Descriptor for a TTS voice the engine can use.
- *
- * Pre-IDL only RN exposed this (TTSTypes.ts:106). Canonicalized here so all
- * SDKs gain a typed voice-listing API. `gender` uses an enum to avoid the
- * string-typed drift that RN had ('male' | 'female' | 'neutral').
- * ---------------------------------------------------------------------------
- */
 public class TTSVoiceInfo(
   /**
-   * Engine-specific voice identifier (passed back as TTSOptions.voice or
-   * TTSConfiguration.voice).
+   * Passed back as TTSOptions.voice.
    */
   @field:WireField(
     tag = 1,
@@ -53,7 +43,7 @@ public class TTSVoiceInfo(
   )
   public val id: String = "",
   /**
-   * Human-readable display name (e.g. "Samantha", "Daniel").
+   * e.g. "Samantha".
    */
   @field:WireField(
     tag = 2,
@@ -64,7 +54,7 @@ public class TTSVoiceInfo(
   )
   public val display_name: String = "",
   /**
-   * Language spoken by this voice (BCP-47, e.g. "en-US").
+   * BCP-47.
    */
   @field:WireField(
     tag = 3,
@@ -74,9 +64,6 @@ public class TTSVoiceInfo(
     schemaIndex = 2,
   )
   public val language_code: String = "",
-  /**
-   * Voice gender, when known.
-   */
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.TTSVoiceGender#ADAPTER",
@@ -85,7 +72,7 @@ public class TTSVoiceInfo(
   )
   public val gender: TTSVoiceGender = TTSVoiceGender.TTS_VOICE_GENDER_UNSPECIFIED,
   /**
-   * Optional descriptive text (locale, age, style notes).
+   * Locale, age, or style notes.
    */
   @field:WireField(
     tag = 5,
@@ -94,9 +81,6 @@ public class TTSVoiceInfo(
     schemaIndex = 4,
   )
   public val description: String = "",
-  /**
-   * Additional discovery fields surfaced by system and ONNX/Piper voices.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

@@ -34,19 +34,7 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Alternative transcription hypothesis (n-best).
- * Sources pre-IDL:
- *   Swift  STTTypes.swift:275          TranscriptionAlternative (text, confidence)
- *   Kotlin STTTypes.kt:155             TranscriptionAlternative (text, confidence)
- *   Dart   generation_types.dart:146   TranscriptionAlternative (transcript, confidence)
- *   RN     STTTypes.ts:65              STTAlternative (text, confidence)
- *   C ABI  rac_stt_types.h:320         rac_transcription_alternative_t (text, confidence)
- *
- * Drift: Dart uses `transcript` while everyone else uses `text`. Canonical
- * field name is `text`. Per-word breakdown is OPTIONAL (only some backends
- * emit it for alternatives).
- * ---------------------------------------------------------------------------
+ * One n-best hypothesis. Per-word breakdown only when the backend emits it.
  */
 public class TranscriptionAlternative(
   @field:WireField(

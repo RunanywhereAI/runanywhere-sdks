@@ -16,12 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * VLM model family for chat-template selection.
- * Mirrors rac_vlm_model_family_t.
- * ---------------------------------------------------------------------------
- */
 public enum class VLMModelFamily(
   override val `value`: Int,
 ) : WireEnum {

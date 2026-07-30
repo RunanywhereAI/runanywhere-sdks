@@ -14,15 +14,7 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// Audio format — union of all cases currently defined across SDKs.
-/// Sources pre-IDL:
-///   Kotlin  AudioTypes.kt:12          (pcm, wav, mp3, opus, aac, flac, ogg, pcm_16bit)
-///   Kotlin  ComponentTypes.kt:39      (pcm, wav, mp3, aac, ogg, opus, flac)  ← duplicate
-///   Swift   AudioTypes.swift:17       (pcm, wav, mp3, opus, aac, flac)
-///   Dart    audio_format.dart:3       (wav, mp3, m4a, flac, pcm, opus)
-///   RN      TTSTypes.ts:36            ('pcm' | 'wav' | 'mp3')
-/// ---------------------------------------------------------------------------
+/// Container format of an audio payload.
 class AudioFormat extends $pb.ProtobufEnum {
   static const AudioFormat AUDIO_FORMAT_UNSPECIFIED =
       AudioFormat._(0, _omitEnumNames ? '' : 'AUDIO_FORMAT_UNSPECIFIED');
@@ -66,16 +58,40 @@ class AudioFormat extends $pb.ProtobufEnum {
   const AudioFormat._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Model file format — union across all SDKs.
-/// Sources pre-IDL:
-///   Swift  ModelTypes.swift:27        (onnx, ort, gguf, bin, coreml, unknown)
-///   Kotlin ModelTypes.kt:41           (ONNX, ORT, GGUF, BIN, QNN_CONTEXT, UNKNOWN)
-///   Dart   model_types.dart:34        (onnx, ort, gguf, bin, unknown)
-///   RN     enums.ts:115               (12-case superset incl. MLModel, MLPackage, TFLite,
-///                                       SafeTensors, Zip, Folder, Proprietary)
-///   Web    enums.ts:56                (copy of RN)
-/// ---------------------------------------------------------------------------
+/// Sample layout of a raw audio payload, as opposed to AudioFormat above, which
+/// names the container. CONTAINER means the bytes carry their own header and the
+/// companion AudioFormat field says which one.
+///
+/// This is the single encoding enum for STT, VAD, diarization, and the voice
+/// agent. STT previously numbered PCM_S16_LE=1 and PCM_F32_LE=2, the reverse of
+/// everywhere else; it now follows the ordering below.
+class AudioEncoding extends $pb.ProtobufEnum {
+  static const AudioEncoding AUDIO_ENCODING_UNSPECIFIED =
+      AudioEncoding._(0, _omitEnumNames ? '' : 'AUDIO_ENCODING_UNSPECIFIED');
+  static const AudioEncoding AUDIO_ENCODING_PCM_F32_LE =
+      AudioEncoding._(1, _omitEnumNames ? '' : 'AUDIO_ENCODING_PCM_F32_LE');
+  static const AudioEncoding AUDIO_ENCODING_PCM_S16_LE =
+      AudioEncoding._(2, _omitEnumNames ? '' : 'AUDIO_ENCODING_PCM_S16_LE');
+  static const AudioEncoding AUDIO_ENCODING_CONTAINER =
+      AudioEncoding._(3, _omitEnumNames ? '' : 'AUDIO_ENCODING_CONTAINER');
+
+  static const $core.List<AudioEncoding> values = <AudioEncoding>[
+    AUDIO_ENCODING_UNSPECIFIED,
+    AUDIO_ENCODING_PCM_F32_LE,
+    AUDIO_ENCODING_PCM_S16_LE,
+    AUDIO_ENCODING_CONTAINER,
+  ];
+
+  static final $core.List<AudioEncoding?> _byValue =
+      $pb.ProtobufEnum.$_initByValueList(values, 3);
+  static AudioEncoding? valueOf($core.int value) =>
+      value < 0 || value >= _byValue.length ? null : _byValue[value];
+
+  const AudioEncoding._(super.value, super.name);
+}
+
+/// On-disk file format, as opposed to ModelArtifactType (bundle kind) or
+/// ArchiveType (compression).
 class ModelFormat extends $pb.ProtobufEnum {
   static const ModelFormat MODEL_FORMAT_UNSPECIFIED =
       ModelFormat._(0, _omitEnumNames ? '' : 'MODEL_FORMAT_UNSPECIFIED');
@@ -137,16 +153,8 @@ class ModelFormat extends $pb.ProtobufEnum {
   const ModelFormat._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Inference framework / runtime. Same name used across all SDKs (RN names it
-/// LLMFramework; we canonicalize on InferenceFramework).
-/// Sources pre-IDL:
-///   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
-///   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
-///   Dart   model_types.dart:106       (9 cases, matches Kotlin)
-///   RN     enums.ts:30 (LLMFramework) (16 cases)
-///   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
-/// ---------------------------------------------------------------------------
+/// Engine that executes a model. Reached from ModelInfo.framework, so the
+/// reserved values below are manifest-critical.
 class InferenceFramework extends $pb.ProtobufEnum {
   static const InferenceFramework INFERENCE_FRAMEWORK_UNSPECIFIED =
       InferenceFramework._(
@@ -237,14 +245,8 @@ class InferenceFramework extends $pb.ProtobufEnum {
   const InferenceFramework._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Model category / modality class. Sources pre-IDL:
-///   Swift ModelTypes.swift:39         (9 cases incl. voiceActivityDetection + audio)
-///   Kotlin ModelTypes.kt:147          (8 cases, no VAD)
-///   Dart  model_types.dart:55         (8 cases, no VAD)
-///   RN    enums.ts:75                 (8 cases, no VAD, Audio labeled as VAD)
-///   Web   enums.ts:39                 (7 cases, Audio labeled as VAD)
-/// ---------------------------------------------------------------------------
+/// What a model does. There is no RERANK member, which is why the rerank
+/// primitive cannot auto-load a model.
 class ModelCategory extends $pb.ProtobufEnum {
   static const ModelCategory MODEL_CATEGORY_UNSPECIFIED =
       ModelCategory._(0, _omitEnumNames ? '' : 'MODEL_CATEGORY_UNSPECIFIED');
@@ -353,12 +355,7 @@ class ModelSource extends $pb.ProtobufEnum {
   const ModelSource._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Archive types for multi-file model packages. Sources pre-IDL:
-///   Swift  ModelTypes.swift:195       (zip, tarBz2, tarGz, tarXz)
-///   Kotlin ModelTypes.kt:176          (ZIP, TAR_BZ2, TAR_GZ, TAR_XZ)
-///   Dart   model_types.dart:141       (zip, tarBz2, tarGz, tarXz)
-/// ---------------------------------------------------------------------------
+/// Compression flavor of a multi-file model package.
 class ArchiveType extends $pb.ProtobufEnum {
   static const ArchiveType ARCHIVE_TYPE_UNSPECIFIED =
       ArchiveType._(0, _omitEnumNames ? '' : 'ARCHIVE_TYPE_UNSPECIFIED');
@@ -419,14 +416,7 @@ class ArchiveStructure extends $pb.ProtobufEnum {
   const ArchiveStructure._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// High-level artifact classification — what KIND of bundle a model ships as.
-/// Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
-/// compression flavor). Sources pre-IDL:
-///   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
-///   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
-///   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
-/// ---------------------------------------------------------------------------
+/// What kind of bundle a model ships as.
 class ModelArtifactType extends $pb.ProtobufEnum {
   static const ModelArtifactType MODEL_ARTIFACT_TYPE_UNSPECIFIED =
       ModelArtifactType._(
@@ -484,14 +474,8 @@ class ModelArtifactType extends $pb.ProtobufEnum {
   const ModelArtifactType._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Model registry lifecycle state. This is durable/catalog state, not a live
-/// transfer progress stream. Per-download byte counters and transient progress
-/// events stay in download_service.proto.
-/// Sources pre-IDL:
-///   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
-///   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
-/// ---------------------------------------------------------------------------
+/// Durable catalog state, not a live transfer stream. Byte counters and
+/// progress events live in download_service.proto.
 class ModelRegistryStatus extends $pb.ProtobufEnum {
   static const ModelRegistryStatus MODEL_REGISTRY_STATUS_UNSPECIFIED =
       ModelRegistryStatus._(
@@ -642,15 +626,8 @@ class ModelFileRole extends $pb.ProtobufEnum {
   const ModelFileRole._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
-///   Web    enums.ts (RoutingPolicy)
-///          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
-///          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
-///   Swift  extensions (RoutingPolicy)
-/// Canonical short-form below; specific PreferLocal/PreferCloud cover the
-/// "preferred" cases, MANUAL covers explicit user override.
-/// ---------------------------------------------------------------------------
+/// On-device versus cloud routing. PREFER_LOCAL and PREFER_CLOUD cover the
+/// "preferred" cases; MANUAL is an explicit user override.
 class RoutingPolicy extends $pb.ProtobufEnum {
   static const RoutingPolicy ROUTING_POLICY_UNSPECIFIED =
       RoutingPolicy._(0, _omitEnumNames ? '' : 'ROUTING_POLICY_UNSPECIFIED');

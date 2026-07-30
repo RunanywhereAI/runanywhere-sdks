@@ -16,16 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Generation mode. Sources pre-IDL (identical across all surfaces):
- *   Swift   DiffusionTypes.swift:257    (textToImage / imageToImage / inpainting)
- *   Kotlin  DiffusionTypes.kt:188       (TEXT_TO_IMAGE / IMAGE_TO_IMAGE / INPAINTING)
- *   RN      DiffusionTypes.ts:73        (TextToImage / ImageToImage / Inpainting)
- *   Web     DiffusionTypes.ts:23        (TextToImage / ImageToImage / Inpainting)
- *   C ABI   rac_diffusion_types.h:59    (RAC_DIFFUSION_MODE_*)
- * ---------------------------------------------------------------------------
- */
 public enum class DiffusionMode(
   override val `value`: Int,
 ) : WireEnum {

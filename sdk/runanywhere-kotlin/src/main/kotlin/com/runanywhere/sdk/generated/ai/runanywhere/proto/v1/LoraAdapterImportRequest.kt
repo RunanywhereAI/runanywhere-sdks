@@ -29,20 +29,9 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Import of a user-picked local adapter file. Commons owns everything past
- * the platform-readable source path: deterministic catalog matching (exact
- * local-path match, else an unambiguous filename match), canonical placement
- * under {Models}/{framework}/lora-adapter:{id}/, artifact registry record +
- * manifest persistence, and catalog completion for matched entries.
- * Platforms only resolve OS-specific access (security-scoped URLs, content
- * URIs, Blob-to-FS staging) before calling.
- * ---------------------------------------------------------------------------
- */
 public class LoraAdapterImportRequest(
   /**
-   * platform-readable path of the picked file
+   * Platform-readable path of the picked file.
    */
   @field:WireField(
     tag = 1,
@@ -53,7 +42,7 @@ public class LoraAdapterImportRequest(
   )
   public val source_path: String = "",
   /**
-   * destination filename; default basename(source_path)
+   * Defaults to basename(source_path).
    */
   @field:WireField(
     tag = 2,

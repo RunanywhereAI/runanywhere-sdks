@@ -57,11 +57,11 @@ public class STTAudioSource(
   public val adapter_handle: String? = null,
   @field:WireField(
     tag = 4,
-    adapter = "ai.runanywhere.proto.v1.STTAudioEncoding#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.AudioEncoding#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 3,
   )
-  public val encoding: STTAudioEncoding = STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED,
+  public val encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.AudioFormat#ADAPTER",
@@ -167,7 +167,7 @@ public class STTAudioSource(
     audio_data: ByteString? = this.audio_data,
     file_uri: String? = this.file_uri,
     adapter_handle: String? = this.adapter_handle,
-    encoding: STTAudioEncoding = this.encoding,
+    encoding: AudioEncoding = this.encoding,
     audio_format: AudioFormat = this.audio_format,
     sample_rate: Int = this.sample_rate,
     channels: Int = this.channels,
@@ -191,8 +191,8 @@ public class STTAudioSource(
         size += ProtoAdapter.BYTES.encodedSizeWithTag(1, value.audio_data)
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.file_uri)
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.adapter_handle)
-        if (value.encoding != ai.runanywhere.proto.v1.STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED) {
-          size += STTAudioEncoding.ADAPTER.encodedSizeWithTag(4, value.encoding)
+        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+          size += AudioEncoding.ADAPTER.encodedSizeWithTag(4, value.encoding)
         }
         if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
           size += AudioFormat.ADAPTER.encodedSizeWithTag(5, value.audio_format)
@@ -213,8 +213,8 @@ public class STTAudioSource(
       }
 
       override fun encode(writer: ProtoWriter, `value`: STTAudioSource) {
-        if (value.encoding != ai.runanywhere.proto.v1.STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED) {
-          STTAudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
+        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+          AudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
         }
         if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
           AudioFormat.ADAPTER.encodeWithTag(writer, 5, value.audio_format)
@@ -257,8 +257,8 @@ public class STTAudioSource(
         if (value.audio_format != ai.runanywhere.proto.v1.AudioFormat.AUDIO_FORMAT_UNSPECIFIED) {
           AudioFormat.ADAPTER.encodeWithTag(writer, 5, value.audio_format)
         }
-        if (value.encoding != ai.runanywhere.proto.v1.STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED) {
-          STTAudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
+        if (value.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+          AudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
         }
       }
 
@@ -266,7 +266,7 @@ public class STTAudioSource(
         var audio_data: ByteString? = null
         var file_uri: String? = null
         var adapter_handle: String? = null
-        var encoding: STTAudioEncoding = STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED
+        var encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
         var audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED
         var sample_rate: Int = 0
         var channels: Int = 0
@@ -278,7 +278,7 @@ public class STTAudioSource(
             2 -> file_uri = ProtoAdapter.STRING.decode(reader)
             3 -> adapter_handle = ProtoAdapter.STRING.decode(reader)
             4 -> try {
-              encoding = STTAudioEncoding.ADAPTER.decode(reader)
+              encoding = AudioEncoding.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

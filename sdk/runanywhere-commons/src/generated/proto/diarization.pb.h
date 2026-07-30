@@ -32,6 +32,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "errors.pb.h"
+#include "model_types.pb.h"
 #include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
@@ -58,8 +59,6 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_diar
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum DiarizationAudioEncoding : int;
-extern const uint32_t DiarizationAudioEncoding_internal_data_[];
 enum DiarizationStreamEventKind : int;
 extern const uint32_t DiarizationStreamEventKind_internal_data_[];
 class DiarizationOptions;
@@ -107,9 +106,6 @@ extern const DiarizationStreamEventGlobalsTypeInternal DiarizationStreamEvent_gl
 namespace google {
 namespace protobuf {
 template <>
-internal::EnumTraitsT<::runanywhere::v1::DiarizationAudioEncoding_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::DiarizationAudioEncoding>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::DiarizationStreamEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::DiarizationStreamEventKind>;
 }  // namespace protobuf
@@ -117,47 +113,6 @@ internal::EnumTraitsT<::runanywhere::v1::DiarizationStreamEventKind_internal_dat
 
 namespace runanywhere {
 namespace v1 {
-enum DiarizationAudioEncoding : int {
-  DIARIZATION_AUDIO_ENCODING_UNSPECIFIED = 0,
-  DIARIZATION_AUDIO_ENCODING_PCM_F32_LE = 1,
-  DIARIZATION_AUDIO_ENCODING_PCM_S16_LE = 2,
-  DiarizationAudioEncoding_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  DiarizationAudioEncoding_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t DiarizationAudioEncoding_internal_data_[];
-inline constexpr DiarizationAudioEncoding DiarizationAudioEncoding_MIN =
-    static_cast<DiarizationAudioEncoding>(0);
-inline constexpr DiarizationAudioEncoding DiarizationAudioEncoding_MAX =
-    static_cast<DiarizationAudioEncoding>(2);
-[[nodiscard]] inline bool DiarizationAudioEncoding_IsValid(int value) {
-  return 0 <= value && value <= 2;
-}
-inline constexpr int DiarizationAudioEncoding_ARRAYSIZE = 2 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-DiarizationAudioEncoding_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(DiarizationAudioEncoding) {
-  return DiarizationAudioEncoding_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& DiarizationAudioEncoding_Name(T value) {
-  static_assert(::std::is_same<T, DiarizationAudioEncoding>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to DiarizationAudioEncoding_Name().");
-  return DiarizationAudioEncoding_Name(static_cast<DiarizationAudioEncoding>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& DiarizationAudioEncoding_Name(DiarizationAudioEncoding value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<DiarizationAudioEncoding_descriptor, 0, 2>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool DiarizationAudioEncoding_Parse(
-    ::absl::string_view name, DiarizationAudioEncoding* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<DiarizationAudioEncoding>(DiarizationAudioEncoding_descriptor(), name,
-                                           value);
-}
 enum DiarizationStreamEventKind : int {
   DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED = 0,
   DIARIZATION_STREAM_EVENT_KIND_STARTED = 1,
@@ -630,16 +585,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationOptions final : public :
   void _internal_set_channels(::int32_t value);
 
   public:
-  // optional .runanywhere.v1.DiarizationAudioEncoding encoding = 3 [(.runanywhere.v1.rac_default) = "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE"];
+  // optional .runanywhere.v1.AudioEncoding encoding = 3 [(.runanywhere.v1.rac_default) = "AUDIO_ENCODING_PCM_F32_LE"];
   [[nodiscard]] bool has_encoding()
       const;
   void clear_encoding() ;
-  [[nodiscard]] ::runanywhere::v1::DiarizationAudioEncoding encoding() const;
-  void set_encoding(::runanywhere::v1::DiarizationAudioEncoding value);
+  [[nodiscard]] ::runanywhere::v1::AudioEncoding encoding() const;
+  void set_encoding(::runanywhere::v1::AudioEncoding value);
 
   private:
-  ::runanywhere::v1::DiarizationAudioEncoding _internal_encoding() const;
-  void _internal_set_encoding(::runanywhere::v1::DiarizationAudioEncoding value);
+  ::runanywhere::v1::AudioEncoding _internal_encoding() const;
+  void _internal_set_encoding(::runanywhere::v1::AudioEncoding value);
 
   public:
   // optional float threshold = 4 [(.runanywhere.v1.rac_default) = "0.5", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
@@ -1553,7 +1508,7 @@ inline void DiarizationOptions::_internal_set_channels(::int32_t value) {
   _impl_.channels_ = value;
 }
 
-// optional .runanywhere.v1.DiarizationAudioEncoding encoding = 3 [(.runanywhere.v1.rac_default) = "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE"];
+// optional .runanywhere.v1.AudioEncoding encoding = 3 [(.runanywhere.v1.rac_default) = "AUDIO_ENCODING_PCM_F32_LE"];
 inline bool DiarizationOptions::has_encoding() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   return value;
@@ -1563,20 +1518,20 @@ inline void DiarizationOptions::clear_encoding() {
   _impl_.encoding_ = 0;
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline ::runanywhere::v1::DiarizationAudioEncoding DiarizationOptions::encoding() const {
+inline ::runanywhere::v1::AudioEncoding DiarizationOptions::encoding() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationOptions.encoding)
   return _internal_encoding();
 }
-inline void DiarizationOptions::set_encoding(::runanywhere::v1::DiarizationAudioEncoding value) {
+inline void DiarizationOptions::set_encoding(::runanywhere::v1::AudioEncoding value) {
   _internal_set_encoding(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationOptions.encoding)
 }
-inline ::runanywhere::v1::DiarizationAudioEncoding DiarizationOptions::_internal_encoding() const {
+inline ::runanywhere::v1::AudioEncoding DiarizationOptions::_internal_encoding() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::DiarizationAudioEncoding>(_impl_.encoding_);
+  return static_cast<::runanywhere::v1::AudioEncoding>(_impl_.encoding_);
 }
-inline void DiarizationOptions::_internal_set_encoding(::runanywhere::v1::DiarizationAudioEncoding value) {
+inline void DiarizationOptions::_internal_set_encoding(::runanywhere::v1::AudioEncoding value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.encoding_ = value;
 }
@@ -2461,12 +2416,6 @@ inline void DiarizationStreamEvent::set_allocated_error(::runanywhere::v1::SDKEr
 namespace google {
 namespace protobuf {
 
-template <>
-struct is_proto_enum<::runanywhere::v1::DiarizationAudioEncoding> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::DiarizationAudioEncoding>() {
-  return ::runanywhere::v1::DiarizationAudioEncoding_descriptor();
-}
 template <>
 struct is_proto_enum<::runanywhere::v1::DiarizationStreamEventKind> : std::true_type {};
 template <>

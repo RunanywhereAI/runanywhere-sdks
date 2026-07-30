@@ -1,33 +1,21 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
 export declare const protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * Phase identifiers — used by SdkInitResult.phase to indicate which phase the
- * result describes. Mirrors the SDK_INIT_* analytics events (started /
- * completed / failed) that exist in sdk_events.proto.
- * ---------------------------------------------------------------------------
- */
 export declare enum SdkInitPhase {
     SDK_INIT_PHASE_UNSPECIFIED = 0,
-    /** SDK_INIT_PHASE_ONE - Synchronous core init (~1-5ms, no network) */
+    /** SDK_INIT_PHASE_ONE - Synchronous core init, no network */
     SDK_INIT_PHASE_ONE = 1,
-    /** SDK_INIT_PHASE_TWO - Async services init (~100-500ms, network) */
+    /** SDK_INIT_PHASE_TWO - Async services init, network */
     SDK_INIT_PHASE_TWO = 2,
-    /** SDK_INIT_PHASE_RETRY_HTTP - HTTP/auth retry after offline init */
+    /** SDK_INIT_PHASE_RETRY_HTTP - HTTP/auth retry after an offline init */
     SDK_INIT_PHASE_RETRY_HTTP = 3,
     UNRECOGNIZED = -1
 }
 export declare function sdkInitPhaseFromJSON(object: any): SdkInitPhase;
 export declare function sdkInitPhaseToJSON(object: SdkInitPhase): string;
 /**
- * ---------------------------------------------------------------------------
- * Environment values — must match RAC_ENV_* in
- * sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
- * (development=0, production=2). Numeric values are part of the wire format;
- * do not reorder. Number 1 was formerly SDK_INIT_ENVIRONMENT_STAGING and is
- * reserved so PRODUCTION stays at 2 (shipped commons / xcframework layout).
- * ---------------------------------------------------------------------------
+ * PRODUCTION is 2 because 1 was a staging value in shipped commons and
+ * xcframework builds. Do not renumber.
  */
 export declare enum SdkInitEnvironment {
     SDK_INIT_ENVIRONMENT_DEVELOPMENT = 0,
@@ -37,15 +25,9 @@ export declare enum SdkInitEnvironment {
 export declare function sdkInitEnvironmentFromJSON(object: any): SdkInitEnvironment;
 export declare function sdkInitEnvironmentToJSON(object: SdkInitEnvironment): string;
 /**
- * ---------------------------------------------------------------------------
- * Phase 1 input — synchronous core initialization. Carries the only
- * platform-supplied values commons cannot derive on its own: API credentials
- * + environment + device id (resolved by platform Keychain/Keystore lookup).
- *
- * Platform adapter callbacks (file I/O, secure storage, HTTP transport, log,
- * memory) are registered separately via rac_platform_adapter_t prior to
- * calling this entry point. This message is purely the data envelope.
- * ---------------------------------------------------------------------------
+ * The only platform-supplied values commons cannot derive itself. Platform
+ * adapter callbacks are registered separately through rac_platform_adapter_t
+ * before this call; this message is purely the data envelope.
  */
 export interface SdkInitPhase1Request {
     environment: SdkInitEnvironment;
@@ -53,85 +35,56 @@ export interface SdkInitPhase1Request {
     apiKey: string;
     /** May be empty in development mode. */
     baseUrl: string;
-    /** Resolved by platform (Keychain UUID, etc.). */
+    /** Platform-resolved, e.g. a Keychain UUID. */
     deviceId: string;
-    /** SDK/platform identity used in auth/device metadata. */
     platform: string;
-    /** SDK version reported to backend services. */
     sdkVersion: string;
 }
 /**
- * ---------------------------------------------------------------------------
- * Phase 2 input — async services initialization. Most state is already
- * resident in commons after Phase 1; this envelope carries the few per-call
- * hints that remain SDK-owned while the deterministic orchestration lives in
- * commons.
- * ---------------------------------------------------------------------------
+ * Most state is already resident in commons after Phase 1; these are the
+ * per-call hints that stay SDK-owned.
  */
 export interface SdkInitPhase2Request {
-    /** Optional dev-mode device registration token. */
+    /** Dev-mode device registration token. */
     buildToken: string;
-    /** Bypass cached model assignments. */
     forceRefreshAssignments: boolean;
-    /** Flush the registered telemetry sink. */
     flushTelemetry: boolean;
     /** Reconcile registry rows with local files. */
     discoverDownloadedModels: boolean;
-    /** Ask discovery/refresh to rescan model dirs. */
     rescanLocalModels: boolean;
 }
 /**
- * ---------------------------------------------------------------------------
- * Result envelope returned by Phase 1 / Phase 2 / retryHTTP. Mirrors the
- * Swift RunAnywhere.swift Phase 2 logging shape (phase + duration + outcome
- * counts) so each SDK reports the same structured result to its consumer.
+ * Returned by Phase 1, Phase 2, and retryHTTP.
  *
- * success = true when the phase reached its terminal step. Even successful
- * Phase 2 results may carry warnings: HTTP/auth setup is allowed to fail in
- * offline mode; the SDK continues with cached/local models. In that case
- * success=true, http_configured=false, and warning carries the offline-mode
- * notice.
- * ---------------------------------------------------------------------------
+ * A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
+ * to fail in offline mode, in which case success=true, http_configured=false,
+ * and warning holds the offline notice while the SDK continues on cached
+ * models.
  */
 export interface SdkInitResult {
-    /** Which phase produced this result. */
     phase: SdkInitPhase;
-    /** True when the phase reached its terminal step. */
+    /** The phase reached its terminal step. */
     success: boolean;
-    /** Set when success=false (validation/init failure). */
     error?: SDKError | undefined;
-    /** Phase 2 / retryHTTP: HTTP transport wired up. */
+    /** HTTP transport wired at this call site. */
     httpConfigured: boolean;
-    /** Phase 2: device registration callback returned RAC_SUCCESS. */
     deviceRegistered: boolean;
-    /** Phase 2: count of registry rows that linked to local files. */
+    /** Registry rows that linked to local files. */
     linkedModelsCount: number;
-    /** Phase 2: count of on-disk folders without registry rows. */
+    /** On-disk folders with no registry row. */
     discoveredOrphans: number;
-    /** Optional non-fatal note (e.g. "offline mode", "auth deferred"). */
     warning: string;
-    /** Wall-clock duration for this phase. */
     durationMs: number;
     /**
-     * Explicit two-phase HTTP-setup completion flag,
-     * decoupled from services-init completion so SDKs that initialize
-     * offline (no connectivity) can still report success=true with
-     * has_completed_http_setup=false and retry HTTP later via the
-     * SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
-     * (`internal static var hasCompletedHTTPSetup`) and is the canonical
-     * signal Flutter / Web / RN consume to decide whether the next
-     * download/authenticated call can proceed without a retryHTTP step.
-     *
-     * Distinct from `http_configured` (field 4) which historically meant
-     * "HTTP transport wired up at this phase's call site"; this field is
-     * the cross-phase latched bit that survives between phase calls.
+     * The cross-phase latched bit that survives between calls, as opposed to
+     * http_configured, which describes only the calling phase. SDKs read this
+     * to decide whether an authenticated call can proceed without a retryHTTP.
      */
     hasCompletedHttpSetup: boolean;
     /**
-     * True when this SDK configuration has a usable network credential/url
-     * pair and therefore HTTP/auth setup can eventually succeed. Local-only
-     * development builds without baked-in Supabase config set this false so
-     * platform SDKs do not retry HTTP on every guarded API call.
+     * Whether this configuration has a usable credential and URL pair at all.
+     * Local-only development builds set it false so platform SDKs stop
+     * retrying HTTP on every guarded call.
      */
     httpApplicable: boolean;
 }

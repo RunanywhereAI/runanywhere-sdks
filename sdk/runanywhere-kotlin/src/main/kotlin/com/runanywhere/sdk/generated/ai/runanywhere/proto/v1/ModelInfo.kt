@@ -31,14 +31,8 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Core metadata for a model entry.
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:393       (16 fields)
- *   Kotlin ModelTypes.kt:332          (16 fields, Long vs Int drift on download size)
- *   Dart   model_types.dart:335       (similar shape, nullable divergences)
- *   RN     HybridRunAnywhereCore.cpp:995-1010 (13 fields, string-typed category/format)
- * ---------------------------------------------------------------------------
+ * Core metadata for a model entry. This message is persisted verbatim to
+ * .rac-manifest.binpb, so field numbers here are permanent.
  */
 public class ModelInfo(
   @field:WireField(

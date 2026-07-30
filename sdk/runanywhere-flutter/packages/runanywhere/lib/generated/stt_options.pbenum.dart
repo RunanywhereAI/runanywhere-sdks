@@ -14,35 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-class STTAudioEncoding extends $pb.ProtobufEnum {
-  static const STTAudioEncoding STT_AUDIO_ENCODING_UNSPECIFIED =
-      STTAudioEncoding._(
-          0, _omitEnumNames ? '' : 'STT_AUDIO_ENCODING_UNSPECIFIED');
-  static const STTAudioEncoding STT_AUDIO_ENCODING_PCM_S16_LE =
-      STTAudioEncoding._(
-          1, _omitEnumNames ? '' : 'STT_AUDIO_ENCODING_PCM_S16_LE');
-  static const STTAudioEncoding STT_AUDIO_ENCODING_PCM_F32_LE =
-      STTAudioEncoding._(
-          2, _omitEnumNames ? '' : 'STT_AUDIO_ENCODING_PCM_F32_LE');
-  static const STTAudioEncoding STT_AUDIO_ENCODING_CONTAINER =
-      STTAudioEncoding._(
-          3, _omitEnumNames ? '' : 'STT_AUDIO_ENCODING_CONTAINER');
-
-  static const $core.List<STTAudioEncoding> values = <STTAudioEncoding>[
-    STT_AUDIO_ENCODING_UNSPECIFIED,
-    STT_AUDIO_ENCODING_PCM_S16_LE,
-    STT_AUDIO_ENCODING_PCM_F32_LE,
-    STT_AUDIO_ENCODING_CONTAINER,
-  ];
-
-  static final $core.List<STTAudioEncoding?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 3);
-  static STTAudioEncoding? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const STTAudioEncoding._(super.value, super.name);
-}
-
 class STTStreamEventKind extends $pb.ProtobufEnum {
   static const STTStreamEventKind STT_STREAM_EVENT_KIND_UNSPECIFIED =
       STTStreamEventKind._(

@@ -2173,7 +2173,7 @@ const ::_pbi::ClassData* HybridRoutingPolicy_get_class_data() {
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_hybrid_5frouter_2eproto[4];
+    file_level_enum_descriptors_hybrid_5frouter_2eproto[3];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_hybrid_5frouter_2eproto = nullptr;
 const ::uint32_t
@@ -2327,70 +2327,65 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_hybrid_5frouter_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\023hybrid_router.proto\022\016runanywhere.v1\"\251\001"
+    "\n\023hybrid_router.proto\022\016runanywhere.v1\"\243\001"
     "\n\014HybridFilter\022\021\n\007network\030\001 \001(\010H\000\022\026\n\014qua"
     "lity_tier\030\003 \001(\005H\000\0220\n\007battery\030\004 \001(\0132\035.run"
     "anywhere.v1.BatteryFilterH\000\022.\n\006custom\030\005 "
     "\001(\0132\034.runanywhere.v1.CustomFilterH\000B\006\n\004k"
-    "indJ\004\010\002\020\003\",\n\rBatteryFilter\022\033\n\023min_batter"
-    "y_percent\030\001 \001(\005\"1\n\014CustomFilter\022\014\n\004name\030"
-    "\001 \001(\t\022\023\n\013description\030\002 \001(\t\"P\n\rHybridCasc"
-    "ade\0227\n\nconfidence\030\001 \001(\0132!.runanywhere.v1"
-    ".ConfidenceCascadeH\000B\006\n\004kind\"&\n\021Confiden"
-    "ceCascade\022\021\n\tthreshold\030\001 \001(\002\"\243\001\n\023HybridR"
-    "outingPolicy\0222\n\014hard_filters\030\001 \003(\0132\034.run"
-    "anywhere.v1.HybridFilter\022.\n\007cascade\030\002 \001("
-    "\0132\035.runanywhere.v1.HybridCascade\022(\n\004rank"
-    "\030\003 \001(\0162\032.runanywhere.v1.HybridRank\"\244\001\n\025H"
-    "ybridModelDescriptor\022\020\n\010model_id\030\001 \001(\t\0223"
-    "\n\nmodel_type\030\002 \001(\0162\037.runanywhere.v1.Hybr"
-    "idModelType\0222\n\007backend\030\003 \001(\0162!.runanywhe"
-    "re.v1.HybridBackendKind\022\020\n\010provider\030\004 \001("
-    "\t\"\307\001\n\024HybridRoutedMetadata\022\027\n\017chosen_mod"
-    "el_id\030\001 \001(\t\022\024\n\014was_fallback\030\002 \001(\010\022\025\n\ratt"
-    "empt_count\030\003 \001(\005\022\032\n\022primary_error_code\030\004"
-    " \001(\005\022\035\n\025primary_error_message\030\005 \001(\t\022\022\n\nc"
-    "onfidence\030\006 \001(\002\022\032\n\022primary_confidence\030\007 "
-    "\001(\002\".\n\024HybridRoutingContextJ\004\010\001\020\002J\004\010\002\020\003J"
-    "\004\010\003\020\004J\004\010\004\020\005\"\206\001\n\025CloudSttBackendConfig\022\020\n"
-    "\010provider\030\001 \001(\t\022\r\n\005model\030\002 \001(\t\022\017\n\007api_ke"
-    "y\030\003 \001(\t\022\025\n\rlanguage_code\030\004 \001(\t\022\020\n\010base_u"
-    "rl\030\005 \001(\t\022\022\n\ntimeout_ms\030\006 \001(\005\"Y\n\032HybridSt"
-    "tTranscribeOptions\022\020\n\010language\030\001 \001(\t\022\023\n\013"
-    "sample_rate\030\002 \001(\005\022\024\n\014audio_format\030\003 \001(\005\""
-    "\245\001\n\032HybridSttTranscribeRequest\022\023\n\013audio_"
-    "bytes\030\001 \001(\014\0225\n\007context\030\002 \001(\0132$.runanywhe"
-    "re.v1.HybridRoutingContext\022;\n\007options\030\003 "
-    "\001(\0132*.runanywhere.v1.HybridSttTranscribe"
-    "Options\"\234\001\n\033HybridSttTranscribeResponse\022"
-    "\n\n\002rc\030\001 \001(\005\022\014\n\004text\030\002 \001(\t\022\031\n\021detected_la"
-    "nguage\030\003 \001(\t\0225\n\007routing\030\004 \001(\0132$.runanywh"
-    "ere.v1.HybridRoutedMetadata\022\021\n\terror_msg"
-    "\030\005 \001(\t*\274\001\n\020HybridCapability\022!\n\035HYBRID_CA"
-    "PABILITY_UNSPECIFIED\020\000\022\031\n\025HYBRID_CAPABIL"
-    "ITY_LLM\020\001\022\031\n\025HYBRID_CAPABILITY_VLM\020\002\022\031\n\025"
-    "HYBRID_CAPABILITY_STT\020\003\022\031\n\025HYBRID_CAPABI"
-    "LITY_TTS\020\004\022\031\n\025HYBRID_CAPABILITY_VAD\020\005*\244\001"
-    "\n\021HybridBackendKind\022\036\n\032HYBRID_BACKEND_UN"
-    "SPECIFIED\020\000\022\033\n\027HYBRID_BACKEND_LLAMACPP\020\001"
-    "\022\035\n\031HYBRID_BACKEND_OPENROUTER\020\002\022\031\n\025HYBRI"
-    "D_BACKEND_SHERPA\020\003\022\030\n\024HYBRID_BACKEND_CLO"
-    "UD\020\004*q\n\017HybridModelType\022!\n\035HYBRID_MODEL_"
-    "TYPE_UNSPECIFIED\020\000\022\035\n\031HYBRID_MODEL_TYPE_"
-    "OFFLINE\020\001\022\034\n\030HYBRID_MODEL_TYPE_ONLINE\020\002*"
-    "r\n\nHybridRank\022\033\n\027HYBRID_RANK_UNSPECIFIED"
-    "\020\000\022\"\n\036HYBRID_RANK_PREFER_LOCAL_FIRST\020\001\022#"
-    "\n\037HYBRID_RANK_PREFER_ONLINE_FIRST\020\002B\214\001\n\027"
-    "ai.runanywhere.proto.v1B\021HybridRouterPro"
-    "toP\001Z<github.com/runanywhere/runanywhere"
-    "-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016R"
-    "unanywhere.V1\272\002\002RAb\006proto3"
+    "ind\",\n\rBatteryFilter\022\033\n\023min_battery_perc"
+    "ent\030\001 \001(\005\"1\n\014CustomFilter\022\014\n\004name\030\001 \001(\t\022"
+    "\023\n\013description\030\002 \001(\t\"P\n\rHybridCascade\0227\n"
+    "\nconfidence\030\001 \001(\0132!.runanywhere.v1.Confi"
+    "denceCascadeH\000B\006\n\004kind\"&\n\021ConfidenceCasc"
+    "ade\022\021\n\tthreshold\030\001 \001(\002\"\243\001\n\023HybridRouting"
+    "Policy\0222\n\014hard_filters\030\001 \003(\0132\034.runanywhe"
+    "re.v1.HybridFilter\022.\n\007cascade\030\002 \001(\0132\035.ru"
+    "nanywhere.v1.HybridCascade\022(\n\004rank\030\003 \001(\016"
+    "2\032.runanywhere.v1.HybridRank\"\244\001\n\025HybridM"
+    "odelDescriptor\022\020\n\010model_id\030\001 \001(\t\0223\n\nmode"
+    "l_type\030\002 \001(\0162\037.runanywhere.v1.HybridMode"
+    "lType\0222\n\007backend\030\003 \001(\0162!.runanywhere.v1."
+    "HybridBackendKind\022\020\n\010provider\030\004 \001(\t\"\307\001\n\024"
+    "HybridRoutedMetadata\022\027\n\017chosen_model_id\030"
+    "\001 \001(\t\022\024\n\014was_fallback\030\002 \001(\010\022\025\n\rattempt_c"
+    "ount\030\003 \001(\005\022\032\n\022primary_error_code\030\004 \001(\005\022\035"
+    "\n\025primary_error_message\030\005 \001(\t\022\022\n\nconfide"
+    "nce\030\006 \001(\002\022\032\n\022primary_confidence\030\007 \001(\002\"\026\n"
+    "\024HybridRoutingContext\"\206\001\n\025CloudSttBacken"
+    "dConfig\022\020\n\010provider\030\001 \001(\t\022\r\n\005model\030\002 \001(\t"
+    "\022\017\n\007api_key\030\003 \001(\t\022\025\n\rlanguage_code\030\004 \001(\t"
+    "\022\020\n\010base_url\030\005 \001(\t\022\022\n\ntimeout_ms\030\006 \001(\005\"Y"
+    "\n\032HybridSttTranscribeOptions\022\020\n\010language"
+    "\030\001 \001(\t\022\023\n\013sample_rate\030\002 \001(\005\022\024\n\014audio_for"
+    "mat\030\003 \001(\005\"\245\001\n\032HybridSttTranscribeRequest"
+    "\022\023\n\013audio_bytes\030\001 \001(\014\0225\n\007context\030\002 \001(\0132$"
+    ".runanywhere.v1.HybridRoutingContext\022;\n\007"
+    "options\030\003 \001(\0132*.runanywhere.v1.HybridStt"
+    "TranscribeOptions\"\234\001\n\033HybridSttTranscrib"
+    "eResponse\022\n\n\002rc\030\001 \001(\005\022\014\n\004text\030\002 \001(\t\022\031\n\021d"
+    "etected_language\030\003 \001(\t\0225\n\007routing\030\004 \001(\0132"
+    "$.runanywhere.v1.HybridRoutedMetadata\022\021\n"
+    "\terror_msg\030\005 \001(\t*\244\001\n\021HybridBackendKind\022\036"
+    "\n\032HYBRID_BACKEND_UNSPECIFIED\020\000\022\033\n\027HYBRID"
+    "_BACKEND_LLAMACPP\020\001\022\035\n\031HYBRID_BACKEND_OP"
+    "ENROUTER\020\002\022\031\n\025HYBRID_BACKEND_SHERPA\020\003\022\030\n"
+    "\024HYBRID_BACKEND_CLOUD\020\004*q\n\017HybridModelTy"
+    "pe\022!\n\035HYBRID_MODEL_TYPE_UNSPECIFIED\020\000\022\035\n"
+    "\031HYBRID_MODEL_TYPE_OFFLINE\020\001\022\034\n\030HYBRID_M"
+    "ODEL_TYPE_ONLINE\020\002*r\n\nHybridRank\022\033\n\027HYBR"
+    "ID_RANK_UNSPECIFIED\020\000\022\"\n\036HYBRID_RANK_PRE"
+    "FER_LOCAL_FIRST\020\001\022#\n\037HYBRID_RANK_PREFER_"
+    "ONLINE_FIRST\020\002B\214\001\n\027ai.runanywhere.proto."
+    "v1B\021HybridRouterProtoP\001Z<github.com/runa"
+    "nywhere/runanywhere-sdks/idl/v1;runanywh"
+    "erev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006p"
+    "roto3"
 };
 static ::absl::once_flag descriptor_table_hybrid_5frouter_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hybrid_5frouter_2eproto = {
     false,
     false,
-    2306,
+    2085,
     descriptor_table_protodef_hybrid_5frouter_2eproto,
     "hybrid_router.proto",
     &descriptor_table_hybrid_5frouter_2eproto_once,
@@ -2406,30 +2401,23 @@ PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hybrid_5froute
 namespace runanywhere {
 namespace v1 {
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridCapability_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hybrid_5frouter_2eproto);
-  return file_level_enum_descriptors_hybrid_5frouter_2eproto[0];
-}
-PROTOBUF_CONSTINIT const uint32_t HybridCapability_internal_data_[] = {
-    393216u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 HybridBackendKind_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hybrid_5frouter_2eproto);
-  return file_level_enum_descriptors_hybrid_5frouter_2eproto[1];
+  return file_level_enum_descriptors_hybrid_5frouter_2eproto[0];
 }
 PROTOBUF_CONSTINIT const uint32_t HybridBackendKind_internal_data_[] = {
     327680u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 HybridModelType_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hybrid_5frouter_2eproto);
-  return file_level_enum_descriptors_hybrid_5frouter_2eproto[2];
+  return file_level_enum_descriptors_hybrid_5frouter_2eproto[1];
 }
 PROTOBUF_CONSTINIT const uint32_t HybridModelType_internal_data_[] = {
     196608u, 0u, };
 [[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
 HybridRank_descriptor() {
   ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hybrid_5frouter_2eproto);
-  return file_level_enum_descriptors_hybrid_5frouter_2eproto[3];
+  return file_level_enum_descriptors_hybrid_5frouter_2eproto[2];
 }
 PROTOBUF_CONSTINIT const uint32_t HybridRank_internal_data_[] = {
     196608u, 0u, };

@@ -29,14 +29,11 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * SDK logging configuration. Per-environment presets
- * (development/staging/production) stay in each SDK as factory helpers.
- * ---------------------------------------------------------------------------
+ * Per-environment presets stay in each SDK as factory helpers.
  */
 public class LoggingConfiguration(
   /**
-   * Write logs to the platform-local sink (os_log / Logcat / console).
+   * The platform-local sink: os_log, Logcat, or console.
    */
   @RacDefaultOption("true")
   @field:WireField(
@@ -48,7 +45,7 @@ public class LoggingConfiguration(
   )
   public val enable_local_logging: Boolean = false,
   /**
-   * Minimum severity emitted. Messages below this level are dropped.
+   * Records below this level are dropped.
    */
   @field:WireField(
     tag = 2,
@@ -58,9 +55,6 @@ public class LoggingConfiguration(
     schemaIndex = 1,
   )
   public val min_log_level: LogLevel = LogLevel.LOG_LEVEL_TRACE,
-  /**
-   * Attach file:line:function source location to each record.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -70,7 +64,7 @@ public class LoggingConfiguration(
   )
   public val include_source_location: Boolean = false,
   /**
-   * Attach device/build metadata (model, os version, app build) to records.
+   * Device model, OS version, app build.
    */
   @field:WireField(
     tag = 4,
@@ -80,9 +74,6 @@ public class LoggingConfiguration(
     schemaIndex = 3,
   )
   public val include_device_metadata: Boolean = false,
-  /**
-   * Forward records to the remote logging pipeline.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

@@ -29,22 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * One-shot voice-turn result.
- *
- * Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
- * `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
- * `rac_voice_agent_result_t` (rac/features/voice_agent/rac_voice_agent.h).
- * Returned by the `processVoiceTurn` ergonomic API where a single audio
- * blob produces transcription + assistant response + synthesized audio in
- * one call (as opposed to the streaming path served by the Stream rpc).
- * ---------------------------------------------------------------------------
- */
 public class VoiceAgentResult(
-  /**
-   * Whether the input audio passed VAD's speech-detected check.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -53,19 +38,12 @@ public class VoiceAgentResult(
     schemaIndex = 0,
   )
   public val speech_detected: Boolean = false,
-  /**
-   * Transcribed text from STT. Unset when speech_detected=false.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     schemaIndex = 1,
   )
   public val transcription: String? = null,
-  /**
-   * Generated assistant response text from the LLM. Unset when STT
-   * produced no transcription or LLM was skipped.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -73,11 +51,6 @@ public class VoiceAgentResult(
     schemaIndex = 2,
   )
   public val assistant_response: String? = null,
-  /**
-   * Thinking content extracted from `<think>...</think>` tags
-   * (qwen3, deepseek-r1). Unset when the active LLM does not emit
-   * a chain-of-thought trace.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -85,11 +58,6 @@ public class VoiceAgentResult(
     schemaIndex = 3,
   )
   public val thinking_content: String? = null,
-  /**
-   * Synthesized audio data from TTS. Encoding follows AudioFrameEvent
-   * conventions (typically PCM-F32-LE, sample rate per voice). Unset
-   * when TTS was skipped or auto_play_tts=false in VoiceSessionConfig.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
@@ -97,11 +65,6 @@ public class VoiceAgentResult(
     schemaIndex = 4,
   )
   public val synthesized_audio: ByteString? = null,
-  /**
-   * Component states captured at the end of the turn — useful for UIs
-   * surfacing readiness / partial-failure breakdowns alongside the
-   * final result. Unset when the caller does not ask for it.
-   */
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.VoiceAgentComponentStates#ADAPTER",
@@ -110,8 +73,7 @@ public class VoiceAgentResult(
   )
   public val final_state: VoiceAgentComponentStates? = null,
   /**
-   * Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
-   * or unknown.
+   * Required to interpret synthesized_audio.
    */
   @field:WireField(
     tag = 7,
@@ -153,6 +115,9 @@ public class VoiceAgentResult(
     schemaIndex = 10,
   )
   public val turn_id: String = "",
+  /**
+   * Per-stage timings, then the wall-clock total.
+   */
   @field:WireField(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",

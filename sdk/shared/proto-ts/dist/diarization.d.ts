@@ -1,19 +1,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
+import { AudioEncoding } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
-/**
- * Raw PCM encodings accepted at the SDK boundary. Commons validates complete
- * sample frames and normalizes either representation to float samples before
- * dispatching to an engine.
- */
-export declare enum DiarizationAudioEncoding {
-    DIARIZATION_AUDIO_ENCODING_UNSPECIFIED = 0,
-    DIARIZATION_AUDIO_ENCODING_PCM_F32_LE = 1,
-    DIARIZATION_AUDIO_ENCODING_PCM_S16_LE = 2,
-    UNRECOGNIZED = -1
-}
-export declare function diarizationAudioEncodingFromJSON(object: any): DiarizationAudioEncoding;
-export declare function diarizationAudioEncodingToJSON(object: DiarizationAudioEncoding): string;
 export declare enum DiarizationStreamEventKind {
     DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED = 0,
     DIARIZATION_STREAM_EVENT_KIND_STARTED = 1,
@@ -27,7 +15,11 @@ export declare function diarizationStreamEventKindToJSON(object: DiarizationStre
 export interface DiarizationOptions {
     sampleRate?: number | undefined;
     channels?: number | undefined;
-    encoding?: DiarizationAudioEncoding | undefined;
+    /**
+     * Commons normalizes either PCM representation to float samples before
+     * dispatching to an engine.
+     */
+    encoding?: AudioEncoding | undefined;
     threshold?: number | undefined;
     minimumDurationMs: number;
     mergeGapMs: number;

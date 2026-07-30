@@ -26,7 +26,7 @@ _sym_db = _symbol_database.Default()
 from runanywhere._proto import storage_types_pb2 as storage__types__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16hardware_profile.proto\x12\x0erunanywhere.v1\x1a\x13storage_types.proto\"\x8d\x02\n\x0fHardwareProfile\x12\x0c\n\x04\x63hip\x18\x01 \x01(\t\x12\x19\n\x11has_neural_engine\x18\x02 \x01(\x08\x12\x19\n\x11\x61\x63\x63\x65leration_mode\x18\x03 \x01(\t\x12\x1a\n\x12total_memory_bytes\x18\x04 \x01(\x04\x12\x12\n\ncore_count\x18\x05 \x01(\r\x12\x19\n\x11performance_cores\x18\x06 \x01(\r\x12\x18\n\x10\x65\x66\x66iciency_cores\x18\x07 \x01(\r\x12\x14\n\x0c\x61rchitecture\x18\x08 \x01(\t\x12\x10\n\x08platform\x18\t \x01(\t\x12)\n\x08npu_chip\x18\n \x01(\x0e\x32\x17.runanywhere.v1.NPUChip\"h\n\x0f\x41\x63\x63\x65leratorInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x34\n\x04type\x18\x02 \x01(\x0e\x32&.runanywhere.v1.AccelerationPreference\x12\x11\n\tavailable\x18\x03 \x01(\x08\"\x80\x01\n\x15HardwareProfileResult\x12\x30\n\x07profile\x18\x01 \x01(\x0b\x32\x1f.runanywhere.v1.HardwareProfile\x12\x35\n\x0c\x61\x63\x63\x65lerators\x18\x02 \x03(\x0b\x32\x1f.runanywhere.v1.AcceleratorInfo\"\x18\n\x16HardwareProfileRequest\"\x1d\n\x1bHardwareAcceleratorsRequest\"b\n$HardwareAcceleratorPreferenceRequest\x12:\n\npreference\x18\x01 \x01(\x0e\x32&.runanywhere.v1.AccelerationPreference\"M\n#HardwareAcceleratorPreferenceResult\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x15\n\rerror_message\x18\x02 \x01(\t\"\x92\x01\n\rNpuCapability\x12\x11\n\tsoc_model\x18\x01 \x01(\t\x12\x0e\n\x06soc_id\x18\x02 \x01(\x05\x12\x31\n\x0chexagon_arch\x18\x03 \x01(\x0e\x32\x1b.runanywhere.v1.HexagonArch\x12\x18\n\x10qhexrt_supported\x18\x04 \x01(\x08\x12\x11\n\tarch_name\x18\x05 \x01(\t\"\x11\n\x0fNpuProbeRequest*\xb1\x02\n\x16\x41\x63\x63\x65lerationPreference\x12\'\n#ACCELERATION_PREFERENCE_UNSPECIFIED\x10\x00\x12 \n\x1c\x41\x43\x43\x45LERATION_PREFERENCE_AUTO\x10\x01\x12\x1f\n\x1b\x41\x43\x43\x45LERATION_PREFERENCE_CPU\x10\x02\x12\x1f\n\x1b\x41\x43\x43\x45LERATION_PREFERENCE_GPU\x10\x03\x12\x1f\n\x1b\x41\x43\x43\x45LERATION_PREFERENCE_NPU\x10\x04\x12\"\n\x1e\x41\x43\x43\x45LERATION_PREFERENCE_WEBGPU\x10\x05\x12!\n\x1d\x41\x43\x43\x45LERATION_PREFERENCE_METAL\x10\x06\x12\"\n\x1e\x41\x43\x43\x45LERATION_PREFERENCE_VULKAN\x10\x07*\xab\x01\n\x0bHexagonArch\x12\x18\n\x14HEXAGON_ARCH_UNKNOWN\x10\x00\x12\x14\n\x10HEXAGON_ARCH_V68\x10\x44\x12\x14\n\x10HEXAGON_ARCH_V69\x10\x45\x12\x14\n\x10HEXAGON_ARCH_V73\x10I\x12\x14\n\x10HEXAGON_ARCH_V75\x10K\x12\x14\n\x10HEXAGON_ARCH_V79\x10O\x12\x14\n\x10HEXAGON_ARCH_V81\x10Q2\xa2\x03\n\x08Hardware\x12[\n\nGetProfile\x12&.runanywhere.v1.HardwareProfileRequest\x1a%.runanywhere.v1.HardwareProfileResult\x12\x65\n\x0fGetAccelerators\x12+.runanywhere.v1.HardwareAcceleratorsRequest\x1a%.runanywhere.v1.HardwareProfileResult\x12\x85\x01\n\x18SetAcceleratorPreference\x12\x34.runanywhere.v1.HardwareAcceleratorPreferenceRequest\x1a\x33.runanywhere.v1.HardwareAcceleratorPreferenceResult\x12J\n\x08ProbeNpu\x12\x1f.runanywhere.v1.NpuProbeRequest\x1a\x1d.runanywhere.v1.NpuCapabilityB\x8f\x01\n\x17\x61i.runanywhere.proto.v1B\x14HardwareProfileProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16hardware_profile.proto\x12\x0erunanywhere.v1\x1a\x13storage_types.proto\"\x8d\x02\n\x0fHardwareProfile\x12\x0c\n\x04\x63hip\x18\x01 \x01(\t\x12\x19\n\x11has_neural_engine\x18\x02 \x01(\x08\x12\x19\n\x11\x61\x63\x63\x65leration_mode\x18\x03 \x01(\t\x12\x1a\n\x12total_memory_bytes\x18\x04 \x01(\x04\x12\x12\n\ncore_count\x18\x05 \x01(\r\x12\x19\n\x11performance_cores\x18\x06 \x01(\r\x12\x18\n\x10\x65\x66\x66iciency_cores\x18\x07 \x01(\r\x12\x14\n\x0c\x61rchitecture\x18\x08 \x01(\t\x12\x10\n\x08platform\x18\t \x01(\t\x12)\n\x08npu_chip\x18\n \x01(\x0e\x32\x17.runanywhere.v1.NPUChip\"h\n\x0f\x41\x63\x63\x65leratorInfo\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x34\n\x04type\x18\x02 \x01(\x0e\x32&.runanywhere.v1.AccelerationPreference\x12\x11\n\tavailable\x18\x03 \x01(\x08\"\x80\x01\n\x15HardwareProfileResult\x12\x30\n\x07profile\x18\x01 \x01(\x0b\x32\x1f.runanywhere.v1.HardwareProfile\x12\x35\n\x0c\x61\x63\x63\x65lerators\x18\x02 \x03(\x0b\x32\x1f.runanywhere.v1.AcceleratorInfo\"\x92\x01\n\rNpuCapability\x12\x11\n\tsoc_model\x18\x01 \x01(\t\x12\x0e\n\x06soc_id\x18\x02 \x01(\x05\x12\x31\n\x0chexagon_arch\x18\x03 \x01(\x0e\x32\x1b.runanywhere.v1.HexagonArch\x12\x18\n\x10qhexrt_supported\x18\x04 \x01(\x08\x12\x11\n\tarch_name\x18\x05 \x01(\t*\xb1\x02\n\x16\x41\x63\x63\x65lerationPreference\x12\'\n#ACCELERATION_PREFERENCE_UNSPECIFIED\x10\x00\x12 \n\x1c\x41\x43\x43\x45LERATION_PREFERENCE_AUTO\x10\x01\x12\x1f\n\x1b\x41\x43\x43\x45LERATION_PREFERENCE_CPU\x10\x02\x12\x1f\n\x1b\x41\x43\x43\x45LERATION_PREFERENCE_GPU\x10\x03\x12\x1f\n\x1b\x41\x43\x43\x45LERATION_PREFERENCE_NPU\x10\x04\x12\"\n\x1e\x41\x43\x43\x45LERATION_PREFERENCE_WEBGPU\x10\x05\x12!\n\x1d\x41\x43\x43\x45LERATION_PREFERENCE_METAL\x10\x06\x12\"\n\x1e\x41\x43\x43\x45LERATION_PREFERENCE_VULKAN\x10\x07*\xab\x01\n\x0bHexagonArch\x12\x18\n\x14HEXAGON_ARCH_UNKNOWN\x10\x00\x12\x14\n\x10HEXAGON_ARCH_V68\x10\x44\x12\x14\n\x10HEXAGON_ARCH_V69\x10\x45\x12\x14\n\x10HEXAGON_ARCH_V73\x10I\x12\x14\n\x10HEXAGON_ARCH_V75\x10K\x12\x14\n\x10HEXAGON_ARCH_V79\x10O\x12\x14\n\x10HEXAGON_ARCH_V81\x10QB\x8f\x01\n\x17\x61i.runanywhere.proto.v1B\x14HardwareProfileProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,28 +34,16 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'hardware_profile_pb2', _glo
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\024HardwareProfileProtoP\001Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA'
-  _globals['_ACCELERATIONPREFERENCE']._serialized_start=977
-  _globals['_ACCELERATIONPREFERENCE']._serialized_end=1282
-  _globals['_HEXAGONARCH']._serialized_start=1285
-  _globals['_HEXAGONARCH']._serialized_end=1456
+  _globals['_ACCELERATIONPREFERENCE']._serialized_start=722
+  _globals['_ACCELERATIONPREFERENCE']._serialized_end=1027
+  _globals['_HEXAGONARCH']._serialized_start=1030
+  _globals['_HEXAGONARCH']._serialized_end=1201
   _globals['_HARDWAREPROFILE']._serialized_start=64
   _globals['_HARDWAREPROFILE']._serialized_end=333
   _globals['_ACCELERATORINFO']._serialized_start=335
   _globals['_ACCELERATORINFO']._serialized_end=439
   _globals['_HARDWAREPROFILERESULT']._serialized_start=442
   _globals['_HARDWAREPROFILERESULT']._serialized_end=570
-  _globals['_HARDWAREPROFILEREQUEST']._serialized_start=572
-  _globals['_HARDWAREPROFILEREQUEST']._serialized_end=596
-  _globals['_HARDWAREACCELERATORSREQUEST']._serialized_start=598
-  _globals['_HARDWAREACCELERATORSREQUEST']._serialized_end=627
-  _globals['_HARDWAREACCELERATORPREFERENCEREQUEST']._serialized_start=629
-  _globals['_HARDWAREACCELERATORPREFERENCEREQUEST']._serialized_end=727
-  _globals['_HARDWAREACCELERATORPREFERENCERESULT']._serialized_start=729
-  _globals['_HARDWAREACCELERATORPREFERENCERESULT']._serialized_end=806
-  _globals['_NPUCAPABILITY']._serialized_start=809
-  _globals['_NPUCAPABILITY']._serialized_end=955
-  _globals['_NPUPROBEREQUEST']._serialized_start=957
-  _globals['_NPUPROBEREQUEST']._serialized_end=974
-  _globals['_HARDWARE']._serialized_start=1459
-  _globals['_HARDWARE']._serialized_end=1877
+  _globals['_NPUCAPABILITY']._serialized_start=573
+  _globals['_NPUCAPABILITY']._serialized_end=719
 # @@protoc_insertion_point(module_scope)

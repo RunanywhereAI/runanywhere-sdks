@@ -32,21 +32,8 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * STT component configuration (init-time settings).
- * Sources pre-IDL:
- *   Swift  STTTypes.swift:15           STTConfiguration
- *   Kotlin STTTypes.kt:27              STTConfiguration
- *   Dart   stt_configuration.dart:9    STTConfiguration
- *   C ABI  rac_stt_types.h:76          rac_stt_config_t
- *
- * Note: max_alternatives, enable_punctuation, enable_diarization, and
- * enable_timestamps appear in the pre-IDL configs but are runtime knobs
- * in the canonical model. They live on STTOptions; STTConfiguration
- * keeps only true init-time fields (model id, language, sample rate,
- * VAD toggle, audio format). Producers should mirror runtime knobs into
- * STTOptions when constructing requests.
- * ---------------------------------------------------------------------------
+ * Init-time settings. Per-call knobs live on STTOptions; adapters mirror the
+ * transcription defaults below into STTOptions when building a request.
  */
 public class STTConfiguration(
   @field:WireField(
@@ -57,9 +44,6 @@ public class STTConfiguration(
     schemaIndex = 0,
   )
   public val model_id: String = "",
-  /**
-   * Default input language, BCP-47 / ISO-639-1. Unset/empty = auto-detect.
-   */
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -93,10 +77,6 @@ public class STTConfiguration(
     schemaIndex = 4,
   )
   public val audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED,
-  /**
-   * C ABI / legacy SDK config-level transcription defaults. These may be
-   * mirrored into STTOptions by adapters for per-call overrides.
-   */
   @RacDefaultOption("true")
   @field:WireField(
     tag = 6,
@@ -116,7 +96,7 @@ public class STTConfiguration(
   public val enable_diarization: Boolean = false,
   vocabulary_list: List<String> = emptyList(),
   /**
-   * 0 = backend/default
+   * 0 = backend default
    */
   @field:WireField(
     tag = 9,
@@ -135,9 +115,6 @@ public class STTConfiguration(
     schemaIndex = 9,
   )
   public val enable_word_timestamps: Boolean = false,
-  /**
-   * Preferred framework for the component. Absent = auto.
-   */
   @field:WireField(
     tag = 11,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",

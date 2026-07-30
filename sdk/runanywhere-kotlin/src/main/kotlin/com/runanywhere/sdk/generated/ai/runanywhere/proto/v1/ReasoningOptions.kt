@@ -37,8 +37,8 @@ public class ReasoningOptions(
   )
   public val mode: ReasoningMode = ReasoningMode.REASONING_MODE_UNSPECIFIED,
   /**
-   * Emit thought tokens/content to the caller (stream TokenKind.THOUGHT
-   * events and result thinking_content). False = thinking is stripped.
+   * Emit thought tokens to the caller as TokenKind.THOUGHT events plus
+   * result thinking_content. False strips them.
    */
   @field:WireField(
     tag = 2,
@@ -49,8 +49,7 @@ public class ReasoningOptions(
   )
   public val include_in_output: Boolean = false,
   /**
-   * Tag override for models whose thinking markers differ from the
-   * catalog default.
+   * For models whose thinking markers differ from the catalog default.
    */
   @field:WireField(
     tag = 3,

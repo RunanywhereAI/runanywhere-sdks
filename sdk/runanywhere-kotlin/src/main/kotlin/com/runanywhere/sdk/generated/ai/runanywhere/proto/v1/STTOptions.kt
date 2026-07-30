@@ -32,28 +32,9 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * STT runtime transcription options (per-call overrides).
- * Sources pre-IDL:
- *   Swift  STTTypes.swift:64           STTOptions  (10 fields)
- *   Kotlin STTTypes.kt:65              STTOptions  (10 fields)
- *   Dart   generation_types.dart:78    STTOptions  (10 fields)
- *   RN     STTTypes.ts:12              STTOptions  (5 fields, narrower)
- *   Web    STTTypes.ts:25              STTTranscribeOptions (2 fields)
- *   C ABI  rac_stt_types.h:130         rac_stt_options_t (8 fields)
- *
- * Per spec, this canonical message exposes: language, enable_punctuation,
- * enable_diarization, max_speakers, vocabulary_list, enable_word_timestamps,
- * beam_size. Other pre-IDL fields (audio_format, sample_rate, detect_language,
- * preferred_framework) are part of STTConfiguration or implied by
- * STT_LANGUAGE_AUTO.
- * ---------------------------------------------------------------------------
+ * Per-call overrides.
  */
 public class STTOptions(
-  /**
-   * Input language as a BCP-47 / ISO-639-1 tag ("en", "en-US", "hi").
-   * Unset or empty = auto-detect. Matches the industry `language` param.
-   */
   @field:WireField(
     tag = 17,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -100,7 +81,7 @@ public class STTOptions(
   )
   public val enable_word_timestamps: Boolean = false,
   /**
-   * 0 = backend default
+   * 0 = backend default, for all four of these.
    */
   @RacDefaultOption("0")
   @field:WireField(
@@ -111,9 +92,6 @@ public class STTOptions(
     schemaIndex = 6,
   )
   public val beam_size: Int = 0,
-  /**
-   * Maximum number of alternatives to return. 0 = backend/default.
-   */
   @RacDefaultOption("0")
   @field:WireField(
     tag = 12,
@@ -123,9 +101,6 @@ public class STTOptions(
     schemaIndex = 7,
   )
   public val max_alternatives: Int = 0,
-  /**
-   * Streaming/endpointer controls. 0 = backend/default.
-   */
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -160,9 +135,6 @@ public class STTOptions(
   public val translate_to_english: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTOptions, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Custom vocabulary bias
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

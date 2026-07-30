@@ -29,13 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * STT transcription options carried through the router. Sample rate and
- * audio_format mirror the C `rac_stt_options_t` knobs; `language` is the
- * caller-supplied BCP-47 hint (empty = backend auto-detect).
- * ---------------------------------------------------------------------------
- */
 public class HybridSttTranscribeOptions(
   @field:WireField(
     tag = 1,
@@ -53,7 +46,7 @@ public class HybridSttTranscribeOptions(
   )
   public val sample_rate: Int = 0,
   /**
-   * Matches rac_audio_format_enum_t: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC.
+   * Untyped: every other file uses the AudioFormat enum here.
    */
   @field:WireField(
     tag = 3,

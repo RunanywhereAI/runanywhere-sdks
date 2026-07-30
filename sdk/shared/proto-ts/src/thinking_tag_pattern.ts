@@ -10,25 +10,15 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export const protobufPackage = "runanywhere.v1";
 
 /**
- * ---------------------------------------------------------------------------
- * The single home for reasoning/thinking control. Replaces the retired
- * per-message toggles (LLMGenerationOptions.disable_thinking,
- * ToolCallingOptions.disable_thinking, RAGQueryOptions.disable_thinking,
- * ToolCallingSessionCreateRequest.disable_thinking,
- * LLMGenerateRequest.emit_thoughts). Referenced from LLM and VLM generation
- * options; every composed surface (tool calling, RAG, voice agent) inherits
- * it through the embedded LLMGenerationOptions.
- * ---------------------------------------------------------------------------
+ * The single home for reasoning control. Composed surfaces (tool calling, RAG,
+ * voice agent) inherit it through the embedded LLMGenerationOptions.
  */
 export enum ReasoningMode {
-  /** REASONING_MODE_UNSPECIFIED - Model default: reasoning-capable models think, others don't. */
+  /** REASONING_MODE_UNSPECIFIED - Reasoning-capable models think; others don't. */
   REASONING_MODE_UNSPECIFIED = 0,
-  /**
-   * REASONING_MODE_OFF - Suppress the thinking phase (commons applies the model's no-think
-   * directive at the prompt level).
-   */
+  /** REASONING_MODE_OFF - Commons applies the model's no-think directive at the prompt level. */
   REASONING_MODE_OFF = 1,
-  /** REASONING_MODE_ON - Request the thinking phase on models where it is optional. */
+  /** REASONING_MODE_ON - Request thinking on models where it is optional. */
   REASONING_MODE_ON = 2,
   UNRECOGNIZED = -1,
 }
@@ -66,31 +56,25 @@ export function reasoningModeToJSON(object: ReasoningMode): string {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Pattern used to extract a model's "thinking" / reasoning block from its
- * raw output. Used by Qwen3 and LFM2 family models that emit
- * <think>...</think> wrappers. Shared by LLM generation options (per-call
- * override) and ModelInfo catalog metadata (default pattern for a model).
- * ---------------------------------------------------------------------------
+ * Extracts a model's reasoning block from raw output, for families like Qwen3
+ * and LFM2 that wrap it in <think>...</think>. Used both per-call and as
+ * ModelInfo catalog metadata.
  */
 export interface ThinkingTagPattern {
-  /** Opening tag string. Default if empty: "<think>". */
+  /** Empty defaults to "<think>". */
   openTag: string;
-  /** Closing tag string. Default if empty: "</think>". */
+  /** Empty defaults to "</think>". */
   closeTag: string;
 }
 
 export interface ReasoningOptions {
   mode: ReasoningMode;
   /**
-   * Emit thought tokens/content to the caller (stream TokenKind.THOUGHT
-   * events and result thinking_content). False = thinking is stripped.
+   * Emit thought tokens to the caller as TokenKind.THOUGHT events plus
+   * result thinking_content. False strips them.
    */
   includeInOutput: boolean;
-  /**
-   * Tag override for models whose thinking markers differ from the
-   * catalog default.
-   */
+  /** For models whose thinking markers differ from the catalog default. */
   pattern?: ThinkingTagPattern | undefined;
 }
 

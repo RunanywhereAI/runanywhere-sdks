@@ -30,16 +30,12 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Phase 2 input — async services initialization. Most state is already
- * resident in commons after Phase 1; this envelope carries the few per-call
- * hints that remain SDK-owned while the deterministic orchestration lives in
- * commons.
- * ---------------------------------------------------------------------------
+ * Most state is already resident in commons after Phase 1; these are the
+ * per-call hints that stay SDK-owned.
  */
 public class SdkInitPhase2Request(
   /**
-   * Optional dev-mode device registration token.
+   * Dev-mode device registration token.
    */
   @field:WireField(
     tag = 1,
@@ -49,9 +45,6 @@ public class SdkInitPhase2Request(
     schemaIndex = 0,
   )
   public val build_token: String = "",
-  /**
-   * Bypass cached model assignments.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -60,9 +53,6 @@ public class SdkInitPhase2Request(
     schemaIndex = 1,
   )
   public val force_refresh_assignments: Boolean = false,
-  /**
-   * Flush the registered telemetry sink.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -82,9 +72,6 @@ public class SdkInitPhase2Request(
     schemaIndex = 3,
   )
   public val discover_downloaded_models: Boolean = false,
-  /**
-   * Ask discovery/refresh to rescan model dirs.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

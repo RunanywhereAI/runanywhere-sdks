@@ -32,15 +32,9 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
- * Empty request type — the voice agent already has its config set via
- * `rac_voice_agent_init()` at handle creation time. The Stream rpc just
- * opens a new event subscription on an existing handle.
+ * Subscription parameters for the agent's event stream.
  */
 public class VoiceAgentRequest(
-  /**
-   * Optional: filter the stream to only certain VoiceEvent.payload arms
-   * (e.g. "user_said,assistant_token"). Empty = all events.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

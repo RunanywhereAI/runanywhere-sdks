@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show AudioEncoding;
 import 'package:runanywhere/generated/vad_options.pb.dart' as vad_pb;
 import 'package:runanywhere/generated/voice_events.pb.dart' as pb;
 
@@ -62,7 +64,7 @@ List<pb.VoiceEvent> voiceParityEvents() => <pb.VoiceEvent>[
           pcm: Uint8List(16),
           sampleRateHz: 24000,
           channels: 1,
-          encoding: pb.AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
+          encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
         ),
       ),
       pb.VoiceEvent(

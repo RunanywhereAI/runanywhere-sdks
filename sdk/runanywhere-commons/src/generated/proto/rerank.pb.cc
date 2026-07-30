@@ -937,12 +937,10 @@ const char descriptor_table_protodef_rerank_2eproto[] ABSL_ATTRIBUTE_SECTION_VAR
     "(\r\022\014\n\004rank\030\004 \001(\r\"m\n\014RerankResult\022/\n\005item"
     "s\030\001 \003(\0132 .runanywhere.v1.RerankScoredIte"
     "m\022\032\n\022processing_time_ms\030\002 \001(\003\022\020\n\010model_i"
-    "d\030\003 \001(\t2R\n\tReranking\022E\n\006Rerank\022\035.runanyw"
-    "here.v1.RerankRequest\032\034.runanywhere.v1.R"
-    "erankResultB\206\001\n\027ai.runanywhere.proto.v1B"
-    "\013RerankProtoP\001Z<github.com/runanywhere/r"
-    "unanywhere-sdks/idl/v1;runanywherev1\370\001\001\242"
-    "\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "d\030\003 \001(\tB\206\001\n\027ai.runanywhere.proto.v1B\013Rer"
+    "ankProtoP\001Z<github.com/runanywhere/runan"
+    "ywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RA"
+    "V1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_rerank_2eproto_deps[1] = {
@@ -952,7 +950,7 @@ static ::absl::once_flag descriptor_table_rerank_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_rerank_2eproto = {
     false,
     false,
-    716,
+    632,
     descriptor_table_protodef_rerank_2eproto,
     "rerank.proto",
     &descriptor_table_rerank_2eproto_once,

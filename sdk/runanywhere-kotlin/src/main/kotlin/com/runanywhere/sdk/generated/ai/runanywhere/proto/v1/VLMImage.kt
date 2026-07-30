@@ -33,22 +33,7 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * VLM image input.
- *
- * `source` is a oneof so that exactly one of {file_path, encoded, raw_rgb,
- * base64} can be supplied per request. `width` / `height` are required for
- * non-encoded formats (raw_rgb, raw_rgba) where the consumer cannot infer
- * dimensions from a container header. `format` disambiguates encoded `bytes`
- * payloads (JPEG / PNG / WEBP) and explicitly tags raw / file-path / base64
- * sources.
- * ---------------------------------------------------------------------------
- */
 public class VLMImage(
-  /**
-   * VLM_IMAGE_FORMAT_FILE_PATH
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -58,7 +43,7 @@ public class VLMImage(
   )
   public val file_path: String? = null,
   /**
-   * VLM_IMAGE_FORMAT_{JPEG,PNG,WEBP} container bytes
+   * JPEG/PNG/WEBP container bytes
    */
   @field:WireField(
     tag = 2,
@@ -68,7 +53,7 @@ public class VLMImage(
   )
   public val encoded: ByteString? = null,
   /**
-   * VLM_IMAGE_FORMAT_RAW_RGB / RAW_RGBA pixel buffer
+   * RAW_RGB or RAW_RGBA pixel buffer
    */
   @field:WireField(
     tag = 3,
@@ -78,9 +63,6 @@ public class VLMImage(
     schemaIndex = 2,
   )
   public val raw_rgb: ByteString? = null,
-  /**
-   * VLM_IMAGE_FORMAT_BASE64 (UTF-8 string)
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -88,12 +70,6 @@ public class VLMImage(
     schemaIndex = 3,
   )
   public val base64: String? = null,
-  /**
-   * Required for VLM_IMAGE_FORMAT_RAW_RGB and VLM_IMAGE_FORMAT_RAW_RGBA
-   * (consumers cannot infer dimensions for raw pixel buffers). Optional
-   * for encoded / file_path / base64 sources where the decoder reads
-   * dimensions from the container.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -115,10 +91,6 @@ public class VLMImage(
     schemaIndex = 6,
   )
   public val format: VLMImageFormat = VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED,
-  /**
-   * Optional source metadata. Adapters may populate this after camera/file
-   * picker capture without exposing native APIs to core.
-   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

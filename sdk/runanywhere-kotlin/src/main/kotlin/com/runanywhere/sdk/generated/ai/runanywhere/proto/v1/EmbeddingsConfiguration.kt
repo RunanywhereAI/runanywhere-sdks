@@ -30,15 +30,11 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Component-level configuration applied at service creation. Mirrors the
- * transport-portable subset of rac_embeddings_config_t. Backend selection
- * (preferred_framework) and pooling strategy live outside the wire schema.
- * ---------------------------------------------------------------------------
+ * Applied at service creation.
  */
 public class EmbeddingsConfiguration(
   /**
-   * Model identifier (registry id or local path). Required.
+   * Registry id or local path.
    */
   @RacRequiredOption(true)
   @field:WireField(
@@ -50,8 +46,8 @@ public class EmbeddingsConfiguration(
   )
   public val model_id: String = "",
   /**
-   * Output vector dimension. Must match the loaded model's hidden size
-   * (e.g. 384 for all-MiniLM-L6-v2, 768 for bge-base, 1024 for bge-large).
+   * Must match the loaded model's hidden size: 384 for all-MiniLM-L6-v2,
+   * 768 for bge-base, 1024 for bge-large.
    */
   @RacDefaultOption("384")
   @RacMinOption(1)
@@ -64,8 +60,7 @@ public class EmbeddingsConfiguration(
   )
   public val embedding_dimension: Int = 0,
   /**
-   * Maximum tokens per input. Truncation/sliding window is backend-decided
-   * when an input exceeds this length. C ABI default: 512.
+   * Truncation or sliding window past this length is backend-decided.
    */
   @RacDefaultOption("512")
   @RacMinOption(1)
@@ -77,9 +72,6 @@ public class EmbeddingsConfiguration(
     schemaIndex = 2,
   )
   public val max_sequence_length: Int = 0,
-  /**
-   * Preferred framework for the component. Absent = auto.
-   */
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
@@ -87,10 +79,6 @@ public class EmbeddingsConfiguration(
     schemaIndex = 3,
   )
   public val preferred_framework: InferenceFramework? = null,
-  /**
-   * Vector normalization mode for the component. UNSPECIFIED = L2
-   * (the C ABI default).
-   */
   @RacDefaultOption("EMBEDDINGS_NORMALIZE_MODE_L2")
   @field:WireField(
     tag = 7,
@@ -111,7 +99,7 @@ public class EmbeddingsConfiguration(
   public val pooling:
       EmbeddingsPoolingStrategy = EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED,
   /**
-   * Backend-specific JSON config (e.g. tokenizer/vocab companion paths).
+   * Backend-specific config such as tokenizer or vocab companion paths.
    */
   @field:WireField(
     tag = 9,

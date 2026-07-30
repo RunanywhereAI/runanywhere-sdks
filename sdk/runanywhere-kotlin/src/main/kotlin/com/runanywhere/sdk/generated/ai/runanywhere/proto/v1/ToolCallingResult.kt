@@ -32,15 +32,7 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Result of a tool-enabled generation.
- * ---------------------------------------------------------------------------
- */
 public class ToolCallingResult(
-  /**
-   * Final text response from the assistant.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -51,7 +43,7 @@ public class ToolCallingResult(
   tool_calls: List<ToolCall> = emptyList(),
   tool_results: List<ToolResult> = emptyList(),
   /**
-   * Whether the response is complete or waiting for more tool results.
+   * False when the loop stopped at max_tool_calls with calls outstanding.
    */
   @field:WireField(
     tag = 4,
@@ -61,9 +53,6 @@ public class ToolCallingResult(
     schemaIndex = 3,
   )
   public val is_complete: Boolean = false,
-  /**
-   * Conversation ID for continuing with tool results.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -71,9 +60,6 @@ public class ToolCallingResult(
     schemaIndex = 4,
   )
   public val conversation_id: String? = null,
-  /**
-   * Number of LLM generation turns used, including the final synthesis turn.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -105,9 +91,6 @@ public class ToolCallingResult(
     schemaIndex = 8,
   )
   public val raw_text: String = "",
-  /**
-   * Optional thinking/reasoning content extracted from the final response.
-   */
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -117,9 +100,6 @@ public class ToolCallingResult(
   public val thinking_content: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingResult, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Tool calls the LLM made.
-   */
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",
@@ -129,9 +109,6 @@ public class ToolCallingResult(
   )
   public val tool_calls: List<ToolCall> = immutableCopyOf("tool_calls", tool_calls)
 
-  /**
-   * Results of executed tools (only populated when auto_execute was true).
-   */
   @field:WireField(
     tag = 3,
     adapter = "ai.runanywhere.proto.v1.ToolResult#ADAPTER",

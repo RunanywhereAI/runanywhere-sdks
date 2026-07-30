@@ -285,7 +285,7 @@ bool stt_transcribe(const std::string& pcm, v1::STTOutput* out, std::string* err
     v1::STTTranscriptionRequest request;
     v1::STTAudioSource* audio = request.mutable_audio();
     audio->set_audio_data(pcm);
-    audio->set_encoding(v1::STT_AUDIO_ENCODING_PCM_S16_LE);
+    audio->set_encoding(v1::AUDIO_ENCODING_PCM_S16_LE);
     audio->set_sample_rate(16000);
     audio->set_channels(1);
     audio->set_bits_per_sample(16);

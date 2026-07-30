@@ -16,11 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
- * ---------------------------------------------------------------------------
- */
 public enum class EmbeddingsPoolingStrategy(
   override val `value`: Int,
 ) : WireEnum {

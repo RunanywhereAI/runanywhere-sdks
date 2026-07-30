@@ -22,15 +22,9 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'sdk_init.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// Phase 1 input — synchronous core initialization. Carries the only
-/// platform-supplied values commons cannot derive on its own: API credentials
-/// + environment + device id (resolved by platform Keychain/Keystore lookup).
-///
-/// Platform adapter callbacks (file I/O, secure storage, HTTP transport, log,
-/// memory) are registered separately via rac_platform_adapter_t prior to
-/// calling this entry point. This message is purely the data envelope.
-/// ---------------------------------------------------------------------------
+/// The only platform-supplied values commons cannot derive itself. Platform
+/// adapter callbacks are registered separately through rac_platform_adapter_t
+/// before this call; this message is purely the data envelope.
 class SdkInitPhase1Request extends $pb.GeneratedMessage {
   factory SdkInitPhase1Request({
     SdkInitEnvironment? environment,
@@ -146,12 +140,8 @@ class SdkInitPhase1Request extends $pb.GeneratedMessage {
   void clearSdkVersion() => $_clearField(6);
 }
 
-/// ---------------------------------------------------------------------------
-/// Phase 2 input — async services initialization. Most state is already
-/// resident in commons after Phase 1; this envelope carries the few per-call
-/// hints that remain SDK-owned while the deterministic orchestration lives in
-/// commons.
-/// ---------------------------------------------------------------------------
+/// Most state is already resident in commons after Phase 1; these are the
+/// per-call hints that stay SDK-owned.
 class SdkInitPhase2Request extends $pb.GeneratedMessage {
   factory SdkInitPhase2Request({
     $core.String? buildToken,
@@ -256,17 +246,12 @@ class SdkInitPhase2Request extends $pb.GeneratedMessage {
   void clearRescanLocalModels() => $_clearField(5);
 }
 
-/// ---------------------------------------------------------------------------
-/// Result envelope returned by Phase 1 / Phase 2 / retryHTTP. Mirrors the
-/// Swift RunAnywhere.swift Phase 2 logging shape (phase + duration + outcome
-/// counts) so each SDK reports the same structured result to its consumer.
+/// Returned by Phase 1, Phase 2, and retryHTTP.
 ///
-/// success = true when the phase reached its terminal step. Even successful
-/// Phase 2 results may carry warnings: HTTP/auth setup is allowed to fail in
-/// offline mode; the SDK continues with cached/local models. In that case
-/// success=true, http_configured=false, and warning carries the offline-mode
-/// notice.
-/// ---------------------------------------------------------------------------
+/// A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
+/// to fail in offline mode, in which case success=true, http_configured=false,
+/// and warning holds the offline notice while the SDK continues on cached
+/// models.
 class SdkInitResult extends $pb.GeneratedMessage {
   factory SdkInitResult({
     SdkInitPhase? phase,
@@ -429,18 +414,9 @@ class SdkInitResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearDurationMs() => $_clearField(9);
 
-  /// Explicit two-phase HTTP-setup completion flag,
-  /// decoupled from services-init completion so SDKs that initialize
-  /// offline (no connectivity) can still report success=true with
-  /// has_completed_http_setup=false and retry HTTP later via the
-  /// SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
-  /// (`internal static var hasCompletedHTTPSetup`) and is the canonical
-  /// signal Flutter / Web / RN consume to decide whether the next
-  /// download/authenticated call can proceed without a retryHTTP step.
-  ///
-  /// Distinct from `http_configured` (field 4) which historically meant
-  /// "HTTP transport wired up at this phase's call site"; this field is
-  /// the cross-phase latched bit that survives between phase calls.
+  /// The cross-phase latched bit that survives between calls, as opposed to
+  /// http_configured, which describes only the calling phase. SDKs read this
+  /// to decide whether an authenticated call can proceed without a retryHTTP.
   @$pb.TagNumber(10)
   $core.bool get hasCompletedHttpSetup => $_getBF(9);
   @$pb.TagNumber(10)
@@ -450,10 +426,9 @@ class SdkInitResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearHasCompletedHttpSetup() => $_clearField(10);
 
-  /// True when this SDK configuration has a usable network credential/url
-  /// pair and therefore HTTP/auth setup can eventually succeed. Local-only
-  /// development builds without baked-in Supabase config set this false so
-  /// platform SDKs do not retry HTTP on every guarded API call.
+  /// Whether this configuration has a usable credential and URL pair at all.
+  /// Local-only development builds set it false so platform SDKs stop
+  /// retrying HTTP on every guarded call.
   @$pb.TagNumber(11)
   $core.bool get httpApplicable => $_getBF(10);
   @$pb.TagNumber(11)

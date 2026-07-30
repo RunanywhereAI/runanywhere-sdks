@@ -13,86 +13,10 @@ import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 
 export const protobufPackage = "runanywhere.v1";
 
-export enum LLMGenerationState {
-  LLM_GENERATION_STATE_UNSPECIFIED = 0,
-  LLM_GENERATION_STATE_QUEUED = 1,
-  LLM_GENERATION_STATE_PREFILLING = 2,
-  LLM_GENERATION_STATE_DECODING = 3,
-  LLM_GENERATION_STATE_TOOL_CALLING = 4,
-  LLM_GENERATION_STATE_COMPLETED = 5,
-  LLM_GENERATION_STATE_CANCELLED = 6,
-  LLM_GENERATION_STATE_FAILED = 7,
-  UNRECOGNIZED = -1,
-}
-
-export function lLMGenerationStateFromJSON(object: any): LLMGenerationState {
-  switch (object) {
-    case 0:
-    case "LLM_GENERATION_STATE_UNSPECIFIED":
-      return LLMGenerationState.LLM_GENERATION_STATE_UNSPECIFIED;
-    case 1:
-    case "LLM_GENERATION_STATE_QUEUED":
-      return LLMGenerationState.LLM_GENERATION_STATE_QUEUED;
-    case 2:
-    case "LLM_GENERATION_STATE_PREFILLING":
-      return LLMGenerationState.LLM_GENERATION_STATE_PREFILLING;
-    case 3:
-    case "LLM_GENERATION_STATE_DECODING":
-      return LLMGenerationState.LLM_GENERATION_STATE_DECODING;
-    case 4:
-    case "LLM_GENERATION_STATE_TOOL_CALLING":
-      return LLMGenerationState.LLM_GENERATION_STATE_TOOL_CALLING;
-    case 5:
-    case "LLM_GENERATION_STATE_COMPLETED":
-      return LLMGenerationState.LLM_GENERATION_STATE_COMPLETED;
-    case 6:
-    case "LLM_GENERATION_STATE_CANCELLED":
-      return LLMGenerationState.LLM_GENERATION_STATE_CANCELLED;
-    case 7:
-    case "LLM_GENERATION_STATE_FAILED":
-      return LLMGenerationState.LLM_GENERATION_STATE_FAILED;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return LLMGenerationState.UNRECOGNIZED;
-  }
-}
-
-export function lLMGenerationStateToJSON(object: LLMGenerationState): string {
-  switch (object) {
-    case LLMGenerationState.LLM_GENERATION_STATE_UNSPECIFIED:
-      return "LLM_GENERATION_STATE_UNSPECIFIED";
-    case LLMGenerationState.LLM_GENERATION_STATE_QUEUED:
-      return "LLM_GENERATION_STATE_QUEUED";
-    case LLMGenerationState.LLM_GENERATION_STATE_PREFILLING:
-      return "LLM_GENERATION_STATE_PREFILLING";
-    case LLMGenerationState.LLM_GENERATION_STATE_DECODING:
-      return "LLM_GENERATION_STATE_DECODING";
-    case LLMGenerationState.LLM_GENERATION_STATE_TOOL_CALLING:
-      return "LLM_GENERATION_STATE_TOOL_CALLING";
-    case LLMGenerationState.LLM_GENERATION_STATE_COMPLETED:
-      return "LLM_GENERATION_STATE_COMPLETED";
-    case LLMGenerationState.LLM_GENERATION_STATE_CANCELLED:
-      return "LLM_GENERATION_STATE_CANCELLED";
-    case LLMGenerationState.LLM_GENERATION_STATE_FAILED:
-      return "LLM_GENERATION_STATE_FAILED";
-    case LLMGenerationState.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Routing destination for a generation (Web SDK ExecutionTarget in
- * types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
- * ---------------------------------------------------------------------------
- */
 export enum ExecutionTarget {
   EXECUTION_TARGET_UNSPECIFIED = 0,
   EXECUTION_TARGET_ON_DEVICE = 1,
   EXECUTION_TARGET_CLOUD = 2,
-  /** EXECUTION_TARGET_AUTO - Let the SDK decide based on policy (cost, latency, privacy, etc.). */
   EXECUTION_TARGET_AUTO = 3,
   UNRECOGNIZED = -1,
 }
@@ -134,252 +58,90 @@ export function executionTargetToJSON(object: ExecutionTarget): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Options for a single text generation invocation.
- *
- * Field names match Swift LLMGenerationOptions exactly; consumers may treat
- * proto3 scalar defaults as "unset" (Swift handled this via Optionals — proto
- * represents optional reference fields explicitly via `optional` keyword).
- * ---------------------------------------------------------------------------
- */
 export interface LLMGenerationOptions {
-  /**
-   * Maximum number of tokens to generate. 0 (default) = unset → engine
-   * default (typically 100).
-   */
+  /** 0 = unset, so the annotated default applies. */
   maxOutputTokens: number;
-  /** Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding. */
+  /** 0.0 = greedy decoding. */
   temperature: number;
-  /** Nucleus sampling (top-p). 1.0 = no nucleus truncation. */
   topP: number;
-  /** Top-K sampling (Kotlin/Dart/RN field). 0 = disabled. */
+  /** Commons treats 0 as unset for every sampling knob below. */
   topK: number;
-  /** Repetition penalty (Kotlin/Dart/RN field). 1.0 = no penalty. */
   repetitionPenalty: number;
-  /**
-   * Stop sequences. Generation halts when any of these strings appears in
-   * the output stream.
-   */
   stopSequences: string[];
-  /** Preferred inference framework. UNSPECIFIED = pick automatically. */
   preferredFramework: InferenceFramework;
-  /** System prompt to define AI behavior and formatting rules. */
-  systemPrompt?:
-    | string
-    | undefined;
-  /**
-   * Reasoning/thinking control (mode, emission, tag pattern). Unset =
-   * model default with thinking stripped from output.
-   */
+  systemPrompt?: string | undefined;
   reasoning?:
     | ReasoningOptions
     | undefined;
-  /**
-   * Routing hint: where this generation should run (on-device, cloud, or
-   * SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
-   */
-  executionTarget?:
-    | ExecutionTarget
-    | undefined;
-  /**
-   * The ONE output-constraint surface (typed or raw JSON schema, grammar,
-   * regex — see structured_output.proto).
-   */
-  structuredOutput?:
-    | StructuredOutputOptions
-    | undefined;
-  /** Deterministic sampling seed. 0 = backend/default random seed. */
+  /** No consumer reads this today. */
+  executionTarget?: ExecutionTarget | undefined;
+  structuredOutput?: StructuredOutputOptions | undefined;
   seed: number;
-  /** OpenAI-compatible sampling penalties. 0.0 = disabled. */
   frequencyPenalty: number;
   presencePenalty: number;
-  /** Repeat-penalty lookback window. 0 = backend default. */
+  /** No engine reads repeat_last_n or echo_prompt. */
   repeatLastN: number;
-  /** Minimum probability sampling. 0.0 = disabled. */
   minP: number;
-  /** Include prompt text in the result/stream when the backend supports echo. */
   echoPrompt: boolean;
-  /** Per-request backend thread hint. 0 = backend/runtime default. */
   nThreads: number;
-  /**
-   * Tool-calling contract for this generation: pure tool configuration
-   * (definitions, choice policy, loop limits). Sampling and reasoning come
-   * from THIS message — ToolCallingOptions carries none of its own.
-   */
   toolCalling?: ToolCallingOptions | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Result of a single text generation shared by every SDK.
- * ---------------------------------------------------------------------------
- */
 export interface LLMGenerationResult {
-  /** Generated text (with thinking content removed if extracted). */
   text: string;
-  /** Optional thinking/reasoning content extracted from the response. */
-  thinkingContent?:
-    | string
-    | undefined;
-  /** Number of input/prompt tokens (from tokenizer). */
+  thinkingContent?: string | undefined;
   inputTokens: number;
-  /** Number of output/completion tokens. */
   outputTokens: number;
-  /** Model used for generation. */
   modelUsed: string;
-  /** Total wall-clock generation time in milliseconds. */
   generationTimeMs: number;
-  /** Time-to-first-token in milliseconds (only set in streaming mode). */
-  ttftMs?:
-    | number
-    | undefined;
-  /** Tokens-per-second throughput. */
+  ttftMs?: number | undefined;
   tokensPerSecond: number;
-  /**
-   * Framework that actually performed the generation. Optional because
-   * some C ABI paths don't surface it.
-   */
-  framework?:
-    | string
-    | undefined;
-  /**
-   * Reason the generation stopped: "stop", "length", "cancelled", "error".
-   * Empty = unset.
-   */
+  framework?: string | undefined;
   finishReason: string;
-  /** Number of tokens used for thinking/reasoning. 0 = not applicable. */
   thinkingTokens: number;
-  /** Number of tokens in the actual response content (vs thinking). */
   responseTokens: number;
-  /**
-   * Optional JSON output (when structured-output mode was requested).
-   * Empty = no structured output.
-   */
   jsonOutput?:
     | string
     | undefined;
-  /**
-   * Optional aggregated performance metrics. Web SDK surfaces this as a
-   * separate object alongside the result; consumers may ignore it if they
-   * already use the per-field timings above.
-   */
-  performance?:
-    | PerformanceMetrics
-    | undefined;
-  /**
-   * Where the generation actually ran (on-device, cloud, etc.). Useful
-   * when execution_target was AUTO and the SDK picked the route.
-   */
-  executedOn?:
-    | ExecutionTarget
-    | undefined;
-  /**
-   * Structured-output validation details, when a structured-output request
-   * was used. Mirrors the Swift/RN validation payload.
-   */
+  /** Nothing reads performance or executed_on. */
+  performance?: PerformanceMetrics | undefined;
+  executedOn?: ExecutionTarget | undefined;
   structuredOutputValidation?:
     | StructuredOutputValidation
     | undefined;
-  /**
-   * Total tokens consumed (prompt + completion). Some C ABI paths expose
-   * this directly; consumers may also compute it from the per-field counts.
-   */
+  /** input_tokens + output_tokens. */
   totalTokens: number;
-  /**
-   * Backend error text for result-producing APIs that return a terminal
-   * result envelope instead of throwing through the host language.
-   */
-  errorMessage?:
-    | string
-    | undefined;
-  /** Numeric backend status code when a result envelope carries an error. */
+  errorMessage?: string | undefined;
   errorCode: number;
-  /** Prompt/cache accounting surfaced by llama.cpp/CoreML-style backends. */
   cachedPromptTokens: number;
   promptEvalTimeMs: number;
   decodeTimeMs: number;
-  /** Tool calls parsed from the final assistant response, if any. */
   toolCalls: ToolCall[];
-  /** Tool results incorporated during auto-execute loops. */
   toolResults: ToolResult[];
 }
 
-export interface LLMGenerationStatus {
-  requestId: string;
-  state: LLMGenerationState;
-  promptTokensProcessed: number;
-  completionTokensGenerated: number;
-  progress: number;
-  elapsedMs: number;
-  message?: string | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Lightweight LLM configuration used at component-init time (Swift
- * LLMConfiguration in LLMTypes.swift:15). Distinct from LLMGenerationOptions
- * — this is the "load the model" knob set, not the per-call sampling knobs.
- * ---------------------------------------------------------------------------
- */
 export interface LLMConfiguration {
-  /** Model context window length in tokens. 0 = use model default. */
   contextLength: number;
-  /**
-   * Model identifier/path resolved by the component loader. Present in the
-   * C ABI rac_llm_config_t and needed for generated-proto service handles.
-   */
-  modelId?:
-    | string
-    | undefined;
-  /**
-   * Preferred inference framework for this component. UNSPECIFIED / absent
-   * means "auto".
-   */
+  modelId?: string | undefined;
   preferredFramework?:
     | InferenceFramework
     | undefined;
-  /**
-   * Component-level defaults applied when a per-call options message is
-   * absent or leaves a field unset.
-   */
+  /** Applied when a per-call LLMGenerationOptions leaves a field unset. */
   defaultOptions?: LLMGenerationOptions | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
- * once per token in streaming mode.
- * ---------------------------------------------------------------------------
- */
 export interface StreamToken {
-  /** Decoded text fragment for this token. */
   text: string;
-  /** Wall-clock timestamp (ms since Unix epoch) the token was produced. */
   timestampMs: number;
-  /** Sequence index within the current generation (0-based). */
   index: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Aggregated performance metrics for a generation (Web SDK
- * PerformanceMetrics in types/models.ts:57). Higher-level summary that
- * rolls up the timing fields scattered across LLMGenerationResult.
- * ---------------------------------------------------------------------------
- */
+/** Referenced only by LLMGenerationResult.performance, which no SDK reads. */
 export interface PerformanceMetrics {
-  /** Total latency from request to last token, in milliseconds. */
   latencyMs: number;
-  /** Peak memory used by the inference engine, in bytes. */
   memoryBytes: number;
-  /** Decode throughput in tokens/second. */
   throughputTokensPerSec: number;
-  /** Input (prompt) token count. */
   inputTokens: number;
-  /** Output (completion) token count. */
   outputTokens: number;
 }
 
@@ -1359,228 +1121,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     message.decodeTimeMs = object.decodeTimeMs ?? 0;
     message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
     message.toolResults = object.toolResults?.map((e) => ToolResult.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseLLMGenerationStatus(): LLMGenerationStatus {
-  return {
-    requestId: "",
-    state: 0,
-    promptTokensProcessed: 0,
-    completionTokensGenerated: 0,
-    progress: 0,
-    elapsedMs: 0,
-    message: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
-  };
-}
-
-export const LLMGenerationStatus: MessageFns<LLMGenerationStatus> = {
-  encode(message: LLMGenerationStatus, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.requestId !== "") {
-      writer.uint32(10).string(message.requestId);
-    }
-    if (message.state !== 0) {
-      writer.uint32(16).int32(message.state);
-    }
-    if (message.promptTokensProcessed !== 0) {
-      writer.uint32(24).int32(message.promptTokensProcessed);
-    }
-    if (message.completionTokensGenerated !== 0) {
-      writer.uint32(32).int32(message.completionTokensGenerated);
-    }
-    if (message.progress !== 0) {
-      writer.uint32(45).float(message.progress);
-    }
-    if (message.elapsedMs !== 0) {
-      writer.uint32(48).int64(message.elapsedMs);
-    }
-    if (message.message !== undefined) {
-      writer.uint32(58).string(message.message);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(66).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(72).int32(message.errorCode);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): LLMGenerationStatus {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLLMGenerationStatus();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.requestId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.state = reader.int32() as any;
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.promptTokensProcessed = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.completionTokensGenerated = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 45) {
-            break;
-          }
-
-          message.progress = reader.float();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.elapsedMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.message = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): LLMGenerationStatus {
-    return {
-      requestId: isSet(object.requestId)
-        ? globalThis.String(object.requestId)
-        : isSet(object.request_id)
-        ? globalThis.String(object.request_id)
-        : "",
-      state: isSet(object.state) ? lLMGenerationStateFromJSON(object.state) : 0,
-      promptTokensProcessed: isSet(object.promptTokensProcessed)
-        ? globalThis.Number(object.promptTokensProcessed)
-        : isSet(object.prompt_tokens_processed)
-        ? globalThis.Number(object.prompt_tokens_processed)
-        : 0,
-      completionTokensGenerated: isSet(object.completionTokensGenerated)
-        ? globalThis.Number(object.completionTokensGenerated)
-        : isSet(object.completion_tokens_generated)
-        ? globalThis.Number(object.completion_tokens_generated)
-        : 0,
-      progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
-      elapsedMs: isSet(object.elapsedMs)
-        ? globalThis.Number(object.elapsedMs)
-        : isSet(object.elapsed_ms)
-        ? globalThis.Number(object.elapsed_ms)
-        : 0,
-      message: isSet(object.message) ? globalThis.String(object.message) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
-    };
-  },
-
-  toJSON(message: LLMGenerationStatus): unknown {
-    const obj: any = {};
-    if (message.requestId !== "") {
-      obj.requestId = message.requestId;
-    }
-    if (message.state !== 0) {
-      obj.state = lLMGenerationStateToJSON(message.state);
-    }
-    if (message.promptTokensProcessed !== 0) {
-      obj.promptTokensProcessed = Math.round(message.promptTokensProcessed);
-    }
-    if (message.completionTokensGenerated !== 0) {
-      obj.completionTokensGenerated = Math.round(message.completionTokensGenerated);
-    }
-    if (message.progress !== 0) {
-      obj.progress = message.progress;
-    }
-    if (message.elapsedMs !== 0) {
-      obj.elapsedMs = Math.round(message.elapsedMs);
-    }
-    if (message.message !== undefined) {
-      obj.message = message.message;
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<LLMGenerationStatus>, I>>(base?: I): LLMGenerationStatus {
-    return LLMGenerationStatus.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<LLMGenerationStatus>, I>>(object: I): LLMGenerationStatus {
-    const message = createBaseLLMGenerationStatus();
-    message.requestId = object.requestId ?? "";
-    message.state = object.state ?? 0;
-    message.promptTokensProcessed = object.promptTokensProcessed ?? 0;
-    message.completionTokensGenerated = object.completionTokensGenerated ?? 0;
-    message.progress = object.progress ?? 0;
-    message.elapsedMs = object.elapsedMs ?? 0;
-    message.message = object.message ?? undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };

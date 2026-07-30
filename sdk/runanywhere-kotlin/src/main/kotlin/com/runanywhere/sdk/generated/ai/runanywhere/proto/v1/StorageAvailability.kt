@@ -30,19 +30,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Result of a "do I have room to download X bytes?" probe. SDKs use this to
- * pre-flight `downloadModel(...)` and surface user-facing warnings (e.g.
- * "you only have 1.2 GB free; this model needs 4 GB").
- *
- * `warning_message` and `recommendation` are independently optional —
- * `warning_message` describes the current shortfall, `recommendation`
- * suggests an action (delete cache, free models, etc.).
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 public class StorageAvailability(
   @field:WireField(
     tag = 1,

@@ -16,16 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Stable Diffusion model variant. Sources pre-IDL (identical 6 cases):
- *   Swift  DiffusionTypes.swift:92     (sd15 / sd21 / sdxl / sdxlTurbo / sdxs / lcm)
- *   Kotlin DiffusionTypes.kt:85        (SD15 / SD21 / SDXL / SDXL_TURBO / SDXS / LCM)
- *   RN     DiffusionTypes.ts:28        (SD15 / SD21 / SDXL / SDXLTurbo / SDXS / LCM)
- *   Web    DiffusionTypes.ts:14        (numeric SD_1_5 / SD_2_1 / SDXL / SDXL_Turbo / SDXS / LCM)
- *   C ABI  rac_diffusion_types.h:47    (RAC_DIFFUSION_MODEL_*)
- * ---------------------------------------------------------------------------
- */
 public enum class DiffusionModelVariant(
   override val `value`: Int,
 ) : WireEnum {

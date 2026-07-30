@@ -33,15 +33,7 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Result of a single text generation shared by every SDK.
- * ---------------------------------------------------------------------------
- */
 public class LLMGenerationResult(
-  /**
-   * Generated text (with thinking content removed if extracted).
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -49,9 +41,6 @@ public class LLMGenerationResult(
     schemaIndex = 0,
   )
   public val text: String = "",
-  /**
-   * Optional thinking/reasoning content extracted from the response.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -59,9 +48,6 @@ public class LLMGenerationResult(
     schemaIndex = 1,
   )
   public val thinking_content: String? = null,
-  /**
-   * Number of input/prompt tokens (from tokenizer).
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -70,9 +56,6 @@ public class LLMGenerationResult(
     schemaIndex = 2,
   )
   public val input_tokens: Int = 0,
-  /**
-   * Number of output/completion tokens.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -81,9 +64,6 @@ public class LLMGenerationResult(
     schemaIndex = 3,
   )
   public val output_tokens: Int = 0,
-  /**
-   * Model used for generation.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -92,9 +72,6 @@ public class LLMGenerationResult(
     schemaIndex = 4,
   )
   public val model_used: String = "",
-  /**
-   * Total wall-clock generation time in milliseconds.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
@@ -103,9 +80,6 @@ public class LLMGenerationResult(
     schemaIndex = 5,
   )
   public val generation_time_ms: Double = 0.0,
-  /**
-   * Time-to-first-token in milliseconds (only set in streaming mode).
-   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
@@ -113,9 +87,6 @@ public class LLMGenerationResult(
     schemaIndex = 6,
   )
   public val ttft_ms: Double? = null,
-  /**
-   * Tokens-per-second throughput.
-   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
@@ -124,20 +95,12 @@ public class LLMGenerationResult(
     schemaIndex = 7,
   )
   public val tokens_per_second: Double = 0.0,
-  /**
-   * Framework that actually performed the generation. Optional because
-   * some C ABI paths don't surface it.
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     schemaIndex = 8,
   )
   public val framework: String? = null,
-  /**
-   * Reason the generation stopped: "stop", "length", "cancelled", "error".
-   * Empty = unset.
-   */
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -146,9 +109,6 @@ public class LLMGenerationResult(
     schemaIndex = 9,
   )
   public val finish_reason: String = "",
-  /**
-   * Number of tokens used for thinking/reasoning. 0 = not applicable.
-   */
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -157,9 +117,6 @@ public class LLMGenerationResult(
     schemaIndex = 10,
   )
   public val thinking_tokens: Int = 0,
-  /**
-   * Number of tokens in the actual response content (vs thinking).
-   */
   @field:WireField(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -168,10 +125,6 @@ public class LLMGenerationResult(
     schemaIndex = 11,
   )
   public val response_tokens: Int = 0,
-  /**
-   * Optional JSON output (when structured-output mode was requested).
-   * Empty = no structured output.
-   */
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -180,9 +133,7 @@ public class LLMGenerationResult(
   )
   public val json_output: String? = null,
   /**
-   * Optional aggregated performance metrics. Web SDK surfaces this as a
-   * separate object alongside the result; consumers may ignore it if they
-   * already use the per-field timings above.
+   * Nothing reads performance or executed_on.
    */
   @field:WireField(
     tag = 14,
@@ -190,10 +141,6 @@ public class LLMGenerationResult(
     schemaIndex = 13,
   )
   public val performance: PerformanceMetrics? = null,
-  /**
-   * Where the generation actually ran (on-device, cloud, etc.). Useful
-   * when execution_target was AUTO and the SDK picked the route.
-   */
   @field:WireField(
     tag = 15,
     adapter = "ai.runanywhere.proto.v1.ExecutionTarget#ADAPTER",
@@ -201,10 +148,6 @@ public class LLMGenerationResult(
     schemaIndex = 14,
   )
   public val executed_on: ExecutionTarget? = null,
-  /**
-   * Structured-output validation details, when a structured-output request
-   * was used. Mirrors the Swift/RN validation payload.
-   */
   @field:WireField(
     tag = 16,
     adapter = "ai.runanywhere.proto.v1.StructuredOutputValidation#ADAPTER",
@@ -213,8 +156,7 @@ public class LLMGenerationResult(
   )
   public val structured_output_validation: StructuredOutputValidation? = null,
   /**
-   * Total tokens consumed (prompt + completion). Some C ABI paths expose
-   * this directly; consumers may also compute it from the per-field counts.
+   * input_tokens + output_tokens.
    */
   @field:WireField(
     tag = 17,
@@ -224,10 +166,6 @@ public class LLMGenerationResult(
     schemaIndex = 16,
   )
   public val total_tokens: Int = 0,
-  /**
-   * Backend error text for result-producing APIs that return a terminal
-   * result envelope instead of throwing through the host language.
-   */
   @field:WireField(
     tag = 18,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -235,9 +173,6 @@ public class LLMGenerationResult(
     schemaIndex = 17,
   )
   public val error_message: String? = null,
-  /**
-   * Numeric backend status code when a result envelope carries an error.
-   */
   @field:WireField(
     tag = 19,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -246,9 +181,6 @@ public class LLMGenerationResult(
     schemaIndex = 18,
   )
   public val error_code: Int = 0,
-  /**
-   * Prompt/cache accounting surfaced by llama.cpp/CoreML-style backends.
-   */
   @field:WireField(
     tag = 20,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -277,9 +209,6 @@ public class LLMGenerationResult(
   tool_results: List<ToolResult> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerationResult, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Tool calls parsed from the final assistant response, if any.
-   */
   @field:WireField(
     tag = 23,
     adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",
@@ -289,9 +218,6 @@ public class LLMGenerationResult(
   )
   public val tool_calls: List<ToolCall> = immutableCopyOf("tool_calls", tool_calls)
 
-  /**
-   * Tool results incorporated during auto-execute loops.
-   */
   @field:WireField(
     tag = 24,
     adapter = "ai.runanywhere.proto.v1.ToolResult#ADAPTER",

@@ -33,21 +33,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Streaming partial result emitted during live transcription.
- * Sources pre-IDL:
- *   Dart   generation_types.dart:184   STTPartialResult (transcript, conf, isFinal, lang, ts, alts)
- *   RN     STTTypes.ts:90              STTPartialResult (transcript, conf, ts, lang, alts, isFinal)
- *   C ABI  rac_stt_types.h:240         rac_stt_stream_callback_t (partial_text, is_final)
- *   Web    STTTypes.ts:31              STTStreamCallback (text, isFinal)
- *
- * Canonical minimal shape per spec: text, is_final, stability. Full word
- * timestamps + alternatives flow through STTOutput on the terminal event.
- * `stability` is the Whisper-style hypothesis stability score (0.0-1.0);
- * 0.0 when backend does not provide one.
- * ---------------------------------------------------------------------------
- */
 public class STTPartialResult(
   @field:WireField(
     tag = 1,
@@ -64,6 +49,9 @@ public class STTPartialResult(
     schemaIndex = 1,
   )
   public val is_final: Boolean = false,
+  /**
+   * Whisper-style hypothesis stability, 0.0-1.0. 0.0 when unsupported.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -71,9 +59,6 @@ public class STTPartialResult(
     schemaIndex = 2,
   )
   public val stability: Float = 0f,
-  /**
-   * Additional partial-hypothesis fields carried by Dart/RN live streams.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -96,9 +81,6 @@ public class STTPartialResult(
   )
   public val timestamp_ms: Long = 0L,
   alternatives: List<TranscriptionAlternative> = emptyList(),
-  /**
-   * Streaming correlation and endpointing metadata.
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

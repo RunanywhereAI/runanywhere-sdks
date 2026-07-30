@@ -16,14 +16,7 @@ exports.vectorStoreToJSON = vectorStoreToJSON;
 const wire_1 = require("@bufbuild/protobuf/wire");
 const llm_options_1 = require("./llm_options");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * SolutionType — discriminator for the kind of solution backing a
- * `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
- * oneof arms so frontends can switch on a single enum value rather than
- * inspecting the oneof shape.
- * ---------------------------------------------------------------------------
- */
+/** Lets frontends switch on one enum instead of inspecting the oneof. */
 var SolutionType;
 (function (SolutionType) {
     SolutionType[SolutionType["SOLUTION_TYPE_UNSPECIFIED"] = 0] = "SOLUTION_TYPE_UNSPECIFIED";
@@ -76,11 +69,9 @@ function solutionTypeToJSON(object) {
 var AudioSource;
 (function (AudioSource) {
     AudioSource[AudioSource["AUDIO_SOURCE_UNSPECIFIED"] = 0] = "AUDIO_SOURCE_UNSPECIFIED";
-    /** AUDIO_SOURCE_MICROPHONE - Platform mic (default) */
     AudioSource[AudioSource["AUDIO_SOURCE_MICROPHONE"] = 1] = "AUDIO_SOURCE_MICROPHONE";
-    /** AUDIO_SOURCE_FILE - Path supplied in audio_file_path */
     AudioSource[AudioSource["AUDIO_SOURCE_FILE"] = 2] = "AUDIO_SOURCE_FILE";
-    /** AUDIO_SOURCE_CALLBACK - Frontend feeds frames via C ABI */
+    /** AUDIO_SOURCE_CALLBACK - Frontend feeds frames through the C ABI */
     AudioSource[AudioSource["AUDIO_SOURCE_CALLBACK"] = 3] = "AUDIO_SOURCE_CALLBACK";
     AudioSource[AudioSource["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(AudioSource || (exports.AudioSource = AudioSource = {}));
@@ -122,9 +113,9 @@ function audioSourceToJSON(object) {
 var VectorStore;
 (function (VectorStore) {
     VectorStore[VectorStore["VECTOR_STORE_UNSPECIFIED"] = 0] = "VECTOR_STORE_UNSPECIFIED";
-    /** VECTOR_STORE_USEARCH - default, in-process HNSW */
+    /** VECTOR_STORE_USEARCH - in-process HNSW */
     VectorStore[VectorStore["VECTOR_STORE_USEARCH"] = 1] = "VECTOR_STORE_USEARCH";
-    /** VECTOR_STORE_PGVECTOR - remote, server deployments only */
+    /** VECTOR_STORE_PGVECTOR - server deployments only, no on-device path */
     VectorStore[VectorStore["VECTOR_STORE_PGVECTOR"] = 2] = "VECTOR_STORE_PGVECTOR";
     VectorStore[VectorStore["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(VectorStore || (exports.VectorStore = VectorStore = {}));

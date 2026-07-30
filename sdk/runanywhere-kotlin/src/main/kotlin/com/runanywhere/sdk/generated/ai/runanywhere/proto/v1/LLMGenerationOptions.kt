@@ -32,35 +32,11 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * The rac_default annotations on LLMGenerationOptions are the single
- * declaration of the LLM sampling defaults. RAC_LLM_OPTIONS_DEFAULT in
- * rac_llm_types.h is generated from them, and every SDK reads the generated
- * defaults() rather than keeping its own table (Swift, Kotlin, Flutter, and Web
- * each used to).
- *
- * On the wire, a proto3 zero still means "unset, let the engine decide". The
- * generated defaults() is for callers who want a populated options value; it
- * does not change how an unset field is interpreted.
- *
- * This block is deliberately separated from the message by a blank line. protoc
- * only attaches a comment that directly abuts an element, and notes about the
- * codegen pipeline should not be copied into the generated message in five
- * languages. Keep pipeline commentary here and wire semantics below.
- * ---------------------------------------------------------------------------
- * Options for a single text generation invocation.
- *
- * Field names match Swift LLMGenerationOptions exactly; consumers may treat
- * proto3 scalar defaults as "unset" (Swift handled this via Optionals — proto
- * represents optional reference fields explicitly via `optional` keyword).
- * ---------------------------------------------------------------------------
- */
 public class LLMGenerationOptions(
   /**
-   * Maximum number of tokens to generate. 0 (default) = unset → engine
-   * default (typically 100).
+   * 0 = unset, so the annotated default applies.
    */
-  @RacDefaultOption("100")
+  @RacDefaultOption("512")
   @RacMinOption(0)
   @field:WireField(
     tag = 1,
@@ -71,9 +47,9 @@ public class LLMGenerationOptions(
   )
   public val max_output_tokens: Int = 0,
   /**
-   * Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding.
+   * 0.0 = greedy decoding.
    */
-  @RacDefaultOption("0.8")
+  @RacDefaultOption("0.7")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(2.0)
   @field:WireField(
@@ -83,9 +59,6 @@ public class LLMGenerationOptions(
     schemaIndex = 1,
   )
   public val temperature: Float = 0f,
-  /**
-   * Nucleus sampling (top-p). 1.0 = no nucleus truncation.
-   */
   @RacDefaultOption("1.0")
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(1.0)
@@ -98,7 +71,7 @@ public class LLMGenerationOptions(
   )
   public val top_p: Float = 0f,
   /**
-   * Top-K sampling (Kotlin/Dart/RN field). 0 = disabled.
+   * Commons treats 0 as unset for every sampling knob below.
    */
   @RacDefaultOption("0")
   @RacMinOption(0)
@@ -110,9 +83,6 @@ public class LLMGenerationOptions(
     schemaIndex = 3,
   )
   public val top_k: Int = 0,
-  /**
-   * Repetition penalty (Kotlin/Dart/RN field). 1.0 = no penalty.
-   */
   @RacDefaultOption("1.0")
   @RacMinFloatOption(0.0)
   @field:WireField(
@@ -124,9 +94,6 @@ public class LLMGenerationOptions(
   )
   public val repetition_penalty: Float = 0f,
   stop_sequences: List<String> = emptyList(),
-  /**
-   * Preferred inference framework. UNSPECIFIED = pick automatically.
-   */
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
@@ -136,9 +103,6 @@ public class LLMGenerationOptions(
   )
   public val preferred_framework:
       InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
-  /**
-   * System prompt to define AI behavior and formatting rules.
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -146,10 +110,6 @@ public class LLMGenerationOptions(
     schemaIndex = 7,
   )
   public val system_prompt: String? = null,
-  /**
-   * Reasoning/thinking control (mode, emission, tag pattern). Unset =
-   * model default with thinking stripped from output.
-   */
   @field:WireField(
     tag = 11,
     adapter = "ai.runanywhere.proto.v1.ReasoningOptions#ADAPTER",
@@ -157,8 +117,7 @@ public class LLMGenerationOptions(
   )
   public val reasoning: ReasoningOptions? = null,
   /**
-   * Routing hint: where this generation should run (on-device, cloud, or
-   * SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
+   * No consumer reads this today.
    */
   @field:WireField(
     tag = 12,
@@ -167,10 +126,6 @@ public class LLMGenerationOptions(
     schemaIndex = 9,
   )
   public val execution_target: ExecutionTarget? = null,
-  /**
-   * The ONE output-constraint surface (typed or raw JSON schema, grammar,
-   * regex — see structured_output.proto).
-   */
   @field:WireField(
     tag = 13,
     adapter = "ai.runanywhere.proto.v1.StructuredOutputOptions#ADAPTER",
@@ -178,9 +133,6 @@ public class LLMGenerationOptions(
     schemaIndex = 10,
   )
   public val structured_output: StructuredOutputOptions? = null,
-  /**
-   * Deterministic sampling seed. 0 = backend/default random seed.
-   */
   @RacDefaultOption("0")
   @field:WireField(
     tag = 15,
@@ -189,9 +141,6 @@ public class LLMGenerationOptions(
     schemaIndex = 11,
   )
   public val seed: Long = 0L,
-  /**
-   * OpenAI-compatible sampling penalties. 0.0 = disabled.
-   */
   @RacDefaultOption("0.0")
   @field:WireField(
     tag = 16,
@@ -211,7 +160,7 @@ public class LLMGenerationOptions(
   )
   public val presence_penalty: Float = 0f,
   /**
-   * Repeat-penalty lookback window. 0 = backend default.
+   * No engine reads repeat_last_n or echo_prompt.
    */
   @RacDefaultOption("0")
   @field:WireField(
@@ -222,9 +171,6 @@ public class LLMGenerationOptions(
     schemaIndex = 14,
   )
   public val repeat_last_n: Int = 0,
-  /**
-   * Minimum probability sampling. 0.0 = disabled.
-   */
   @RacDefaultOption("0.0")
   @field:WireField(
     tag = 19,
@@ -234,9 +180,6 @@ public class LLMGenerationOptions(
     schemaIndex = 15,
   )
   public val min_p: Float = 0f,
-  /**
-   * Include prompt text in the result/stream when the backend supports echo.
-   */
   @field:WireField(
     tag = 22,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -245,9 +188,6 @@ public class LLMGenerationOptions(
     schemaIndex = 16,
   )
   public val echo_prompt: Boolean = false,
-  /**
-   * Per-request backend thread hint. 0 = backend/runtime default.
-   */
   @RacDefaultOption("0")
   @field:WireField(
     tag = 23,
@@ -257,11 +197,6 @@ public class LLMGenerationOptions(
     schemaIndex = 17,
   )
   public val n_threads: Int = 0,
-  /**
-   * Tool-calling contract for this generation: pure tool configuration
-   * (definitions, choice policy, loop limits). Sampling and reasoning come
-   * from THIS message — ToolCallingOptions carries none of its own.
-   */
   @field:WireField(
     tag = 24,
     adapter = "ai.runanywhere.proto.v1.ToolCallingOptions#ADAPTER",
@@ -271,10 +206,6 @@ public class LLMGenerationOptions(
   public val tool_calling: ToolCallingOptions? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerationOptions, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Stop sequences. Generation halts when any of these strings appears in
-   * the output stream.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

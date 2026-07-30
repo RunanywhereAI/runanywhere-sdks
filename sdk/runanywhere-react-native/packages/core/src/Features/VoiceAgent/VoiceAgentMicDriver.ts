@@ -28,7 +28,7 @@ import {
   VoiceAgentAudioFrame,
   VoiceAgentResult as VoiceAgentResultMessage,
 } from '@runanywhere/proto-ts/voice_agent_service';
-import { AudioEncoding } from '@runanywhere/proto-ts/voice_events';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 
 const SAMPLE_RATE_HZ = audioCaptureDefaults.micSampleRateHz;

@@ -31,17 +31,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Named entity — single span identified within input text.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:143    NamedEntity (text, type, startOffset,
- *                                       endOffset, confidence)
- * ---------------------------------------------------------------------------
+ * Character offsets into the source text.
  */
 public class NamedEntity(
-  /**
-   * Surface form of the entity exactly as it appeared in input.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -49,9 +41,6 @@ public class NamedEntity(
     schemaIndex = 0,
   )
   public val text: String = "",
-  /**
-   * Entity class label, e.g. "PERSON", "ORG", "LOCATION".
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -60,9 +49,6 @@ public class NamedEntity(
     schemaIndex = 1,
   )
   public val entity_type: String = "",
-  /**
-   * UTF-16 / character start offset (inclusive) within input text.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -71,9 +57,6 @@ public class NamedEntity(
     schemaIndex = 2,
   )
   public val start_offset: Int = 0,
-  /**
-   * UTF-16 / character end offset (exclusive) within input text.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -82,9 +65,6 @@ public class NamedEntity(
     schemaIndex = 3,
   )
   public val end_offset: Int = 0,
-  /**
-   * Model confidence in \[0.0, 1.0\].
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

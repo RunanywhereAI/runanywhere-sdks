@@ -3906,34 +3906,10 @@ const char descriptor_table_protodef_lora_5foptions_2eproto[] ABSL_ATTRIBUTE_SEC
     "rs\030\002 \001(\010\022\032\n\rbase_model_id\030\003 \001(\tH\000\210\001\001\022\032\n\r"
     "error_message\030\004 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\005"
     " \001(\005B\020\n\016_base_model_idB\020\n\016_error_message"
-    "2\247\007\n\004LoRA\022h\n\024RegisterCatalogEntry\022\'.runa"
-    "nywhere.v1.LoraAdapterCatalogEntry\032\'.run"
-    "anywhere.v1.LoraAdapterCatalogEntry\022j\n\013L"
-    "istCatalog\022-.runanywhere.v1.LoraAdapterC"
-    "atalogListRequest\032,.runanywhere.v1.LoraA"
-    "dapterCatalogListResult\022e\n\014QueryCatalog\022"
-    "\'.runanywhere.v1.LoraAdapterCatalogQuery"
-    "\032,.runanywhere.v1.LoraAdapterCatalogList"
-    "Result\022l\n\017GetCatalogEntry\022,.runanywhere."
-    "v1.LoraAdapterCatalogGetRequest\032+.runany"
-    "where.v1.LoraAdapterCatalogGetResult\022\200\001\n"
-    "\025MarkDownloadCompleted\0223.runanywhere.v1."
-    "LoraAdapterDownloadCompletedRequest\0322.ru"
-    "nanywhere.v1.LoraAdapterDownloadComplete"
-    "dResult\022J\n\005Apply\022 .runanywhere.v1.LoRAAp"
-    "plyRequest\032\037.runanywhere.v1.LoRAApplyRes"
-    "ult\022F\n\006Remove\022!.runanywhere.v1.LoRARemov"
-    "eRequest\032\031.runanywhere.v1.LoRAState\022`\n\022C"
-    "heckCompatibility\022!.runanywhere.v1.LoRAA"
-    "dapterConfig\032\'.runanywhere.v1.LoraCompat"
-    "ibilityResult\022<\n\004List\022\031.runanywhere.v1.L"
-    "oRAState\032\031.runanywhere.v1.LoRAState\022=\n\005S"
-    "tate\022\031.runanywhere.v1.LoRAState\032\031.runany"
-    "where.v1.LoRAStateB\213\001\n\027ai.runanywhere.pr"
-    "oto.v1B\020LoraOptionsProtoP\001Z<github.com/r"
-    "unanywhere/runanywhere-sdks/idl/v1;runan"
-    "ywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA"
-    "b\006proto3"
+    "B\213\001\n\027ai.runanywhere.proto.v1B\020LoraOption"
+    "sProtoP\001Z<github.com/runanywhere/runanyw"
+    "here-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1"
+    "\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_lora_5foptions_2eproto_deps[1] = {
@@ -3943,7 +3919,7 @@ static ::absl::once_flag descriptor_table_lora_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_lora_5foptions_2eproto = {
     false,
     false,
-    4448,
+    3510,
     descriptor_table_protodef_lora_5foptions_2eproto,
     "lora_options.proto",
     &descriptor_table_lora_5foptions_2eproto_once,

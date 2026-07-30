@@ -16,8 +16,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.lLMConfigurationDefaults = exports.validateLLMGenerationOptions = exports.lLMGenerationOptionsDefaults = void 0;
 const _errors_1 = require("./_errors");
 const lLMGenerationOptionsDefaults = () => ({
-    maxOutputTokens: 100,
-    temperature: 0.8,
+    maxOutputTokens: 512,
+    temperature: 0.7,
     topP: 1.0,
     topK: 0,
     repetitionPenalty: 1.0,

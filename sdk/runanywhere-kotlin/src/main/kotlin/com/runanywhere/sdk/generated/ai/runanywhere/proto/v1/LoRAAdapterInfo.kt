@@ -30,18 +30,9 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Info about a currently-loaded LoRA adapter (read-only snapshot).
- *
- * `adapter_id` and `error_message` are not present in any current SDK shape;
- * they are encoded as `proto3 optional` so the existing fields (path, scale,
- * applied) round-trip exactly while reserving room for richer status reports.
- * ---------------------------------------------------------------------------
- */
 public class LoRAAdapterInfo(
   /**
-   * catalog id if known, else empty
+   * Catalog id when known, else empty.
    */
   @field:WireField(
     tag = 1,
@@ -51,9 +42,6 @@ public class LoRAAdapterInfo(
     schemaIndex = 0,
   )
   public val adapter_id: String = "",
-  /**
-   * path used when loading
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -62,9 +50,6 @@ public class LoRAAdapterInfo(
     schemaIndex = 1,
   )
   public val adapter_path: String = "",
-  /**
-   * active scale factor
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -73,7 +58,7 @@ public class LoRAAdapterInfo(
   )
   public val scale: Float = 0f,
   /**
-   * currently applied to the context
+   * Whether it is currently applied to the context.
    */
   @field:WireField(
     tag = 4,
@@ -83,7 +68,7 @@ public class LoRAAdapterInfo(
   )
   public val applied: Boolean = false,
   /**
-   * populated when applied = false
+   * Populated when applied is false.
    */
   @field:WireField(
     tag = 5,

@@ -30,35 +30,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * VLM generation result.
- * Sources pre-IDL:
- *   Swift  VLMTypes.swift:208     (text, promptTokens, completionTokens,
- *                                  totalTimeMs as Double, tokensPerSecond)
- *   Kotlin VLMTypes.kt:120        (text, promptTokens, imageTokens,
- *                                  completionTokens, totalTokens,
- *                                  timeToFirstTokenMs, imageEncodeTimeMs,
- *                                  totalTimeMs, tokensPerSecond)
- *   Dart   vlm_types.dart:68      (text, promptTokens, completionTokens,
- *                                  totalTimeMs, tokensPerSecond)
- *   RN     VLMTypes.ts:28         (text, promptTokens, completionTokens,
- *                                  totalTimeMs, tokensPerSecond)
- *   Web    VLMTypes.ts:38         (VLMGenerationResult: text, promptTokens,
- *                                  imageTokens, completionTokens, totalTokens,
- *                                  timeToFirstTokenMs, imageEncodeTimeMs,
- *                                  totalTimeMs, tokensPerSecond, hardwareUsed)
- *   C ABI  rac_vlm_types.h:268    (text, prompt_tokens, image_tokens,
- *                                  completion_tokens, total_tokens,
- *                                  time_to_first_token_ms,
- *                                  image_encode_time_ms, total_time_ms,
- *                                  tokens_per_second)
- *
- * Streaming note: the VLM service emits VLMStreamEvent messages for
- * per-token deltas and terminal results; this aggregate result is carried on
- * the unary Generate RPC and on terminal stream events.
- * ---------------------------------------------------------------------------
- */
 public class VLMResult(
   @field:WireField(
     tag = 1,
@@ -91,9 +62,6 @@ public class VLMResult(
     schemaIndex = 3,
   )
   public val total_tokens: Long = 0L,
-  /**
-   * Kotlin/C ABI total_time_ms;
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -102,9 +70,6 @@ public class VLMResult(
     schemaIndex = 4,
   )
   public val processing_time_ms: Long = 0L,
-  /**
-   * Swift VLMResult totalTimeMs (Double ms).
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -113,9 +78,6 @@ public class VLMResult(
     schemaIndex = 5,
   )
   public val tokens_per_second: Float = 0f,
-  /**
-   * Detailed VLM metrics from Kotlin/Web/C ABI.
-   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

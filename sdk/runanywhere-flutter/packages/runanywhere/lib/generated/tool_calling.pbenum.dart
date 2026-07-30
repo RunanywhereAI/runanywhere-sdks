@@ -14,9 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// Supported parameter types.
-/// ---------------------------------------------------------------------------
 class ToolParameterType extends $pb.ProtobufEnum {
   static const ToolParameterType TOOL_PARAMETER_TYPE_UNSPECIFIED =
       ToolParameterType._(
@@ -53,10 +50,7 @@ class ToolParameterType extends $pb.ProtobufEnum {
   const ToolParameterType._(super.value, super.name);
 }
 
-/// ---------------------------------------------------------------------------
-/// Tool-call wire formats various LLM families emit. This enum is the single
-/// portable format selector across commons and every generated SDK binding.
-/// ---------------------------------------------------------------------------
+/// LFM2 names a model family in a wire enum, which the rest of the IDL avoids.
 class ToolCallFormatName extends $pb.ProtobufEnum {
   static const ToolCallFormatName TOOL_CALL_FORMAT_NAME_UNSPECIFIED =
       ToolCallFormatName._(
@@ -107,62 +101,6 @@ class ToolChoiceMode extends $pb.ProtobufEnum {
       value < 0 || value >= _byValue.length ? null : _byValue[value];
 
   const ToolChoiceMode._(super.value, super.name);
-}
-
-class ToolCallingStreamEventKind extends $pb.ProtobufEnum {
-  static const ToolCallingStreamEventKind
-      TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED = ToolCallingStreamEventKind._(
-          0,
-          _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED');
-  static const ToolCallingStreamEventKind
-      TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN = ToolCallingStreamEventKind._(
-          1,
-          _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN');
-  static const ToolCallingStreamEventKind
-      TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED =
-      ToolCallingStreamEventKind._(
-          2,
-          _omitEnumNames
-              ? ''
-              : 'TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED');
-  static const ToolCallingStreamEventKind
-      TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED =
-      ToolCallingStreamEventKind._(
-          3,
-          _omitEnumNames
-              ? ''
-              : 'TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED');
-  static const ToolCallingStreamEventKind
-      TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED =
-      ToolCallingStreamEventKind._(
-          4,
-          _omitEnumNames
-              ? ''
-              : 'TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED');
-  static const ToolCallingStreamEventKind
-      TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED = ToolCallingStreamEventKind._(
-          5, _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED');
-  static const ToolCallingStreamEventKind TOOL_CALLING_STREAM_EVENT_KIND_ERROR =
-      ToolCallingStreamEventKind._(
-          6, _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_ERROR');
-
-  static const $core.List<ToolCallingStreamEventKind> values =
-      <ToolCallingStreamEventKind>[
-    TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED,
-    TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN,
-    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED,
-    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED,
-    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED,
-    TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED,
-    TOOL_CALLING_STREAM_EVENT_KIND_ERROR,
-  ];
-
-  static final $core.List<ToolCallingStreamEventKind?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 6);
-  static ToolCallingStreamEventKind? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const ToolCallingStreamEventKind._(super.value, super.name);
 }
 
 const $core.bool _omitEnumNames =

@@ -25,13 +25,6 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'llm_options.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// Options for a single text generation invocation.
-///
-/// Field names match Swift LLMGenerationOptions exactly; consumers may treat
-/// proto3 scalar defaults as "unset" (Swift handled this via Optionals — proto
-/// represents optional reference fields explicitly via `optional` keyword).
-/// ---------------------------------------------------------------------------
 class LLMGenerationOptions extends $pb.GeneratedMessage {
   factory LLMGenerationOptions({
     $core.int? maxOutputTokens,
@@ -140,8 +133,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LLMGenerationOptions>(create);
   static LLMGenerationOptions? _defaultInstance;
 
-  /// Maximum number of tokens to generate. 0 (default) = unset → engine
-  /// default (typically 100).
+  /// 0 = unset, so the annotated default applies.
   @$pb.TagNumber(1)
   $core.int get maxOutputTokens => $_getIZ(0);
   @$pb.TagNumber(1)
@@ -151,7 +143,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearMaxOutputTokens() => $_clearField(1);
 
-  /// Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding.
+  /// 0.0 = greedy decoding.
   @$pb.TagNumber(2)
   $core.double get temperature => $_getN(1);
   @$pb.TagNumber(2)
@@ -161,7 +153,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearTemperature() => $_clearField(2);
 
-  /// Nucleus sampling (top-p). 1.0 = no nucleus truncation.
   @$pb.TagNumber(3)
   $core.double get topP => $_getN(2);
   @$pb.TagNumber(3)
@@ -171,7 +162,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearTopP() => $_clearField(3);
 
-  /// Top-K sampling (Kotlin/Dart/RN field). 0 = disabled.
+  /// Commons treats 0 as unset for every sampling knob below.
   @$pb.TagNumber(4)
   $core.int get topK => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -181,7 +172,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearTopK() => $_clearField(4);
 
-  /// Repetition penalty (Kotlin/Dart/RN field). 1.0 = no penalty.
   @$pb.TagNumber(5)
   $core.double get repetitionPenalty => $_getN(4);
   @$pb.TagNumber(5)
@@ -191,12 +181,9 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearRepetitionPenalty() => $_clearField(5);
 
-  /// Stop sequences. Generation halts when any of these strings appears in
-  /// the output stream.
   @$pb.TagNumber(6)
   $pb.PbList<$core.String> get stopSequences => $_getList(5);
 
-  /// Preferred inference framework. UNSPECIFIED = pick automatically.
   @$pb.TagNumber(8)
   $3.InferenceFramework get preferredFramework => $_getN(6);
   @$pb.TagNumber(8)
@@ -206,7 +193,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearPreferredFramework() => $_clearField(8);
 
-  /// System prompt to define AI behavior and formatting rules.
   @$pb.TagNumber(9)
   $core.String get systemPrompt => $_getSZ(7);
   @$pb.TagNumber(9)
@@ -216,8 +202,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearSystemPrompt() => $_clearField(9);
 
-  /// Reasoning/thinking control (mode, emission, tag pattern). Unset =
-  /// model default with thinking stripped from output.
   @$pb.TagNumber(11)
   $0.ReasoningOptions get reasoning => $_getN(8);
   @$pb.TagNumber(11)
@@ -229,8 +213,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   $0.ReasoningOptions ensureReasoning() => $_ensure(8);
 
-  /// Routing hint: where this generation should run (on-device, cloud, or
-  /// SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
+  /// No consumer reads this today.
   @$pb.TagNumber(12)
   ExecutionTarget get executionTarget => $_getN(9);
   @$pb.TagNumber(12)
@@ -240,8 +223,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearExecutionTarget() => $_clearField(12);
 
-  /// The ONE output-constraint surface (typed or raw JSON schema, grammar,
-  /// regex — see structured_output.proto).
   @$pb.TagNumber(13)
   $1.StructuredOutputOptions get structuredOutput => $_getN(10);
   @$pb.TagNumber(13)
@@ -254,7 +235,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   $1.StructuredOutputOptions ensureStructuredOutput() => $_ensure(10);
 
-  /// Deterministic sampling seed. 0 = backend/default random seed.
   @$pb.TagNumber(15)
   $fixnum.Int64 get seed => $_getI64(11);
   @$pb.TagNumber(15)
@@ -264,7 +244,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   void clearSeed() => $_clearField(15);
 
-  /// OpenAI-compatible sampling penalties. 0.0 = disabled.
   @$pb.TagNumber(16)
   $core.double get frequencyPenalty => $_getN(12);
   @$pb.TagNumber(16)
@@ -283,7 +262,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   void clearPresencePenalty() => $_clearField(17);
 
-  /// Repeat-penalty lookback window. 0 = backend default.
+  /// No engine reads repeat_last_n or echo_prompt.
   @$pb.TagNumber(18)
   $core.int get repeatLastN => $_getIZ(14);
   @$pb.TagNumber(18)
@@ -293,7 +272,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   void clearRepeatLastN() => $_clearField(18);
 
-  /// Minimum probability sampling. 0.0 = disabled.
   @$pb.TagNumber(19)
   $core.double get minP => $_getN(15);
   @$pb.TagNumber(19)
@@ -303,7 +281,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(19)
   void clearMinP() => $_clearField(19);
 
-  /// Include prompt text in the result/stream when the backend supports echo.
   @$pb.TagNumber(22)
   $core.bool get echoPrompt => $_getBF(16);
   @$pb.TagNumber(22)
@@ -313,7 +290,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(22)
   void clearEchoPrompt() => $_clearField(22);
 
-  /// Per-request backend thread hint. 0 = backend/runtime default.
   @$pb.TagNumber(23)
   $core.int get nThreads => $_getIZ(17);
   @$pb.TagNumber(23)
@@ -323,9 +299,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(23)
   void clearNThreads() => $_clearField(23);
 
-  /// Tool-calling contract for this generation: pure tool configuration
-  /// (definitions, choice policy, loop limits). Sampling and reasoning come
-  /// from THIS message — ToolCallingOptions carries none of its own.
   @$pb.TagNumber(24)
   $2.ToolCallingOptions get toolCalling => $_getN(18);
   @$pb.TagNumber(24)
@@ -338,9 +311,6 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   $2.ToolCallingOptions ensureToolCalling() => $_ensure(18);
 }
 
-/// ---------------------------------------------------------------------------
-/// Result of a single text generation shared by every SDK.
-/// ---------------------------------------------------------------------------
 class LLMGenerationResult extends $pb.GeneratedMessage {
   factory LLMGenerationResult({
     $core.String? text,
@@ -462,7 +432,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LLMGenerationResult>(create);
   static LLMGenerationResult? _defaultInstance;
 
-  /// Generated text (with thinking content removed if extracted).
   @$pb.TagNumber(1)
   $core.String get text => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -472,7 +441,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearText() => $_clearField(1);
 
-  /// Optional thinking/reasoning content extracted from the response.
   @$pb.TagNumber(2)
   $core.String get thinkingContent => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -482,7 +450,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearThinkingContent() => $_clearField(2);
 
-  /// Number of input/prompt tokens (from tokenizer).
   @$pb.TagNumber(3)
   $core.int get inputTokens => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -492,7 +459,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearInputTokens() => $_clearField(3);
 
-  /// Number of output/completion tokens.
   @$pb.TagNumber(4)
   $core.int get outputTokens => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -502,7 +468,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearOutputTokens() => $_clearField(4);
 
-  /// Model used for generation.
   @$pb.TagNumber(5)
   $core.String get modelUsed => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -512,7 +477,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearModelUsed() => $_clearField(5);
 
-  /// Total wall-clock generation time in milliseconds.
   @$pb.TagNumber(6)
   $core.double get generationTimeMs => $_getN(5);
   @$pb.TagNumber(6)
@@ -522,7 +486,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearGenerationTimeMs() => $_clearField(6);
 
-  /// Time-to-first-token in milliseconds (only set in streaming mode).
   @$pb.TagNumber(7)
   $core.double get ttftMs => $_getN(6);
   @$pb.TagNumber(7)
@@ -532,7 +495,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearTtftMs() => $_clearField(7);
 
-  /// Tokens-per-second throughput.
   @$pb.TagNumber(8)
   $core.double get tokensPerSecond => $_getN(7);
   @$pb.TagNumber(8)
@@ -542,8 +504,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearTokensPerSecond() => $_clearField(8);
 
-  /// Framework that actually performed the generation. Optional because
-  /// some C ABI paths don't surface it.
   @$pb.TagNumber(9)
   $core.String get framework => $_getSZ(8);
   @$pb.TagNumber(9)
@@ -553,8 +513,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearFramework() => $_clearField(9);
 
-  /// Reason the generation stopped: "stop", "length", "cancelled", "error".
-  /// Empty = unset.
   @$pb.TagNumber(10)
   $core.String get finishReason => $_getSZ(9);
   @$pb.TagNumber(10)
@@ -564,7 +522,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearFinishReason() => $_clearField(10);
 
-  /// Number of tokens used for thinking/reasoning. 0 = not applicable.
   @$pb.TagNumber(11)
   $core.int get thinkingTokens => $_getIZ(10);
   @$pb.TagNumber(11)
@@ -574,7 +531,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   void clearThinkingTokens() => $_clearField(11);
 
-  /// Number of tokens in the actual response content (vs thinking).
   @$pb.TagNumber(12)
   $core.int get responseTokens => $_getIZ(11);
   @$pb.TagNumber(12)
@@ -584,8 +540,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearResponseTokens() => $_clearField(12);
 
-  /// Optional JSON output (when structured-output mode was requested).
-  /// Empty = no structured output.
   @$pb.TagNumber(13)
   $core.String get jsonOutput => $_getSZ(12);
   @$pb.TagNumber(13)
@@ -595,9 +549,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearJsonOutput() => $_clearField(13);
 
-  /// Optional aggregated performance metrics. Web SDK surfaces this as a
-  /// separate object alongside the result; consumers may ignore it if they
-  /// already use the per-field timings above.
+  /// Nothing reads performance or executed_on.
   @$pb.TagNumber(14)
   PerformanceMetrics get performance => $_getN(13);
   @$pb.TagNumber(14)
@@ -609,8 +561,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   PerformanceMetrics ensurePerformance() => $_ensure(13);
 
-  /// Where the generation actually ran (on-device, cloud, etc.). Useful
-  /// when execution_target was AUTO and the SDK picked the route.
   @$pb.TagNumber(15)
   ExecutionTarget get executedOn => $_getN(14);
   @$pb.TagNumber(15)
@@ -620,8 +570,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   void clearExecutedOn() => $_clearField(15);
 
-  /// Structured-output validation details, when a structured-output request
-  /// was used. Mirrors the Swift/RN validation payload.
   @$pb.TagNumber(16)
   $1.StructuredOutputValidation get structuredOutputValidation => $_getN(15);
   @$pb.TagNumber(16)
@@ -635,8 +583,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   $1.StructuredOutputValidation ensureStructuredOutputValidation() =>
       $_ensure(15);
 
-  /// Total tokens consumed (prompt + completion). Some C ABI paths expose
-  /// this directly; consumers may also compute it from the per-field counts.
+  /// input_tokens + output_tokens.
   @$pb.TagNumber(17)
   $core.int get totalTokens => $_getIZ(16);
   @$pb.TagNumber(17)
@@ -646,8 +593,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   void clearTotalTokens() => $_clearField(17);
 
-  /// Backend error text for result-producing APIs that return a terminal
-  /// result envelope instead of throwing through the host language.
   @$pb.TagNumber(18)
   $core.String get errorMessage => $_getSZ(17);
   @$pb.TagNumber(18)
@@ -657,7 +602,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   void clearErrorMessage() => $_clearField(18);
 
-  /// Numeric backend status code when a result envelope carries an error.
   @$pb.TagNumber(19)
   $core.int get errorCode => $_getIZ(18);
   @$pb.TagNumber(19)
@@ -667,7 +611,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(19)
   void clearErrorCode() => $_clearField(19);
 
-  /// Prompt/cache accounting surfaced by llama.cpp/CoreML-style backends.
   @$pb.TagNumber(20)
   $core.int get cachedPromptTokens => $_getIZ(19);
   @$pb.TagNumber(20)
@@ -695,173 +638,13 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(22)
   void clearDecodeTimeMs() => $_clearField(22);
 
-  /// Tool calls parsed from the final assistant response, if any.
   @$pb.TagNumber(23)
   $pb.PbList<$2.ToolCall> get toolCalls => $_getList(22);
 
-  /// Tool results incorporated during auto-execute loops.
   @$pb.TagNumber(24)
   $pb.PbList<$2.ToolResult> get toolResults => $_getList(23);
 }
 
-class LLMGenerationStatus extends $pb.GeneratedMessage {
-  factory LLMGenerationStatus({
-    $core.String? requestId,
-    LLMGenerationState? state,
-    $core.int? promptTokensProcessed,
-    $core.int? completionTokensGenerated,
-    $core.double? progress,
-    $fixnum.Int64? elapsedMs,
-    $core.String? message,
-    $core.String? errorMessage,
-    $core.int? errorCode,
-  }) {
-    final result = create();
-    if (requestId != null) result.requestId = requestId;
-    if (state != null) result.state = state;
-    if (promptTokensProcessed != null)
-      result.promptTokensProcessed = promptTokensProcessed;
-    if (completionTokensGenerated != null)
-      result.completionTokensGenerated = completionTokensGenerated;
-    if (progress != null) result.progress = progress;
-    if (elapsedMs != null) result.elapsedMs = elapsedMs;
-    if (message != null) result.message = message;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
-    return result;
-  }
-
-  LLMGenerationStatus._();
-
-  factory LLMGenerationStatus.fromBuffer($core.List<$core.int> data,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromBuffer(data, registry);
-  factory LLMGenerationStatus.fromJson($core.String json,
-          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
-      create()..mergeFromJson(json, registry);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
-      _omitMessageNames ? '' : 'LLMGenerationStatus',
-      package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
-      createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'requestId')
-    ..aE<LLMGenerationState>(2, _omitFieldNames ? '' : 'state',
-        enumValues: LLMGenerationState.values)
-    ..aI(3, _omitFieldNames ? '' : 'promptTokensProcessed')
-    ..aI(4, _omitFieldNames ? '' : 'completionTokensGenerated')
-    ..aD(5, _omitFieldNames ? '' : 'progress', fieldType: $pb.PbFieldType.OF)
-    ..aInt64(6, _omitFieldNames ? '' : 'elapsedMs')
-    ..aOS(7, _omitFieldNames ? '' : 'message')
-    ..aOS(8, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(9, _omitFieldNames ? '' : 'errorCode')
-    ..hasRequiredFields = false;
-
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LLMGenerationStatus clone() => deepCopy();
-  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
-  LLMGenerationStatus copyWith(void Function(LLMGenerationStatus) updates) =>
-      super.copyWith((message) => updates(message as LLMGenerationStatus))
-          as LLMGenerationStatus;
-
-  @$core.override
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static LLMGenerationStatus create() => LLMGenerationStatus._();
-  @$core.override
-  LLMGenerationStatus createEmptyInstance() => create();
-  @$core.pragma('dart2js:noInline')
-  static LLMGenerationStatus getDefault() => _defaultInstance ??=
-      $pb.GeneratedMessage.$_defaultFor<LLMGenerationStatus>(create);
-  static LLMGenerationStatus? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get requestId => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set requestId($core.String value) => $_setString(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasRequestId() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearRequestId() => $_clearField(1);
-
-  @$pb.TagNumber(2)
-  LLMGenerationState get state => $_getN(1);
-  @$pb.TagNumber(2)
-  set state(LLMGenerationState value) => $_setField(2, value);
-  @$pb.TagNumber(2)
-  $core.bool hasState() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearState() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.int get promptTokensProcessed => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set promptTokensProcessed($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasPromptTokensProcessed() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearPromptTokensProcessed() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get completionTokensGenerated => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set completionTokensGenerated($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasCompletionTokensGenerated() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearCompletionTokensGenerated() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.double get progress => $_getN(4);
-  @$pb.TagNumber(5)
-  set progress($core.double value) => $_setFloat(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasProgress() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearProgress() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $fixnum.Int64 get elapsedMs => $_getI64(5);
-  @$pb.TagNumber(6)
-  set elapsedMs($fixnum.Int64 value) => $_setInt64(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasElapsedMs() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearElapsedMs() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.String get message => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set message($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasMessage() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearMessage() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.String get errorMessage => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set errorMessage($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasErrorMessage() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearErrorMessage() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.int get errorCode => $_getIZ(8);
-  @$pb.TagNumber(9)
-  set errorCode($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasErrorCode() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearErrorCode() => $_clearField(9);
-}
-
-/// ---------------------------------------------------------------------------
-/// Lightweight LLM configuration used at component-init time (Swift
-/// LLMConfiguration in LLMTypes.swift:15). Distinct from LLMGenerationOptions
-/// — this is the "load the model" knob set, not the per-call sampling knobs.
-/// ---------------------------------------------------------------------------
 class LLMConfiguration extends $pb.GeneratedMessage {
   factory LLMConfiguration({
     $core.int? contextLength,
@@ -918,7 +701,6 @@ class LLMConfiguration extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LLMConfiguration>(create);
   static LLMConfiguration? _defaultInstance;
 
-  /// Model context window length in tokens. 0 = use model default.
   @$pb.TagNumber(1)
   $core.int get contextLength => $_getIZ(0);
   @$pb.TagNumber(1)
@@ -928,8 +710,6 @@ class LLMConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearContextLength() => $_clearField(1);
 
-  /// Model identifier/path resolved by the component loader. Present in the
-  /// C ABI rac_llm_config_t and needed for generated-proto service handles.
   @$pb.TagNumber(6)
   $core.String get modelId => $_getSZ(1);
   @$pb.TagNumber(6)
@@ -939,8 +719,6 @@ class LLMConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearModelId() => $_clearField(6);
 
-  /// Preferred inference framework for this component. UNSPECIFIED / absent
-  /// means "auto".
   @$pb.TagNumber(7)
   $3.InferenceFramework get preferredFramework => $_getN(2);
   @$pb.TagNumber(7)
@@ -950,8 +728,7 @@ class LLMConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearPreferredFramework() => $_clearField(7);
 
-  /// Component-level defaults applied when a per-call options message is
-  /// absent or leaves a field unset.
+  /// Applied when a per-call LLMGenerationOptions leaves a field unset.
   @$pb.TagNumber(8)
   LLMGenerationOptions get defaultOptions => $_getN(3);
   @$pb.TagNumber(8)
@@ -964,10 +741,6 @@ class LLMConfiguration extends $pb.GeneratedMessage {
   LLMGenerationOptions ensureDefaultOptions() => $_ensure(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
-/// once per token in streaming mode.
-/// ---------------------------------------------------------------------------
 class StreamToken extends $pb.GeneratedMessage {
   factory StreamToken({
     $core.String? text,
@@ -1018,7 +791,6 @@ class StreamToken extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<StreamToken>(create);
   static StreamToken? _defaultInstance;
 
-  /// Decoded text fragment for this token.
   @$pb.TagNumber(1)
   $core.String get text => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -1028,7 +800,6 @@ class StreamToken extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearText() => $_clearField(1);
 
-  /// Wall-clock timestamp (ms since Unix epoch) the token was produced.
   @$pb.TagNumber(2)
   $fixnum.Int64 get timestampMs => $_getI64(1);
   @$pb.TagNumber(2)
@@ -1038,7 +809,6 @@ class StreamToken extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearTimestampMs() => $_clearField(2);
 
-  /// Sequence index within the current generation (0-based).
   @$pb.TagNumber(3)
   $core.int get index => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -1049,11 +819,7 @@ class StreamToken extends $pb.GeneratedMessage {
   void clearIndex() => $_clearField(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Aggregated performance metrics for a generation (Web SDK
-/// PerformanceMetrics in types/models.ts:57). Higher-level summary that
-/// rolls up the timing fields scattered across LLMGenerationResult.
-/// ---------------------------------------------------------------------------
+/// Referenced only by LLMGenerationResult.performance, which no SDK reads.
 class PerformanceMetrics extends $pb.GeneratedMessage {
   factory PerformanceMetrics({
     $fixnum.Int64? latencyMs,
@@ -1112,7 +878,6 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<PerformanceMetrics>(create);
   static PerformanceMetrics? _defaultInstance;
 
-  /// Total latency from request to last token, in milliseconds.
   @$pb.TagNumber(1)
   $fixnum.Int64 get latencyMs => $_getI64(0);
   @$pb.TagNumber(1)
@@ -1122,7 +887,6 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearLatencyMs() => $_clearField(1);
 
-  /// Peak memory used by the inference engine, in bytes.
   @$pb.TagNumber(2)
   $fixnum.Int64 get memoryBytes => $_getI64(1);
   @$pb.TagNumber(2)
@@ -1132,7 +896,6 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearMemoryBytes() => $_clearField(2);
 
-  /// Decode throughput in tokens/second.
   @$pb.TagNumber(3)
   $core.double get throughputTokensPerSec => $_getN(2);
   @$pb.TagNumber(3)
@@ -1142,7 +905,6 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearThroughputTokensPerSec() => $_clearField(3);
 
-  /// Input (prompt) token count.
   @$pb.TagNumber(4)
   $core.int get inputTokens => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -1152,7 +914,6 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearInputTokens() => $_clearField(4);
 
-  /// Output (completion) token count.
   @$pb.TagNumber(5)
   $core.int get outputTokens => $_getIZ(4);
   @$pb.TagNumber(5)

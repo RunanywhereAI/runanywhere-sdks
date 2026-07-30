@@ -14,13 +14,12 @@
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateDiarizationOptions = exports.diarizationOptionsDefaults = void 0;
-/* eslint-disable */
-const diarization_1 = require("../diarization");
+const model_types_1 = require("../model_types");
 const _errors_1 = require("./_errors");
 const diarizationOptionsDefaults = () => ({
     sampleRate: 16000,
     channels: 1,
-    encoding: diarization_1.DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE,
+    encoding: model_types_1.AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
     threshold: 0.5,
     minimumDurationMs: 0,
     mergeGapMs: 0,

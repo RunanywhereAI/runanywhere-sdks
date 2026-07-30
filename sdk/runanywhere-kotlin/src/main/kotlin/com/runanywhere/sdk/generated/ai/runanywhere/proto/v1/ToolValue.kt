@@ -32,13 +32,7 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * JSON-typed scalar / composite carrier for tool arguments and results.
- * Mirrors Swift's ToolValue enum, Kotlin's sealed class, and the
- * TypeScript discriminated union. Used inside ToolParameter.enum_values
- * (string-only) and as the canonical wire shape when consumers want
- * strongly-typed arguments rather than raw JSON.
- * ---------------------------------------------------------------------------
+ * A JSON value, typed rather than stringly.
  */
 public class ToolValue(
   @field:WireField(

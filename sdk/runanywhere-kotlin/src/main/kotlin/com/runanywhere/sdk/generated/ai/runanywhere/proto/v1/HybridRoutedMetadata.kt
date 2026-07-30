@@ -31,10 +31,7 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Metadata returned alongside the capability result describing what the
- * router did. Always populated even on success.
- * ---------------------------------------------------------------------------
+ * What the router actually did, including the failed primary attempt.
  */
 public class HybridRoutedMetadata(
   @field:WireField(
@@ -61,10 +58,6 @@ public class HybridRoutedMetadata(
     schemaIndex = 2,
   )
   public val attempt_count: Int = 0,
-  /**
-   * Why the router fell back to the secondary. Zero (RAC_SUCCESS) when
-   * the primary served the request or no fallback occurred.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -81,10 +74,6 @@ public class HybridRoutedMetadata(
     schemaIndex = 4,
   )
   public val primary_error_message: String = "",
-  /**
-   * Final confidence of the result that was actually returned. NaN when
-   * the engine does not surface a quality signal (e.g. sherpa-onnx Whisper).
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -92,11 +81,6 @@ public class HybridRoutedMetadata(
     schemaIndex = 5,
   )
   public val confidence: Float = 0f,
-  /**
-   * Primary's confidence captured BEFORE cascading to the secondary.
-   * Populated only when `was_fallback = true` AND the fallback fired on
-   * confidence (not on an error). NaN otherwise.
-   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

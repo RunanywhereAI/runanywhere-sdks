@@ -29,11 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Descriptor for a single registered model on one side of the pair.
- * ---------------------------------------------------------------------------
- */
 public class HybridModelDescriptor(
   @field:WireField(
     tag = 1,
@@ -58,11 +53,6 @@ public class HybridModelDescriptor(
     schemaIndex = 2,
   )
   public val backend: HybridBackendKind = HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED,
-  /**
-   * Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-   * "sarvam"). The cloud_stt engine reads it from config_json\["provider"\];
-   * empty defaults to "sarvam". Ignored for non-cloud backends.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

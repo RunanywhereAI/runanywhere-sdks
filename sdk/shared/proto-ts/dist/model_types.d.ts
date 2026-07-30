@@ -2,17 +2,7 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { AccelerationPreference, HardwareProfile } from "./hardware_profile";
 import { ThinkingTagPattern } from "./thinking_tag_pattern";
 export declare const protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * Audio format — union of all cases currently defined across SDKs.
- * Sources pre-IDL:
- *   Kotlin  AudioTypes.kt:12          (pcm, wav, mp3, opus, aac, flac, ogg, pcm_16bit)
- *   Kotlin  ComponentTypes.kt:39      (pcm, wav, mp3, aac, ogg, opus, flac)  ← duplicate
- *   Swift   AudioTypes.swift:17       (pcm, wav, mp3, opus, aac, flac)
- *   Dart    audio_format.dart:3       (wav, mp3, m4a, flac, pcm, opus)
- *   RN      TTSTypes.ts:36            ('pcm' | 'wav' | 'mp3')
- * ---------------------------------------------------------------------------
- */
+/** Container format of an audio payload. */
 export declare enum AudioFormat {
     AUDIO_FORMAT_UNSPECIFIED = 0,
     AUDIO_FORMAT_PCM = 1,
@@ -31,16 +21,26 @@ export declare enum AudioFormat {
 export declare function audioFormatFromJSON(object: any): AudioFormat;
 export declare function audioFormatToJSON(object: AudioFormat): string;
 /**
- * ---------------------------------------------------------------------------
- * Model file format — union across all SDKs.
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:27        (onnx, ort, gguf, bin, coreml, unknown)
- *   Kotlin ModelTypes.kt:41           (ONNX, ORT, GGUF, BIN, QNN_CONTEXT, UNKNOWN)
- *   Dart   model_types.dart:34        (onnx, ort, gguf, bin, unknown)
- *   RN     enums.ts:115               (12-case superset incl. MLModel, MLPackage, TFLite,
- *                                       SafeTensors, Zip, Folder, Proprietary)
- *   Web    enums.ts:56                (copy of RN)
- * ---------------------------------------------------------------------------
+ * Sample layout of a raw audio payload, as opposed to AudioFormat above, which
+ * names the container. CONTAINER means the bytes carry their own header and the
+ * companion AudioFormat field says which one.
+ *
+ * This is the single encoding enum for STT, VAD, diarization, and the voice
+ * agent. STT previously numbered PCM_S16_LE=1 and PCM_F32_LE=2, the reverse of
+ * everywhere else; it now follows the ordering below.
+ */
+export declare enum AudioEncoding {
+    AUDIO_ENCODING_UNSPECIFIED = 0,
+    AUDIO_ENCODING_PCM_F32_LE = 1,
+    AUDIO_ENCODING_PCM_S16_LE = 2,
+    AUDIO_ENCODING_CONTAINER = 3,
+    UNRECOGNIZED = -1
+}
+export declare function audioEncodingFromJSON(object: any): AudioEncoding;
+export declare function audioEncodingToJSON(object: AudioEncoding): string;
+/**
+ * On-disk file format, as opposed to ModelArtifactType (bundle kind) or
+ * ArchiveType (compression).
  */
 export declare enum ModelFormat {
     MODEL_FORMAT_UNSPECIFIED = 0,
@@ -70,16 +70,8 @@ export declare enum ModelFormat {
 export declare function modelFormatFromJSON(object: any): ModelFormat;
 export declare function modelFormatToJSON(object: ModelFormat): string;
 /**
- * ---------------------------------------------------------------------------
- * Inference framework / runtime. Same name used across all SDKs (RN names it
- * LLMFramework; we canonicalize on InferenceFramework).
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:76        (12 cases incl. coreml, mlx, whisperKitCoreML)
- *   Kotlin ComponentTypes.kt:122      (9 cases; no coreml / mlx / whisperKit)
- *   Dart   model_types.dart:106       (9 cases, matches Kotlin)
- *   RN     enums.ts:30 (LLMFramework) (16 cases)
- *   Web    enums.ts:21 (LLMFramework) (16 cases, copy of RN)
- * ---------------------------------------------------------------------------
+ * Engine that executes a model. Reached from ModelInfo.framework, so the
+ * reserved values below are manifest-critical.
  */
 export declare enum InferenceFramework {
     INFERENCE_FRAMEWORK_UNSPECIFIED = 0,
@@ -113,14 +105,8 @@ export declare enum InferenceFramework {
 export declare function inferenceFrameworkFromJSON(object: any): InferenceFramework;
 export declare function inferenceFrameworkToJSON(object: InferenceFramework): string;
 /**
- * ---------------------------------------------------------------------------
- * Model category / modality class. Sources pre-IDL:
- *   Swift ModelTypes.swift:39         (9 cases incl. voiceActivityDetection + audio)
- *   Kotlin ModelTypes.kt:147          (8 cases, no VAD)
- *   Dart  model_types.dart:55         (8 cases, no VAD)
- *   RN    enums.ts:75                 (8 cases, no VAD, Audio labeled as VAD)
- *   Web   enums.ts:39                 (7 cases, Audio labeled as VAD)
- * ---------------------------------------------------------------------------
+ * What a model does. There is no RERANK member, which is why the rerank
+ * primitive cannot auto-load a model.
  */
 export declare enum ModelCategory {
     MODEL_CATEGORY_UNSPECIFIED = 0,
@@ -172,14 +158,7 @@ export declare enum ModelSource {
 }
 export declare function modelSourceFromJSON(object: any): ModelSource;
 export declare function modelSourceToJSON(object: ModelSource): string;
-/**
- * ---------------------------------------------------------------------------
- * Archive types for multi-file model packages. Sources pre-IDL:
- *   Swift  ModelTypes.swift:195       (zip, tarBz2, tarGz, tarXz)
- *   Kotlin ModelTypes.kt:176          (ZIP, TAR_BZ2, TAR_GZ, TAR_XZ)
- *   Dart   model_types.dart:141       (zip, tarBz2, tarGz, tarXz)
- * ---------------------------------------------------------------------------
- */
+/** Compression flavor of a multi-file model package. */
 export declare enum ArchiveType {
     ARCHIVE_TYPE_UNSPECIFIED = 0,
     ARCHIVE_TYPE_ZIP = 1,
@@ -200,16 +179,7 @@ export declare enum ArchiveStructure {
 }
 export declare function archiveStructureFromJSON(object: any): ArchiveStructure;
 export declare function archiveStructureToJSON(object: ArchiveStructure): string;
-/**
- * ---------------------------------------------------------------------------
- * High-level artifact classification — what KIND of bundle a model ships as.
- * Distinct from ModelFormat (the on-disk file format) and ArchiveType (the
- * compression flavor). Sources pre-IDL:
- *   Swift  ModelTypes.swift:~200            (singleFile, archive, multiFile, custom)
- *   Web    types.ts:149                     (SingleFile / Archive / MultiFile / Custom)
- *   Kotlin sealed class ModelArtifactType   (SingleFile / Archive / MultiFile / Custom)
- * ---------------------------------------------------------------------------
- */
+/** What kind of bundle a model ships as. */
 export declare enum ModelArtifactType {
     MODEL_ARTIFACT_TYPE_UNSPECIFIED = 0,
     MODEL_ARTIFACT_TYPE_SINGLE_FILE = 1,
@@ -227,14 +197,8 @@ export declare enum ModelArtifactType {
 export declare function modelArtifactTypeFromJSON(object: any): ModelArtifactType;
 export declare function modelArtifactTypeToJSON(object: ModelArtifactType): string;
 /**
- * ---------------------------------------------------------------------------
- * Model registry lifecycle state. This is durable/catalog state, not a live
- * transfer progress stream. Per-download byte counters and transient progress
- * events stay in download_service.proto.
- * Sources pre-IDL:
- *   Web ModelRegistry.ts ManagedModel.status (registered/downloading/downloaded/loading/loaded/error)
- *   RN  ModelInfo.isDownloaded/isAvailable and registry query criteria
- * ---------------------------------------------------------------------------
+ * Durable catalog state, not a live transfer stream. Byte counters and
+ * progress events live in download_service.proto.
  */
 export declare enum ModelRegistryStatus {
     MODEL_REGISTRY_STATUS_UNSPECIFIED = 0,
@@ -293,15 +257,8 @@ export declare enum ModelFileRole {
 export declare function modelFileRoleFromJSON(object: any): ModelFileRole;
 export declare function modelFileRoleToJSON(object: ModelFileRole): string;
 /**
- * ---------------------------------------------------------------------------
- * Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
- *   Web    enums.ts (RoutingPolicy)
- *          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
- *          Hybrid / CostOptimized / LatencyOptimized / PrivacyOptimized
- *   Swift  extensions (RoutingPolicy)
- * Canonical short-form below; specific PreferLocal/PreferCloud cover the
- * "preferred" cases, MANUAL covers explicit user override.
- * ---------------------------------------------------------------------------
+ * On-device versus cloud routing. PREFER_LOCAL and PREFER_CLOUD cover the
+ * "preferred" cases; MANUAL is an explicit user override.
  */
 export declare enum RoutingPolicy {
     ROUTING_POLICY_UNSPECIFIED = 0,
@@ -326,14 +283,8 @@ export interface ModelRuntimeCompatibility {
     compatibleFormats: ModelFormat[];
 }
 /**
- * ---------------------------------------------------------------------------
- * Core metadata for a model entry.
- * Sources pre-IDL:
- *   Swift  ModelTypes.swift:393       (16 fields)
- *   Kotlin ModelTypes.kt:332          (16 fields, Long vs Int drift on download size)
- *   Dart   model_types.dart:335       (similar shape, nullable divergences)
- *   RN     HybridRunAnywhereCore.cpp:995-1010 (13 fields, string-typed category/format)
- * ---------------------------------------------------------------------------
+ * Core metadata for a model entry. This message is persisted verbatim to
+ * .rac-manifest.binpb, so field numbers here are permanent.
  */
 export interface ModelInfo {
     id: string;
@@ -471,13 +422,8 @@ export interface MultiFileArtifact {
     files: ModelFileDescriptor[];
 }
 /**
- * ---------------------------------------------------------------------------
- * Declarative manifest of files a multi-file / directory model is expected
- * to contain on disk after download/extraction. Used for verification before
- * hand-off to the inference framework. Sources pre-IDL:
- *   Flutter core/types/model_types.dart:420
- *   Swift   ModelTypes.swift:~300
- * ---------------------------------------------------------------------------
+ * What a multi-file model should contain on disk after extraction. Verified
+ * before hand-off to the inference framework.
  */
 export interface ExpectedModelFiles {
     files: ModelFileDescriptor[];
@@ -671,12 +617,6 @@ export interface CurrentModelResult {
     framework: InferenceFramework;
     resolvedPath: string;
     resolvedArtifacts: ModelFileDescriptor[];
-}
-export interface ModelDeleteRequest {
-    modelId: string;
-    deleteFiles: boolean;
-    unregister: boolean;
-    unloadIfLoaded: boolean;
 }
 export interface ModelDeleteResult {
     success: boolean;
@@ -991,7 +931,6 @@ export declare const ModelUnloadRequest: MessageFns<ModelUnloadRequest>;
 export declare const ModelUnloadResult: MessageFns<ModelUnloadResult>;
 export declare const CurrentModelRequest: MessageFns<CurrentModelRequest>;
 export declare const CurrentModelResult: MessageFns<CurrentModelResult>;
-export declare const ModelDeleteRequest: MessageFns<ModelDeleteRequest>;
 export declare const ModelDeleteResult: MessageFns<ModelDeleteResult>;
 export declare const ModelCompatibilityRequest: MessageFns<ModelCompatibilityRequest>;
 export declare const ModelCompatibilityResult: MessageFns<ModelCompatibilityResult>;

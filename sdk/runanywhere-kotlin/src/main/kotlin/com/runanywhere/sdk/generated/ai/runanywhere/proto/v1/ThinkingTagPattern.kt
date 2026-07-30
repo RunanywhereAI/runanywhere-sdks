@@ -30,16 +30,13 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Pattern used to extract a model's "thinking" / reasoning block from its
- * raw output. Used by Qwen3 and LFM2 family models that emit
- * <think>...</think> wrappers. Shared by LLM generation options (per-call
- * override) and ModelInfo catalog metadata (default pattern for a model).
- * ---------------------------------------------------------------------------
+ * Extracts a model's reasoning block from raw output, for families like Qwen3
+ * and LFM2 that wrap it in <think>...</think>. Used both per-call and as
+ * ModelInfo catalog metadata.
  */
 public class ThinkingTagPattern(
   /**
-   * Opening tag string. Default if empty: "<think>".
+   * Empty defaults to "<think>".
    */
   @field:WireField(
     tag = 1,
@@ -50,7 +47,7 @@ public class ThinkingTagPattern(
   )
   public val open_tag: String = "",
   /**
-   * Closing tag string. Default if empty: "</think>".
+   * Empty defaults to "</think>".
    */
   @field:WireField(
     tag = 2,

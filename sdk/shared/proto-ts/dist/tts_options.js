@@ -14,14 +14,6 @@ exports.tTSStreamEventKindToJSON = tTSStreamEventKindToJSON;
 const wire_1 = require("@bufbuild/protobuf/wire");
 const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * Voice gender — union across SDKs.
- * Sources pre-IDL:
- *   RN     TTSTypes.ts:117    ('male' | 'female' | 'neutral')
- * (Other SDKs did not expose voice listing pre-IDL; canonicalized here.)
- * ---------------------------------------------------------------------------
- */
 var TTSVoiceGender;
 (function (TTSVoiceGender) {
     TTSVoiceGender[TTSVoiceGender["TTS_VOICE_GENDER_UNSPECIFIED"] = 0] = "TTS_VOICE_GENDER_UNSPECIFIED";

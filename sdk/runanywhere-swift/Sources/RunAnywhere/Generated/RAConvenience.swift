@@ -455,16 +455,16 @@ extension RAVADConfiguration {
 extension RAVADConfiguration {
     /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
     public func validate() throws {
-        if sampleRate < 1 || sampleRate > 48000 {
+        if sampleRate < 8000 || sampleRate > 48000 {
             throw SDKException.validationFailed(
                 fieldPath: "VADConfiguration.sample_rate",
-                message: "sample_rate must be in 1...48000 (got \(sampleRate))"
+                message: "sample_rate must be in 8000...48000 (got \(sampleRate))"
             )
         }
-        if frameLengthMs < 1 || frameLengthMs > 1000 {
+        if frameLengthMs < 20 || frameLengthMs > 1000 {
             throw SDKException.validationFailed(
                 fieldPath: "VADConfiguration.frame_length_ms",
-                message: "frame_length_ms must be in 1...1000 (got \(frameLengthMs))"
+                message: "frame_length_ms must be in 20...1000 (got \(frameLengthMs))"
             )
         }
         if !activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0 {
@@ -473,10 +473,10 @@ extension RAVADConfiguration {
                 message: "activation_threshold must be in 0.0...1.0 (got \(activationThreshold))"
             )
         }
-        if !calibrationMultiplier.isFinite || calibrationMultiplier < 1.5 || calibrationMultiplier > 4.0 {
+        if !calibrationMultiplier.isFinite || calibrationMultiplier < 1.2 || calibrationMultiplier > 4.0 {
             throw SDKException.validationFailed(
                 fieldPath: "VADConfiguration.calibration_multiplier",
-                message: "calibration_multiplier must be in 1.5...4.0 (got \(calibrationMultiplier))"
+                message: "calibration_multiplier must be in 1.2...4.0 (got \(calibrationMultiplier))"
             )
         }
     }

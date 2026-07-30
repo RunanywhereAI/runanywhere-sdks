@@ -18,52 +18,19 @@ const model_types_1 = require("./model_types");
 const thinking_tag_pattern_1 = require("./thinking_tag_pattern");
 exports.protobufPackage = "runanywhere.v1";
 /**
- * ---------------------------------------------------------------------------
- * VLM image input format — union across all SDKs and the C ABI.
- *
- * SDK ↔ proto enum mapping pre-IDL:
- *   C ABI  / Kotlin / RN / Web all expose three numeric formats (FILE_PATH=0,
- *          RGB_PIXELS=1, BASE64=2). Mapped to FILE_PATH, RAW_RGB, BASE64.
- *   Swift  Format enum adds Apple-only cases uiImage / pixelBuffer that are
- *          flattened to RAW_RGB before crossing the C ABI (see VLMTypes.swift
- *          lines 70-89). RAW_RGBA is reserved for SDKs that pass straight
- *          RGBA pixel buffers without the BGRA→RGB downsample step.
- *   Dart   sealed class with the same three formats (filePath / rgbPixels /
- *          base64); Flutter adapter passes RGB pixels through to the C ABI.
- *
- * JPEG / PNG / WEBP are container hints carried in the encoded `bytes`
- * payload (no current SDK declares these as enum cases — they are
- * reserved here so we can disambiguate decoded vs encoded sources without a
- * schema migration once a backend exposes container detection).
- * ---------------------------------------------------------------------------
+ * The JPEG/PNG/WEBP and RAW_RGBA values are reserved: no backend detects
+ * containers yet, and no SDK passes straight RGBA. Swift's Apple-only uiImage
+ * and pixelBuffer cases flatten to RAW_RGB before crossing the C ABI.
  */
 var VLMImageFormat;
 (function (VLMImageFormat) {
     VLMImageFormat[VLMImageFormat["VLM_IMAGE_FORMAT_UNSPECIFIED"] = 0] = "VLM_IMAGE_FORMAT_UNSPECIFIED";
-    /** VLM_IMAGE_FORMAT_JPEG - reserved — encoded JPEG bytes */
     VLMImageFormat[VLMImageFormat["VLM_IMAGE_FORMAT_JPEG"] = 1] = "VLM_IMAGE_FORMAT_JPEG";
-    /** VLM_IMAGE_FORMAT_PNG - reserved — encoded PNG bytes */
     VLMImageFormat[VLMImageFormat["VLM_IMAGE_FORMAT_PNG"] = 2] = "VLM_IMAGE_FORMAT_PNG";
-    /** VLM_IMAGE_FORMAT_WEBP - reserved — encoded WebP bytes */
     VLMImageFormat[VLMImageFormat["VLM_IMAGE_FORMAT_WEBP"] = 3] = "VLM_IMAGE_FORMAT_WEBP";
-    /** VLM_IMAGE_FORMAT_RAW_RGB - Swift rgbPixels / Kotlin RGB_PIXELS / */
     VLMImageFormat[VLMImageFormat["VLM_IMAGE_FORMAT_RAW_RGB"] = 4] = "VLM_IMAGE_FORMAT_RAW_RGB";
-    /**
-     * VLM_IMAGE_FORMAT_RAW_RGBA - RN RGBPixels / Web RGBPixels /
-     * C ABI RAC_VLM_IMAGE_FORMAT_RGB_PIXELS
-     */
     VLMImageFormat[VLMImageFormat["VLM_IMAGE_FORMAT_RAW_RGBA"] = 5] = "VLM_IMAGE_FORMAT_RAW_RGBA";
-    /**
-     * VLM_IMAGE_FORMAT_BASE64 - (Swift UIImage path produces RGBA
-     * before downsample; pre-IDL no SDK
-     * exposes RGBA over the C ABI)
-     */
     VLMImageFormat[VLMImageFormat["VLM_IMAGE_FORMAT_BASE64"] = 6] = "VLM_IMAGE_FORMAT_BASE64";
-    /**
-     * VLM_IMAGE_FORMAT_FILE_PATH - Dart base64 / RN Base64 /
-     * Web Base64 /
-     * C ABI RAC_VLM_IMAGE_FORMAT_BASE64
-     */
     VLMImageFormat[VLMImageFormat["VLM_IMAGE_FORMAT_FILE_PATH"] = 7] = "VLM_IMAGE_FORMAT_FILE_PATH";
     VLMImageFormat[VLMImageFormat["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(VLMImageFormat || (exports.VLMImageFormat = VLMImageFormat = {}));
@@ -122,12 +89,6 @@ function vLMImageFormatToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-/**
- * ---------------------------------------------------------------------------
- * VLM model family for chat-template selection.
- * Mirrors rac_vlm_model_family_t.
- * ---------------------------------------------------------------------------
- */
 var VLMModelFamily;
 (function (VLMModelFamily) {
     VLMModelFamily[VLMModelFamily["VLM_MODEL_FAMILY_UNSPECIFIED"] = 0] = "VLM_MODEL_FAMILY_UNSPECIFIED";

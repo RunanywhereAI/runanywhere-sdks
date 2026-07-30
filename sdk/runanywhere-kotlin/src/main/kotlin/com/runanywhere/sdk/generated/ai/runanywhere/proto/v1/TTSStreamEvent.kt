@@ -96,8 +96,7 @@ public class TTSStreamEvent(
   )
   public val error_code: Int = 0,
   /**
-   * Progress metadata for started/progress/audio_chunk/completed events.
-   * progress is 0.0..1.0 when known; total_chunks=0 means unknown.
+   * progress is 0.0-1.0 when known; total_chunks 0 = unknown.
    */
   @field:WireField(
     tag = 10,

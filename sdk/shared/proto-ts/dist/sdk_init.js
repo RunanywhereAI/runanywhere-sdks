@@ -14,21 +14,14 @@ exports.sdkInitEnvironmentToJSON = sdkInitEnvironmentToJSON;
 const wire_1 = require("@bufbuild/protobuf/wire");
 const errors_1 = require("./errors");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * Phase identifiers — used by SdkInitResult.phase to indicate which phase the
- * result describes. Mirrors the SDK_INIT_* analytics events (started /
- * completed / failed) that exist in sdk_events.proto.
- * ---------------------------------------------------------------------------
- */
 var SdkInitPhase;
 (function (SdkInitPhase) {
     SdkInitPhase[SdkInitPhase["SDK_INIT_PHASE_UNSPECIFIED"] = 0] = "SDK_INIT_PHASE_UNSPECIFIED";
-    /** SDK_INIT_PHASE_ONE - Synchronous core init (~1-5ms, no network) */
+    /** SDK_INIT_PHASE_ONE - Synchronous core init, no network */
     SdkInitPhase[SdkInitPhase["SDK_INIT_PHASE_ONE"] = 1] = "SDK_INIT_PHASE_ONE";
-    /** SDK_INIT_PHASE_TWO - Async services init (~100-500ms, network) */
+    /** SDK_INIT_PHASE_TWO - Async services init, network */
     SdkInitPhase[SdkInitPhase["SDK_INIT_PHASE_TWO"] = 2] = "SDK_INIT_PHASE_TWO";
-    /** SDK_INIT_PHASE_RETRY_HTTP - HTTP/auth retry after offline init */
+    /** SDK_INIT_PHASE_RETRY_HTTP - HTTP/auth retry after an offline init */
     SdkInitPhase[SdkInitPhase["SDK_INIT_PHASE_RETRY_HTTP"] = 3] = "SDK_INIT_PHASE_RETRY_HTTP";
     SdkInitPhase[SdkInitPhase["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(SdkInitPhase || (exports.SdkInitPhase = SdkInitPhase = {}));
@@ -68,13 +61,8 @@ function sdkInitPhaseToJSON(object) {
     }
 }
 /**
- * ---------------------------------------------------------------------------
- * Environment values — must match RAC_ENV_* in
- * sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
- * (development=0, production=2). Numeric values are part of the wire format;
- * do not reorder. Number 1 was formerly SDK_INIT_ENVIRONMENT_STAGING and is
- * reserved so PRODUCTION stays at 2 (shipped commons / xcframework layout).
- * ---------------------------------------------------------------------------
+ * PRODUCTION is 2 because 1 was a staging value in shipped commons and
+ * xcframework builds. Do not renumber.
  */
 var SdkInitEnvironment;
 (function (SdkInitEnvironment) {

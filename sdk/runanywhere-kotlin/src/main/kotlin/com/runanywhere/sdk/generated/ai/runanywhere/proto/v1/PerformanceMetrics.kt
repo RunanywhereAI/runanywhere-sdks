@@ -30,16 +30,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Aggregated performance metrics for a generation (Web SDK
- * PerformanceMetrics in types/models.ts:57). Higher-level summary that
- * rolls up the timing fields scattered across LLMGenerationResult.
- * ---------------------------------------------------------------------------
+ * Referenced only by LLMGenerationResult.performance, which no SDK reads.
  */
 public class PerformanceMetrics(
-  /**
-   * Total latency from request to last token, in milliseconds.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -48,9 +41,6 @@ public class PerformanceMetrics(
     schemaIndex = 0,
   )
   public val latency_ms: Long = 0L,
-  /**
-   * Peak memory used by the inference engine, in bytes.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -59,9 +49,6 @@ public class PerformanceMetrics(
     schemaIndex = 1,
   )
   public val memory_bytes: Long = 0L,
-  /**
-   * Decode throughput in tokens/second.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -70,9 +57,6 @@ public class PerformanceMetrics(
     schemaIndex = 2,
   )
   public val throughput_tokens_per_sec: Float = 0f,
-  /**
-   * Input (prompt) token count.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -81,9 +65,6 @@ public class PerformanceMetrics(
     schemaIndex = 3,
   )
   public val input_tokens: Int = 0,
-  /**
-   * Output (completion) token count.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

@@ -7,52 +7,9 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { SDKError } from "./errors";
+import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
-
-/**
- * Raw PCM encodings accepted at the SDK boundary. Commons validates complete
- * sample frames and normalizes either representation to float samples before
- * dispatching to an engine.
- */
-export enum DiarizationAudioEncoding {
-  DIARIZATION_AUDIO_ENCODING_UNSPECIFIED = 0,
-  DIARIZATION_AUDIO_ENCODING_PCM_F32_LE = 1,
-  DIARIZATION_AUDIO_ENCODING_PCM_S16_LE = 2,
-  UNRECOGNIZED = -1,
-}
-
-export function diarizationAudioEncodingFromJSON(object: any): DiarizationAudioEncoding {
-  switch (object) {
-    case 0:
-    case "DIARIZATION_AUDIO_ENCODING_UNSPECIFIED":
-      return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_UNSPECIFIED;
-    case 1:
-    case "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE":
-      return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
-    case 2:
-    case "DIARIZATION_AUDIO_ENCODING_PCM_S16_LE":
-      return DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return DiarizationAudioEncoding.UNRECOGNIZED;
-  }
-}
-
-export function diarizationAudioEncodingToJSON(object: DiarizationAudioEncoding): string {
-  switch (object) {
-    case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_UNSPECIFIED:
-      return "DIARIZATION_AUDIO_ENCODING_UNSPECIFIED";
-    case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE:
-      return "DIARIZATION_AUDIO_ENCODING_PCM_F32_LE";
-    case DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE:
-      return "DIARIZATION_AUDIO_ENCODING_PCM_S16_LE";
-    case DiarizationAudioEncoding.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
 
 export enum DiarizationStreamEventKind {
   DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED = 0,
@@ -107,8 +64,14 @@ export function diarizationStreamEventKindToJSON(object: DiarizationStreamEventK
 
 export interface DiarizationOptions {
   sampleRate?: number | undefined;
-  channels?: number | undefined;
-  encoding?: DiarizationAudioEncoding | undefined;
+  channels?:
+    | number
+    | undefined;
+  /**
+   * Commons normalizes either PCM representation to float samples before
+   * dispatching to an engine.
+   */
+  encoding?: AudioEncoding | undefined;
   threshold?: number | undefined;
   minimumDurationMs: number;
   mergeGapMs: number;
@@ -254,7 +217,7 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
         ? globalThis.Number(object.sample_rate)
         : undefined,
       channels: isSet(object.channels) ? globalThis.Number(object.channels) : undefined,
-      encoding: isSet(object.encoding) ? diarizationAudioEncodingFromJSON(object.encoding) : undefined,
+      encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : undefined,
       threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : undefined,
       minimumDurationMs: isSet(object.minimumDurationMs)
         ? globalThis.Number(object.minimumDurationMs)
@@ -278,7 +241,7 @@ export const DiarizationOptions: MessageFns<DiarizationOptions> = {
       obj.channels = Math.round(message.channels);
     }
     if (message.encoding !== undefined) {
-      obj.encoding = diarizationAudioEncodingToJSON(message.encoding);
+      obj.encoding = audioEncodingToJSON(message.encoding);
     }
     if (message.threshold !== undefined) {
       obj.threshold = message.threshold;

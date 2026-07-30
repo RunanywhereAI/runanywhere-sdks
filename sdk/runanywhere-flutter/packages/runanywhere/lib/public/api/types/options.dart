@@ -17,6 +17,8 @@ import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
     show AudioFormat, InferenceFramework;
+// Prefixed because the public API declares its own AudioEncoding.
+import 'package:runanywhere/generated/model_types.pbenum.dart' as model_pb;
 import 'package:runanywhere/generated/rag.pb.dart' show RAGConfiguration;
 import 'package:runanywhere/generated/segmentation.pb.dart' as seg_pb;
 import 'package:runanywhere/generated/structured_output.pb.dart'
@@ -612,10 +614,8 @@ class DiarizationOptions {
           : defaults.sampleRate,
       channels: audio.format.channels,
       encoding: audio.format.encoding == AudioEncoding.pcm16
-          ? diar_pb.DiarizationAudioEncoding
-                .DIARIZATION_AUDIO_ENCODING_PCM_S16_LE
-          : diar_pb.DiarizationAudioEncoding
-                .DIARIZATION_AUDIO_ENCODING_PCM_F32_LE,
+          ? model_pb.AudioEncoding.AUDIO_ENCODING_PCM_S16_LE
+          : model_pb.AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
       threshold: threshold ?? defaults.threshold,
     );
     if (minimumDurationMs != null) {

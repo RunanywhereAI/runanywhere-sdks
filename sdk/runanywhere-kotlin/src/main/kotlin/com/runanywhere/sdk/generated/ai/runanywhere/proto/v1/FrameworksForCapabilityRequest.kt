@@ -29,12 +29,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Request: ask commons which frameworks can serve a given SDK component.
- * Maps to the engine-router plugin registry (not the model registry); this
- * answers "which engines CAN run this capability on this host" independent
- * of whether any matching model has been registered yet.
- * ---------------------------------------------------------------------------
+ * Answers "which engines can run this capability on this host", from the
+ * engine-router plugin registry rather than the model registry, so it is
+ * independent of whether a matching model is registered.
  */
 public class FrameworksForCapabilityRequest(
   @field:WireField(

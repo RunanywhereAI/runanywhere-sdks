@@ -31,12 +31,8 @@ import kotlin.collections.List
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Response: ordered list of inference frameworks. Ordering matches the
- * engine-router's priority-descending scan of registered plugins for the
- * primitive(s) mapped from `component`. Duplicates are removed while
- * preserving first-seen order.
- * ---------------------------------------------------------------------------
+ * Ordered by the router's priority-descending scan of registered plugins.
+ * Duplicates removed, first-seen order preserved.
  */
 public class FrameworksForCapabilityResponse(
   frameworks: List<InferenceFramework> = emptyList(),

@@ -199,9 +199,7 @@ public struct LlmOptions: Sendable {
         case .none:
             options.toolChoice = RAToolChoiceMode.none
         case .required:
-            // Commons has no REQUIRED mode; SPECIFIC without a name is the
-            // closest honest mapping (any registered tool must be called).
-            options.toolChoice = .auto
+            options.toolChoice = .required
         case .forced(let name):
             options.toolChoice = .specific
             options.forcedToolName = name
@@ -460,7 +458,7 @@ public struct DiarizationOptions: Sendable {
     func toProto(
         sampleRate: Int,
         channels: Int,
-        encoding: RADiarizationAudioEncoding
+        encoding: RAAudioEncoding
     ) -> RADiarizationOptions {
         var proto = RADiarizationOptions.defaults()
         if sampleRate > 0 { proto.sampleRate = Int32(sampleRate) }

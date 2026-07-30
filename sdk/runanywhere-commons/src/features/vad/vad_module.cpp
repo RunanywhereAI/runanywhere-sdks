@@ -1456,7 +1456,7 @@ rac_result_t decode_vad_samples(const runanywhere::v1::VADAudioSource& audio,
     const std::string& bytes = audio.audio_data();
     out->clear();
     switch (audio.encoding()) {
-        case runanywhere::v1::VAD_AUDIO_ENCODING_PCM_S16_LE: {
+        case runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE: {
             if (bytes.size() % sizeof(int16_t) != 0) {
                 return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
                                                   "VAD PCM_S16_LE audio byte length is invalid");
@@ -1472,8 +1472,8 @@ rac_result_t decode_vad_samples(const runanywhere::v1::VADAudioSource& audio,
             }
             return RAC_SUCCESS;
         }
-        case runanywhere::v1::VAD_AUDIO_ENCODING_UNSPECIFIED:
-        case runanywhere::v1::VAD_AUDIO_ENCODING_PCM_F32_LE: {
+        case runanywhere::v1::AUDIO_ENCODING_UNSPECIFIED:
+        case runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE: {
             if (bytes.size() % sizeof(float) != 0) {
                 return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
                                                   "VAD PCM_F32_LE audio byte length is invalid");

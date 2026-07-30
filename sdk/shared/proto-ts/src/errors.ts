@@ -10,33 +10,9 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 export const protobufPackage = "runanywhere.v1";
 
 /**
- * ---------------------------------------------------------------------------
- * ErrorCategory — coarse-grained logical grouping for filtering / analytics.
- *
- * This is the union of all categories declared across SDKs, condensed to the
- * minimum stable set. The task spec pins a 9-case enum (UNSPECIFIED, NETWORK,
- * VALIDATION, MODEL, COMPONENT, IO, AUTH, INTERNAL, CONFIGURATION); that set
- * covers every category currently in use except for the per-modality ones
- * (STT, TTS, LLM, VAD, VLM, etc.) which are intentionally folded into
- * COMPONENT. Per-modality routing is recovered at runtime from the source
- * of the failure (the `c_abi_code` numeric value uniquely identifies the
- * component) and from `ErrorContext.operation` — there is no need to encode
- * modality twice.
- *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:46  rac_error_category_t — 15 cases incl.
- *                                      stt/tts/llm/vad/vlm/etc.
- *   Swift   ErrorCategory.swift:11     16 cases incl. rag.
- *   Kotlin  ErrorCategory.kt:19        18 cases incl. CONFIGURATION,
- *                                      INITIALIZATION, FILE_RESOURCE,
- *                                      OPERATION, PLATFORM (no per-modality).
- *   Dart    error_category.dart:3      27 cases (superset).
- *   RN      ErrorCategory.ts:10        12 cases.
- *   Web     ErrorTypes.ts              (none — only SDKErrorCode exists).
- *
- * The drift here is severe — every SDK uses a different category vocabulary.
- * Codegen MUST collapse to the 9 canonical buckets below.
- * ---------------------------------------------------------------------------
+ * Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
+ * into COMPONENT; the modality is recoverable from c_abi_code and
+ * ErrorContext.operation, so it is not encoded twice.
  */
 export enum ErrorCategory {
   ERROR_CATEGORY_UNSPECIFIED = 0,
@@ -179,35 +155,13 @@ export function errorSeverityToJSON(object: ErrorSeverity): string {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * ErrorCode — exhaustive enumeration of every distinct numeric error code in
- * the C ABI (`rac_result_t`).
+ * proto3 forbids negative enum values, so each constant is the absolute
+ * magnitude of its C ABI code: ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>).
+ * SDKError.c_abi_code carries the signed original.
  *
- * proto3 forbids negative enum values, so the proto enum holds POSITIVE
- * values that mirror the *absolute* magnitude of each C ABI code. The signed
- * `rac_result_t` numeric value is preserved on `SDKError.c_abi_code` so
- * platforms can round-trip the original C ABI integer. The naming scheme is:
- *
- *     ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>)
- *
- * (e.g. RAC_ERROR_MODEL_NOT_FOUND = -110 → ERROR_CODE_MODEL_NOT_FOUND = 110)
- *
- * `ERROR_CODE_UNSPECIFIED = 0` covers proto3's required zero-default; the
- * C ABI's `RAC_SUCCESS = 0` is NOT an error and MUST NOT appear inside an
- * SDKError.code (an SDKError implies a failure; success is signalled by the
- * absence of an SDKError). The zero-value enum entry exists only because
- * proto3 mandates it.
- *
- * CRITICAL: Do not change the numeric values without coordinated
- * migrations across every SDK *and* the C ABI. Adding new values is safe;
- * removing or renumbering is a wire-format break.
- *
- * All values below are sourced from
- * `sdk/runanywhere-commons/include/rac/core/rac_error.h`. Aliases (codes
- * where the C ABI defines two distinct macro names for the same numeric
- * value) are documented inline; we pick one canonical name per numeric value
- * to keep proto enum values unique.
- * ---------------------------------------------------------------------------
+ * The trailing macro names below are kept because they are the cross-reference
+ * into rac_error.h; where the C ABI defines two names for one value, the alias
+ * is noted.
  */
 export enum ErrorCode {
   ERROR_CODE_UNSPECIFIED = 0,
@@ -1144,66 +1098,26 @@ export function errorCodeToJSON(object: ErrorCode): string {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * ErrorContext — debugging metadata captured at the throw site.
- *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:102  rac_error_t fields source_file,
- *                                       source_line, source_function plus a
- *                                       rac_stack_frame_t[32] fixed-size
- *                                       stack capture and 3 custom k/v slots
- *                                       (custom_key1..3 / custom_value1..3).
- *                                       The fixed-shape custom slots flatten
- *                                       to a `metadata` map<string,string> in
- *                                       proto.
- *   Swift   ErrorContext.swift          (matches Dart equivalent).
- *   Kotlin  SDKError.kt                 No ErrorContext — uses Throwable.cause
- *                                       only. Will pick up source location
- *                                       from this proto on regeneration.
- *   Dart    error_context.dart:4        StackTrace? stackTrace, String file,
- *                                       int line, String function, DateTime
- *                                       timestamp, String threadInfo.
- *   RN      ErrorContext.ts:11          stackTrace[], file, line, function,
- *                                       timestamp, threadInfo.
- *   Web     ErrorTypes.ts               (no context type).
- *
- * Stack traces are intentionally NOT modeled here — they are platform-shaped
- * (string lines on RN/Dart, rac_stack_frame_t[] on C, StackTrace on Dart) and
- * belong in a platform-local logging path, not in the wire IDL. If the C ABI
- * ever ships symbolicated frames, add a `repeated StackFrame frames` field
- * guarded by a feature flag.
- * ---------------------------------------------------------------------------
+ * Debugging metadata captured at the throw site. Stack traces are deliberately
+ * absent: they are platform-shaped and belong in platform-local logging.
  */
 export interface ErrorContext {
-  /**
-   * Free-form key/value pairs for telemetry tagging. Maps onto the C ABI's
-   * three custom_key/custom_value slots and Dart's `Map<String, dynamic>`
-   * (after string-coercion).
-   */
+  /** Telemetry tagging. */
   metadata: { [key: string]: string };
-  /** __FILE__ at the throw site. C ABI cap is RAC_MAX_METADATA_STRING (256). */
-  sourceFile?:
-    | string
-    | undefined;
-  /** __LINE__ at the throw site. */
+  sourceFile?: string | undefined;
   sourceLine?:
     | number
     | undefined;
   /**
-   * Logical operation name ("loadModel", "generate", "transcribeStream",
-   * ...). Lets clients route on operation without parsing free-text.
-   * Maps roughly onto Dart's `function` field and C ABI's source_function;
-   * we use the more generic "operation" name because some platforms (C++,
-   * Swift) symbolicate the function name from the stack frame instead.
+   * Logical operation ("loadModel", "generate", "transcribeStream"), so
+   * clients can route without parsing free text.
    */
   operation?:
     | string
     | undefined;
   /**
-   * The structured field path a validation error refers to
-   * ("<Message>.<field>"). First-class replacement for the
-   * metadata["field_path"] magic key all five SDKs read/write today; the
-   * generated convenience validate() already emits this path.
+   * "<Message>.<field>" for validation errors. The generated validate()
+   * emits this.
    */
   fieldPath?: string | undefined;
 }
@@ -1214,53 +1128,11 @@ export interface ErrorContext_MetadataEntry {
 }
 
 /**
- * ---------------------------------------------------------------------------
- * SDKError — the unified error payload every SDK throws / returns.
+ * The unified error payload every SDK throws or returns.
  *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:102  rac_error_t (code, category, message,
- *                                       source location, stack trace,
- *                                       underlying_code, underlying_message,
- *                                       model_id, framework, session_id,
- *                                       timestamp_ms, 3 custom k/v slots).
- *   Swift   (no concrete SDKError type was located; Swift code uses
- *           ErrorCode + ErrorCategory + a SDKErrorProtocol shape that
- *           matches this message; the migrated Swift SDK in sdk/swift/ will
- *           be regenerated from this proto).
- *   Kotlin  SDKError.kt:27              data class (code, category, message,
- *                                       cause).
- *   Dart    sdk_error.dart:13           class SDKError (message, type,
- *                                       underlyingError, context).
- *   RN      SDKError.ts:147             class SDKError (code, legacyCode?,
- *                                       category, underlyingError, context,
- *                                       details?).
- *   Web     ErrorTypes.ts:68            class SDKError (code, details?).
- *
- * Wire contract:
- *   * `code` — required. Always non-zero (zero indicates success and there
- *     should be no SDKError to begin with). Codegen MUST refuse to emit
- *     ERROR_CODE_UNSPECIFIED at runtime.
- *   * `category` — required. Coarse routing bucket. May be UNSPECIFIED only
- *     when `code` itself doesn't fit any bucket cleanly (rare).
- *   * `message` — required, human-readable, non-localized. Localization is a
- *     consumer concern.
- *   * `context` — optional. Source location + telemetry metadata.
- *   * `c_abi_code` — optional. Negative `rac_result_t` integer from the C ABI
- *     (e.g. -110 for MODEL_NOT_FOUND). Allows lossless round-trip with the
- *     C ABI even when intermediate platforms (Kotlin, Dart, RN) use a
- *     positive-numbered local enum. If `code` is set, `c_abi_code` MUST
- *     equal `-int32(code)` for codes ≤ 899; for the Web-only WASM codes
- *     (≥ 900) `c_abi_code` is unset because no canonical C ABI value exists.
- *   * `nested_message` — optional. Underlying-error message as captured at
- *     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
- *     and Kotlin's Throwable.cause.message.
- *   * `retryable` — canonical retry hint. This is business-policy metadata
- *     owned by the portable layer; the platform adapter still decides how to
- *     schedule the retry through native/background APIs when appropriate.
- *   * `correlation_id` — stable cross-event/request correlation key. SDKEvent
- *     also carries this field so callers can join success/progress/failure
- *     events without parsing free-form properties.
- * ---------------------------------------------------------------------------
+ * `code` is always non-zero: an SDKError implies failure, and success is
+ * signalled by its absence. `message` is non-localized; localization is a
+ * consumer concern.
  */
 export interface SDKError {
   code: ErrorCode;
@@ -1270,21 +1142,20 @@ export interface SDKError {
     | ErrorContext
     | undefined;
   /**
-   * Negative rac_result_t value from the C ABI. May be negative; preserved
-   * via int32 (proto3 int32 is signed). Unset when the failure originated
-   * outside the C ABI (e.g. a pure-Web WASM failure).
+   * Signed rac_result_t. Equals -code for codes <= 899. Unset for the
+   * Web-only WASM codes (>= 900), which have no C ABI counterpart, and for
+   * failures originating outside the C ABI.
    */
   cAbiCode?:
     | number
     | undefined;
-  /** Underlying error's message (the "caused by" chain), if any. */
+  /** The "caused by" chain. */
   nestedMessage?:
     | string
     | undefined;
   /**
-   * Envelope metadata for canonical error emission. `component` is a stable
-   * lowercase component key ("llm", "stt", "tts", "vad", "vlm", "rag",
-   * "download", "storage", ...); SDKEvent carries the enum-typed component.
+   * `component` is a stable lowercase key ("llm", "stt", "rag", "download").
+   * SDKEvent carries the enum-typed component instead.
    */
   timestampMs: number;
   severity: ErrorSeverity;

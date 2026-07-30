@@ -16,17 +16,6 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * JSON Schema primitive type — union across SDKs.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:12     ('string'|'number'|'integer'|
- *                                        'boolean'|'object'|'array'|'null')
- *   Web (delegates to llamacpp pkg; no own enum)
- *   Swift / Kotlin / Dart represent schema as a serialized JSON string today,
- *     so this enum canonicalizes the RN-defined union.
- * ---------------------------------------------------------------------------
- */
 public enum class JSONSchemaType(
   override val `value`: Int,
 ) : WireEnum {

@@ -48,21 +48,10 @@ function render(vars) {
         tpl.replace(/\{#[\s\S]*?#\}\\n?/g, ''));
 }
 const tuples = [
+    // Only the wrappers RN and Web actually import. The other nine
+    // server-streaming RPCs were generated and never consumed.
     ['VoiceAgent',       'voice_agent',       'VoiceAgentRequest',          'VoiceEvent',                  'Stream',         '../voice_agent_service', '../voice_events'],
     ['LLM',              'llm',               'LLMGenerateRequest',         'LLMStreamEvent',              'Generate',       '../llm_service',         '../llm_service'],
-    ['Download',         'download',          'DownloadSubscribeRequest',   'DownloadProgress',            'Subscribe',      '../download_service',    '../download_service'],
-    // Generate AsyncIterable wrappers for the remaining
-    // 9 server-streaming RPCs so RN and Web consumers can consume them
-    // through the same generated pattern as VoiceAgent / LLM / Download.
-    ['VLM',              'vlm',               'VLMGenerationRequest',       'VLMStreamEvent',              'Stream',         '../vlm_options',         '../vlm_options'],
-    ['STT',              'stt',               'STTTranscriptionRequest',    'STTStreamEvent',              'Stream',         '../stt_options',         '../stt_options'],
-    ['TTS',              'tts',               'TTSSynthesisRequest',        'TTSStreamEvent',              'Stream',         '../tts_options',         '../tts_options'],
-    ['VAD',              'vad',               'VADProcessRequest',          'VADStreamEvent',              'Stream',         '../vad_options',         '../vad_options'],
-    ['Chat',             'chat',              'ChatGenerationRequest',      'ChatStreamEvent',             'Stream',         '../chat',                '../chat'],
-    ['Diffusion',        'diffusion',         'DiffusionGenerationRequest', 'DiffusionStreamEvent',        'Stream',         '../diffusion_options',   '../diffusion_options'],
-    ['RAG',              'rag',               'RAGQueryRequest',            'RAGStreamEvent',              'Stream',         '../rag',                 '../rag'],
-    ['SDKEvents',        'sdk_events',        'SDKEventSubscribeRequest',   'SDKEvent',                    'Subscribe',      '../sdk_events',          '../sdk_events'],
-    ['StructuredOutput', 'structured_output', 'StructuredOutputRequest',    'StructuredOutputStreamEvent', 'GenerateStream', '../structured_output',   '../structured_output'],
 ];
 // Derive source_proto from request_module: '../voice_agent_service' ->
 // 'idl/voice_agent_service.proto'. Previously the Nunjucks template

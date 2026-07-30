@@ -29,16 +29,16 @@ export const vADConfigurationDefaults = (): VADConfiguration => ({
 });
 
 export const validateVADConfiguration = (m: VADConfiguration): void => {
-  if (m.sampleRate < 1 || m.sampleRate > 48000) {
+  if (m.sampleRate < 8000 || m.sampleRate > 48000) {
     throw new ValidationError({
       fieldPath: 'VADConfiguration.sample_rate',
-      message: `sample_rate must be in 1...48000 (got ${m.sampleRate})`,
+      message: `sample_rate must be in 8000...48000 (got ${m.sampleRate})`,
     });
   }
-  if (m.frameLengthMs < 1 || m.frameLengthMs > 1000) {
+  if (m.frameLengthMs < 20 || m.frameLengthMs > 1000) {
     throw new ValidationError({
       fieldPath: 'VADConfiguration.frame_length_ms',
-      message: `frame_length_ms must be in 1...1000 (got ${m.frameLengthMs})`,
+      message: `frame_length_ms must be in 20...1000 (got ${m.frameLengthMs})`,
     });
   }
   if (!Number.isFinite(m.activationThreshold) || m.activationThreshold < 0.0 || m.activationThreshold > 1.0) {
@@ -47,10 +47,10 @@ export const validateVADConfiguration = (m: VADConfiguration): void => {
       message: `activation_threshold must be in 0.0...1.0 (got ${m.activationThreshold})`,
     });
   }
-  if (!Number.isFinite(m.calibrationMultiplier) || m.calibrationMultiplier < 1.5 || m.calibrationMultiplier > 4.0) {
+  if (!Number.isFinite(m.calibrationMultiplier) || m.calibrationMultiplier < 1.2 || m.calibrationMultiplier > 4.0) {
     throw new ValidationError({
       fieldPath: 'VADConfiguration.calibration_multiplier',
-      message: `calibration_multiplier must be in 1.5...4.0 (got ${m.calibrationMultiplier})`,
+      message: `calibration_multiplier must be in 1.2...4.0 (got ${m.calibrationMultiplier})`,
     });
   }
 };

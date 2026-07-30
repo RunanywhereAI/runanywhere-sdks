@@ -33,22 +33,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Final STT output.
- * Sources pre-IDL:
- *   Swift  STTTypes.swift:147          STTOutput (text, conf, words, lang, alts, meta, ts)
- *   Kotlin STTTypes.kt:100             STTOutput (text, conf, words, lang, alts, meta, ts)
- *   Dart   generation_types.dart:218   STTResult / STTOutput (text, conf, durMs, lang, words, alts, meta, ts)
- *   RN     STTTypes.ts:32              STTOutput (text, conf, words, lang, alts, meta)
- *   Web    STTTypes.ts:9               STTTranscriptionResult (text, conf, lang, procMs, words)
- *   C ABI  rac_stt_types.h:338         rac_stt_output_t (text, conf, words, lang, alts, meta, ts_ms)
- *
- * Drift reconciled:
- *   - language: detected language. Promoted to STTLanguage enum.
- *   - durationMs (Dart) / processingTimeMs (Web) → captured in metadata.
- * ---------------------------------------------------------------------------
- */
 public class STTOutput(
   @field:WireField(
     tag = 1,
@@ -65,7 +49,7 @@ public class STTOutput(
   )
   public val confidence: Float = 0f,
   /**
-   * Detected language, BCP-47 (preserves regional variants). Empty = unknown.
+   * Detected language, BCP-47. Empty = unknown.
    */
   @field:WireField(
     tag = 14,
@@ -83,7 +67,7 @@ public class STTOutput(
   )
   public val metadata: TranscriptionMetadata? = null,
   /**
-   * Wall-clock output timestamp in milliseconds since Unix epoch.
+   * Milliseconds since epoch.
    */
   @field:WireField(
     tag = 8,
@@ -94,7 +78,6 @@ public class STTOutput(
   )
   public val timestamp_ms: Long = 0L,
   /**
-   * Audio duration in milliseconds for SDKs that expose duration directly.
    * Often duplicates metadata.audio_length_ms.
    */
   @field:WireField(
@@ -106,9 +89,6 @@ public class STTOutput(
   )
   public val duration_ms: Long = 0L,
   speaker_ids: List<String> = emptyList(),
-  /**
-   * Terminal error details for result-envelope APIs.
-   */
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -125,7 +105,7 @@ public class STTOutput(
   )
   public val error_code: Int = 0,
   /**
-   * Segment index for long-running/streaming transcription.
+   * For long-running or streaming transcription.
    */
   @field:WireField(
     tag = 13,
@@ -154,9 +134,6 @@ public class STTOutput(
   public val alternatives: List<TranscriptionAlternative> =
       immutableCopyOf("alternatives", alternatives)
 
-  /**
-   * Diarization summary when available.
-   */
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

@@ -30,17 +30,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Hard filter — drops a candidate from consideration when the predicate
- * fails. Filters compose with AND semantics. The wire kinds match
- * thoughts/file.txt's Routing Conditions list verbatim.
- * ---------------------------------------------------------------------------
+ * A candidate must pass every hard filter to stay in the running.
  */
 public class HybridFilter(
-  /**
-   * True iff the host has working network. Disqualifies online
-   * candidates when false; offline candidates are unaffected.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -49,8 +41,7 @@ public class HybridFilter(
   )
   public val network: Boolean? = null,
   /**
-   * Discrete quality tier required from the candidate. Candidates
-   * declaring a lower tier in their descriptor are filtered out.
+   * Documented as a no-op in the Dart policy.
    */
   @field:WireField(
     tag = 3,
@@ -60,10 +51,6 @@ public class HybridFilter(
     schemaIndex = 1,
   )
   public val quality_tier: Int? = null,
-  /**
-   * Disqualifies cloud candidates when the device is below the
-   * given battery percent (0–100).
-   */
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.BatteryFilter#ADAPTER",
@@ -71,10 +58,6 @@ public class HybridFilter(
     schemaIndex = 2,
   )
   public val battery: BatteryFilter? = null,
-  /**
-   * Caller-supplied predicate, evaluated host-side via the
-   * registered custom-filter callback table.
-   */
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.CustomFilter#ADAPTER",

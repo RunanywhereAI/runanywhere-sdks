@@ -565,7 +565,7 @@ int main() {
 
     request.Clear();
     request.set_audio_data(std::string(1, '\0'));
-    request.mutable_options()->set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE);
+    request.mutable_options()->set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
     (void)request.SerializeToString(&request_bytes);
     CHECK(rac_diarization_component_diarize_proto(
               component, reinterpret_cast<const uint8_t*>(request_bytes.data()),
@@ -678,7 +678,7 @@ int main() {
     }
     {
         runanywhere::v1::DiarizationOptions opts;
-        opts.set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_UNSPECIFIED);
+        opts.set_encoding(runanywhere::v1::AUDIO_ENCODING_UNSPECIFIED);
         CHECK(diarize_options_rc(opts) == RAC_ERROR_AUDIO_FORMAT_NOT_SUPPORTED,
               "offline diarize rejects an unspecified audio encoding");
     }
@@ -688,7 +688,7 @@ int main() {
     request.Clear();
     request.set_audio_data(s16le(16384) + s16le(-16384));
     request.mutable_options()->set_encoding(
-        runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE);
+        runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
     (void)request.SerializeToString(&request_bytes);
     CHECK(rac_diarization_component_diarize_proto(
               component, reinterpret_cast<const uint8_t*>(request_bytes.data()),
@@ -838,7 +838,7 @@ int main() {
     }
     {
         runanywhere::v1::DiarizationOptions unsupported_enc;
-        unsupported_enc.set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_UNSPECIFIED);
+        unsupported_enc.set_encoding(runanywhere::v1::AUDIO_ENCODING_UNSPECIFIED);
         std::string unsupported_enc_bytes;
         (void)unsupported_enc.SerializeToString(&unsupported_enc_bytes);
         uint64_t unsupported_enc_session = 777;
@@ -853,7 +853,7 @@ int main() {
     // ---- S16-configured stream: stored encoding drives feed decode ----------
     {
         runanywhere::v1::DiarizationOptions s16_opts;
-        s16_opts.set_encoding(runanywhere::v1::DIARIZATION_AUDIO_ENCODING_PCM_S16_LE);
+        s16_opts.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_S16_LE);
         std::string s16_opts_bytes;
         (void)s16_opts.SerializeToString(&s16_opts_bytes);
         uint64_t s16_session = 0;

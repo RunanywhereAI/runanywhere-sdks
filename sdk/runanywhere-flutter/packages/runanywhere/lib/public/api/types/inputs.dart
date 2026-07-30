@@ -8,17 +8,15 @@ import 'dart:typed_data';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/chat.pb.dart' as chat_pb;
 import 'package:runanywhere/generated/chat.pbenum.dart' show MessageRole;
+// Prefixed because the public API declares its own AudioEncoding.
+import 'package:runanywhere/generated/model_types.pbenum.dart' as model_pb;
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/segmentation.pb.dart' as seg_pb;
 import 'package:runanywhere/generated/segmentation.pbenum.dart'
     show SegmentationPixelFormat;
 import 'package:runanywhere/generated/stt_options.pb.dart'
     show STTAudioSource;
-import 'package:runanywhere/generated/stt_options.pbenum.dart'
-    show STTAudioEncoding;
 import 'package:runanywhere/generated/vad_options.pb.dart' show VADAudioSource;
-import 'package:runanywhere/generated/vad_options.pbenum.dart'
-    show VADAudioEncoding;
 import 'package:runanywhere/generated/vlm_options.pb.dart' as vlm_pb;
 
 /// Sample encoding of the bytes carried by an [AudioInput].
@@ -139,22 +137,22 @@ class AudioInput {
   VADAudioSource toVadSource() => VADAudioSource(
     audioData: bytes,
     encoding: format.encoding == AudioEncoding.float32
-        ? VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE
-        : VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_S16_LE,
+        ? model_pb.AudioEncoding.AUDIO_ENCODING_PCM_F32_LE
+        : model_pb.AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
     sampleRate: format.sampleRate > 0
         ? format.sampleRate
         : RADefaultsAudioCapture.micSampleRateHz,
     channels: format.channels,
   );
 
-  STTAudioEncoding get _sttEncoding {
+  model_pb.AudioEncoding get _sttEncoding {
     switch (format.encoding) {
       case AudioEncoding.pcm16:
-        return STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE;
+        return model_pb.AudioEncoding.AUDIO_ENCODING_PCM_S16_LE;
       case AudioEncoding.float32:
-        return STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE;
+        return model_pb.AudioEncoding.AUDIO_ENCODING_PCM_F32_LE;
       case AudioEncoding.container:
-        return STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER;
+        return model_pb.AudioEncoding.AUDIO_ENCODING_CONTAINER;
     }
   }
 

@@ -300,11 +300,6 @@ message ComponentLifecycleSnapshot {
     ModelInfo               model         = 10;
 }
 
-message ComponentLifecycleSnapshotRequest {
-    SDKComponent component = 1;
-    bool         include_model = 2;
-}
-
 message ComponentLifecycleSnapshotResult {
     bool success = 1;
     repeated ComponentLifecycleSnapshot snapshots = 2;
@@ -1255,59 +1250,4 @@ message SDKEvent {
         CancellationEvent             cancellation       = 31;
         FailureEvent                  failure            = 32;
     }
-}
-
-// Subscription-side filter for the canonical SDKEvent stream. Empty fields are
-// wildcards; implementations match populated fields against the envelope fields
-// above without interpreting payload-specific data.
-message SDKEventFilter {
-    repeated EventCategory    categories       = 1;
-    repeated SDKComponent     components       = 2;
-    repeated EventDestination destinations     = 3;
-    ErrorSeverity             minimum_severity = 4;
-    string                    session_id       = 5;
-    string                    operation_id     = 6;
-    string                    correlation_id   = 7;
-    string                    source           = 8;
-    string                    trace_id         = 9;
-}
-
-message SDKEventPublishRequest {
-    SDKEvent event = 1;
-
-    // When true, the portable event layer fills missing envelope metadata such
-    // as id, timestamp, destination, category/component defaults, source, and
-    // correlation fields before routing the event.
-    bool     normalize_envelope = 2;
-}
-
-message SDKEventPublishResult {
-    bool      accepted         = 1;
-    string    event_id         = 2;
-
-    // The event as accepted by the portable layer after optional envelope
-    // normalization. This is the same typed payload that serialized-proto
-    // bridges publish to subscribers.
-    optional SDKEvent normalized_event = 3;
-
-    string    error_message    = 4;
-    optional SDKError error    = 5;
-}
-
-message SDKEventSubscribeRequest {
-    SDKEventFilter filter = 1;
-
-    // Replays queued events before following live events when the backing
-    // bridge has a poll queue. Implementations without retention may ignore it
-    // and continue with live events only.
-    bool           replay_queued_events = 2;
-}
-
-// Logical SDK event service contract. C++ owns event envelope normalization,
-// routing/subscription matching, correlation/operation/source/trace metadata,
-// and the serialized-proto bridge. Platform adapters own OS notification APIs,
-// lifecycle callbacks, permission prompts, and host event-loop integration.
-service SDKEvents {
-    rpc Publish(SDKEventPublishRequest) returns (SDKEventPublishResult);
-    rpc Subscribe(SDKEventSubscribeRequest) returns (stream SDKEvent);
 }

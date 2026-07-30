@@ -31,17 +31,9 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * Unified per-token streaming event. Replaces
- * LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
- * callbackFlow / StreamController / tokenQueue. One serialized event
- * per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
- * from voice_events.proto so frontends can reuse gap-detection logic.
+ * `result` is populated only on the terminal event.
  */
 public class LLMStreamEvent(
-  /**
-   * Monotonic per-process sequence number. Useful for frontends that
-   * need to detect gaps or out-of-order delivery.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#UINT64",
@@ -49,10 +41,6 @@ public class LLMStreamEvent(
     schemaIndex = 0,
   )
   public val seq: Long = 0L,
-  /**
-   * Wall-clock timestamp captured at the C++ edge, in microseconds
-   * since Unix epoch. Frontends may re-timestamp for UI display.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -61,10 +49,6 @@ public class LLMStreamEvent(
     schemaIndex = 1,
   )
   public val timestamp_us: Long = 0L,
-  /**
-   * Generated token text. Empty on terminal events where only
-   * finish_reason or error_message is populated.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -72,9 +56,6 @@ public class LLMStreamEvent(
     schemaIndex = 2,
   )
   public val token: String = "",
-  /**
-   * True on the last event of a generation.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -83,10 +64,6 @@ public class LLMStreamEvent(
     schemaIndex = 3,
   )
   public val is_final: Boolean = false,
-  /**
-   * Token semantic category (answer / thought / tool-call).
-   * Canonical TokenKind from voice_events.proto.
-   */
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.TokenKind#ADAPTER",
@@ -94,10 +71,6 @@ public class LLMStreamEvent(
     schemaIndex = 4,
   )
   public val kind: TokenKind = TokenKind.TOKEN_KIND_UNSPECIFIED,
-  /**
-   * Backend-provided token id when the engine exposes it; 0 = unset
-   * (proto3 scalar default).
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
@@ -106,9 +79,6 @@ public class LLMStreamEvent(
     schemaIndex = 5,
   )
   public val token_id: Int = 0,
-  /**
-   * Per-token log-probability when supported; 0.0 = unset.
-   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -116,10 +86,6 @@ public class LLMStreamEvent(
     schemaIndex = 6,
   )
   public val logprob: Float = 0f,
-  /**
-   * Reason the stream stopped: "stop", "length", "cancelled", "error",
-   * "" = unset (proto3 scalar default). Only populated when is_final.
-   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -128,10 +94,6 @@ public class LLMStreamEvent(
     schemaIndex = 7,
   )
   public val finish_reason: String = "",
-  /**
-   * Error message on failure events (kind may be unset, is_final true).
-   * Empty on success.
-   */
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -140,20 +102,12 @@ public class LLMStreamEvent(
     schemaIndex = 8,
   )
   public val error_message: String = "",
-  /**
-   * Final aggregate result. Only populated on terminal events
-   * (is_final=true) when the backend can report result metrics.
-   */
   @field:WireField(
     tag = 10,
     adapter = "ai.runanywhere.proto.v1.LLMStreamFinalResult#ADAPTER",
     schemaIndex = 9,
   )
   public val result: LLMStreamFinalResult? = null,
-  /**
-   * Numeric backend status code when the terminal event represents a
-   * failure. 0 = unset/success.
-   */
   @field:WireField(
     tag = 11,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -162,9 +116,6 @@ public class LLMStreamEvent(
     schemaIndex = 10,
   )
   public val error_code: Int = 0,
-  /**
-   * Event classification distinct from token semantic kind.
-   */
   @field:WireField(
     tag = 12,
     adapter = "ai.runanywhere.proto.v1.LLMStreamEventKind#ADAPTER",
@@ -173,9 +124,6 @@ public class LLMStreamEvent(
     schemaIndex = 11,
   )
   public val event_kind: LLMStreamEventKind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED,
-  /**
-   * Request/session correlation fields.
-   */
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -192,9 +140,6 @@ public class LLMStreamEvent(
     schemaIndex = 13,
   )
   public val conversation_id: String = "",
-  /**
-   * Running counters for progress UIs.
-   */
   @field:WireField(
     tag = 15,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -219,10 +164,6 @@ public class LLMStreamEvent(
     schemaIndex = 16,
   )
   public val elapsed_ms: Long = 0L,
-  /**
-   * Structured tool-call payload emitted when event_kind is
-   * LLM_STREAM_EVENT_KIND_TOOL_CALL.
-   */
   @field:WireField(
     tag = 18,
     adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",

@@ -29,12 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Result of executing a tool. `result_json` is a JSON-encoded payload;
- * `error` is non-empty when the execution failed.
- * ---------------------------------------------------------------------------
- */
 public class ToolResult(
   @field:WireField(
     tag = 1,
@@ -51,14 +45,6 @@ public class ToolResult(
     schemaIndex = 1,
   )
   public val name: String = "",
-  /**
-   * JSON-encoded tool execution result.
-   *
-   * The C++ tool-prompt formatter
-   * (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
-   * reads `result_json` directly when building follow-up LLM prompts after
-   * tool execution. It is the canonical wire shape.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -74,8 +60,7 @@ public class ToolResult(
   )
   public val error: String? = null,
   /**
-   * Whether execution succeeded. If unset/false and error is empty,
-   * consumers should fall back to result_json/error semantics.
+   * When false and error is empty, fall back to result_json semantics.
    */
   @field:WireField(
     tag = 5,

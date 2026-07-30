@@ -1,5 +1,5 @@
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
-  STTAudioEncoding,
   STTOutput,
   STTPartialResult,
   STTServiceState,
@@ -237,7 +237,7 @@ function lifecycleRequest(
   return STTTranscriptionRequest.create({
     audio: {
       audioData,
-      encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
+      encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM_S16LE,
       sampleRate,
       channels: 1,

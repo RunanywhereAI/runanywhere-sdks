@@ -30,23 +30,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * VLM component configuration.
- * Sources pre-IDL:
- *   Kotlin VLMTypes.kt:163        (modelId, contextLength, temperature,
- *                                  maxTokens, systemPrompt, streamingEnabled,
- *                                  preferredFramework)
- *   C ABI  rac_vlm_types.h:224    (model_id, preferred_framework,
- *                                  context_length, temperature, max_tokens,
- *                                  system_prompt, streaming_enabled)
- *
- * Per the canonicalization brief, only the load-bearing identification +
- * limits cross the IDL boundary here: model_id, max_image_size_px, max_tokens.
- * Per-request sampling parameters live on VLMGenerationOptions; runtime
- * streaming toggles and chat-template selection stay backend-private.
- * ---------------------------------------------------------------------------
- */
 public class VLMConfiguration(
   @field:WireField(
     tag = 1,
@@ -56,9 +39,6 @@ public class VLMConfiguration(
     schemaIndex = 0,
   )
   public val model_id: String = "",
-  /**
-   * Kotlin maxImageSize / C ABI max_image_size
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -67,10 +47,6 @@ public class VLMConfiguration(
     schemaIndex = 1,
   )
   public val max_image_size_px: Int = 0,
-  /**
-   * (0 = backend default)
-   * Kotlin maxTokens / C ABI max_tokens
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -79,9 +55,6 @@ public class VLMConfiguration(
     schemaIndex = 2,
   )
   public val max_tokens: Int = 0,
-  /**
-   * Additional component-level fields from rac_vlm_config_t.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

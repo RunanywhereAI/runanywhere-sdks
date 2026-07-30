@@ -93,28 +93,6 @@ class TokenKind extends $pb.ProtobufEnum {
   const TokenKind._(super.value, super.name);
 }
 
-class AudioEncoding extends $pb.ProtobufEnum {
-  static const AudioEncoding AUDIO_ENCODING_UNSPECIFIED =
-      AudioEncoding._(0, _omitEnumNames ? '' : 'AUDIO_ENCODING_UNSPECIFIED');
-  static const AudioEncoding AUDIO_ENCODING_PCM_F32_LE =
-      AudioEncoding._(1, _omitEnumNames ? '' : 'AUDIO_ENCODING_PCM_F32_LE');
-  static const AudioEncoding AUDIO_ENCODING_PCM_S16_LE =
-      AudioEncoding._(2, _omitEnumNames ? '' : 'AUDIO_ENCODING_PCM_S16_LE');
-
-  static const $core.List<AudioEncoding> values = <AudioEncoding>[
-    AUDIO_ENCODING_UNSPECIFIED,
-    AUDIO_ENCODING_PCM_F32_LE,
-    AUDIO_ENCODING_PCM_S16_LE,
-  ];
-
-  static final $core.List<AudioEncoding?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static AudioEncoding? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const AudioEncoding._(super.value, super.name);
-}
-
 class InterruptReason extends $pb.ProtobufEnum {
   static const InterruptReason INTERRUPT_REASON_UNSPECIFIED = InterruptReason._(
       0, _omitEnumNames ? '' : 'INTERRUPT_REASON_UNSPECIFIED');

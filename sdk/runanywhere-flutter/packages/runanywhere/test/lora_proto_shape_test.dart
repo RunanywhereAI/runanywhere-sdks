@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
-import 'package:runanywhere/runanywhere.dart'
+import 'package:runanywhere/runanywhere_protos.dart'
     show
         LoRAAdapterConfig,
         LoRAAdapterInfo,

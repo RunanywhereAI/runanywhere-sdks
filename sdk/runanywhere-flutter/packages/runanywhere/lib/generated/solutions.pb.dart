@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -25,7 +24,6 @@ export 'solutions.pbenum.dart';
 
 enum SolutionConfig_Config { voiceAgent, rag, agentLoop, timeSeries, notSet }
 
-/// Top-level union dispatched to the matching solution loader.
 class SolutionConfig extends $pb.GeneratedMessage {
   factory SolutionConfig({
     VoiceAgentConfig? voiceAgent,
@@ -149,15 +147,6 @@ class SolutionConfig extends $pb.GeneratedMessage {
   TimeSeriesConfig ensureTimeSeries() => $_ensure(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// SolutionHandle — opaque, serialisable descriptor for a started solution.
-///
-/// The native side owns a `rac_solution_handle_t`; this message is the
-/// language-agnostic shape that frontends (Swift `SolutionHandle` class,
-/// Kotlin/Flutter/RN/Web equivalents) carry across the C ABI to identify
-/// the underlying instance. Lifecycle verbs (start/stop/cancel/feed/destroy)
-/// are issued against the C handle keyed by `handle_id`.
-/// ---------------------------------------------------------------------------
 class SolutionHandle extends $pb.GeneratedMessage {
   factory SolutionHandle({
     $core.String? handleId,
@@ -211,8 +200,6 @@ class SolutionHandle extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<SolutionHandle>(create);
   static SolutionHandle? _defaultInstance;
 
-  /// Stable, opaque identifier minted by the core for this solution
-  /// instance. Used as the lookup key for lifecycle calls.
   @$pb.TagNumber(1)
   $core.String get handleId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -222,10 +209,6 @@ class SolutionHandle extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearHandleId() => $_clearField(1);
 
-  /// String discriminator for the solution kind, e.g. "voice_agent",
-  /// "rag", "time_series", "agent_loop". Free-form for
-  /// forward-compat with future solutions; canonical values match the
-  /// `SolutionType` enum names lower-cased.
   @$pb.TagNumber(2)
   $core.String get solutionType => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -235,7 +218,6 @@ class SolutionHandle extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearSolutionType() => $_clearField(2);
 
-  /// Wall-clock creation timestamp (ms since Unix epoch).
   @$pb.TagNumber(3)
   $fixnum.Int64 get createdAtMs => $_getI64(2);
   @$pb.TagNumber(3)
@@ -245,8 +227,7 @@ class SolutionHandle extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearCreatedAtMs() => $_clearField(3);
 
-  /// Optional engine-specific state string (e.g. "created", "running",
-  /// "stopped"). Empty when the host hasn't surfaced state.
+  /// Engine-specific, e.g. "running" or "stopped".
   @$pb.TagNumber(4)
   $core.String get state => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -257,9 +238,6 @@ class SolutionHandle extends $pb.GeneratedMessage {
   void clearState() => $_clearField(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// VoiceAgent — the canonical streaming voice AI loop.
-/// ---------------------------------------------------------------------------
 class VoiceAgentConfig extends $pb.GeneratedMessage {
   factory VoiceAgentConfig({
     $core.String? llmModelId,
@@ -350,7 +328,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<VoiceAgentConfig>(create);
   static VoiceAgentConfig? _defaultInstance;
 
-  /// Model identifiers — resolved against the model registry.
   @$pb.TagNumber(1)
   $core.String get llmModelId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -387,7 +364,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearVadModelId() => $_clearField(4);
 
-  /// Audio configuration.
   @$pb.TagNumber(5)
   $core.int get sampleRateHz => $_getIZ(4);
   @$pb.TagNumber(5)
@@ -406,6 +382,7 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearChunkMs() => $_clearField(6);
 
+  /// audio_file_path applies when audio_source is FILE.
   @$pb.TagNumber(7)
   AudioSource get audioSource => $_getN(6);
   @$pb.TagNumber(7)
@@ -415,7 +392,7 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearAudioSource() => $_clearField(7);
 
-  /// Barge-in behavior.
+  /// Unset means enabled.
   @$pb.TagNumber(8)
   $core.bool get enableBargeIn => $_getBF(7);
   @$pb.TagNumber(8)
@@ -443,7 +420,7 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   void clearMaxContextTokens() => $_clearField(11);
 
-  /// Emit partial transcripts as UserSaidEvent{is_final=false}.
+  /// Emit partial transcripts as non-final user-said events.
   @$pb.TagNumber(13)
   $core.bool get emitPartials => $_getBF(10);
   @$pb.TagNumber(13)
@@ -453,8 +430,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   void clearEmitPartials() => $_clearField(13);
 
-  /// Absolute path to an audio file. Required when `audio_source` is
-  /// `AUDIO_SOURCE_FILE`; ignored for MICROPHONE / CALLBACK sources.
   @$pb.TagNumber(15)
   $core.String get audioFilePath => $_getSZ(11);
   @$pb.TagNumber(15)
@@ -464,9 +439,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   void clearAudioFilePath() => $_clearField(15);
 
-  /// Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
-  /// oneof arm; provided so callers that pass this message standalone (or
-  /// log it) can read a single discriminator. Defaults to UNSPECIFIED.
   @$pb.TagNumber(16)
   SolutionType get typeKind => $_getN(12);
   @$pb.TagNumber(16)
@@ -476,12 +448,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(16)
   void clearTypeKind() => $_clearField(16);
 
-  /// pass3-syn-025/030: explicit TTS voice id for multi-voice TTS engines
-  /// (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice). When unset, callers
-  /// fall back to using tts_model_id as the voice id — correct for
-  /// single-voice engines, wrong for multi-voice. Aligns the caller-facing
-  /// VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
-  /// (voice_agent_service.proto:214) which already exposes tts_voice_id.
   @$pb.TagNumber(17)
   $core.String get ttsVoiceId => $_getSZ(13);
   @$pb.TagNumber(17)
@@ -503,9 +469,6 @@ class VoiceAgentConfig extends $pb.GeneratedMessage {
   $0.LLMGenerationOptions ensureGeneration() => $_ensure(14);
 }
 
-/// ---------------------------------------------------------------------------
-/// RAG — retrieve → rerank → prompt → LLM.
-/// ---------------------------------------------------------------------------
 class RAGConfig extends $pb.GeneratedMessage {
   factory RAGConfig({
     $core.String? embedModelId,
@@ -611,7 +574,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearLlmModelId() => $_clearField(3);
 
-  /// Vector store — USearch (in-process HNSW, default) or remote pgvector.
   @$pb.TagNumber(4)
   VectorStore get vectorStore => $_getN(3);
   @$pb.TagNumber(4)
@@ -630,6 +592,7 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearVectorStorePath() => $_clearField(5);
 
+  /// Retrieve this many candidates, then keep this many after reranking.
   @$pb.TagNumber(6)
   $core.int get retrieveK => $_getIZ(5);
   @$pb.TagNumber(6)
@@ -648,7 +611,7 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearRerankTop() => $_clearField(7);
 
-  /// BM25 parameters.
+  /// BM25 term-saturation and length-normalization parameters.
   @$pb.TagNumber(8)
   $core.double get bm25K1 => $_getN(7);
   @$pb.TagNumber(8)
@@ -667,7 +630,7 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearBm25B() => $_clearField(9);
 
-  /// RRF fusion parameter.
+  /// Reciprocal-rank-fusion smoothing constant.
   @$pb.TagNumber(10)
   $core.int get rrfK => $_getIZ(9);
   @$pb.TagNumber(10)
@@ -677,7 +640,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearRrfK() => $_clearField(10);
 
-  /// Prompt template. Supports {{context}} and {{query}} placeholders.
   @$pb.TagNumber(11)
   $core.String get promptTemplate => $_getSZ(10);
   @$pb.TagNumber(11)
@@ -687,7 +649,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(11)
   void clearPromptTemplate() => $_clearField(11);
 
-  /// Optional explicit solution-kind tag. See `SolutionType`.
   @$pb.TagNumber(12)
   SolutionType get typeKind => $_getN(11);
   @$pb.TagNumber(12)
@@ -698,9 +659,6 @@ class RAGConfig extends $pb.GeneratedMessage {
   void clearTypeKind() => $_clearField(12);
 }
 
-/// ---------------------------------------------------------------------------
-/// Agent loop — multi-turn LLM with tool calling.
-/// ---------------------------------------------------------------------------
 class AgentLoopConfig extends $pb.GeneratedMessage {
   factory AgentLoopConfig({
     $core.String? llmModelId,
@@ -801,7 +759,6 @@ class AgentLoopConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearMaxContextTokens() => $_clearField(5);
 
-  /// Optional explicit solution-kind tag. See `SolutionType`.
   @$pb.TagNumber(6)
   SolutionType get typeKind => $_getN(5);
   @$pb.TagNumber(6)
@@ -879,6 +836,7 @@ class ToolSpec extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearDescription() => $_clearField(2);
 
+  /// OpenAI-compatible parameters schema.
   @$pb.TagNumber(3)
   $core.String get jsonSchema => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -889,9 +847,6 @@ class ToolSpec extends $pb.GeneratedMessage {
   void clearJsonSchema() => $_clearField(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Time series — window + anomaly_detect + generate_text.
-/// ---------------------------------------------------------------------------
 class TimeSeriesConfig extends $pb.GeneratedMessage {
   factory TimeSeriesConfig({
     $core.String? anomalyModelId,
@@ -971,6 +926,7 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearLlmModelId() => $_clearField(2);
 
+  /// Samples per window, and how far the window advances each step.
   @$pb.TagNumber(3)
   $core.int get windowSize => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -998,7 +954,6 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearAnomalyThreshold() => $_clearField(5);
 
-  /// Optional explicit solution-kind tag. See `SolutionType`.
   @$pb.TagNumber(6)
   SolutionType get typeKind => $_getN(5);
   @$pb.TagNumber(6)
@@ -1007,40 +962,6 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
   $core.bool hasTypeKind() => $_has(5);
   @$pb.TagNumber(6)
   void clearTypeKind() => $_clearField(6);
-}
-
-/// Logical solutions service contract. Solution lifecycle verbs (create/start/
-/// stop/destroy) mirror the `rac_solution_handle_t` C ABI. Host UI, progress
-/// surfacing, and side effects remain adapter-owned; this service describes
-/// only the portable ergonomic entry points over generated messages.
-class SolutionsApi {
-  final $pb.RpcClient _client;
-
-  SolutionsApi(this._client);
-
-  /// Instantiate a solution from a SolutionConfig oneof.
-  $async.Future<SolutionHandle> create_(
-          $pb.ClientContext? ctx, SolutionConfig request) =>
-      _client.invoke<SolutionHandle>(
-          ctx, 'Solutions', 'Create', request, SolutionHandle());
-
-  /// Transition the solution to a running state.
-  $async.Future<SolutionHandle> start(
-          $pb.ClientContext? ctx, SolutionHandle request) =>
-      _client.invoke<SolutionHandle>(
-          ctx, 'Solutions', 'Start', request, SolutionHandle());
-
-  /// Transition the solution to a stopped state (resumable).
-  $async.Future<SolutionHandle> stop(
-          $pb.ClientContext? ctx, SolutionHandle request) =>
-      _client.invoke<SolutionHandle>(
-          ctx, 'Solutions', 'Stop', request, SolutionHandle());
-
-  /// Terminate the solution and release native resources.
-  $async.Future<SolutionHandle> destroy(
-          $pb.ClientContext? ctx, SolutionHandle request) =>
-      _client.invoke<SolutionHandle>(
-          ctx, 'Solutions', 'Destroy', request, SolutionHandle());
 }
 
 const $core.bool _omitFieldNames =

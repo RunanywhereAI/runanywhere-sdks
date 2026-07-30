@@ -9,85 +9,11 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "runanywhere.v1";
 
-/**
- * ---------------------------------------------------------------------------
- * Capability under hybrid routing. Only STT is wired today.
- * ---------------------------------------------------------------------------
- */
-export enum HybridCapability {
-  HYBRID_CAPABILITY_UNSPECIFIED = 0,
-  HYBRID_CAPABILITY_LLM = 1,
-  HYBRID_CAPABILITY_VLM = 2,
-  HYBRID_CAPABILITY_STT = 3,
-  HYBRID_CAPABILITY_TTS = 4,
-  HYBRID_CAPABILITY_VAD = 5,
-  UNRECOGNIZED = -1,
-}
-
-export function hybridCapabilityFromJSON(object: any): HybridCapability {
-  switch (object) {
-    case 0:
-    case "HYBRID_CAPABILITY_UNSPECIFIED":
-      return HybridCapability.HYBRID_CAPABILITY_UNSPECIFIED;
-    case 1:
-    case "HYBRID_CAPABILITY_LLM":
-      return HybridCapability.HYBRID_CAPABILITY_LLM;
-    case 2:
-    case "HYBRID_CAPABILITY_VLM":
-      return HybridCapability.HYBRID_CAPABILITY_VLM;
-    case 3:
-    case "HYBRID_CAPABILITY_STT":
-      return HybridCapability.HYBRID_CAPABILITY_STT;
-    case 4:
-    case "HYBRID_CAPABILITY_TTS":
-      return HybridCapability.HYBRID_CAPABILITY_TTS;
-    case 5:
-    case "HYBRID_CAPABILITY_VAD":
-      return HybridCapability.HYBRID_CAPABILITY_VAD;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return HybridCapability.UNRECOGNIZED;
-  }
-}
-
-export function hybridCapabilityToJSON(object: HybridCapability): string {
-  switch (object) {
-    case HybridCapability.HYBRID_CAPABILITY_UNSPECIFIED:
-      return "HYBRID_CAPABILITY_UNSPECIFIED";
-    case HybridCapability.HYBRID_CAPABILITY_LLM:
-      return "HYBRID_CAPABILITY_LLM";
-    case HybridCapability.HYBRID_CAPABILITY_VLM:
-      return "HYBRID_CAPABILITY_VLM";
-    case HybridCapability.HYBRID_CAPABILITY_STT:
-      return "HYBRID_CAPABILITY_STT";
-    case HybridCapability.HYBRID_CAPABILITY_TTS:
-      return "HYBRID_CAPABILITY_TTS";
-    case HybridCapability.HYBRID_CAPABILITY_VAD:
-      return "HYBRID_CAPABILITY_VAD";
-    case HybridCapability.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Backend identity. Matches the engines/ directory entry that registers
- * the service vtable. HYBRID_BACKEND_CLOUD is the generic cloud STT engine
- * ("cloud_stt"); the concrete HTTP provider (e.g. "sarvam") is selected from
- * the descriptor's `provider` field, not from a distinct enum kind.
- * ---------------------------------------------------------------------------
- */
 export enum HybridBackendKind {
   HYBRID_BACKEND_UNSPECIFIED = 0,
   HYBRID_BACKEND_LLAMACPP = 1,
   HYBRID_BACKEND_OPENROUTER = 2,
   HYBRID_BACKEND_SHERPA = 3,
-  /**
-   * HYBRID_BACKEND_CLOUD - Renamed from HYBRID_BACKEND_SARVAM (same wire number) — the engine is now
-   * the generic "cloud_stt" backend; the provider is carried out-of-band.
-   */
   HYBRID_BACKEND_CLOUD = 4,
   UNRECOGNIZED = -1,
 }
@@ -134,12 +60,6 @@ export function hybridBackendKindToJSON(object: HybridBackendKind): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Whether a model runs on-device or in the cloud. The router decides which
- * of its two registered candidates to invoke based on policy.
- * ---------------------------------------------------------------------------
- */
 export enum HybridModelType {
   HYBRID_MODEL_TYPE_UNSPECIFIED = 0,
   HYBRID_MODEL_TYPE_OFFLINE = 1,
@@ -179,12 +99,6 @@ export function hybridModelTypeToJSON(object: HybridModelType): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Rank — comparator used to sort eligible candidates. Exactly one rank
- * per policy.
- * ---------------------------------------------------------------------------
- */
 export enum HybridRank {
   HYBRID_RANK_UNSPECIFIED = 0,
   HYBRID_RANK_PREFER_LOCAL_FIRST = 1,
@@ -224,39 +138,14 @@ export function hybridRankToJSON(object: HybridRank): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Hard filter — drops a candidate from consideration when the predicate
- * fails. Filters compose with AND semantics. The wire kinds match
- * thoughts/file.txt's Routing Conditions list verbatim.
- * ---------------------------------------------------------------------------
- */
+/** A candidate must pass every hard filter to stay in the running. */
 export interface HybridFilter {
-  /**
-   * True iff the host has working network. Disqualifies online
-   * candidates when false; offline candidates are unaffected.
-   */
   network?:
     | boolean
     | undefined;
-  /**
-   * Discrete quality tier required from the candidate. Candidates
-   * declaring a lower tier in their descriptor are filtered out.
-   */
-  qualityTier?:
-    | number
-    | undefined;
-  /**
-   * Disqualifies cloud candidates when the device is below the
-   * given battery percent (0–100).
-   */
-  battery?:
-    | BatteryFilter
-    | undefined;
-  /**
-   * Caller-supplied predicate, evaluated host-side via the
-   * registered custom-filter callback table.
-   */
+  /** Documented as a no-op in the Dart policy. */
+  qualityTier?: number | undefined;
+  battery?: BatteryFilter | undefined;
   custom?: CustomFilter | undefined;
 }
 
@@ -269,156 +158,68 @@ export interface CustomFilter {
   description: string;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Cascade — triggers fallback from the primary candidate to the next
- * candidate mid-request. Matches the file.txt Confidence policy.
- * ---------------------------------------------------------------------------
- */
 export interface HybridCascade {
-  /**
-   * Cascade when the primary's confidence/logprob signal falls below
-   * `threshold`, or when the primary returns an error (treated as
-   * "no confidence").
-   */
   confidence?: ConfidenceCascade | undefined;
 }
 
+/** Below this on-device confidence, the router escalates to cloud. */
 export interface ConfidenceCascade {
   threshold: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Full routing policy attached to a model pair. `simple` mode collapses
- * to a single filter; `advanced` mode allows composition.
- * ---------------------------------------------------------------------------
- */
 export interface HybridRoutingPolicy {
   hardFilters: HybridFilter[];
   cascade?: HybridCascade | undefined;
   rank: HybridRank;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Descriptor for a single registered model on one side of the pair.
- * ---------------------------------------------------------------------------
- */
 export interface HybridModelDescriptor {
   modelId: string;
   modelType: HybridModelType;
   backend: HybridBackendKind;
-  /**
-   * Concrete cloud provider when backend == HYBRID_BACKEND_CLOUD (e.g.
-   * "sarvam"). The cloud_stt engine reads it from config_json["provider"];
-   * empty defaults to "sarvam". Ignored for non-cloud backends.
-   */
   provider: string;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Metadata returned alongside the capability result describing what the
- * router did. Always populated even on success.
- * ---------------------------------------------------------------------------
- */
+/** What the router actually did, including the failed primary attempt. */
 export interface HybridRoutedMetadata {
   chosenModelId: string;
   wasFallback: boolean;
   attemptCount: number;
-  /**
-   * Why the router fell back to the secondary. Zero (RAC_SUCCESS) when
-   * the primary served the request or no fallback occurred.
-   */
   primaryErrorCode: number;
   primaryErrorMessage: string;
-  /**
-   * Final confidence of the result that was actually returned. NaN when
-   * the engine does not surface a quality signal (e.g. sherpa-onnx Whisper).
-   */
   confidence: number;
-  /**
-   * Primary's confidence captured BEFORE cascading to the secondary.
-   * Populated only when `was_fallback = true` AND the fallback fired on
-   * confidence (not on an error). NaN otherwise.
-   */
   primaryConfidence: number;
 }
 
 /**
- * ---------------------------------------------------------------------------
- * Per-request routing context — caller-supplied hints only.
- *
- * Device state lives behind the rac_hybrid_device_state C ABI vtable in
- * commons; callers do not serialize platform state into this message.
- * ---------------------------------------------------------------------------
+ * Device state lives behind the rac_hybrid_device_state vtable in commons, so
+ * callers never serialize platform state into this message.
  */
 export interface HybridRoutingContext {
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Cloud STT backend registration config. Replaces the hand-built
- * `config_json` string that Swift (CloudSTT.swift), Kotlin (CloudModelEntry /
- * HybridRouterBridgeAdapter), Flutter (CloudModelEntry.toConfigJson), RN
- * (CloudSTT.configJSON), and Web (CloudSTT) each assemble identically and pass
- * across the FFI/JNI boundary as `config_json`. The cloud_stt engine reads
- * these fields when a model's backend == HYBRID_BACKEND_CLOUD; today it parses
- * the same keys out of the JSON blob (`config_json["provider"]` etc., see
- * HybridModelDescriptor.provider).
- * ---------------------------------------------------------------------------
- */
 export interface CloudSttBackendConfig {
-  /** HTTP provider implementation (e.g. "sarvam"). Empty defaults to "sarvam". */
   provider: string;
-  /** Provider-side model id (e.g. "saarika:v2"). */
   model: string;
-  /** Provider API key / credential. */
   apiKey: string;
-  /** BCP-47 language hint forwarded to the provider (empty = auto-detect). */
   languageCode: string;
-  /** Override the provider base URL (empty = provider default). */
   baseUrl: string;
-  /** Request timeout in milliseconds (0 = engine default). */
   timeoutMs: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * STT transcription options carried through the router. Sample rate and
- * audio_format mirror the C `rac_stt_options_t` knobs; `language` is the
- * caller-supplied BCP-47 hint (empty = backend auto-detect).
- * ---------------------------------------------------------------------------
- */
 export interface HybridSttTranscribeOptions {
   language: string;
   sampleRate: number;
-  /** Matches rac_audio_format_enum_t: 0=PCM, 1=WAV, 2=MP3, 3=OPUS, 4=AAC, 5=FLAC. */
+  /** Untyped: every other file uses the AudioFormat enum here. */
   audioFormat: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Request handed to the JNI transcribe thunk. Audio bytes are passed
- * verbatim to the chosen backend; each engine is responsible for parsing
- * the encoded format (the cloud provider, e.g. Sarvam, reads the multipart
- * file part; sherpa decodes the WAV/PCM bytes).
- * ---------------------------------------------------------------------------
- */
 export interface HybridSttTranscribeRequest {
   audioBytes: Uint8Array;
   context?: HybridRoutingContext | undefined;
   options?: HybridSttTranscribeOptions | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Response returned by the JNI transcribe thunk. Carries the transcript,
- * the detected (or hinted) language, the routing decision metadata, the
- * native rc, and a human-readable error message when rc != 0.
- * ---------------------------------------------------------------------------
- */
 export interface HybridSttTranscribeResponse {
   rc: number;
   text: string;

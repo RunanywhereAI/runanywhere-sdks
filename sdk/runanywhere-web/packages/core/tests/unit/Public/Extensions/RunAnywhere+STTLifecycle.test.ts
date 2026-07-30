@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import { AudioEncoding, AudioFormat } from '@runanywhere/proto-ts/model_types';
 import {
-  STTAudioEncoding,
   STTOutput,
   STTPartialResult,
   STTStreamEvent,
@@ -70,7 +69,7 @@ describe('lifecycle-owned Web STT', () => {
     });
     expect(harness.requests).toHaveLength(1);
     expect(harness.requests[0]?.audio).toMatchObject({
-      encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE,
+      encoding: AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM_S16LE,
       sampleRate: 16_000,
       channels: 1,

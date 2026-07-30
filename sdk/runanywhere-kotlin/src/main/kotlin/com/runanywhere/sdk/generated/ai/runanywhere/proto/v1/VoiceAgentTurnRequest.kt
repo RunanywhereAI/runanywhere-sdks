@@ -32,6 +32,9 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
+/**
+ * One-shot turn: audio in, transcription plus response plus audio out.
+ */
 public class VoiceAgentTurnRequest(
   @field:WireField(
     tag = 1,

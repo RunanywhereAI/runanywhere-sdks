@@ -30,25 +30,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Structured output options — request-side configuration for a structured
- * generation call. Wraps a JSONSchema plus generation flags.
- * Sources pre-IDL:
- *   Swift  LLMTypes.swift:533           StructuredOutputConfig
- *   Kotlin LLMTypes.kt:242              StructuredOutputConfig
- *   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
- *   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
- * ---------------------------------------------------------------------------
- * The ONE output-constraint surface. The retired loose fields on
- * LLMGenerationOptions (json_schema, grammar, response_format) all fold in
- * here: schema-shaped output via `schema_source`, low-level constrained
- * decoding via `grammar`/`regex_pattern`.
- */
 public class StructuredOutputOptions(
-  /**
-   * Whether to embed the schema text in the LLM prompt.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -58,7 +40,7 @@ public class StructuredOutputOptions(
   )
   public val include_schema_in_prompt: Boolean = false,
   /**
-   * Strict schema adherence — rejects outputs that don't fully validate.
+   * Not read by commons.
    */
   @field:WireField(
     tag = 3,
@@ -83,7 +65,7 @@ public class StructuredOutputOptions(
   )
   public val json_schema: String? = null,
   /**
-   * Name for the schema/output type (OpenAI json_schema.name).
+   * Matches OpenAI's json_schema.name.
    */
   @field:WireField(
     tag = 6,
@@ -111,6 +93,9 @@ public class StructuredOutputOptions(
     schemaIndex = 7,
   )
   public val grammar: String? = null,
+  /**
+   * Attempt to repair malformed JSON before failing.
+   */
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

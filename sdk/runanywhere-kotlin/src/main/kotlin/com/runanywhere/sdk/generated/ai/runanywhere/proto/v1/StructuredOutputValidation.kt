@@ -31,19 +31,7 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Structured output validation result — populated after the model returns.
- * Sources pre-IDL:
- *   Swift  LLMTypes.swift:585           StructuredOutputValidation
- *   Kotlin LLMTypes.kt:278              StructuredOutputValidation
- *   Dart   structured_output_types.dart StructuredOutputValidation
- * ---------------------------------------------------------------------------
- */
 public class StructuredOutputValidation(
-  /**
-   * Whether the parsed output validates against the requested schema.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -52,9 +40,6 @@ public class StructuredOutputValidation(
     schemaIndex = 0,
   )
   public val is_valid: Boolean = false,
-  /**
-   * Whether the raw text contained any parseable JSON object.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -63,9 +48,6 @@ public class StructuredOutputValidation(
     schemaIndex = 1,
   )
   public val contains_json: Boolean = false,
-  /**
-   * Validation / parse error message when `is_valid == false`.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -73,9 +55,6 @@ public class StructuredOutputValidation(
     schemaIndex = 2,
   )
   public val error_message: String? = null,
-  /**
-   * Original raw model output (for debugging / fallback parsing).
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -83,10 +62,6 @@ public class StructuredOutputValidation(
     schemaIndex = 3,
   )
   public val raw_output: String? = null,
-  /**
-   * JSON substring extracted from raw_output before validation, when the
-   * extractor found one.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

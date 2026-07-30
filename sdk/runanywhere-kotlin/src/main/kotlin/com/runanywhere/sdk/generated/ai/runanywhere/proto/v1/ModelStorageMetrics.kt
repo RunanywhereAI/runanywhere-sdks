@@ -29,19 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * On-disk metrics for a single downloaded model. The full ModelInfo is *not*
- * embedded here — callers cross-reference `model_id` against ModelInfo from
- * model_types.proto. This avoids circular embeds and keeps the wire payload
- * for storage queries small.
- *
- * `last_used_ms` supports LRU presentation and eviction without another type
- * round-trip.
- *
- * Sources pre-IDL: see header drift table.
- * ---------------------------------------------------------------------------
- */
 public class ModelStorageMetrics(
   @field:WireField(
     tag = 1,
@@ -60,7 +47,7 @@ public class ModelStorageMetrics(
   )
   public val size_on_disk_bytes: Long = 0L,
   /**
-   * Unix epoch ms of last load
+   * Epoch ms of the last load.
    */
   @field:WireField(
     tag = 3,

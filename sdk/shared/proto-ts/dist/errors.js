@@ -16,33 +16,9 @@ exports.errorCodeToJSON = errorCodeToJSON;
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
 /**
- * ---------------------------------------------------------------------------
- * ErrorCategory — coarse-grained logical grouping for filtering / analytics.
- *
- * This is the union of all categories declared across SDKs, condensed to the
- * minimum stable set. The task spec pins a 9-case enum (UNSPECIFIED, NETWORK,
- * VALIDATION, MODEL, COMPONENT, IO, AUTH, INTERNAL, CONFIGURATION); that set
- * covers every category currently in use except for the per-modality ones
- * (STT, TTS, LLM, VAD, VLM, etc.) which are intentionally folded into
- * COMPONENT. Per-modality routing is recovered at runtime from the source
- * of the failure (the `c_abi_code` numeric value uniquely identifies the
- * component) and from `ErrorContext.operation` — there is no need to encode
- * modality twice.
- *
- * Sources pre-IDL:
- *   C ABI   rac_structured_error.h:46  rac_error_category_t — 15 cases incl.
- *                                      stt/tts/llm/vad/vlm/etc.
- *   Swift   ErrorCategory.swift:11     16 cases incl. rag.
- *   Kotlin  ErrorCategory.kt:19        18 cases incl. CONFIGURATION,
- *                                      INITIALIZATION, FILE_RESOURCE,
- *                                      OPERATION, PLATFORM (no per-modality).
- *   Dart    error_category.dart:3      27 cases (superset).
- *   RN      ErrorCategory.ts:10        12 cases.
- *   Web     ErrorTypes.ts              (none — only SDKErrorCode exists).
- *
- * The drift here is severe — every SDK uses a different category vocabulary.
- * Codegen MUST collapse to the 9 canonical buckets below.
- * ---------------------------------------------------------------------------
+ * Coarse routing bucket. Per-modality errors (STT, TTS, LLM, VAD, VLM) fold
+ * into COMPONENT; the modality is recoverable from c_abi_code and
+ * ErrorContext.operation, so it is not encoded twice.
  */
 var ErrorCategory;
 (function (ErrorCategory) {
@@ -181,35 +157,13 @@ function errorSeverityToJSON(object) {
     }
 }
 /**
- * ---------------------------------------------------------------------------
- * ErrorCode — exhaustive enumeration of every distinct numeric error code in
- * the C ABI (`rac_result_t`).
+ * proto3 forbids negative enum values, so each constant is the absolute
+ * magnitude of its C ABI code: ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>).
+ * SDKError.c_abi_code carries the signed original.
  *
- * proto3 forbids negative enum values, so the proto enum holds POSITIVE
- * values that mirror the *absolute* magnitude of each C ABI code. The signed
- * `rac_result_t` numeric value is preserved on `SDKError.c_abi_code` so
- * platforms can round-trip the original C ABI integer. The naming scheme is:
- *
- *     ERROR_CODE_<NAME> = abs(RAC_ERROR_<NAME>)
- *
- * (e.g. RAC_ERROR_MODEL_NOT_FOUND = -110 → ERROR_CODE_MODEL_NOT_FOUND = 110)
- *
- * `ERROR_CODE_UNSPECIFIED = 0` covers proto3's required zero-default; the
- * C ABI's `RAC_SUCCESS = 0` is NOT an error and MUST NOT appear inside an
- * SDKError.code (an SDKError implies a failure; success is signalled by the
- * absence of an SDKError). The zero-value enum entry exists only because
- * proto3 mandates it.
- *
- * CRITICAL: Do not change the numeric values without coordinated
- * migrations across every SDK *and* the C ABI. Adding new values is safe;
- * removing or renumbering is a wire-format break.
- *
- * All values below are sourced from
- * `sdk/runanywhere-commons/include/rac/core/rac_error.h`. Aliases (codes
- * where the C ABI defines two distinct macro names for the same numeric
- * value) are documented inline; we pick one canonical name per numeric value
- * to keep proto enum values unique.
- * ---------------------------------------------------------------------------
+ * The trailing macro names below are kept because they are the cross-reference
+ * into rac_error.h; where the C ABI defines two names for one value, the alias
+ * is noted.
  */
 var ErrorCode;
 (function (ErrorCode) {

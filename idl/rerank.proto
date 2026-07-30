@@ -62,7 +62,3 @@ message RerankResult {
     int64 processing_time_ms = 2;
     string model_id = 3;
 }
-
-service Reranking {
-    rpc Rerank(RerankRequest) returns (RerankResult);
-}

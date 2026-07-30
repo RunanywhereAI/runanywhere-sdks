@@ -30,11 +30,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Time series — window + anomaly_detect + generate_text.
- * ---------------------------------------------------------------------------
- */
 public class TimeSeriesConfig(
   @field:WireField(
     tag = 1,
@@ -53,7 +48,7 @@ public class TimeSeriesConfig(
   )
   public val llm_model_id: String = "",
   /**
-   * Samples per window
+   * Samples per window, and how far the window advances each step.
    */
   @field:WireField(
     tag = 3,
@@ -78,9 +73,6 @@ public class TimeSeriesConfig(
     schemaIndex = 4,
   )
   public val anomaly_threshold: Float = 0f,
-  /**
-   * Optional explicit solution-kind tag. See `SolutionType`.
-   */
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",

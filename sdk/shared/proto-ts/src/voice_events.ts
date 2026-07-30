@@ -22,6 +22,7 @@ import {
   errorSeverityFromJSON,
   errorSeverityToJSON,
 } from "./errors";
+import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON } from "./model_types";
 import { VADStreamEventKind, vADStreamEventKindFromJSON, vADStreamEventKindToJSON } from "./vad_options";
 
 export const protobufPackage = "runanywhere.v1";
@@ -150,45 +151,6 @@ export function tokenKindToJSON(object: TokenKind): string {
     case TokenKind.TOKEN_KIND_TOOL_CALL:
       return "TOKEN_KIND_TOOL_CALL";
     case TokenKind.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export enum AudioEncoding {
-  AUDIO_ENCODING_UNSPECIFIED = 0,
-  AUDIO_ENCODING_PCM_F32_LE = 1,
-  AUDIO_ENCODING_PCM_S16_LE = 2,
-  UNRECOGNIZED = -1,
-}
-
-export function audioEncodingFromJSON(object: any): AudioEncoding {
-  switch (object) {
-    case 0:
-    case "AUDIO_ENCODING_UNSPECIFIED":
-      return AudioEncoding.AUDIO_ENCODING_UNSPECIFIED;
-    case 1:
-    case "AUDIO_ENCODING_PCM_F32_LE":
-      return AudioEncoding.AUDIO_ENCODING_PCM_F32_LE;
-    case 2:
-    case "AUDIO_ENCODING_PCM_S16_LE":
-      return AudioEncoding.AUDIO_ENCODING_PCM_S16_LE;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return AudioEncoding.UNRECOGNIZED;
-  }
-}
-
-export function audioEncodingToJSON(object: AudioEncoding): string {
-  switch (object) {
-    case AudioEncoding.AUDIO_ENCODING_UNSPECIFIED:
-      return "AUDIO_ENCODING_UNSPECIFIED";
-    case AudioEncoding.AUDIO_ENCODING_PCM_F32_LE:
-      return "AUDIO_ENCODING_PCM_F32_LE";
-    case AudioEncoding.AUDIO_ENCODING_PCM_S16_LE:
-      return "AUDIO_ENCODING_PCM_S16_LE";
-    case AudioEncoding.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }

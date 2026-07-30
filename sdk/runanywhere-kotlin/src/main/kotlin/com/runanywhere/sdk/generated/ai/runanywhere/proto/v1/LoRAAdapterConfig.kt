@@ -34,20 +34,9 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Configuration for loading a LoRA adapter.
- *
- * `adapter_path` is a path on disk to a LoRA GGUF file. `scale` controls the
- * adapter's effect strength (default 1.0; e.g. 0.3 for F16 adapters on
- * quantized bases). `adapter_id` is optional and, when present, links the
- * runtime config back to a registered `LoraAdapterCatalogEntry.id`. Catalog
- * helper APIs should preserve it; raw path-only adapters may omit it.
- * ---------------------------------------------------------------------------
- */
 public class LoRAAdapterConfig(
   /**
-   * path on disk to the GGUF file
+   * On-disk path to the GGUF file.
    */
   @RacRequiredOption(true)
   @field:WireField(
@@ -67,7 +56,7 @@ public class LoRAAdapterConfig(
   )
   public val scale: Float = 0f,
   /**
-   * optional link to catalog entry id
+   * Links back to a catalog entry when the adapter came from one.
    */
   @field:WireField(
     tag = 3,
@@ -88,6 +77,9 @@ public class LoRAAdapterConfig(
   )
   public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
+  /**
+   * Not read by commons.
+   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

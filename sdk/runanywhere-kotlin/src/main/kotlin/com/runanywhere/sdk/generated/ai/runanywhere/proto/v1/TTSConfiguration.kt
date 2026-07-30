@@ -29,31 +29,10 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Component-level TTS configuration.
- *
- * Mirrors the C ABI rac_tts_config_t exactly (minus preferred_framework, which
- * is a runtime hint, not part of the wire contract). Field names match Swift
- * TTSConfiguration / Kotlin TTSConfiguration.
- *
- * Defaults (for documentation; proto3 zero-values apply on the wire):
- *   voice              = "default"  (Kotlin) / "com.apple.ttsbundle..." (Swift)
- *   language_code      = "en-US"
- *   speed              = 1.0   (range 0.5 – 2.0)
- *   pitch              = 1.0   (range 0.5 – 2.0)
- *   volume             = 1.0   (range 0.0 – 1.0)
- *   audio_format       = AUDIO_FORMAT_PCM
- *   sample_rate        = 22050 (RAC_TTS_DEFAULT_SAMPLE_RATE)
- *   enable_neural_voice= true
- *   enable_ssml        = false
- * ---------------------------------------------------------------------------
- */
 public class TTSConfiguration(
   /**
-   * Model identifier (voice model file id, e.g. piper voice). Optional —
-   * platform TTS engines (Apple System TTS, Android TextToSpeech) don't
-   * require a model file.
+   * Voice model file id, e.g. a piper voice. Empty for platform TTS engines
+   * (Apple System TTS, Android TextToSpeech), which need no model file.
    */
   @field:WireField(
     tag = 1,
@@ -64,7 +43,7 @@ public class TTSConfiguration(
   )
   public val model_id: String = "",
   /**
-   * Whether to use neural / premium voice if available.
+   * Use the neural or premium voice when available.
    */
   @RacDefaultOption("true")
   @field:WireField(
@@ -75,9 +54,6 @@ public class TTSConfiguration(
     schemaIndex = 1,
   )
   public val enable_neural_voice: Boolean = false,
-  /**
-   * Preferred framework for the component. Absent = auto.
-   */
   @field:WireField(
     tag = 11,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
@@ -86,8 +62,7 @@ public class TTSConfiguration(
   )
   public val preferred_framework: InferenceFramework? = null,
   /**
-   * Component-level defaults applied when a per-call TTSOptions is absent
-   * or leaves a field unset.
+   * Applied when a per-call TTSOptions is absent or leaves a field unset.
    */
   @field:WireField(
     tag = 12,

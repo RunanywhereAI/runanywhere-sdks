@@ -11,28 +11,20 @@ exports.nPUChipToJSON = nPUChipToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * NPU chipset detected on the host device. Used to drive vendor-NPU
- * model-download URL selection and runtime backend wiring.
- * ---------------------------------------------------------------------------
- */
 var NPUChip;
 (function (NPUChip) {
     NPUChip[NPUChip["NPU_CHIP_UNSPECIFIED"] = 0] = "NPU_CHIP_UNSPECIFIED";
-    /** NPU_CHIP_NONE - No NPU detected on this device */
     NPUChip[NPUChip["NPU_CHIP_NONE"] = 1] = "NPU_CHIP_NONE";
-    /** NPU_CHIP_APPLE_NEURAL_ENGINE - Apple Neural Engine (A-series / M-series) */
+    /** NPU_CHIP_APPLE_NEURAL_ENGINE - A-series and M-series */
     NPUChip[NPUChip["NPU_CHIP_APPLE_NEURAL_ENGINE"] = 2] = "NPU_CHIP_APPLE_NEURAL_ENGINE";
-    /** NPU_CHIP_QUALCOMM_HEXAGON - Snapdragon 8 Elite, 8 Elite Gen 5, etc. */
     NPUChip[NPUChip["NPU_CHIP_QUALCOMM_HEXAGON"] = 3] = "NPU_CHIP_QUALCOMM_HEXAGON";
-    /** NPU_CHIP_MEDIATEK_APU - MediaTek Dimensity APU */
+    /** NPU_CHIP_MEDIATEK_APU - Dimensity APU */
     NPUChip[NPUChip["NPU_CHIP_MEDIATEK_APU"] = 4] = "NPU_CHIP_MEDIATEK_APU";
-    /** NPU_CHIP_GOOGLE_TPU - Pixel Tensor / TPU */
+    /** NPU_CHIP_GOOGLE_TPU - Pixel Tensor */
     NPUChip[NPUChip["NPU_CHIP_GOOGLE_TPU"] = 5] = "NPU_CHIP_GOOGLE_TPU";
-    /** NPU_CHIP_INTEL_NPU - Intel Core Ultra NPU */
+    /** NPU_CHIP_INTEL_NPU - Core Ultra */
     NPUChip[NPUChip["NPU_CHIP_INTEL_NPU"] = 6] = "NPU_CHIP_INTEL_NPU";
-    /** NPU_CHIP_OTHER - Detected NPU but vendor unmapped */
+    /** NPU_CHIP_OTHER - Detected but vendor unmapped */
     NPUChip[NPUChip["NPU_CHIP_OTHER"] = 99] = "NPU_CHIP_OTHER";
     NPUChip[NPUChip["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(NPUChip || (exports.NPUChip = NPUChip = {}));

@@ -29,22 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Structured output result — generic envelope returned by structured calls.
- * `parsed_json` is a UTF-8 JSON-encoded byte payload to keep the result
- * language-agnostic; SDKs deserialize into their concrete typed value.
- * Sources pre-IDL:
- *   RN     StructuredOutputTypes.ts:93  StructuredOutputResult<T> (data, raw,
- *                                       success, error)
- *   Dart   structured_output_types.dart StructuredOutputResult<T> (result,
- *                                       rawText, metrics)
- * ---------------------------------------------------------------------------
- */
 public class StructuredOutputResult(
-  /**
-   * JSON-encoded parsed value (UTF-8 bytes).
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
@@ -53,9 +38,6 @@ public class StructuredOutputResult(
     schemaIndex = 0,
   )
   public val parsed_json: ByteString = ByteString.EMPTY,
-  /**
-   * Validation / parse outcome.
-   */
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.StructuredOutputValidation#ADAPTER",
@@ -63,9 +45,6 @@ public class StructuredOutputResult(
     schemaIndex = 1,
   )
   public val validation: StructuredOutputValidation? = null,
-  /**
-   * Raw model text prior to parsing (optional, useful for retries).
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

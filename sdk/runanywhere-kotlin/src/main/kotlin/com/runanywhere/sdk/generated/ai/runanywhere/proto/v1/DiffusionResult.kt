@@ -31,29 +31,7 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Final generation result. Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:560    (DiffusionResult)
- *   Kotlin DiffusionTypes.kt:355       (DiffusionResult)
- *   RN     DiffusionTypes.ts:185       (DiffusionResult)
- *   Web    DiffusionTypes.ts:54        (DiffusionGenerationResult)
- *   C ABI  rac_diffusion_types.h:314   (rac_diffusion_result_t)
- *
- * Drift note: pre-IDL Swift/Kotlin/RN/Web all name the wall-clock field
- * `generation_time_ms`. The v1 IDL renames it to `total_time_ms` per the
- * spec — round-trip is a pure rename. `used_scheduler` is *new* in the IDL
- * (no pre-IDL surface echoes back which scheduler actually ran when the
- * caller sent UNSPECIFIED); it lets clients log which sampler the engine
- * chose.
- * ---------------------------------------------------------------------------
- */
 public class DiffusionResult(
-  /**
-   * Encoded image. PNG bytes on Swift/Kotlin/RN; raw RGBA bytes on the
-   * C ABI / Web llamacpp surface. (Encoding is a property of the
-   * backend's vtable, not of this message.)
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
@@ -62,9 +40,6 @@ public class DiffusionResult(
     schemaIndex = 0,
   )
   public val image_data: ByteString = ByteString.EMPTY,
-  /**
-   * Final image width  in pixels.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -72,9 +47,6 @@ public class DiffusionResult(
     schemaIndex = 1,
   )
   public val width: Int = 0,
-  /**
-   * Final image height in pixels.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -83,7 +55,7 @@ public class DiffusionResult(
   )
   public val height: Int = 0,
   /**
-   * Seed actually used (resolved if the caller passed -1 for random).
+   * The resolved seed, so a run can be reproduced when seed was -1.
    */
   @field:WireField(
     tag = 4,
@@ -93,10 +65,6 @@ public class DiffusionResult(
     schemaIndex = 3,
   )
   public val seed_used: Long = 0L,
-  /**
-   * Total wall-clock generation time in milliseconds (renamed from
-   * pre-IDL `generation_time_ms`).
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -105,10 +73,6 @@ public class DiffusionResult(
     schemaIndex = 4,
   )
   public val total_time_ms: Long = 0L,
-  /**
-   * Whether the safety checker flagged the image as NSFW. False if the
-   * checker was disabled in DiffusionConfiguration.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -117,10 +81,6 @@ public class DiffusionResult(
     schemaIndex = 5,
   )
   public val safety_flag: Boolean = false,
-  /**
-   * Scheduler the engine actually ran. Useful when the caller passed
-   * DIFFUSION_SCHEDULER_UNSPECIFIED.
-   */
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.DiffusionScheduler#ADAPTER",
@@ -130,9 +90,6 @@ public class DiffusionResult(
   )
   public val used_scheduler:
       DiffusionScheduler = DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED,
-  /**
-   * Failure details for result-envelope APIs.
-   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -148,9 +105,6 @@ public class DiffusionResult(
     schemaIndex = 8,
   )
   public val error_code: Int = 0,
-  /**
-   * Output image media type, e.g. "image/png" or "image/raw-rgba".
-   */
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

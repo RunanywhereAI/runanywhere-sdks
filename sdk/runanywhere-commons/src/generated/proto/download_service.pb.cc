@@ -2689,22 +2689,11 @@ const char descriptor_table_protodef_download_5fservice_2eproto[] ABSL_ATTRIBUTE
     "ATUS_NETWORK_UNAVAILABLE\020\t\022\"\n\036HTTP_DOWNL"
     "OAD_STATUS_DNS_ERROR\020\n\022\"\n\036HTTP_DOWNLOAD_"
     "STATUS_SSL_ERROR\020\013\022 \n\034HTTP_DOWNLOAD_STAT"
-    "US_UNKNOWN\020c2\270\003\n\010Download\022O\n\004Plan\022#.runa"
-    "nywhere.v1.DownloadPlanRequest\032\".runanyw"
-    "here.v1.DownloadPlanResult\022R\n\005Start\022$.ru"
-    "nanywhere.v1.DownloadStartRequest\032#.runa"
-    "nywhere.v1.DownloadStartResult\022Y\n\tSubscr"
-    "ibe\022(.runanywhere.v1.DownloadSubscribeRe"
-    "quest\032 .runanywhere.v1.DownloadProgress0"
-    "\001\022U\n\006Cancel\022%.runanywhere.v1.DownloadCan"
-    "celRequest\032$.runanywhere.v1.DownloadCanc"
-    "elResult\022U\n\006Resume\022%.runanywhere.v1.Down"
-    "loadResumeRequest\032$.runanywhere.v1.Downl"
-    "oadResumeResultB\217\001\n\027ai.runanywhere.proto"
-    ".v1B\024DownloadServiceProtoP\001Z<github.com/"
-    "runanywhere/runanywhere-sdks/idl/v1;runa"
-    "nywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002R"
-    "Ab\006proto3"
+    "US_UNKNOWN\020cB\217\001\n\027ai.runanywhere.proto.v1"
+    "B\024DownloadServiceProtoP\001Z<github.com/run"
+    "anywhere/runanywhere-sdks/idl/v1;runanyw"
+    "herev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006"
+    "proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_download_5fservice_2eproto_deps[1] = {
@@ -2714,7 +2703,7 @@ static ::absl::once_flag descriptor_table_download_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_download_5fservice_2eproto = {
     false,
     false,
-    4649,
+    4206,
     descriptor_table_protodef_download_5fservice_2eproto,
     "download_service.proto",
     &descriptor_table_download_5fservice_2eproto_once,

@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -18,15 +17,6 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
-/// ---------------------------------------------------------------------------
-/// Configuration for loading a LoRA adapter.
-///
-/// `adapter_path` is a path on disk to a LoRA GGUF file. `scale` controls the
-/// adapter's effect strength (default 1.0; e.g. 0.3 for F16 adapters on
-/// quantized bases). `adapter_id` is optional and, when present, links the
-/// runtime config back to a registered `LoraAdapterCatalogEntry.id`. Catalog
-/// helper APIs should preserve it; raw path-only adapters may omit it.
-/// ---------------------------------------------------------------------------
 class LoRAAdapterConfig extends $pb.GeneratedMessage {
   factory LoRAAdapterConfig({
     $core.String? adapterPath,
@@ -87,6 +77,7 @@ class LoRAAdapterConfig extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LoRAAdapterConfig>(create);
   static LoRAAdapterConfig? _defaultInstance;
 
+  /// On-disk path to the GGUF file.
   @$pb.TagNumber(1)
   $core.String get adapterPath => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -105,6 +96,7 @@ class LoRAAdapterConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearScale() => $_clearField(2);
 
+  /// Links back to a catalog entry when the adapter came from one.
   @$pb.TagNumber(3)
   $core.String get adapterId => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -117,17 +109,11 @@ class LoRAAdapterConfig extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(3);
 
+  /// Not read by commons.
   @$pb.TagNumber(5)
   $pb.PbList<$core.String> get targetModules => $_getList(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// Info about a currently-loaded LoRA adapter (read-only snapshot).
-///
-/// `adapter_id` and `error_message` are not present in any current SDK shape;
-/// they are encoded as `proto3 optional` so the existing fields (path, scale,
-/// applied) round-trip exactly while reserving room for richer status reports.
-/// ---------------------------------------------------------------------------
 class LoRAAdapterInfo extends $pb.GeneratedMessage {
   factory LoRAAdapterInfo({
     $core.String? adapterId,
@@ -190,6 +176,7 @@ class LoRAAdapterInfo extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LoRAAdapterInfo>(create);
   static LoRAAdapterInfo? _defaultInstance;
 
+  /// Catalog id when known, else empty.
   @$pb.TagNumber(1)
   $core.String get adapterId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -217,6 +204,7 @@ class LoRAAdapterInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearScale() => $_clearField(3);
 
+  /// Whether it is currently applied to the context.
   @$pb.TagNumber(4)
   $core.bool get applied => $_getBF(3);
   @$pb.TagNumber(4)
@@ -226,6 +214,7 @@ class LoRAAdapterInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearApplied() => $_clearField(4);
 
+  /// Populated when applied is false.
   @$pb.TagNumber(5)
   $core.String get errorMessage => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -254,15 +243,6 @@ class LoRAAdapterInfo extends $pb.GeneratedMessage {
   void clearLoadedAtMs() => $_clearField(7);
 }
 
-/// ---------------------------------------------------------------------------
-/// Catalog entry for a LoRA adapter registered with the SDK.
-/// Apps register entries at startup; SDKs query "which adapters work with this
-/// model" without reinventing detection logic per platform.
-///
-/// `author` is not present in any current SDK shape (Swift, Kotlin, Dart, RN,
-/// Web, C ABI) — it is encoded as `proto3 optional` so codegen produces a
-/// nullable / has-bit-tracked field.
-/// ---------------------------------------------------------------------------
 class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
   factory LoraAdapterCatalogEntry({
     $core.String? id,
@@ -393,6 +373,7 @@ class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearDescription() => $_clearField(3);
 
+  /// Direct .gguf download URL, and the filename to save it as.
   @$pb.TagNumber(4)
   $core.String get url => $_getSZ(3);
   @$pb.TagNumber(4)
@@ -411,9 +392,11 @@ class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearFilename() => $_clearField(5);
 
+  /// Explicit base model ids this adapter works with.
   @$pb.TagNumber(6)
   $pb.PbList<$core.String> get compatibleModels => $_getList(5);
 
+  /// 0 if unknown.
   @$pb.TagNumber(7)
   $fixnum.Int64 get sizeBytes => $_getI64(6);
   @$pb.TagNumber(7)
@@ -441,6 +424,7 @@ class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearDefaultScale() => $_clearField(9);
 
+  /// Lowercase hex.
   @$pb.TagNumber(10)
   $core.String get checksumSha256 => $_getSZ(9);
   @$pb.TagNumber(10)
@@ -465,8 +449,7 @@ class LoraAdapterCatalogEntry extends $pb.GeneratedMessage {
   @$pb.TagNumber(13)
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(12);
 
-  /// Stable platform-normalized local artifact path after native/Web has
-  /// completed download/import and reported the result back to commons.
+  /// Local artifact state, persisted only after the platform reports success.
   @$pb.TagNumber(14)
   $core.String get localPath => $_getSZ(13);
   @$pb.TagNumber(14)
@@ -766,6 +749,7 @@ class LoraAdapterCatalogListResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearErrorMessage() => $_clearField(3);
 
+  /// total_count is unfiltered; filtered_count reflects the query.
   @$pb.TagNumber(4)
   $core.int get totalCount => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -1164,15 +1148,6 @@ class LoraAdapterDownloadCompletedResult extends $pb.GeneratedMessage {
   void clearPersisted() => $_clearField(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// Import of a user-picked local adapter file. Commons owns everything past
-/// the platform-readable source path: deterministic catalog matching (exact
-/// local-path match, else an unambiguous filename match), canonical placement
-/// under {Models}/{framework}/lora-adapter:{id}/, artifact registry record +
-/// manifest persistence, and catalog completion for matched entries.
-/// Platforms only resolve OS-specific access (security-scoped URLs, content
-/// URIs, Blob-to-FS staging) before calling.
-/// ---------------------------------------------------------------------------
 class LoraAdapterImportRequest extends $pb.GeneratedMessage {
   factory LoraAdapterImportRequest({
     $core.String? sourcePath,
@@ -1221,6 +1196,7 @@ class LoraAdapterImportRequest extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LoraAdapterImportRequest>(create);
   static LoraAdapterImportRequest? _defaultInstance;
 
+  /// Platform-readable path of the picked file.
   @$pb.TagNumber(1)
   $core.String get sourcePath => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -1230,6 +1206,7 @@ class LoraAdapterImportRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearSourcePath() => $_clearField(1);
 
+  /// Defaults to basename(source_path).
   @$pb.TagNumber(2)
   $core.String get filename => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -1316,6 +1293,7 @@ class LoraAdapterImportResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearErrorMessage() => $_clearField(2);
 
+  /// Stable SDK-owned path of the imported file.
   @$pb.TagNumber(3)
   $core.String get localPath => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -1325,6 +1303,7 @@ class LoraAdapterImportResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearLocalPath() => $_clearField(3);
 
+  /// Whether a catalog entry matched and was completed.
   @$pb.TagNumber(4)
   $core.bool get matched => $_getBF(3);
   @$pb.TagNumber(4)
@@ -1346,13 +1325,6 @@ class LoraAdapterImportResult extends $pb.GeneratedMessage {
   LoraAdapterCatalogEntry ensureEntry() => $_ensure(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// Result of a LoRA compatibility pre-check.
-///
-/// `base_model_required` is not present in any current SDK shape — it is
-/// encoded as `proto3 optional` so a future implementation can surface "this
-/// adapter requires base model X" without breaking wire compatibility.
-/// ---------------------------------------------------------------------------
 class LoraCompatibilityResult extends $pb.GeneratedMessage {
   factory LoraCompatibilityResult({
     $core.bool? isCompatible,
@@ -1419,6 +1391,7 @@ class LoraCompatibilityResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearIsCompatible() => $_clearField(1);
 
+  /// Populated when is_compatible is false.
   @$pb.TagNumber(2)
   $core.String get errorMessage => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -1513,6 +1486,7 @@ class LoRAApplyRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   $pb.PbList<LoRAAdapterConfig> get adapters => $_getList(1);
 
+  /// Drop currently-applied adapters instead of stacking.
   @$pb.TagNumber(3)
   $core.bool get replaceExisting => $_getBF(2);
   @$pb.TagNumber(3)
@@ -1682,6 +1656,7 @@ class LoRARemoveRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearRequestId() => $_clearField(1);
 
+  /// Remove by id or by path; clear_all ignores both lists.
   @$pb.TagNumber(2)
   $pb.PbList<$core.String> get adapterIds => $_getList(1);
 
@@ -1698,6 +1673,8 @@ class LoRARemoveRequest extends $pb.GeneratedMessage {
   void clearClearAll() => $_clearField(4);
 }
 
+/// Also serves as the request for List and State, carrying optional
+/// base_model_id filtering without a separate empty request type.
 class LoRAState extends $pb.GeneratedMessage {
   factory LoRAState({
     $core.Iterable<LoRAAdapterInfo>? loadedAdapters,
@@ -1792,77 +1769,6 @@ class LoRAState extends $pb.GeneratedMessage {
   $core.bool hasErrorCode() => $_has(4);
   @$pb.TagNumber(5)
   void clearErrorCode() => $_clearField(5);
-}
-
-/// Logical LoRA service contract. Adapter file acquisition, sandbox handles,
-/// and backend-specific load/unload execution remain adapter/backend-owned;
-/// C++ consumes only serialized request/result/state messages.
-class LoRAApi {
-  final $pb.RpcClient _client;
-
-  LoRAApi(this._client);
-
-  /// Register catalog metadata. Local artifact state is ignored here and is
-  /// persisted only by MarkDownloadCompleted after native/Web reports success.
-  $async.Future<LoraAdapterCatalogEntry> registerCatalogEntry(
-          $pb.ClientContext? ctx, LoraAdapterCatalogEntry request) =>
-      _client.invoke<LoraAdapterCatalogEntry>(ctx, 'LoRA',
-          'RegisterCatalogEntry', request, LoraAdapterCatalogEntry());
-
-  /// Return catalog entries, optionally filtered by query.
-  $async.Future<LoraAdapterCatalogListResult> listCatalog(
-          $pb.ClientContext? ctx, LoraAdapterCatalogListRequest request) =>
-      _client.invoke<LoraAdapterCatalogListResult>(
-          ctx, 'LoRA', 'ListCatalog', request, LoraAdapterCatalogListResult());
-
-  /// Query catalog entries directly.
-  $async.Future<LoraAdapterCatalogListResult> queryCatalog(
-          $pb.ClientContext? ctx, LoraAdapterCatalogQuery request) =>
-      _client.invoke<LoraAdapterCatalogListResult>(
-          ctx, 'LoRA', 'QueryCatalog', request, LoraAdapterCatalogListResult());
-
-  /// Return one catalog entry by id.
-  $async.Future<LoraAdapterCatalogGetResult> getCatalogEntry(
-          $pb.ClientContext? ctx, LoraAdapterCatalogGetRequest request) =>
-      _client.invoke<LoraAdapterCatalogGetResult>(ctx, 'LoRA',
-          'GetCatalogEntry', request, LoraAdapterCatalogGetResult());
-
-  /// Persist platform-reported local path state after download/import.
-  $async.Future<LoraAdapterDownloadCompletedResult> markDownloadCompleted(
-          $pb.ClientContext? ctx,
-          LoraAdapterDownloadCompletedRequest request) =>
-      _client.invoke<LoraAdapterDownloadCompletedResult>(
-          ctx,
-          'LoRA',
-          'MarkDownloadCompleted',
-          request,
-          LoraAdapterDownloadCompletedResult());
-
-  /// Apply one or more adapters to the current logical model/session.
-  $async.Future<LoRAApplyResult> apply(
-          $pb.ClientContext? ctx, LoRAApplyRequest request) =>
-      _client.invoke<LoRAApplyResult>(
-          ctx, 'LoRA', 'Apply', request, LoRAApplyResult());
-
-  /// Remove named/path adapters, or clear all when LoRARemoveRequest.clear_all is true.
-  $async.Future<LoRAState> remove(
-          $pb.ClientContext? ctx, LoRARemoveRequest request) =>
-      _client.invoke<LoRAState>(ctx, 'LoRA', 'Remove', request, LoRAState());
-
-  /// Check whether an adapter config is compatible with the current base model.
-  $async.Future<LoraCompatibilityResult> checkCompatibility(
-          $pb.ClientContext? ctx, LoRAAdapterConfig request) =>
-      _client.invoke<LoraCompatibilityResult>(ctx, 'LoRA', 'CheckCompatibility',
-          request, LoraCompatibilityResult());
-
-  /// Return the current loaded-adapter snapshot. The request state can carry
-  /// optional base_model_id filtering without introducing an empty request type.
-  $async.Future<LoRAState> list($pb.ClientContext? ctx, LoRAState request) =>
-      _client.invoke<LoRAState>(ctx, 'LoRA', 'List', request, LoRAState());
-
-  /// Return the logical LoRA service state.
-  $async.Future<LoRAState> state($pb.ClientContext? ctx, LoRAState request) =>
-      _client.invoke<LoRAState>(ctx, 'LoRA', 'State', request, LoRAState());
 }
 
 const $core.bool _omitFieldNames =

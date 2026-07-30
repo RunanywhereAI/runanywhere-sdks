@@ -31,15 +31,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Result of a LoRA compatibility pre-check.
- *
- * `base_model_required` is not present in any current SDK shape — it is
- * encoded as `proto3 optional` so a future implementation can surface "this
- * adapter requires base model X" without breaking wire compatibility.
- * ---------------------------------------------------------------------------
- */
 public class LoraCompatibilityResult(
   @field:WireField(
     tag = 1,
@@ -50,7 +41,7 @@ public class LoraCompatibilityResult(
   )
   public val is_compatible: Boolean = false,
   /**
-   * populated when is_compatible = false
+   * Populated when is_compatible is false.
    */
   @field:WireField(
     tag = 2,
@@ -59,9 +50,6 @@ public class LoraCompatibilityResult(
     schemaIndex = 1,
   )
   public val error_message: String? = null,
-  /**
-   * base model id this adapter expects
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

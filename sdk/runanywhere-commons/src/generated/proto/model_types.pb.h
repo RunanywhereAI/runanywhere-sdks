@@ -63,6 +63,8 @@ enum ArchiveStructure : int;
 extern const uint32_t ArchiveStructure_internal_data_[];
 enum ArchiveType : int;
 extern const uint32_t ArchiveType_internal_data_[];
+enum AudioEncoding : int;
+extern const uint32_t AudioEncoding_internal_data_[];
 enum AudioFormat : int;
 extern const uint32_t AudioFormat_internal_data_[];
 enum InferenceFramework : int;
@@ -158,14 +160,6 @@ extern ModelCompatibilityResultGlobalsTypeInternal ModelCompatibilityResult_glob
 extern const ::google::protobuf::internal::ClassDataFull ModelCompatibilityResult_class_data_;
 #else
 extern const ModelCompatibilityResultGlobalsTypeInternal ModelCompatibilityResult_globals_;
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-class ModelDeleteRequest;
-struct ModelDeleteRequestGlobalsTypeInternal;
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-extern ModelDeleteRequestGlobalsTypeInternal ModelDeleteRequest_globals_;
-extern const ::google::protobuf::internal::ClassDataFull ModelDeleteRequest_class_data_;
-#else
-extern const ModelDeleteRequestGlobalsTypeInternal ModelDeleteRequest_globals_;
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 class ModelDeleteResult;
 struct ModelDeleteResultGlobalsTypeInternal;
@@ -418,6 +412,9 @@ template <>
 internal::EnumTraitsT<::runanywhere::v1::ArchiveType_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::ArchiveType>;
 template <>
+internal::EnumTraitsT<::runanywhere::v1::AudioEncoding_internal_data_>
+    internal::EnumTraitsImpl::value<::runanywhere::v1::AudioEncoding>;
+template <>
 internal::EnumTraitsT<::runanywhere::v1::AudioFormat_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::AudioFormat>;
 template <>
@@ -504,6 +501,48 @@ template <>
 [[nodiscard]] inline bool AudioFormat_Parse(
     ::absl::string_view name, AudioFormat* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<AudioFormat>(AudioFormat_descriptor(), name,
+                                           value);
+}
+enum AudioEncoding : int {
+  AUDIO_ENCODING_UNSPECIFIED = 0,
+  AUDIO_ENCODING_PCM_F32_LE = 1,
+  AUDIO_ENCODING_PCM_S16_LE = 2,
+  AUDIO_ENCODING_CONTAINER = 3,
+  AudioEncoding_INT_MIN_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::min(),
+  AudioEncoding_INT_MAX_SENTINEL_DO_NOT_USE_ =
+      ::std::numeric_limits<::int32_t>::max(),
+};
+
+extern const uint32_t AudioEncoding_internal_data_[];
+inline constexpr AudioEncoding AudioEncoding_MIN =
+    static_cast<AudioEncoding>(0);
+inline constexpr AudioEncoding AudioEncoding_MAX =
+    static_cast<AudioEncoding>(3);
+[[nodiscard]] inline bool AudioEncoding_IsValid(int value) {
+  return 0 <= value && value <= 3;
+}
+inline constexpr int AudioEncoding_ARRAYSIZE = 3 + 1;
+[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
+AudioEncoding_descriptor();
+[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(AudioEncoding) {
+  return AudioEncoding_descriptor();
+}
+template <typename T>
+[[nodiscard]] const ::std::string& AudioEncoding_Name(T value) {
+  static_assert(::std::is_same<T, AudioEncoding>::value ||
+                    ::std::is_integral<T>::value,
+                "Incorrect type passed to AudioEncoding_Name().");
+  return AudioEncoding_Name(static_cast<AudioEncoding>(value));
+}
+template <>
+[[nodiscard]] inline const ::std::string& AudioEncoding_Name(AudioEncoding value) {
+  return ::google::protobuf::internal::NameOfDenseEnum<AudioEncoding_descriptor, 0, 3>(
+      static_cast<int>(value));
+}
+[[nodiscard]] inline bool AudioEncoding_Parse(
+    ::absl::string_view name, AudioEncoding* PROTOBUF_NONNULL value) {
+  return ::google::protobuf::internal::ParseNamedEnum<AudioEncoding>(AudioEncoding_descriptor(), name,
                                            value);
 }
 enum ModelFormat : int {
@@ -1172,7 +1211,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RegisterModelFromUrlRequest final :
   [[nodiscard]] static const RegisterModelFromUrlRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RegisterModelFromUrlRequest>(&RegisterModelFromUrlRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 38;
+  static constexpr int kIndexInFileMessages = 37;
   friend void swap(RegisterModelFromUrlRequest& a, RegisterModelFromUrlRequest& b) { a.Swap(&b); }
   inline void Swap(RegisterModelFromUrlRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2330,7 +2369,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelRegistryFetchAssignmentsReques
   [[nodiscard]] static const ModelRegistryFetchAssignmentsRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ModelRegistryFetchAssignmentsRequest>(&ModelRegistryFetchAssignmentsRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 35;
+  static constexpr int kIndexInFileMessages = 34;
   friend void swap(ModelRegistryFetchAssignmentsRequest& a, ModelRegistryFetchAssignmentsRequest& b) { a.Swap(&b); }
   inline void Swap(ModelRegistryFetchAssignmentsRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3452,7 +3491,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelInfoMakeRequest final : public
   [[nodiscard]] static const ModelInfoMakeRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ModelInfoMakeRequest>(&ModelInfoMakeRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 37;
+  static constexpr int kIndexInFileMessages = 36;
   friend void swap(ModelInfoMakeRequest& a, ModelInfoMakeRequest& b) { a.Swap(&b); }
   inline void Swap(ModelInfoMakeRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3923,7 +3962,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFormatFromUrlResult final : pu
   [[nodiscard]] static const ModelFormatFromUrlResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ModelFormatFromUrlResult>(&ModelFormatFromUrlResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 32;
+  static constexpr int kIndexInFileMessages = 31;
   friend void swap(ModelFormatFromUrlResult& a, ModelFormatFromUrlResult& b) { a.Swap(&b); }
   inline void Swap(ModelFormatFromUrlResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4136,7 +4175,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFormatFromUrlRequest final : p
   [[nodiscard]] static const ModelFormatFromUrlRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ModelFormatFromUrlRequest>(&ModelFormatFromUrlRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 31;
+  static constexpr int kIndexInFileMessages = 30;
   friend void swap(ModelFormatFromUrlRequest& a, ModelFormatFromUrlRequest& b) { a.Swap(&b); }
   inline void Swap(ModelFormatFromUrlRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4681,7 +4720,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelDeleteResult final : public ::
   [[nodiscard]] static const ModelDeleteResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ModelDeleteResult>(&ModelDeleteResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 28;
+  static constexpr int kIndexInFileMessages = 27;
   friend void swap(ModelDeleteResult& a, ModelDeleteResult& b) { a.Swap(&b); }
   inline void Swap(ModelDeleteResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4937,248 +4976,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelDeleteResult final : public ::
 };
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelDeleteRequest final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.ModelDeleteRequest) */ {
- public:
-  inline ModelDeleteRequest() : ModelDeleteRequest(nullptr) {}
-  ~ModelDeleteRequest() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(ModelDeleteRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(ModelDeleteRequest));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr ModelDeleteRequest(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline ModelDeleteRequest(const ModelDeleteRequest& from) : ModelDeleteRequest(nullptr, from) {}
-  inline ModelDeleteRequest(ModelDeleteRequest&& from) noexcept : ModelDeleteRequest(nullptr, ::std::move(from)) {}
-  inline ModelDeleteRequest& operator=(const ModelDeleteRequest& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline ModelDeleteRequest& operator=(ModelDeleteRequest&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const ModelDeleteRequest& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ModelDeleteRequest>(&ModelDeleteRequest_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 27;
-  friend void swap(ModelDeleteRequest& a, ModelDeleteRequest& b) { a.Swap(&b); }
-  inline void Swap(ModelDeleteRequest* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(ModelDeleteRequest* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] ModelDeleteRequest* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<ModelDeleteRequest>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const ModelDeleteRequest& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const ModelDeleteRequest& from) { ModelDeleteRequest::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(ModelDeleteRequest* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ModelDeleteRequest"; }
-
-  explicit ModelDeleteRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  ModelDeleteRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ModelDeleteRequest& from);
-  ModelDeleteRequest(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ModelDeleteRequest&& from) noexcept
-      : ModelDeleteRequest(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kModelIdFieldNumber = 1,
-    kDeleteFilesFieldNumber = 2,
-    kUnregisterFieldNumber = 3,
-    kUnloadIfLoadedFieldNumber = 4,
-  };
-  // string model_id = 1;
-  void clear_model_id() ;
-  [[nodiscard]] const ::std::string& model_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_model_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_model_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
-  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_model_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
-
-  public:
-  // bool delete_files = 2;
-  void clear_delete_files() ;
-  [[nodiscard]] bool delete_files() const;
-  void set_delete_files(bool value);
-
-  private:
-  bool _internal_delete_files() const;
-  void _internal_set_delete_files(bool value);
-
-  public:
-  // bool unregister = 3;
-  void clear_unregister() ;
-  [[nodiscard]] bool unregister() const;
-  void set_unregister(bool value);
-
-  private:
-  bool _internal_unregister() const;
-  void _internal_set_unregister(bool value);
-
-  public:
-  // bool unload_if_loaded = 4;
-  void clear_unload_if_loaded() ;
-  [[nodiscard]] bool unload_if_loaded() const;
-  void set_unload_if_loaded(bool value);
-
-  private:
-  bool _internal_unload_if_loaded() const;
-  void _internal_set_unload_if_loaded(bool value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.ModelDeleteRequest)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 4,
-                          0, 50,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const ModelDeleteRequest& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr model_id_;
-    bool delete_files_;
-    bool unregister_;
-    bool unload_if_loaded_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_model_5ftypes_2eproto;
-};
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelCompatibilityResult final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.ModelCompatibilityResult) */ {
  public:
@@ -5235,7 +5032,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelCompatibilityResult final : pu
   [[nodiscard]] static const ModelCompatibilityResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ModelCompatibilityResult>(&ModelCompatibilityResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 30;
+  static constexpr int kIndexInFileMessages = 29;
   friend void swap(ModelCompatibilityResult& a, ModelCompatibilityResult& b) { a.Swap(&b); }
   inline void Swap(ModelCompatibilityResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5841,7 +5638,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ArtifactInferFromUrlResult final : 
   [[nodiscard]] static const ArtifactInferFromUrlResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ArtifactInferFromUrlResult>(&ArtifactInferFromUrlResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 34;
+  static constexpr int kIndexInFileMessages = 33;
   friend void swap(ArtifactInferFromUrlResult& a, ArtifactInferFromUrlResult& b) { a.Swap(&b); }
   inline void Swap(ArtifactInferFromUrlResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -6095,7 +5892,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ArtifactInferFromUrlRequest final :
   [[nodiscard]] static const ArtifactInferFromUrlRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ArtifactInferFromUrlRequest>(&ArtifactInferFromUrlRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 33;
+  static constexpr int kIndexInFileMessages = 32;
   friend void swap(ArtifactInferFromUrlRequest& a, ArtifactInferFromUrlRequest& b) { a.Swap(&b); }
   inline void Swap(ArtifactInferFromUrlRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -6318,7 +6115,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RegisterMultiFileModelRequest final
   [[nodiscard]] static const RegisterMultiFileModelRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<RegisterMultiFileModelRequest>(&RegisterMultiFileModelRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 39;
+  static constexpr int kIndexInFileMessages = 38;
   friend void swap(RegisterMultiFileModelRequest& a, RegisterMultiFileModelRequest& b) { a.Swap(&b); }
   inline void Swap(RegisterMultiFileModelRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -8070,7 +7867,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelCompatibilityRequest final : p
   [[nodiscard]] static const ModelCompatibilityRequest& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ModelCompatibilityRequest>(&ModelCompatibilityRequest_globals_);
   }
-  static constexpr int kIndexInFileMessages = 29;
+  static constexpr int kIndexInFileMessages = 28;
   friend void swap(ModelCompatibilityRequest& a, ModelCompatibilityRequest& b) { a.Swap(&b); }
   inline void Swap(ModelCompatibilityRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -12003,7 +11800,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelRegistryFetchAssignmentsResult
   [[nodiscard]] static const ModelRegistryFetchAssignmentsResult& default_instance() {
     return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<ModelRegistryFetchAssignmentsResult>(&ModelRegistryFetchAssignmentsResult_globals_);
   }
-  static constexpr int kIndexInFileMessages = 36;
+  static constexpr int kIndexInFileMessages = 35;
   friend void swap(ModelRegistryFetchAssignmentsResult& a, ModelRegistryFetchAssignmentsResult& b) { a.Swap(&b); }
   inline void Swap(ModelRegistryFetchAssignmentsResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -21411,146 +21208,6 @@ CurrentModelResult::_internal_mutable_resolved_artifacts() {
 
 // -------------------------------------------------------------------
 
-// ModelDeleteRequest
-
-// string model_id = 1;
-inline void ModelDeleteRequest::clear_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_id_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::std::string& ModelDeleteRequest::model_id() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelDeleteRequest.model_id)
-  return _internal_model_id();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void ModelDeleteRequest::set_model_id(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelDeleteRequest.model_id)
-}
-inline ::std::string* PROTOBUF_NONNULL ModelDeleteRequest::mutable_model_id()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_model_id();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelDeleteRequest.model_id)
-  return _s;
-}
-inline const ::std::string& ModelDeleteRequest::_internal_model_id() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.model_id_.Get();
-}
-inline void ModelDeleteRequest::_internal_set_model_id(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_id_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL ModelDeleteRequest::_internal_mutable_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.model_id_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE ModelDeleteRequest::release_model_id() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelDeleteRequest.model_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.model_id_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.model_id_.Set("", GetArena());
-  }
-  return released;
-}
-inline void ModelDeleteRequest::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  }
-  _impl_.model_id_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
-    _impl_.model_id_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelDeleteRequest.model_id)
-}
-
-// bool delete_files = 2;
-inline void ModelDeleteRequest::clear_delete_files() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.delete_files_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline bool ModelDeleteRequest::delete_files() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelDeleteRequest.delete_files)
-  return _internal_delete_files();
-}
-inline void ModelDeleteRequest::set_delete_files(bool value) {
-  _internal_set_delete_files(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelDeleteRequest.delete_files)
-}
-inline bool ModelDeleteRequest::_internal_delete_files() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.delete_files_;
-}
-inline void ModelDeleteRequest::_internal_set_delete_files(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.delete_files_ = value;
-}
-
-// bool unregister = 3;
-inline void ModelDeleteRequest::clear_unregister() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.unregister_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline bool ModelDeleteRequest::unregister() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelDeleteRequest.unregister)
-  return _internal_unregister();
-}
-inline void ModelDeleteRequest::set_unregister(bool value) {
-  _internal_set_unregister(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelDeleteRequest.unregister)
-}
-inline bool ModelDeleteRequest::_internal_unregister() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.unregister_;
-}
-inline void ModelDeleteRequest::_internal_set_unregister(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.unregister_ = value;
-}
-
-// bool unload_if_loaded = 4;
-inline void ModelDeleteRequest::clear_unload_if_loaded() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.unload_if_loaded_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline bool ModelDeleteRequest::unload_if_loaded() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelDeleteRequest.unload_if_loaded)
-  return _internal_unload_if_loaded();
-}
-inline void ModelDeleteRequest::set_unload_if_loaded(bool value) {
-  _internal_set_unload_if_loaded(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelDeleteRequest.unload_if_loaded)
-}
-inline bool ModelDeleteRequest::_internal_unload_if_loaded() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.unload_if_loaded_;
-}
-inline void ModelDeleteRequest::_internal_set_unload_if_loaded(bool value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.unload_if_loaded_ = value;
-}
-
-// -------------------------------------------------------------------
-
 // ModelDeleteResult
 
 // bool success = 1;
@@ -24660,6 +24317,12 @@ struct is_proto_enum<::runanywhere::v1::AudioFormat> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::AudioFormat>() {
   return ::runanywhere::v1::AudioFormat_descriptor();
+}
+template <>
+struct is_proto_enum<::runanywhere::v1::AudioEncoding> : std::true_type {};
+template <>
+inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::AudioEncoding>() {
+  return ::runanywhere::v1::AudioEncoding_descriptor();
 }
 template <>
 struct is_proto_enum<::runanywhere::v1::ModelFormat> : std::true_type {};

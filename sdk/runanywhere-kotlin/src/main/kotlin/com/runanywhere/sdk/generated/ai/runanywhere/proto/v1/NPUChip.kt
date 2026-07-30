@@ -16,42 +16,30 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * NPU chipset detected on the host device. Used to drive vendor-NPU
- * model-download URL selection and runtime backend wiring.
- * ---------------------------------------------------------------------------
- */
 public enum class NPUChip(
   override val `value`: Int,
 ) : WireEnum {
   NPU_CHIP_UNSPECIFIED(0),
-  /**
-   * No NPU detected on this device
-   */
   NPU_CHIP_NONE(1),
   /**
-   * Apple Neural Engine (A-series / M-series)
+   * A-series and M-series
    */
   NPU_CHIP_APPLE_NEURAL_ENGINE(2),
-  /**
-   * Snapdragon 8 Elite, 8 Elite Gen 5, etc.
-   */
   NPU_CHIP_QUALCOMM_HEXAGON(3),
   /**
-   * MediaTek Dimensity APU
+   * Dimensity APU
    */
   NPU_CHIP_MEDIATEK_APU(4),
   /**
-   * Pixel Tensor / TPU
+   * Pixel Tensor
    */
   NPU_CHIP_GOOGLE_TPU(5),
   /**
-   * Intel Core Ultra NPU
+   * Core Ultra
    */
   NPU_CHIP_INTEL_NPU(6),
   /**
-   * Detected NPU but vendor unmapped
+   * Detected but vendor unmapped
    */
   NPU_CHIP_OTHER(99),
   ;

@@ -16,27 +16,20 @@ import com.squareup.wire.`internal`.JvmStatic
 import kotlin.Int
 import kotlin.Suppress
 
-/**
- * ---------------------------------------------------------------------------
- * Phase identifiers — used by SdkInitResult.phase to indicate which phase the
- * result describes. Mirrors the SDK_INIT_* analytics events (started /
- * completed / failed) that exist in sdk_events.proto.
- * ---------------------------------------------------------------------------
- */
 public enum class SdkInitPhase(
   override val `value`: Int,
 ) : WireEnum {
   SDK_INIT_PHASE_UNSPECIFIED(0),
   /**
-   * Synchronous core init (~1-5ms, no network)
+   * Synchronous core init, no network
    */
   SDK_INIT_PHASE_ONE(1),
   /**
-   * Async services init (~100-500ms, network)
+   * Async services init, network
    */
   SDK_INIT_PHASE_TWO(2),
   /**
-   * HTTP/auth retry after offline init
+   * HTTP/auth retry after an offline init
    */
   SDK_INIT_PHASE_RETRY_HTTP(3),
   ;

@@ -344,7 +344,7 @@ extension DiarizationOptionsConvenience on DiarizationOptions {
     final r = DiarizationOptions();
     r.sampleRate = 16000;
     r.channels = 1;
-    r.encoding = DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE;
+    r.encoding = AudioEncoding.AUDIO_ENCODING_PCM_F32_LE;
     r.threshold = 0.5;
     return r;
   }
@@ -497,15 +497,15 @@ extension VADConfigurationConvenience on VADConfiguration {
 
 extension VADConfigurationValidate on VADConfiguration {
   void validate() {
-    if (sampleRate < 1 || sampleRate > 48000) {
+    if (sampleRate < 8000 || sampleRate > 48000) {
       throw SDKException.validationFailed(
-        'sample_rate must be in 1...48000 (got $sampleRate)',
+        'sample_rate must be in 8000...48000 (got $sampleRate)',
         fieldPath: 'VADConfiguration.sample_rate',
       );
     }
-    if (frameLengthMs < 1 || frameLengthMs > 1000) {
+    if (frameLengthMs < 20 || frameLengthMs > 1000) {
       throw SDKException.validationFailed(
-        'frame_length_ms must be in 1...1000 (got $frameLengthMs)',
+        'frame_length_ms must be in 20...1000 (got $frameLengthMs)',
         fieldPath: 'VADConfiguration.frame_length_ms',
       );
     }
@@ -515,9 +515,9 @@ extension VADConfigurationValidate on VADConfiguration {
         fieldPath: 'VADConfiguration.activation_threshold',
       );
     }
-    if (!calibrationMultiplier.isFinite || calibrationMultiplier < 1.5 || calibrationMultiplier > 4.0) {
+    if (!calibrationMultiplier.isFinite || calibrationMultiplier < 1.2 || calibrationMultiplier > 4.0) {
       throw SDKException.validationFailed(
-        'calibration_multiplier must be in 1.5...4.0 (got $calibrationMultiplier)',
+        'calibration_multiplier must be in 1.2...4.0 (got $calibrationMultiplier)',
         fieldPath: 'VADConfiguration.calibration_multiplier',
       );
     }

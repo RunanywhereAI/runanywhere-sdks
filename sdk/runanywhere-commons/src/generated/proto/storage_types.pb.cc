@@ -3023,26 +3023,17 @@ const char descriptor_table_protodef_storage_5ftypes_2eproto[] ABSL_ATTRIBUTE_SE
     "INE\020\002\022\035\n\031NPU_CHIP_QUALCOMM_HEXAGON\020\003\022\031\n\025"
     "NPU_CHIP_MEDIATEK_APU\020\004\022\027\n\023NPU_CHIP_GOOG"
     "LE_TPU\020\005\022\026\n\022NPU_CHIP_INTEL_NPU\020\006\022\022\n\016NPU_"
-    "CHIP_OTHER\020c2\357\002\n\007Storage\022M\n\004Info\022\".runan"
-    "ywhere.v1.StorageInfoRequest\032!.runanywhe"
-    "re.v1.StorageInfoResult\022e\n\014Availability\022"
-    "*.runanywhere.v1.StorageAvailabilityRequ"
-    "est\032).runanywhere.v1.StorageAvailability"
-    "Result\022Y\n\nDeletePlan\022(.runanywhere.v1.St"
-    "orageDeletePlanRequest\032!.runanywhere.v1."
-    "StorageDeletePlan\022S\n\006Delete\022$.runanywher"
-    "e.v1.StorageDeleteRequest\032#.runanywhere."
-    "v1.StorageDeleteResultB\214\001\n\027ai.runanywher"
-    "e.proto.v1B\021StorageTypesProtoP\001Z<github."
-    "com/runanywhere/runanywhere-sdks/idl/v1;"
-    "runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1"
-    "\272\002\002RAb\006proto3"
+    "CHIP_OTHER\020cB\214\001\n\027ai.runanywhere.proto.v1"
+    "B\021StorageTypesProtoP\001Z<github.com/runany"
+    "where/runanywhere-sdks/idl/v1;runanywher"
+    "ev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pro"
+    "to3"
 };
 static ::absl::once_flag descriptor_table_storage_5ftypes_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_storage_5ftypes_2eproto = {
     false,
     false,
-    3453,
+    3083,
     descriptor_table_protodef_storage_5ftypes_2eproto,
     "storage_types.proto",
     &descriptor_table_storage_5ftypes_2eproto_once,

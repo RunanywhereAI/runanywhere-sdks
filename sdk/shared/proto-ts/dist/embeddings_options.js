@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: embeddings_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EmbeddingsCreateResult = exports.EmbeddingsCreateRequest = exports.EmbeddingsServiceState = exports.EmbeddingsResult = exports.EmbeddingsRequest_MetadataEntry = exports.EmbeddingsRequest = exports.EmbeddingVector_MetadataEntry = exports.EmbeddingVector = exports.EmbeddingsOptions = exports.EmbeddingsConfiguration = exports.EmbeddingsPoolingStrategy = exports.EmbeddingsNormalizeMode = exports.protobufPackage = void 0;
+exports.EmbeddingsCreateResult = exports.EmbeddingsCreateRequest = exports.EmbeddingsResult = exports.EmbeddingsRequest_MetadataEntry = exports.EmbeddingsRequest = exports.EmbeddingVector_MetadataEntry = exports.EmbeddingVector = exports.EmbeddingsOptions = exports.EmbeddingsConfiguration = exports.EmbeddingsPoolingStrategy = exports.EmbeddingsNormalizeMode = exports.protobufPackage = void 0;
 exports.embeddingsNormalizeModeFromJSON = embeddingsNormalizeModeFromJSON;
 exports.embeddingsNormalizeModeToJSON = embeddingsNormalizeModeToJSON;
 exports.embeddingsPoolingStrategyFromJSON = embeddingsPoolingStrategyFromJSON;
@@ -14,11 +14,6 @@ exports.embeddingsPoolingStrategyToJSON = embeddingsPoolingStrategyToJSON;
 const wire_1 = require("@bufbuild/protobuf/wire");
 const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
-/**
- * ---------------------------------------------------------------------------
- * Embedding normalization mode. Mirrors rac_embeddings_normalize_t.
- * ---------------------------------------------------------------------------
- */
 var EmbeddingsNormalizeMode;
 (function (EmbeddingsNormalizeMode) {
     EmbeddingsNormalizeMode[EmbeddingsNormalizeMode["EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"] = 0] = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED";
@@ -56,11 +51,6 @@ function embeddingsNormalizeModeToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-/**
- * ---------------------------------------------------------------------------
- * Embedding pooling strategy. Mirrors rac_embeddings_pooling_t.
- * ---------------------------------------------------------------------------
- */
 var EmbeddingsPoolingStrategy;
 (function (EmbeddingsPoolingStrategy) {
     EmbeddingsPoolingStrategy[EmbeddingsPoolingStrategy["EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED"] = 0] = "EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED";
@@ -1032,154 +1022,6 @@ exports.EmbeddingsResult = {
         message.errorMessage = object.errorMessage ?? undefined;
         message.errorCode = object.errorCode ?? 0;
         message.requestId = object.requestId ?? "";
-        return message;
-    },
-};
-function createBaseEmbeddingsServiceState() {
-    return { isReady: false, currentModel: undefined, dimension: 0, maxTokens: 0, errorMessage: undefined, errorCode: 0 };
-}
-exports.EmbeddingsServiceState = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.isReady !== false) {
-            writer.uint32(8).bool(message.isReady);
-        }
-        if (message.currentModel !== undefined) {
-            writer.uint32(18).string(message.currentModel);
-        }
-        if (message.dimension !== 0) {
-            writer.uint32(24).int32(message.dimension);
-        }
-        if (message.maxTokens !== 0) {
-            writer.uint32(32).int32(message.maxTokens);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(42).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(48).int32(message.errorCode);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseEmbeddingsServiceState();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.isReady = reader.bool();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.currentModel = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.dimension = reader.int32();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 32) {
-                        break;
-                    }
-                    message.maxTokens = reader.int32();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            isReady: isSet(object.isReady)
-                ? globalThis.Boolean(object.isReady)
-                : isSet(object.is_ready)
-                    ? globalThis.Boolean(object.is_ready)
-                    : false,
-            currentModel: isSet(object.currentModel)
-                ? globalThis.String(object.currentModel)
-                : isSet(object.current_model)
-                    ? globalThis.String(object.current_model)
-                    : undefined,
-            dimension: isSet(object.dimension) ? globalThis.Number(object.dimension) : 0,
-            maxTokens: isSet(object.maxTokens)
-                ? globalThis.Number(object.maxTokens)
-                : isSet(object.max_tokens)
-                    ? globalThis.Number(object.max_tokens)
-                    : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.isReady !== false) {
-            obj.isReady = message.isReady;
-        }
-        if (message.currentModel !== undefined) {
-            obj.currentModel = message.currentModel;
-        }
-        if (message.dimension !== 0) {
-            obj.dimension = Math.round(message.dimension);
-        }
-        if (message.maxTokens !== 0) {
-            obj.maxTokens = Math.round(message.maxTokens);
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.EmbeddingsServiceState.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseEmbeddingsServiceState();
-        message.isReady = object.isReady ?? false;
-        message.currentModel = object.currentModel ?? undefined;
-        message.dimension = object.dimension ?? 0;
-        message.maxTokens = object.maxTokens ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         return message;
     },
 };

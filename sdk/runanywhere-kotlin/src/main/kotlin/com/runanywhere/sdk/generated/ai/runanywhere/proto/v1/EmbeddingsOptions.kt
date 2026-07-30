@@ -29,16 +29,12 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Per-call generation options. Overrides for a single embed / embed_batch
- * invocation; any field left unset falls back to the configuration default.
- * ---------------------------------------------------------------------------
+ * Per-call overrides. Unset fields fall back to the component configuration.
  */
 public class EmbeddingsOptions(
   /**
-   * Truncate inputs longer than max_sequence_length instead of erroring.
-   * Unset = backend default (currently truncate-on-overflow for ONNX,
-   * sliding-window for llama.cpp).
+   * Truncate over-long inputs instead of erroring. Unset = backend default,
+   * currently truncate-on-overflow for ONNX and sliding-window for llama.cpp.
    */
   @field:WireField(
     tag = 2,
@@ -47,8 +43,7 @@ public class EmbeddingsOptions(
   )
   public val truncate: Boolean? = null,
   /**
-   * Override batch size for embed_batch. Unset = backend chooses
-   * (RAC_EMBEDDINGS_DEFAULT_BATCH_SIZE = 512, capped at 8192).
+   * Unset = backend chooses (512, capped at 8192).
    */
   @RacMinOption(1)
   @RacMaxOption(8_192)
@@ -60,8 +55,7 @@ public class EmbeddingsOptions(
   )
   public val batch_size: Int? = null,
   /**
-   * Vector normalization mode. UNSPECIFIED = use component config
-   * (default L2).
+   * UNSPECIFIED = use the component config.
    */
   @RacDefaultOption("EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED")
   @field:WireField(

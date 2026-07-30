@@ -80,23 +80,6 @@ export type {
   VoiceEvent,
   Word,
 } from './api/types';
-export {
-  EMBED_DEFAULTS,
-  IMAGE_DEFAULTS,
-  LLM_DEFAULTS,
-  RAG_DEFAULTS,
-  REASONING_DEFAULTS,
-  SEGMENTATION_DEFAULTS,
-  STT_DEFAULTS,
-  TTS_DEFAULTS,
-  TURN_DEFAULTS,
-  VAD_DEFAULTS,
-  toNativeEmbedOptions,
-  toNativeGenerateOptions,
-  toNativeSttOptions,
-  toNativeTtsOptions,
-  toNativeVadConfig,
-} from './api/options';
 export type {
   DiarizationOptions,
   EmbedOptions,
@@ -114,28 +97,9 @@ export type {
   TurnHandlingOptions,
   VadOptions,
 } from './api/options';
-export type { LlmNamespace, ToolsNamespace, VlmNamespace } from './api/text';
-export type {
-  DiarizationNamespace,
-  SttNamespace,
-  TtsNamespace,
-  VadNamespace,
-  VoiceNamespace,
-  VoiceSession,
-  VoiceSessionConfig,
-} from './api/speech';
-export type {
-  EmbeddingsNamespace,
-  RagNamespace,
-  RagSession,
-  RerankNamespace,
-} from './api/data';
-export type {
-  ImagesNamespace,
-  LoraNamespace,
-  ModelsNamespace,
-  SegmentationNamespace,
-} from './api/assets';
+// The namespace interfaces are reached through `RunAnywhereApi`, not by name.
+export type { VoiceSession, VoiceSessionConfig } from './api/speech';
+export type { RagSession } from './api/data';
 
 // ---- deprecated (pre-v3) ----
 // Where a pre-v3 name collides with a v3 one, the v3 name is canonical and the old

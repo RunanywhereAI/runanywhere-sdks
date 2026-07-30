@@ -30,31 +30,11 @@ import kotlin.Suppress
 import okio.ByteString
 
 /**
- * ---------------------------------------------------------------------------
- * Runtime / per-call options applied to a VAD pass.
- * Sources pre-IDL:
- *   Swift  none — Swift uses raw arguments to detectSpeech().
- *   Kotlin none — same as Swift.
- *   Dart   runanywhere_vad.dart:99          (`detectSpeech` takes raw Float32List)
- *   RN     VADTypes.ts —                    (no per-call options struct)
- *   Web    VADTypes.ts —                    (no per-call options struct)
- *   C ABI  rac_vad_types.h:123 (rac_vad_input_t)
- *                                           (audio_samples, num_samples,
- *                                            energy_threshold_override)
- *
- * We canonicalize on the energy_threshold_override + the speech-duration
- * gates that already appear as constants in rac_vad_types.h:50-51:
- *   RAC_VAD_MIN_SPEECH_DURATION_MS  = 100
- *   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
- * Surfacing them as fields lets callers tune debouncing without a rebuild.
- * ---------------------------------------------------------------------------
- * Field vocabulary follows the industry VAD naming (LiveKit/Silero):
- * activation_threshold + min/max duration knobs + prefix padding.
+ * Per-call options. Field vocabulary follows LiveKit/Silero naming.
  */
 public class VADOptions(
   /**
-   * Per-call activation threshold override in \[0.0, 1.0\]. Unset/0 = keep
-   * the configured threshold.
+   * 0 = keep the configured threshold.
    */
   @RacMinFloatOption(0.0)
   @RacMaxFloatOption(1.0)
@@ -66,9 +46,6 @@ public class VADOptions(
     schemaIndex = 0,
   )
   public val activation_threshold: Float = 0f,
-  /**
-   * Minimum continuous speech duration (ms) before SPEECH_STARTED fires.
-   */
   @RacDefaultOption("100")
   @field:WireField(
     tag = 2,
@@ -78,9 +55,6 @@ public class VADOptions(
     schemaIndex = 1,
   )
   public val min_speech_duration_ms: Int = 0,
-  /**
-   * Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
-   */
   @RacDefaultOption("300")
   @field:WireField(
     tag = 3,
@@ -91,8 +65,7 @@ public class VADOptions(
   )
   public val min_silence_duration_ms: Int = 0,
   /**
-   * Maximum continuous speech duration (ms) before forcing a segment split.
-   * 0 = backend/default.
+   * 0 = backend default, for both of these.
    */
   @RacDefaultOption("0")
   @field:WireField(
@@ -105,7 +78,7 @@ public class VADOptions(
   public val max_speech_duration_ms: Int = 0,
   /**
    * Audio retained before SPEECH_STARTED so segments don't clip the first
-   * syllable. 0 = backend/default.
+   * syllable.
    */
   @RacDefaultOption("0")
   @field:WireField(
@@ -116,9 +89,6 @@ public class VADOptions(
     schemaIndex = 4,
   )
   public val prefix_padding_ms: Int = 0,
-  /**
-   * Whether to include VADStatistics in stream events when available.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

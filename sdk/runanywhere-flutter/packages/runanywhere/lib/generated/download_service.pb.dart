@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -1544,37 +1543,6 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
   $core.bool hasFailureReason() => $_has(6);
   @$pb.TagNumber(7)
   void clearFailureReason() => $_clearField(7);
-}
-
-class DownloadApi {
-  final $pb.RpcClient _client;
-
-  DownloadApi(this._client);
-
-  $async.Future<DownloadPlanResult> plan(
-          $pb.ClientContext? ctx, DownloadPlanRequest request) =>
-      _client.invoke<DownloadPlanResult>(
-          ctx, 'Download', 'Plan', request, DownloadPlanResult());
-  $async.Future<DownloadStartResult> start(
-          $pb.ClientContext? ctx, DownloadStartRequest request) =>
-      _client.invoke<DownloadStartResult>(
-          ctx, 'Download', 'Start', request, DownloadStartResult());
-
-  /// Server-streaming: emits a DownloadProgress message every time
-  /// bytes_downloaded crosses a per-engine reporting threshold (currently
-  /// every 64 KiB) until state ∈ {COMPLETED, FAILED, CANCELLED}.
-  $async.Future<DownloadProgress> subscribe(
-          $pb.ClientContext? ctx, DownloadSubscribeRequest request) =>
-      _client.invoke<DownloadProgress>(
-          ctx, 'Download', 'Subscribe', request, DownloadProgress());
-  $async.Future<DownloadCancelResult> cancel(
-          $pb.ClientContext? ctx, DownloadCancelRequest request) =>
-      _client.invoke<DownloadCancelResult>(
-          ctx, 'Download', 'Cancel', request, DownloadCancelResult());
-  $async.Future<DownloadResumeResult> resume(
-          $pb.ClientContext? ctx, DownloadResumeRequest request) =>
-      _client.invoke<DownloadResumeResult>(
-          ctx, 'Download', 'Resume', request, DownloadResumeResult());
 }
 
 const $core.bool _omitFieldNames =

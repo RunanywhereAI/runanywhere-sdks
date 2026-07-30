@@ -5,15 +5,9 @@
 
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import { MessageRole, ChatMessage as ChatMessageProto } from '@runanywhere/proto-ts/chat';
-import {
-  STTAudioEncoding,
-  STTAudioSource,
-} from '@runanywhere/proto-ts/stt_options';
-import {
-  VADAudioEncoding,
-  VADAudioSource,
-} from '@runanywhere/proto-ts/vad_options';
-import { DiarizationAudioEncoding } from '@runanywhere/proto-ts/diarization';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
+import { STTAudioSource } from '@runanywhere/proto-ts/stt_options';
+import { VADAudioSource } from '@runanywhere/proto-ts/vad_options';
 import {
   SegmentationImage,
   SegmentationPixelFormat,
@@ -126,10 +120,10 @@ function requireAudioBytes(audio: AudioInput, operation: string): Uint8Array {
 export function toSttAudioSource(audio: AudioInput): STTAudioSource {
   const encoding =
     audio.encoding === 'pcm16'
-      ? STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE
+      ? AudioEncoding.AUDIO_ENCODING_PCM_S16_LE
       : audio.encoding === 'float32'
-        ? STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE
-        : STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER;
+        ? AudioEncoding.AUDIO_ENCODING_PCM_F32_LE
+        : AudioEncoding.AUDIO_ENCODING_CONTAINER;
   return STTAudioSource.fromPartial({
     ...(audio.data ? { audioData: audio.data } : {}),
     ...(audio.filePath ? { fileUri: audio.filePath } : {}),
@@ -146,8 +140,8 @@ export function toVadAudioSource(audio: AudioInput): VADAudioSource {
     audioData: requireAudioBytes(audio, 'vad.detect'),
     encoding:
       audio.encoding === 'float32'
-        ? VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_F32_LE
-        : VADAudioEncoding.VAD_AUDIO_ENCODING_PCM_S16_LE,
+        ? AudioEncoding.AUDIO_ENCODING_PCM_F32_LE
+        : AudioEncoding.AUDIO_ENCODING_PCM_S16_LE,
     sampleRate: audio.sampleRate,
     channels: audio.channels,
   });
@@ -156,10 +150,10 @@ export function toVadAudioSource(audio: AudioInput): VADAudioSource {
 /** Pick the diarization encoding matching a public audio input. */
 export function toDiarizationEncoding(
   audio: AudioInput
-): DiarizationAudioEncoding {
+): AudioEncoding {
   return audio.encoding === 'float32'
-    ? DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE
-    : DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_S16_LE;
+    ? AudioEncoding.AUDIO_ENCODING_PCM_F32_LE
+    : AudioEncoding.AUDIO_ENCODING_PCM_S16_LE;
 }
 
 /** Raw bytes of a public audio input, for verbs that take a bare buffer. */

@@ -14,13 +14,14 @@
 
 /* eslint-disable */
 
-import { DiarizationAudioEncoding, DiarizationOptions } from '../diarization';
+import { DiarizationOptions } from '../diarization';
+import { AudioEncoding } from '../model_types';
 import { ValidationError } from './_errors';
 
 export const diarizationOptionsDefaults = (): DiarizationOptions => ({
   sampleRate: 16000,
   channels: 1,
-  encoding: DiarizationAudioEncoding.DIARIZATION_AUDIO_ENCODING_PCM_F32_LE,
+  encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
   threshold: 0.5,
   minimumDurationMs: 0,
   mergeGapMs: 0,

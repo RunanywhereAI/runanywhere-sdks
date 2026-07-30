@@ -32,11 +32,6 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Agent loop — multi-turn LLM with tool calling.
- * ---------------------------------------------------------------------------
- */
 public class AgentLoopConfig(
   @field:WireField(
     tag = 1,
@@ -55,9 +50,6 @@ public class AgentLoopConfig(
   )
   public val system_prompt: String = "",
   tools: List<ToolSpec> = emptyList(),
-  /**
-   * default 10
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -74,9 +66,6 @@ public class AgentLoopConfig(
     schemaIndex = 4,
   )
   public val max_context_tokens: Int = 0,
-  /**
-   * Optional explicit solution-kind tag. See `SolutionType`.
-   */
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.SolutionType#ADAPTER",

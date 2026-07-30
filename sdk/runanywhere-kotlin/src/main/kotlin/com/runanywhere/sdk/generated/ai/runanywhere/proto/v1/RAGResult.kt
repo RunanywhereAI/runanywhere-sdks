@@ -32,15 +32,7 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * RAGResult — the full result of a RAG query.
- * ---------------------------------------------------------------------------
- */
 public class RAGResult(
-  /**
-   * The LLM-generated answer grounded in the retrieved context.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -49,10 +41,6 @@ public class RAGResult(
   )
   public val answer: String = "",
   retrieved_chunks: List<RAGSearchResult> = emptyList(),
-  /**
-   * Full context string passed to the LLM (chunks joined into a prompt).
-   * May be empty for queries with no matching chunks.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -61,9 +49,6 @@ public class RAGResult(
     schemaIndex = 2,
   )
   public val context_used: String = "",
-  /**
-   * Time spent in the retrieval phase (vector search), in milliseconds.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -72,9 +57,6 @@ public class RAGResult(
     schemaIndex = 3,
   )
   public val retrieval_time_ms: Long = 0L,
-  /**
-   * Time spent in the LLM generation phase, in milliseconds.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -83,10 +65,6 @@ public class RAGResult(
     schemaIndex = 4,
   )
   public val generation_time_ms: Long = 0L,
-  /**
-   * Total end-to-end query time (retrieval + generation + overhead),
-   * in milliseconds.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -95,6 +73,10 @@ public class RAGResult(
     schemaIndex = 5,
   )
   public val total_time_ms: Long = 0L,
+  /**
+   * These use the OpenAI legacy names; everything else in the IDL says
+   * input_tokens / output_tokens.
+   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -142,9 +124,6 @@ public class RAGResult(
     schemaIndex = 11,
   )
   public val request_id: String = "",
-  /**
-   * Optional thinking/reasoning content extracted from the answer.
-   */
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -154,10 +133,6 @@ public class RAGResult(
   public val thinking_content: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGResult, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Document chunks retrieved during vector search and used as context.
-   * Order matches retrieval rank (highest similarity first).
-   */
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.RAGSearchResult#ADAPTER",

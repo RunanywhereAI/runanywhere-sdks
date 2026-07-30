@@ -32,15 +32,7 @@ import kotlin.collections.Map
 import kotlin.lazy
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * RAGDocument — batch-ingest input item.
- * ---------------------------------------------------------------------------
- */
 public class RAGDocument(
-  /**
-   * Optional caller-supplied document id.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -48,9 +40,6 @@ public class RAGDocument(
     schemaIndex = 0,
   )
   public val id: String = "",
-  /**
-   * Plain text content to chunk/embed.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -59,10 +48,6 @@ public class RAGDocument(
   )
   public val text: String = "",
   metadata: Map<String, String> = emptyMap(),
-  /**
-   * Adapter-normalized document source. Pickers, sandbox bookmarks, and
-   * platform file access remain SDK-owned.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -94,9 +79,6 @@ public class RAGDocument(
   public val size_bytes: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGDocument, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Typed metadata map for generated-proto callers.
-   */
   @field:WireField(
     tag = 4,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",

@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -20,17 +19,6 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'storage_types.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// Whole-device storage capacity. Reported by the platform OS (e.g. iOS
-/// `URLResourceKey.volumeAvailableCapacity*`, Android `StatFs`, browser
-/// `navigator.storage.estimate()`).
-///
-/// `used_percent` is materialized rather than computed at the receiver so
-/// every binding (Swift, Kotlin, Dart, RN, Web) reports the same number even
-/// when total_bytes == 0 (in which case used_percent MUST be 0.0).
-///
-/// Sources pre-IDL: see header drift table.
-/// ---------------------------------------------------------------------------
 class DeviceStorageInfo extends $pb.GeneratedMessage {
   factory DeviceStorageInfo({
     $fixnum.Int64? totalBytes,
@@ -111,6 +99,7 @@ class DeviceStorageInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearUsedBytes() => $_clearField(3);
 
+  /// 0.0 to 100.0, and 0.0 when total_bytes is 0.
   @$pb.TagNumber(4)
   $core.double get usedPercent => $_getN(3);
   @$pb.TagNumber(4)
@@ -121,14 +110,6 @@ class DeviceStorageInfo extends $pb.GeneratedMessage {
   void clearUsedPercent() => $_clearField(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// Per-app storage breakdown by directory type. Mirrors the iOS notion of
-/// Documents / Caches / Application Support; on Android these map to
-/// filesDir / cacheDir / a stable app-support sub-directory; on Web they map
-/// to OPFS / FSAccess buckets (collapsed to documents_bytes by default).
-///
-/// Sources pre-IDL: see header drift table.
-/// ---------------------------------------------------------------------------
 class AppStorageInfo extends $pb.GeneratedMessage {
   factory AppStorageInfo({
     $fixnum.Int64? documentsBytes,
@@ -219,17 +200,6 @@ class AppStorageInfo extends $pb.GeneratedMessage {
   void clearTotalBytes() => $_clearField(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// On-disk metrics for a single downloaded model. The full ModelInfo is *not*
-/// embedded here — callers cross-reference `model_id` against ModelInfo from
-/// model_types.proto. This avoids circular embeds and keeps the wire payload
-/// for storage queries small.
-///
-/// `last_used_ms` supports LRU presentation and eviction without another type
-/// round-trip.
-///
-/// Sources pre-IDL: see header drift table.
-/// ---------------------------------------------------------------------------
 class ModelStorageMetrics extends $pb.GeneratedMessage {
   factory ModelStorageMetrics({
     $core.String? modelId,
@@ -298,6 +268,7 @@ class ModelStorageMetrics extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearSizeOnDiskBytes() => $_clearField(2);
 
+  /// Epoch ms of the last load.
   @$pb.TagNumber(3)
   $fixnum.Int64 get lastUsedMs => $_getI64(2);
   @$pb.TagNumber(3)
@@ -308,13 +279,6 @@ class ModelStorageMetrics extends $pb.GeneratedMessage {
   void clearLastUsedMs() => $_clearField(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Aggregate storage view: device capacity + app footprint + per-model rows.
-/// `total_models` and `total_models_bytes` are denormalized for receivers that
-/// would otherwise re-iterate `models` to compute them (Web binding, RN host).
-///
-/// Sources pre-IDL: see header drift table.
-/// ---------------------------------------------------------------------------
 class StorageInfo extends $pb.GeneratedMessage {
   factory StorageInfo({
     AppStorageInfo? app,
@@ -418,17 +382,6 @@ class StorageInfo extends $pb.GeneratedMessage {
   void clearTotalModelsBytes() => $_clearField(5);
 }
 
-/// ---------------------------------------------------------------------------
-/// Result of a "do I have room to download X bytes?" probe. SDKs use this to
-/// pre-flight `downloadModel(...)` and surface user-facing warnings (e.g.
-/// "you only have 1.2 GB free; this model needs 4 GB").
-///
-/// `warning_message` and `recommendation` are independently optional —
-/// `warning_message` describes the current shortfall, `recommendation`
-/// suggests an action (delete cache, free models, etc.).
-///
-/// Sources pre-IDL: see header drift table.
-/// ---------------------------------------------------------------------------
 class StorageAvailability extends $pb.GeneratedMessage {
   factory StorageAvailability({
     $core.bool? isAvailable,
@@ -815,6 +768,7 @@ class StorageAvailabilityRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearRequiredBytes() => $_clearField(2);
 
+  /// Headroom multiplier applied on top of required_bytes.
   @$pb.TagNumber(3)
   $core.double get safetyMargin => $_getN(2);
   @$pb.TagNumber(3)
@@ -824,6 +778,7 @@ class StorageAvailabilityRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearSafetyMargin() => $_clearField(3);
 
+  /// Count bytes already occupied by this model as reclaimable.
   @$pb.TagNumber(4)
   $core.bool get includeExistingModelBytes => $_getBF(3);
   @$pb.TagNumber(4)
@@ -1037,6 +992,7 @@ class StorageDeletePlanRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearIncludeCache() => $_clearField(3);
 
+  /// Evict by least-recently-used rather than by size.
   @$pb.TagNumber(4)
   $core.bool get oldestFirst => $_getBF(3);
   @$pb.TagNumber(4)
@@ -1177,6 +1133,7 @@ class StorageDeleteCandidate extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearLocalPath() => $_clearField(5);
 
+  /// Deleting this needs an unload first, or a platform-side delete.
   @$pb.TagNumber(6)
   $core.bool get requiresUnload => $_getBF(5);
   @$pb.TagNumber(6)
@@ -1205,6 +1162,7 @@ class StorageDeleteCandidate extends $pb.GeneratedMessage {
   void clearStorageKey() => $_clearField(8);
 }
 
+/// Non-destructive: describes what could be reclaimed without doing it.
 class StorageDeletePlan extends $pb.GeneratedMessage {
   factory StorageDeletePlan({
     $core.bool? canReclaimRequiredBytes,
@@ -1453,6 +1411,7 @@ class StorageDeleteRequest extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearDryRun() => $_clearField(5);
 
+  /// Refuse to execute if the plan no longer matches current state.
   @$pb.TagNumber(6)
   StorageDeletePlan get plan => $_getN(5);
   @$pb.TagNumber(6)
@@ -1619,44 +1578,6 @@ class StorageDeleteResult extends $pb.GeneratedMessage {
   $core.bool hasFilesDeleted() => $_has(9);
   @$pb.TagNumber(10)
   void clearFilesDeleted() => $_clearField(10);
-}
-
-/// Logical Storage service contract. Platform adapters remain responsible for
-/// directory resolution, sandbox/bookmark/SAF/File System Access handles, OS
-/// free-space facts, permissions, and destructive file operations that require
-/// platform participation. C++ consumes only serialized request/result messages
-/// for metadata aggregation, availability checks, safe delete planning, and
-/// scoped delete execution.
-class StorageApi {
-  final $pb.RpcClient _client;
-
-  StorageApi(this._client);
-
-  /// Aggregate normalized storage metadata for device, app, cache, and models.
-  $async.Future<StorageInfoResult> info(
-          $pb.ClientContext? ctx, StorageInfoRequest request) =>
-      _client.invoke<StorageInfoResult>(
-          ctx, 'Storage', 'Info', request, StorageInfoResult());
-
-  /// Check whether required bytes fit under the configured policy and optional
-  /// delete-plan inputs.
-  $async.Future<StorageAvailabilityResult> availability(
-          $pb.ClientContext? ctx, StorageAvailabilityRequest request) =>
-      _client.invoke<StorageAvailabilityResult>(
-          ctx, 'Storage', 'Availability', request, StorageAvailabilityResult());
-
-  /// Build a non-destructive plan for reclaiming model/cache bytes.
-  $async.Future<StorageDeletePlan> deletePlan(
-          $pb.ClientContext? ctx, StorageDeletePlanRequest request) =>
-      _client.invoke<StorageDeletePlan>(
-          ctx, 'Storage', 'DeletePlan', request, StorageDeletePlan());
-
-  /// Execute or dry-run a scoped delete request using a validated plan when
-  /// supplied by the caller.
-  $async.Future<StorageDeleteResult> delete(
-          $pb.ClientContext? ctx, StorageDeleteRequest request) =>
-      _client.invoke<StorageDeleteResult>(
-          ctx, 'Storage', 'Delete', request, StorageDeleteResult());
 }
 
 const $core.bool _omitFieldNames =

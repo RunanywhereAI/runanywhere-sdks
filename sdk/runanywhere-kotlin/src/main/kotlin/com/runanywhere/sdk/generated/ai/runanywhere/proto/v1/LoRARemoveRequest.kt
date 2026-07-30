@@ -52,6 +52,9 @@ public class LoRARemoveRequest(
   public val clear_all: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoRARemoveRequest, Nothing>(ADAPTER, unknownFields) {
+  /**
+   * Remove by id or by path; clear_all ignores both lists.
+   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

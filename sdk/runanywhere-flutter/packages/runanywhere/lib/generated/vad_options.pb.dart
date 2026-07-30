@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -23,25 +22,7 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'vad_options.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// Compile-time / load-time configuration for a VAD instance.
-/// Sources pre-IDL:
-///   Swift  VADTypes.swift:15                (energyThreshold, sampleRate, frameLength,
-///                                            enableAutoCalibration, calibrationMultiplier)
-///   Kotlin VADTypes.kt:26                   (same five fields, defaults match Swift)
-///   Dart   vad_configuration.dart:5         (same five fields)
-///   RN     VADTypes.ts:12                   (sampleRate, frameLength, energyThreshold;
-///                                            no calibration fields)
-///   Web    VADTypes.ts —                    (no VADConfiguration; per-backend in WebSDK)
-///   C ABI  rac_vad_types.h:63 (rac_vad_config_t)
-///                                           (model_id, preferred_framework, energy_threshold,
-///                                            sample_rate, frame_length, enable_auto_calibration,
-///                                            calibration_multiplier)
-///
-/// `frame_length_ms` is the canonical wire field — Swift/Kotlin/Dart/C use
-/// seconds (float), but ms is more interoperable across protobuf consumers.
-/// Generators must convert when binding to per-platform types.
-/// ---------------------------------------------------------------------------
+/// Load-time configuration for a VAD instance.
 class VADConfiguration extends $pb.GeneratedMessage {
   factory VADConfiguration({
     $core.String? modelId,
@@ -121,8 +102,7 @@ class VADConfiguration extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<VADConfiguration>(create);
   static VADConfiguration? _defaultInstance;
 
-  /// Optional model id; empty when using the built-in energy VAD.
-  /// C ABI: model_id (rac_vad_config_t::model_id, may be NULL).
+  /// Empty when using the built-in energy VAD.
   @$pb.TagNumber(1)
   $core.String get modelId => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -132,7 +112,6 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearModelId() => $_clearField(1);
 
-  /// PCM sample rate in Hz. Default 16000 (RAC_VAD_DEFAULT_SAMPLE_RATE).
   @$pb.TagNumber(2)
   $core.int get sampleRate => $_getIZ(1);
   @$pb.TagNumber(2)
@@ -142,8 +121,8 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearSampleRate() => $_clearField(2);
 
-  /// Frame length in milliseconds. Default 100 (Swift/Kotlin/Dart store
-  /// 0.1 seconds; we canonicalize to ms on the wire).
+  /// Milliseconds on the wire; Swift/Kotlin/Dart/C hold seconds, so generated
+  /// bindings divide by 1000 when they bind to those types.
   @$pb.TagNumber(3)
   $core.int get frameLengthMs => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -153,8 +132,7 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearFrameLengthMs() => $_clearField(3);
 
-  /// Activation (energy) threshold in [0.0, 1.0] for voice detection.
-  /// Recommended range 0.01–0.05.
+  /// Commons rejects values outside [0, 1] and warns below 0.002 or above 0.1.
   @$pb.TagNumber(4)
   $core.double get activationThreshold => $_getN(3);
   @$pb.TagNumber(4)
@@ -164,9 +142,8 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearActivationThreshold() => $_clearField(4);
 
-  /// When true, the VAD performs ambient-noise calibration and uses the
-  /// result as a multiplier on the threshold (see calibration_multiplier
-  /// in the C ABI). Defaults to false.
+  /// Calibrate against ambient noise and scale the threshold by
+  /// calibration_multiplier.
   @$pb.TagNumber(5)
   $core.bool get enableAutoCalibration => $_getBF(4);
   @$pb.TagNumber(5)
@@ -176,8 +153,7 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearEnableAutoCalibration() => $_clearField(5);
 
-  /// Calibration multiplier (threshold = ambient noise * multiplier).
-  /// Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
+  /// threshold = ambient noise * multiplier
   @$pb.TagNumber(6)
   $core.double get calibrationMultiplier => $_getN(5);
   @$pb.TagNumber(6)
@@ -187,7 +163,6 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearCalibrationMultiplier() => $_clearField(6);
 
-  /// Preferred framework for VAD. Absent = auto.
   @$pb.TagNumber(7)
   $0.InferenceFramework get preferredFramework => $_getN(6);
   @$pb.TagNumber(7)
@@ -197,7 +172,7 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearPreferredFramework() => $_clearField(7);
 
-  /// Optional model path for backend-specific VADs (e.g. Silero ONNX).
+  /// For backend-specific VADs such as Silero ONNX.
   @$pb.TagNumber(8)
   $core.String get modelPath => $_getSZ(7);
   @$pb.TagNumber(8)
@@ -207,8 +182,7 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   void clearModelPath() => $_clearField(8);
 
-  /// Window size in samples for frame-based neural VAD backends. 0 =
-  /// backend/default.
+  /// 0 = backend default, for both of these.
   @$pb.TagNumber(9)
   $core.int get windowSizeSamples => $_getIZ(8);
   @$pb.TagNumber(9)
@@ -218,8 +192,6 @@ class VADConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearWindowSizeSamples() => $_clearField(9);
 
-  /// Maximum continuous speech segment duration in milliseconds. 0 =
-  /// backend/default.
   @$pb.TagNumber(10)
   $core.int get maxSpeechDurationMs => $_getIZ(9);
   @$pb.TagNumber(10)
@@ -230,26 +202,7 @@ class VADConfiguration extends $pb.GeneratedMessage {
   void clearMaxSpeechDurationMs() => $_clearField(10);
 }
 
-/// ---------------------------------------------------------------------------
-/// Runtime / per-call options applied to a VAD pass.
-/// Sources pre-IDL:
-///   Swift  none — Swift uses raw arguments to detectSpeech().
-///   Kotlin none — same as Swift.
-///   Dart   runanywhere_vad.dart:99          (`detectSpeech` takes raw Float32List)
-///   RN     VADTypes.ts —                    (no per-call options struct)
-///   Web    VADTypes.ts —                    (no per-call options struct)
-///   C ABI  rac_vad_types.h:123 (rac_vad_input_t)
-///                                           (audio_samples, num_samples,
-///                                            energy_threshold_override)
-///
-/// We canonicalize on the energy_threshold_override + the speech-duration
-/// gates that already appear as constants in rac_vad_types.h:50-51:
-///   RAC_VAD_MIN_SPEECH_DURATION_MS  = 100
-///   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
-/// Surfacing them as fields lets callers tune debouncing without a rebuild.
-/// ---------------------------------------------------------------------------
-/// Field vocabulary follows the industry VAD naming (LiveKit/Silero):
-/// activation_threshold + min/max duration knobs + prefix padding.
+/// Per-call options. Field vocabulary follows LiveKit/Silero naming.
 class VADOptions extends $pb.GeneratedMessage {
   factory VADOptions({
     $core.int? minSpeechDurationMs,
@@ -313,7 +266,6 @@ class VADOptions extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<VADOptions>(create);
   static VADOptions? _defaultInstance;
 
-  /// Minimum continuous speech duration (ms) before SPEECH_STARTED fires.
   @$pb.TagNumber(2)
   $core.int get minSpeechDurationMs => $_getIZ(0);
   @$pb.TagNumber(2)
@@ -323,7 +275,6 @@ class VADOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearMinSpeechDurationMs() => $_clearField(2);
 
-  /// Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
   @$pb.TagNumber(3)
   $core.int get minSilenceDurationMs => $_getIZ(1);
   @$pb.TagNumber(3)
@@ -333,8 +284,7 @@ class VADOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearMinSilenceDurationMs() => $_clearField(3);
 
-  /// Maximum continuous speech duration (ms) before forcing a segment split.
-  /// 0 = backend/default.
+  /// 0 = backend default, for both of these.
   @$pb.TagNumber(4)
   $core.int get maxSpeechDurationMs => $_getIZ(2);
   @$pb.TagNumber(4)
@@ -344,7 +294,6 @@ class VADOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearMaxSpeechDurationMs() => $_clearField(4);
 
-  /// Whether to include VADStatistics in stream events when available.
   @$pb.TagNumber(5)
   $core.bool get includeStatistics => $_getBF(3);
   @$pb.TagNumber(5)
@@ -354,8 +303,7 @@ class VADOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearIncludeStatistics() => $_clearField(5);
 
-  /// Per-call activation threshold override in [0.0, 1.0]. Unset/0 = keep
-  /// the configured threshold.
+  /// 0 = keep the configured threshold.
   @$pb.TagNumber(6)
   $core.double get activationThreshold => $_getN(4);
   @$pb.TagNumber(6)
@@ -366,7 +314,7 @@ class VADOptions extends $pb.GeneratedMessage {
   void clearActivationThreshold() => $_clearField(6);
 
   /// Audio retained before SPEECH_STARTED so segments don't clip the first
-  /// syllable. 0 = backend/default.
+  /// syllable.
   @$pb.TagNumber(7)
   $core.int get prefixPaddingMs => $_getIZ(5);
   @$pb.TagNumber(7)
@@ -383,7 +331,7 @@ class VADAudioSource extends $pb.GeneratedMessage {
   factory VADAudioSource({
     $core.List<$core.int>? audioData,
     $core.String? adapterHandle,
-    VADAudioEncoding? encoding,
+    $0.AudioEncoding? encoding,
     $core.int? sampleRate,
     $core.int? channels,
     $fixnum.Int64? frameOffsetMs,
@@ -421,8 +369,8 @@ class VADAudioSource extends $pb.GeneratedMessage {
     ..a<$core.List<$core.int>>(
         1, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
     ..aOS(2, _omitFieldNames ? '' : 'adapterHandle')
-    ..aE<VADAudioEncoding>(3, _omitFieldNames ? '' : 'encoding',
-        enumValues: VADAudioEncoding.values)
+    ..aE<$0.AudioEncoding>(3, _omitFieldNames ? '' : 'encoding',
+        enumValues: $0.AudioEncoding.values)
     ..aI(4, _omitFieldNames ? '' : 'sampleRate')
     ..aI(5, _omitFieldNames ? '' : 'channels')
     ..aInt64(6, _omitFieldNames ? '' : 'frameOffsetMs')
@@ -474,9 +422,9 @@ class VADAudioSource extends $pb.GeneratedMessage {
   void clearAdapterHandle() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  VADAudioEncoding get encoding => $_getN(2);
+  $0.AudioEncoding get encoding => $_getN(2);
   @$pb.TagNumber(3)
-  set encoding(VADAudioEncoding value) => $_setField(3, value);
+  set encoding($0.AudioEncoding value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasEncoding() => $_has(2);
   @$pb.TagNumber(3)
@@ -604,25 +552,6 @@ class VADProcessRequest extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(3);
 }
 
-/// ---------------------------------------------------------------------------
-/// Result of a single VAD pass over a chunk of PCM audio.
-/// Sources pre-IDL:
-///   Swift  VADTypes.swift —                 (no struct; bool returned from detectSpeech())
-///   Kotlin VADTypes.kt:152                  (isSpeech, confidence, energyLevel,
-///                                            statistics, timestamp)
-///   Dart   dart_bridge_vad.dart:290         (isSpeech, energy, speechProbability)
-///   RN     VADTypes.ts:26                   (isSpeech, probability, startTime, endTime)
-///   Web    VADTypes.ts —                    (no VADResult; only SpeechSegment)
-///   C ABI  rac_vad_types.h:151 (rac_vad_output_t)
-///                                           (is_speech_detected, energy_level, timestamp_ms)
-///
-/// Drift notes:
-///   - Kotlin's `confidence` and Dart's `speechProbability` and RN's
-///     `probability` collapse onto the canonical `confidence` field.
-///   - Kotlin/RN/C all carry timing — we encode duration_ms (length of the
-///     analyzed frame). Wall-clock timestamps belong on the carrying envelope
-///     (e.g. VoiceEvent.timestamp_us in voice_events.proto).
-/// ---------------------------------------------------------------------------
 class VADResult extends $pb.GeneratedMessage {
   factory VADResult({
     $core.bool? isSpeech,
@@ -694,8 +623,6 @@ class VADResult extends $pb.GeneratedMessage {
       _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VADResult>(create);
   static VADResult? _defaultInstance;
 
-  /// Whether speech was detected in this frame.
-  /// Mirrors rac_vad_output_t::is_speech_detected.
   @$pb.TagNumber(1)
   $core.bool get isSpeech => $_getBF(0);
   @$pb.TagNumber(1)
@@ -705,7 +632,7 @@ class VADResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearIsSpeech() => $_clearField(1);
 
-  /// Confidence / probability in [0.0, 1.0]. Backend-dependent.
+  /// [0.0, 1.0], backend-dependent.
   @$pb.TagNumber(2)
   $core.double get confidence => $_getN(1);
   @$pb.TagNumber(2)
@@ -715,8 +642,7 @@ class VADResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearConfidence() => $_clearField(2);
 
-  /// RMS energy level of the analyzed frame.
-  /// Mirrors rac_vad_output_t::energy_level.
+  /// RMS energy of the analyzed frame.
   @$pb.TagNumber(3)
   $core.double get energy => $_getN(2);
   @$pb.TagNumber(3)
@@ -726,7 +652,7 @@ class VADResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearEnergy() => $_clearField(3);
 
-  /// Length of the analyzed frame in milliseconds.
+  /// Length of the analyzed frame.
   @$pb.TagNumber(4)
   $core.int get durationMs => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -736,7 +662,7 @@ class VADResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearDurationMs() => $_clearField(4);
 
-  /// Wall-clock timestamp for this frame/result, in milliseconds since epoch.
+  /// Milliseconds since epoch.
   @$pb.TagNumber(5)
   $fixnum.Int64 get timestampMs => $_getI64(4);
   @$pb.TagNumber(5)
@@ -746,7 +672,7 @@ class VADResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearTimestampMs() => $_clearField(5);
 
-  /// Optional detected segment start/end times, in milliseconds. 0 = unset.
+  /// 0 = unset.
   @$pb.TagNumber(6)
   $fixnum.Int64 get startTimeMs => $_getI64(5);
   @$pb.TagNumber(6)
@@ -765,7 +691,6 @@ class VADResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearEndTimeMs() => $_clearField(7);
 
-  /// Optional statistics snapshot and result-envelope error details.
   @$pb.TagNumber(8)
   VADStatistics get statistics => $_getN(7);
   @$pb.TagNumber(8)
@@ -796,24 +721,7 @@ class VADResult extends $pb.GeneratedMessage {
   void clearErrorCode() => $_clearField(10);
 }
 
-/// ---------------------------------------------------------------------------
-/// Internal VAD statistics, exposed for debugging / waveform UIs.
-/// Sources pre-IDL:
-///   Swift  VADTypes.swift:174               (current, threshold, ambient,
-///                                            recentAvg, recentMax)
-///   Kotlin VADTypes.kt:123                  (same five fields)
-///   Dart   none — Dart bridge does not surface statistics yet.
-///   RN     VADTypes.ts —                    (none)
-///   Web    VADTypes.ts —                    (none)
-///   C ABI  rac_vad_types.h:194 (rac_vad_statistics_t)
-///                                           (current_threshold, ambient_noise_level,
-///                                            total_speech_segments, total_speech_duration_ms,
-///                                            average_energy, peak_energy)
-///
-/// We canonicalize on the Swift/Kotlin shape because it is the most widely
-/// used. The richer C ABI fields (segment counts, totals) belong on a future
-/// VADAnalytics message and are intentionally NOT included here.
-/// ---------------------------------------------------------------------------
+/// Exposed for debugging and waveform UIs.
 class VADStatistics extends $pb.GeneratedMessage {
   factory VADStatistics({
     $core.double? currentEnergy,
@@ -888,7 +796,6 @@ class VADStatistics extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<VADStatistics>(create);
   static VADStatistics? _defaultInstance;
 
-  /// Current instantaneous energy level. (Swift/Kotlin: `current`)
   @$pb.TagNumber(1)
   $core.double get currentEnergy => $_getN(0);
   @$pb.TagNumber(1)
@@ -898,8 +805,6 @@ class VADStatistics extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearCurrentEnergy() => $_clearField(1);
 
-  /// Energy threshold currently in use. (Swift/Kotlin: `threshold`;
-  /// C ABI: rac_vad_statistics_t::current_threshold)
   @$pb.TagNumber(2)
   $core.double get currentThreshold => $_getN(1);
   @$pb.TagNumber(2)
@@ -909,8 +814,7 @@ class VADStatistics extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearCurrentThreshold() => $_clearField(2);
 
-  /// Ambient noise level captured by calibration. (Swift/Kotlin: `ambient`;
-  /// C ABI: rac_vad_statistics_t::ambient_noise_level)
+  /// Ambient noise level captured by calibration.
   @$pb.TagNumber(3)
   $core.double get ambientLevel => $_getN(2);
   @$pb.TagNumber(3)
@@ -920,7 +824,7 @@ class VADStatistics extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearAmbientLevel() => $_clearField(3);
 
-  /// Recent moving-window average energy. (Swift/Kotlin: `recentAvg`)
+  /// Moving-window average and peak.
   @$pb.TagNumber(4)
   $core.double get recentAvg => $_getN(3);
   @$pb.TagNumber(4)
@@ -930,7 +834,6 @@ class VADStatistics extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearRecentAvg() => $_clearField(4);
 
-  /// Recent moving-window peak energy. (Swift/Kotlin: `recentMax`)
   @$pb.TagNumber(5)
   $core.double get recentMax => $_getN(4);
   @$pb.TagNumber(5)
@@ -940,8 +843,7 @@ class VADStatistics extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearRecentMax() => $_clearField(5);
 
-  /// Richer service-level counters from rac_vad_statistics_t. Zero = unset
-  /// for energy-only implementations.
+  /// Zero = unset for energy-only implementations.
   @$pb.TagNumber(6)
   $core.int get totalSpeechSegments => $_getIZ(5);
   @$pb.TagNumber(6)
@@ -979,22 +881,8 @@ class VADStatistics extends $pb.GeneratedMessage {
   void clearPeakEnergy() => $_clearField(9);
 }
 
-/// ---------------------------------------------------------------------------
-/// Activity transition emitted by the VAD as it watches a stream.
-/// Sources pre-IDL:
-///   Swift  VADTypes.swift:235               (SpeechActivityEvent enum: started/ended)
-///   Kotlin VADTypes.kt:171                  (SpeechActivityEvent enum: STARTED/ENDED)
-///   Dart   runanywhere_vad.dart:28          (SpeechActivityEvent enum: started/ended)
-///   RN     VADTypes.ts:43                   ('started' | 'ended' string union)
-///   Web    VADTypes.ts:8                    (SpeechActivity enum: Started/Ended/Ongoing)
-///   C ABI  rac_vad_types.h:107 (rac_speech_activity_t)
-///                                           (RAC_SPEECH_STARTED/ENDED/ONGOING)
-///
-/// Distinct from voice_events.proto's `VADEvent`, which carries the broader
-/// pipeline-level taxonomy (BARGE_IN, END_OF_UTTERANCE, etc) via
-/// `VADStreamEventKind`. `SpeechActivityEvent` here is the narrow
-/// component-level transition.
-/// ---------------------------------------------------------------------------
+/// Narrow component-level transition. voice_events.proto's VADEvent carries the
+/// broader pipeline taxonomy (BARGE_IN, END_OF_UTTERANCE) via VADStreamEventKind.
 class SpeechActivityEvent extends $pb.GeneratedMessage {
   factory SpeechActivityEvent({
     SpeechActivityKind? eventType,
@@ -1056,7 +944,6 @@ class SpeechActivityEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<SpeechActivityEvent>(create);
   static SpeechActivityEvent? _defaultInstance;
 
-  /// Which transition happened.
   @$pb.TagNumber(1)
   SpeechActivityKind get eventType => $_getN(0);
   @$pb.TagNumber(1)
@@ -1066,8 +953,7 @@ class SpeechActivityEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearEventType() => $_clearField(1);
 
-  /// Wall-clock time of the transition, in milliseconds since epoch.
-  /// Aligns with rac_vad_output_t::timestamp_ms.
+  /// Milliseconds since epoch.
   @$pb.TagNumber(2)
   $fixnum.Int64 get timestampMs => $_getI64(1);
   @$pb.TagNumber(2)
@@ -1077,9 +963,8 @@ class SpeechActivityEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearTimestampMs() => $_clearField(2);
 
-  /// Optional duration of the speech / silence that triggered this event,
-  /// in milliseconds. Set on SPEECH_ENDED to communicate the just-finished
-  /// utterance length; left zero on SPEECH_STARTED.
+  /// Length of the just-finished utterance on SPEECH_ENDED; zero on
+  /// SPEECH_STARTED.
   @$pb.TagNumber(3)
   $core.int get durationMs => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -1417,29 +1302,6 @@ class VADServiceState extends $pb.GeneratedMessage {
   $core.bool hasErrorCode() => $_has(7);
   @$pb.TagNumber(8)
   void clearErrorCode() => $_clearField(8);
-}
-
-/// Logical VAD service contract. Native microphone capture, audio-session
-/// ownership, device routing, and platform stream plumbing remain outside C++;
-/// C++ consumes only serialized frame requests and emits logical VAD events.
-class VADApi {
-  final $pb.RpcClient _client;
-
-  VADApi(this._client);
-
-  /// One-shot frame processing over PCM bytes or an adapter-provided logical
-  /// audio handle.
-  $async.Future<VADResult> processFrame(
-          $pb.ClientContext? ctx, VADProcessRequest request) =>
-      _client.invoke<VADResult>(
-          ctx, 'VAD', 'ProcessFrame', request, VADResult());
-
-  /// Server-streaming speech-activity events: frame results, transitions,
-  /// statistics snapshots, terminal stop, and errors.
-  $async.Future<VADStreamEvent> stream(
-          $pb.ClientContext? ctx, VADProcessRequest request) =>
-      _client.invoke<VADStreamEvent>(
-          ctx, 'VAD', 'Stream', request, VADStreamEvent());
 }
 
 const $core.bool _omitFieldNames =

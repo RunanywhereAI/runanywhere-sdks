@@ -29,13 +29,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Tokenizer source descriptor. `kind` is the preset; `custom_path` is only
- * meaningful when kind == CUSTOM and points at a directory URL containing
- * vocab.json + merges.txt (the SDK appends those filenames itself).
- * ---------------------------------------------------------------------------
- */
 public class DiffusionTokenizerSource(
   @field:WireField(
     tag = 1,
@@ -45,10 +38,6 @@ public class DiffusionTokenizerSource(
   )
   public val kind:
       DiffusionTokenizerSourceKind = DiffusionTokenizerSourceKind.DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED,
-  /**
-   * Only set when kind == DIFFUSION_TOKENIZER_SOURCE_KIND_CUSTOM. Empty /
-   * unset for the bundled presets.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -56,10 +45,6 @@ public class DiffusionTokenizerSource(
     schemaIndex = 1,
   )
   public val custom_path: String? = null,
-  /**
-   * Automatically download missing tokenizer files. Defaults to backend
-   * policy when unset/false.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

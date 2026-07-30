@@ -28,14 +28,6 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Audio pipeline state-manager configuration.
- *
- * Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
- * to prevent microphone/TTS feedback loops.
- * ---------------------------------------------------------------------------
- */
 public class AudioPipelineConfig(
   @field:WireField(
     tag = 1,

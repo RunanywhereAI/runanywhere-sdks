@@ -30,15 +30,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * RAGQueryOptions — per-query sampling and prompt overrides.
- * ---------------------------------------------------------------------------
- */
 public class RAGQueryOptions(
-  /**
-   * The user question to answer. Required (empty = no-op).
-   */
   @RacRequiredOption(true)
   @field:WireField(
     tag = 1,
@@ -47,12 +39,6 @@ public class RAGQueryOptions(
     schemaIndex = 0,
   )
   public val question: String = "",
-  /**
-   * Answer-generation knobs (sampling, system prompt, reasoning). Unset =
-   * pipeline defaults. RAG-appropriate defaults (e.g. max_output_tokens
-   * 512, temperature 0.7) are applied by the pipeline when unset, not
-   * re-declared here.
-   */
   @field:WireField(
     tag = 14,
     adapter = "ai.runanywhere.proto.v1.LLMGenerationOptions#ADAPTER",
@@ -60,7 +46,7 @@ public class RAGQueryOptions(
   )
   public val generation: LLMGenerationOptions? = null,
   /**
-   * Retrieval overrides. 0/unset = use RAGConfiguration defaults.
+   * Retrieval depth for this call, overriding RAGConfiguration.top_k.
    */
   @field:WireField(
     tag = 7,
@@ -70,11 +56,6 @@ public class RAGQueryOptions(
     schemaIndex = 2,
   )
   public val retrieval_top_k: Int = 0,
-  /**
-   * Per-query similarity floor. `optional` so an explicit 0.0 (accept
-   * everything) is distinguishable from "unset" and can override a positive
-   * session-level default; unset falls back to RAGConfiguration.
-   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -90,10 +71,7 @@ public class RAGQueryOptions(
   )
   public val stream: Boolean = false,
   /**
-   * Multi-query expansion: when true, the answer LLM rewrites the question
-   * into `multi_query_count` variants; retrieval runs for the original plus
-   * each variant and the rankings are RRF-fused before rerank. Falls back to
-   * a single query if expansion yields nothing.
+   * Expand the question into several queries and merge the results.
    */
   @field:WireField(
     tag = 11,
@@ -114,9 +92,7 @@ public class RAGQueryOptions(
   )
   public val multi_query_count: Int? = null,
   /**
-   * Scoped retrieval: when set, only chunks whose document id begins with
-   * this prefix are eligible (e.g. a chat/collection namespace). Unset =
-   * search the whole index.
+   * Restrict retrieval to chunks whose source matches this prefix.
    */
   @field:WireField(
     tag = 13,

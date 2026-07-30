@@ -14,17 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// Speech-activity lifecycle kind.
-/// Sources pre-IDL:
-///   Swift  VADTypes.swift:235               (started, ended)
-///   Kotlin VADTypes.kt:171                  (STARTED, ENDED)
-///   Dart   runanywhere_vad.dart:28          (started, ended)
-///   RN     VADTypes.ts:43                   ('started' | 'ended')
-///   Web    VADTypes.ts:8                    (Started, Ended, Ongoing)   ← only SDK with ONGOING
-///   C ABI  rac_vad_types.h:107              (RAC_SPEECH_STARTED, RAC_SPEECH_ENDED, RAC_SPEECH_ONGOING)
-/// Canonical union: STARTED, ENDED, ONGOING.
-/// ---------------------------------------------------------------------------
 class SpeechActivityKind extends $pb.ProtobufEnum {
   static const SpeechActivityKind SPEECH_ACTIVITY_KIND_UNSPECIFIED =
       SpeechActivityKind._(
@@ -54,31 +43,6 @@ class SpeechActivityKind extends $pb.ProtobufEnum {
   const SpeechActivityKind._(super.value, super.name);
 }
 
-class VADAudioEncoding extends $pb.ProtobufEnum {
-  static const VADAudioEncoding VAD_AUDIO_ENCODING_UNSPECIFIED =
-      VADAudioEncoding._(
-          0, _omitEnumNames ? '' : 'VAD_AUDIO_ENCODING_UNSPECIFIED');
-  static const VADAudioEncoding VAD_AUDIO_ENCODING_PCM_F32_LE =
-      VADAudioEncoding._(
-          1, _omitEnumNames ? '' : 'VAD_AUDIO_ENCODING_PCM_F32_LE');
-  static const VADAudioEncoding VAD_AUDIO_ENCODING_PCM_S16_LE =
-      VADAudioEncoding._(
-          2, _omitEnumNames ? '' : 'VAD_AUDIO_ENCODING_PCM_S16_LE');
-
-  static const $core.List<VADAudioEncoding> values = <VADAudioEncoding>[
-    VAD_AUDIO_ENCODING_UNSPECIFIED,
-    VAD_AUDIO_ENCODING_PCM_F32_LE,
-    VAD_AUDIO_ENCODING_PCM_S16_LE,
-  ];
-
-  static final $core.List<VADAudioEncoding?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static VADAudioEncoding? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const VADAudioEncoding._(super.value, super.name);
-}
-
 class VADStreamEventKind extends $pb.ProtobufEnum {
   static const VADStreamEventKind VAD_STREAM_EVENT_KIND_UNSPECIFIED =
       VADStreamEventKind._(
@@ -102,10 +66,8 @@ class VADStreamEventKind extends $pb.ProtobufEnum {
       VADStreamEventKind._(
           6, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_ERROR');
 
-  /// Pipeline-level barge-in signal previously carried by the
-  /// deleted VADEventType enum. Emitted when the VAD detects speech that
-  /// interrupts active assistant playback; downstream pipeline typically
-  /// routes this through InterruptedEvent/InterruptReason as well.
+  /// Speech that interrupts active assistant playback. Downstream pipeline
+  /// also routes this through InterruptedEvent/InterruptReason.
   static const VADStreamEventKind VAD_STREAM_EVENT_KIND_BARGE_IN =
       VADStreamEventKind._(
           7, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_BARGE_IN');

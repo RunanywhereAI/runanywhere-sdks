@@ -31,7 +31,7 @@ import okio.ByteString
 
 public class EmbeddingsCreateResult(
   /**
-   * Opaque handle (rac_handle_t cast to u64). Zero on failure.
+   * rac_handle_t cast to u64. Zero on failure.
    */
   @field:WireField(
     tag = 1,
@@ -41,8 +41,7 @@ public class EmbeddingsCreateResult(
   )
   public val handle: Long = 0L,
   /**
-   * Echo of the model id the caller requested — so JS/Swift/Kotlin can
-   * store it next to the handle without re-parsing the request.
+   * Echoed so callers can store it beside the handle.
    */
   @field:WireField(
     tag = 2,
@@ -53,8 +52,7 @@ public class EmbeddingsCreateResult(
   )
   public val model_id: String = "",
   /**
-   * Backend-resolved dimension/max_tokens after load. 0 = unknown until
-   * the first embed call.
+   * Backend-resolved after load. 0 = unknown until the first embed call.
    */
   @field:WireField(
     tag = 3,
@@ -72,8 +70,7 @@ public class EmbeddingsCreateResult(
   )
   public val max_tokens: Int = 0,
   /**
-   * Negative on failure; mirrors rac_result_t. Empty error_message on
-   * success.
+   * Mirrors rac_result_t; negative on failure.
    */
   @field:WireField(
     tag = 5,

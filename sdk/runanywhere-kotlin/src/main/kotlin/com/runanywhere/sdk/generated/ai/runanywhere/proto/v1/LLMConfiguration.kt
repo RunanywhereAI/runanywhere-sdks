@@ -29,17 +29,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Lightweight LLM configuration used at component-init time (Swift
- * LLMConfiguration in LLMTypes.swift:15). Distinct from LLMGenerationOptions
- * — this is the "load the model" knob set, not the per-call sampling knobs.
- * ---------------------------------------------------------------------------
- */
 public class LLMConfiguration(
-  /**
-   * Model context window length in tokens. 0 = use model default.
-   */
   @RacDefaultOption("2048")
   @field:WireField(
     tag = 1,
@@ -49,10 +39,6 @@ public class LLMConfiguration(
     schemaIndex = 0,
   )
   public val context_length: Int = 0,
-  /**
-   * Model identifier/path resolved by the component loader. Present in the
-   * C ABI rac_llm_config_t and needed for generated-proto service handles.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -60,10 +46,6 @@ public class LLMConfiguration(
     schemaIndex = 1,
   )
   public val model_id: String? = null,
-  /**
-   * Preferred inference framework for this component. UNSPECIFIED / absent
-   * means "auto".
-   */
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
@@ -72,8 +54,7 @@ public class LLMConfiguration(
   )
   public val preferred_framework: InferenceFramework? = null,
   /**
-   * Component-level defaults applied when a per-call options message is
-   * absent or leaves a field unset.
+   * Applied when a per-call LLMGenerationOptions leaves a field unset.
    */
   @field:WireField(
     tag = 8,

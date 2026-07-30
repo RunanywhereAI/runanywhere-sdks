@@ -20,12 +20,9 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'thinking_tag_pattern.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// Pattern used to extract a model's "thinking" / reasoning block from its
-/// raw output. Used by Qwen3 and LFM2 family models that emit
-/// <think>...</think> wrappers. Shared by LLM generation options (per-call
-/// override) and ModelInfo catalog metadata (default pattern for a model).
-/// ---------------------------------------------------------------------------
+/// Extracts a model's reasoning block from raw output, for families like Qwen3
+/// and LFM2 that wrap it in <think>...</think>. Used both per-call and as
+/// ModelInfo catalog metadata.
 class ThinkingTagPattern extends $pb.GeneratedMessage {
   factory ThinkingTagPattern({
     $core.String? openTag,
@@ -73,7 +70,7 @@ class ThinkingTagPattern extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ThinkingTagPattern>(create);
   static ThinkingTagPattern? _defaultInstance;
 
-  /// Opening tag string. Default if empty: "<think>".
+  /// Empty defaults to "<think>".
   @$pb.TagNumber(1)
   $core.String get openTag => $_getSZ(0);
   @$pb.TagNumber(1)
@@ -83,7 +80,7 @@ class ThinkingTagPattern extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearOpenTag() => $_clearField(1);
 
-  /// Closing tag string. Default if empty: "</think>".
+  /// Empty defaults to "</think>".
   @$pb.TagNumber(2)
   $core.String get closeTag => $_getSZ(1);
   @$pb.TagNumber(2)
@@ -155,8 +152,8 @@ class ReasoningOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearMode() => $_clearField(1);
 
-  /// Emit thought tokens/content to the caller (stream TokenKind.THOUGHT
-  /// events and result thinking_content). False = thinking is stripped.
+  /// Emit thought tokens to the caller as TokenKind.THOUGHT events plus
+  /// result thinking_content. False strips them.
   @$pb.TagNumber(2)
   $core.bool get includeInOutput => $_getBF(1);
   @$pb.TagNumber(2)
@@ -166,8 +163,7 @@ class ReasoningOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearIncludeInOutput() => $_clearField(2);
 
-  /// Tag override for models whose thinking markers differ from the
-  /// catalog default.
+  /// For models whose thinking markers differ from the catalog default.
   @$pb.TagNumber(3)
   ThinkingTagPattern get pattern => $_getN(2);
   @$pb.TagNumber(3)

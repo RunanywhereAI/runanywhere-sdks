@@ -30,18 +30,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Synthesis metadata.
- *
- * Mirrors the C ABI rac_tts_synthesis_metadata_t. Time units in milliseconds
- * and durations as int64 to match the C ABI.
- * ---------------------------------------------------------------------------
- */
 public class TTSSynthesisMetadata(
-  /**
-   * Voice id used for synthesis.
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -51,9 +40,7 @@ public class TTSSynthesisMetadata(
   )
   public val voice_id: String = "",
   /**
-   * Language used for synthesis (BCP-47). Source field name varies:
-   * C ABI: `language`, Swift: `language`, Kotlin: `language`. We use
-   * `language_code` to match TTSConfiguration / TTSOptions.
+   * BCP-47.
    */
   @field:WireField(
     tag = 2,
@@ -63,9 +50,6 @@ public class TTSSynthesisMetadata(
     schemaIndex = 1,
   )
   public val language_code: String = "",
-  /**
-   * Wall-clock processing time in milliseconds.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -74,9 +58,6 @@ public class TTSSynthesisMetadata(
     schemaIndex = 2,
   )
   public val processing_time_ms: Long = 0L,
-  /**
-   * Number of input characters synthesized.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -85,11 +66,6 @@ public class TTSSynthesisMetadata(
     schemaIndex = 3,
   )
   public val character_count: Int = 0,
-  /**
-   * Audio duration in milliseconds. Present in C ABI rac_tts_output_t but
-   * mirrored here so metadata is self-describing for clients that consume
-   * metadata-only paths (e.g. TTSSpeakResult).
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -99,8 +75,7 @@ public class TTSSynthesisMetadata(
   )
   public val audio_duration_ms: Long = 0L,
   /**
-   * Characters processed per second. Some native paths expose this directly;
-   * consumers may also compute it from character_count / processing_time_ms.
+   * character_count / processing_time_ms, set by the producer.
    */
   @field:WireField(
     tag = 6,

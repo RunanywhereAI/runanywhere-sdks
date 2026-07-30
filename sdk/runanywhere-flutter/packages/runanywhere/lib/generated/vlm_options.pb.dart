@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -24,10 +23,6 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'vlm_options.pbenum.dart';
 
-/// ---------------------------------------------------------------------------
-/// Custom VLM chat template.
-/// Mirrors rac_vlm_chat_template_t.
-/// ---------------------------------------------------------------------------
 class VLMChatTemplate extends $pb.GeneratedMessage {
   factory VLMChatTemplate({
     $core.String? templateText,
@@ -109,16 +104,6 @@ class VLMChatTemplate extends $pb.GeneratedMessage {
 
 enum VLMImage_Source { filePath, encoded, rawRgb, base64, notSet }
 
-/// ---------------------------------------------------------------------------
-/// VLM image input.
-///
-/// `source` is a oneof so that exactly one of {file_path, encoded, raw_rgb,
-/// base64} can be supplied per request. `width` / `height` are required for
-/// non-encoded formats (raw_rgb, raw_rgba) where the consumer cannot infer
-/// dimensions from a container header. `format` disambiguates encoded `bytes`
-/// payloads (JPEG / PNG / WEBP) and explicitly tags raw / file-path / base64
-/// sources.
-/// ---------------------------------------------------------------------------
 class VLMImage extends $pb.GeneratedMessage {
   factory VLMImage({
     $core.String? filePath,
@@ -254,10 +239,6 @@ class VLMImage extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearBase64() => $_clearField(4);
 
-  /// Required for VLM_IMAGE_FORMAT_RAW_RGB and VLM_IMAGE_FORMAT_RAW_RGBA
-  /// (consumers cannot infer dimensions for raw pixel buffers). Optional
-  /// for encoded / file_path / base64 sources where the decoder reads
-  /// dimensions from the container.
   @$pb.TagNumber(5)
   $core.int get width => $_getIZ(4);
   @$pb.TagNumber(5)
@@ -285,8 +266,6 @@ class VLMImage extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   void clearFormat() => $_clearField(7);
 
-  /// Optional source metadata. Adapters may populate this after camera/file
-  /// picker capture without exposing native APIs to core.
   @$pb.TagNumber(8)
   $core.String get mediaType => $_getSZ(7);
   @$pb.TagNumber(8)
@@ -318,21 +297,6 @@ class VLMImage extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(10);
 }
 
-/// ---------------------------------------------------------------------------
-/// VLM component configuration.
-/// Sources pre-IDL:
-///   Kotlin VLMTypes.kt:163        (modelId, contextLength, temperature,
-///                                  maxTokens, systemPrompt, streamingEnabled,
-///                                  preferredFramework)
-///   C ABI  rac_vlm_types.h:224    (model_id, preferred_framework,
-///                                  context_length, temperature, max_tokens,
-///                                  system_prompt, streaming_enabled)
-///
-/// Per the canonicalization brief, only the load-bearing identification +
-/// limits cross the IDL boundary here: model_id, max_image_size_px, max_tokens.
-/// Per-request sampling parameters live on VLMGenerationOptions; runtime
-/// streaming toggles and chat-template selection stay backend-private.
-/// ---------------------------------------------------------------------------
 class VLMConfiguration extends $pb.GeneratedMessage {
   factory VLMConfiguration({
     $core.String? modelId,
@@ -418,7 +382,6 @@ class VLMConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearMaxImageSizePx() => $_clearField(2);
 
-  /// (0 = backend default)
   @$pb.TagNumber(3)
   $core.int get maxTokens => $_getIZ(2);
   @$pb.TagNumber(3)
@@ -428,7 +391,6 @@ class VLMConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearMaxTokens() => $_clearField(3);
 
-  /// Additional component-level fields from rac_vlm_config_t.
   @$pb.TagNumber(4)
   $core.int get contextLength => $_getIZ(3);
   @$pb.TagNumber(4)
@@ -475,27 +437,6 @@ class VLMConfiguration extends $pb.GeneratedMessage {
   void clearPreferredFramework() => $_clearField(8);
 }
 
-/// ---------------------------------------------------------------------------
-/// VLM generation options — per-request sampling + prompt parameters.
-/// Sources pre-IDL:
-///   Kotlin VLMTypes.kt:103        (maxTokens, temperature, topP, systemPrompt,
-///                                  maxImageSize, nThreads, useGpu)
-///   Dart   vlm_types.dart:127     (maxTokens, temperature, topP, systemPrompt,
-///                                  maxImageSize, nThreads, useGpu)
-///   RN     VLMTypes.ts:21         (maxTokens, temperature, topP)
-///   Web    VLMTypes.ts:28         (maxTokens, temperature, topP, systemPrompt,
-///                                  modelFamily, streaming)
-///   C ABI  rac_vlm_types.h:143    (max_tokens, temperature, top_p,
-///                                  stop_sequences, num_stop_sequences,
-///                                  streaming_enabled, system_prompt,
-///                                  max_image_size, n_threads, use_gpu,
-///                                  model_family, custom_chat_template,
-///                                  image_marker_override)
-///
-/// top_k is included to align with the other text generation services
-/// (LLM / chat) even though no current VLM SDK exposes it; the C ABI's
-/// llama.cpp backend already supports top_k internally.
-/// ---------------------------------------------------------------------------
 class VLMGenerationOptions extends $pb.GeneratedMessage {
   factory VLMGenerationOptions({
     $core.String? prompt,
@@ -643,7 +584,6 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearTopK() => $_clearField(5);
 
-  /// Full rac_vlm_options_t coverage.
   @$pb.TagNumber(6)
   $pb.PbList<$core.String> get stopSequences => $_getList(5);
 
@@ -692,6 +632,8 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(12)
   void clearModelFamily() => $_clearField(12);
 
+  /// Commons does not convert this field on the VLM proto path, so the
+  /// llama.cpp template support behind it is currently unreachable from here.
   @$pb.TagNumber(13)
   VLMChatTemplate get customChatTemplate => $_getN(11);
   @$pb.TagNumber(13)
@@ -712,7 +654,6 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   void clearImageMarkerOverride() => $_clearField(14);
 
-  /// Additional llama.cpp sampling knobs and result controls.
   @$pb.TagNumber(15)
   $fixnum.Int64 get seed => $_getI64(13);
   @$pb.TagNumber(15)
@@ -749,7 +690,6 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(18)
   void clearEmitImageEmbeddings() => $_clearField(18);
 
-  /// Reasoning/thinking control — same message as LLMGenerationOptions.
   @$pb.TagNumber(19)
   $0.ReasoningOptions get reasoning => $_getN(17);
   @$pb.TagNumber(19)
@@ -860,33 +800,6 @@ class VLMGenerationRequest extends $pb.GeneratedMessage {
   $pb.PbMap<$core.String, $core.String> get metadata => $_getMap(4);
 }
 
-/// ---------------------------------------------------------------------------
-/// VLM generation result.
-/// Sources pre-IDL:
-///   Swift  VLMTypes.swift:208     (text, promptTokens, completionTokens,
-///                                  totalTimeMs as Double, tokensPerSecond)
-///   Kotlin VLMTypes.kt:120        (text, promptTokens, imageTokens,
-///                                  completionTokens, totalTokens,
-///                                  timeToFirstTokenMs, imageEncodeTimeMs,
-///                                  totalTimeMs, tokensPerSecond)
-///   Dart   vlm_types.dart:68      (text, promptTokens, completionTokens,
-///                                  totalTimeMs, tokensPerSecond)
-///   RN     VLMTypes.ts:28         (text, promptTokens, completionTokens,
-///                                  totalTimeMs, tokensPerSecond)
-///   Web    VLMTypes.ts:38         (VLMGenerationResult: text, promptTokens,
-///                                  imageTokens, completionTokens, totalTokens,
-///                                  timeToFirstTokenMs, imageEncodeTimeMs,
-///                                  totalTimeMs, tokensPerSecond, hardwareUsed)
-///   C ABI  rac_vlm_types.h:268    (text, prompt_tokens, image_tokens,
-///                                  completion_tokens, total_tokens,
-///                                  time_to_first_token_ms,
-///                                  image_encode_time_ms, total_time_ms,
-///                                  tokens_per_second)
-///
-/// Streaming note: the VLM service emits VLMStreamEvent messages for
-/// per-token deltas and terminal results; this aggregate result is carried on
-/// the unary Generate RPC and on terminal stream events.
-/// ---------------------------------------------------------------------------
 class VLMResult extends $pb.GeneratedMessage {
   factory VLMResult({
     $core.String? text,
@@ -1016,7 +929,6 @@ class VLMResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearProcessingTimeMs() => $_clearField(5);
 
-  /// Swift VLMResult totalTimeMs (Double ms).
   @$pb.TagNumber(6)
   $core.double get tokensPerSecond => $_getN(5);
   @$pb.TagNumber(6)
@@ -1026,7 +938,6 @@ class VLMResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearTokensPerSecond() => $_clearField(6);
 
-  /// Detailed VLM metrics from Kotlin/Web/C ABI.
   @$pb.TagNumber(7)
   $core.int get imageTokens => $_getIZ(6);
   @$pb.TagNumber(7)
@@ -1417,27 +1328,6 @@ class VLMServiceState extends $pb.GeneratedMessage {
   $core.bool hasErrorCode() => $_has(7);
   @$pb.TagNumber(8)
   void clearErrorCode() => $_clearField(8);
-}
-
-/// Logical VLM service contract. Native camera capture, file picking, image
-/// decoding performed by OS media APIs, and backend execution remain
-/// adapter-owned; C++ consumes only serialized request/result/event messages.
-class VLMApi {
-  final $pb.RpcClient _client;
-
-  VLMApi(this._client);
-
-  /// One-shot multimodal generation returning aggregate text and metrics.
-  $async.Future<VLMResult> generate(
-          $pb.ClientContext? ctx, VLMGenerationRequest request) =>
-      _client.invoke<VLMResult>(ctx, 'VLM', 'Generate', request, VLMResult());
-
-  /// Server-streaming generation events: start, image preprocessing,
-  /// per-token text deltas, terminal completion, and errors.
-  $async.Future<VLMStreamEvent> stream(
-          $pb.ClientContext? ctx, VLMGenerationRequest request) =>
-      _client.invoke<VLMStreamEvent>(
-          ctx, 'VLM', 'Stream', request, VLMStreamEvent());
 }
 
 const $core.bool _omitFieldNames =

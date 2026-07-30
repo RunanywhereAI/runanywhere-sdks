@@ -2285,8 +2285,8 @@ const char descriptor_table_protodef_voice_5fagent_5fservice_2eproto[] ABSL_ATTR
     protodesc_cold) = {
     "\n\031voice_agent_service.proto\022\016runanywhere"
     ".v1\032\025component_types.proto\032\014errors.proto"
-    "\032\022voice_events.proto\032\021tts_options.proto\032"
-    "\021stt_options.proto\032\021vad_options.proto\032\021l"
+    "\032\021model_types.proto\032\022voice_events.proto\032"
+    "\021tts_options.proto\032\021vad_options.proto\032\021l"
     "lm_options.proto\"\325\001\n\021VoiceAgentRequest\022\024"
     "\n\014event_filter\030\001 \001(\t\022\022\n\nsession_id\030\002 \001(\t"
     "\0221\n\ncategories\030\003 \003(\0162\035.runanywhere.v1.Ev"
@@ -2333,7 +2333,7 @@ const char descriptor_table_protodef_voice_5fagent_5fservice_2eproto[] ABSL_ATTR
     "\n\t_voice_id\"l\n\023AudioPipelineConfig\022\034\n\024co"
     "oldown_duration_ms\030\001 \001(\005\022\032\n\022strict_trans"
     "itions\030\002 \001(\010\022\033\n\023max_tts_duration_ms\030\003 \001("
-    "\005\"\235\010\n\027VoiceAgentComposeConfig\022\033\n\016stt_mod"
+    "\005\"\372\006\n\027VoiceAgentComposeConfig\022\033\n\016stt_mod"
     "el_path\030\001 \001(\tH\000\210\001\001\022\031\n\014stt_model_id\030\002 \001(\t"
     "H\001\210\001\001\022\033\n\016stt_model_name\030\003 \001(\tH\002\210\001\001\022\033\n\016ll"
     "m_model_path\030\004 \001(\tH\003\210\001\001\022\031\n\014llm_model_id\030"
@@ -2355,41 +2355,26 @@ const char descriptor_table_protodef_voice_5fagent_5fservice_2eproto[] ABSL_ATTR
     "tts_voice_nameB\r\n\013_vad_configB\021\n\017_llm_ge"
     "nerationB\021\n\017_session_configB\030\n\026_audio_pi"
     "peline_configB\r\n\013_session_idB\030\n\026_default"
-    "_language_codeJ\004\010\n\020\rJ\004\010\r\020\024R\020wakeword_ena"
-    "bledR\023wakeword_model_pathR\021wakeword_mode"
-    "l_idR\017wakeword_phraseR\022wakeword_threshol"
-    "dR\035wakeword_embedding_model_pathR\027wakewo"
-    "rd_vad_model_path\"\271\001\n VoiceAgentTranscri"
-    "beProtoRequest\022\022\n\naudio_data\030\001 \001(\014\022\022\n\nse"
-    "ssion_id\030\002 \001(\t\022\023\n\013sample_rate\030\003 \001(\005\022\025\n\rl"
-    "anguage_hint\030\004 \001(\t\022\020\n\010channels\030\005 \001(\005\022/\n\010"
-    "encoding\030\006 \001(\0162\035.runanywhere.v1.AudioEnc"
-    "oding\"\210\001\n&VoiceAgentSynthesizeSpeechProt"
-    "oRequest\022\014\n\004text\030\001 \001(\t\022\022\n\nsession_id\030\002 \001"
-    "(\t\0220\n\007options\030\003 \001(\0132\032.runanywhere.v1.TTS"
-    "OptionsH\000\210\001\001B\n\n\010_options2\311\003\n\nVoiceAgent\022"
-    "I\n\006Stream\022!.runanywhere.v1.VoiceAgentReq"
-    "uest\032\032.runanywhere.v1.VoiceEvent0\001\022V\n\013Pr"
-    "ocessTurn\022%.runanywhere.v1.VoiceAgentTur"
-    "nRequest\032 .runanywhere.v1.VoiceAgentResu"
-    "lt\022Y\n\nTranscribe\0220.runanywhere.v1.VoiceA"
-    "gentTranscribeProtoRequest\032\031.runanywhere"
-    ".v1.STTOutput\022e\n\020SynthesizeSpeech\0226.runa"
-    "nywhere.v1.VoiceAgentSynthesizeSpeechPro"
-    "toRequest\032\031.runanywhere.v1.TTSOutput\022V\n\t"
-    "Configure\022\'.runanywhere.v1.VoiceAgentCom"
-    "poseConfig\032 .runanywhere.v1.VoiceAgentRe"
-    "sultB\221\001\n\027ai.runanywhere.proto.v1B\026VoiceA"
-    "gentServiceProtoP\001Z<github.com/runanywhe"
-    "re/runanywhere-sdks/idl/v1;runanywherev1"
-    "\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "_language_code\"\271\001\n VoiceAgentTranscribeP"
+    "rotoRequest\022\022\n\naudio_data\030\001 \001(\014\022\022\n\nsessi"
+    "on_id\030\002 \001(\t\022\023\n\013sample_rate\030\003 \001(\005\022\025\n\rlang"
+    "uage_hint\030\004 \001(\t\022\020\n\010channels\030\005 \001(\005\022/\n\010enc"
+    "oding\030\006 \001(\0162\035.runanywhere.v1.AudioEncodi"
+    "ng\"\210\001\n&VoiceAgentSynthesizeSpeechProtoRe"
+    "quest\022\014\n\004text\030\001 \001(\t\022\022\n\nsession_id\030\002 \001(\t\022"
+    "0\n\007options\030\003 \001(\0132\032.runanywhere.v1.TTSOpt"
+    "ionsH\000\210\001\001B\n\n\010_optionsB\221\001\n\027ai.runanywhere"
+    ".proto.v1B\026VoiceAgentServiceProtoP\001Z<git"
+    "hub.com/runanywhere/runanywhere-sdks/idl"
+    "/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywher"
+    "e.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_voice_5fagent_5fservice_2eproto_deps[7] = {
         &::descriptor_table_component_5ftypes_2eproto,
         &::descriptor_table_errors_2eproto,
         &::descriptor_table_llm_5foptions_2eproto,
-        &::descriptor_table_stt_5foptions_2eproto,
+        &::descriptor_table_model_5ftypes_2eproto,
         &::descriptor_table_tts_5foptions_2eproto,
         &::descriptor_table_vad_5foptions_2eproto,
         &::descriptor_table_voice_5fevents_2eproto,
@@ -2398,7 +2383,7 @@ static ::absl::once_flag descriptor_table_voice_5fagent_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_voice_5fagent_5fservice_2eproto = {
     false,
     false,
-    4000,
+    3377,
     descriptor_table_protodef_voice_5fagent_5fservice_2eproto,
     "voice_agent_service.proto",
     &descriptor_table_voice_5fagent_5fservice_2eproto_once,

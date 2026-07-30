@@ -10,7 +10,6 @@
 // ignore_for_file: deprecated_member_use_from_same_package, library_prefixes
 // ignore_for_file: non_constant_identifier_names, prefer_relative_imports
 
-import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -475,17 +474,6 @@ class SegmentationResult extends $pb.GeneratedMessage {
   $core.bool hasModelId() => $_has(6);
   @$pb.TagNumber(7)
   void clearModelId() => $_clearField(7);
-}
-
-class SemanticSegmentationApi {
-  final $pb.RpcClient _client;
-
-  SemanticSegmentationApi(this._client);
-
-  $async.Future<SegmentationResult> segment(
-          $pb.ClientContext? ctx, SegmentationRequest request) =>
-      _client.invoke<SegmentationResult>(ctx, 'SemanticSegmentation', 'Segment',
-          request, SegmentationResult());
 }
 
 const $core.bool _omitFieldNames =

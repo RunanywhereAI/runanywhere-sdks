@@ -14,12 +14,9 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-/// ---------------------------------------------------------------------------
-/// Severity, mirroring the C ABI `rac_log_level_t`. Larger value = more severe.
-/// 0 is TRACE (not UNSPECIFIED) to keep numeric parity with the C enum — the
-/// same C-ABI-aligned convention used by HttpDownloadStatus (0=OK) and
-/// SdkInitEnvironment (0=DEVELOPMENT).
-/// ---------------------------------------------------------------------------
+/// Mirrors rac_log_level_t exactly so the generated enum round-trips with the
+/// platform-adapter log callback without a translation table. 0 is TRACE, not
+/// UNSPECIFIED, to keep numeric parity with the C enum.
 class LogLevel extends $pb.ProtobufEnum {
   static const LogLevel LOG_LEVEL_TRACE =
       LogLevel._(0, _omitEnumNames ? '' : 'LOG_LEVEL_TRACE');

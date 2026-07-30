@@ -738,14 +738,13 @@ const char descriptor_table_protodef_sdk_5finit_2eproto[] ABSL_ATTRIBUTE_SECTION
     "}\n\014SdkInitPhase\022\036\n\032SDK_INIT_PHASE_UNSPEC"
     "IFIED\020\000\022\026\n\022SDK_INIT_PHASE_ONE\020\001\022\026\n\022SDK_I"
     "NIT_PHASE_TWO\020\002\022\035\n\031SDK_INIT_PHASE_RETRY_"
-    "HTTP\020\003*\203\001\n\022SdkInitEnvironment\022$\n SDK_INI"
-    "T_ENVIRONMENT_DEVELOPMENT\020\000\022#\n\037SDK_INIT_"
-    "ENVIRONMENT_PRODUCTION\020\002\"\004\010\001\020\001*\034SDK_INIT"
-    "_ENVIRONMENT_STAGINGB\207\001\n\027ai.runanywhere."
-    "proto.v1B\014SdkInitProtoP\001Z<github.com/run"
-    "anywhere/runanywhere-sdks/idl/v1;runanyw"
-    "herev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006"
-    "proto3"
+    "HTTP\020\003*_\n\022SdkInitEnvironment\022$\n SDK_INIT"
+    "_ENVIRONMENT_DEVELOPMENT\020\000\022#\n\037SDK_INIT_E"
+    "NVIRONMENT_PRODUCTION\020\002B\207\001\n\027ai.runanywhe"
+    "re.proto.v1B\014SdkInitProtoP\001Z<github.com/"
+    "runanywhere/runanywhere-sdks/idl/v1;runa"
+    "nywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002R"
+    "Ab\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_sdk_5finit_2eproto_deps[1] = {
@@ -755,7 +754,7 @@ static ::absl::once_flag descriptor_table_sdk_5finit_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_sdk_5finit_2eproto = {
     false,
     false,
-    1126,
+    1089,
     descriptor_table_protodef_sdk_5finit_2eproto,
     "sdk_init.proto",
     &descriptor_table_sdk_5finit_2eproto_once,

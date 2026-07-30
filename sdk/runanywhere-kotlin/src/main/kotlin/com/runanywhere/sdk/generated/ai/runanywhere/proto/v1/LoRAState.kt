@@ -32,6 +32,10 @@ import kotlin.Suppress
 import kotlin.collections.List
 import okio.ByteString
 
+/**
+ * Also serves as the request for List and State, carrying optional
+ * base_model_id filtering without a separate empty request type.
+ */
 public class LoRAState(
   loaded_adapters: List<LoRAAdapterInfo> = emptyList(),
   @field:WireField(

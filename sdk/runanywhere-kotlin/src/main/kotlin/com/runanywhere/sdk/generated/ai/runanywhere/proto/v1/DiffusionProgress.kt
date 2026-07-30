@@ -30,20 +30,7 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
-/**
- * ---------------------------------------------------------------------------
- * Streamed progress event. Sources pre-IDL:
- *   Swift  DiffusionTypes.swift:511    (DiffusionProgress)
- *   Kotlin DiffusionTypes.kt:337       (DiffusionProgress)
- *   RN     DiffusionTypes.ts:163       (DiffusionProgress)
- *   Web    DiffusionTypes.ts:69        (callback signature, not a struct)
- *   C ABI  rac_diffusion_types.h:279   (rac_diffusion_progress_t)
- * ---------------------------------------------------------------------------
- */
 public class DiffusionProgress(
-  /**
-   * Fraction of denoising completed in \[0.0, 1.0\].
-   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -52,9 +39,6 @@ public class DiffusionProgress(
     schemaIndex = 0,
   )
   public val progress_percent: Float = 0f,
-  /**
-   * 1-based current step number.
-   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -63,9 +47,6 @@ public class DiffusionProgress(
     schemaIndex = 1,
   )
   public val current_step: Int = 0,
-  /**
-   * Total number of steps the engine plans to execute.
-   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -74,9 +55,6 @@ public class DiffusionProgress(
     schemaIndex = 2,
   )
   public val total_steps: Int = 0,
-  /**
-   * Free-form stage name ("Encoding", "Denoising", "Decoding", …).
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -84,12 +62,6 @@ public class DiffusionProgress(
     schemaIndex = 3,
   )
   public val stage: String = "",
-  /**
-   * Optional intermediate image bytes (PNG when surfaced by
-   * Swift/Kotlin/RN; raw RGBA when surfaced by the C ABI). Present only
-   * when the caller requested intermediate-image reporting and the
-   * engine has produced one for this step.
-   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#BYTES",
@@ -97,9 +69,6 @@ public class DiffusionProgress(
     schemaIndex = 4,
   )
   public val intermediate_image_data: ByteString? = null,
-  /**
-   * Dimensions for intermediate_image_data when it is raw pixel data.
-   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

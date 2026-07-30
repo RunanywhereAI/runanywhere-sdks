@@ -9,17 +9,6 @@ import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 
 export const protobufPackage = "runanywhere.v1";
 
-/**
- * ---------------------------------------------------------------------------
- * JSON Schema primitive type — union across SDKs.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:12     ('string'|'number'|'integer'|
- *                                        'boolean'|'object'|'array'|'null')
- *   Web (delegates to llamacpp pkg; no own enum)
- *   Swift / Kotlin / Dart represent schema as a serialized JSON string today,
- *     so this enum canonicalizes the RN-defined union.
- * ---------------------------------------------------------------------------
- */
 export enum JSONSchemaType {
   JSON_SCHEMA_TYPE_UNSPECIFIED = 0,
   JSON_SCHEMA_TYPE_OBJECT = 1,
@@ -84,66 +73,6 @@ export function jSONSchemaTypeToJSON(object: JSONSchemaType): string {
     case JSONSchemaType.JSON_SCHEMA_TYPE_NULL:
       return "JSON_SCHEMA_TYPE_NULL";
     case JSONSchemaType.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Sentiment label — union across SDKs.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:131    ('positive'|'negative'|'neutral')
- *   (Other SDKs do not yet define a Sentiment type; MIXED is added for
- *    completeness — common in industry sentiment APIs.)
- * ---------------------------------------------------------------------------
- */
-export enum Sentiment {
-  SENTIMENT_UNSPECIFIED = 0,
-  SENTIMENT_POSITIVE = 1,
-  SENTIMENT_NEGATIVE = 2,
-  SENTIMENT_NEUTRAL = 3,
-  SENTIMENT_MIXED = 4,
-  UNRECOGNIZED = -1,
-}
-
-export function sentimentFromJSON(object: any): Sentiment {
-  switch (object) {
-    case 0:
-    case "SENTIMENT_UNSPECIFIED":
-      return Sentiment.SENTIMENT_UNSPECIFIED;
-    case 1:
-    case "SENTIMENT_POSITIVE":
-      return Sentiment.SENTIMENT_POSITIVE;
-    case 2:
-    case "SENTIMENT_NEGATIVE":
-      return Sentiment.SENTIMENT_NEGATIVE;
-    case 3:
-    case "SENTIMENT_NEUTRAL":
-      return Sentiment.SENTIMENT_NEUTRAL;
-    case 4:
-    case "SENTIMENT_MIXED":
-      return Sentiment.SENTIMENT_MIXED;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return Sentiment.UNRECOGNIZED;
-  }
-}
-
-export function sentimentToJSON(object: Sentiment): string {
-  switch (object) {
-    case Sentiment.SENTIMENT_UNSPECIFIED:
-      return "SENTIMENT_UNSPECIFIED";
-    case Sentiment.SENTIMENT_POSITIVE:
-      return "SENTIMENT_POSITIVE";
-    case Sentiment.SENTIMENT_NEGATIVE:
-      return "SENTIMENT_NEGATIVE";
-    case Sentiment.SENTIMENT_NEUTRAL:
-      return "SENTIMENT_NEUTRAL";
-    case Sentiment.SENTIMENT_MIXED:
-      return "SENTIMENT_MIXED";
-    case Sentiment.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -257,51 +186,16 @@ export function structuredOutputStreamEventKindToJSON(object: StructuredOutputSt
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * JSON Schema property — describes a single property within a schema.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:24     JSONSchemaProperty (type, description,
- *                                       enum, format, items, properties, …)
- *
- * proto3 does not allow direct self-referential message fields without
- * `optional` / explicit handle. Recursion is expressed via:
- *   - `items_schema`     — for array element types       (handle to JSONSchema)
- *   - `object_schema`    — for nested object types       (handle to JSONSchema)
- * Deeper recursion (a property whose items are themselves objects with
- * further nested properties) is represented by repeating the same indirection
- * inside the referenced JSONSchema. Very deep schemas are uncommon and
- * supported by chaining these handles.
- * ---------------------------------------------------------------------------
- */
 export interface JSONSchemaProperty {
-  /** Primitive / composite type for this property. */
   type: JSONSchemaType;
-  /** Human-readable description (`description` in JSON Schema). */
-  description?:
-    | string
-    | undefined;
-  /**
-   * Allowed enum values (`enum` in JSON Schema). Strings only; numeric and
-   * boolean enums are rare and serialized as strings here.
-   */
+  description?: string | undefined;
   enumValues: string[];
-  /**
-   * String format hint (`format` in JSON Schema): "email", "uri",
-   * "date-time", etc.
-   */
   format?:
     | string
     | undefined;
-  /** Element schema when `type == JSON_SCHEMA_TYPE_ARRAY`. */
-  itemsSchema?:
-    | JSONSchema
-    | undefined;
-  /** Nested object schema when `type == JSON_SCHEMA_TYPE_OBJECT`. */
-  objectSchema?:
-    | JSONSchema
-    | undefined;
-  /** Common validation constraints carried by RN/Web schema builders. */
+  /** items_schema for arrays, object_schema for nested objects. */
+  itemsSchema?: JSONSchema | undefined;
+  objectSchema?: JSONSchema | undefined;
   minimum?: number | undefined;
   maximum?: number | undefined;
   minLength?: number | undefined;
@@ -312,34 +206,12 @@ export interface JSONSchemaProperty {
   defaultJson?: string | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * JSON Schema definition — top-level schema for structured output.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:59     JSONSchema (extends JSONSchemaProperty
- *                                       with $schema, $id, title, definitions,
- *                                       $ref, allOf/anyOf/oneOf/not)
- * ---------------------------------------------------------------------------
- */
 export interface JSONSchema {
-  /** Root type for this schema (commonly OBJECT or ARRAY). */
   type: JSONSchemaType;
-  /** Map of property name -> property definition. */
   properties: { [key: string]: JSONSchemaProperty };
-  /** Names of required properties (`required` in JSON Schema). */
   required: string[];
-  /** Element schema when the root `type == JSON_SCHEMA_TYPE_ARRAY`. */
-  items?:
-    | JSONSchemaProperty
-    | undefined;
-  /** Whether properties not declared in `properties` are allowed. */
-  additionalProperties?:
-    | boolean
-    | undefined;
-  /**
-   * JSON Schema document metadata / composition fields. Field names avoid
-   * `$` in generated APIs while preserving JSON names for serializers.
-   */
+  items?: JSONSchemaProperty | undefined;
+  additionalProperties?: boolean | undefined;
   schemaUri?: string | undefined;
   idUri?: string | undefined;
   title?: string | undefined;
@@ -349,7 +221,10 @@ export interface JSONSchema {
   allOf: JSONSchema[];
   anyOf: JSONSchema[];
   oneOf: JSONSchema[];
-  notSchema?: JSONSchema | undefined;
+  notSchema?:
+    | JSONSchema
+    | undefined;
+  /** Escape hatch for schemas the typed shape above cannot express. */
   rawJson?: string | undefined;
 }
 
@@ -363,90 +238,39 @@ export interface JSONSchema_DefinitionsEntry {
   value?: JSONSchema | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Structured output options — request-side configuration for a structured
- * generation call. Wraps a JSONSchema plus generation flags.
- * Sources pre-IDL:
- *   Swift  LLMTypes.swift:533           StructuredOutputConfig
- *   Kotlin LLMTypes.kt:242              StructuredOutputConfig
- *   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
- *   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
- * ---------------------------------------------------------------------------
- * The ONE output-constraint surface. The retired loose fields on
- * LLMGenerationOptions (json_schema, grammar, response_format) all fold in
- * here: schema-shaped output via `schema_source`, low-level constrained
- * decoding via `grammar`/`regex_pattern`.
- */
 export interface StructuredOutputOptions {
-  /** Whether to embed the schema text in the LLM prompt. */
   includeSchemaInPrompt: boolean;
-  /** Strict schema adherence — rejects outputs that don't fully validate. */
+  /** Not read by commons. */
   strictMode?: boolean | undefined;
   schema?: JSONSchema | undefined;
   jsonSchema?:
     | string
     | undefined;
-  /** Name for the schema/output type (OpenAI json_schema.name). */
+  /** Matches OpenAI's json_schema.name. */
   name?: string | undefined;
   mode: StructuredOutputMode;
   regexPattern?: string | undefined;
-  grammar?: string | undefined;
+  grammar?:
+    | string
+    | undefined;
+  /** Attempt to repair malformed JSON before failing. */
   repairJson: boolean;
   maxRetries: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Structured output validation result — populated after the model returns.
- * Sources pre-IDL:
- *   Swift  LLMTypes.swift:585           StructuredOutputValidation
- *   Kotlin LLMTypes.kt:278              StructuredOutputValidation
- *   Dart   structured_output_types.dart StructuredOutputValidation
- * ---------------------------------------------------------------------------
- */
 export interface StructuredOutputValidation {
-  /** Whether the parsed output validates against the requested schema. */
   isValid: boolean;
-  /** Whether the raw text contained any parseable JSON object. */
   containsJson: boolean;
-  /** Validation / parse error message when `is_valid == false`. */
-  errorMessage?:
-    | string
-    | undefined;
-  /** Original raw model output (for debugging / fallback parsing). */
-  rawOutput?:
-    | string
-    | undefined;
-  /**
-   * JSON substring extracted from raw_output before validation, when the
-   * extractor found one.
-   */
+  errorMessage?: string | undefined;
+  rawOutput?: string | undefined;
   extractedJson?: string | undefined;
   validationErrors: string[];
   validationTimeMs: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Structured output result — generic envelope returned by structured calls.
- * `parsed_json` is a UTF-8 JSON-encoded byte payload to keep the result
- * language-agnostic; SDKs deserialize into their concrete typed value.
- * Sources pre-IDL:
- *   RN     StructuredOutputTypes.ts:93  StructuredOutputResult<T> (data, raw,
- *                                       success, error)
- *   Dart   structured_output_types.dart StructuredOutputResult<T> (result,
- *                                       rawText, metrics)
- * ---------------------------------------------------------------------------
- */
 export interface StructuredOutputResult {
-  /** JSON-encoded parsed value (UTF-8 bytes). */
   parsedJson: Uint8Array;
-  /** Validation / parse outcome. */
-  validation?:
-    | StructuredOutputValidation
-    | undefined;
-  /** Raw model text prior to parsing (optional, useful for retries). */
+  validation?: StructuredOutputValidation | undefined;
   rawText?: string | undefined;
   errorMessage?: string | undefined;
   errorCode: number;
@@ -504,99 +328,13 @@ export interface StructuredOutputStreamEvent {
   errorCode: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Named entity — single span identified within input text.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:143    NamedEntity (text, type, startOffset,
- *                                       endOffset, confidence)
- * ---------------------------------------------------------------------------
- */
+/** Character offsets into the source text. */
 export interface NamedEntity {
-  /** Surface form of the entity exactly as it appeared in input. */
   text: string;
-  /** Entity class label, e.g. "PERSON", "ORG", "LOCATION". */
   entityType: string;
-  /** UTF-16 / character start offset (inclusive) within input text. */
   startOffset: number;
-  /** UTF-16 / character end offset (exclusive) within input text. */
   endOffset: number;
-  /** Model confidence in [0.0, 1.0]. */
   confidence: number;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Entity extraction result — list of entities pulled from a document.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:110    EntityExtractionResult<T>
- *                                       (entities, confidence)
- * Note: RN's per-result `confidence` is dropped in favor of per-entity
- * confidence on `NamedEntity`, which is the more granular and useful form.
- * ---------------------------------------------------------------------------
- */
-export interface EntityExtractionResult {
-  entities: NamedEntity[];
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Classification candidate — alternative label considered.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:118    ClassificationResult.alternatives item
- * ---------------------------------------------------------------------------
- */
-export interface ClassificationCandidate {
-  label: string;
-  confidence: number;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Classification result — top label plus optional alternatives.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:118    ClassificationResult (category,
- *                                       confidence, alternatives)
- * Note: RN names the field `category`; canonicalized here to `label`, which
- * matches industry classifier APIs (HuggingFace, OpenAI, etc.).
- * ---------------------------------------------------------------------------
- */
-export interface ClassificationResult {
-  label: string;
-  confidence: number;
-  alternatives: ClassificationCandidate[];
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Sentiment analysis result — overall sentiment plus per-class scores.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:130    SentimentResult (sentiment, score,
- *                                       aspects)
- * ---------------------------------------------------------------------------
- */
-export interface SentimentResult {
-  sentiment: Sentiment;
-  /** Aggregate confidence in the chosen sentiment label, [0.0, 1.0]. */
-  confidence: number;
-  /** Per-class soft scores (optional). Absent fields are unscored. */
-  positiveScore?: number | undefined;
-  negativeScore?: number | undefined;
-  neutralScore?: number | undefined;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Named entity recognition result — alias-style wrapper carrying entities.
- * Equivalent in shape to `EntityExtractionResult`; both are kept so SDKs that
- * distinguish "extraction" (instruction-driven) from "NER" (model-native)
- * can route to the appropriate type without ambiguity.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:154    NERResult (entities)
- * ---------------------------------------------------------------------------
- */
-export interface NERResult {
-  entities: NamedEntity[];
 }
 
 function createBaseJSONSchemaProperty(): JSONSchemaProperty {
@@ -3141,436 +2879,6 @@ export const NamedEntity: MessageFns<NamedEntity> = {
     message.startOffset = object.startOffset ?? 0;
     message.endOffset = object.endOffset ?? 0;
     message.confidence = object.confidence ?? 0;
-    return message;
-  },
-};
-
-function createBaseEntityExtractionResult(): EntityExtractionResult {
-  return { entities: [] };
-}
-
-export const EntityExtractionResult: MessageFns<EntityExtractionResult> = {
-  encode(message: EntityExtractionResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.entities) {
-      NamedEntity.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): EntityExtractionResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseEntityExtractionResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.entities.push(NamedEntity.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): EntityExtractionResult {
-    return {
-      entities: globalThis.Array.isArray(object?.entities)
-        ? object.entities.map((e: any) => NamedEntity.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: EntityExtractionResult): unknown {
-    const obj: any = {};
-    if (message.entities?.length) {
-      obj.entities = message.entities.map((e) => NamedEntity.toJSON(e));
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<EntityExtractionResult>, I>>(base?: I): EntityExtractionResult {
-    return EntityExtractionResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<EntityExtractionResult>, I>>(object: I): EntityExtractionResult {
-    const message = createBaseEntityExtractionResult();
-    message.entities = object.entities?.map((e) => NamedEntity.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseClassificationCandidate(): ClassificationCandidate {
-  return { label: "", confidence: 0 };
-}
-
-export const ClassificationCandidate: MessageFns<ClassificationCandidate> = {
-  encode(message: ClassificationCandidate, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.label !== "") {
-      writer.uint32(10).string(message.label);
-    }
-    if (message.confidence !== 0) {
-      writer.uint32(21).float(message.confidence);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ClassificationCandidate {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseClassificationCandidate();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.label = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 21) {
-            break;
-          }
-
-          message.confidence = reader.float();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ClassificationCandidate {
-    return {
-      label: isSet(object.label) ? globalThis.String(object.label) : "",
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-    };
-  },
-
-  toJSON(message: ClassificationCandidate): unknown {
-    const obj: any = {};
-    if (message.label !== "") {
-      obj.label = message.label;
-    }
-    if (message.confidence !== 0) {
-      obj.confidence = message.confidence;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ClassificationCandidate>, I>>(base?: I): ClassificationCandidate {
-    return ClassificationCandidate.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ClassificationCandidate>, I>>(object: I): ClassificationCandidate {
-    const message = createBaseClassificationCandidate();
-    message.label = object.label ?? "";
-    message.confidence = object.confidence ?? 0;
-    return message;
-  },
-};
-
-function createBaseClassificationResult(): ClassificationResult {
-  return { label: "", confidence: 0, alternatives: [] };
-}
-
-export const ClassificationResult: MessageFns<ClassificationResult> = {
-  encode(message: ClassificationResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.label !== "") {
-      writer.uint32(10).string(message.label);
-    }
-    if (message.confidence !== 0) {
-      writer.uint32(21).float(message.confidence);
-    }
-    for (const v of message.alternatives) {
-      ClassificationCandidate.encode(v!, writer.uint32(26).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ClassificationResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseClassificationResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.label = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 21) {
-            break;
-          }
-
-          message.confidence = reader.float();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.alternatives.push(ClassificationCandidate.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ClassificationResult {
-    return {
-      label: isSet(object.label) ? globalThis.String(object.label) : "",
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-      alternatives: globalThis.Array.isArray(object?.alternatives)
-        ? object.alternatives.map((e: any) => ClassificationCandidate.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: ClassificationResult): unknown {
-    const obj: any = {};
-    if (message.label !== "") {
-      obj.label = message.label;
-    }
-    if (message.confidence !== 0) {
-      obj.confidence = message.confidence;
-    }
-    if (message.alternatives?.length) {
-      obj.alternatives = message.alternatives.map((e) => ClassificationCandidate.toJSON(e));
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ClassificationResult>, I>>(base?: I): ClassificationResult {
-    return ClassificationResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ClassificationResult>, I>>(object: I): ClassificationResult {
-    const message = createBaseClassificationResult();
-    message.label = object.label ?? "";
-    message.confidence = object.confidence ?? 0;
-    message.alternatives = object.alternatives?.map((e) => ClassificationCandidate.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseSentimentResult(): SentimentResult {
-  return { sentiment: 0, confidence: 0, positiveScore: undefined, negativeScore: undefined, neutralScore: undefined };
-}
-
-export const SentimentResult: MessageFns<SentimentResult> = {
-  encode(message: SentimentResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sentiment !== 0) {
-      writer.uint32(8).int32(message.sentiment);
-    }
-    if (message.confidence !== 0) {
-      writer.uint32(21).float(message.confidence);
-    }
-    if (message.positiveScore !== undefined) {
-      writer.uint32(29).float(message.positiveScore);
-    }
-    if (message.negativeScore !== undefined) {
-      writer.uint32(37).float(message.negativeScore);
-    }
-    if (message.neutralScore !== undefined) {
-      writer.uint32(45).float(message.neutralScore);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SentimentResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSentimentResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.sentiment = reader.int32() as any;
-          continue;
-        }
-        case 2: {
-          if (tag !== 21) {
-            break;
-          }
-
-          message.confidence = reader.float();
-          continue;
-        }
-        case 3: {
-          if (tag !== 29) {
-            break;
-          }
-
-          message.positiveScore = reader.float();
-          continue;
-        }
-        case 4: {
-          if (tag !== 37) {
-            break;
-          }
-
-          message.negativeScore = reader.float();
-          continue;
-        }
-        case 5: {
-          if (tag !== 45) {
-            break;
-          }
-
-          message.neutralScore = reader.float();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SentimentResult {
-    return {
-      sentiment: isSet(object.sentiment) ? sentimentFromJSON(object.sentiment) : 0,
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-      positiveScore: isSet(object.positiveScore)
-        ? globalThis.Number(object.positiveScore)
-        : isSet(object.positive_score)
-        ? globalThis.Number(object.positive_score)
-        : undefined,
-      negativeScore: isSet(object.negativeScore)
-        ? globalThis.Number(object.negativeScore)
-        : isSet(object.negative_score)
-        ? globalThis.Number(object.negative_score)
-        : undefined,
-      neutralScore: isSet(object.neutralScore)
-        ? globalThis.Number(object.neutralScore)
-        : isSet(object.neutral_score)
-        ? globalThis.Number(object.neutral_score)
-        : undefined,
-    };
-  },
-
-  toJSON(message: SentimentResult): unknown {
-    const obj: any = {};
-    if (message.sentiment !== 0) {
-      obj.sentiment = sentimentToJSON(message.sentiment);
-    }
-    if (message.confidence !== 0) {
-      obj.confidence = message.confidence;
-    }
-    if (message.positiveScore !== undefined) {
-      obj.positiveScore = message.positiveScore;
-    }
-    if (message.negativeScore !== undefined) {
-      obj.negativeScore = message.negativeScore;
-    }
-    if (message.neutralScore !== undefined) {
-      obj.neutralScore = message.neutralScore;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<SentimentResult>, I>>(base?: I): SentimentResult {
-    return SentimentResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<SentimentResult>, I>>(object: I): SentimentResult {
-    const message = createBaseSentimentResult();
-    message.sentiment = object.sentiment ?? 0;
-    message.confidence = object.confidence ?? 0;
-    message.positiveScore = object.positiveScore ?? undefined;
-    message.negativeScore = object.negativeScore ?? undefined;
-    message.neutralScore = object.neutralScore ?? undefined;
-    return message;
-  },
-};
-
-function createBaseNERResult(): NERResult {
-  return { entities: [] };
-}
-
-export const NERResult: MessageFns<NERResult> = {
-  encode(message: NERResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.entities) {
-      NamedEntity.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): NERResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseNERResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.entities.push(NamedEntity.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): NERResult {
-    return {
-      entities: globalThis.Array.isArray(object?.entities)
-        ? object.entities.map((e: any) => NamedEntity.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: NERResult): unknown {
-    const obj: any = {};
-    if (message.entities?.length) {
-      obj.entities = message.entities.map((e) => NamedEntity.toJSON(e));
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<NERResult>, I>>(base?: I): NERResult {
-    return NERResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<NERResult>, I>>(object: I): NERResult {
-    const message = createBaseNERResult();
-    message.entities = object.entities?.map((e) => NamedEntity.fromPartial(e)) || [];
     return message;
   },
 };
