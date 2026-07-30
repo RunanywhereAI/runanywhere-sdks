@@ -116,6 +116,7 @@ class ToolCallingModelPolicyTest {
         assertEquals(0f, plan.toolOptions.temperature)
         assertTrue(plan.toolOptions.disable_thinking == true)
         assertFalse(plan.toolOptions.keep_tools_available)
+        assertTrue(plan.toolOptions.parallel_tool_calls)
     }
 
     private fun model(name: String, contextLength: Int): ModelInfo = ModelInfo(

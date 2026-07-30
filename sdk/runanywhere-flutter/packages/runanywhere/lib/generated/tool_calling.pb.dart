@@ -866,6 +866,7 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
     $core.int? maxToolCalls,
     ToolChoiceMode? toolChoice,
     $core.String? forcedToolName,
+    $core.bool? parallelToolCalls,
     $core.bool? requireJsonArguments,
     $core.bool? disableThinking,
   }) {
@@ -883,6 +884,7 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
     if (maxToolCalls != null) result.maxToolCalls = maxToolCalls;
     if (toolChoice != null) result.toolChoice = toolChoice;
     if (forcedToolName != null) result.forcedToolName = forcedToolName;
+    if (parallelToolCalls != null) result.parallelToolCalls = parallelToolCalls;
     if (requireJsonArguments != null)
       result.requireJsonArguments = requireJsonArguments;
     if (disableThinking != null) result.disableThinking = disableThinking;
@@ -916,6 +918,7 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
     ..aE<ToolChoiceMode>(13, _omitFieldNames ? '' : 'toolChoice',
         enumValues: ToolChoiceMode.values)
     ..aOS(14, _omitFieldNames ? '' : 'forcedToolName')
+    ..aOB(15, _omitFieldNames ? '' : 'parallelToolCalls')
     ..aOB(16, _omitFieldNames ? '' : 'requireJsonArguments')
     ..aOB(17, _omitFieldNames ? '' : 'disableThinking')
     ..hasRequiredFields = false;
@@ -1045,12 +1048,26 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   void clearForcedToolName() => $_clearField(14);
 
+  /// When true, one model turn may emit multiple tool-call envelopes;
+  /// commons parses and executes all of them before building a single
+  /// follow-up prompt. Default false preserves the historical
+  /// one-call-per-turn behavior. (Reclaims the field number that
+  /// originally carried this flag before it was reserved.)
+  @$pb.TagNumber(15)
+  $core.bool get parallelToolCalls => $_getBF(11);
+  @$pb.TagNumber(15)
+  set parallelToolCalls($core.bool value) => $_setBool(11, value);
+  @$pb.TagNumber(15)
+  $core.bool hasParallelToolCalls() => $_has(11);
+  @$pb.TagNumber(15)
+  void clearParallelToolCalls() => $_clearField(15);
+
   @$pb.TagNumber(16)
-  $core.bool get requireJsonArguments => $_getBF(11);
+  $core.bool get requireJsonArguments => $_getBF(12);
   @$pb.TagNumber(16)
-  set requireJsonArguments($core.bool value) => $_setBool(11, value);
+  set requireJsonArguments($core.bool value) => $_setBool(12, value);
   @$pb.TagNumber(16)
-  $core.bool hasRequireJsonArguments() => $_has(11);
+  $core.bool hasRequireJsonArguments() => $_has(12);
   @$pb.TagNumber(16)
   void clearRequireJsonArguments() => $_clearField(16);
 
@@ -1059,11 +1076,11 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
   /// at the prompt level — same contract as
   /// LLMGenerationOptions.disable_thinking). Default false.
   @$pb.TagNumber(17)
-  $core.bool get disableThinking => $_getBF(12);
+  $core.bool get disableThinking => $_getBF(13);
   @$pb.TagNumber(17)
-  set disableThinking($core.bool value) => $_setBool(12, value);
+  set disableThinking($core.bool value) => $_setBool(13, value);
   @$pb.TagNumber(17)
-  $core.bool hasDisableThinking() => $_has(12);
+  $core.bool hasDisableThinking() => $_has(13);
   @$pb.TagNumber(17)
   void clearDisableThinking() => $_clearField(17);
 }
@@ -2026,6 +2043,7 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     $core.bool? replaceSystemPrompt,
     $core.bool? requireJsonArguments,
     $core.Iterable<$core.String>? history,
+    $core.bool? parallelToolCalls,
   }) {
     final result = create();
     if (prompt != null) result.prompt = prompt;
@@ -2048,6 +2066,7 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     if (requireJsonArguments != null)
       result.requireJsonArguments = requireJsonArguments;
     if (history != null) result.history.addAll(history);
+    if (parallelToolCalls != null) result.parallelToolCalls = parallelToolCalls;
     return result;
   }
 
@@ -2086,6 +2105,7 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
     ..aOB(17, _omitFieldNames ? '' : 'replaceSystemPrompt')
     ..aOB(18, _omitFieldNames ? '' : 'requireJsonArguments')
     ..pPS(19, _omitFieldNames ? '' : 'history')
+    ..aOB(20, _omitFieldNames ? '' : 'parallelToolCalls')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2273,6 +2293,19 @@ class ToolCallingSessionCreateRequest extends $pb.GeneratedMessage {
   /// cross-proto import cycle.
   @$pb.TagNumber(19)
   $pb.PbList<$core.String> get history => $_getList(16);
+
+  /// Mirrors ToolCallingOptions.parallel_tool_calls for the run-loop /
+  /// session envelope: when true, one model turn may emit multiple
+  /// tool-call envelopes and commons executes all of them before one
+  /// follow-up prompt. Default false = historical single-call behavior.
+  @$pb.TagNumber(20)
+  $core.bool get parallelToolCalls => $_getBF(17);
+  @$pb.TagNumber(20)
+  set parallelToolCalls($core.bool value) => $_setBool(17, value);
+  @$pb.TagNumber(20)
+  $core.bool hasParallelToolCalls() => $_has(17);
+  @$pb.TagNumber(20)
+  void clearParallelToolCalls() => $_clearField(20);
 }
 
 class ToolCallingSessionCreateResult extends $pb.GeneratedMessage {

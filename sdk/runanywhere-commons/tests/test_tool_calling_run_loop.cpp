@@ -1918,7 +1918,9 @@ int test_specific_narrows_grammar_spec() {
         const auto captures = generation_captures();
         CHECK(!captures.empty(), "SPECIFIC grammar backend generated");
         if (!captures.empty()) {
-            CHECK(captures[0].grammar == "toolcall_opt:get_weather",
+            // TC-1: SPECIFIC uses the must-call dialect (toolcall:) narrowed to
+            // the forced tool — stricter than the always-optional RUN-80 default.
+            CHECK(captures[0].grammar == "toolcall:get_weather",
                   "SPECIFIC narrows the grammar spec to the forced tool only (not calculate)");
         }
         rac_proto_buffer_free(&out);
@@ -1979,7 +1981,9 @@ int test_required_on_grammar_backend() {
                   "REQUIRED grammar prompt is bare-Pythonic");
             CHECK(captures[0].prompt.find("You must call exactly one tool now") != std::string::npos,
                   "REQUIRED grammar prompt carries the firm directive");
-            CHECK(captures[0].grammar == "toolcall_opt:get_weather",
+            // TC-1: REQUIRED uses the must-call dialect (toolcall:), not the
+            // optional toolcall_opt: used for AUTO.
+            CHECK(captures[0].grammar == "toolcall:get_weather",
                   "REQUIRED grammar backend attaches the grammar spec");
         }
         runanywhere::v1::ToolCallingResult result;

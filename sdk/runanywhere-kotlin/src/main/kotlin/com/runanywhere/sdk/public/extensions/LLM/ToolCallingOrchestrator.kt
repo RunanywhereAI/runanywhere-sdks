@@ -189,6 +189,9 @@ internal fun makeToolCallingRunLoopRequest(
         replace_system_prompt = options.replace_system_prompt,
         require_json_arguments = options.require_json_arguments,
         history = history,
+        // TC-2: mirror options onto request field 20 — commons reads parallel
+        // mode from the session/run-loop request, not from inline options alone.
+        parallel_tool_calls = options.parallel_tool_calls,
     )
 
 /**

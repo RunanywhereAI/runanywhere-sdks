@@ -26,5 +26,10 @@
     <array>
         <string>group.com.runanywhere.runanywhereai</string>
     </array>
+    <!-- iOS HealthKit read access for the get_health_data tool -->
+    <key>com.apple.developer.healthkit</key>
+    <true/>
+    <key>com.apple.developer.healthkit.access</key>
+    <array/>
 </dict>
 </plist>

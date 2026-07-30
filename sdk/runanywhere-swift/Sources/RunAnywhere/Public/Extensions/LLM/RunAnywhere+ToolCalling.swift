@@ -253,6 +253,11 @@ public extension RunAnywhere {
         toolChoice: RAToolChoiceMode? = nil,
         forcedToolName: String? = nil,
         validateCalls: Bool? = nil,
+        // TC-2: when true, one model turn may request multiple tools; commons
+        // executes the whole batch before one follow-up prompt instead of
+        // one LLM round-trip per tool. Default false preserves the
+        // historical single-call-per-turn behavior.
+        parallelToolCalls: Bool? = nil,
         history: [String] = []
     ) async throws -> RAToolCallingResult {
         guard isInitialized else {
@@ -266,6 +271,9 @@ public extension RunAnywhere {
         }
         if let forcedToolName {
             tcOpts.forcedToolName = forcedToolName
+        }
+        if let parallelToolCalls {
+            tcOpts.parallelToolCalls = parallelToolCalls
         }
         let registeredTools = await ToolRegistry.shared.getAll()
         let tools = tcOpts.tools.isEmpty ? registeredTools : tcOpts.tools
@@ -433,6 +441,11 @@ public extension RunAnywhere {
         request.replaceSystemPrompt = toolOptions.replaceSystemPrompt
         request.requireJsonArguments = toolOptions.requireJsonArguments
         request.keepToolsAvailable = toolOptions.keepToolsAvailable
+        // TC-2: mirrors ToolCallingOptions.parallelToolCalls onto the
+        // session-create envelope (proto field 20) — the run-loop reads
+        // parallel_tool_calls from THIS request, not from the inline
+        // ToolCallingOptions snapshot.
+        request.parallelToolCalls = toolOptions.parallelToolCalls
         // `validate_calls` is `optional bool` on the proto so
         // hosts that delegate validation/authorization to their executor (or
         // use dynamic tool registries where argument inspection happens

@@ -469,6 +469,10 @@ function buildSessionCreateRequest(
     // these into every generate in the session loop so multi-turn tool use keeps
     // context — Kotlin parity (makeToolCallingRunLoopRequest history param).
     history: extra.history ?? [],
+    // TC-2: mirror options onto request field 20 — commons reads parallel
+    // mode from the session/run-loop request, not from inline options alone.
+    // Swift parity: RunAnywhere+ToolCalling.swift makeRunLoopRequest.
+    parallelToolCalls: effectiveOptions.parallelToolCalls ?? false,
   });
   return ToolCallingSessionCreateRequestMessage.encode(request).finish();
 }

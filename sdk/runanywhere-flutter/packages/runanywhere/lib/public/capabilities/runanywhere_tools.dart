@@ -252,6 +252,9 @@ class RunAnywhereTools {
       // Flutter uses the session ABI — commons threads these into every
       // generate in the loop so multi-turn tool use keeps context.
       history: history,
+      // TC-2: mirror options onto request field 20 — commons reads parallel
+      // mode from the session/run-loop request, not from inline options alone.
+      parallelToolCalls: opts.parallelToolCalls,
     );
     // `validate_calls` is `optional bool` on the proto — leave it UNSET when
     // the caller did not supply a value so commons applies its documented
