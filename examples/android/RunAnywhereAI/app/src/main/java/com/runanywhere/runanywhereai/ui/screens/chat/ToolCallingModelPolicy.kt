@@ -139,5 +139,9 @@ internal object ToolCallingExecutionPolicy {
         auto_execute = true,
         keep_tools_available = false,
         disable_thinking = true,
+        // Match the iOS example (LLMViewModel+ToolCalling.swift): one model
+        // turn may request multiple tools (e.g. weather + time) and get them
+        // all executed before a single follow-up reply.
+        parallel_tool_calls = true,
     )
 }
