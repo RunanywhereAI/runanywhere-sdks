@@ -69,3 +69,40 @@ test('turn ids are distinct and monotonic', () => {
   assert.deepEqual(ids, [1, 2, 3]);
   assert.equal(g.currentId, 3);
 });
+
+test('leaving the tab mid-turn abandons the turn (it must not speak later)', () => {
+  // Reported in review: voiceCleanup stopped capture and playback but never
+  // invalidated a turn that was still transcribing or generating. That turn kept
+  // running, then wrote into the Voice DOM and started TTS while the user was on
+  // another tab. Cleanup must supersede it, exactly like the cancel path.
+  const g = createTurnGuard();
+  const turn = g.begin();
+
+  g.cancel();                       // <- what voiceCleanup now does on tab change
+
+  // Everything the in-flight turn does from here is guarded by current().
+  const wrote = [];
+  const step = (what) => { if (turn.current()) wrote.push(what); };
+  step('transcript');
+  step('reply-text');
+  step('synthesize');
+  step('play-audio');
+
+  assert.deepEqual(wrote, [], 'an abandoned turn must not touch the UI or speak');
+});
+
+test('a turn abandoned by cleanup does not disturb the next visit to the tab', () => {
+  const g = createTurnGuard();
+  const stale = g.begin();
+  g.cancel();                       // tab change
+
+  const fresh = g.begin();          // user comes back and taps the orb
+  let busy = true;
+  let orb = 'thinking';
+
+  if (stale.current()) { busy = false; orb = 'idle'; }   // stale finally block lands
+
+  assert.equal(fresh.current(), true);
+  assert.equal(busy, true);
+  assert.equal(orb, 'thinking');
+});
