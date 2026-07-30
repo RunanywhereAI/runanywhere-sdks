@@ -73,7 +73,7 @@ class VoiceApi {
     );
     final turns = turnHandling ?? const TurnHandlingOptions();
     config.sessionConfig = VoiceSessionConfig(
-      silenceDurationMs: turns.endpointing.maxDelayMs,
+      silenceDurationMs: turns.endpointing.minDelayMs,
       autoPlayTts: true,
       continuousMode: true,
     );

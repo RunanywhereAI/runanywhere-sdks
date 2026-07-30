@@ -1,6 +1,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.LLMGenerationOptions
+import com.runanywhere.sdk.generated.convenience.defaults
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -25,10 +26,11 @@ class CppBridgeLLMGenerationOptionsTest {
         val request = (null as LLMGenerationOptions?).toGenerateRequest(prompt = "test")
 
         val canonical = assertNotNull(request.options)
-        assertEquals(0.8f, canonical.temperature)
-        assertEquals(100, canonical.max_output_tokens)
-        assertEquals(1.0f, canonical.top_p)
-        assertEquals(1.0f, canonical.repetition_penalty)
+        val defaults = LLMGenerationOptions.defaults()
+        assertEquals(defaults.temperature, canonical.temperature)
+        assertEquals(defaults.max_output_tokens, canonical.max_output_tokens)
+        assertEquals(defaults.top_p, canonical.top_p)
+        assertEquals(defaults.repetition_penalty, canonical.repetition_penalty)
     }
 
     @Test

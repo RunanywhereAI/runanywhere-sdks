@@ -77,7 +77,7 @@ public class LlmNamespace internal constructor() {
     public suspend fun generate(prompt: String, options: LlmOptions? = null): GenerationResult {
         val opts = options.orDefault()
         val model = prepareGeneration(opts, ModelCategory.MODEL_CATEGORY_LANGUAGE)
-        if (opts.usesTools() && ToolCallingOrchestrator.getRegisteredTools().isNotEmpty()) {
+        if (opts.usesTools() && opts.activeTools().isNotEmpty()) {
             return generateWithTools(prompt, opts, emptyList(), model)
         }
         return generateUnary(opts.toRequest(prompt, newRequestId(), emptyList()))
@@ -96,7 +96,7 @@ public class LlmNamespace internal constructor() {
         val model = prepareGeneration(opts, ModelCategory.MODEL_CATEGORY_LANGUAGE)
         val prompt = messages.lastPrompt()
         val history = messages.dropLast(1)
-        if (opts.usesTools() && ToolCallingOrchestrator.getRegisteredTools().isNotEmpty()) {
+        if (opts.usesTools() && opts.activeTools().isNotEmpty()) {
             return generateWithTools(prompt, opts, history, model)
         }
         return generateUnary(opts.toRequest(prompt, newRequestId(), history))
@@ -252,6 +252,14 @@ public class LlmNamespace internal constructor() {
 private fun newRequestId(): String = UUID.randomUUID().toString()
 
 private fun LlmOptions.usesTools(): Boolean = toolChoice != ToolChoice.None
+
+/**
+ * Tools the run loop will offer, using the same rule the orchestrator applies:
+ * the explicit list when the caller gave one, otherwise the registry. Reading
+ * only the registry here would skip the loop for inline tools.
+ */
+private suspend fun LlmOptions.activeTools(): List<ToolDefinition> =
+    tools.ifEmpty { ToolCallingOrchestrator.getRegisteredTools() }
 
 private fun LlmOptions.strictStructuredOutput(): Boolean = structuredOutput?.strict ?: true
 
