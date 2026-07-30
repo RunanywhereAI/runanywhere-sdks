@@ -1189,6 +1189,14 @@ function wireVoice() {
   voiceCleanup = () => {
     if (state === 'listening') { cc.stop(); level = 0; }
     stopPlayback();
+    // Leaving the tab must also abandon a turn that is still transcribing or
+    // generating. Nothing in the inference stack cancels, so that turn keeps
+    // running; without this it would later write into the Voice DOM and start
+    // speaking out loud while the user is on another tab. Superseding it makes
+    // every one of its remaining guards fail closed.
+    turns.cancel();
+    clearTimeout(watchdog);
+    busy = false;
     if (state !== 'idle') setVoiceState('idle');
   };
   setVoiceState('idle');
