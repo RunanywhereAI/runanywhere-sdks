@@ -9,6 +9,10 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import { jsonSchemaToGrammar } from '../grammar';
 import { splitThinking } from '../thinking';
+import { speakableText } from '../speech';
+import { formatChat } from '../chat-template';
+import type { ChatTemplate, ChatTurn, FormatOptions } from '../chat-template';
+import { downsample, pcm16Bytes, rms } from '../audio';
 import {
   RAGConfiguration,
   RAGDocument,
@@ -56,7 +60,16 @@ function rejectAllPending(err: Error): void {
   pending.clear();
 }
 
+// The args of the last successful initialize(), replayed onto a REPLACEMENT host.
+// The native addon's initialised state is per-process, so a re-forked host starts
+// uninitialised: without this, one host crash leaves the app alive but every
+// feature failing "not initialized" until the user restarts it.
+let initArgs: [string | undefined, string | undefined] | null = null;
+let sawFirstPort = false;
+
 ipcRenderer.on('runanywhere-port', (event) => {
+  const isReplacement = sawFirstPort;
+  sawFirstPort = true;
   port = event.ports[0];
   port.onmessage = (ev: MessageEvent) => {
     const m = ev.data as RpcMessage;
@@ -73,6 +86,21 @@ ipcRenderer.on('runanywhere-port', (event) => {
   };
   port.onmessageerror = () => { /* ignore an undeserializable message rather than wedge the port */ };
   port.start();
+  if (isReplacement && initArgs) {
+    // Re-initialise BEFORE opening the gate, so calls queued behind `ready` do not
+    // race the init and fail. If it fails there is nothing further we can do here;
+    // the next call surfaces the error.
+    const [secureDir, baseDir] = initArgs;
+    new Promise<void>((resolve, reject) => {
+      const id = nextId++;
+      pending.set(id, { resolve: () => resolve(), reject });
+      port!.postMessage({ id, method: 'initialize', args: [secureDir, baseDir] });
+    })
+      .then(() => bus.emit({ type: 'initialized' }))
+      .catch(() => { /* surfaced by the caller's next request */ })
+      .finally(() => markReady());
+    return;
+  }
   markReady();
 });
 
@@ -111,14 +139,30 @@ contextBridge.exposeInMainWorld('runanywhere', {
   ready: (): Promise<void> => ready,
   version: () => send('version', []),
   initialize: (secureDir?: string, baseDir?: string) =>
-    emitAfter(send('initialize', [secureDir, baseDir]), () => bus.emit({ type: 'initialized' })),
+    emitAfter(send('initialize', [secureDir, baseDir]), () => {
+      // Remembered so a re-forked host is initialised automatically (see above).
+      initArgs = [secureDir, baseDir];
+      bus.emit({ type: 'initialized' });
+    }),
 
   // ---- lifecycle + telemetry events (local bus, driven by these wrappers) ----
   onEvent: (listener: EventListener) => bus.on(listener),
 
+  // ---- audio helpers (pure DSP; renderer-side, no RPC) ----
+  // Anti-aliased rate conversion + PCM16 packing for the mic -> STT path. Doing
+  // this by hand in an app folds >8kHz energy into the band Whisper reads.
+  downsample: (samples: Float32Array, inRate: number, outRate: number) => downsample(samples, inRate, outRate),
+  pcm16Bytes: (samples: Float32Array) => pcm16Bytes(samples),
+  rms: (samples: Float32Array) => rms(samples),
+
   // ---- reasoning ----
   // Split a reasoning model's <think>…</think> from its answer (pure, in-page).
   splitThinking: (text: string) => splitThinking(text),
+  // Markdown/symbols -> words a TTS voice can read (no "asterisk asterisk").
+  speakableText: (text: string) => speakableText(text),
+  // Render a conversation in the markup the model was trained on. Without this a
+  // multi-turn chat collapses into a single user turn and the model "forgets".
+  formatChat: (turns: ChatTurn[], template?: ChatTemplate, opts?: FormatOptions) => formatChat(turns, template, opts),
 
   // ---- model catalog + storage ----
   catalog: () => CATALOG,

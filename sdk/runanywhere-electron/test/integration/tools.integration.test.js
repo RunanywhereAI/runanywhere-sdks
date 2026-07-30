@@ -23,7 +23,7 @@ const HAVE_ADDON = sdk !== null;
 const SKIP = HAVE_ADDON ? false : `native addon not available: ${loadError && loadError.message}`;
 
 // Catalog id for the model under test (see dist/catalog.js: single-file llm).
-const MODEL_ID = 'qwen2.5-0.5b';
+const MODEL_ID = 'qwen3.5-0.8b';
 
 // The two tools the model may be asked to call.
 const TOOLS = [

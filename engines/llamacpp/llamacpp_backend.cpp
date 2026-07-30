@@ -691,10 +691,16 @@ std::string LlamaCppTextGeneration::build_prompt(const TextGenerationRequest& re
         messages = request.messages;
     } else if (!request.prompt.empty()) {
         // If the prompt already contains chat template tokens (e.g. <|im_start|>,
-        // [INST], <|begin_of_text|>), it was pre-formatted by the caller — pass
-        // it through verbatim to avoid double-applying the template.
+        // [INST], <|begin_of_text|>, <start_of_turn>), it was pre-formatted by the
+        // caller — pass it through verbatim to avoid double-applying the template.
+        //
+        // <start_of_turn> is Gemma's marker. Without it here, a correctly formatted
+        // multi-turn Gemma prompt falls through to the single-user-message path
+        // below, which collapses the whole conversation into one turn — the model
+        // then answers as if it had no history.
         if (request.prompt.find("<|im_start|>") != std::string::npos ||
             request.prompt.find("<|begin_of_text|>") != std::string::npos ||
+            request.prompt.find("<start_of_turn>") != std::string::npos ||
             request.prompt.find("[INST]") != std::string::npos) {
             RAC_LOG_INFO("LLM.LlamaCpp",
                          "Prompt already contains chat template tokens, using as-is (len=%zu)",
