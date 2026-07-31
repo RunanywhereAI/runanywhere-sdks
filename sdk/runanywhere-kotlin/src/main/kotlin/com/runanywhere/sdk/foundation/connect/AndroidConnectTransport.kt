@@ -446,6 +446,7 @@ internal class AndroidConnectSocket(
         const val HANDSHAKE_TIMEOUT_MS = 5_000
         const val HEARTBEAT_INTERVAL_MS = 3_000L
         const val HEARTBEAT_TIMEOUT_MS = 2_000
+
         /** Generous inter-frame timeout so a stalled host is visible without false positives. */
         val GENERATION_READ_TIMEOUT_MS = RADefaults.Connect.GENERATION_READ_TIMEOUT_MS
     }
