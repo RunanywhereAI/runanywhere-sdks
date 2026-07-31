@@ -202,7 +202,8 @@ void register_embed(CLI::App& app, GlobalOptions& options) {
                     "Embedding model (default: " + std::string(kDefaultEmbeddingModel) + ")")
         ->default_val(kDefaultEmbeddingModel);
     cmd->add_option("--engine", *engine,
-                    "Engine/framework hint for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
+                    "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa). Honoured for "
+                    "catalog models too, not just URL/HF refs.");
     cmd->add_option("--text,-t", *option_texts,
                     "Additional text to embed; repeat for batch embeddings");
     cmd->callback([&options, model, engine, positional_text, option_texts]() {

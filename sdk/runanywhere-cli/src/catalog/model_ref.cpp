@@ -1,6 +1,9 @@
 #include "catalog/model_ref.h"
 
+#include <cctype>
+#include <dirent.h>
 #include <string>
+#include <sys/stat.h>
 #include <vector>
 
 #include "model_types.pb.h"
@@ -30,6 +33,131 @@ bool looks_like_hf_ref(const std::string &ref) {
     }
   }
   return false;
+}
+
+// A ref that names an existing directory or file on disk. Checked BEFORE the
+// HF/URL branch but AFTER the catalog and the registry, so a local path can
+// never shadow a real model id.
+bool is_local_path(const std::string &ref) {
+  if (ref.empty() || is_http_url(ref) || looks_like_hf_ref(ref)) {
+    return false;
+  }
+  // Only treat something as a path when it looks like one. A bare word is a
+  // model id; requiring a separator or an explicit `.`/`~` prefix keeps
+  // `rcli run qwen3` from stat()ing the cwd and finding a stray directory.
+  if (ref.find('/') == std::string::npos) {
+    return false;
+  }
+  struct stat st {};
+  return ::stat(ref.c_str(), &st) == 0;
+}
+
+// Derive a stable, collision-free registry id from a bundle path. Using one
+// hardcoded id (as the diffusion path does) is fine for a single model and
+// wrong the moment two bundles are registered in one process — the second
+// silently overwrites the first, and every later load resolves to whichever
+// won.
+std::string id_for_local_path(const std::string &path) {
+  std::string base = path;
+  while (base.size() > 1 && base.back() == '/') {
+    base.pop_back();
+  }
+  const size_t slash = base.find_last_of('/');
+  if (slash != std::string::npos) {
+    base.erase(0, slash + 1);
+  }
+  for (char &c : base) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '.') {
+      c = '-';
+    }
+  }
+  return "local-" + base;
+}
+
+// Best-effort format/framework inference from the bundle layout. Only used when
+// the caller did not pin one with --engine, and deliberately narrow: it answers
+// "which of the shapes the CLI can actually load is this", not "what model is
+// this". Unknown layouts are left UNSPECIFIED so commons falls back to its own
+// resolution rather than acting on a CLI guess.
+void infer_local_kind(const std::string &path,
+                      runanywhere::v1::InferenceFramework *framework,
+                      runanywhere::v1::ModelFormat *format) {
+  *framework = runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED;
+  *format = runanywhere::v1::MODEL_FORMAT_UNSPECIFIED;
+
+  struct stat st {};
+  if (::stat(path.c_str(), &st) != 0) {
+    return;
+  }
+  if (!S_ISDIR(st.st_mode)) {
+    if (path.ends_with(".gguf")) {
+      *framework = runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
+      *format = runanywhere::v1::MODEL_FORMAT_GGUF;
+    }
+    return;
+  }
+  // A directory holding at least one .mlpackage is an Apple bundle — the shape
+  // every runanywhere/*_ANE repo ships.
+  if (DIR *dir = ::opendir(path.c_str())) {
+    while (dirent *ent = ::readdir(dir)) {
+      const std::string name = ent->d_name;
+      if (name.ends_with(".mlpackage") || name.ends_with(".mlmodelc")) {
+        *framework = runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
+        *format = runanywhere::v1::MODEL_FORMAT_MLPACKAGE;
+        break;
+      }
+    }
+    ::closedir(dir);
+  }
+}
+
+// Register an already-present local bundle so the lifecycle loader can resolve
+// it by id, with no download. Mirrors what `rcli image` has always done for a
+// local CoreML diffusion bundle (cmd_image.cpp::register_local_bundle) — this
+// is that capability moved down to the shared resolver, so every command that
+// takes a model ref gets it instead of just one.
+rac_result_t register_local_path(const std::string &path,
+                                 const ResolveOptions *options,
+                                 std::string *out_id, std::string *error) {
+  runanywhere::v1::InferenceFramework framework;
+  runanywhere::v1::ModelFormat format;
+  infer_local_kind(path, &framework, &format);
+  // An explicit --engine always wins over inference.
+  if (options && options->has_framework) {
+    framework = options->framework;
+  }
+
+  runanywhere::v1::ModelInfo model;
+  model.set_id(id_for_local_path(path));
+  model.set_name(path);
+  model.set_local_path(path);
+  model.set_source(runanywhere::v1::MODEL_SOURCE_LOCAL);
+  if (framework != runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED) {
+    model.set_framework(framework);
+  }
+  if (format != runanywhere::v1::MODEL_FORMAT_UNSPECIFIED) {
+    model.set_format(format);
+  }
+  if (options && options->has_category) {
+    model.set_category(options->category);
+  } else {
+    model.set_category(runanywhere::v1::MODEL_CATEGORY_LANGUAGE);
+  }
+
+  const std::string bytes = proto::serialize(model);
+  const rac_result_t rc = rac_model_registry_register_proto(
+      rac_get_model_registry(),
+      reinterpret_cast<const uint8_t *>(bytes.data()), bytes.size());
+  if (rc != RAC_SUCCESS) {
+    if (error) {
+      *error = "failed to register local bundle '" + path +
+               "': " + out::describe_result(rc);
+    }
+    return rc;
+  }
+  *out_id = model.id();
+  return RAC_SUCCESS;
 }
 
 // Registers a URL or Hugging Face ref through the commons factory and returns
@@ -107,6 +235,15 @@ rac_result_t resolve(const std::string &ref, Resolved *out, std::string *error,
     rac_proto_buffer_free(&found);
   }
 
+  // A path on disk. Checked after the catalog + registry so it can never
+  // shadow a real id, and before the "unknown model" arm so an ANE bundle
+  // sitting in a directory is reachable at all — it previously was not, which
+  // made every local Core ML LLM unloadable through the CLI.
+  if (is_local_path(ref)) {
+    out->from_catalog = false;
+    return register_local_path(ref, options, &out->model_id, error);
+  }
+
   if (is_http_url(ref) || looks_like_hf_ref(ref)) {
     out->from_catalog = false;
     return register_url(ref, options, &out->model_id, error);
@@ -122,8 +259,8 @@ rac_result_t resolve(const std::string &ref, Resolved *out, std::string *error,
       }
       *error += "?";
     } else {
-      *error += " (try `rcli list --all`, an hf.co/org/repo[:quant] ref, or a "
-                "direct URL)";
+      *error += " (try `rcli list --all`, an hf.co/org/repo[:quant] ref, a "
+                "direct URL, or a path to a local bundle directory)";
     }
   }
   return RAC_ERROR_NOT_FOUND;
