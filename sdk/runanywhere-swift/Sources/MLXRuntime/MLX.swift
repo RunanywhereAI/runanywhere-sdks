@@ -6,6 +6,7 @@
 // swiftlint:disable file_length
 
 import CoreImage
+import Darwin
 import Foundation
 import MLX
 import MLXBackend
@@ -55,8 +56,13 @@ private struct MLXRuntimeLog {
 
     private func write(level: String, _ message: String) {
         let line = "[RunAnywhereMLX][\(category)][\(level)] \(message)\n"
-        guard let data = line.data(using: .utf8) else { return }
-        FileHandle.standardError.write(data)
+        // Never crash the host app on a logging I/O failure. Xcode / device
+        // stderr can raise NSFileHandleOperationException ("Input/output error")
+        // during MLX unload/cleanup; the old non-throwing write(Data) turned
+        // that into an uncaught ObjC exception. Prefer libc stderr, then a
+        // throwing FileHandle write swallowed with try?.
+        fputs(line, stderr)
+        fflush(stderr)
     }
 }
 

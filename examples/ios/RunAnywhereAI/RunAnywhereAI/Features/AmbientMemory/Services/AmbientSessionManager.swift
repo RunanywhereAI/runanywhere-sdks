@@ -491,7 +491,8 @@ final class AmbientSessionManager: ObservableObject {
     }
 
     /// Load the chosen digest model on demand, write summary + action items,
-    /// then unload. Pass `rewrite: true` to wipe prior machine summary/items.
+    /// then unload. Pass `rewrite: true` to replace prior machine summary/items
+    /// only after a usable new digest (failed rewrites keep the previous draft).
     /// `modelID` overrides the note's stored choice (from the note-detail picker).
     func generateSummary(
         for noteID: String,
@@ -528,20 +529,35 @@ final class AmbientSessionManager: ObservableObject {
         statusMessage = rewrite ? "Rewriting summary…" : "Loading model and summarizing…"
         defer { isSummarizing = false }
 
+        // Keep the previous draft until the new pass succeeds — a failed or
+        // unparseable rewrite used to wipe summary + machine action items.
+        let previousSummary = note.summary
+        let previousMachineItems = note.actionItems.filter { !$0.isManual }.map(\.text)
+        let previousPartials = note.partialSummaries
+
         note.summaryPending = true
         note.digestModelID = modelID
         note.partialSummaries = []
         if rewrite {
+            // Clear only in memory for the map pass; disk keeps the old draft
+            // until we confirm a usable result below.
             note.summary = ""
             note.replaceMachineActionItems(with: [])
         }
-        await store.save(note)
         sessionRecord = note
         pendingChunk = source
 
         let flushed = await flushPendingAsChunks(modelID: modelID)
         guard flushed, var current = sessionRecord else {
-            statusMessage = lastError ?? "Summarization failed."
+            // Restore prior content so Rewrite never leaves an empty note.
+            var restored = note
+            restored.summary = previousSummary
+            restored.partialSummaries = previousPartials
+            restored.replaceMachineActionItems(with: previousMachineItems)
+            restored.summaryPending = false
+            sessionRecord = restored
+            await store.save(restored)
+            statusMessage = lastError ?? "Summarization failed — previous summary kept."
             await unloadLanguageModel(modelID)
             return
         }
@@ -552,18 +568,31 @@ final class AmbientSessionManager: ObservableObject {
         } else if current.partialSummaries.count == 1 {
             current.summary = current.partialSummaries[0]
             current.summaryPending = false
-            await store.save(current)
         }
 
+        let newSummary = current.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let looksLikeFallback = newSummary.count <= 200
+            && source.hasPrefix(newSummary)
+            && current.actionItems.filter({ !$0.isManual }).isEmpty
+        if newSummary.isEmpty || (rewrite && looksLikeFallback && !previousSummary.isEmpty) {
+            current.summary = previousSummary
+            current.partialSummaries = previousPartials
+            current.replaceMachineActionItems(with: previousMachineItems)
+            current.summaryPending = false
+            await store.save(current)
+            sessionRecord = current
+            await unloadLanguageModel(modelID)
+            lastError = "Rewrite did not produce a usable summary — previous draft kept. Try LFM2 350M or disable thinking models."
+            statusMessage = lastError ?? ""
+            return
+        }
+
+        await store.save(current)
         await unloadLanguageModel(modelID)
         sessionRecord = current
         didFinishDeferredMerge.send(current.id)
-        if current.summary.isEmpty {
-            statusMessage = lastError ?? "Summary still empty — try a different model."
-        } else {
-            statusMessage = rewrite ? "Summary rewritten." : "Summary ready."
-            lastError = nil
-        }
+        statusMessage = rewrite ? "Summary rewritten." : "Summary ready."
+        lastError = nil
     }
 
     /// Back-compat name used by older call sites / tests.

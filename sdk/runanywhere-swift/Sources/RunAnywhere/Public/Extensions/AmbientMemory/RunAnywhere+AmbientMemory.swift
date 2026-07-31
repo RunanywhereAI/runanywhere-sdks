@@ -205,6 +205,10 @@ public extension RunAnywhere {
             var options = RALLMGenerationOptions.defaults()
             options.temperature = 0.1
             options.maxTokens = 512
+            // Thinking models (e.g. Qwen3) otherwise emit <think>…</think> before
+            // JSON; parse then falls back to a transcript snippet and empty
+            // action items — which looks like a "failed rewrite".
+            options.disableThinking = true
             options.systemPrompt = AmbientDigestPrompt.system(mode: mode, maxActionItems: maxActionItems)
             let result = try await RunAnywhere.generate(
                 prompt: AmbientDigestPrompt.user(text: text, mode: mode),
@@ -324,7 +328,8 @@ enum AmbientDigestPrompt {
     /// keeps a note readable even when the model misbehaves.
     static func parse(_ response: String, fallbackText: String) -> Parsed {
         let fallbackSummary = String(fallbackText.prefix(200))
-        guard let payload = jsonObject(in: response) else {
+        let cleaned = stripThinking(response)
+        guard let payload = jsonObject(in: cleaned) else {
             return Parsed(summary: fallbackSummary, actionItems: [])
         }
 
@@ -345,6 +350,23 @@ enum AmbientDigestPrompt {
             summary: summary.isEmpty ? fallbackSummary : summary,
             actionItems: actionItems
         )
+    }
+
+    /// Drop Qwen-style thinking blocks so brace scanning finds the JSON object.
+    private static func stripThinking(_ response: String) -> String {
+        var text = response
+        let patterns = [
+            #"<think>[\s\S]*?</think>"#,
+            #"<thinking>[\s\S]*?</thinking>"#,
+            #"◁think▷[\s\S]*?◁/think▷"#,
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
+                let range = NSRange(text.startIndex..<text.endIndex, in: text)
+                text = regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: "")
+            }
+        }
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Action items arrive either as bare strings or, from chattier models, as

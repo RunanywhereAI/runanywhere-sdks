@@ -317,10 +317,32 @@ final class AmbientMemoryViewModel: ObservableObject {
         }
     }
 
+    /// Persist a user edit of the note summary (LLM output is a draft).
+    func updateSummary(sessionID: String, to text: String) async {
+        await update(sessionID: sessionID) { note in
+            note.summary = text
+            // A manual edit means the note is no longer waiting on the model.
+            if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                note.summaryPending = false
+            }
+        }
+    }
+
     func toggleActionItem(_ itemID: String, in sessionID: String) async {
         await update(sessionID: sessionID) { note in
             guard let index = note.actionItems.firstIndex(where: { $0.id == itemID }) else { return }
             note.actionItems[index].isDone.toggle()
+        }
+    }
+
+    func updateActionItem(_ itemID: String, text: String, in sessionID: String) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        await update(sessionID: sessionID) { note in
+            guard let index = note.actionItems.firstIndex(where: { $0.id == itemID }) else { return }
+            note.actionItems[index].text = trimmed
+            // Editing promotes it to a user-owned item so Rewrite won't wipe it.
+            note.actionItems[index].isManual = true
         }
     }
 

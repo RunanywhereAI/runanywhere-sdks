@@ -20,6 +20,9 @@ struct AmbientSessionDetailView: View {
     @State private var isRenaming = false
     @State private var draftTitle = ""
     @State private var draftItem = ""
+    @State private var draftSummary = ""
+    @State private var summaryNoteID: String?
+    @State private var summarySaveTask: Task<Void, Never>?
     @StateObject private var player = AmbientNotePlayer()
 
     private var record: AmbientSessionRecord? {
@@ -90,6 +93,31 @@ struct AmbientSessionDetailView: View {
             }
         }
         .onDisappear { player.stop() }
+        .onAppear { syncSummaryDraft(from: record) }
+        .onChange(of: record?.summary) { _, _ in
+            // Refresh the editor when Summarize / Rewrite finishes, but not
+            // while the user is mid-keystroke on the same note.
+            syncSummaryDraft(from: record, onlyIfIdle: true)
+        }
+        .onChange(of: viewModel.sessionManager.isSummarizing) { _, busy in
+            if !busy { syncSummaryDraft(from: record) }
+        }
+    }
+
+    private func syncSummaryDraft(from record: AmbientSessionRecord?, onlyIfIdle: Bool = false) {
+        guard let record else { return }
+        if onlyIfIdle, summaryNoteID == record.id, draftSummary != record.summary {
+            // User has local edits that differ from disk — don't clobber.
+            // Still adopt when the note id changes or after a model rewrite
+            // that cleared/replaced summary while we weren't editing.
+            if !record.summary.isEmpty, draftSummary.isEmpty {
+                draftSummary = record.summary
+                summaryNoteID = record.id
+            }
+            return
+        }
+        draftSummary = record.summary
+        summaryNoteID = record.id
     }
 
     private func content(for record: AmbientSessionRecord) -> some View {
@@ -143,26 +171,38 @@ struct AmbientSessionDetailView: View {
                 Text(error)
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.statusRed)
-            } else if record.summary.isEmpty, hasTranscript {
+            }
+
+            // Always editable — LLM output is a starting draft, not locked text.
+            TextEditor(text: $draftSummary)
+                .font(AppTypography.body)
+                .frame(minHeight: 120)
+                .disabled(busy)
+                .onChange(of: draftSummary) { _, newValue in
+                    summarySaveTask?.cancel()
+                    summarySaveTask = Task {
+                        try? await Task.sleep(nanoseconds: 450_000_000)
+                        guard !Task.isCancelled else { return }
+                        await viewModel.updateSummary(sessionID: sessionID, to: newValue)
+                    }
+                }
+                .onDisappear {
+                    summarySaveTask?.cancel()
+                    Task { await viewModel.updateSummary(sessionID: sessionID, to: draftSummary) }
+                }
+
+            if draftSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, hasTranscript, !busy {
                 Text(
                     digestID == nil
-                        ? "Choose an LLM above, then tap Summarize."
-                        : "Tap Summarize to load the LLM and write summary + action items."
+                        ? "Type a summary, or choose an LLM and tap Summarize."
+                        : "Type a summary, or tap Summarize to draft with the LLM."
                 )
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.statusOrange)
-            } else if record.summary.isEmpty {
-                Text(hasTranscript ? "No summary yet." : "Nothing was said worth summarizing.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
-            } else {
-                Text(record.summary)
-                    .font(AppTypography.body)
-                    .foregroundColor(AppColors.textPrimary)
+                .font(AppTypography.caption2)
+                .foregroundColor(AppColors.textSecondary)
             }
 
             if hasTranscript {
-                if record.summary.isEmpty {
+                if record.summary.isEmpty, draftSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Button {
                         if digestID == nil {
                             showDigestPicker = true
@@ -202,19 +242,15 @@ struct AmbientSessionDetailView: View {
     private func actionItemsSection(_ record: AmbientSessionRecord) -> some View {
         Section("Action items") {
             ForEach(record.actionItems) { item in
-                Button {
-                    Task { await viewModel.toggleActionItem(item.id, in: sessionID) }
-                } label: {
-                    HStack(alignment: .top, spacing: AppSpacing.smallMedium) {
-                        Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
-                            .foregroundColor(item.isDone ? AppColors.statusGreen : AppColors.textSecondary)
-                        Text(item.text)
-                            .font(AppTypography.callout)
-                            .foregroundColor(item.isDone ? AppColors.textSecondary : AppColors.textPrimary)
-                            .strikethrough(item.isDone)
+                EditableActionItemRow(
+                    item: item,
+                    onToggle: {
+                        Task { await viewModel.toggleActionItem(item.id, in: sessionID) }
+                    },
+                    onSaveText: { text in
+                        Task { await viewModel.updateActionItem(item.id, text: text, in: sessionID) }
                     }
-                }
-                .buttonStyle(.plain)
+                )
                 .swipeActions {
                     Button("Delete", role: .destructive) {
                         Task { await viewModel.deleteActionItem(item.id, from: sessionID) }
@@ -278,6 +314,41 @@ struct AmbientSessionDetailView: View {
         formatter.timeStyle = .short
         return formatter
     }()
+}
+
+/// Checkmark + editable text for one action item.
+private struct EditableActionItemRow: View {
+    let item: AmbientActionItem
+    let onToggle: () -> Void
+    let onSaveText: (String) -> Void
+
+    @State private var draft: String = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: AppSpacing.smallMedium) {
+            Button(action: onToggle) {
+                Image(systemName: item.isDone ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(item.isDone ? AppColors.statusGreen : AppColors.textSecondary)
+            }
+            .buttonStyle(.plain)
+
+            TextField("Action item", text: $draft, axis: .vertical)
+                .font(AppTypography.callout)
+                .foregroundColor(item.isDone ? AppColors.textSecondary : AppColors.textPrimary)
+                .strikethrough(item.isDone)
+                .focused($focused)
+                .onAppear { draft = item.text }
+                .onChange(of: item.text) { _, newValue in
+                    if !focused { draft = newValue }
+                }
+                .onChange(of: focused) { _, isFocused in
+                    guard !isFocused, draft != item.text else { return }
+                    onSaveText(draft)
+                }
+                .onSubmit { onSaveText(draft) }
+        }
+    }
 }
 
 // MARK: - Playback
