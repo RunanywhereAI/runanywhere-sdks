@@ -21,6 +21,9 @@
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
+// `rac_llm_service_ops_t` lives here; the vtable header forward-declares the slot but not the
+// type, so the entry file must include it to name the NeuRT op table.
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(__APPLE__) && defined(RAC_COREML_GENERATE_AVAILABLE) && \
@@ -135,6 +138,13 @@ static const uint32_t k_coreml_formats[] = {
 
 static const rac_primitive_t k_coreml_primitives[] = {
     RAC_PRIMITIVE_DIFFUSION,
+#if RAC_COREML_HAVE_NEURT
+    // Advertised ONLY when NeuRT is linked. Claiming a primitive the vtable cannot serve would let the
+    // router pick this engine for an LLM and then hand back a null op-table.
+    // NOTE: the text-generation primitive is RAC_PRIMITIVE_GENERATE_TEXT. There is no
+    // RAC_PRIMITIVE_LLM — SDK_PATCH.md's diff names one and the enum has never had it.
+    RAC_PRIMITIVE_GENERATE_TEXT,
+#endif
 };
 #endif
 
@@ -202,16 +212,32 @@ static const rac_engine_manifest_t k_coreml_manifest = {
     .reserved_1 = 0,
 };
 
+// The LLM modality of the coreml engine, implemented in NeuRT
+// (neurun/NeuRT/src/sdk/rac_llm_ops_neurt.cpp) and linked in as the static library `neurt_core`.
+// NeuRT runs prebuilt Core ML graphs on the Apple Neural Engine; it never compiles a model.
+// Guarded on RAC_COREML_HAVE_NEURT, which the CMake sets ONLY when the neurun checkout was found and
+// `rac_neurt_llm_ops` is actually linked. Guarding on RAC_COREML_ROUTABLE instead would reference a
+// symbol that is not linked in a checkout without neurun and fail at link time — the engine must still
+// build standalone, exactly as it did before, just without the ANE LLM path.
+#if RAC_COREML_HAVE_NEURT
+extern "C" const rac_llm_service_ops_t g_neurt_llm_ops;
+#endif
+
 static const rac_engine_vtable_t g_coreml_engine_vtable = {
     /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_coreml_manifest),
     /* capability_check */ coreml_capability_check,
     /* on_unload        */ nullptr,
 
     // The coreml engine's DIFFUSION modality wires its op-table into the
-    // diffusion_ops slot below. To add a CoreML LLM/VLM/embeddings modality:
-    // fill `llm_ops`/`vlm_ops`/`embedding_ops` here (backed by that modality's
-    // impl) and add its primitive to k_coreml_manifest.primitives.
-    /* llm_ops          */ nullptr,
+    // diffusion_ops slot below. To add a CoreML VLM/embeddings modality: fill
+    // `vlm_ops`/`embedding_ops` here (backed by that modality's impl) and add its
+    // primitive to k_coreml_manifest.primitives.
+/* llm_ops          */
+#if RAC_COREML_HAVE_NEURT && RAC_COREML_ROUTABLE
+    &g_neurt_llm_ops,  // LLM modality of the coreml engine, backed by NeuRT (Apple Neural Engine)
+#else
+    nullptr,
+#endif
     /* stt_ops          */ nullptr,
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,
