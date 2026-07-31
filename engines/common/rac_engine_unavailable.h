@@ -10,7 +10,7 @@
  * any primitive so the router can never select it:
  *
  *   - qhexrt — private Android NPU engine whose prebuilt archive may be absent.
- *   - coreml — Apple-only; its non-routable arm publishes nothing.
+ *   - neurt — Apple-only; its non-routable arm publishes nothing.
  *
  * Each of those hand-rolls the identical four-part shell:
  *   1. an empty / not-routable `rac_engine_manifest_t` (zero primitives /
@@ -129,9 +129,9 @@ extern "C" {
  *
  * Engines pass their own `#if`-derived booleans (1/0):
  *   - @p platform_supported — is this OS/arch a target for the engine at all?
- *     (e.g. `__ANDROID__` for qhexrt, `__APPLE__` for coreml).
+ *     (e.g. `__ANDROID__` for qhexrt, `__APPLE__` for neurt).
  *   - @p backend_present    — is the real engine implementation linked / wired
- *     on this build? (the QHexRT prebuilt archive, the generate path for coreml).
+ *     on this build? (the QHexRT prebuilt archive, the generate path for neurt).
  *
  * Returns, in priority order:
  *   - `RAC_ERROR_CAPABILITY_UNSUPPORTED` when the platform itself is wrong —
@@ -144,7 +144,7 @@ extern "C" {
  *
  * The platform check is evaluated first so a stub build on the wrong OS reports
  * UNSUPPORTED rather than UNAVAILABLE, matching the hand-written gates in
- * qhexrt / coreml.
+ * qhexrt / neurt.
  */
 static inline rac_result_t rac_engine_unavailable_capability(int platform_supported,
                                                              int backend_present) {

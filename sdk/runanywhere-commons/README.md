@@ -145,7 +145,7 @@ Apple Foundation Models (LLM) and System TTS via Swift callbacks on iOS/macOS.
 
 ### Core ML
 
-Image generation (diffusion) on Apple platforms. Registration: `rac/plugin/rac_plugin_entry_coreml.h`.
+ANE text generation + image generation (diffusion) on Apple platforms. Registration: `rac/plugin/rac_plugin_entry_neurt.h`.
 
 ## Platform SDK integration
 

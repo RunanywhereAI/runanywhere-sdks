@@ -179,7 +179,7 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
         case RAC_FRAMEWORK_SYSTEM_TTS:
             return RAC_ENGINE_ID_PLATFORM;
         case RAC_FRAMEWORK_COREML:
-            return primitive == RAC_PRIMITIVE_DIFFUSION ? RAC_ENGINE_ID_COREML
+            return primitive == RAC_PRIMITIVE_DIFFUSION ? RAC_ENGINE_ID_NEURT
                                                         : RAC_ENGINE_ID_PLATFORM;
         case RAC_FRAMEWORK_QHEXRT:
             return RAC_ENGINE_ID_QHEXRT;

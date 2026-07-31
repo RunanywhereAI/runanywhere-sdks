@@ -1291,16 +1291,17 @@ endif()
 # configured after sdk/runanywhere-commons/, so the target does not exist yet
 # when this file runs in a root-level build.
 
-if(APPLE AND RAC_BACKEND_COREML AND TARGET rac_backend_coreml)
+if(APPLE AND RAC_BACKEND_NEURT AND TARGET rac_backend_neurt)
     add_executable(test_diffusion_coreml_generate test_diffusion_coreml_generate.cpp)
+    # rac_diffusion_coreml.h lives in neurun (NeuRT/src/sdk/); it arrives
+    # transitively through rac_backend_neurt's PUBLIC include dirs.
     target_include_directories(test_diffusion_coreml_generate PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/engines/coreml
     )
     target_link_libraries(test_diffusion_coreml_generate PRIVATE
         rac_commons
-        rac_backend_coreml
+        rac_backend_neurt
     )
     rac_link_archive_deps(test_diffusion_coreml_generate)
     target_compile_features(test_diffusion_coreml_generate PRIVATE cxx_std_17)

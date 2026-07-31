@@ -57,7 +57,7 @@ runanywhere::v1::InferenceFramework framework_for_plugin(const rac_engine_vtable
     if (name.find("llama") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
     }
-    if (name.find("coreml") != std::string::npos) {
+    if (name.find("neurt") != std::string::npos) {
         return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
     }
     if (name.find("mlx") != std::string::npos) {

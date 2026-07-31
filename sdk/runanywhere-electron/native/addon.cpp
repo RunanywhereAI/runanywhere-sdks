@@ -25,6 +25,10 @@
 #include "win32_platform_adapter.h"
 
 #include "rac/core/rac_core.h"
+#ifdef RAC_HAVE_BACKEND_NEURT
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_entry_neurt.h"
+#endif
 #include "rac/core/rac_types.h"
 #include "rac/features/llm/rac_llm_component.h"
 #include "rac/features/vlm/rac_vlm_component.h"
@@ -60,9 +64,6 @@ rac_result_t rac_backend_qhexrt_register(void);
 #endif
 #ifdef RAC_HAVE_BACKEND_MLX
 rac_result_t rac_backend_mlx_register(void);
-#endif
-#ifdef RAC_HAVE_BACKEND_COREML
-rac_result_t rac_backend_coreml_register(void);
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
 rac_result_t rac_backend_cloud_register(void);
@@ -236,8 +237,10 @@ Napi::Value Initialize(const Napi::CallbackInfo& info) {
 #ifdef RAC_HAVE_BACKEND_MLX
         rac_backend_mlx_register();
 #endif
-#ifdef RAC_HAVE_BACKEND_COREML
-        rac_backend_coreml_register();
+#ifdef RAC_HAVE_BACKEND_NEURT
+        // The neurt engine has no bespoke rac_backend_*_register() fn; register
+        // its plugin entry directly, like rcli's bootstrap does.
+        rac_plugin_register(rac_plugin_entry_neurt());
 #endif
 #ifdef RAC_HAVE_BACKEND_CLOUD
         rac_backend_cloud_register();

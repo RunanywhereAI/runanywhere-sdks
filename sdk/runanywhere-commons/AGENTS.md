@@ -113,7 +113,7 @@ scripts/build-windows.bat
 ┌──────────────────────────▼──────────────────────────────────────┐
 │                    Engine Plugins                                 │
 │  llamacpp (LLM+VLM) | sherpa (STT+TTS+VAD)                       │
-│  onnx (Embed+Segment) | coreml (Image/Diffusion, Apple)          │
+│  onnx (Embed+Segment) | neurt (ANE LLM + Diffusion, Apple)       │
 │  qhexrt (LLM+VLM+STT+TTS, HNPU) | platform (Apple FM+TTS+Diff)  │
 └─────────────────────────────────────────────────────────────────┘
 ```
