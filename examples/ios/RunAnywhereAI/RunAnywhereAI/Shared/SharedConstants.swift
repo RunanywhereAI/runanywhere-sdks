@@ -16,6 +16,12 @@ enum SharedConstants {
     static let urlScheme = "runanywhere"
     static let startFlowURLString = "runanywhere://startFlow"
 
+    // Deep links for the Ambient Memory Lab. `startAmbient` is what the App
+    // Shortcut (and therefore the Action Button) opens; `ambient` just routes
+    // to the Lab without starting a session.
+    static let ambientURLString = "runanywhere://ambient"
+    static let startAmbientURLString = "runanywhere://startAmbient"
+
     // App Group UserDefaults keys
     enum Keys {
         static let sessionState = "sessionState"                // FlowSessionPhase raw value
@@ -42,6 +48,8 @@ enum SharedConstants {
         static let stopListening = "com.runanywhere.keyboard.stopListening"
         static let cancelListening = "com.runanywhere.keyboard.cancelListening"
         static let endSession = "com.runanywhere.session.end"
+        // Live Activity / App Intent → app: stop the ambient memory session.
+        static let ambientStopRequested = "com.runanywhere.ambient.stopRequested"
     }
 
     // Curated map of host app bundle IDs → URL schemes for bounce-back (WisprFlow approach).

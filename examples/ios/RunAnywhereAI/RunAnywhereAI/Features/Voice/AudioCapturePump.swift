@@ -14,9 +14,10 @@ enum AudioCapturePump {
     /// MainActor hop so STT, VAD, and keyboard dictation do not repeat it.
     static func startRecording(
         with audioCapture: AudioCaptureManager,
+        configureSession: Bool = true,
         onChunk: @escaping @MainActor @Sendable (Data) -> Void
     ) async throws {
-        try await audioCapture.startRecording { audioData in
+        try await audioCapture.startRecording(configureSession: configureSession) { audioData in
             MainActor.assumeIsolated {
                 onChunk(audioData)
             }

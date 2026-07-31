@@ -50,6 +50,10 @@ final class FlowSessionManager: ObservableObject {
     @Published var sessionPhase: FlowSessionPhase = .idle
     @Published var lastError: String?
 
+    /// Every phase from acquiring the microphone through teardown. Broader than
+    /// `isActive`, which only covers the phases the keyboard UI reacts to.
+    var holdsAudioSession: Bool { sessionPhase != .idle }
+
     // MARK: - Private State
 
     private var audioBuffer = Data()
@@ -104,6 +108,13 @@ final class FlowSessionManager: ObservableObject {
     func handleStartFlow() async {
         guard sessionPhase == .idle else {
             logger.warning("Flow session already active — ignoring duplicate start")
+            return
+        }
+        // One microphone and one Live Activity at a time: the Ambient Memory
+        // Lab holds both while it is capturing.
+        guard !AmbientSessionManager.shared.isCapturing else {
+            lastError = "A note is recording and using the microphone. Stop it first."
+            logger.warning("Ambient capture active — refusing to start dictation")
             return
         }
         await activateSession()

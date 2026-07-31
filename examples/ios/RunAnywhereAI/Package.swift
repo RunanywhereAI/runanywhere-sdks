@@ -68,6 +68,13 @@ let package = Package(
             name: "RunAnywhereAITests",
             dependencies: ["RunAnywhereAI"],
             path: "RunAnywhereAIUITests"
+        ),
+        // Pure app-logic tests (model routing, records, retention). Kept out of
+        // the UI test target so they run without a simulator.
+        .testTarget(
+            name: "RunAnywhereAIUnitTests",
+            dependencies: ["RunAnywhereAI"],
+            path: "RunAnywhereAIUnitTests"
         )
     ]
 )

@@ -10,5 +10,6 @@ import SwiftUI
 struct RunAnywhereActivityExtensionBundle: WidgetBundle {
     var body: some Widget {
         DictationLiveActivityWidget()
+        AmbientLiveActivityWidget()
     }
 }

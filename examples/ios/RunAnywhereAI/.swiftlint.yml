@@ -38,7 +38,8 @@ opt_in_rules:
 # Directories to include
 included:
   - RunAnywhereAI
-  - RunAnywhereAITests
+  - RunAnywhereActivityExtension
+  - RunAnywhereAIUnitTests
   - RunAnywhereAIUITests
 
 # Directories to exclude

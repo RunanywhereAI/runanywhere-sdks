@@ -29,6 +29,7 @@ struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
     #if os(iOS)
     @StateObject private var flowSession = FlowSessionManager.shared
+    @StateObject private var ambientRouter = AmbientRouter.shared
     @State private var showFlowActivation = false
     #endif
     @State private var isSDKInitialized = false
@@ -44,15 +45,32 @@ struct RunAnywhereAIApp: App {
                         #if os(iOS)
                         .environmentObject(flowSession)
                         .onOpenURL { url in
-                            guard url.scheme == SharedConstants.urlScheme,
-                                  url.host == "startFlow" else { return }
-                            logger.info("Received startFlow deep link")
-                            showFlowActivation = true
-                            Task { await flowSession.handleStartFlow() }
+                            guard url.scheme == SharedConstants.urlScheme else { return }
+                            switch url.host {
+                            case "startFlow":
+                                logger.info("Received startFlow deep link")
+                                showFlowActivation = true
+                                Task { await flowSession.handleStartFlow() }
+                            case "ambient", "startAmbient":
+                                logger.info("Received \(url.host ?? "", privacy: .public) deep link")
+                                ambientRouter.open(autoStart: url.host == "startAmbient")
+                            default:
+                                break
+                            }
                         }
                         .fullScreenCover(isPresented: $showFlowActivation) {
                             FlowActivationView(isPresented: $showFlowActivation)
                                 .environmentObject(flowSession)
+                        }
+                        .sheet(isPresented: $ambientRouter.isPresented) {
+                            NavigationStack {
+                                AmbientMemoryView(autoStartRequested: ambientRouter.consumeAutoStart())
+                                    .toolbar {
+                                        ToolbarItem(placement: .navigationBarLeading) {
+                                            Button("Done") { ambientRouter.isPresented = false }
+                                        }
+                                    }
+                            }
                         }
                         #endif
                         .onAppear {

@@ -126,9 +126,7 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 DispatchQueue.global(qos: .userInitiated).async {
                     do {
-                        let audioSession = AVAudioSession.sharedInstance()
-                        try audioSession.setCategory(.record, mode: .measurement)
-                        try audioSession.setActive(true)
+                        try Self.activateRecordingSession()
                         continuation.resume()
                     } catch {
                         continuation.resume(throwing: error)
@@ -211,9 +209,7 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
-                    let audioSession = AVAudioSession.sharedInstance()
-                    try audioSession.setCategory(.record, mode: .measurement)
-                    try audioSession.setActive(true)
+                    try Self.activateRecordingSession()
                     continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)
@@ -223,6 +219,35 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
         logger.info("Audio session activated (keepalive)")
         #endif
     }
+
+    /// Configure `.record` / `.measurement` and activate, recovering from the
+    /// common "Session activation failed" case where the shared session was
+    /// left active under a different category (TTS, playback, a prior start).
+    #if os(iOS) || os(tvOS)
+    private static func activateRecordingSession() throws {
+        let audioSession = AVAudioSession.sharedInstance()
+        // Drop any leftover activation first — changing category while still
+        // active is a frequent cause of activation failures on device.
+        try? audioSession.setActive(false, options: .notifyOthersOnDeactivation)
+        try audioSession.setCategory(
+            .record,
+            mode: .measurement,
+            options: [.allowBluetoothHFP]
+        )
+        do {
+            try audioSession.setActive(true)
+        } catch {
+            // mediaserverd sometimes needs a beat after deactivation.
+            Thread.sleep(forTimeInterval: 0.2)
+            try audioSession.setCategory(
+                .record,
+                mode: .measurement,
+                options: [.allowBluetoothHFP]
+            )
+            try audioSession.setActive(true)
+        }
+    }
+    #endif
 
     /// Deactivates the AVAudioSession. Call this when the session is fully ended.
     public func deactivateAudioSession() {

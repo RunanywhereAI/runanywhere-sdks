@@ -76,6 +76,23 @@ struct ConsumerAdvancedHubView: View {
             }
             #endif
 
+            #if os(iOS)
+            Section {
+                NavigationLink(destination: AmbientMemoryView()) {
+                    AdvancedFeatureRow(
+                        icon: "note.text",
+                        color: AppColors.primaryAccent,
+                        title: "Notes",
+                        subtitle: "Record, transcribe, and summarize — entirely on device"
+                    )
+                }
+            } header: {
+                Text("Notes")
+            } footer: {
+                Text("Recording is explicit and stays visible in a Live Activity until you stop it.")
+            }
+            #endif
+
             Section {
                 NavigationLink(destination: BenchmarkDashboardView()) {
                     AdvancedFeatureRow(

@@ -18,6 +18,10 @@
 		58LLAMACPP12ED16DA40058D0 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = 58LLAMACPP02ED16DA40058D0 /* RunAnywhereLlamaCPP */; };
 		58MLX00012ED16DA40058D0 /* RunAnywhereMLX in Frameworks */ = {isa = PBXBuildFile; productRef = 58MLX00002ED16DA40058D0 /* RunAnywhereMLX */; };
 		RACACTIVITY01ACTIVITY01RAC /* DictationActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACACTIVITY02ACTIVITY02RAC /* DictationActivityAttributes.swift */; };
+		RACAMBIENT01AMBIENT01RAC /* AmbientActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACAMBIENT02AMBIENT02RAC /* AmbientActivityAttributes.swift */; };
+		RACAMBIENT03AMBIENT03RAC /* AmbientStopIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACAMBIENT04AMBIENT04RAC /* AmbientStopIntent.swift */; };
+		RACAMBIENT05AMBIENT05RAC /* SharedConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED02RACSHARED02RACS /* SharedConstants.swift */; };
+		RACAMBIENT06AMBIENT06RAC /* SharedDataBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED04RACSHARED04RACS /* SharedDataBridge.swift */; };
 		RACSHARED01RACSHARED01RACS /* SharedConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED02RACSHARED02RACS /* SharedConstants.swift */; };
 		RACSHARED03RACSHARED03RACS /* SharedDataBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = RACSHARED04RACSHARED04RACS /* SharedDataBridge.swift */; };
 /* End PBXBuildFile section */
@@ -83,6 +87,8 @@
 		5480A2082E2F250400337F2F /* RunAnywhereAIUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunAnywhereAIUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F8388285B0D64126DD4540F8 /* libarchive.tbd */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libarchive.tbd; path = usr/lib/libarchive.tbd; sourceTree = SDKROOT; };
 		RACACTIVITY02ACTIVITY02RAC /* DictationActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DictationActivityAttributes.swift; path = RunAnywhereAI/Features/VoiceKeyboard/DictationActivityAttributes.swift; sourceTree = SOURCE_ROOT; };
+		RACAMBIENT02AMBIENT02RAC /* AmbientActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AmbientActivityAttributes.swift; path = RunAnywhereAI/Features/AmbientMemory/AmbientActivityAttributes.swift; sourceTree = SOURCE_ROOT; };
+		RACAMBIENT04AMBIENT04RAC /* AmbientStopIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AmbientStopIntent.swift; path = RunAnywhereAI/Features/AmbientMemory/AmbientStopIntent.swift; sourceTree = SOURCE_ROOT; };
 		RACSHARED02RACSHARED02RACS /* SharedConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SharedConstants.swift; path = RunAnywhereAI/Shared/SharedConstants.swift; sourceTree = SOURCE_ROOT; };
 		RACSHARED04RACSHARED04RACS /* SharedDataBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SharedDataBridge.swift; path = RunAnywhereAI/Shared/SharedDataBridge.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
@@ -136,9 +142,9 @@
 			path = RunAnywhereAI;
 			sourceTree = "<group>";
 		};
-		5480A2012E2F250400337F2F /* RunAnywhereAITests */ = {
+		5480A2012E2F250400337F2F /* RunAnywhereAIUnitTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = RunAnywhereAITests;
+			path = RunAnywhereAIUnitTests;
 			sourceTree = "<group>";
 		};
 		5480A20B2E2F250400337F2F /* RunAnywhereAIUITests */ = {
@@ -201,6 +207,8 @@
 				RACSHARED02RACSHARED02RACS /* SharedConstants.swift */,
 				RACSHARED04RACSHARED04RACS /* SharedDataBridge.swift */,
 				RACACTIVITY02ACTIVITY02RAC /* DictationActivityAttributes.swift */,
+				RACAMBIENT02AMBIENT02RAC /* AmbientActivityAttributes.swift */,
+				RACAMBIENT04AMBIENT04RAC /* AmbientStopIntent.swift */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -224,7 +232,7 @@
 			isa = PBXGroup;
 			children = (
 				5480A1F22E2F250200337F2F /* RunAnywhereAI */,
-				5480A2012E2F250400337F2F /* RunAnywhereAITests */,
+				5480A2012E2F250400337F2F /* RunAnywhereAIUnitTests */,
 				5480A20B2E2F250400337F2F /* RunAnywhereAIUITests */,
 				54398ABF2F492D1D009D6B51 /* RunAnywhereKeyboard */,
 				54398D252F4939A7009D6B51 /* RunAnywhereActivityExtension */,
@@ -336,7 +344,7 @@
 				5480A2002E2F250400337F2F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				5480A2012E2F250400337F2F /* RunAnywhereAITests */,
+				5480A2012E2F250400337F2F /* RunAnywhereAIUnitTests */,
 			);
 			name = RunAnywhereAITests;
 			productName = RunAnywhereAITests;
@@ -472,6 +480,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				RACACTIVITY01ACTIVITY01RAC /* DictationActivityAttributes.swift in Sources */,
+				RACAMBIENT01AMBIENT01RAC /* AmbientActivityAttributes.swift in Sources */,
+				RACAMBIENT03AMBIENT03RAC /* AmbientStopIntent.swift in Sources */,
+				RACAMBIENT05AMBIENT05RAC /* SharedConstants.swift in Sources */,
+				RACAMBIENT06AMBIENT06RAC /* SharedDataBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -789,7 +801,7 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "RunAnywhere AI reads your Calendar events so the on-device assistant can answer questions about your schedule and upcoming events.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "RunAnywhere AI needs access to your camera for vision language model features to analyze images.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "RunAnywhere AI reads Apple Health data (steps, sleep, heart rate, activity, and workouts) so the on-device assistant can answer questions about your health and fitness.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI uses your microphone for voice input and for ambient memory sessions you start yourself, which keep listening until you stop them. Audio, transcripts, and memories stay on this device, and raw audio is kept only while you turn on dogfood audio retention.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -843,7 +855,7 @@
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "RunAnywhere AI reads your Calendar events so the on-device assistant can answer questions about your schedule and upcoming events.";
 				INFOPLIST_KEY_NSCameraUsageDescription = "RunAnywhere AI needs access to your camera for vision language model features to analyze images.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "RunAnywhere AI reads Apple Health data (steps, sleep, heart rate, activity, and workouts) so the on-device assistant can answer questions about your health and fitness.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI uses your microphone for voice input and for ambient memory sessions you start yourself, which keep listening until you stop them. Audio, transcripts, and memories stay on this device, and raw audio is kept only while you turn on dogfood audio retention.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
