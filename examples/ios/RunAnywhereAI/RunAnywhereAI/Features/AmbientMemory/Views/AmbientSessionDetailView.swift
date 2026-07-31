@@ -16,6 +16,7 @@ struct AmbientSessionDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
+    @State private var showDigestPicker = false
     @State private var isRenaming = false
     @State private var draftTitle = ""
     @State private var draftItem = ""
@@ -75,6 +76,19 @@ struct AmbientSessionDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+        .adaptiveSheet(isPresented: $showDigestPicker) {
+            ModelSelectionSheet(context: .llm) { model in
+                viewModel.select(digest: model)
+                Task {
+                    // Persist the choice on this note so Rewrite reuses it.
+                    if var note = viewModel.note(id: sessionID) {
+                        note.digestModelID = model.id
+                        await AmbientMemoryStore.shared.save(note)
+                        await viewModel.refreshLibrary()
+                    }
+                }
+            }
+        }
         .onDisappear { player.stop() }
     }
 
@@ -91,17 +105,54 @@ struct AmbientSessionDetailView: View {
 
     @ViewBuilder
     private func summarySection(_ record: AmbientSessionRecord) -> some View {
+        let hasTranscript = !record.fullTranscript
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let digestID = record.digestModelID ?? viewModel.selection.digestModelID
+        let busy = viewModel.sessionManager.isSummarizing
+        let status = viewModel.sessionManager.statusMessage
+
         Section("Summary") {
-            if record.summaryPending {
+            // LLM pick lives here — recording only needs VAD + ASR.
+            Button {
+                showDigestPicker = true
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Summarizing model")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                        Text(viewModel.displayName(for: digestID ?? ""))
+                            .font(AppTypography.subheadline)
+                            .foregroundColor(AppColors.textPrimary)
+                    }
+                    Spacer()
+                    Text(digestID == nil ? "Choose" : "Change")
+                        .font(AppTypography.caption)
+                }
+            }
+            .disabled(busy)
+
+            if busy {
                 Label(
-                    "Waiting to summarize. This finishes the next time the app is open, or tap Retry.",
-                    systemImage: "clock"
+                    status.isEmpty ? "Loading the summarizing model…" : status,
+                    systemImage: "brain"
+                )
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.primaryAccent)
+            } else if let error = viewModel.sessionManager.lastError {
+                Text(error)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.statusRed)
+            } else if record.summary.isEmpty, hasTranscript {
+                Text(
+                    digestID == nil
+                        ? "Choose an LLM above, then tap Summarize."
+                        : "Tap Summarize to load the LLM and write summary + action items."
                 )
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.statusOrange)
-            }
-            if record.summary.isEmpty {
-                Text(emptySummaryMessage(for: record))
+            } else if record.summary.isEmpty {
+                Text(hasTranscript ? "No summary yet." : "Nothing was said worth summarizing.")
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.textSecondary)
             } else {
@@ -109,28 +160,40 @@ struct AmbientSessionDetailView: View {
                     .font(AppTypography.body)
                     .foregroundColor(AppColors.textPrimary)
             }
-            if record.summary.isEmpty, !record.fullTranscript.isEmpty, record.digestModelID != nil {
-                Button("Retry summary") {
-                    Task { await viewModel.retrySummary(sessionID: sessionID) }
+
+            if hasTranscript {
+                if record.summary.isEmpty {
+                    Button {
+                        if digestID == nil {
+                            showDigestPicker = true
+                        } else {
+                            Task { await viewModel.summarize(sessionID: sessionID, modelID: digestID) }
+                        }
+                    } label: {
+                        Label(
+                            busy ? "Summarizing…" : "Summarize with LLM",
+                            systemImage: "text.badge.star"
+                        )
+                    }
+                    .disabled(busy)
+                } else {
+                    Button {
+                        Task { await viewModel.rewriteSummary(sessionID: sessionID, modelID: digestID) }
+                    } label: {
+                        Label(
+                            busy ? "Rewriting…" : "Rewrite summary & action items",
+                            systemImage: "arrow.triangle.2.circlepath"
+                        )
+                    }
+                    .disabled(busy || digestID == nil)
                 }
-                .font(AppTypography.caption)
             }
+
             Text("\(Self.dateFormatter.string(from: record.startedAt)) · "
                 + AmbientMemoryView.duration(Int(record.duration)))
                 .font(AppTypography.caption2)
                 .foregroundColor(AppColors.textSecondary)
         }
-    }
-
-    private func emptySummaryMessage(for record: AmbientSessionRecord) -> String {
-        if record.summaryPending { return "No summary yet." }
-        if record.digestModelID == nil {
-            return "No summarizing model was selected for this note."
-        }
-        if !record.fullTranscript.isEmpty {
-            return "Summarization did not finish. Tap Retry, or pick a different summarizing model."
-        }
-        return "Nothing was said worth summarizing."
     }
 
     // MARK: - Action Items

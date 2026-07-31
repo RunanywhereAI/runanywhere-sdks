@@ -8,6 +8,10 @@
 //  never renders transcript, summary, speaker, or memory text — only that a
 //  session is recording, for how long, and how much it has captured.
 //
+//  Duration uses Text(..., style: .timer) so the clock keeps advancing while
+//  the app is backgrounded — ActivityKit push updates are throttled and cannot
+//  drive a reliable second-by-second counter.
+//
 
 import ActivityKit
 import AppIntents
@@ -39,7 +43,7 @@ struct AmbientLiveActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(AmbientPhase.duration(context.state.elapsedSeconds))
+                        AmbientDurationLabel(state: context.state)
                             .font(.subheadline.monospacedDigit())
                             .foregroundStyle(.secondary)
                         Text("\(context.state.segmentCount) captured")
@@ -63,7 +67,7 @@ struct AmbientLiveActivityWidget: Widget {
                     .font(.caption)
                     .foregroundStyle(AmbientBrand.accent)
             } compactTrailing: {
-                Text(AmbientPhase.duration(context.state.elapsedSeconds))
+                AmbientDurationLabel(state: context.state)
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
             } minimal: {
@@ -92,9 +96,17 @@ private struct AmbientLockScreenView: View {
                 Text(AmbientPhase.title(state.phase, isStopped: state.isStopped))
                     .font(.headline)
                     .foregroundStyle(.white)
-                Text(subtitle)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.6))
+                HStack(spacing: 6) {
+                    AmbientDurationLabel(state: state)
+                    Text("·")
+                    Text("\(state.segmentCount) captured")
+                    if state.actionItemCount > 0 {
+                        Text("·")
+                        Text("\(state.actionItemCount) to do")
+                    }
+                }
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.white.opacity(0.6))
             }
 
             Spacer()
@@ -119,12 +131,21 @@ private struct AmbientLockScreenView: View {
         .activityBackgroundTint(AmbientBrand.darkBg)
         .activitySystemActionForegroundColor(.white)
     }
+}
 
-    private var subtitle: String {
-        var parts = [AmbientPhase.duration(state.elapsedSeconds)]
-        parts.append("\(state.segmentCount) captured")
-        if state.actionItemCount > 0 { parts.append("\(state.actionItemCount) to do") }
-        return parts.joined(separator: " · ")
+// MARK: - Duration
+
+/// Live, system-driven timer while recording; frozen digits while paused/stopped.
+private struct AmbientDurationLabel: View {
+    let state: AmbientActivityAttributes.ContentState
+
+    var body: some View {
+        if state.isStopped || state.phase == "paused" {
+            Text(AmbientPhase.duration(state.elapsedSeconds))
+        } else {
+            Text(state.timerStart, style: .timer)
+                .monospacedDigit()
+        }
     }
 }
 

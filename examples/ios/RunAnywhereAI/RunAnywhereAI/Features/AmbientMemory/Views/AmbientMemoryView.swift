@@ -22,7 +22,6 @@ struct AmbientMemoryView: View {
     @State private var showConsent = false
     @State private var showVADPicker = false
     @State private var showASRPicker = false
-    @State private var showDigestPicker = false
 
     /// Set by the App Shortcut / Action Button deep link so recording starts as
     /// soon as the screen is up and consent is already in place.
@@ -74,11 +73,6 @@ struct AmbientMemoryView: View {
                 viewModel.select(asr: model)
             }
         }
-        .adaptiveSheet(isPresented: $showDigestPicker) {
-            ModelSelectionSheet(context: .llm) { model in
-                viewModel.select(digest: model)
-            }
-        }
         .confirmationDialog(
             "Delete every note?",
             isPresented: $showPurgeConfirmation,
@@ -93,7 +87,10 @@ struct AmbientMemoryView: View {
         }
         .task {
             await viewModel.onAppear()
-            if autoStartRequested, viewModel.canStartSession, !session.isRecording {
+            guard autoStartRequested else { return }
+            if !viewModel.hasRecordingConsent {
+                showConsent = true
+            } else if viewModel.canStartSession, !session.isRecording {
                 await viewModel.startSession()
             }
         }
@@ -126,11 +123,9 @@ struct AmbientMemoryView: View {
                 required: true
             ) { showASRPicker = true }
 
-            modelRow(
-                title: "Summarizing",
-                modelID: viewModel.selection.digestModelID ?? "",
-                required: false
-            ) { showDigestPicker = true }
+            Text("Pick a summarizing LLM on each note when you tap Summarize — it is not needed to record.")
+                .font(AppTypography.caption2)
+                .foregroundColor(AppColors.textSecondary)
 
             if let risk = viewModel.backgroundRiskMessage {
                 Text(risk)
@@ -454,8 +449,10 @@ struct AmbientSessionRow: View {
                         .foregroundColor(AppColors.textSecondary)
                 }
 
-                if record.summaryPending {
-                    Text("Summary pending")
+                if record.summary.isEmpty,
+                   !record.fullTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   record.digestModelID != nil || record.summaryPending {
+                    Text("Tap to summarize")
                         .font(AppTypography.caption2)
                         .foregroundColor(AppColors.statusOrange)
                 } else if let reason = record.stopReason {

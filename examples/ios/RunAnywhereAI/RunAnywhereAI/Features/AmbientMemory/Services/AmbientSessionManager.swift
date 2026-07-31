@@ -42,13 +42,16 @@ final class AmbientSessionManager: ObservableObject {
     @Published private(set) var activeGates: [RAAmbientResourceGate.Reason: String] = [:]
     @Published private(set) var statusMessage: String = ""
     @Published private(set) var lastError: String?
+    /// True while a user-triggered Summarize / Rewrite is loading the LLM.
+    @Published private(set) var isSummarizing = false
+    /// Anchor for the Live Activity's system timer (survives backgrounding).
+    private var liveActivityTimerStart = Date()
 
     /// Selection the active (or most recent) session ran with.
     @Published private(set) var selection: AmbientModelSelection?
     @Published private(set) var retentionPolicy: AmbientRetentionPolicy = .retainAudio
 
-    /// Fires when a note that stopped in the background finally gets the
-    /// summary it had to defer, so the notes list can refresh that row.
+    /// Fires when Summarize / Rewrite finishes so the notes list can refresh.
     let didFinishDeferredMerge = PassthroughSubject<String, Never>()
 
     var isRecording: Bool { phase.isRecording }
@@ -91,6 +94,8 @@ final class AmbientSessionManager: ObservableObject {
         observeInterruptions()
         observeStopRequests()
         observeForeground()
+        // Force-quit leaves Live Activities behind — clear orphans on launch.
+        Task { await self.dismissOrphanLiveActivities() }
     }
 
     // MARK: - Start
@@ -198,7 +203,8 @@ final class AmbientSessionManager: ObservableObject {
 
     // MARK: - Stop / Pause
 
-    /// Stop capture, finish in-flight transcription, summarize, and save.
+    /// Stop capture, finish in-flight transcription, and save. Summarization
+    /// is opt-in via Summarize / Rewrite so the LLM is only loaded on demand.
     func stop(reason: String? = nil) async {
         guard phase != .idle, phase != .stopped else { return }
         logger.info("Ambient session stopping (\(reason ?? "user", privacy: .public))")
@@ -217,14 +223,35 @@ final class AmbientSessionManager: ObservableObject {
         eventTask = nil
         await digestTask?.value
         digestTask = nil
+        pendingChunk = ""
 
         sessionRecord?.endedAt = Date()
         sessionRecord?.stopReason = reason
 
-        statusMessage = "Writing the summary…"
-        await summarizeNote()
+        // Free ASR/VAD immediately — do not pull the digest LLM in here.
+        if let asr = selection?.asrModelID {
+            var unload = RAModelUnloadRequest()
+            unload.modelID = asr
+            unload.category = .speechRecognition
+            _ = await RunAnywhere.unloadModel(unload)
+        }
+        if let vad = selection?.vadModelID {
+            var unload = RAModelUnloadRequest()
+            unload.modelID = vad
+            unload.category = .voiceActivityDetection
+            _ = await RunAnywhere.unloadModel(unload)
+        }
 
-        if let record = sessionRecord {
+        if var record = sessionRecord {
+            let hasTranscript = !record.fullTranscript
+                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let canSummarize = record.digestModelID != nil || selection?.digestModelID != nil
+            if record.digestModelID == nil {
+                record.digestModelID = selection?.digestModelID
+            }
+            // Empty summary + pending flag = "tap Summarize" in the UI.
+            record.summaryPending = hasTranscript && canSummarize && record.summary.isEmpty
+            sessionRecord = record
             await store.save(record)
             await benchmarkRecorder.finish(record: record, store: store)
         }
@@ -232,7 +259,11 @@ final class AmbientSessionManager: ObservableObject {
         if #available(iOS 16.1, *) { await endLiveActivity() }
         audioLevel = 0
         transition(to: .stopped)
-        statusMessage = reason.map { "Stopped: \($0)" } ?? "Note saved."
+        if sessionRecord?.summaryPending == true {
+            statusMessage = "Note saved. Open it and tap Summarize when you want the LLM."
+        } else {
+            statusMessage = reason.map { "Stopped: \($0)" } ?? "Note saved."
+        }
     }
 
     func pause() async {
@@ -240,13 +271,18 @@ final class AmbientSessionManager: ObservableObject {
         await session?.pause()
         transition(to: .paused)
         statusMessage = "Paused. The microphone stays open but nothing is captured."
+        // Freeze the Island/Lock Screen clock at the current elapsed time.
+        updateLiveActivityIfNeeded()
     }
 
     func resume() async {
         guard phase == .paused else { return }
         await session?.resume()
+        // Rewind the system timer so it continues from the frozen elapsed value.
+        liveActivityTimerStart = Date().addingTimeInterval(-TimeInterval(elapsedSeconds))
         transition(to: .listening)
         statusMessage = "Listening."
+        updateLiveActivityIfNeeded()
     }
 
 
@@ -364,73 +400,35 @@ final class AmbientSessionManager: ObservableObject {
     /// room for its answer, large enough that the summary has real context.
     private static let chunkCharacterLimit = 2_000
 
-    /// Buffer finalized transcript and digest it a chunk at a time, so a
-    /// two-hour note is summarized as it happens rather than in one impossible
-    /// pass at the end.
+    /// Buffer finalized transcript. LLM work waits until stop/retry so ASR and
+    /// the digest model are never coresident (a common jetsam cause for 4B).
     private func accumulate(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         pendingChunk += pendingChunk.isEmpty ? trimmed : " " + trimmed
-        guard pendingChunk.count >= Self.chunkCharacterLimit else { return }
-        scheduleChunkDigest()
     }
 
-    /// Digests are chained onto a single task so LLM work stays serialized
-    /// behind transcription and never runs two generations at once.
-    private func scheduleChunkDigest() {
-        guard selection?.digestModelID != nil, !pendingChunk.isEmpty else { return }
-        guard activeGates[.thermal] == nil, activeGates[.memory] == nil else {
-            logger.info("Holding the chunk digest while a resource gate is active")
-            return
-        }
-        // A Metal model cannot run while the screen is locked, and the whole
-        // point of the feature is that capture survives locking. The text is
-        // kept in the buffer and digested on return to the foreground.
+    /// Digests one chunk. Returns `false` on failure so callers stop retrying
+    /// (putting text back into `pendingChunk` used to infinite-loop the flush).
+    @discardableResult
+    private func digestChunk(_ chunk: String, modelID: String) async -> Bool {
         guard canRunDigestNow else {
-            logger.info("Deferring chunk digest until the app is foregrounded")
-            return
-        }
-
-        let chunk = pendingChunk
-        pendingChunk = ""
-        let previous = digestTask
-        digestTask = Task { [weak self] in
-            await previous?.value
-            guard let self else { return }
-            // Re-check inside the task: the phone may have locked between
-            // schedule and run, and Metal work from background always fails.
-            await self.digestChunk(chunk)
-        }
-    }
-
-    private func digestChunk(_ chunk: String) async {
-        let modelID = selection?.digestModelID ?? sessionRecord?.digestModelID
-        guard let modelID else { return }
-        guard canRunDigestNow else {
-            // Restore the text and wait for foreground — never touch Metal here.
-            pendingChunk = chunk + (pendingChunk.isEmpty ? "" : " " + pendingChunk)
-            if var record = sessionRecord {
-                record.summaryPending = true
-                sessionRecord = record
-                await store.save(record)
-            }
+            lastError = "Bring the app to the foreground to run the summarizer."
             logger.info("Chunk digest deferred — app is not in the foreground")
-            return
+            return false
         }
         do {
+            statusMessage = "Loading \(modelID)…"
             try await ensureLoaded(modelID: modelID, category: .language)
-            // Screen can lock during model load; refuse generate if it did.
             guard canRunDigestNow else {
-                pendingChunk = chunk + (pendingChunk.isEmpty ? "" : " " + pendingChunk)
-                logger.info("Chunk digest aborted after load — app left the foreground")
-                return
+                lastError = "Bring the app to the foreground to run the summarizer."
+                return false
             }
+            statusMessage = "Summarizing…"
             let digest = try await RunAnywhere.ambient.digest(text: chunk, mode: .chunk)
-            guard var record = sessionRecord else { return }
+            guard var record = sessionRecord else { return false }
             record.partialSummaries.append(digest.summary)
             record.mergeActionItems(digest.actionItems)
-            // Until the merge runs, the joined partials are the best summary
-            // the note has, so a crash mid-recording still leaves it readable.
             if record.summary.isEmpty || record.summaryPending {
                 record.summary = record.partialSummaries.joined(separator: "\n\n")
             }
@@ -438,137 +436,139 @@ final class AmbientSessionManager: ObservableObject {
             sessionRecord = record
             benchmarkRecorder.markDigest(digest)
             await store.save(record)
-            updateLiveActivityIfNeeded()
+            return true
         } catch {
-            // Put the text back so the next attempt still covers it.
-            pendingChunk = chunk + (pendingChunk.isEmpty ? "" : " " + pendingChunk)
             let detail = error.localizedDescription
+            lastError = "Summarization failed: \(detail)"
             logger.warning("Chunk digest failed: \(detail, privacy: .public)")
             if var record = sessionRecord {
                 record.summaryPending = true
                 sessionRecord = record
                 await store.save(record)
             }
+            return false
         }
     }
 
-    /// Digest the tail of the transcript, then fold every partial summary into
-    /// the one summary and action list the note keeps.
-    private func summarizeNote() async {
-        guard var record = sessionRecord else { return }
-        let modelID = selection?.digestModelID ?? record.digestModelID
-        guard let modelID else {
-            logger.info("No digest model on the note — skipping summary")
-            return
-        }
-
-        guard canRunDigestNow else {
-            // Stop can arrive from the Live Activity or a Shortcut while the
-            // app is backgrounded. Segments are already on disk, so the next
-            // foreground can digest `fullTranscript` even with no partials yet.
-            record.summaryPending = true
-            if record.summary.isEmpty {
-                record.summary = record.partialSummaries.joined(separator: "\n\n")
+    /// Drain `pendingChunk` in sized pieces. Stops on the first failure.
+    private func flushPendingAsChunks(modelID: String) async -> Bool {
+        var guardCounter = 0
+        while !pendingChunk.isEmpty {
+            guardCounter += 1
+            if guardCounter > 64 {
+                lastError = "Summarization stopped — transcript is too large to process safely."
+                return false
             }
-            sessionRecord = record
-            await store.save(record)
-            logger.info("Merge deferred to the foreground for note \(record.id, privacy: .public)")
-            return
-        }
-
-        if !pendingChunk.isEmpty {
-            let tail = pendingChunk
-            pendingChunk = ""
-            await digestChunk(tail)
-        }
-
-        guard var current = sessionRecord else { return }
-        // Short notes never hit the mid-session chunk threshold. If the live
-        // buffer digest failed (or was empty), summarize from the persisted
-        // transcript so a working STT note is never left summary-less.
-        if current.partialSummaries.isEmpty {
-            let source = current.fullTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !source.isEmpty {
+            if pendingChunk.count <= Self.chunkCharacterLimit {
+                let all = pendingChunk
                 pendingChunk = ""
-                await digestChunk(source)
-                current = sessionRecord ?? current
+                return await digestChunk(all, modelID: modelID)
             }
-        }
-
-        let finished = await merged(current, modelID: modelID)
-        if finished.summary.isEmpty, !finished.fullTranscript.isEmpty {
-            var pending = finished
-            pending.summaryPending = true
-            sessionRecord = pending
-            await store.save(pending)
-            statusMessage = "Note saved. Summary still pending — open the note and tap Retry."
-            logger.warning(
-                "Summarization produced no summary for note \(pending.id, privacy: .public)"
+            let endIdx = pendingChunk.index(
+                pendingChunk.startIndex,
+                offsetBy: Self.chunkCharacterLimit
             )
-        } else {
-            sessionRecord = finished
+            var split = endIdx
+            if let space = pendingChunk[..<endIdx].lastIndex(of: " "),
+               space > pendingChunk.startIndex {
+                split = space
+            }
+            let piece = String(pendingChunk[..<split])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let rest = String(pendingChunk[split...])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            // Always advance — an empty piece with unchanged remainder would loop.
+            if rest.count >= pendingChunk.count {
+                pendingChunk = String(pendingChunk[endIdx...])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                pendingChunk = rest
+            }
+            if piece.isEmpty { continue }
+            guard await digestChunk(piece, modelID: modelID) else { return false }
         }
+        return true
     }
 
-    /// Re-run summarization for a saved note that has a transcript but no
-    /// summary (failed digest, deferred GPU work, etc.).
-    func retrySummary(for noteID: String) async {
+    /// Load the chosen digest model on demand, write summary + action items,
+    /// then unload. Pass `rewrite: true` to wipe prior machine summary/items.
+    /// `modelID` overrides the note's stored choice (from the note-detail picker).
+    func generateSummary(
+        for noteID: String,
+        modelID overrideModelID: String? = nil,
+        rewrite: Bool = false
+    ) async {
+        guard !isSummarizing else { return }
         guard !phase.holdsAudioSession else {
-            lastError = "Stop the current recording before retrying a summary."
+            lastError = "Stop the current recording before summarizing."
             return
         }
         guard var note = await store.loadSession(id: noteID) else { return }
-        guard let modelID = note.digestModelID ?? selection?.digestModelID else {
-            lastError = "Pick a summarizing model on Notes, then retry."
+        let modelID = overrideModelID
+            ?? note.digestModelID
+            ?? selection?.digestModelID
+        guard let modelID, !modelID.isEmpty else {
+            lastError = "Pick a summarizing model, then try again."
             return
         }
         guard canRunDigestNow else {
-            lastError = "Bring the app to the foreground to finish the summary."
+            lastError = "Bring the app to the foreground to run the summarizer."
             return
         }
 
-        statusMessage = "Writing the summary…"
-        note.summaryPending = true
-        note.digestModelID = modelID
-        await store.save(note)
-
-        if note.partialSummaries.isEmpty {
-            let source = note.fullTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !source.isEmpty else {
-                note.summaryPending = false
-                await store.save(note)
-                statusMessage = "Nothing to summarize — this note has no transcript."
-                return
-            }
-            do {
-                try await ensureLoaded(modelID: modelID, category: .language)
-                guard canRunDigestNow else {
-                    note.summaryPending = true
-                    await store.save(note)
-                    lastError = "Bring the app to the foreground to finish the summary."
-                    statusMessage = lastError ?? ""
-                    return
-                }
-                let digest = try await RunAnywhere.ambient.digest(text: source, mode: .chunk)
-                note.partialSummaries = [digest.summary]
-                note.mergeActionItems(digest.actionItems)
-                note.summary = digest.summary
-                benchmarkRecorder.markDigest(digest)
-            } catch {
-                note.summaryPending = true
-                await store.save(note)
-                lastError = "Summarization failed: \(error.localizedDescription)"
-                statusMessage = lastError ?? ""
-                return
-            }
+        let source = note.fullTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !source.isEmpty else {
+            lastError = "Nothing to summarize — this note has no transcript."
+            statusMessage = lastError ?? ""
+            return
         }
 
-        let finished = await merged(note, modelID: modelID)
-        if sessionRecord?.id == finished.id { sessionRecord = finished }
-        didFinishDeferredMerge.send(finished.id)
-        statusMessage = finished.summary.isEmpty
-            ? "Summary still empty — try a different summarizing model."
-            : "Summary updated."
+        isSummarizing = true
+        lastError = nil
+        statusMessage = rewrite ? "Rewriting summary…" : "Loading model and summarizing…"
+        defer { isSummarizing = false }
+
+        note.summaryPending = true
+        note.digestModelID = modelID
+        note.partialSummaries = []
+        if rewrite {
+            note.summary = ""
+            note.replaceMachineActionItems(with: [])
+        }
+        await store.save(note)
+        sessionRecord = note
+        pendingChunk = source
+
+        let flushed = await flushPendingAsChunks(modelID: modelID)
+        guard flushed, var current = sessionRecord else {
+            statusMessage = lastError ?? "Summarization failed."
+            await unloadLanguageModel(modelID)
+            return
+        }
+        // Short single-chunk notes already have a usable summary from the map
+        // pass; multi-chunk notes get a merge.
+        if current.partialSummaries.count > 1 {
+            current = await merged(current, modelID: modelID)
+        } else if current.partialSummaries.count == 1 {
+            current.summary = current.partialSummaries[0]
+            current.summaryPending = false
+            await store.save(current)
+        }
+
+        await unloadLanguageModel(modelID)
+        sessionRecord = current
+        didFinishDeferredMerge.send(current.id)
+        if current.summary.isEmpty {
+            statusMessage = lastError ?? "Summary still empty — try a different model."
+        } else {
+            statusMessage = rewrite ? "Summary rewritten." : "Summary ready."
+            lastError = nil
+        }
+    }
+
+    /// Back-compat name used by older call sites / tests.
+    func retrySummary(for noteID: String) async {
+        await generateSummary(for: noteID, rewrite: false)
     }
 
     /// The reduce half of the map-reduce: one pass over the partial summaries.
@@ -652,35 +652,17 @@ final class AmbientSessionManager: ObservableObject {
         UIApplication.shared.applicationState == .active
     }
 
-    /// Finish anything that had to wait for the GPU to become usable again:
-    /// the current note's buffered chunks, and any note that stopped while
-    /// backgrounded and never got its merge.
+    /// Summarization is user-triggered only (Summarize / Rewrite). Returning
+    /// to the foreground no longer auto-loads the LLM.
     private func runDeferredDigests() async {
-        if phase.holdsAudioSession {
-            if !pendingChunk.isEmpty { scheduleChunkDigest() }
-            return
-        }
-
-        for note in await store.loadSessions() where note.summaryPending {
-            guard let modelID = note.digestModelID else { continue }
-            let finished = await merged(note, modelID: modelID)
-            if sessionRecord?.id == finished.id { sessionRecord = finished }
-            didFinishDeferredMerge.send(finished.id)
-        }
+        // Intentionally empty — kept so the foreground observer can stay wired
+        // for a future opt-in auto-finish without reintroducing silent loads.
     }
 
     private func ensureLoaded(modelID: String, category: RAModelCategory) async throws {
         var request = RACurrentModelRequest()
         request.category = category
-        // Always reload. A prior stop-from-Lock-Screen attempt can leave the
-        // Metal/llama.cpp backend wedged (`backend is in error state`), and
-        // skipping load then makes every foreground retry fail too.
-        if RunAnywhere.currentModel(request).modelID == modelID {
-            var unload = RAModelUnloadRequest()
-            unload.modelID = modelID
-            unload.category = category
-            _ = await RunAnywhere.unloadModel(unload)
-        }
+        if RunAnywhere.currentModel(request).modelID == modelID { return }
 
         var load = RAModelLoadRequest()
         load.modelID = modelID
@@ -693,6 +675,15 @@ final class AmbientSessionManager: ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: result.errorMessage]
             )
         }
+    }
+
+    /// Free the digest LLM after summarize/retry so Notes does not keep it
+    /// resident beside Chat or the next recording's ASR.
+    private func unloadLanguageModel(_ modelID: String) async {
+        var unload = RAModelUnloadRequest()
+        unload.modelID = modelID
+        unload.category = .language
+        _ = await RunAnywhere.unloadModel(unload)
     }
 
     // MARK: - Audio Engine
@@ -909,14 +900,26 @@ final class AmbientSessionManager: ObservableObject {
         guard let activity = liveActivity else { return }
         var state = currentActivityState()
         state.isStopped = true
-        await activity.end(.init(state: state, staleDate: nil), dismissalPolicy: .after(.now + 4))
+        await activity.end(.init(state: state, staleDate: nil), dismissalPolicy: .immediate)
         liveActivity = nil
+    }
+
+    /// Force-quit / crash can leave a Dynamic Island / Lock Screen activity
+    /// with no owning process. End every Ambient activity that is not the
+    /// one for the current in-memory session.
+    func dismissOrphanLiveActivities() async {
+        guard #available(iOS 16.1, *) else { return }
+        let keepID = liveActivity?.id
+        for activity in Activity<AmbientActivityAttributes>.activities where activity.id != keepID {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
     }
 
     @available(iOS 16.1, *)
     private func currentActivityState() -> AmbientActivityAttributes.ContentState {
         AmbientActivityAttributes.ContentState(
             phase: phase.liveActivityPhase,
+            timerStart: liveActivityTimerStart,
             elapsedSeconds: elapsedSeconds,
             segmentCount: sessionRecord?.segments.count ?? 0,
             actionItemCount: sessionRecord?.actionItems.count ?? 0,
@@ -927,12 +930,23 @@ final class AmbientSessionManager: ObservableObject {
     // MARK: - Timer
 
     private func startElapsedTimer() {
+        liveActivityTimerStart = Date()
         elapsedTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard let self, self.phase.isRecording || self.phase == .paused else { break }
-                self.elapsedSeconds += 1
-                if self.elapsedSeconds % 5 == 0 {
+                // Keep in-app elapsed in sync with the Live Activity timer
+                // anchor so pause/resume and the Notes UI stay honest even if
+                // a background Task tick is delayed.
+                if self.phase.isRecording {
+                    self.elapsedSeconds = max(
+                        0,
+                        Int(Date().timeIntervalSince(self.liveActivityTimerStart))
+                    )
+                }
+                // Segment counts still need an ActivityKit push; the clock itself
+                // ticks in the widget via Text(..., style: .timer).
+                if self.elapsedSeconds % 15 == 0 {
                     self.updateLiveActivityIfNeeded()
                 }
                 if self.elapsedSeconds % 30 == 0 {
@@ -952,6 +966,7 @@ final class AmbientSessionManager: ObservableObject {
 
     private func reset() {
         elapsedSeconds = 0
+        liveActivityTimerStart = Date()
         liveTranscript = ""
         activeGates.removeAll()
         lastError = nil

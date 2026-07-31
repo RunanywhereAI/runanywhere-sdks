@@ -19,10 +19,10 @@ import AppIntents
 import Foundation
 
 struct StopAmbientMemoryIntent: AppIntent {
-    static var title: LocalizedStringResource = "Stop Memory Lab"
+    static var title: LocalizedStringResource = "Stop Note Recording"
     static var description = IntentDescription(
-        "Stops the active ambient memory session and saves it.",
-        categoryName: "Ambient"
+        "Stops the active note recording and saves the transcript.",
+        categoryName: "Notes"
     )
 
     static var openAppWhenRun: Bool = false
@@ -31,7 +31,7 @@ struct StopAmbientMemoryIntent: AppIntent {
         DarwinNotificationCenter.shared.post(
             name: SharedConstants.DarwinNotifications.ambientStopRequested
         )
-        return .result(dialog: "Stopping the Memory Lab session.")
+        return .result(dialog: "Stopping the note recording.")
     }
 }
 #endif

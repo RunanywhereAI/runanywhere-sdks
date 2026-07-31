@@ -25,6 +25,11 @@ struct AmbientActivityAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {
         /// "preparing" | "listening" | "speech" | "processing" | "paused"
         var phase: String
+        /// Wall-clock anchor for `Text(..., style: .timer)` in the widget so
+        /// the Lock Screen / Island keep ticking without app push updates.
+        /// On resume after pause this is rewound by the frozen elapsed time.
+        var timerStart: Date
+        /// Frozen seconds — used while paused/stopped, and as a fallback.
         var elapsedSeconds: Int
         /// Number of speech segments captured so far.
         var segmentCount: Int

@@ -88,22 +88,10 @@ final class AmbientMemoryViewModel: ObservableObject {
         return "Download the speech detector and transcription model below to start recording."
     }
 
-    /// Soft warning when a GPU ASR was chosen, or when summarizing will wait
-    /// for the foreground after a Lock Screen stop — Record stays enabled.
+    /// Soft warning when a GPU ASR was chosen — Record stays enabled.
     var backgroundRiskMessage: String? {
-        var parts: [String] = []
-        if !selection.asrModelID.isEmpty, !selection.isASRBackgroundSafe {
-            parts.append(
-                "This transcription model uses the GPU, so lock-screen transcription may stall."
-            )
-        }
-        if selection.digestModelID != nil {
-            parts.append(
-                "Summarizing finishes when the app is open — stopping from the Lock Screen saves the note and summarizes on return."
-            )
-        }
-        guard !parts.isEmpty else { return nil }
-        return parts.joined(separator: " ")
+        guard !selection.asrModelID.isEmpty, !selection.isASRBackgroundSafe else { return nil }
+        return "This transcription model uses the GPU, so lock-screen transcription may stall."
     }
 
     func modelInfo(for modelID: String) -> RAModelInfo? {
@@ -246,10 +234,37 @@ final class AmbientMemoryViewModel: ObservableObject {
         await refreshLibrary()
     }
 
-    /// Re-run summarization for a note that has a transcript but no summary.
-    func retrySummary(sessionID: String) async {
-        await sessionManager.retrySummary(for: sessionID)
+    /// First-time summarize with an explicit LLM (from the note-detail picker).
+    func summarize(sessionID: String, modelID: String? = nil) async {
+        let resolved = modelID ?? selection.digestModelID
+        if let resolved, let model = modelInfo(for: resolved) {
+            select(digest: model)
+        }
+        await sessionManager.generateSummary(
+            for: sessionID,
+            modelID: resolved,
+            rewrite: false
+        )
         await refreshLibrary()
+    }
+
+    /// Run inference again and overwrite the machine summary + action items.
+    func rewriteSummary(sessionID: String, modelID: String? = nil) async {
+        let resolved = modelID ?? selection.digestModelID
+        if let resolved, let model = modelInfo(for: resolved) {
+            select(digest: model)
+        }
+        await sessionManager.generateSummary(
+            for: sessionID,
+            modelID: resolved,
+            rewrite: true
+        )
+        await refreshLibrary()
+    }
+
+    /// Back-compat for call sites that still say "retry".
+    func retrySummary(sessionID: String) async {
+        await summarize(sessionID: sessionID)
     }
 
     func togglePause() async {

@@ -57,6 +57,7 @@ import SwiftProtobuf
 ///
 /// `Handle` must be `Hashable` so per-handle fan-out instances can be
 /// shared across multiple `HandleStreamAdapter` constructions for the
+/// 
 /// same native handle. `Event` must be a SwiftProtobuf `Message` so
 /// the trampoline can decode raw bytes via `Event(serializedBytes:)`.
 public final class HandleStreamAdapter<Handle: Hashable, Event: Message>: @unchecked Sendable {

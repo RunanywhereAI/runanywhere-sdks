@@ -2,14 +2,9 @@
 //  AmbientAppIntents.swift
 //  RunAnywhereAI
 //
-//  Action Button / Shortcuts entry points for the Ambient Memory Lab.
-//
-//  The start intent deliberately uses `openAppWhenRun`. iOS will not let a
-//  background App Intent start `AVAudioEngine`, and a covert capture path is
-//  not something this feature should offer even if it could: the user must see
-//  the Lab, the preparation state, and the active recording indicator. The
-//  Action Button is a faster way into the same explicit flow, not an exception
-//  to it.
+//  Lightweight App Intents for Notes. Start opens the app (mic requires a
+//  visible session). Stop lives in AmbientStopIntent.swift so the Live
+//  Activity extension can share it.
 //
 
 #if os(iOS)
@@ -20,17 +15,12 @@ import SwiftUI
 
 // MARK: - Router
 
-/// Bridges an intent invocation to the SwiftUI hierarchy.
-///
-/// The intent runs in the app process once `openAppWhenRun` brings it forward,
-/// so it can flip this flag and let the root scene present the Lab.
+/// Bridges an intent / deep link to the SwiftUI hierarchy.
 @MainActor
 final class AmbientRouter: ObservableObject {
     static let shared = AmbientRouter()
 
-    /// Set when the Lab should be on screen.
     @Published var isPresented = false
-    /// Set when the Lab should begin a session as soon as it appears.
     @Published var shouldAutoStart = false
 
     private init() {}
@@ -40,8 +30,6 @@ final class AmbientRouter: ObservableObject {
         isPresented = true
     }
 
-    /// Consume the auto-start request so returning to the Lab later does not
-    /// silently begin another recording.
     func consumeAutoStart() -> Bool {
         defer { shouldAutoStart = false }
         return shouldAutoStart
@@ -51,14 +39,12 @@ final class AmbientRouter: ObservableObject {
 // MARK: - Intents
 
 struct StartAmbientMemoryIntent: AppIntent {
-    static var title: LocalizedStringResource = "Start Memory Lab"
+    static var title: LocalizedStringResource = "Start Note Recording"
     static var description = IntentDescription(
-        "Opens RunAnywhere and starts an on-device ambient memory session.",
-        categoryName: "Ambient"
+        "Opens RunAnywhere and starts an on-device note recording.",
+        categoryName: "Notes"
     )
 
-    /// Capture is only ever started from a visible screen, so the intent opens
-    /// the app rather than trying to record in the background.
     static var openAppWhenRun: Bool = true
 
     @MainActor
@@ -69,10 +55,10 @@ struct StartAmbientMemoryIntent: AppIntent {
 }
 
 struct OpenAmbientMemoryIntent: AppIntent {
-    static var title: LocalizedStringResource = "Open Memory Lab"
+    static var title: LocalizedStringResource = "Open Notes"
     static var description = IntentDescription(
-        "Opens the RunAnywhere Memory Lab without starting a recording.",
-        categoryName: "Ambient"
+        "Opens RunAnywhere Notes without starting a recording.",
+        categoryName: "Notes"
     )
 
     static var openAppWhenRun: Bool = true
@@ -81,33 +67,6 @@ struct OpenAmbientMemoryIntent: AppIntent {
     func perform() async throws -> some IntentResult {
         AmbientRouter.shared.open(autoStart: false)
         return .result()
-    }
-}
-
-// MARK: - Shortcuts
-
-/// Published so the user can assign "Start Memory Lab" to the Action Button on
-/// supported iPhones through Settings › Action Button › Shortcut.
-struct AmbientAppShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: StartAmbientMemoryIntent(),
-            phrases: [
-                "Start \(.applicationName) Memory Lab",
-                "Start remembering with \(.applicationName)",
-            ],
-            shortTitle: "Start Memory Lab",
-            systemImageName: "brain.head.profile"
-        )
-        AppShortcut(
-            intent: StopAmbientMemoryIntent(),
-            phrases: [
-                "Stop \(.applicationName) Memory Lab",
-                "Stop remembering with \(.applicationName)",
-            ],
-            shortTitle: "Stop Memory Lab",
-            systemImageName: "stop.circle"
-        )
     }
 }
 #endif
