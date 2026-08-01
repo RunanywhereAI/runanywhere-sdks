@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import {
   AudioEncoding,
   audioEncodingFromJSON,
@@ -157,8 +158,6 @@ export interface TranscriptionMetadata {
   modelId: string;
   processingTimeMs: number;
   audioLengthMs: number;
-  /** processing_time_ms / audio_length_ms, set by the producer. */
-  realTimeFactor: number;
 }
 
 export interface STTOutput {
@@ -176,10 +175,9 @@ export interface STTOutput {
   /** Often duplicates metadata.audio_length_ms. */
   durationMs: number;
   speakerIds: string[];
-  errorMessage?: string | undefined;
-  errorCode: number;
   /** For long-running or streaming transcription. */
   segmentIndex: number;
+  error?: SDKError | undefined;
 }
 
 export interface STTPartialResult {
@@ -199,14 +197,12 @@ export interface STTPartialResult {
 }
 
 export interface STTStreamEvent {
-  seq: number;
   timestampUs: number;
   requestId: string;
   kind: STTStreamEventKind;
   partial?: STTPartialResult | undefined;
   finalOutput?: STTOutput | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 export interface STTServiceState {
@@ -214,8 +210,7 @@ export interface STTServiceState {
   currentModel?: string | undefined;
   supportsStreaming: boolean;
   supportedLanguageCodes: string[];
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 function createBaseSTTConfiguration(): STTConfiguration {
@@ -1459,7 +1454,7 @@ export const TranscriptionAlternative: MessageFns<TranscriptionAlternative> = {
 };
 
 function createBaseTranscriptionMetadata(): TranscriptionMetadata {
-  return { modelId: "", processingTimeMs: 0, audioLengthMs: 0, realTimeFactor: 0 };
+  return { modelId: "", processingTimeMs: 0, audioLengthMs: 0 };
 }
 
 export const TranscriptionMetadata: MessageFns<TranscriptionMetadata> = {
@@ -1472,9 +1467,6 @@ export const TranscriptionMetadata: MessageFns<TranscriptionMetadata> = {
     }
     if (message.audioLengthMs !== 0) {
       writer.uint32(24).int64(message.audioLengthMs);
-    }
-    if (message.realTimeFactor !== 0) {
-      writer.uint32(37).float(message.realTimeFactor);
     }
     return writer;
   },
@@ -1510,14 +1502,6 @@ export const TranscriptionMetadata: MessageFns<TranscriptionMetadata> = {
           message.audioLengthMs = longToNumber(reader.int64());
           continue;
         }
-        case 4: {
-          if (tag !== 37) {
-            break;
-          }
-
-          message.realTimeFactor = reader.float();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1544,11 +1528,6 @@ export const TranscriptionMetadata: MessageFns<TranscriptionMetadata> = {
         : isSet(object.audio_length_ms)
         ? globalThis.Number(object.audio_length_ms)
         : 0,
-      realTimeFactor: isSet(object.realTimeFactor)
-        ? globalThis.Number(object.realTimeFactor)
-        : isSet(object.real_time_factor)
-        ? globalThis.Number(object.real_time_factor)
-        : 0,
     };
   },
 
@@ -1563,9 +1542,6 @@ export const TranscriptionMetadata: MessageFns<TranscriptionMetadata> = {
     if (message.audioLengthMs !== 0) {
       obj.audioLengthMs = Math.round(message.audioLengthMs);
     }
-    if (message.realTimeFactor !== 0) {
-      obj.realTimeFactor = message.realTimeFactor;
-    }
     return obj;
   },
 
@@ -1577,7 +1553,6 @@ export const TranscriptionMetadata: MessageFns<TranscriptionMetadata> = {
     message.modelId = object.modelId ?? "";
     message.processingTimeMs = object.processingTimeMs ?? 0;
     message.audioLengthMs = object.audioLengthMs ?? 0;
-    message.realTimeFactor = object.realTimeFactor ?? 0;
     return message;
   },
 };
@@ -1593,9 +1568,8 @@ function createBaseSTTOutput(): STTOutput {
     timestampMs: 0,
     durationMs: 0,
     speakerIds: [],
-    errorMessage: undefined,
-    errorCode: 0,
     segmentIndex: 0,
+    error: undefined,
   };
 }
 
@@ -1628,14 +1602,11 @@ export const STTOutput: MessageFns<STTOutput> = {
     for (const v of message.speakerIds) {
       writer.uint32(82).string(v!);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(90).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(96).int32(message.errorCode);
-    }
     if (message.segmentIndex !== 0) {
       writer.uint32(104).int32(message.segmentIndex);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(122).fork()).join();
     }
     return writer;
   },
@@ -1719,28 +1690,20 @@ export const STTOutput: MessageFns<STTOutput> = {
           message.speakerIds.push(reader.string());
           continue;
         }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
         case 13: {
           if (tag !== 104) {
             break;
           }
 
           message.segmentIndex = reader.int32();
+          continue;
+        }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1777,21 +1740,12 @@ export const STTOutput: MessageFns<STTOutput> = {
         : globalThis.Array.isArray(object?.speaker_ids)
         ? object.speaker_ids.map((e: any) => globalThis.String(e))
         : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
       segmentIndex: isSet(object.segmentIndex)
         ? globalThis.Number(object.segmentIndex)
         : isSet(object.segment_index)
         ? globalThis.Number(object.segment_index)
         : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1824,14 +1778,11 @@ export const STTOutput: MessageFns<STTOutput> = {
     if (message.speakerIds?.length) {
       obj.speakerIds = message.speakerIds;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
     if (message.segmentIndex !== 0) {
       obj.segmentIndex = Math.round(message.segmentIndex);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1852,9 +1803,10 @@ export const STTOutput: MessageFns<STTOutput> = {
     message.timestampMs = object.timestampMs ?? 0;
     message.durationMs = object.durationMs ?? 0;
     message.speakerIds = object.speakerIds?.map((e) => e) || [];
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     message.segmentIndex = object.segmentIndex ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -2141,23 +2093,11 @@ export const STTPartialResult: MessageFns<STTPartialResult> = {
 };
 
 function createBaseSTTStreamEvent(): STTStreamEvent {
-  return {
-    seq: 0,
-    timestampUs: 0,
-    requestId: "",
-    kind: 0,
-    partial: undefined,
-    finalOutput: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
-  };
+  return { timestampUs: 0, requestId: "", kind: 0, partial: undefined, finalOutput: undefined, error: undefined };
 }
 
 export const STTStreamEvent: MessageFns<STTStreamEvent> = {
   encode(message: STTStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.seq !== 0) {
-      writer.uint32(8).uint64(message.seq);
-    }
     if (message.timestampUs !== 0) {
       writer.uint32(16).int64(message.timestampUs);
     }
@@ -2173,11 +2113,8 @@ export const STTStreamEvent: MessageFns<STTStreamEvent> = {
     if (message.finalOutput !== undefined) {
       STTOutput.encode(message.finalOutput, writer.uint32(50).fork()).join();
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(58).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(64).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -2189,14 +2126,6 @@ export const STTStreamEvent: MessageFns<STTStreamEvent> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.seq = longToNumber(reader.uint64());
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -2237,20 +2166,12 @@ export const STTStreamEvent: MessageFns<STTStreamEvent> = {
           message.finalOutput = STTOutput.decode(reader, reader.uint32());
           continue;
         }
-        case 7: {
-          if (tag !== 58) {
+        case 9: {
+          if (tag !== 74) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2264,7 +2185,6 @@ export const STTStreamEvent: MessageFns<STTStreamEvent> = {
 
   fromJSON(object: any): STTStreamEvent {
     return {
-      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -2282,24 +2202,12 @@ export const STTStreamEvent: MessageFns<STTStreamEvent> = {
         : isSet(object.final_output)
         ? STTOutput.fromJSON(object.final_output)
         : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: STTStreamEvent): unknown {
     const obj: any = {};
-    if (message.seq !== 0) {
-      obj.seq = Math.round(message.seq);
-    }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
     }
@@ -2315,11 +2223,8 @@ export const STTStreamEvent: MessageFns<STTStreamEvent> = {
     if (message.finalOutput !== undefined) {
       obj.finalOutput = STTOutput.toJSON(message.finalOutput);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2329,7 +2234,6 @@ export const STTStreamEvent: MessageFns<STTStreamEvent> = {
   },
   fromPartial<I extends Exact<DeepPartial<STTStreamEvent>, I>>(object: I): STTStreamEvent {
     const message = createBaseSTTStreamEvent();
-    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.requestId = object.requestId ?? "";
     message.kind = object.kind ?? 0;
@@ -2339,8 +2243,9 @@ export const STTStreamEvent: MessageFns<STTStreamEvent> = {
     message.finalOutput = (object.finalOutput !== undefined && object.finalOutput !== null)
       ? STTOutput.fromPartial(object.finalOutput)
       : undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -2351,8 +2256,7 @@ function createBaseSTTServiceState(): STTServiceState {
     currentModel: undefined,
     supportsStreaming: false,
     supportedLanguageCodes: [],
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
@@ -2370,11 +2274,8 @@ export const STTServiceState: MessageFns<STTServiceState> = {
     for (const v of message.supportedLanguageCodes) {
       writer.uint32(34).string(v!);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(42).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(48).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -2418,20 +2319,12 @@ export const STTServiceState: MessageFns<STTServiceState> = {
           message.supportedLanguageCodes.push(reader.string());
           continue;
         }
-        case 5: {
-          if (tag !== 42) {
+        case 7: {
+          if (tag !== 58) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2465,16 +2358,7 @@ export const STTServiceState: MessageFns<STTServiceState> = {
         : globalThis.Array.isArray(object?.supported_language_codes)
         ? object.supported_language_codes.map((e: any) => globalThis.String(e))
         : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2492,11 +2376,8 @@ export const STTServiceState: MessageFns<STTServiceState> = {
     if (message.supportedLanguageCodes?.length) {
       obj.supportedLanguageCodes = message.supportedLanguageCodes;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2510,8 +2391,9 @@ export const STTServiceState: MessageFns<STTServiceState> = {
     message.currentModel = object.currentModel ?? undefined;
     message.supportsStreaming = object.supportsStreaming ?? false;
     message.supportedLanguageCodes = object.supportedLanguageCodes?.map((e) => e) || [];
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

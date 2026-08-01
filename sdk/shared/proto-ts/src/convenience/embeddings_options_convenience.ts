@@ -14,14 +14,14 @@
 
 /* eslint-disable */
 
-import { EmbeddingsConfiguration, EmbeddingsNormalizeMode, EmbeddingsOptions, EmbeddingsPoolingStrategy } from '../embeddings_options';
+import { EmbeddingsConfiguration, EmbeddingsOptions, EmbeddingsPoolingStrategy } from '../embeddings_options';
 import { ValidationError } from './_errors';
 
 export const embeddingsConfigurationDefaults = (): EmbeddingsConfiguration => ({
   modelId: '',
   embeddingDimension: 384,
   maxSequenceLength: 512,
-  normalizeMode: EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2,
+  normalize: true,
   pooling: EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN,
 });
 
@@ -47,7 +47,7 @@ export const validateEmbeddingsConfiguration = (m: EmbeddingsConfiguration): voi
 };
 
 export const embeddingsOptionsDefaults = (): EmbeddingsOptions => ({
-  normalizeMode: EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED,
+  normalize: false,
   pooling: 0,
   nThreads: 0,
 });

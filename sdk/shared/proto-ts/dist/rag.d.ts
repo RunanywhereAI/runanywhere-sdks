@@ -1,5 +1,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { LLMGenerationOptions } from "./llm_options";
+import { TokenUsage } from "./token_usage";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum RAGStreamEventKind {
     RAG_STREAM_EVENT_KIND_UNSPECIFIED = 0,
@@ -86,17 +88,10 @@ export interface RAGResult {
     retrievalTimeMs: number;
     generationTimeMs: number;
     totalTimeMs: number;
-    /**
-     * These use the OpenAI legacy names; everything else in the IDL says
-     * input_tokens / output_tokens.
-     */
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-    errorMessage?: string | undefined;
-    errorCode: number;
     requestId: string;
     thinkingContent?: string | undefined;
+    usage?: TokenUsage | undefined;
+    error?: SDKError | undefined;
 }
 export interface RAGStatistics {
     indexedDocuments: number;
@@ -108,19 +103,16 @@ export interface RAGStatistics {
     vectorStoreSizeBytes: number;
     isPersistent: boolean;
     lastQueryMs: number;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export interface RAGStreamEvent {
-    seq: number;
     timestampUs: number;
     requestId: string;
     kind: RAGStreamEventKind;
     chunk?: RAGSearchResult | undefined;
     token: string;
     result?: RAGResult | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export declare const RAGConfiguration: MessageFns<RAGConfiguration>;
 export declare const RAGDocument: MessageFns<RAGDocument>;

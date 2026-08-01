@@ -10,22 +10,6 @@ export declare enum HybridBackendKind {
 }
 export declare function hybridBackendKindFromJSON(object: any): HybridBackendKind;
 export declare function hybridBackendKindToJSON(object: HybridBackendKind): string;
-export declare enum HybridModelType {
-    HYBRID_MODEL_TYPE_UNSPECIFIED = 0,
-    HYBRID_MODEL_TYPE_OFFLINE = 1,
-    HYBRID_MODEL_TYPE_ONLINE = 2,
-    UNRECOGNIZED = -1
-}
-export declare function hybridModelTypeFromJSON(object: any): HybridModelType;
-export declare function hybridModelTypeToJSON(object: HybridModelType): string;
-export declare enum HybridRank {
-    HYBRID_RANK_UNSPECIFIED = 0,
-    HYBRID_RANK_PREFER_LOCAL_FIRST = 1,
-    HYBRID_RANK_PREFER_ONLINE_FIRST = 2,
-    UNRECOGNIZED = -1
-}
-export declare function hybridRankFromJSON(object: any): HybridRank;
-export declare function hybridRankToJSON(object: HybridRank): string;
 /** A candidate must pass every hard filter to stay in the running. */
 export interface HybridFilter {
     network?: boolean | undefined;
@@ -51,11 +35,11 @@ export interface ConfidenceCascade {
 export interface HybridRoutingPolicy {
     hardFilters: HybridFilter[];
     cascade?: HybridCascade | undefined;
-    rank: HybridRank;
+    preferLocal: boolean;
 }
 export interface HybridModelDescriptor {
     modelId: string;
-    modelType: HybridModelType;
+    isLocal: boolean;
     backend: HybridBackendKind;
     provider: string;
 }

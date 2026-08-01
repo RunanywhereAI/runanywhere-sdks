@@ -15,6 +15,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'errors.pb.dart' as $0;
 import 'tool_calling.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -686,19 +687,17 @@ class ToolResult extends $pb.GeneratedMessage {
     $core.String? toolCallId,
     $core.String? name,
     $core.String? resultJson,
-    $core.String? error,
-    $core.bool? success,
     $fixnum.Int64? startedAtMs,
     $fixnum.Int64? completedAtMs,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (toolCallId != null) result.toolCallId = toolCallId;
     if (name != null) result.name = name;
     if (resultJson != null) result.resultJson = resultJson;
-    if (error != null) result.error = error;
-    if (success != null) result.success = success;
     if (startedAtMs != null) result.startedAtMs = startedAtMs;
     if (completedAtMs != null) result.completedAtMs = completedAtMs;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -718,10 +717,10 @@ class ToolResult extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'toolCallId')
     ..aOS(2, _omitFieldNames ? '' : 'name')
     ..aOS(3, _omitFieldNames ? '' : 'resultJson')
-    ..aOS(4, _omitFieldNames ? '' : 'error')
-    ..aOB(5, _omitFieldNames ? '' : 'success')
     ..aInt64(8, _omitFieldNames ? '' : 'startedAtMs')
     ..aInt64(9, _omitFieldNames ? '' : 'completedAtMs')
+    ..aOM<$0.SDKError>(10, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -769,42 +768,35 @@ class ToolResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearResultJson() => $_clearField(3);
 
-  @$pb.TagNumber(4)
-  $core.String get error => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set error($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasError() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearError() => $_clearField(4);
-
-  /// When false and error is empty, fall back to result_json semantics.
-  @$pb.TagNumber(5)
-  $core.bool get success => $_getBF(4);
-  @$pb.TagNumber(5)
-  set success($core.bool value) => $_setBool(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasSuccess() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearSuccess() => $_clearField(5);
-
   @$pb.TagNumber(8)
-  $fixnum.Int64 get startedAtMs => $_getI64(5);
+  $fixnum.Int64 get startedAtMs => $_getI64(3);
   @$pb.TagNumber(8)
-  set startedAtMs($fixnum.Int64 value) => $_setInt64(5, value);
+  set startedAtMs($fixnum.Int64 value) => $_setInt64(3, value);
   @$pb.TagNumber(8)
-  $core.bool hasStartedAtMs() => $_has(5);
+  $core.bool hasStartedAtMs() => $_has(3);
   @$pb.TagNumber(8)
   void clearStartedAtMs() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $fixnum.Int64 get completedAtMs => $_getI64(6);
+  $fixnum.Int64 get completedAtMs => $_getI64(4);
   @$pb.TagNumber(9)
-  set completedAtMs($fixnum.Int64 value) => $_setInt64(6, value);
+  set completedAtMs($fixnum.Int64 value) => $_setInt64(4, value);
   @$pb.TagNumber(9)
-  $core.bool hasCompletedAtMs() => $_has(6);
+  $core.bool hasCompletedAtMs() => $_has(4);
   @$pb.TagNumber(9)
   void clearCompletedAtMs() => $_clearField(9);
+
+  /// Unset means the tool ran successfully; fall back to result_json semantics.
+  @$pb.TagNumber(10)
+  $0.SDKError get error => $_getN(5);
+  @$pb.TagNumber(10)
+  set error($0.SDKError value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasError() => $_has(5);
+  @$pb.TagNumber(10)
+  void clearError() => $_clearField(10);
+  @$pb.TagNumber(10)
+  $0.SDKError ensureError() => $_ensure(5);
 }
 
 class ToolCallingOptions extends $pb.GeneratedMessage {
@@ -970,10 +962,9 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     $core.bool? isComplete,
     $core.String? conversationId,
     $core.int? iterationsUsed,
-    $core.String? errorMessage,
-    $core.int? errorCode,
     $core.String? rawText,
     $core.String? thinkingContent,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (text != null) result.text = text;
@@ -982,10 +973,9 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     if (isComplete != null) result.isComplete = isComplete;
     if (conversationId != null) result.conversationId = conversationId;
     if (iterationsUsed != null) result.iterationsUsed = iterationsUsed;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
     if (rawText != null) result.rawText = rawText;
     if (thinkingContent != null) result.thinkingContent = thinkingContent;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1010,10 +1000,10 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     ..aOB(4, _omitFieldNames ? '' : 'isComplete')
     ..aOS(5, _omitFieldNames ? '' : 'conversationId')
     ..aI(6, _omitFieldNames ? '' : 'iterationsUsed')
-    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(8, _omitFieldNames ? '' : 'errorCode')
     ..aOS(9, _omitFieldNames ? '' : 'rawText')
     ..aOS(10, _omitFieldNames ? '' : 'thinkingContent')
+    ..aOM<$0.SDKError>(11, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1078,41 +1068,34 @@ class ToolCallingResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearIterationsUsed() => $_clearField(6);
 
-  @$pb.TagNumber(7)
-  $core.String get errorMessage => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set errorMessage($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasErrorMessage() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearErrorMessage() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.int get errorCode => $_getIZ(7);
-  @$pb.TagNumber(8)
-  set errorCode($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasErrorCode() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearErrorCode() => $_clearField(8);
-
   @$pb.TagNumber(9)
-  $core.String get rawText => $_getSZ(8);
+  $core.String get rawText => $_getSZ(6);
   @$pb.TagNumber(9)
-  set rawText($core.String value) => $_setString(8, value);
+  set rawText($core.String value) => $_setString(6, value);
   @$pb.TagNumber(9)
-  $core.bool hasRawText() => $_has(8);
+  $core.bool hasRawText() => $_has(6);
   @$pb.TagNumber(9)
   void clearRawText() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  $core.String get thinkingContent => $_getSZ(9);
+  $core.String get thinkingContent => $_getSZ(7);
   @$pb.TagNumber(10)
-  set thinkingContent($core.String value) => $_setString(9, value);
+  set thinkingContent($core.String value) => $_setString(7, value);
   @$pb.TagNumber(10)
-  $core.bool hasThinkingContent() => $_has(9);
+  $core.bool hasThinkingContent() => $_has(7);
   @$pb.TagNumber(10)
   void clearThinkingContent() => $_clearField(10);
+
+  @$pb.TagNumber(11)
+  $0.SDKError get error => $_getN(8);
+  @$pb.TagNumber(11)
+  set error($0.SDKError value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasError() => $_has(8);
+  @$pb.TagNumber(11)
+  void clearError() => $_clearField(11);
+  @$pb.TagNumber(11)
+  $0.SDKError ensureError() => $_ensure(8);
 }
 
 class ToolParseRequest extends $pb.GeneratedMessage {
@@ -1189,15 +1172,13 @@ class ToolParseResult extends $pb.GeneratedMessage {
     $core.bool? hasToolCall,
     $core.Iterable<ToolCall>? toolCalls,
     $core.String? remainingText,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (hasToolCall != null) result.hasToolCall = hasToolCall;
     if (toolCalls != null) result.toolCalls.addAll(toolCalls);
     if (remainingText != null) result.remainingText = remainingText;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1218,8 +1199,8 @@ class ToolParseResult extends $pb.GeneratedMessage {
     ..pPM<ToolCall>(2, _omitFieldNames ? '' : 'toolCalls',
         subBuilder: ToolCall.create)
     ..aOS(3, _omitFieldNames ? '' : 'remainingText')
-    ..aOS(4, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(5, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(6, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1263,23 +1244,16 @@ class ToolParseResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearRemainingText() => $_clearField(3);
 
-  @$pb.TagNumber(4)
-  $core.String get errorMessage => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set errorMessage($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasErrorMessage() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearErrorMessage() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get errorCode => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set errorCode($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorCode() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearErrorCode() => $_clearField(5);
+  @$pb.TagNumber(6)
+  $0.SDKError get error => $_getN(3);
+  @$pb.TagNumber(6)
+  set error($0.SDKError value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasError() => $_has(3);
+  @$pb.TagNumber(6)
+  void clearError() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.SDKError ensureError() => $_ensure(3);
 }
 
 class ToolPromptFormatRequest extends $pb.GeneratedMessage {
@@ -1376,14 +1350,12 @@ class ToolPromptFormatResult extends $pb.GeneratedMessage {
   factory ToolPromptFormatResult({
     $core.String? formattedPrompt,
     ToolCallFormatName? format,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (formattedPrompt != null) result.formattedPrompt = formattedPrompt;
     if (format != null) result.format = format;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1403,8 +1375,8 @@ class ToolPromptFormatResult extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'formattedPrompt')
     ..aE<ToolCallFormatName>(2, _omitFieldNames ? '' : 'format',
         enumValues: ToolCallFormatName.values)
-    ..aOS(4, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(5, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(6, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1445,23 +1417,16 @@ class ToolPromptFormatResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearFormat() => $_clearField(2);
 
-  @$pb.TagNumber(4)
-  $core.String get errorMessage => $_getSZ(2);
-  @$pb.TagNumber(4)
-  set errorMessage($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(4)
-  $core.bool hasErrorMessage() => $_has(2);
-  @$pb.TagNumber(4)
-  void clearErrorMessage() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get errorCode => $_getIZ(3);
-  @$pb.TagNumber(5)
-  set errorCode($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorCode() => $_has(3);
-  @$pb.TagNumber(5)
-  void clearErrorCode() => $_clearField(5);
+  @$pb.TagNumber(6)
+  $0.SDKError get error => $_getN(2);
+  @$pb.TagNumber(6)
+  set error($0.SDKError value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasError() => $_has(2);
+  @$pb.TagNumber(6)
+  void clearError() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.SDKError ensureError() => $_ensure(2);
 }
 
 class ToolCallValidationRequest extends $pb.GeneratedMessage {
@@ -1543,8 +1508,7 @@ class ToolCallValidationResult extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? validationErrors,
     ToolDefinition? matchedTool,
     $core.String? normalizedArgumentsJson,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (isValid != null) result.isValid = isValid;
@@ -1553,8 +1517,7 @@ class ToolCallValidationResult extends $pb.GeneratedMessage {
     if (matchedTool != null) result.matchedTool = matchedTool;
     if (normalizedArgumentsJson != null)
       result.normalizedArgumentsJson = normalizedArgumentsJson;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1576,8 +1539,8 @@ class ToolCallValidationResult extends $pb.GeneratedMessage {
     ..aOM<ToolDefinition>(3, _omitFieldNames ? '' : 'matchedTool',
         subBuilder: ToolDefinition.create)
     ..aOS(4, _omitFieldNames ? '' : 'normalizedArgumentsJson')
-    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(6, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(7, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1633,23 +1596,16 @@ class ToolCallValidationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearNormalizedArgumentsJson() => $_clearField(4);
 
-  @$pb.TagNumber(5)
-  $core.String get errorMessage => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set errorMessage($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorMessage() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearErrorMessage() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.int get errorCode => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set errorCode($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasErrorCode() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearErrorCode() => $_clearField(6);
+  @$pb.TagNumber(7)
+  $0.SDKError get error => $_getN(4);
+  @$pb.TagNumber(7)
+  set error($0.SDKError value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasError() => $_has(4);
+  @$pb.TagNumber(7)
+  void clearError() => $_clearField(7);
+  @$pb.TagNumber(7)
+  $0.SDKError ensureError() => $_ensure(4);
 }
 
 const $core.bool _omitFieldNames =

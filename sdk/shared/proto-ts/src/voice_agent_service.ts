@@ -7,7 +7,7 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { EventCategory, eventCategoryFromJSON, eventCategoryToJSON } from "./component_types";
-import { ErrorSeverity, errorSeverityFromJSON, errorSeverityToJSON } from "./errors";
+import { ErrorSeverity, errorSeverityFromJSON, errorSeverityToJSON, SDKError } from "./errors";
 import { LLMGenerationOptions } from "./llm_options";
 import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON } from "./model_types";
 import { TTSOptions } from "./tts_options";
@@ -46,8 +46,7 @@ export interface VoiceAgentResult {
   llmTimeMs: number;
   ttsTimeMs: number;
   totalTimeMs: number;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 /** One-shot turn: audio in, transcription plus response plus audio out. */
@@ -325,8 +324,7 @@ function createBaseVoiceAgentResult(): VoiceAgentResult {
     llmTimeMs: 0,
     ttsTimeMs: 0,
     totalTimeMs: 0,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
@@ -377,11 +375,8 @@ export const VoiceAgentResult: MessageFns<VoiceAgentResult> = {
     if (message.totalTimeMs !== 0) {
       writer.uint32(120).int64(message.totalTimeMs);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(130).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(136).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(146).fork()).join();
     }
     return writer;
   },
@@ -513,20 +508,12 @@ export const VoiceAgentResult: MessageFns<VoiceAgentResult> = {
           message.totalTimeMs = longToNumber(reader.int64());
           continue;
         }
-        case 16: {
-          if (tag !== 130) {
+        case 18: {
+          if (tag !== 146) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 17: {
-          if (tag !== 136) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -611,16 +598,7 @@ export const VoiceAgentResult: MessageFns<VoiceAgentResult> = {
         : isSet(object.total_time_ms)
         ? globalThis.Number(object.total_time_ms)
         : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -671,11 +649,8 @@ export const VoiceAgentResult: MessageFns<VoiceAgentResult> = {
     if (message.totalTimeMs !== 0) {
       obj.totalTimeMs = Math.round(message.totalTimeMs);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -702,8 +677,9 @@ export const VoiceAgentResult: MessageFns<VoiceAgentResult> = {
     message.llmTimeMs = object.llmTimeMs ?? 0;
     message.ttsTimeMs = object.ttsTimeMs ?? 0;
     message.totalTimeMs = object.totalTimeMs ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

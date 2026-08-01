@@ -40,12 +40,12 @@ public class HybridModelDescriptor(
   public val model_id: String = "",
   @field:WireField(
     tag = 2,
-    adapter = "ai.runanywhere.proto.v1.HybridModelType#ADAPTER",
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "modelType",
+    jsonName = "isLocal",
     schemaIndex = 1,
   )
-  public val model_type: HybridModelType = HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED,
+  public val is_local: Boolean = false,
   @field:WireField(
     tag = 3,
     adapter = "ai.runanywhere.proto.v1.HybridBackendKind#ADAPTER",
@@ -73,7 +73,7 @@ public class HybridModelDescriptor(
     if (other !is HybridModelDescriptor) return false
     if (unknownFields != other.unknownFields) return false
     if (model_id != other.model_id) return false
-    if (model_type != other.model_type) return false
+    if (is_local != other.is_local) return false
     if (backend != other.backend) return false
     if (provider != other.provider) return false
     return true
@@ -84,7 +84,7 @@ public class HybridModelDescriptor(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + model_id.hashCode()
-      result = result * 37 + model_type.hashCode()
+      result = result * 37 + is_local.hashCode()
       result = result * 37 + backend.hashCode()
       result = result * 37 + provider.hashCode()
       super.hashCode = result
@@ -95,7 +95,7 @@ public class HybridModelDescriptor(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """model_id=${sanitize(model_id)}"""
-    result += """model_type=$model_type"""
+    result += """is_local=$is_local"""
     result += """backend=$backend"""
     result += """provider=${sanitize(provider)}"""
     return result.joinToString(prefix = "HybridModelDescriptor{", separator = ", ", postfix = "}")
@@ -103,11 +103,11 @@ public class HybridModelDescriptor(
 
   public fun copy(
     model_id: String = this.model_id,
-    model_type: HybridModelType = this.model_type,
+    is_local: Boolean = this.is_local,
     backend: HybridBackendKind = this.backend,
     provider: String = this.provider,
     unknownFields: ByteString = this.unknownFields,
-  ): HybridModelDescriptor = HybridModelDescriptor(model_id, model_type, backend, provider, unknownFields)
+  ): HybridModelDescriptor = HybridModelDescriptor(model_id, is_local, backend, provider, unknownFields)
 
   public companion object {
     @JvmField
@@ -125,8 +125,8 @@ public class HybridModelDescriptor(
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.model_id)
         }
-        if (value.model_type != ai.runanywhere.proto.v1.HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED) {
-          size += HybridModelType.ADAPTER.encodedSizeWithTag(2, value.model_type)
+        if (value.is_local != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.is_local)
         }
         if (value.backend != ai.runanywhere.proto.v1.HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED) {
           size += HybridBackendKind.ADAPTER.encodedSizeWithTag(3, value.backend)
@@ -141,8 +141,8 @@ public class HybridModelDescriptor(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         }
-        if (value.model_type != ai.runanywhere.proto.v1.HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED) {
-          HybridModelType.ADAPTER.encodeWithTag(writer, 2, value.model_type)
+        if (value.is_local != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_local)
         }
         if (value.backend != ai.runanywhere.proto.v1.HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED) {
           HybridBackendKind.ADAPTER.encodeWithTag(writer, 3, value.backend)
@@ -161,8 +161,8 @@ public class HybridModelDescriptor(
         if (value.backend != ai.runanywhere.proto.v1.HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED) {
           HybridBackendKind.ADAPTER.encodeWithTag(writer, 3, value.backend)
         }
-        if (value.model_type != ai.runanywhere.proto.v1.HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED) {
-          HybridModelType.ADAPTER.encodeWithTag(writer, 2, value.model_type)
+        if (value.is_local != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_local)
         }
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
@@ -171,17 +171,13 @@ public class HybridModelDescriptor(
 
       override fun decode(reader: ProtoReader): HybridModelDescriptor {
         var model_id: String = ""
-        var model_type: HybridModelType = HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED
+        var is_local: Boolean = false
         var backend: HybridBackendKind = HybridBackendKind.HYBRID_BACKEND_UNSPECIFIED
         var provider: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
-            2 -> try {
-              model_type = HybridModelType.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
+            2 -> is_local = ProtoAdapter.BOOL.decode(reader)
             3 -> try {
               backend = HybridBackendKind.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -193,7 +189,7 @@ public class HybridModelDescriptor(
         }
         return HybridModelDescriptor(
           model_id = model_id,
-          model_type = model_type,
+          is_local = is_local,
           backend = backend,
           provider = provider,
           unknownFields = unknownFields

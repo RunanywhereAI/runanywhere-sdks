@@ -435,7 +435,7 @@ extension EmbeddingsConfigurationConvenience on EmbeddingsConfiguration {
     final r = EmbeddingsConfiguration();
     r.embeddingDimension = 384;
     r.maxSequenceLength = 512;
-    r.normalizeMode = EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2;
+    r.normalize = true;
     r.pooling = EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN;
     return r;
   }
@@ -467,7 +467,6 @@ extension EmbeddingsConfigurationValidate on EmbeddingsConfiguration {
 extension EmbeddingsOptionsConvenience on EmbeddingsOptions {
   static EmbeddingsOptions defaults() {
     final r = EmbeddingsOptions();
-    r.normalizeMode = EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED;
     r.nThreads = 0;
     return r;
   }

@@ -558,31 +558,6 @@ class ModelQuerySortField extends $pb.ProtobufEnum {
   const ModelQuerySortField._(super.value, super.name);
 }
 
-class ModelQuerySortOrder extends $pb.ProtobufEnum {
-  static const ModelQuerySortOrder MODEL_QUERY_SORT_ORDER_UNSPECIFIED =
-      ModelQuerySortOrder._(
-          0, _omitEnumNames ? '' : 'MODEL_QUERY_SORT_ORDER_UNSPECIFIED');
-  static const ModelQuerySortOrder MODEL_QUERY_SORT_ORDER_ASCENDING =
-      ModelQuerySortOrder._(
-          1, _omitEnumNames ? '' : 'MODEL_QUERY_SORT_ORDER_ASCENDING');
-  static const ModelQuerySortOrder MODEL_QUERY_SORT_ORDER_DESCENDING =
-      ModelQuerySortOrder._(
-          2, _omitEnumNames ? '' : 'MODEL_QUERY_SORT_ORDER_DESCENDING');
-
-  static const $core.List<ModelQuerySortOrder> values = <ModelQuerySortOrder>[
-    MODEL_QUERY_SORT_ORDER_UNSPECIFIED,
-    MODEL_QUERY_SORT_ORDER_ASCENDING,
-    MODEL_QUERY_SORT_ORDER_DESCENDING,
-  ];
-
-  static final $core.List<ModelQuerySortOrder?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static ModelQuerySortOrder? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const ModelQuerySortOrder._(super.value, super.name);
-}
-
 /// Role of a file inside a single/multi-file artifact. The generic COMPANION
 /// role covers arbitrary sidecars; specific roles document common public
 /// catalog files such as VLM mmproj files and tokenizer/config assets.

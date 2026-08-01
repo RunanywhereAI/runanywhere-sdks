@@ -388,7 +388,7 @@ extension RAEmbeddingsConfiguration {
         var r = RAEmbeddingsConfiguration()
         r.embeddingDimension = 384
         r.maxSequenceLength = 512
-        r.normalizeMode = .l2
+        r.normalize = true
         r.pooling = .mean
         return r
     }
@@ -422,7 +422,6 @@ extension RAEmbeddingsOptions {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RAEmbeddingsOptions {
         var r = RAEmbeddingsOptions()
-        r.normalizeMode = .unspecified
         r.nThreads = 0
         return r
     }

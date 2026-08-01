@@ -15,7 +15,8 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'model_types.pbenum.dart' as $0;
+import 'errors.pb.dart' as $0;
+import 'model_types.pbenum.dart' as $1;
 import 'vad_options.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -31,7 +32,7 @@ class VADConfiguration extends $pb.GeneratedMessage {
     $core.double? activationThreshold,
     $core.bool? enableAutoCalibration,
     $core.double? calibrationMultiplier,
-    $0.InferenceFramework? preferredFramework,
+    $1.InferenceFramework? preferredFramework,
     $core.String? modelPath,
     $core.int? windowSizeSamples,
     $core.int? maxSpeechDurationMs,
@@ -76,8 +77,8 @@ class VADConfiguration extends $pb.GeneratedMessage {
     ..aOB(5, _omitFieldNames ? '' : 'enableAutoCalibration')
     ..aD(6, _omitFieldNames ? '' : 'calibrationMultiplier',
         fieldType: $pb.PbFieldType.OF)
-    ..aE<$0.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework',
-        enumValues: $0.InferenceFramework.values)
+    ..aE<$1.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework',
+        enumValues: $1.InferenceFramework.values)
     ..aOS(8, _omitFieldNames ? '' : 'modelPath')
     ..aI(9, _omitFieldNames ? '' : 'windowSizeSamples')
     ..aI(10, _omitFieldNames ? '' : 'maxSpeechDurationMs')
@@ -164,9 +165,9 @@ class VADConfiguration extends $pb.GeneratedMessage {
   void clearCalibrationMultiplier() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $0.InferenceFramework get preferredFramework => $_getN(6);
+  $1.InferenceFramework get preferredFramework => $_getN(6);
   @$pb.TagNumber(7)
-  set preferredFramework($0.InferenceFramework value) => $_setField(7, value);
+  set preferredFramework($1.InferenceFramework value) => $_setField(7, value);
   @$pb.TagNumber(7)
   $core.bool hasPreferredFramework() => $_has(6);
   @$pb.TagNumber(7)
@@ -331,7 +332,7 @@ class VADAudioSource extends $pb.GeneratedMessage {
   factory VADAudioSource({
     $core.List<$core.int>? audioData,
     $core.String? adapterHandle,
-    $0.AudioEncoding? encoding,
+    $1.AudioEncoding? encoding,
     $core.int? sampleRate,
     $core.int? channels,
     $fixnum.Int64? frameOffsetMs,
@@ -369,8 +370,8 @@ class VADAudioSource extends $pb.GeneratedMessage {
     ..a<$core.List<$core.int>>(
         1, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
     ..aOS(2, _omitFieldNames ? '' : 'adapterHandle')
-    ..aE<$0.AudioEncoding>(3, _omitFieldNames ? '' : 'encoding',
-        enumValues: $0.AudioEncoding.values)
+    ..aE<$1.AudioEncoding>(3, _omitFieldNames ? '' : 'encoding',
+        enumValues: $1.AudioEncoding.values)
     ..aI(4, _omitFieldNames ? '' : 'sampleRate')
     ..aI(5, _omitFieldNames ? '' : 'channels')
     ..aInt64(6, _omitFieldNames ? '' : 'frameOffsetMs')
@@ -422,9 +423,9 @@ class VADAudioSource extends $pb.GeneratedMessage {
   void clearAdapterHandle() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $0.AudioEncoding get encoding => $_getN(2);
+  $1.AudioEncoding get encoding => $_getN(2);
   @$pb.TagNumber(3)
-  set encoding($0.AudioEncoding value) => $_setField(3, value);
+  set encoding($1.AudioEncoding value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasEncoding() => $_has(2);
   @$pb.TagNumber(3)
@@ -562,8 +563,7 @@ class VADResult extends $pb.GeneratedMessage {
     $fixnum.Int64? startTimeMs,
     $fixnum.Int64? endTimeMs,
     VADStatistics? statistics,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (isSpeech != null) result.isSpeech = isSpeech;
@@ -574,8 +574,7 @@ class VADResult extends $pb.GeneratedMessage {
     if (startTimeMs != null) result.startTimeMs = startTimeMs;
     if (endTimeMs != null) result.endTimeMs = endTimeMs;
     if (statistics != null) result.statistics = statistics;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -601,8 +600,8 @@ class VADResult extends $pb.GeneratedMessage {
     ..aInt64(7, _omitFieldNames ? '' : 'endTimeMs')
     ..aOM<VADStatistics>(8, _omitFieldNames ? '' : 'statistics',
         subBuilder: VADStatistics.create)
-    ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(10, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(11, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -702,23 +701,16 @@ class VADResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   VADStatistics ensureStatistics() => $_ensure(7);
 
-  @$pb.TagNumber(9)
-  $core.String get errorMessage => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set errorMessage($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasErrorMessage() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearErrorMessage() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.int get errorCode => $_getIZ(9);
-  @$pb.TagNumber(10)
-  set errorCode($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasErrorCode() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearErrorCode() => $_clearField(10);
+  @$pb.TagNumber(11)
+  $0.SDKError get error => $_getN(8);
+  @$pb.TagNumber(11)
+  set error($0.SDKError value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasError() => $_has(8);
+  @$pb.TagNumber(11)
+  void clearError() => $_clearField(11);
+  @$pb.TagNumber(11)
+  $0.SDKError ensureError() => $_ensure(8);
 }
 
 /// Exposed for debugging and waveform UIs.
@@ -1006,26 +998,22 @@ class SpeechActivityEvent extends $pb.GeneratedMessage {
 
 class VADStreamEvent extends $pb.GeneratedMessage {
   factory VADStreamEvent({
-    $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
     $core.String? requestId,
     VADStreamEventKind? kind,
     VADResult? result,
     SpeechActivityEvent? activity,
     VADStatistics? statistics,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result$ = create();
-    if (seq != null) result$.seq = seq;
     if (timestampUs != null) result$.timestampUs = timestampUs;
     if (requestId != null) result$.requestId = requestId;
     if (kind != null) result$.kind = kind;
     if (result != null) result$.result = result;
     if (activity != null) result$.activity = activity;
     if (statistics != null) result$.statistics = statistics;
-    if (errorMessage != null) result$.errorMessage = errorMessage;
-    if (errorCode != null) result$.errorCode = errorCode;
+    if (error != null) result$.error = error;
     return result$;
   }
 
@@ -1042,8 +1030,6 @@ class VADStreamEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'VADStreamEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6,
-        defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(3, _omitFieldNames ? '' : 'requestId')
     ..aE<VADStreamEventKind>(4, _omitFieldNames ? '' : 'kind',
@@ -1054,8 +1040,8 @@ class VADStreamEvent extends $pb.GeneratedMessage {
         subBuilder: SpeechActivityEvent.create)
     ..aOM<VADStatistics>(7, _omitFieldNames ? '' : 'statistics',
         subBuilder: VADStatistics.create)
-    ..aOS(8, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(9, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(10, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1077,92 +1063,76 @@ class VADStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<VADStreamEvent>(create);
   static VADStreamEvent? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $fixnum.Int64 get seq => $_getI64(0);
-  @$pb.TagNumber(1)
-  set seq($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSeq() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSeq() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $fixnum.Int64 get timestampUs => $_getI64(1);
+  $fixnum.Int64 get timestampUs => $_getI64(0);
   @$pb.TagNumber(2)
-  set timestampUs($fixnum.Int64 value) => $_setInt64(1, value);
+  set timestampUs($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasTimestampUs() => $_has(1);
+  $core.bool hasTimestampUs() => $_has(0);
   @$pb.TagNumber(2)
   void clearTimestampUs() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get requestId => $_getSZ(2);
+  $core.String get requestId => $_getSZ(1);
   @$pb.TagNumber(3)
-  set requestId($core.String value) => $_setString(2, value);
+  set requestId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasRequestId() => $_has(2);
+  $core.bool hasRequestId() => $_has(1);
   @$pb.TagNumber(3)
   void clearRequestId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  VADStreamEventKind get kind => $_getN(3);
+  VADStreamEventKind get kind => $_getN(2);
   @$pb.TagNumber(4)
   set kind(VADStreamEventKind value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasKind() => $_has(3);
+  $core.bool hasKind() => $_has(2);
   @$pb.TagNumber(4)
   void clearKind() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  VADResult get result => $_getN(4);
+  VADResult get result => $_getN(3);
   @$pb.TagNumber(5)
   set result(VADResult value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasResult() => $_has(4);
+  $core.bool hasResult() => $_has(3);
   @$pb.TagNumber(5)
   void clearResult() => $_clearField(5);
   @$pb.TagNumber(5)
-  VADResult ensureResult() => $_ensure(4);
+  VADResult ensureResult() => $_ensure(3);
 
   @$pb.TagNumber(6)
-  SpeechActivityEvent get activity => $_getN(5);
+  SpeechActivityEvent get activity => $_getN(4);
   @$pb.TagNumber(6)
   set activity(SpeechActivityEvent value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasActivity() => $_has(5);
+  $core.bool hasActivity() => $_has(4);
   @$pb.TagNumber(6)
   void clearActivity() => $_clearField(6);
   @$pb.TagNumber(6)
-  SpeechActivityEvent ensureActivity() => $_ensure(5);
+  SpeechActivityEvent ensureActivity() => $_ensure(4);
 
   @$pb.TagNumber(7)
-  VADStatistics get statistics => $_getN(6);
+  VADStatistics get statistics => $_getN(5);
   @$pb.TagNumber(7)
   set statistics(VADStatistics value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasStatistics() => $_has(6);
+  $core.bool hasStatistics() => $_has(5);
   @$pb.TagNumber(7)
   void clearStatistics() => $_clearField(7);
   @$pb.TagNumber(7)
-  VADStatistics ensureStatistics() => $_ensure(6);
+  VADStatistics ensureStatistics() => $_ensure(5);
 
-  @$pb.TagNumber(8)
-  $core.String get errorMessage => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set errorMessage($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasErrorMessage() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearErrorMessage() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.int get errorCode => $_getIZ(8);
-  @$pb.TagNumber(9)
-  set errorCode($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasErrorCode() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearErrorCode() => $_clearField(9);
+  @$pb.TagNumber(10)
+  $0.SDKError get error => $_getN(6);
+  @$pb.TagNumber(10)
+  set error($0.SDKError value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(10)
+  void clearError() => $_clearField(10);
+  @$pb.TagNumber(10)
+  $0.SDKError ensureError() => $_ensure(6);
 }
 
 class VADServiceState extends $pb.GeneratedMessage {
@@ -1173,8 +1143,7 @@ class VADServiceState extends $pb.GeneratedMessage {
     $core.int? sampleRate,
     $core.int? frameLengthMs,
     $core.String? currentModel,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (isReady != null) result.isReady = isReady;
@@ -1183,8 +1152,7 @@ class VADServiceState extends $pb.GeneratedMessage {
     if (sampleRate != null) result.sampleRate = sampleRate;
     if (frameLengthMs != null) result.frameLengthMs = frameLengthMs;
     if (currentModel != null) result.currentModel = currentModel;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1208,8 +1176,8 @@ class VADServiceState extends $pb.GeneratedMessage {
     ..aI(4, _omitFieldNames ? '' : 'sampleRate')
     ..aI(5, _omitFieldNames ? '' : 'frameLengthMs')
     ..aOS(6, _omitFieldNames ? '' : 'currentModel')
-    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(8, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(9, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1285,23 +1253,16 @@ class VADServiceState extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearCurrentModel() => $_clearField(6);
 
-  @$pb.TagNumber(7)
-  $core.String get errorMessage => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set errorMessage($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasErrorMessage() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearErrorMessage() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.int get errorCode => $_getIZ(7);
-  @$pb.TagNumber(8)
-  set errorCode($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasErrorCode() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearErrorCode() => $_clearField(8);
+  @$pb.TagNumber(9)
+  $0.SDKError get error => $_getN(6);
+  @$pb.TagNumber(9)
+  set error($0.SDKError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $0.SDKError ensureError() => $_ensure(6);
 }
 
 const $core.bool _omitFieldNames =

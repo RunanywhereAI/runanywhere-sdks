@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
@@ -398,22 +399,19 @@ export interface DiffusionResult {
   totalTimeMs: number;
   safetyFlag: boolean;
   usedScheduler: DiffusionScheduler;
-  errorMessage?: string | undefined;
-  errorCode: number;
   imageMediaType?: string | undefined;
   batchImages: Uint8Array[];
   imagesGenerated: number;
+  error?: SDKError | undefined;
 }
 
 export interface DiffusionStreamEvent {
-  seq: number;
   timestampUs: number;
   requestId: string;
   kind: DiffusionStreamEventKind;
   progress?: DiffusionProgress | undefined;
   result?: DiffusionResult | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 function createBaseDiffusionTokenizerSource(): DiffusionTokenizerSource {
@@ -1609,11 +1607,10 @@ function createBaseDiffusionResult(): DiffusionResult {
     totalTimeMs: 0,
     safetyFlag: false,
     usedScheduler: 0,
-    errorMessage: undefined,
-    errorCode: 0,
     imageMediaType: undefined,
     batchImages: [],
     imagesGenerated: 0,
+    error: undefined,
   };
 }
 
@@ -1640,12 +1637,6 @@ export const DiffusionResult: MessageFns<DiffusionResult> = {
     if (message.usedScheduler !== 0) {
       writer.uint32(56).int32(message.usedScheduler);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(66).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(72).int32(message.errorCode);
-    }
     if (message.imageMediaType !== undefined) {
       writer.uint32(82).string(message.imageMediaType);
     }
@@ -1654,6 +1645,9 @@ export const DiffusionResult: MessageFns<DiffusionResult> = {
     }
     if (message.imagesGenerated !== 0) {
       writer.uint32(96).int32(message.imagesGenerated);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(106).fork()).join();
     }
     return writer;
   },
@@ -1721,22 +1715,6 @@ export const DiffusionResult: MessageFns<DiffusionResult> = {
           message.usedScheduler = reader.int32() as any;
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
         case 10: {
           if (tag !== 82) {
             break;
@@ -1759,6 +1737,14 @@ export const DiffusionResult: MessageFns<DiffusionResult> = {
           }
 
           message.imagesGenerated = reader.int32();
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1799,16 +1785,6 @@ export const DiffusionResult: MessageFns<DiffusionResult> = {
         : isSet(object.used_scheduler)
         ? diffusionSchedulerFromJSON(object.used_scheduler)
         : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
       imageMediaType: isSet(object.imageMediaType)
         ? globalThis.String(object.imageMediaType)
         : isSet(object.image_media_type)
@@ -1824,6 +1800,7 @@ export const DiffusionResult: MessageFns<DiffusionResult> = {
         : isSet(object.images_generated)
         ? globalThis.Number(object.images_generated)
         : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1850,12 +1827,6 @@ export const DiffusionResult: MessageFns<DiffusionResult> = {
     if (message.usedScheduler !== 0) {
       obj.usedScheduler = diffusionSchedulerToJSON(message.usedScheduler);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
     if (message.imageMediaType !== undefined) {
       obj.imageMediaType = message.imageMediaType;
     }
@@ -1864,6 +1835,9 @@ export const DiffusionResult: MessageFns<DiffusionResult> = {
     }
     if (message.imagesGenerated !== 0) {
       obj.imagesGenerated = Math.round(message.imagesGenerated);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1880,33 +1854,22 @@ export const DiffusionResult: MessageFns<DiffusionResult> = {
     message.totalTimeMs = object.totalTimeMs ?? 0;
     message.safetyFlag = object.safetyFlag ?? false;
     message.usedScheduler = object.usedScheduler ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     message.imageMediaType = object.imageMediaType ?? undefined;
     message.batchImages = object.batchImages?.map((e) => e) || [];
     message.imagesGenerated = object.imagesGenerated ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
 function createBaseDiffusionStreamEvent(): DiffusionStreamEvent {
-  return {
-    seq: 0,
-    timestampUs: 0,
-    requestId: "",
-    kind: 0,
-    progress: undefined,
-    result: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
-  };
+  return { timestampUs: 0, requestId: "", kind: 0, progress: undefined, result: undefined, error: undefined };
 }
 
 export const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent> = {
   encode(message: DiffusionStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.seq !== 0) {
-      writer.uint32(8).uint64(message.seq);
-    }
     if (message.timestampUs !== 0) {
       writer.uint32(16).int64(message.timestampUs);
     }
@@ -1922,11 +1885,8 @@ export const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent> = {
     if (message.result !== undefined) {
       DiffusionResult.encode(message.result, writer.uint32(50).fork()).join();
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(58).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(64).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -1938,14 +1898,6 @@ export const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.seq = longToNumber(reader.uint64());
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -1986,20 +1938,12 @@ export const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent> = {
           message.result = DiffusionResult.decode(reader, reader.uint32());
           continue;
         }
-        case 7: {
-          if (tag !== 58) {
+        case 9: {
+          if (tag !== 74) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2013,7 +1957,6 @@ export const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent> = {
 
   fromJSON(object: any): DiffusionStreamEvent {
     return {
-      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -2027,24 +1970,12 @@ export const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent> = {
       kind: isSet(object.kind) ? diffusionStreamEventKindFromJSON(object.kind) : 0,
       progress: isSet(object.progress) ? DiffusionProgress.fromJSON(object.progress) : undefined,
       result: isSet(object.result) ? DiffusionResult.fromJSON(object.result) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: DiffusionStreamEvent): unknown {
     const obj: any = {};
-    if (message.seq !== 0) {
-      obj.seq = Math.round(message.seq);
-    }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
     }
@@ -2060,11 +1991,8 @@ export const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent> = {
     if (message.result !== undefined) {
       obj.result = DiffusionResult.toJSON(message.result);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2074,7 +2002,6 @@ export const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent> = {
   },
   fromPartial<I extends Exact<DeepPartial<DiffusionStreamEvent>, I>>(object: I): DiffusionStreamEvent {
     const message = createBaseDiffusionStreamEvent();
-    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.requestId = object.requestId ?? "";
     message.kind = object.kind ?? 0;
@@ -2084,8 +2011,9 @@ export const DiffusionStreamEvent: MessageFns<DiffusionStreamEvent> = {
     message.result = (object.result !== undefined && object.result !== null)
       ? DiffusionResult.fromPartial(object.result)
       : undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

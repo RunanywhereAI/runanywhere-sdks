@@ -15,7 +15,8 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'hardware_profile.pb.dart' as $1;
+import 'errors.pb.dart' as $1;
+import 'hardware_profile.pb.dart' as $2;
 import 'model_types.pbenum.dart';
 import 'thinking_tag_pattern.pb.dart' as $0;
 
@@ -222,7 +223,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     $core.bool? builtIn,
     ModelArtifactType? artifactType,
     ExpectedModelFiles? expectedFiles,
-    $1.AccelerationPreference? accelerationPreference,
+    $2.AccelerationPreference? accelerationPreference,
     RoutingPolicy? routingPolicy,
     ModelRuntimeCompatibility? compatibility,
     InferenceFramework? preferredFramework,
@@ -336,9 +337,9 @@ class ModelInfo extends $pb.GeneratedMessage {
         enumValues: ModelArtifactType.values)
     ..aOM<ExpectedModelFiles>(26, _omitFieldNames ? '' : 'expectedFiles',
         subBuilder: ExpectedModelFiles.create)
-    ..aE<$1.AccelerationPreference>(
+    ..aE<$2.AccelerationPreference>(
         27, _omitFieldNames ? '' : 'accelerationPreference',
-        enumValues: $1.AccelerationPreference.values)
+        enumValues: $2.AccelerationPreference.values)
     ..aE<RoutingPolicy>(28, _omitFieldNames ? '' : 'routingPolicy',
         enumValues: RoutingPolicy.values)
     ..aOM<ModelRuntimeCompatibility>(29, _omitFieldNames ? '' : 'compatibility',
@@ -645,9 +646,9 @@ class ModelInfo extends $pb.GeneratedMessage {
 
   /// Preferred hardware acceleration backend for this model.
   @$pb.TagNumber(27)
-  $1.AccelerationPreference get accelerationPreference => $_getN(25);
+  $2.AccelerationPreference get accelerationPreference => $_getN(25);
   @$pb.TagNumber(27)
-  set accelerationPreference($1.AccelerationPreference value) =>
+  set accelerationPreference($2.AccelerationPreference value) =>
       $_setField(27, value);
   @$pb.TagNumber(27)
   $core.bool hasAccelerationPreference() => $_has(25);
@@ -1289,7 +1290,7 @@ class ModelQuery extends $pb.GeneratedMessage {
     $core.String? searchQuery,
     ModelSource? source,
     ModelQuerySortField? sortField,
-    ModelQuerySortOrder? sortOrder,
+    $core.bool? descending,
     ModelRegistryStatus? registryStatus,
   }) {
     final result = create();
@@ -1302,7 +1303,7 @@ class ModelQuery extends $pb.GeneratedMessage {
     if (searchQuery != null) result.searchQuery = searchQuery;
     if (source != null) result.source = source;
     if (sortField != null) result.sortField = sortField;
-    if (sortOrder != null) result.sortOrder = sortOrder;
+    if (descending != null) result.descending = descending;
     if (registryStatus != null) result.registryStatus = registryStatus;
     return result;
   }
@@ -1334,8 +1335,7 @@ class ModelQuery extends $pb.GeneratedMessage {
         enumValues: ModelSource.values)
     ..aE<ModelQuerySortField>(9, _omitFieldNames ? '' : 'sortField',
         enumValues: ModelQuerySortField.values)
-    ..aE<ModelQuerySortOrder>(10, _omitFieldNames ? '' : 'sortOrder',
-        enumValues: ModelQuerySortOrder.values)
+    ..aOB(10, _omitFieldNames ? '' : 'descending')
     ..aE<ModelRegistryStatus>(11, _omitFieldNames ? '' : 'registryStatus',
         enumValues: ModelRegistryStatus.values)
     ..hasRequiredFields = false;
@@ -1440,13 +1440,13 @@ class ModelQuery extends $pb.GeneratedMessage {
   void clearSortField() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  ModelQuerySortOrder get sortOrder => $_getN(9);
+  $core.bool get descending => $_getBF(9);
   @$pb.TagNumber(10)
-  set sortOrder(ModelQuerySortOrder value) => $_setField(10, value);
+  set descending($core.bool value) => $_setBool(9, value);
   @$pb.TagNumber(10)
-  $core.bool hasSortOrder() => $_has(9);
+  $core.bool hasDescending() => $_has(9);
   @$pb.TagNumber(10)
-  void clearSortOrder() => $_clearField(10);
+  void clearDescending() => $_clearField(10);
 
   @$pb.TagNumber(11)
   ModelRegistryStatus get registryStatus => $_getN(10);
@@ -1602,7 +1602,6 @@ class ModelRegistryRefreshRequest extends $pb.GeneratedMessage {
 
 class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
   factory ModelRegistryRefreshResult({
-    $core.bool? success,
     ModelInfoList? models,
     $core.int? registeredCount,
     $core.int? updatedCount,
@@ -1610,13 +1609,12 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
     $core.int? prunedCount,
     $fixnum.Int64? refreshedAtUnixMs,
     $core.Iterable<$core.String>? warnings,
-    $core.String? errorMessage,
     $core.int? downloadedCount,
     $core.int? availableCount,
     $core.int? errorCount,
+    $1.SDKError? error,
   }) {
     final result = create();
-    if (success != null) result.success = success;
     if (models != null) result.models = models;
     if (registeredCount != null) result.registeredCount = registeredCount;
     if (updatedCount != null) result.updatedCount = updatedCount;
@@ -1624,10 +1622,10 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
     if (prunedCount != null) result.prunedCount = prunedCount;
     if (refreshedAtUnixMs != null) result.refreshedAtUnixMs = refreshedAtUnixMs;
     if (warnings != null) result.warnings.addAll(warnings);
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (downloadedCount != null) result.downloadedCount = downloadedCount;
     if (availableCount != null) result.availableCount = availableCount;
     if (errorCount != null) result.errorCount = errorCount;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1644,7 +1642,6 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ModelRegistryRefreshResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'success')
     ..aOM<ModelInfoList>(2, _omitFieldNames ? '' : 'models',
         subBuilder: ModelInfoList.create)
     ..aI(3, _omitFieldNames ? '' : 'registeredCount')
@@ -1653,10 +1650,11 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
     ..aI(6, _omitFieldNames ? '' : 'prunedCount')
     ..aInt64(7, _omitFieldNames ? '' : 'refreshedAtUnixMs')
     ..pPS(8, _omitFieldNames ? '' : 'warnings')
-    ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
     ..aI(10, _omitFieldNames ? '' : 'downloadedCount')
     ..aI(11, _omitFieldNames ? '' : 'availableCount')
     ..aI(12, _omitFieldNames ? '' : 'errorCount')
+    ..aOM<$1.SDKError>(13, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1680,109 +1678,102 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ModelRegistryRefreshResult>(create);
   static ModelRegistryRefreshResult? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $core.bool get success => $_getBF(0);
-  @$pb.TagNumber(1)
-  set success($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSuccess() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSuccess() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  ModelInfoList get models => $_getN(1);
+  ModelInfoList get models => $_getN(0);
   @$pb.TagNumber(2)
   set models(ModelInfoList value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasModels() => $_has(1);
+  $core.bool hasModels() => $_has(0);
   @$pb.TagNumber(2)
   void clearModels() => $_clearField(2);
   @$pb.TagNumber(2)
-  ModelInfoList ensureModels() => $_ensure(1);
+  ModelInfoList ensureModels() => $_ensure(0);
 
   @$pb.TagNumber(3)
-  $core.int get registeredCount => $_getIZ(2);
+  $core.int get registeredCount => $_getIZ(1);
   @$pb.TagNumber(3)
-  set registeredCount($core.int value) => $_setSignedInt32(2, value);
+  set registeredCount($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasRegisteredCount() => $_has(2);
+  $core.bool hasRegisteredCount() => $_has(1);
   @$pb.TagNumber(3)
   void clearRegisteredCount() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get updatedCount => $_getIZ(3);
+  $core.int get updatedCount => $_getIZ(2);
   @$pb.TagNumber(4)
-  set updatedCount($core.int value) => $_setSignedInt32(3, value);
+  set updatedCount($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasUpdatedCount() => $_has(3);
+  $core.bool hasUpdatedCount() => $_has(2);
   @$pb.TagNumber(4)
   void clearUpdatedCount() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.int get discoveredCount => $_getIZ(4);
+  $core.int get discoveredCount => $_getIZ(3);
   @$pb.TagNumber(5)
-  set discoveredCount($core.int value) => $_setSignedInt32(4, value);
+  set discoveredCount($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasDiscoveredCount() => $_has(4);
+  $core.bool hasDiscoveredCount() => $_has(3);
   @$pb.TagNumber(5)
   void clearDiscoveredCount() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get prunedCount => $_getIZ(5);
+  $core.int get prunedCount => $_getIZ(4);
   @$pb.TagNumber(6)
-  set prunedCount($core.int value) => $_setSignedInt32(5, value);
+  set prunedCount($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasPrunedCount() => $_has(5);
+  $core.bool hasPrunedCount() => $_has(4);
   @$pb.TagNumber(6)
   void clearPrunedCount() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $fixnum.Int64 get refreshedAtUnixMs => $_getI64(6);
+  $fixnum.Int64 get refreshedAtUnixMs => $_getI64(5);
   @$pb.TagNumber(7)
-  set refreshedAtUnixMs($fixnum.Int64 value) => $_setInt64(6, value);
+  set refreshedAtUnixMs($fixnum.Int64 value) => $_setInt64(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasRefreshedAtUnixMs() => $_has(6);
+  $core.bool hasRefreshedAtUnixMs() => $_has(5);
   @$pb.TagNumber(7)
   void clearRefreshedAtUnixMs() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $pb.PbList<$core.String> get warnings => $_getList(7);
-
-  @$pb.TagNumber(9)
-  $core.String get errorMessage => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set errorMessage($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasErrorMessage() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearErrorMessage() => $_clearField(9);
+  $pb.PbList<$core.String> get warnings => $_getList(6);
 
   @$pb.TagNumber(10)
-  $core.int get downloadedCount => $_getIZ(9);
+  $core.int get downloadedCount => $_getIZ(7);
   @$pb.TagNumber(10)
-  set downloadedCount($core.int value) => $_setSignedInt32(9, value);
+  set downloadedCount($core.int value) => $_setSignedInt32(7, value);
   @$pb.TagNumber(10)
-  $core.bool hasDownloadedCount() => $_has(9);
+  $core.bool hasDownloadedCount() => $_has(7);
   @$pb.TagNumber(10)
   void clearDownloadedCount() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.int get availableCount => $_getIZ(10);
+  $core.int get availableCount => $_getIZ(8);
   @$pb.TagNumber(11)
-  set availableCount($core.int value) => $_setSignedInt32(10, value);
+  set availableCount($core.int value) => $_setSignedInt32(8, value);
   @$pb.TagNumber(11)
-  $core.bool hasAvailableCount() => $_has(10);
+  $core.bool hasAvailableCount() => $_has(8);
   @$pb.TagNumber(11)
   void clearAvailableCount() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  $core.int get errorCount => $_getIZ(11);
+  $core.int get errorCount => $_getIZ(9);
   @$pb.TagNumber(12)
-  set errorCount($core.int value) => $_setSignedInt32(11, value);
+  set errorCount($core.int value) => $_setSignedInt32(9, value);
   @$pb.TagNumber(12)
-  $core.bool hasErrorCount() => $_has(11);
+  $core.bool hasErrorCount() => $_has(9);
   @$pb.TagNumber(12)
   void clearErrorCount() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $1.SDKError get error => $_getN(10);
+  @$pb.TagNumber(13)
+  set error($1.SDKError value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasError() => $_has(10);
+  @$pb.TagNumber(13)
+  void clearError() => $_clearField(13);
+  @$pb.TagNumber(13)
+  $1.SDKError ensureError() => $_ensure(10);
 }
 
 class ModelListRequest extends $pb.GeneratedMessage {
@@ -1858,22 +1849,20 @@ class ModelListRequest extends $pb.GeneratedMessage {
 
 class ModelListResult extends $pb.GeneratedMessage {
   factory ModelListResult({
-    $core.bool? success,
     ModelInfoList? models,
-    $core.String? errorMessage,
     $core.int? totalCount,
     $core.int? downloadedCount,
     $core.int? availableCount,
     $core.int? filteredCount,
+    $1.SDKError? error,
   }) {
     final result = create();
-    if (success != null) result.success = success;
     if (models != null) result.models = models;
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (totalCount != null) result.totalCount = totalCount;
     if (downloadedCount != null) result.downloadedCount = downloadedCount;
     if (availableCount != null) result.availableCount = availableCount;
     if (filteredCount != null) result.filteredCount = filteredCount;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1890,14 +1879,14 @@ class ModelListResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ModelListResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'success')
     ..aOM<ModelInfoList>(2, _omitFieldNames ? '' : 'models',
         subBuilder: ModelInfoList.create)
-    ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
     ..aI(4, _omitFieldNames ? '' : 'totalCount')
     ..aI(5, _omitFieldNames ? '' : 'downloadedCount')
     ..aI(6, _omitFieldNames ? '' : 'availableCount')
     ..aI(7, _omitFieldNames ? '' : 'filteredCount')
+    ..aOM<$1.SDKError>(8, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1919,70 +1908,63 @@ class ModelListResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ModelListResult>(create);
   static ModelListResult? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $core.bool get success => $_getBF(0);
-  @$pb.TagNumber(1)
-  set success($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSuccess() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSuccess() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  ModelInfoList get models => $_getN(1);
+  ModelInfoList get models => $_getN(0);
   @$pb.TagNumber(2)
   set models(ModelInfoList value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasModels() => $_has(1);
+  $core.bool hasModels() => $_has(0);
   @$pb.TagNumber(2)
   void clearModels() => $_clearField(2);
   @$pb.TagNumber(2)
-  ModelInfoList ensureModels() => $_ensure(1);
-
-  @$pb.TagNumber(3)
-  $core.String get errorMessage => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set errorMessage($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasErrorMessage() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearErrorMessage() => $_clearField(3);
+  ModelInfoList ensureModels() => $_ensure(0);
 
   @$pb.TagNumber(4)
-  $core.int get totalCount => $_getIZ(3);
+  $core.int get totalCount => $_getIZ(1);
   @$pb.TagNumber(4)
-  set totalCount($core.int value) => $_setSignedInt32(3, value);
+  set totalCount($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(4)
-  $core.bool hasTotalCount() => $_has(3);
+  $core.bool hasTotalCount() => $_has(1);
   @$pb.TagNumber(4)
   void clearTotalCount() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.int get downloadedCount => $_getIZ(4);
+  $core.int get downloadedCount => $_getIZ(2);
   @$pb.TagNumber(5)
-  set downloadedCount($core.int value) => $_setSignedInt32(4, value);
+  set downloadedCount($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(5)
-  $core.bool hasDownloadedCount() => $_has(4);
+  $core.bool hasDownloadedCount() => $_has(2);
   @$pb.TagNumber(5)
   void clearDownloadedCount() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get availableCount => $_getIZ(5);
+  $core.int get availableCount => $_getIZ(3);
   @$pb.TagNumber(6)
-  set availableCount($core.int value) => $_setSignedInt32(5, value);
+  set availableCount($core.int value) => $_setSignedInt32(3, value);
   @$pb.TagNumber(6)
-  $core.bool hasAvailableCount() => $_has(5);
+  $core.bool hasAvailableCount() => $_has(3);
   @$pb.TagNumber(6)
   void clearAvailableCount() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.int get filteredCount => $_getIZ(6);
+  $core.int get filteredCount => $_getIZ(4);
   @$pb.TagNumber(7)
-  set filteredCount($core.int value) => $_setSignedInt32(6, value);
+  set filteredCount($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(7)
-  $core.bool hasFilteredCount() => $_has(6);
+  $core.bool hasFilteredCount() => $_has(4);
   @$pb.TagNumber(7)
   void clearFilteredCount() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $1.SDKError get error => $_getN(5);
+  @$pb.TagNumber(8)
+  set error($1.SDKError value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasError() => $_has(5);
+  @$pb.TagNumber(8)
+  void clearError() => $_clearField(8);
+  @$pb.TagNumber(8)
+  $1.SDKError ensureError() => $_ensure(5);
 }
 
 class ModelGetRequest extends $pb.GeneratedMessage {
@@ -2043,12 +2025,12 @@ class ModelGetResult extends $pb.GeneratedMessage {
   factory ModelGetResult({
     $core.bool? found,
     ModelInfo? model,
-    $core.String? errorMessage,
+    $1.SDKError? error,
   }) {
     final result = create();
     if (found != null) result.found = found;
     if (model != null) result.model = model;
-    if (errorMessage != null) result.errorMessage = errorMessage;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -2068,7 +2050,8 @@ class ModelGetResult extends $pb.GeneratedMessage {
     ..aOB(1, _omitFieldNames ? '' : 'found')
     ..aOM<ModelInfo>(2, _omitFieldNames ? '' : 'model',
         subBuilder: ModelInfo.create)
-    ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
+    ..aOM<$1.SDKError>(4, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2110,14 +2093,16 @@ class ModelGetResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   ModelInfo ensureModel() => $_ensure(1);
 
-  @$pb.TagNumber(3)
-  $core.String get errorMessage => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set errorMessage($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasErrorMessage() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearErrorMessage() => $_clearField(3);
+  @$pb.TagNumber(4)
+  $1.SDKError get error => $_getN(2);
+  @$pb.TagNumber(4)
+  set error($1.SDKError value) => $_setField(4, value);
+  @$pb.TagNumber(4)
+  $core.bool hasError() => $_has(2);
+  @$pb.TagNumber(4)
+  void clearError() => $_clearField(4);
+  @$pb.TagNumber(4)
+  $1.SDKError ensureError() => $_ensure(2);
 }
 
 class ModelImportRequest extends $pb.GeneratedMessage {
@@ -2242,25 +2227,23 @@ class ModelImportRequest extends $pb.GeneratedMessage {
 
 class ModelImportResult extends $pb.GeneratedMessage {
   factory ModelImportResult({
-    $core.bool? success,
     ModelInfo? model,
     $core.String? localPath,
     $fixnum.Int64? importedBytes,
     $core.Iterable<$core.String>? warnings,
-    $core.String? errorMessage,
     $core.bool? registered,
     $core.bool? copiedIntoManagedStorage,
+    $1.SDKError? error,
   }) {
     final result = create();
-    if (success != null) result.success = success;
     if (model != null) result.model = model;
     if (localPath != null) result.localPath = localPath;
     if (importedBytes != null) result.importedBytes = importedBytes;
     if (warnings != null) result.warnings.addAll(warnings);
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (registered != null) result.registered = registered;
     if (copiedIntoManagedStorage != null)
       result.copiedIntoManagedStorage = copiedIntoManagedStorage;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -2277,15 +2260,15 @@ class ModelImportResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ModelImportResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'success')
     ..aOM<ModelInfo>(2, _omitFieldNames ? '' : 'model',
         subBuilder: ModelInfo.create)
     ..aOS(3, _omitFieldNames ? '' : 'localPath')
     ..aInt64(4, _omitFieldNames ? '' : 'importedBytes')
     ..pPS(5, _omitFieldNames ? '' : 'warnings')
-    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
     ..aOB(7, _omitFieldNames ? '' : 'registered')
     ..aOB(8, _omitFieldNames ? '' : 'copiedIntoManagedStorage')
+    ..aOM<$1.SDKError>(9, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2307,73 +2290,66 @@ class ModelImportResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ModelImportResult>(create);
   static ModelImportResult? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $core.bool get success => $_getBF(0);
-  @$pb.TagNumber(1)
-  set success($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSuccess() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSuccess() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  ModelInfo get model => $_getN(1);
+  ModelInfo get model => $_getN(0);
   @$pb.TagNumber(2)
   set model(ModelInfo value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasModel() => $_has(1);
+  $core.bool hasModel() => $_has(0);
   @$pb.TagNumber(2)
   void clearModel() => $_clearField(2);
   @$pb.TagNumber(2)
-  ModelInfo ensureModel() => $_ensure(1);
+  ModelInfo ensureModel() => $_ensure(0);
 
   @$pb.TagNumber(3)
-  $core.String get localPath => $_getSZ(2);
+  $core.String get localPath => $_getSZ(1);
   @$pb.TagNumber(3)
-  set localPath($core.String value) => $_setString(2, value);
+  set localPath($core.String value) => $_setString(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasLocalPath() => $_has(2);
+  $core.bool hasLocalPath() => $_has(1);
   @$pb.TagNumber(3)
   void clearLocalPath() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $fixnum.Int64 get importedBytes => $_getI64(3);
+  $fixnum.Int64 get importedBytes => $_getI64(2);
   @$pb.TagNumber(4)
-  set importedBytes($fixnum.Int64 value) => $_setInt64(3, value);
+  set importedBytes($fixnum.Int64 value) => $_setInt64(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasImportedBytes() => $_has(3);
+  $core.bool hasImportedBytes() => $_has(2);
   @$pb.TagNumber(4)
   void clearImportedBytes() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $pb.PbList<$core.String> get warnings => $_getList(4);
-
-  @$pb.TagNumber(6)
-  $core.String get errorMessage => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set errorMessage($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasErrorMessage() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearErrorMessage() => $_clearField(6);
+  $pb.PbList<$core.String> get warnings => $_getList(3);
 
   @$pb.TagNumber(7)
-  $core.bool get registered => $_getBF(6);
+  $core.bool get registered => $_getBF(4);
   @$pb.TagNumber(7)
-  set registered($core.bool value) => $_setBool(6, value);
+  set registered($core.bool value) => $_setBool(4, value);
   @$pb.TagNumber(7)
-  $core.bool hasRegistered() => $_has(6);
+  $core.bool hasRegistered() => $_has(4);
   @$pb.TagNumber(7)
   void clearRegistered() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.bool get copiedIntoManagedStorage => $_getBF(7);
+  $core.bool get copiedIntoManagedStorage => $_getBF(5);
   @$pb.TagNumber(8)
-  set copiedIntoManagedStorage($core.bool value) => $_setBool(7, value);
+  set copiedIntoManagedStorage($core.bool value) => $_setBool(5, value);
   @$pb.TagNumber(8)
-  $core.bool hasCopiedIntoManagedStorage() => $_has(7);
+  $core.bool hasCopiedIntoManagedStorage() => $_has(5);
   @$pb.TagNumber(8)
   void clearCopiedIntoManagedStorage() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $1.SDKError get error => $_getN(6);
+  @$pb.TagNumber(9)
+  set error($1.SDKError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $1.SDKError ensureError() => $_ensure(6);
 }
 
 class ModelDiscoveryRequest extends $pb.GeneratedMessage {
@@ -2616,25 +2592,23 @@ class DiscoveredModel extends $pb.GeneratedMessage {
 
 class ModelDiscoveryResult extends $pb.GeneratedMessage {
   factory ModelDiscoveryResult({
-    $core.bool? success,
     $core.Iterable<DiscoveredModel>? discoveredModels,
     $core.int? linkedCount,
     $core.int? purgedCount,
     $core.Iterable<$core.String>? warnings,
-    $core.String? errorMessage,
     $core.int? scannedCount,
     $core.int? importedCount,
+    $1.SDKError? error,
   }) {
     final result = create();
-    if (success != null) result.success = success;
     if (discoveredModels != null)
       result.discoveredModels.addAll(discoveredModels);
     if (linkedCount != null) result.linkedCount = linkedCount;
     if (purgedCount != null) result.purgedCount = purgedCount;
     if (warnings != null) result.warnings.addAll(warnings);
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (scannedCount != null) result.scannedCount = scannedCount;
     if (importedCount != null) result.importedCount = importedCount;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -2651,15 +2625,15 @@ class ModelDiscoveryResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ModelDiscoveryResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'success')
     ..pPM<DiscoveredModel>(2, _omitFieldNames ? '' : 'discoveredModels',
         subBuilder: DiscoveredModel.create)
     ..aI(3, _omitFieldNames ? '' : 'linkedCount')
     ..aI(4, _omitFieldNames ? '' : 'purgedCount')
     ..pPS(5, _omitFieldNames ? '' : 'warnings')
-    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
     ..aI(7, _omitFieldNames ? '' : 'scannedCount')
     ..aI(8, _omitFieldNames ? '' : 'importedCount')
+    ..aOM<$1.SDKError>(9, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2681,65 +2655,58 @@ class ModelDiscoveryResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ModelDiscoveryResult>(create);
   static ModelDiscoveryResult? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $core.bool get success => $_getBF(0);
-  @$pb.TagNumber(1)
-  set success($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSuccess() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSuccess() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $pb.PbList<DiscoveredModel> get discoveredModels => $_getList(1);
+  $pb.PbList<DiscoveredModel> get discoveredModels => $_getList(0);
 
   @$pb.TagNumber(3)
-  $core.int get linkedCount => $_getIZ(2);
+  $core.int get linkedCount => $_getIZ(1);
   @$pb.TagNumber(3)
-  set linkedCount($core.int value) => $_setSignedInt32(2, value);
+  set linkedCount($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasLinkedCount() => $_has(2);
+  $core.bool hasLinkedCount() => $_has(1);
   @$pb.TagNumber(3)
   void clearLinkedCount() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.int get purgedCount => $_getIZ(3);
+  $core.int get purgedCount => $_getIZ(2);
   @$pb.TagNumber(4)
-  set purgedCount($core.int value) => $_setSignedInt32(3, value);
+  set purgedCount($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasPurgedCount() => $_has(3);
+  $core.bool hasPurgedCount() => $_has(2);
   @$pb.TagNumber(4)
   void clearPurgedCount() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $pb.PbList<$core.String> get warnings => $_getList(4);
-
-  @$pb.TagNumber(6)
-  $core.String get errorMessage => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set errorMessage($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasErrorMessage() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearErrorMessage() => $_clearField(6);
+  $pb.PbList<$core.String> get warnings => $_getList(3);
 
   @$pb.TagNumber(7)
-  $core.int get scannedCount => $_getIZ(6);
+  $core.int get scannedCount => $_getIZ(4);
   @$pb.TagNumber(7)
-  set scannedCount($core.int value) => $_setSignedInt32(6, value);
+  set scannedCount($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(7)
-  $core.bool hasScannedCount() => $_has(6);
+  $core.bool hasScannedCount() => $_has(4);
   @$pb.TagNumber(7)
   void clearScannedCount() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.int get importedCount => $_getIZ(7);
+  $core.int get importedCount => $_getIZ(5);
   @$pb.TagNumber(8)
-  set importedCount($core.int value) => $_setSignedInt32(7, value);
+  set importedCount($core.int value) => $_setSignedInt32(5, value);
   @$pb.TagNumber(8)
-  $core.bool hasImportedCount() => $_has(7);
+  $core.bool hasImportedCount() => $_has(5);
   @$pb.TagNumber(8)
   void clearImportedCount() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $1.SDKError get error => $_getN(6);
+  @$pb.TagNumber(9)
+  set error($1.SDKError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $1.SDKError ensureError() => $_ensure(6);
 }
 
 class ModelLoadRequest extends $pb.GeneratedMessage {
@@ -2849,29 +2816,27 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
 
 class ModelLoadResult extends $pb.GeneratedMessage {
   factory ModelLoadResult({
-    $core.bool? success,
     $core.String? modelId,
     ModelCategory? category,
     InferenceFramework? framework,
     $core.String? resolvedPath,
     $fixnum.Int64? loadedAtUnixMs,
-    $core.String? errorMessage,
     $core.Iterable<$core.String>? warnings,
     $core.bool? alreadyLoaded,
     $core.Iterable<ModelFileDescriptor>? resolvedArtifacts,
+    $1.SDKError? error,
   }) {
     final result = create();
-    if (success != null) result.success = success;
     if (modelId != null) result.modelId = modelId;
     if (category != null) result.category = category;
     if (framework != null) result.framework = framework;
     if (resolvedPath != null) result.resolvedPath = resolvedPath;
     if (loadedAtUnixMs != null) result.loadedAtUnixMs = loadedAtUnixMs;
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (warnings != null) result.warnings.addAll(warnings);
     if (alreadyLoaded != null) result.alreadyLoaded = alreadyLoaded;
     if (resolvedArtifacts != null)
       result.resolvedArtifacts.addAll(resolvedArtifacts);
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -2888,7 +2853,6 @@ class ModelLoadResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ModelLoadResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'success')
     ..aOS(2, _omitFieldNames ? '' : 'modelId')
     ..aE<ModelCategory>(3, _omitFieldNames ? '' : 'category',
         enumValues: ModelCategory.values)
@@ -2896,11 +2860,12 @@ class ModelLoadResult extends $pb.GeneratedMessage {
         enumValues: InferenceFramework.values)
     ..aOS(5, _omitFieldNames ? '' : 'resolvedPath')
     ..aInt64(6, _omitFieldNames ? '' : 'loadedAtUnixMs')
-    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
     ..pPS(8, _omitFieldNames ? '' : 'warnings')
     ..aOB(9, _omitFieldNames ? '' : 'alreadyLoaded')
     ..pPM<ModelFileDescriptor>(10, _omitFieldNames ? '' : 'resolvedArtifacts',
         subBuilder: ModelFileDescriptor.create)
+    ..aOM<$1.SDKError>(11, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -2922,78 +2887,60 @@ class ModelLoadResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ModelLoadResult>(create);
   static ModelLoadResult? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $core.bool get success => $_getBF(0);
-  @$pb.TagNumber(1)
-  set success($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSuccess() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSuccess() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $core.String get modelId => $_getSZ(1);
+  $core.String get modelId => $_getSZ(0);
   @$pb.TagNumber(2)
-  set modelId($core.String value) => $_setString(1, value);
+  set modelId($core.String value) => $_setString(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasModelId() => $_has(1);
+  $core.bool hasModelId() => $_has(0);
   @$pb.TagNumber(2)
   void clearModelId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  ModelCategory get category => $_getN(2);
+  ModelCategory get category => $_getN(1);
   @$pb.TagNumber(3)
   set category(ModelCategory value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasCategory() => $_has(2);
+  $core.bool hasCategory() => $_has(1);
   @$pb.TagNumber(3)
   void clearCategory() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  InferenceFramework get framework => $_getN(3);
+  InferenceFramework get framework => $_getN(2);
   @$pb.TagNumber(4)
   set framework(InferenceFramework value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasFramework() => $_has(3);
+  $core.bool hasFramework() => $_has(2);
   @$pb.TagNumber(4)
   void clearFramework() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.String get resolvedPath => $_getSZ(4);
+  $core.String get resolvedPath => $_getSZ(3);
   @$pb.TagNumber(5)
-  set resolvedPath($core.String value) => $_setString(4, value);
+  set resolvedPath($core.String value) => $_setString(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasResolvedPath() => $_has(4);
+  $core.bool hasResolvedPath() => $_has(3);
   @$pb.TagNumber(5)
   void clearResolvedPath() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $fixnum.Int64 get loadedAtUnixMs => $_getI64(5);
+  $fixnum.Int64 get loadedAtUnixMs => $_getI64(4);
   @$pb.TagNumber(6)
-  set loadedAtUnixMs($fixnum.Int64 value) => $_setInt64(5, value);
+  set loadedAtUnixMs($fixnum.Int64 value) => $_setInt64(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasLoadedAtUnixMs() => $_has(5);
+  $core.bool hasLoadedAtUnixMs() => $_has(4);
   @$pb.TagNumber(6)
   void clearLoadedAtUnixMs() => $_clearField(6);
 
-  @$pb.TagNumber(7)
-  $core.String get errorMessage => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set errorMessage($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasErrorMessage() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearErrorMessage() => $_clearField(7);
-
   @$pb.TagNumber(8)
-  $pb.PbList<$core.String> get warnings => $_getList(7);
+  $pb.PbList<$core.String> get warnings => $_getList(5);
 
   @$pb.TagNumber(9)
-  $core.bool get alreadyLoaded => $_getBF(8);
+  $core.bool get alreadyLoaded => $_getBF(6);
   @$pb.TagNumber(9)
-  set alreadyLoaded($core.bool value) => $_setBool(8, value);
+  set alreadyLoaded($core.bool value) => $_setBool(6, value);
   @$pb.TagNumber(9)
-  $core.bool hasAlreadyLoaded() => $_has(8);
+  $core.bool hasAlreadyLoaded() => $_has(6);
   @$pb.TagNumber(9)
   void clearAlreadyLoaded() => $_clearField(9);
 
@@ -3001,7 +2948,18 @@ class ModelLoadResult extends $pb.GeneratedMessage {
   /// model entry mirrors resolved_path; companion entries carry explicit
   /// ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
   @$pb.TagNumber(10)
-  $pb.PbList<ModelFileDescriptor> get resolvedArtifacts => $_getList(9);
+  $pb.PbList<ModelFileDescriptor> get resolvedArtifacts => $_getList(7);
+
+  @$pb.TagNumber(11)
+  $1.SDKError get error => $_getN(8);
+  @$pb.TagNumber(11)
+  set error($1.SDKError value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasError() => $_has(8);
+  @$pb.TagNumber(11)
+  void clearError() => $_clearField(11);
+  @$pb.TagNumber(11)
+  $1.SDKError ensureError() => $_ensure(8);
 }
 
 class ModelUnloadRequest extends $pb.GeneratedMessage {
@@ -3098,19 +3056,17 @@ class ModelUnloadRequest extends $pb.GeneratedMessage {
 
 class ModelUnloadResult extends $pb.GeneratedMessage {
   factory ModelUnloadResult({
-    $core.bool? success,
     $core.Iterable<$core.String>? unloadedModelIds,
-    $core.String? errorMessage,
     $fixnum.Int64? unloadedAtUnixMs,
     $core.Iterable<$core.String>? warnings,
+    $1.SDKError? error,
   }) {
     final result = create();
-    if (success != null) result.success = success;
     if (unloadedModelIds != null)
       result.unloadedModelIds.addAll(unloadedModelIds);
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (unloadedAtUnixMs != null) result.unloadedAtUnixMs = unloadedAtUnixMs;
     if (warnings != null) result.warnings.addAll(warnings);
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -3127,11 +3083,11 @@ class ModelUnloadResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ModelUnloadResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'success')
     ..pPS(2, _omitFieldNames ? '' : 'unloadedModelIds')
-    ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
     ..aInt64(4, _omitFieldNames ? '' : 'unloadedAtUnixMs')
     ..pPS(5, _omitFieldNames ? '' : 'warnings')
+    ..aOM<$1.SDKError>(6, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3153,38 +3109,31 @@ class ModelUnloadResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ModelUnloadResult>(create);
   static ModelUnloadResult? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $core.bool get success => $_getBF(0);
-  @$pb.TagNumber(1)
-  set success($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSuccess() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSuccess() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $pb.PbList<$core.String> get unloadedModelIds => $_getList(1);
-
-  @$pb.TagNumber(3)
-  $core.String get errorMessage => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set errorMessage($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasErrorMessage() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearErrorMessage() => $_clearField(3);
+  $pb.PbList<$core.String> get unloadedModelIds => $_getList(0);
 
   @$pb.TagNumber(4)
-  $fixnum.Int64 get unloadedAtUnixMs => $_getI64(3);
+  $fixnum.Int64 get unloadedAtUnixMs => $_getI64(1);
   @$pb.TagNumber(4)
-  set unloadedAtUnixMs($fixnum.Int64 value) => $_setInt64(3, value);
+  set unloadedAtUnixMs($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(4)
-  $core.bool hasUnloadedAtUnixMs() => $_has(3);
+  $core.bool hasUnloadedAtUnixMs() => $_has(1);
   @$pb.TagNumber(4)
   void clearUnloadedAtUnixMs() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $pb.PbList<$core.String> get warnings => $_getList(4);
+  $pb.PbList<$core.String> get warnings => $_getList(2);
+
+  @$pb.TagNumber(6)
+  $1.SDKError get error => $_getN(3);
+  @$pb.TagNumber(6)
+  set error($1.SDKError value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasError() => $_has(3);
+  @$pb.TagNumber(6)
+  void clearError() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $1.SDKError ensureError() => $_ensure(3);
 }
 
 class CurrentModelRequest extends $pb.GeneratedMessage {
@@ -3274,23 +3223,23 @@ class CurrentModelResult extends $pb.GeneratedMessage {
     ModelInfo? model,
     $fixnum.Int64? loadedAtUnixMs,
     $core.bool? found,
-    $core.String? errorMessage,
     ModelCategory? category,
     InferenceFramework? framework,
     $core.String? resolvedPath,
     $core.Iterable<ModelFileDescriptor>? resolvedArtifacts,
+    $1.SDKError? error,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
     if (model != null) result.model = model;
     if (loadedAtUnixMs != null) result.loadedAtUnixMs = loadedAtUnixMs;
     if (found != null) result.found = found;
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (category != null) result.category = category;
     if (framework != null) result.framework = framework;
     if (resolvedPath != null) result.resolvedPath = resolvedPath;
     if (resolvedArtifacts != null)
       result.resolvedArtifacts.addAll(resolvedArtifacts);
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -3312,7 +3261,6 @@ class CurrentModelResult extends $pb.GeneratedMessage {
         subBuilder: ModelInfo.create)
     ..aInt64(4, _omitFieldNames ? '' : 'loadedAtUnixMs')
     ..aOB(5, _omitFieldNames ? '' : 'found')
-    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
     ..aE<ModelCategory>(7, _omitFieldNames ? '' : 'category',
         enumValues: ModelCategory.values)
     ..aE<InferenceFramework>(8, _omitFieldNames ? '' : 'framework',
@@ -3320,6 +3268,8 @@ class CurrentModelResult extends $pb.GeneratedMessage {
     ..aOS(9, _omitFieldNames ? '' : 'resolvedPath')
     ..pPM<ModelFileDescriptor>(10, _omitFieldNames ? '' : 'resolvedArtifacts',
         subBuilder: ModelFileDescriptor.create)
+    ..aOM<$1.SDKError>(11, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3379,66 +3329,66 @@ class CurrentModelResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearFound() => $_clearField(5);
 
-  @$pb.TagNumber(6)
-  $core.String get errorMessage => $_getSZ(4);
-  @$pb.TagNumber(6)
-  set errorMessage($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(6)
-  $core.bool hasErrorMessage() => $_has(4);
-  @$pb.TagNumber(6)
-  void clearErrorMessage() => $_clearField(6);
-
   @$pb.TagNumber(7)
-  ModelCategory get category => $_getN(5);
+  ModelCategory get category => $_getN(4);
   @$pb.TagNumber(7)
   set category(ModelCategory value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasCategory() => $_has(5);
+  $core.bool hasCategory() => $_has(4);
   @$pb.TagNumber(7)
   void clearCategory() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  InferenceFramework get framework => $_getN(6);
+  InferenceFramework get framework => $_getN(5);
   @$pb.TagNumber(8)
   set framework(InferenceFramework value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasFramework() => $_has(6);
+  $core.bool hasFramework() => $_has(5);
   @$pb.TagNumber(8)
   void clearFramework() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $core.String get resolvedPath => $_getSZ(7);
+  $core.String get resolvedPath => $_getSZ(6);
   @$pb.TagNumber(9)
-  set resolvedPath($core.String value) => $_setString(7, value);
+  set resolvedPath($core.String value) => $_setString(6, value);
   @$pb.TagNumber(9)
-  $core.bool hasResolvedPath() => $_has(7);
+  $core.bool hasResolvedPath() => $_has(6);
   @$pb.TagNumber(9)
   void clearResolvedPath() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  $pb.PbList<ModelFileDescriptor> get resolvedArtifacts => $_getList(8);
+  $pb.PbList<ModelFileDescriptor> get resolvedArtifacts => $_getList(7);
+
+  @$pb.TagNumber(11)
+  $1.SDKError get error => $_getN(8);
+  @$pb.TagNumber(11)
+  set error($1.SDKError value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasError() => $_has(8);
+  @$pb.TagNumber(11)
+  void clearError() => $_clearField(11);
+  @$pb.TagNumber(11)
+  $1.SDKError ensureError() => $_ensure(8);
 }
 
 class ModelDeleteResult extends $pb.GeneratedMessage {
   factory ModelDeleteResult({
-    $core.bool? success,
     $core.String? modelId,
     $fixnum.Int64? deletedBytes,
     $core.bool? filesDeleted,
     $core.bool? registryUpdated,
     $core.bool? wasLoaded,
-    $core.String? errorMessage,
     $core.Iterable<$core.String>? warnings,
+    $1.SDKError? error,
   }) {
     final result = create();
-    if (success != null) result.success = success;
     if (modelId != null) result.modelId = modelId;
     if (deletedBytes != null) result.deletedBytes = deletedBytes;
     if (filesDeleted != null) result.filesDeleted = filesDeleted;
     if (registryUpdated != null) result.registryUpdated = registryUpdated;
     if (wasLoaded != null) result.wasLoaded = wasLoaded;
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (warnings != null) result.warnings.addAll(warnings);
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -3455,14 +3405,14 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ModelDeleteResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'success')
     ..aOS(2, _omitFieldNames ? '' : 'modelId')
     ..aInt64(3, _omitFieldNames ? '' : 'deletedBytes')
     ..aOB(4, _omitFieldNames ? '' : 'filesDeleted')
     ..aOB(5, _omitFieldNames ? '' : 'registryUpdated')
     ..aOB(6, _omitFieldNames ? '' : 'wasLoaded')
-    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
     ..pPS(8, _omitFieldNames ? '' : 'warnings')
+    ..aOM<$1.SDKError>(9, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3484,71 +3434,64 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<ModelDeleteResult>(create);
   static ModelDeleteResult? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $core.bool get success => $_getBF(0);
-  @$pb.TagNumber(1)
-  set success($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSuccess() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSuccess() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $core.String get modelId => $_getSZ(1);
+  $core.String get modelId => $_getSZ(0);
   @$pb.TagNumber(2)
-  set modelId($core.String value) => $_setString(1, value);
+  set modelId($core.String value) => $_setString(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasModelId() => $_has(1);
+  $core.bool hasModelId() => $_has(0);
   @$pb.TagNumber(2)
   void clearModelId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $fixnum.Int64 get deletedBytes => $_getI64(2);
+  $fixnum.Int64 get deletedBytes => $_getI64(1);
   @$pb.TagNumber(3)
-  set deletedBytes($fixnum.Int64 value) => $_setInt64(2, value);
+  set deletedBytes($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasDeletedBytes() => $_has(2);
+  $core.bool hasDeletedBytes() => $_has(1);
   @$pb.TagNumber(3)
   void clearDeletedBytes() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.bool get filesDeleted => $_getBF(3);
+  $core.bool get filesDeleted => $_getBF(2);
   @$pb.TagNumber(4)
-  set filesDeleted($core.bool value) => $_setBool(3, value);
+  set filesDeleted($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasFilesDeleted() => $_has(3);
+  $core.bool hasFilesDeleted() => $_has(2);
   @$pb.TagNumber(4)
   void clearFilesDeleted() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.bool get registryUpdated => $_getBF(4);
+  $core.bool get registryUpdated => $_getBF(3);
   @$pb.TagNumber(5)
-  set registryUpdated($core.bool value) => $_setBool(4, value);
+  set registryUpdated($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasRegistryUpdated() => $_has(4);
+  $core.bool hasRegistryUpdated() => $_has(3);
   @$pb.TagNumber(5)
   void clearRegistryUpdated() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.bool get wasLoaded => $_getBF(5);
+  $core.bool get wasLoaded => $_getBF(4);
   @$pb.TagNumber(6)
-  set wasLoaded($core.bool value) => $_setBool(5, value);
+  set wasLoaded($core.bool value) => $_setBool(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasWasLoaded() => $_has(5);
+  $core.bool hasWasLoaded() => $_has(4);
   @$pb.TagNumber(6)
   void clearWasLoaded() => $_clearField(6);
 
-  @$pb.TagNumber(7)
-  $core.String get errorMessage => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set errorMessage($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasErrorMessage() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearErrorMessage() => $_clearField(7);
-
   @$pb.TagNumber(8)
-  $pb.PbList<$core.String> get warnings => $_getList(7);
+  $pb.PbList<$core.String> get warnings => $_getList(5);
+
+  @$pb.TagNumber(9)
+  $1.SDKError get error => $_getN(6);
+  @$pb.TagNumber(9)
+  set error($1.SDKError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $1.SDKError ensureError() => $_ensure(6);
 }
 
 /// ---------------------------------------------------------------------------
@@ -3562,10 +3505,10 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
 class ModelCompatibilityRequest extends $pb.GeneratedMessage {
   factory ModelCompatibilityRequest({
     $core.String? modelId,
-    $1.HardwareProfile? hardwareProfile,
+    $2.HardwareProfile? hardwareProfile,
     $fixnum.Int64? availableRamBytes,
     $fixnum.Int64? availableStorageBytes,
-    $1.AccelerationPreference? acceleratorPreference,
+    $2.AccelerationPreference? acceleratorPreference,
     InferenceFramework? preferredFramework,
   }) {
     final result = create();
@@ -3595,13 +3538,13 @@ class ModelCompatibilityRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOM<$1.HardwareProfile>(2, _omitFieldNames ? '' : 'hardwareProfile',
-        subBuilder: $1.HardwareProfile.create)
+    ..aOM<$2.HardwareProfile>(2, _omitFieldNames ? '' : 'hardwareProfile',
+        subBuilder: $2.HardwareProfile.create)
     ..aInt64(3, _omitFieldNames ? '' : 'availableRamBytes')
     ..aInt64(4, _omitFieldNames ? '' : 'availableStorageBytes')
-    ..aE<$1.AccelerationPreference>(
+    ..aE<$2.AccelerationPreference>(
         5, _omitFieldNames ? '' : 'acceleratorPreference',
-        enumValues: $1.AccelerationPreference.values)
+        enumValues: $2.AccelerationPreference.values)
     ..aE<InferenceFramework>(6, _omitFieldNames ? '' : 'preferredFramework',
         enumValues: InferenceFramework.values)
     ..hasRequiredFields = false;
@@ -3640,15 +3583,15 @@ class ModelCompatibilityRequest extends $pb.GeneratedMessage {
   /// unset, commons will read whatever it has cached internally; the
   /// RAM/storage values below remain authoritative for the verdict.
   @$pb.TagNumber(2)
-  $1.HardwareProfile get hardwareProfile => $_getN(1);
+  $2.HardwareProfile get hardwareProfile => $_getN(1);
   @$pb.TagNumber(2)
-  set hardwareProfile($1.HardwareProfile value) => $_setField(2, value);
+  set hardwareProfile($2.HardwareProfile value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasHardwareProfile() => $_has(1);
   @$pb.TagNumber(2)
   void clearHardwareProfile() => $_clearField(2);
   @$pb.TagNumber(2)
-  $1.HardwareProfile ensureHardwareProfile() => $_ensure(1);
+  $2.HardwareProfile ensureHardwareProfile() => $_ensure(1);
 
   /// Available RAM in bytes (from device probe). 0 = unknown — commons
   /// will treat the requirement as satisfied.
@@ -3674,9 +3617,9 @@ class ModelCompatibilityRequest extends $pb.GeneratedMessage {
   /// Optional caller preferences (acceleration, framework). Reserved for
   /// future use; today's verdict is based on memory/storage alone.
   @$pb.TagNumber(5)
-  $1.AccelerationPreference get acceleratorPreference => $_getN(4);
+  $2.AccelerationPreference get acceleratorPreference => $_getN(4);
   @$pb.TagNumber(5)
-  set acceleratorPreference($1.AccelerationPreference value) =>
+  set acceleratorPreference($2.AccelerationPreference value) =>
       $_setField(5, value);
   @$pb.TagNumber(5)
   $core.bool hasAcceleratorPreference() => $_has(4);
@@ -3705,8 +3648,7 @@ class ModelCompatibilityResult extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? reasons,
     $core.Iterable<$core.String>? suggestedAlternatives,
     $core.String? modelId,
-    $core.int? errorCode,
-    $core.String? errorMessage,
+    $1.SDKError? error,
   }) {
     final result = create();
     if (isCompatible != null) result.isCompatible = isCompatible;
@@ -3724,8 +3666,7 @@ class ModelCompatibilityResult extends $pb.GeneratedMessage {
     if (suggestedAlternatives != null)
       result.suggestedAlternatives.addAll(suggestedAlternatives);
     if (modelId != null) result.modelId = modelId;
-    if (errorCode != null) result.errorCode = errorCode;
-    if (errorMessage != null) result.errorMessage = errorMessage;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -3752,8 +3693,8 @@ class ModelCompatibilityResult extends $pb.GeneratedMessage {
     ..pPS(8, _omitFieldNames ? '' : 'reasons')
     ..pPS(9, _omitFieldNames ? '' : 'suggestedAlternatives')
     ..aOS(10, _omitFieldNames ? '' : 'modelId')
-    ..aI(11, _omitFieldNames ? '' : 'errorCode')
-    ..aOS(12, _omitFieldNames ? '' : 'errorMessage')
+    ..aOM<$1.SDKError>(13, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -3863,25 +3804,16 @@ class ModelCompatibilityResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   void clearModelId() => $_clearField(10);
 
-  /// Negative on failure; mirrors rac_result_t. Empty error_message on
-  /// success.
-  @$pb.TagNumber(11)
-  $core.int get errorCode => $_getIZ(10);
-  @$pb.TagNumber(11)
-  set errorCode($core.int value) => $_setSignedInt32(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasErrorCode() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearErrorCode() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.String get errorMessage => $_getSZ(11);
-  @$pb.TagNumber(12)
-  set errorMessage($core.String value) => $_setString(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasErrorMessage() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearErrorMessage() => $_clearField(12);
+  @$pb.TagNumber(13)
+  $1.SDKError get error => $_getN(10);
+  @$pb.TagNumber(13)
+  set error($1.SDKError value) => $_setField(13, value);
+  @$pb.TagNumber(13)
+  $core.bool hasError() => $_has(10);
+  @$pb.TagNumber(13)
+  void clearError() => $_clearField(13);
+  @$pb.TagNumber(13)
+  $1.SDKError ensureError() => $_ensure(10);
 }
 
 /// ---------------------------------------------------------------------------
@@ -4318,20 +4250,16 @@ class ModelRegistryFetchAssignmentsRequest extends $pb.GeneratedMessage {
 
 class ModelRegistryFetchAssignmentsResult extends $pb.GeneratedMessage {
   factory ModelRegistryFetchAssignmentsResult({
-    $core.bool? success,
     ModelInfoList? models,
     $core.int? modelCount,
     $fixnum.Int64? fetchedAtUnixMs,
-    $core.int? errorCode,
-    $core.String? errorMessage,
+    $1.SDKError? error,
   }) {
     final result = create();
-    if (success != null) result.success = success;
     if (models != null) result.models = models;
     if (modelCount != null) result.modelCount = modelCount;
     if (fetchedAtUnixMs != null) result.fetchedAtUnixMs = fetchedAtUnixMs;
-    if (errorCode != null) result.errorCode = errorCode;
-    if (errorMessage != null) result.errorMessage = errorMessage;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -4349,13 +4277,12 @@ class ModelRegistryFetchAssignmentsResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ModelRegistryFetchAssignmentsResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'success')
     ..aOM<ModelInfoList>(2, _omitFieldNames ? '' : 'models',
         subBuilder: ModelInfoList.create)
     ..aI(3, _omitFieldNames ? '' : 'modelCount')
     ..aInt64(4, _omitFieldNames ? '' : 'fetchedAtUnixMs')
-    ..aI(5, _omitFieldNames ? '' : 'errorCode')
-    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..aOM<$1.SDKError>(7, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4381,61 +4308,45 @@ class ModelRegistryFetchAssignmentsResult extends $pb.GeneratedMessage {
           ModelRegistryFetchAssignmentsResult>(create);
   static ModelRegistryFetchAssignmentsResult? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $core.bool get success => $_getBF(0);
-  @$pb.TagNumber(1)
-  set success($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSuccess() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSuccess() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  ModelInfoList get models => $_getN(1);
+  ModelInfoList get models => $_getN(0);
   @$pb.TagNumber(2)
   set models(ModelInfoList value) => $_setField(2, value);
   @$pb.TagNumber(2)
-  $core.bool hasModels() => $_has(1);
+  $core.bool hasModels() => $_has(0);
   @$pb.TagNumber(2)
   void clearModels() => $_clearField(2);
   @$pb.TagNumber(2)
-  ModelInfoList ensureModels() => $_ensure(1);
+  ModelInfoList ensureModels() => $_ensure(0);
 
   @$pb.TagNumber(3)
-  $core.int get modelCount => $_getIZ(2);
+  $core.int get modelCount => $_getIZ(1);
   @$pb.TagNumber(3)
-  set modelCount($core.int value) => $_setSignedInt32(2, value);
+  set modelCount($core.int value) => $_setSignedInt32(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasModelCount() => $_has(2);
+  $core.bool hasModelCount() => $_has(1);
   @$pb.TagNumber(3)
   void clearModelCount() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $fixnum.Int64 get fetchedAtUnixMs => $_getI64(3);
+  $fixnum.Int64 get fetchedAtUnixMs => $_getI64(2);
   @$pb.TagNumber(4)
-  set fetchedAtUnixMs($fixnum.Int64 value) => $_setInt64(3, value);
+  set fetchedAtUnixMs($fixnum.Int64 value) => $_setInt64(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasFetchedAtUnixMs() => $_has(3);
+  $core.bool hasFetchedAtUnixMs() => $_has(2);
   @$pb.TagNumber(4)
   void clearFetchedAtUnixMs() => $_clearField(4);
 
-  @$pb.TagNumber(5)
-  $core.int get errorCode => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set errorCode($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorCode() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearErrorCode() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.String get errorMessage => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set errorMessage($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasErrorMessage() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearErrorMessage() => $_clearField(6);
+  @$pb.TagNumber(7)
+  $1.SDKError get error => $_getN(3);
+  @$pb.TagNumber(7)
+  set error($1.SDKError value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasError() => $_has(3);
+  @$pb.TagNumber(7)
+  void clearError() => $_clearField(7);
+  @$pb.TagNumber(7)
+  $1.SDKError ensureError() => $_ensure(3);
 }
 
 /// ---------------------------------------------------------------------------

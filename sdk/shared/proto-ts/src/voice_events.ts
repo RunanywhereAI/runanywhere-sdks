@@ -21,6 +21,7 @@ import {
   ErrorSeverity,
   errorSeverityFromJSON,
   errorSeverityToJSON,
+  SDKError,
 } from "./errors";
 import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON } from "./model_types";
 import { VADStreamEventKind, vADStreamEventKindFromJSON, vADStreamEventKindToJSON } from "./vad_options";
@@ -655,7 +656,7 @@ export interface VoiceAgentComponentStates {
    */
   anyLoading: boolean;
   wakewordState: ComponentLifecycleState;
-  errorMessage?: string | undefined;
+  error?: SDKError | undefined;
 }
 
 export interface VoiceSessionError {
@@ -2964,7 +2965,7 @@ function createBaseVoiceAgentComponentStates(): VoiceAgentComponentStates {
     ready: false,
     anyLoading: false,
     wakewordState: 0,
-    errorMessage: undefined,
+    error: undefined,
   };
 }
 
@@ -2991,8 +2992,8 @@ export const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates> = 
     if (message.wakewordState !== 0) {
       writer.uint32(56).int32(message.wakewordState);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(66).string(message.errorMessage);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -3060,12 +3061,12 @@ export const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates> = 
           message.wakewordState = reader.int32() as any;
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
+        case 9: {
+          if (tag !== 74) {
             break;
           }
 
-          message.errorMessage = reader.string();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -3110,11 +3111,7 @@ export const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates> = 
         : isSet(object.wakeword_state)
         ? componentLifecycleStateFromJSON(object.wakeword_state)
         : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -3141,8 +3138,8 @@ export const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates> = 
     if (message.wakewordState !== 0) {
       obj.wakewordState = componentLifecycleStateToJSON(message.wakewordState);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -3159,7 +3156,9 @@ export const VoiceAgentComponentStates: MessageFns<VoiceAgentComponentStates> = 
     message.ready = object.ready ?? false;
     message.anyLoading = object.anyLoading ?? false;
     message.wakewordState = object.wakewordState ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

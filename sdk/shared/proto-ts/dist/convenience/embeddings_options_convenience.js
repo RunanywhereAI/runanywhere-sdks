@@ -21,7 +21,7 @@ const embeddingsConfigurationDefaults = () => ({
     modelId: '',
     embeddingDimension: 384,
     maxSequenceLength: 512,
-    normalizeMode: embeddings_options_1.EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2,
+    normalize: true,
     pooling: embeddings_options_1.EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN,
 });
 exports.embeddingsConfigurationDefaults = embeddingsConfigurationDefaults;
@@ -47,7 +47,7 @@ const validateEmbeddingsConfiguration = (m) => {
 };
 exports.validateEmbeddingsConfiguration = validateEmbeddingsConfiguration;
 const embeddingsOptionsDefaults = () => ({
-    normalizeMode: embeddings_options_1.EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED,
+    normalize: false,
     pooling: 0,
     nThreads: 0,
 });

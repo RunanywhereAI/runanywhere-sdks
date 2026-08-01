@@ -49,27 +49,11 @@ public class LLMGenerationResult(
   )
   public val thinking_content: String? = null,
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "inputTokens",
-    schemaIndex = 2,
-  )
-  public val input_tokens: Int = 0,
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "outputTokens",
-    schemaIndex = 3,
-  )
-  public val output_tokens: Int = 0,
-  @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelUsed",
-    schemaIndex = 4,
+    schemaIndex = 2,
   )
   public val model_used: String = "",
   @field:WireField(
@@ -77,28 +61,20 @@ public class LLMGenerationResult(
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "generationTimeMs",
-    schemaIndex = 5,
+    schemaIndex = 3,
   )
   public val generation_time_ms: Double = 0.0,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
     jsonName = "ttftMs",
-    schemaIndex = 6,
+    schemaIndex = 4,
   )
   public val ttft_ms: Double? = null,
   @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "tokensPerSecond",
-    schemaIndex = 7,
-  )
-  public val tokens_per_second: Double = 0.0,
-  @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 8,
+    schemaIndex = 5,
   )
   public val framework: String? = null,
   @field:WireField(
@@ -106,7 +82,7 @@ public class LLMGenerationResult(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "finishReason",
-    schemaIndex = 9,
+    schemaIndex = 6,
   )
   public val finish_reason: String = "",
   @field:WireField(
@@ -114,7 +90,7 @@ public class LLMGenerationResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "thinkingTokens",
-    schemaIndex = 10,
+    schemaIndex = 7,
   )
   public val thinking_tokens: Int = 0,
   @field:WireField(
@@ -122,14 +98,14 @@ public class LLMGenerationResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "responseTokens",
-    schemaIndex = 11,
+    schemaIndex = 8,
   )
   public val response_tokens: Int = 0,
   @field:WireField(
     tag = 13,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "jsonOutput",
-    schemaIndex = 12,
+    schemaIndex = 9,
   )
   public val json_output: String? = null,
   /**
@@ -138,55 +114,29 @@ public class LLMGenerationResult(
   @field:WireField(
     tag = 14,
     adapter = "ai.runanywhere.proto.v1.PerformanceMetrics#ADAPTER",
-    schemaIndex = 13,
+    schemaIndex = 10,
   )
   public val performance: PerformanceMetrics? = null,
   @field:WireField(
     tag = 15,
     adapter = "ai.runanywhere.proto.v1.ExecutionTarget#ADAPTER",
     jsonName = "executedOn",
-    schemaIndex = 14,
+    schemaIndex = 11,
   )
   public val executed_on: ExecutionTarget? = null,
   @field:WireField(
     tag = 16,
     adapter = "ai.runanywhere.proto.v1.StructuredOutputValidation#ADAPTER",
     jsonName = "structuredOutputValidation",
-    schemaIndex = 15,
+    schemaIndex = 12,
   )
   public val structured_output_validation: StructuredOutputValidation? = null,
-  /**
-   * input_tokens + output_tokens.
-   */
-  @field:WireField(
-    tag = 17,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "totalTokens",
-    schemaIndex = 16,
-  )
-  public val total_tokens: Int = 0,
-  @field:WireField(
-    tag = 18,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 17,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 19,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 18,
-  )
-  public val error_code: Int = 0,
   @field:WireField(
     tag = 20,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "cachedPromptTokens",
-    schemaIndex = 19,
+    schemaIndex = 13,
   )
   public val cached_prompt_tokens: Int = 0,
   @field:WireField(
@@ -194,7 +144,7 @@ public class LLMGenerationResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "promptEvalTimeMs",
-    schemaIndex = 20,
+    schemaIndex = 14,
   )
   public val prompt_eval_time_ms: Long = 0L,
   @field:WireField(
@@ -202,11 +152,24 @@ public class LLMGenerationResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "decodeTimeMs",
-    schemaIndex = 21,
+    schemaIndex = 15,
   )
   public val decode_time_ms: Long = 0L,
   tool_calls: List<ToolCall> = emptyList(),
   tool_results: List<ToolResult> = emptyList(),
+  @field:WireField(
+    tag = 25,
+    adapter = "ai.runanywhere.proto.v1.TokenUsage#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 18,
+  )
+  public val usage: TokenUsage? = null,
+  @field:WireField(
+    tag = 26,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 19,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerationResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -214,7 +177,7 @@ public class LLMGenerationResult(
     adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",
     label = WireField.Label.REPEATED,
     jsonName = "toolCalls",
-    schemaIndex = 22,
+    schemaIndex = 16,
   )
   public val tool_calls: List<ToolCall> = immutableCopyOf("tool_calls", tool_calls)
 
@@ -223,7 +186,7 @@ public class LLMGenerationResult(
     adapter = "ai.runanywhere.proto.v1.ToolResult#ADAPTER",
     label = WireField.Label.REPEATED,
     jsonName = "toolResults",
-    schemaIndex = 23,
+    schemaIndex = 17,
   )
   public val tool_results: List<ToolResult> = immutableCopyOf("tool_results", tool_results)
 
@@ -239,12 +202,9 @@ public class LLMGenerationResult(
     if (unknownFields != other.unknownFields) return false
     if (text != other.text) return false
     if (thinking_content != other.thinking_content) return false
-    if (input_tokens != other.input_tokens) return false
-    if (output_tokens != other.output_tokens) return false
     if (model_used != other.model_used) return false
     if (generation_time_ms != other.generation_time_ms) return false
     if (ttft_ms != other.ttft_ms) return false
-    if (tokens_per_second != other.tokens_per_second) return false
     if (framework != other.framework) return false
     if (finish_reason != other.finish_reason) return false
     if (thinking_tokens != other.thinking_tokens) return false
@@ -253,14 +213,13 @@ public class LLMGenerationResult(
     if (performance != other.performance) return false
     if (executed_on != other.executed_on) return false
     if (structured_output_validation != other.structured_output_validation) return false
-    if (total_tokens != other.total_tokens) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
     if (cached_prompt_tokens != other.cached_prompt_tokens) return false
     if (prompt_eval_time_ms != other.prompt_eval_time_ms) return false
     if (decode_time_ms != other.decode_time_ms) return false
     if (tool_calls != other.tool_calls) return false
     if (tool_results != other.tool_results) return false
+    if (usage != other.usage) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -270,12 +229,9 @@ public class LLMGenerationResult(
       result = unknownFields.hashCode()
       result = result * 37 + text.hashCode()
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
-      result = result * 37 + input_tokens.hashCode()
-      result = result * 37 + output_tokens.hashCode()
       result = result * 37 + model_used.hashCode()
       result = result * 37 + generation_time_ms.hashCode()
       result = result * 37 + (ttft_ms?.hashCode() ?: 0)
-      result = result * 37 + tokens_per_second.hashCode()
       result = result * 37 + (framework?.hashCode() ?: 0)
       result = result * 37 + finish_reason.hashCode()
       result = result * 37 + thinking_tokens.hashCode()
@@ -284,14 +240,13 @@ public class LLMGenerationResult(
       result = result * 37 + (performance?.hashCode() ?: 0)
       result = result * 37 + (executed_on?.hashCode() ?: 0)
       result = result * 37 + (structured_output_validation?.hashCode() ?: 0)
-      result = result * 37 + total_tokens.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
       result = result * 37 + cached_prompt_tokens.hashCode()
       result = result * 37 + prompt_eval_time_ms.hashCode()
       result = result * 37 + decode_time_ms.hashCode()
       result = result * 37 + tool_calls.hashCode()
       result = result * 37 + tool_results.hashCode()
+      result = result * 37 + (usage?.hashCode() ?: 0)
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -301,12 +256,9 @@ public class LLMGenerationResult(
     val result = mutableListOf<String>()
     result += """text=${sanitize(text)}"""
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
-    result += """input_tokens=$input_tokens"""
-    result += """output_tokens=$output_tokens"""
     result += """model_used=${sanitize(model_used)}"""
     result += """generation_time_ms=$generation_time_ms"""
     if (ttft_ms != null) result += """ttft_ms=$ttft_ms"""
-    result += """tokens_per_second=$tokens_per_second"""
     if (framework != null) result += """framework=${sanitize(framework)}"""
     result += """finish_reason=${sanitize(finish_reason)}"""
     result += """thinking_tokens=$thinking_tokens"""
@@ -315,26 +267,22 @@ public class LLMGenerationResult(
     if (performance != null) result += """performance=$performance"""
     if (executed_on != null) result += """executed_on=$executed_on"""
     if (structured_output_validation != null) result += """structured_output_validation=$structured_output_validation"""
-    result += """total_tokens=$total_tokens"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
     result += """cached_prompt_tokens=$cached_prompt_tokens"""
     result += """prompt_eval_time_ms=$prompt_eval_time_ms"""
     result += """decode_time_ms=$decode_time_ms"""
     if (tool_calls.isNotEmpty()) result += """tool_calls=$tool_calls"""
     if (tool_results.isNotEmpty()) result += """tool_results=$tool_results"""
+    if (usage != null) result += """usage=$usage"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "LLMGenerationResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     text: String = this.text,
     thinking_content: String? = this.thinking_content,
-    input_tokens: Int = this.input_tokens,
-    output_tokens: Int = this.output_tokens,
     model_used: String = this.model_used,
     generation_time_ms: Double = this.generation_time_ms,
     ttft_ms: Double? = this.ttft_ms,
-    tokens_per_second: Double = this.tokens_per_second,
     framework: String? = this.framework,
     finish_reason: String = this.finish_reason,
     thinking_tokens: Int = this.thinking_tokens,
@@ -343,16 +291,15 @@ public class LLMGenerationResult(
     performance: PerformanceMetrics? = this.performance,
     executed_on: ExecutionTarget? = this.executed_on,
     structured_output_validation: StructuredOutputValidation? = this.structured_output_validation,
-    total_tokens: Int = this.total_tokens,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
     cached_prompt_tokens: Int = this.cached_prompt_tokens,
     prompt_eval_time_ms: Long = this.prompt_eval_time_ms,
     decode_time_ms: Long = this.decode_time_ms,
     tool_calls: List<ToolCall> = this.tool_calls,
     tool_results: List<ToolResult> = this.tool_results,
+    usage: TokenUsage? = this.usage,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMGenerationResult = LLMGenerationResult(text, thinking_content, input_tokens, output_tokens, model_used, generation_time_ms, ttft_ms, tokens_per_second, framework, finish_reason, thinking_tokens, response_tokens, json_output, performance, executed_on, structured_output_validation, total_tokens, error_message, error_code, cached_prompt_tokens, prompt_eval_time_ms, decode_time_ms, tool_calls, tool_results, unknownFields)
+  ): LLMGenerationResult = LLMGenerationResult(text, thinking_content, model_used, generation_time_ms, ttft_ms, framework, finish_reason, thinking_tokens, response_tokens, json_output, performance, executed_on, structured_output_validation, cached_prompt_tokens, prompt_eval_time_ms, decode_time_ms, tool_calls, tool_results, usage, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -371,12 +318,6 @@ public class LLMGenerationResult(
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.text)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.thinking_content)
-        if (value.input_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.input_tokens)
-        }
-        if (value.output_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.output_tokens)
-        }
         if (value.model_used != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.model_used)
         }
@@ -384,9 +325,6 @@ public class LLMGenerationResult(
           size += ProtoAdapter.DOUBLE.encodedSizeWithTag(6, value.generation_time_ms)
         }
         size += ProtoAdapter.DOUBLE.encodedSizeWithTag(7, value.ttft_ms)
-        if (!value.tokens_per_second.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(8, value.tokens_per_second)
-        }
         size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.framework)
         if (value.finish_reason != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.finish_reason)
@@ -401,13 +339,6 @@ public class LLMGenerationResult(
         size += PerformanceMetrics.ADAPTER.encodedSizeWithTag(14, value.performance)
         size += ExecutionTarget.ADAPTER.encodedSizeWithTag(15, value.executed_on)
         size += StructuredOutputValidation.ADAPTER.encodedSizeWithTag(16, value.structured_output_validation)
-        if (value.total_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(17, value.total_tokens)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(19, value.error_code)
-        }
         if (value.cached_prompt_tokens != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(20, value.cached_prompt_tokens)
         }
@@ -419,6 +350,10 @@ public class LLMGenerationResult(
         }
         size += ToolCall.ADAPTER.asRepeated().encodedSizeWithTag(23, value.tool_calls)
         size += ToolResult.ADAPTER.asRepeated().encodedSizeWithTag(24, value.tool_results)
+        if (value.usage != null) {
+          size += TokenUsage.ADAPTER.encodedSizeWithTag(25, value.usage)
+        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(26, value.error)
         return size
       }
 
@@ -427,12 +362,6 @@ public class LLMGenerationResult(
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.text)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.thinking_content)
-        if (value.input_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.input_tokens)
-        }
-        if (value.output_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.output_tokens)
-        }
         if (value.model_used != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_used)
         }
@@ -440,9 +369,6 @@ public class LLMGenerationResult(
           ProtoAdapter.DOUBLE.encodeWithTag(writer, 6, value.generation_time_ms)
         }
         ProtoAdapter.DOUBLE.encodeWithTag(writer, 7, value.ttft_ms)
-        if (!value.tokens_per_second.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 8, value.tokens_per_second)
-        }
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.framework)
         if (value.finish_reason != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 10, value.finish_reason)
@@ -457,13 +383,6 @@ public class LLMGenerationResult(
         PerformanceMetrics.ADAPTER.encodeWithTag(writer, 14, value.performance)
         ExecutionTarget.ADAPTER.encodeWithTag(writer, 15, value.executed_on)
         StructuredOutputValidation.ADAPTER.encodeWithTag(writer, 16, value.structured_output_validation)
-        if (value.total_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 17, value.total_tokens)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 19, value.error_code)
-        }
         if (value.cached_prompt_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 20, value.cached_prompt_tokens)
         }
@@ -475,11 +394,19 @@ public class LLMGenerationResult(
         }
         ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 23, value.tool_calls)
         ToolResult.ADAPTER.asRepeated().encodeWithTag(writer, 24, value.tool_results)
+        if (value.usage != null) {
+          TokenUsage.ADAPTER.encodeWithTag(writer, 25, value.usage)
+        }
+        SDKError.ADAPTER.encodeWithTag(writer, 26, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerationResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 26, value.error)
+        if (value.usage != null) {
+          TokenUsage.ADAPTER.encodeWithTag(writer, 25, value.usage)
+        }
         ToolResult.ADAPTER.asRepeated().encodeWithTag(writer, 24, value.tool_results)
         ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 23, value.tool_calls)
         if (value.decode_time_ms != 0L) {
@@ -490,13 +417,6 @@ public class LLMGenerationResult(
         }
         if (value.cached_prompt_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 20, value.cached_prompt_tokens)
-        }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 19, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.error_message)
-        if (value.total_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 17, value.total_tokens)
         }
         StructuredOutputValidation.ADAPTER.encodeWithTag(writer, 16, value.structured_output_validation)
         ExecutionTarget.ADAPTER.encodeWithTag(writer, 15, value.executed_on)
@@ -512,21 +432,12 @@ public class LLMGenerationResult(
           ProtoAdapter.STRING.encodeWithTag(writer, 10, value.finish_reason)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.framework)
-        if (!value.tokens_per_second.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 8, value.tokens_per_second)
-        }
         ProtoAdapter.DOUBLE.encodeWithTag(writer, 7, value.ttft_ms)
         if (!value.generation_time_ms.equals(0.0)) {
           ProtoAdapter.DOUBLE.encodeWithTag(writer, 6, value.generation_time_ms)
         }
         if (value.model_used != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_used)
-        }
-        if (value.output_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.output_tokens)
-        }
-        if (value.input_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.input_tokens)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.thinking_content)
         if (value.text != "") {
@@ -537,12 +448,9 @@ public class LLMGenerationResult(
       override fun decode(reader: ProtoReader): LLMGenerationResult {
         var text: String = ""
         var thinking_content: String? = null
-        var input_tokens: Int = 0
-        var output_tokens: Int = 0
         var model_used: String = ""
         var generation_time_ms: Double = 0.0
         var ttft_ms: Double? = null
-        var tokens_per_second: Double = 0.0
         var framework: String? = null
         var finish_reason: String = ""
         var thinking_tokens: Int = 0
@@ -551,24 +459,20 @@ public class LLMGenerationResult(
         var performance: PerformanceMetrics? = null
         var executed_on: ExecutionTarget? = null
         var structured_output_validation: StructuredOutputValidation? = null
-        var total_tokens: Int = 0
-        var error_message: String? = null
-        var error_code: Int = 0
         var cached_prompt_tokens: Int = 0
         var prompt_eval_time_ms: Long = 0L
         var decode_time_ms: Long = 0L
         val tool_calls = mutableListOf<ToolCall>()
         val tool_results = mutableListOf<ToolResult>()
+        var usage: TokenUsage? = null
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
             2 -> thinking_content = ProtoAdapter.STRING.decode(reader)
-            3 -> input_tokens = ProtoAdapter.INT32.decode(reader)
-            4 -> output_tokens = ProtoAdapter.INT32.decode(reader)
             5 -> model_used = ProtoAdapter.STRING.decode(reader)
             6 -> generation_time_ms = ProtoAdapter.DOUBLE.decode(reader)
             7 -> ttft_ms = ProtoAdapter.DOUBLE.decode(reader)
-            8 -> tokens_per_second = ProtoAdapter.DOUBLE.decode(reader)
             9 -> framework = ProtoAdapter.STRING.decode(reader)
             10 -> finish_reason = ProtoAdapter.STRING.decode(reader)
             11 -> thinking_tokens = ProtoAdapter.INT32.decode(reader)
@@ -581,26 +485,22 @@ public class LLMGenerationResult(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             16 -> structured_output_validation = StructuredOutputValidation.ADAPTER.decode(reader)
-            17 -> total_tokens = ProtoAdapter.INT32.decode(reader)
-            18 -> error_message = ProtoAdapter.STRING.decode(reader)
-            19 -> error_code = ProtoAdapter.INT32.decode(reader)
             20 -> cached_prompt_tokens = ProtoAdapter.INT32.decode(reader)
             21 -> prompt_eval_time_ms = ProtoAdapter.INT64.decode(reader)
             22 -> decode_time_ms = ProtoAdapter.INT64.decode(reader)
             23 -> tool_calls.add(ToolCall.ADAPTER.decode(reader))
             24 -> tool_results.add(ToolResult.ADAPTER.decode(reader))
+            25 -> usage = TokenUsage.ADAPTER.decode(reader)
+            26 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LLMGenerationResult(
           text = text,
           thinking_content = thinking_content,
-          input_tokens = input_tokens,
-          output_tokens = output_tokens,
           model_used = model_used,
           generation_time_ms = generation_time_ms,
           ttft_ms = ttft_ms,
-          tokens_per_second = tokens_per_second,
           framework = framework,
           finish_reason = finish_reason,
           thinking_tokens = thinking_tokens,
@@ -609,14 +509,13 @@ public class LLMGenerationResult(
           performance = performance,
           executed_on = executed_on,
           structured_output_validation = structured_output_validation,
-          total_tokens = total_tokens,
-          error_message = error_message,
-          error_code = error_code,
           cached_prompt_tokens = cached_prompt_tokens,
           prompt_eval_time_ms = prompt_eval_time_ms,
           decode_time_ms = decode_time_ms,
           tool_calls = tool_calls,
           tool_results = tool_results,
+          usage = usage,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -626,6 +525,8 @@ public class LLMGenerationResult(
         structured_output_validation = value.structured_output_validation?.let(StructuredOutputValidation.ADAPTER::redact),
         tool_calls = value.tool_calls.redactElements(ToolCall.ADAPTER),
         tool_results = value.tool_results.redactElements(ToolResult.ADAPTER),
+        usage = value.usage?.let(TokenUsage.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

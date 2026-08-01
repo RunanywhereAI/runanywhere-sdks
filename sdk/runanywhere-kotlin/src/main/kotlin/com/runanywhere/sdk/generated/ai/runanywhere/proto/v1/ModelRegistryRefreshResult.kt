@@ -33,17 +33,10 @@ import okio.ByteString
 
 public class ModelRegistryRefreshResult(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.ModelInfoList#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val models: ModelInfoList? = null,
   @field:WireField(
@@ -51,7 +44,7 @@ public class ModelRegistryRefreshResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "registeredCount",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val registered_count: Int = 0,
   @field:WireField(
@@ -59,7 +52,7 @@ public class ModelRegistryRefreshResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "updatedCount",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val updated_count: Int = 0,
   @field:WireField(
@@ -67,7 +60,7 @@ public class ModelRegistryRefreshResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "discoveredCount",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val discovered_count: Int = 0,
   @field:WireField(
@@ -75,7 +68,7 @@ public class ModelRegistryRefreshResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "prunedCount",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val pruned_count: Int = 0,
   @field:WireField(
@@ -83,24 +76,16 @@ public class ModelRegistryRefreshResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "refreshedAtUnixMs",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val refreshed_at_unix_ms: Long = 0L,
   warnings: List<String> = emptyList(),
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 8,
-  )
-  public val error_message: String = "",
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "downloadedCount",
-    schemaIndex = 9,
+    schemaIndex = 7,
   )
   public val downloaded_count: Int = 0,
   @field:WireField(
@@ -108,7 +93,7 @@ public class ModelRegistryRefreshResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "availableCount",
-    schemaIndex = 10,
+    schemaIndex = 8,
   )
   public val available_count: Int = 0,
   @field:WireField(
@@ -116,16 +101,22 @@ public class ModelRegistryRefreshResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "errorCount",
-    schemaIndex = 11,
+    schemaIndex = 9,
   )
   public val error_count: Int = 0,
+  @field:WireField(
+    tag = 13,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 10,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelRegistryRefreshResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val warnings: List<String> = immutableCopyOf("warnings", warnings)
 
@@ -139,7 +130,6 @@ public class ModelRegistryRefreshResult(
     if (other === this) return true
     if (other !is ModelRegistryRefreshResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (models != other.models) return false
     if (registered_count != other.registered_count) return false
     if (updated_count != other.updated_count) return false
@@ -147,10 +137,10 @@ public class ModelRegistryRefreshResult(
     if (pruned_count != other.pruned_count) return false
     if (refreshed_at_unix_ms != other.refreshed_at_unix_ms) return false
     if (warnings != other.warnings) return false
-    if (error_message != other.error_message) return false
     if (downloaded_count != other.downloaded_count) return false
     if (available_count != other.available_count) return false
     if (error_count != other.error_count) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -158,7 +148,6 @@ public class ModelRegistryRefreshResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + (models?.hashCode() ?: 0)
       result = result * 37 + registered_count.hashCode()
       result = result * 37 + updated_count.hashCode()
@@ -166,10 +155,10 @@ public class ModelRegistryRefreshResult(
       result = result * 37 + pruned_count.hashCode()
       result = result * 37 + refreshed_at_unix_ms.hashCode()
       result = result * 37 + warnings.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + downloaded_count.hashCode()
       result = result * 37 + available_count.hashCode()
       result = result * 37 + error_count.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -177,7 +166,6 @@ public class ModelRegistryRefreshResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     if (models != null) result += """models=$models"""
     result += """registered_count=$registered_count"""
     result += """updated_count=$updated_count"""
@@ -185,15 +173,14 @@ public class ModelRegistryRefreshResult(
     result += """pruned_count=$pruned_count"""
     result += """refreshed_at_unix_ms=$refreshed_at_unix_ms"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """downloaded_count=$downloaded_count"""
     result += """available_count=$available_count"""
     result += """error_count=$error_count"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ModelRegistryRefreshResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     models: ModelInfoList? = this.models,
     registered_count: Int = this.registered_count,
     updated_count: Int = this.updated_count,
@@ -201,12 +188,12 @@ public class ModelRegistryRefreshResult(
     pruned_count: Int = this.pruned_count,
     refreshed_at_unix_ms: Long = this.refreshed_at_unix_ms,
     warnings: List<String> = this.warnings,
-    error_message: String = this.error_message,
     downloaded_count: Int = this.downloaded_count,
     available_count: Int = this.available_count,
     error_count: Int = this.error_count,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelRegistryRefreshResult = ModelRegistryRefreshResult(success, models, registered_count, updated_count, discovered_count, pruned_count, refreshed_at_unix_ms, warnings, error_message, downloaded_count, available_count, error_count, unknownFields)
+  ): ModelRegistryRefreshResult = ModelRegistryRefreshResult(models, registered_count, updated_count, discovered_count, pruned_count, refreshed_at_unix_ms, warnings, downloaded_count, available_count, error_count, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -221,9 +208,6 @@ public class ModelRegistryRefreshResult(
     ) {
       override fun encodedSize(`value`: ModelRegistryRefreshResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         if (value.models != null) {
           size += ModelInfoList.ADAPTER.encodedSizeWithTag(2, value.models)
         }
@@ -243,9 +227,6 @@ public class ModelRegistryRefreshResult(
           size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.refreshed_at_unix_ms)
         }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(8, value.warnings)
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.error_message)
-        }
         if (value.downloaded_count != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.downloaded_count)
         }
@@ -255,13 +236,11 @@ public class ModelRegistryRefreshResult(
         if (value.error_count != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.error_count)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(13, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ModelRegistryRefreshResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         if (value.models != null) {
           ModelInfoList.ADAPTER.encodeWithTag(writer, 2, value.models)
         }
@@ -281,9 +260,6 @@ public class ModelRegistryRefreshResult(
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.refreshed_at_unix_ms)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.error_message)
-        }
         if (value.downloaded_count != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 10, value.downloaded_count)
         }
@@ -293,11 +269,13 @@ public class ModelRegistryRefreshResult(
         if (value.error_count != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_count)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 13, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelRegistryRefreshResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 13, value.error)
         if (value.error_count != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_count)
         }
@@ -306,9 +284,6 @@ public class ModelRegistryRefreshResult(
         }
         if (value.downloaded_count != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 10, value.downloaded_count)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 9, value.error_message)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
         if (value.refreshed_at_unix_ms != 0L) {
@@ -329,13 +304,9 @@ public class ModelRegistryRefreshResult(
         if (value.models != null) {
           ModelInfoList.ADAPTER.encodeWithTag(writer, 2, value.models)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): ModelRegistryRefreshResult {
-        var success: Boolean = false
         var models: ModelInfoList? = null
         var registered_count: Int = 0
         var updated_count: Int = 0
@@ -343,13 +314,12 @@ public class ModelRegistryRefreshResult(
         var pruned_count: Int = 0
         var refreshed_at_unix_ms: Long = 0L
         val warnings = mutableListOf<String>()
-        var error_message: String = ""
         var downloaded_count: Int = 0
         var available_count: Int = 0
         var error_count: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> models = ModelInfoList.ADAPTER.decode(reader)
             3 -> registered_count = ProtoAdapter.INT32.decode(reader)
             4 -> updated_count = ProtoAdapter.INT32.decode(reader)
@@ -357,15 +327,14 @@ public class ModelRegistryRefreshResult(
             6 -> pruned_count = ProtoAdapter.INT32.decode(reader)
             7 -> refreshed_at_unix_ms = ProtoAdapter.INT64.decode(reader)
             8 -> warnings.add(ProtoAdapter.STRING.decode(reader))
-            9 -> error_message = ProtoAdapter.STRING.decode(reader)
             10 -> downloaded_count = ProtoAdapter.INT32.decode(reader)
             11 -> available_count = ProtoAdapter.INT32.decode(reader)
             12 -> error_count = ProtoAdapter.INT32.decode(reader)
+            13 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ModelRegistryRefreshResult(
-          success = success,
           models = models,
           registered_count = registered_count,
           updated_count = updated_count,
@@ -373,16 +342,17 @@ public class ModelRegistryRefreshResult(
           pruned_count = pruned_count,
           refreshed_at_unix_ms = refreshed_at_unix_ms,
           warnings = warnings,
-          error_message = error_message,
           downloaded_count = downloaded_count,
           available_count = available_count,
           error_count = error_count,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelRegistryRefreshResult): ModelRegistryRefreshResult = value.copy(
         models = value.models?.let(ModelInfoList.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -107,20 +106,11 @@ public class VADResult(
   )
   public val statistics: VADStatistics? = null,
   @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    tag = 11,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 8,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 9,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -141,8 +131,7 @@ public class VADResult(
     if (start_time_ms != other.start_time_ms) return false
     if (end_time_ms != other.end_time_ms) return false
     if (statistics != other.statistics) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -158,8 +147,7 @@ public class VADResult(
       result = result * 37 + start_time_ms.hashCode()
       result = result * 37 + end_time_ms.hashCode()
       result = result * 37 + (statistics?.hashCode() ?: 0)
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -175,8 +163,7 @@ public class VADResult(
     result += """start_time_ms=$start_time_ms"""
     result += """end_time_ms=$end_time_ms"""
     if (statistics != null) result += """statistics=$statistics"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "VADResult{", separator = ", ", postfix = "}")
   }
 
@@ -189,10 +176,9 @@ public class VADResult(
     start_time_ms: Long = this.start_time_ms,
     end_time_ms: Long = this.end_time_ms,
     statistics: VADStatistics? = this.statistics,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VADResult = VADResult(is_speech, confidence, energy, duration_ms, timestamp_ms, start_time_ms, end_time_ms, statistics, error_message, error_code, unknownFields)
+  ): VADResult = VADResult(is_speech, confidence, energy, duration_ms, timestamp_ms, start_time_ms, end_time_ms, statistics, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -228,10 +214,7 @@ public class VADResult(
           size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.end_time_ms)
         }
         size += VADStatistics.ADAPTER.encodedSizeWithTag(8, value.statistics)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(11, value.error)
         return size
       }
 
@@ -258,19 +241,13 @@ public class VADResult(
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.end_time_ms)
         }
         VADStatistics.ADAPTER.encodeWithTag(writer, 8, value.statistics)
-        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         VADStatistics.ADAPTER.encodeWithTag(writer, 8, value.statistics)
         if (value.end_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.end_time_ms)
@@ -304,8 +281,7 @@ public class VADResult(
         var start_time_ms: Long = 0L
         var end_time_ms: Long = 0L
         var statistics: VADStatistics? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_speech = ProtoAdapter.BOOL.decode(reader)
@@ -316,8 +292,7 @@ public class VADResult(
             6 -> start_time_ms = ProtoAdapter.INT64.decode(reader)
             7 -> end_time_ms = ProtoAdapter.INT64.decode(reader)
             8 -> statistics = VADStatistics.ADAPTER.decode(reader)
-            9 -> error_message = ProtoAdapter.STRING.decode(reader)
-            10 -> error_code = ProtoAdapter.INT32.decode(reader)
+            11 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -330,14 +305,14 @@ public class VADResult(
           start_time_ms = start_time_ms,
           end_time_ms = end_time_ms,
           statistics = statistics,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VADResult): VADResult = value.copy(
         statistics = value.statistics?.let(VADStatistics.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

@@ -24,7 +24,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -49,35 +48,11 @@ public class LLMStreamFinalResult(
   )
   public val thinking_content: String? = null,
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "inputTokens",
-    schemaIndex = 2,
-  )
-  public val input_tokens: Int = 0,
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "outputTokens",
-    schemaIndex = 3,
-  )
-  public val output_tokens: Int = 0,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "totalTokens",
-    schemaIndex = 4,
-  )
-  public val total_tokens: Int = 0,
-  @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "totalTimeMs",
-    schemaIndex = 5,
+    schemaIndex = 2,
   )
   public val total_time_ms: Long = 0L,
   @field:WireField(
@@ -85,47 +60,23 @@ public class LLMStreamFinalResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timeToFirstTokenMs",
-    schemaIndex = 6,
+    schemaIndex = 3,
   )
   public val time_to_first_token_ms: Long = 0L,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "tokensPerSecond",
-    schemaIndex = 7,
-  )
-  public val tokens_per_second: Float = 0f,
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "finishReason",
-    schemaIndex = 8,
+    schemaIndex = 4,
   )
   public val finish_reason: String = "",
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 9,
-  )
-  public val error_code: Int = 0,
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 10,
-  )
-  public val error_message: String = "",
   @field:WireField(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "promptEvalTimeMs",
-    schemaIndex = 11,
+    schemaIndex = 5,
   )
   public val prompt_eval_time_ms: Long = 0L,
   @field:WireField(
@@ -133,11 +84,24 @@ public class LLMStreamFinalResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "decodeTimeMs",
-    schemaIndex = 12,
+    schemaIndex = 6,
   )
   public val decode_time_ms: Long = 0L,
   tool_calls: List<ToolCall> = emptyList(),
   tool_results: List<ToolResult> = emptyList(),
+  @field:WireField(
+    tag = 16,
+    adapter = "ai.runanywhere.proto.v1.TokenUsage#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 9,
+  )
+  public val usage: TokenUsage? = null,
+  @field:WireField(
+    tag = 17,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 10,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMStreamFinalResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -145,7 +109,7 @@ public class LLMStreamFinalResult(
     adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",
     label = WireField.Label.REPEATED,
     jsonName = "toolCalls",
-    schemaIndex = 13,
+    schemaIndex = 7,
   )
   public val tool_calls: List<ToolCall> = immutableCopyOf("tool_calls", tool_calls)
 
@@ -154,7 +118,7 @@ public class LLMStreamFinalResult(
     adapter = "ai.runanywhere.proto.v1.ToolResult#ADAPTER",
     label = WireField.Label.REPEATED,
     jsonName = "toolResults",
-    schemaIndex = 14,
+    schemaIndex = 8,
   )
   public val tool_results: List<ToolResult> = immutableCopyOf("tool_results", tool_results)
 
@@ -170,19 +134,15 @@ public class LLMStreamFinalResult(
     if (unknownFields != other.unknownFields) return false
     if (text != other.text) return false
     if (thinking_content != other.thinking_content) return false
-    if (input_tokens != other.input_tokens) return false
-    if (output_tokens != other.output_tokens) return false
-    if (total_tokens != other.total_tokens) return false
     if (total_time_ms != other.total_time_ms) return false
     if (time_to_first_token_ms != other.time_to_first_token_ms) return false
-    if (tokens_per_second != other.tokens_per_second) return false
     if (finish_reason != other.finish_reason) return false
-    if (error_code != other.error_code) return false
-    if (error_message != other.error_message) return false
     if (prompt_eval_time_ms != other.prompt_eval_time_ms) return false
     if (decode_time_ms != other.decode_time_ms) return false
     if (tool_calls != other.tool_calls) return false
     if (tool_results != other.tool_results) return false
+    if (usage != other.usage) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -192,19 +152,15 @@ public class LLMStreamFinalResult(
       result = unknownFields.hashCode()
       result = result * 37 + text.hashCode()
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
-      result = result * 37 + input_tokens.hashCode()
-      result = result * 37 + output_tokens.hashCode()
-      result = result * 37 + total_tokens.hashCode()
       result = result * 37 + total_time_ms.hashCode()
       result = result * 37 + time_to_first_token_ms.hashCode()
-      result = result * 37 + tokens_per_second.hashCode()
       result = result * 37 + finish_reason.hashCode()
-      result = result * 37 + error_code.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + prompt_eval_time_ms.hashCode()
       result = result * 37 + decode_time_ms.hashCode()
       result = result * 37 + tool_calls.hashCode()
       result = result * 37 + tool_results.hashCode()
+      result = result * 37 + (usage?.hashCode() ?: 0)
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -214,40 +170,32 @@ public class LLMStreamFinalResult(
     val result = mutableListOf<String>()
     result += """text=${sanitize(text)}"""
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
-    result += """input_tokens=$input_tokens"""
-    result += """output_tokens=$output_tokens"""
-    result += """total_tokens=$total_tokens"""
     result += """total_time_ms=$total_time_ms"""
     result += """time_to_first_token_ms=$time_to_first_token_ms"""
-    result += """tokens_per_second=$tokens_per_second"""
     result += """finish_reason=${sanitize(finish_reason)}"""
-    result += """error_code=$error_code"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """prompt_eval_time_ms=$prompt_eval_time_ms"""
     result += """decode_time_ms=$decode_time_ms"""
     if (tool_calls.isNotEmpty()) result += """tool_calls=$tool_calls"""
     if (tool_results.isNotEmpty()) result += """tool_results=$tool_results"""
+    if (usage != null) result += """usage=$usage"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "LLMStreamFinalResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     text: String = this.text,
     thinking_content: String? = this.thinking_content,
-    input_tokens: Int = this.input_tokens,
-    output_tokens: Int = this.output_tokens,
-    total_tokens: Int = this.total_tokens,
     total_time_ms: Long = this.total_time_ms,
     time_to_first_token_ms: Long = this.time_to_first_token_ms,
-    tokens_per_second: Float = this.tokens_per_second,
     finish_reason: String = this.finish_reason,
-    error_code: Int = this.error_code,
-    error_message: String = this.error_message,
     prompt_eval_time_ms: Long = this.prompt_eval_time_ms,
     decode_time_ms: Long = this.decode_time_ms,
     tool_calls: List<ToolCall> = this.tool_calls,
     tool_results: List<ToolResult> = this.tool_results,
+    usage: TokenUsage? = this.usage,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMStreamFinalResult = LLMStreamFinalResult(text, thinking_content, input_tokens, output_tokens, total_tokens, total_time_ms, time_to_first_token_ms, tokens_per_second, finish_reason, error_code, error_message, prompt_eval_time_ms, decode_time_ms, tool_calls, tool_results, unknownFields)
+  ): LLMStreamFinalResult = LLMStreamFinalResult(text, thinking_content, total_time_ms, time_to_first_token_ms, finish_reason, prompt_eval_time_ms, decode_time_ms, tool_calls, tool_results, usage, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -266,32 +214,14 @@ public class LLMStreamFinalResult(
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.text)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.thinking_content)
-        if (value.input_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.input_tokens)
-        }
-        if (value.output_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.output_tokens)
-        }
-        if (value.total_tokens != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.total_tokens)
-        }
         if (value.total_time_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.total_time_ms)
         }
         if (value.time_to_first_token_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.time_to_first_token_ms)
         }
-        if (!value.tokens_per_second.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(8, value.tokens_per_second)
-        }
         if (value.finish_reason != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.finish_reason)
-        }
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.error_code)
-        }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.error_message)
         }
         if (value.prompt_eval_time_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(12, value.prompt_eval_time_ms)
@@ -301,6 +231,10 @@ public class LLMStreamFinalResult(
         }
         size += ToolCall.ADAPTER.asRepeated().encodedSizeWithTag(14, value.tool_calls)
         size += ToolResult.ADAPTER.asRepeated().encodedSizeWithTag(15, value.tool_results)
+        if (value.usage != null) {
+          size += TokenUsage.ADAPTER.encodedSizeWithTag(16, value.usage)
+        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(17, value.error)
         return size
       }
 
@@ -309,32 +243,14 @@ public class LLMStreamFinalResult(
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.text)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.thinking_content)
-        if (value.input_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.input_tokens)
-        }
-        if (value.output_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.output_tokens)
-        }
-        if (value.total_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.total_tokens)
-        }
         if (value.total_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 6, value.total_time_ms)
         }
         if (value.time_to_first_token_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.time_to_first_token_ms)
         }
-        if (!value.tokens_per_second.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.tokens_per_second)
-        }
         if (value.finish_reason != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.finish_reason)
-        }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.error_code)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
         }
         if (value.prompt_eval_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 12, value.prompt_eval_time_ms)
@@ -344,11 +260,19 @@ public class LLMStreamFinalResult(
         }
         ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 14, value.tool_calls)
         ToolResult.ADAPTER.asRepeated().encodeWithTag(writer, 15, value.tool_results)
+        if (value.usage != null) {
+          TokenUsage.ADAPTER.encodeWithTag(writer, 16, value.usage)
+        }
+        SDKError.ADAPTER.encodeWithTag(writer, 17, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMStreamFinalResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 17, value.error)
+        if (value.usage != null) {
+          TokenUsage.ADAPTER.encodeWithTag(writer, 16, value.usage)
+        }
         ToolResult.ADAPTER.asRepeated().encodeWithTag(writer, 15, value.tool_results)
         ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 14, value.tool_calls)
         if (value.decode_time_ms != 0L) {
@@ -357,32 +281,14 @@ public class LLMStreamFinalResult(
         if (value.prompt_eval_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 12, value.prompt_eval_time_ms)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
-        }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.error_code)
-        }
         if (value.finish_reason != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.finish_reason)
-        }
-        if (!value.tokens_per_second.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.tokens_per_second)
         }
         if (value.time_to_first_token_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.time_to_first_token_ms)
         }
         if (value.total_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 6, value.total_time_ms)
-        }
-        if (value.total_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.total_tokens)
-        }
-        if (value.output_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 4, value.output_tokens)
-        }
-        if (value.input_tokens != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 3, value.input_tokens)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.thinking_content)
         if (value.text != "") {
@@ -393,55 +299,43 @@ public class LLMStreamFinalResult(
       override fun decode(reader: ProtoReader): LLMStreamFinalResult {
         var text: String = ""
         var thinking_content: String? = null
-        var input_tokens: Int = 0
-        var output_tokens: Int = 0
-        var total_tokens: Int = 0
         var total_time_ms: Long = 0L
         var time_to_first_token_ms: Long = 0L
-        var tokens_per_second: Float = 0f
         var finish_reason: String = ""
-        var error_code: Int = 0
-        var error_message: String = ""
         var prompt_eval_time_ms: Long = 0L
         var decode_time_ms: Long = 0L
         val tool_calls = mutableListOf<ToolCall>()
         val tool_results = mutableListOf<ToolResult>()
+        var usage: TokenUsage? = null
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
             2 -> thinking_content = ProtoAdapter.STRING.decode(reader)
-            3 -> input_tokens = ProtoAdapter.INT32.decode(reader)
-            4 -> output_tokens = ProtoAdapter.INT32.decode(reader)
-            5 -> total_tokens = ProtoAdapter.INT32.decode(reader)
             6 -> total_time_ms = ProtoAdapter.INT64.decode(reader)
             7 -> time_to_first_token_ms = ProtoAdapter.INT64.decode(reader)
-            8 -> tokens_per_second = ProtoAdapter.FLOAT.decode(reader)
             9 -> finish_reason = ProtoAdapter.STRING.decode(reader)
-            10 -> error_code = ProtoAdapter.INT32.decode(reader)
-            11 -> error_message = ProtoAdapter.STRING.decode(reader)
             12 -> prompt_eval_time_ms = ProtoAdapter.INT64.decode(reader)
             13 -> decode_time_ms = ProtoAdapter.INT64.decode(reader)
             14 -> tool_calls.add(ToolCall.ADAPTER.decode(reader))
             15 -> tool_results.add(ToolResult.ADAPTER.decode(reader))
+            16 -> usage = TokenUsage.ADAPTER.decode(reader)
+            17 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LLMStreamFinalResult(
           text = text,
           thinking_content = thinking_content,
-          input_tokens = input_tokens,
-          output_tokens = output_tokens,
-          total_tokens = total_tokens,
           total_time_ms = total_time_ms,
           time_to_first_token_ms = time_to_first_token_ms,
-          tokens_per_second = tokens_per_second,
           finish_reason = finish_reason,
-          error_code = error_code,
-          error_message = error_message,
           prompt_eval_time_ms = prompt_eval_time_ms,
           decode_time_ms = decode_time_ms,
           tool_calls = tool_calls,
           tool_results = tool_results,
+          usage = usage,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -449,6 +343,8 @@ public class LLMStreamFinalResult(
       override fun redact(`value`: LLMStreamFinalResult): LLMStreamFinalResult = value.copy(
         tool_calls = value.tool_calls.redactElements(ToolCall.ADAPTER),
         tool_results = value.tool_results.redactElements(ToolResult.ADAPTER),
+        usage = value.usage?.let(TokenUsage.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

@@ -6,8 +6,10 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 import { ReasoningOptions } from "./thinking_tag_pattern";
+import { TokenUsage } from "./token_usage";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -281,23 +283,18 @@ export interface VLMGenerationRequest_MetadataEntry {
 
 export interface VLMResult {
   text: string;
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
   processingTimeMs: number;
-  tokensPerSecond: number;
   imageTokens: number;
   timeToFirstTokenMs: number;
   imageEncodeTimeMs: number;
   hardwareUsed?: string | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
   finishReason: string;
   imagesProcessed: number;
+  usage?: TokenUsage | undefined;
+  error?: SDKError | undefined;
 }
 
 export interface VLMStreamEvent {
-  seq: number;
   timestampUs: number;
   requestId: string;
   kind: VLMStreamEventKind;
@@ -306,8 +303,7 @@ export interface VLMStreamEvent {
   isFinal: boolean;
   tokensPerSecond: number;
   result?: VLMResult | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 export interface VLMServiceState {
@@ -317,8 +313,7 @@ export interface VLMServiceState {
   supportsStreaming: boolean;
   supportsMultipleImages: boolean;
   visionEncoderType?: string | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 function createBaseVLMChatTemplate(): VLMChatTemplate {
@@ -1636,19 +1631,15 @@ export const VLMGenerationRequest_MetadataEntry: MessageFns<VLMGenerationRequest
 function createBaseVLMResult(): VLMResult {
   return {
     text: "",
-    inputTokens: 0,
-    outputTokens: 0,
-    totalTokens: 0,
     processingTimeMs: 0,
-    tokensPerSecond: 0,
     imageTokens: 0,
     timeToFirstTokenMs: 0,
     imageEncodeTimeMs: 0,
     hardwareUsed: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
     finishReason: "",
     imagesProcessed: 0,
+    usage: undefined,
+    error: undefined,
   };
 }
 
@@ -1657,20 +1648,8 @@ export const VLMResult: MessageFns<VLMResult> = {
     if (message.text !== "") {
       writer.uint32(10).string(message.text);
     }
-    if (message.inputTokens !== 0) {
-      writer.uint32(16).int32(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      writer.uint32(24).int32(message.outputTokens);
-    }
-    if (message.totalTokens !== 0) {
-      writer.uint32(32).int64(message.totalTokens);
-    }
     if (message.processingTimeMs !== 0) {
       writer.uint32(40).int64(message.processingTimeMs);
-    }
-    if (message.tokensPerSecond !== 0) {
-      writer.uint32(53).float(message.tokensPerSecond);
     }
     if (message.imageTokens !== 0) {
       writer.uint32(56).int32(message.imageTokens);
@@ -1684,17 +1663,17 @@ export const VLMResult: MessageFns<VLMResult> = {
     if (message.hardwareUsed !== undefined) {
       writer.uint32(82).string(message.hardwareUsed);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(90).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(96).int32(message.errorCode);
-    }
     if (message.finishReason !== "") {
       writer.uint32(106).string(message.finishReason);
     }
     if (message.imagesProcessed !== 0) {
       writer.uint32(112).int32(message.imagesProcessed);
+    }
+    if (message.usage !== undefined) {
+      TokenUsage.encode(message.usage, writer.uint32(122).fork()).join();
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(130).fork()).join();
     }
     return writer;
   },
@@ -1714,44 +1693,12 @@ export const VLMResult: MessageFns<VLMResult> = {
           message.text = reader.string();
           continue;
         }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.inputTokens = reader.int32();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.outputTokens = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.totalTokens = longToNumber(reader.int64());
-          continue;
-        }
         case 5: {
           if (tag !== 40) {
             break;
           }
 
           message.processingTimeMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 6: {
-          if (tag !== 53) {
-            break;
-          }
-
-          message.tokensPerSecond = reader.float();
           continue;
         }
         case 7: {
@@ -1786,22 +1733,6 @@ export const VLMResult: MessageFns<VLMResult> = {
           message.hardwareUsed = reader.string();
           continue;
         }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
         case 13: {
           if (tag !== 106) {
             break;
@@ -1818,6 +1749,22 @@ export const VLMResult: MessageFns<VLMResult> = {
           message.imagesProcessed = reader.int32();
           continue;
         }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.usage = TokenUsage.decode(reader, reader.uint32());
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1830,30 +1777,10 @@ export const VLMResult: MessageFns<VLMResult> = {
   fromJSON(object: any): VLMResult {
     return {
       text: isSet(object.text) ? globalThis.String(object.text) : "",
-      inputTokens: isSet(object.inputTokens)
-        ? globalThis.Number(object.inputTokens)
-        : isSet(object.input_tokens)
-        ? globalThis.Number(object.input_tokens)
-        : 0,
-      outputTokens: isSet(object.outputTokens)
-        ? globalThis.Number(object.outputTokens)
-        : isSet(object.output_tokens)
-        ? globalThis.Number(object.output_tokens)
-        : 0,
-      totalTokens: isSet(object.totalTokens)
-        ? globalThis.Number(object.totalTokens)
-        : isSet(object.total_tokens)
-        ? globalThis.Number(object.total_tokens)
-        : 0,
       processingTimeMs: isSet(object.processingTimeMs)
         ? globalThis.Number(object.processingTimeMs)
         : isSet(object.processing_time_ms)
         ? globalThis.Number(object.processing_time_ms)
-        : 0,
-      tokensPerSecond: isSet(object.tokensPerSecond)
-        ? globalThis.Number(object.tokensPerSecond)
-        : isSet(object.tokens_per_second)
-        ? globalThis.Number(object.tokens_per_second)
         : 0,
       imageTokens: isSet(object.imageTokens)
         ? globalThis.Number(object.imageTokens)
@@ -1875,16 +1802,6 @@ export const VLMResult: MessageFns<VLMResult> = {
         : isSet(object.hardware_used)
         ? globalThis.String(object.hardware_used)
         : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
       finishReason: isSet(object.finishReason)
         ? globalThis.String(object.finishReason)
         : isSet(object.finish_reason)
@@ -1895,6 +1812,8 @@ export const VLMResult: MessageFns<VLMResult> = {
         : isSet(object.images_processed)
         ? globalThis.Number(object.images_processed)
         : 0,
+      usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1903,20 +1822,8 @@ export const VLMResult: MessageFns<VLMResult> = {
     if (message.text !== "") {
       obj.text = message.text;
     }
-    if (message.inputTokens !== 0) {
-      obj.inputTokens = Math.round(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      obj.outputTokens = Math.round(message.outputTokens);
-    }
-    if (message.totalTokens !== 0) {
-      obj.totalTokens = Math.round(message.totalTokens);
-    }
     if (message.processingTimeMs !== 0) {
       obj.processingTimeMs = Math.round(message.processingTimeMs);
-    }
-    if (message.tokensPerSecond !== 0) {
-      obj.tokensPerSecond = message.tokensPerSecond;
     }
     if (message.imageTokens !== 0) {
       obj.imageTokens = Math.round(message.imageTokens);
@@ -1930,17 +1837,17 @@ export const VLMResult: MessageFns<VLMResult> = {
     if (message.hardwareUsed !== undefined) {
       obj.hardwareUsed = message.hardwareUsed;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
     if (message.finishReason !== "") {
       obj.finishReason = message.finishReason;
     }
     if (message.imagesProcessed !== 0) {
       obj.imagesProcessed = Math.round(message.imagesProcessed);
+    }
+    if (message.usage !== undefined) {
+      obj.usage = TokenUsage.toJSON(message.usage);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1951,26 +1858,25 @@ export const VLMResult: MessageFns<VLMResult> = {
   fromPartial<I extends Exact<DeepPartial<VLMResult>, I>>(object: I): VLMResult {
     const message = createBaseVLMResult();
     message.text = object.text ?? "";
-    message.inputTokens = object.inputTokens ?? 0;
-    message.outputTokens = object.outputTokens ?? 0;
-    message.totalTokens = object.totalTokens ?? 0;
     message.processingTimeMs = object.processingTimeMs ?? 0;
-    message.tokensPerSecond = object.tokensPerSecond ?? 0;
     message.imageTokens = object.imageTokens ?? 0;
     message.timeToFirstTokenMs = object.timeToFirstTokenMs ?? 0;
     message.imageEncodeTimeMs = object.imageEncodeTimeMs ?? 0;
     message.hardwareUsed = object.hardwareUsed ?? undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     message.finishReason = object.finishReason ?? "";
     message.imagesProcessed = object.imagesProcessed ?? 0;
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? TokenUsage.fromPartial(object.usage)
+      : undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
 function createBaseVLMStreamEvent(): VLMStreamEvent {
   return {
-    seq: 0,
     timestampUs: 0,
     requestId: "",
     kind: 0,
@@ -1979,16 +1885,12 @@ function createBaseVLMStreamEvent(): VLMStreamEvent {
     isFinal: false,
     tokensPerSecond: 0,
     result: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
 export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
   encode(message: VLMStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.seq !== 0) {
-      writer.uint32(8).uint64(message.seq);
-    }
     if (message.timestampUs !== 0) {
       writer.uint32(16).int64(message.timestampUs);
     }
@@ -2013,11 +1915,8 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
     if (message.result !== undefined) {
       VLMResult.encode(message.result, writer.uint32(74).fork()).join();
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(82).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(88).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(98).fork()).join();
     }
     return writer;
   },
@@ -2029,14 +1928,6 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.seq = longToNumber(reader.uint64());
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -2101,20 +1992,12 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
           message.result = VLMResult.decode(reader, reader.uint32());
           continue;
         }
-        case 10: {
-          if (tag !== 82) {
+        case 12: {
+          if (tag !== 98) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2128,7 +2011,6 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
 
   fromJSON(object: any): VLMStreamEvent {
     return {
-      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -2157,24 +2039,12 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
         ? globalThis.Number(object.tokens_per_second)
         : 0,
       result: isSet(object.result) ? VLMResult.fromJSON(object.result) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: VLMStreamEvent): unknown {
     const obj: any = {};
-    if (message.seq !== 0) {
-      obj.seq = Math.round(message.seq);
-    }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
     }
@@ -2199,11 +2069,8 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
     if (message.result !== undefined) {
       obj.result = VLMResult.toJSON(message.result);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2213,7 +2080,6 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
   },
   fromPartial<I extends Exact<DeepPartial<VLMStreamEvent>, I>>(object: I): VLMStreamEvent {
     const message = createBaseVLMStreamEvent();
-    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.requestId = object.requestId ?? "";
     message.kind = object.kind ?? 0;
@@ -2224,8 +2090,9 @@ export const VLMStreamEvent: MessageFns<VLMStreamEvent> = {
     message.result = (object.result !== undefined && object.result !== null)
       ? VLMResult.fromPartial(object.result)
       : undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -2238,8 +2105,7 @@ function createBaseVLMServiceState(): VLMServiceState {
     supportsStreaming: false,
     supportsMultipleImages: false,
     visionEncoderType: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
@@ -2263,11 +2129,8 @@ export const VLMServiceState: MessageFns<VLMServiceState> = {
     if (message.visionEncoderType !== undefined) {
       writer.uint32(50).string(message.visionEncoderType);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(58).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(64).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -2327,20 +2190,12 @@ export const VLMServiceState: MessageFns<VLMServiceState> = {
           message.visionEncoderType = reader.string();
           continue;
         }
-        case 7: {
-          if (tag !== 58) {
+        case 9: {
+          if (tag !== 74) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2384,16 +2239,7 @@ export const VLMServiceState: MessageFns<VLMServiceState> = {
         : isSet(object.vision_encoder_type)
         ? globalThis.String(object.vision_encoder_type)
         : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2417,11 +2263,8 @@ export const VLMServiceState: MessageFns<VLMServiceState> = {
     if (message.visionEncoderType !== undefined) {
       obj.visionEncoderType = message.visionEncoderType;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2437,8 +2280,9 @@ export const VLMServiceState: MessageFns<VLMServiceState> = {
     message.supportsStreaming = object.supportsStreaming ?? false;
     message.supportsMultipleImages = object.supportsMultipleImages ?? false;
     message.visionEncoderType = object.visionEncoderType ?? undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

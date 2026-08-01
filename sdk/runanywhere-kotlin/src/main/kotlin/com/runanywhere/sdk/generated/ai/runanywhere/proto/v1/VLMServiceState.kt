@@ -77,20 +77,11 @@ public class VLMServiceState(
   )
   public val vision_encoder_type: String? = null,
   @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 6,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 7,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMServiceState, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -109,8 +100,7 @@ public class VLMServiceState(
     if (supports_streaming != other.supports_streaming) return false
     if (supports_multiple_images != other.supports_multiple_images) return false
     if (vision_encoder_type != other.vision_encoder_type) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -124,8 +114,7 @@ public class VLMServiceState(
       result = result * 37 + supports_streaming.hashCode()
       result = result * 37 + supports_multiple_images.hashCode()
       result = result * 37 + (vision_encoder_type?.hashCode() ?: 0)
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -139,8 +128,7 @@ public class VLMServiceState(
     result += """supports_streaming=$supports_streaming"""
     result += """supports_multiple_images=$supports_multiple_images"""
     if (vision_encoder_type != null) result += """vision_encoder_type=${sanitize(vision_encoder_type)}"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "VLMServiceState{", separator = ", ", postfix = "}")
   }
 
@@ -151,10 +139,9 @@ public class VLMServiceState(
     supports_streaming: Boolean = this.supports_streaming,
     supports_multiple_images: Boolean = this.supports_multiple_images,
     vision_encoder_type: String? = this.vision_encoder_type,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VLMServiceState = VLMServiceState(is_ready, current_model, context_length, supports_streaming, supports_multiple_images, vision_encoder_type, error_message, error_code, unknownFields)
+  ): VLMServiceState = VLMServiceState(is_ready, current_model, context_length, supports_streaming, supports_multiple_images, vision_encoder_type, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -182,10 +169,7 @@ public class VLMServiceState(
           size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.supports_multiple_images)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.vision_encoder_type)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
 
@@ -204,19 +188,13 @@ public class VLMServiceState(
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.supports_multiple_images)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.vision_encoder_type)
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VLMServiceState) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.vision_encoder_type)
         if (value.supports_multiple_images != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.supports_multiple_images)
@@ -240,8 +218,7 @@ public class VLMServiceState(
         var supports_streaming: Boolean = false
         var supports_multiple_images: Boolean = false
         var vision_encoder_type: String? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_ready = ProtoAdapter.BOOL.decode(reader)
@@ -250,8 +227,7 @@ public class VLMServiceState(
             4 -> supports_streaming = ProtoAdapter.BOOL.decode(reader)
             5 -> supports_multiple_images = ProtoAdapter.BOOL.decode(reader)
             6 -> vision_encoder_type = ProtoAdapter.STRING.decode(reader)
-            7 -> error_message = ProtoAdapter.STRING.decode(reader)
-            8 -> error_code = ProtoAdapter.INT32.decode(reader)
+            9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -262,13 +238,13 @@ public class VLMServiceState(
           supports_streaming = supports_streaming,
           supports_multiple_images = supports_multiple_images,
           vision_encoder_type = vision_encoder_type,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VLMServiceState): VLMServiceState = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

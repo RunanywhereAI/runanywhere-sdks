@@ -15,10 +15,12 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'errors.pb.dart' as $4;
 import 'llm_options.pbenum.dart';
-import 'model_types.pbenum.dart' as $3;
+import 'model_types.pbenum.dart' as $5;
 import 'structured_output.pb.dart' as $1;
 import 'thinking_tag_pattern.pb.dart' as $0;
+import 'token_usage.pb.dart' as $3;
 import 'tool_calling.pb.dart' as $2;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -33,7 +35,7 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     $core.int? topK,
     $core.double? repetitionPenalty,
     $core.Iterable<$core.String>? stopSequences,
-    $3.InferenceFramework? preferredFramework,
+    $5.InferenceFramework? preferredFramework,
     $core.String? systemPrompt,
     $0.ReasoningOptions? reasoning,
     ExecutionTarget? executionTarget,
@@ -91,8 +93,8 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     ..aD(5, _omitFieldNames ? '' : 'repetitionPenalty',
         fieldType: $pb.PbFieldType.OF)
     ..pPS(6, _omitFieldNames ? '' : 'stopSequences')
-    ..aE<$3.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework',
-        enumValues: $3.InferenceFramework.values)
+    ..aE<$5.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework',
+        enumValues: $5.InferenceFramework.values)
     ..aOS(9, _omitFieldNames ? '' : 'systemPrompt')
     ..aOM<$0.ReasoningOptions>(11, _omitFieldNames ? '' : 'reasoning',
         subBuilder: $0.ReasoningOptions.create)
@@ -185,9 +187,9 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   $pb.PbList<$core.String> get stopSequences => $_getList(5);
 
   @$pb.TagNumber(8)
-  $3.InferenceFramework get preferredFramework => $_getN(6);
+  $5.InferenceFramework get preferredFramework => $_getN(6);
   @$pb.TagNumber(8)
-  set preferredFramework($3.InferenceFramework value) => $_setField(8, value);
+  set preferredFramework($5.InferenceFramework value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasPreferredFramework() => $_has(6);
   @$pb.TagNumber(8)
@@ -315,12 +317,9 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   factory LLMGenerationResult({
     $core.String? text,
     $core.String? thinkingContent,
-    $core.int? inputTokens,
-    $core.int? outputTokens,
     $core.String? modelUsed,
     $core.double? generationTimeMs,
     $core.double? ttftMs,
-    $core.double? tokensPerSecond,
     $core.String? framework,
     $core.String? finishReason,
     $core.int? thinkingTokens,
@@ -329,24 +328,20 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     PerformanceMetrics? performance,
     ExecutionTarget? executedOn,
     $1.StructuredOutputValidation? structuredOutputValidation,
-    $core.int? totalTokens,
-    $core.String? errorMessage,
-    $core.int? errorCode,
     $core.int? cachedPromptTokens,
     $fixnum.Int64? promptEvalTimeMs,
     $fixnum.Int64? decodeTimeMs,
     $core.Iterable<$2.ToolCall>? toolCalls,
     $core.Iterable<$2.ToolResult>? toolResults,
+    $3.TokenUsage? usage,
+    $4.SDKError? error,
   }) {
     final result = create();
     if (text != null) result.text = text;
     if (thinkingContent != null) result.thinkingContent = thinkingContent;
-    if (inputTokens != null) result.inputTokens = inputTokens;
-    if (outputTokens != null) result.outputTokens = outputTokens;
     if (modelUsed != null) result.modelUsed = modelUsed;
     if (generationTimeMs != null) result.generationTimeMs = generationTimeMs;
     if (ttftMs != null) result.ttftMs = ttftMs;
-    if (tokensPerSecond != null) result.tokensPerSecond = tokensPerSecond;
     if (framework != null) result.framework = framework;
     if (finishReason != null) result.finishReason = finishReason;
     if (thinkingTokens != null) result.thinkingTokens = thinkingTokens;
@@ -356,15 +351,14 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     if (executedOn != null) result.executedOn = executedOn;
     if (structuredOutputValidation != null)
       result.structuredOutputValidation = structuredOutputValidation;
-    if (totalTokens != null) result.totalTokens = totalTokens;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
     if (cachedPromptTokens != null)
       result.cachedPromptTokens = cachedPromptTokens;
     if (promptEvalTimeMs != null) result.promptEvalTimeMs = promptEvalTimeMs;
     if (decodeTimeMs != null) result.decodeTimeMs = decodeTimeMs;
     if (toolCalls != null) result.toolCalls.addAll(toolCalls);
     if (toolResults != null) result.toolResults.addAll(toolResults);
+    if (usage != null) result.usage = usage;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -383,12 +377,9 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'text')
     ..aOS(2, _omitFieldNames ? '' : 'thinkingContent')
-    ..aI(3, _omitFieldNames ? '' : 'inputTokens')
-    ..aI(4, _omitFieldNames ? '' : 'outputTokens')
     ..aOS(5, _omitFieldNames ? '' : 'modelUsed')
     ..aD(6, _omitFieldNames ? '' : 'generationTimeMs')
     ..aD(7, _omitFieldNames ? '' : 'ttftMs')
-    ..aD(8, _omitFieldNames ? '' : 'tokensPerSecond')
     ..aOS(9, _omitFieldNames ? '' : 'framework')
     ..aOS(10, _omitFieldNames ? '' : 'finishReason')
     ..aI(11, _omitFieldNames ? '' : 'thinkingTokens')
@@ -401,9 +392,6 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     ..aOM<$1.StructuredOutputValidation>(
         16, _omitFieldNames ? '' : 'structuredOutputValidation',
         subBuilder: $1.StructuredOutputValidation.create)
-    ..aI(17, _omitFieldNames ? '' : 'totalTokens')
-    ..aOS(18, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(19, _omitFieldNames ? '' : 'errorCode')
     ..aI(20, _omitFieldNames ? '' : 'cachedPromptTokens')
     ..aInt64(21, _omitFieldNames ? '' : 'promptEvalTimeMs')
     ..aInt64(22, _omitFieldNames ? '' : 'decodeTimeMs')
@@ -411,6 +399,10 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
         subBuilder: $2.ToolCall.create)
     ..pPM<$2.ToolResult>(24, _omitFieldNames ? '' : 'toolResults',
         subBuilder: $2.ToolResult.create)
+    ..aOM<$3.TokenUsage>(25, _omitFieldNames ? '' : 'usage',
+        subBuilder: $3.TokenUsage.create)
+    ..aOM<$4.SDKError>(26, _omitFieldNames ? '' : 'error',
+        subBuilder: $4.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -450,206 +442,173 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearThinkingContent() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  $core.int get inputTokens => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set inputTokens($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasInputTokens() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearInputTokens() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get outputTokens => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set outputTokens($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasOutputTokens() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearOutputTokens() => $_clearField(4);
-
   @$pb.TagNumber(5)
-  $core.String get modelUsed => $_getSZ(4);
+  $core.String get modelUsed => $_getSZ(2);
   @$pb.TagNumber(5)
-  set modelUsed($core.String value) => $_setString(4, value);
+  set modelUsed($core.String value) => $_setString(2, value);
   @$pb.TagNumber(5)
-  $core.bool hasModelUsed() => $_has(4);
+  $core.bool hasModelUsed() => $_has(2);
   @$pb.TagNumber(5)
   void clearModelUsed() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.double get generationTimeMs => $_getN(5);
+  $core.double get generationTimeMs => $_getN(3);
   @$pb.TagNumber(6)
-  set generationTimeMs($core.double value) => $_setDouble(5, value);
+  set generationTimeMs($core.double value) => $_setDouble(3, value);
   @$pb.TagNumber(6)
-  $core.bool hasGenerationTimeMs() => $_has(5);
+  $core.bool hasGenerationTimeMs() => $_has(3);
   @$pb.TagNumber(6)
   void clearGenerationTimeMs() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.double get ttftMs => $_getN(6);
+  $core.double get ttftMs => $_getN(4);
   @$pb.TagNumber(7)
-  set ttftMs($core.double value) => $_setDouble(6, value);
+  set ttftMs($core.double value) => $_setDouble(4, value);
   @$pb.TagNumber(7)
-  $core.bool hasTtftMs() => $_has(6);
+  $core.bool hasTtftMs() => $_has(4);
   @$pb.TagNumber(7)
   void clearTtftMs() => $_clearField(7);
 
-  @$pb.TagNumber(8)
-  $core.double get tokensPerSecond => $_getN(7);
-  @$pb.TagNumber(8)
-  set tokensPerSecond($core.double value) => $_setDouble(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasTokensPerSecond() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearTokensPerSecond() => $_clearField(8);
-
   @$pb.TagNumber(9)
-  $core.String get framework => $_getSZ(8);
+  $core.String get framework => $_getSZ(5);
   @$pb.TagNumber(9)
-  set framework($core.String value) => $_setString(8, value);
+  set framework($core.String value) => $_setString(5, value);
   @$pb.TagNumber(9)
-  $core.bool hasFramework() => $_has(8);
+  $core.bool hasFramework() => $_has(5);
   @$pb.TagNumber(9)
   void clearFramework() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  $core.String get finishReason => $_getSZ(9);
+  $core.String get finishReason => $_getSZ(6);
   @$pb.TagNumber(10)
-  set finishReason($core.String value) => $_setString(9, value);
+  set finishReason($core.String value) => $_setString(6, value);
   @$pb.TagNumber(10)
-  $core.bool hasFinishReason() => $_has(9);
+  $core.bool hasFinishReason() => $_has(6);
   @$pb.TagNumber(10)
   void clearFinishReason() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.int get thinkingTokens => $_getIZ(10);
+  $core.int get thinkingTokens => $_getIZ(7);
   @$pb.TagNumber(11)
-  set thinkingTokens($core.int value) => $_setSignedInt32(10, value);
+  set thinkingTokens($core.int value) => $_setSignedInt32(7, value);
   @$pb.TagNumber(11)
-  $core.bool hasThinkingTokens() => $_has(10);
+  $core.bool hasThinkingTokens() => $_has(7);
   @$pb.TagNumber(11)
   void clearThinkingTokens() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  $core.int get responseTokens => $_getIZ(11);
+  $core.int get responseTokens => $_getIZ(8);
   @$pb.TagNumber(12)
-  set responseTokens($core.int value) => $_setSignedInt32(11, value);
+  set responseTokens($core.int value) => $_setSignedInt32(8, value);
   @$pb.TagNumber(12)
-  $core.bool hasResponseTokens() => $_has(11);
+  $core.bool hasResponseTokens() => $_has(8);
   @$pb.TagNumber(12)
   void clearResponseTokens() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $core.String get jsonOutput => $_getSZ(12);
+  $core.String get jsonOutput => $_getSZ(9);
   @$pb.TagNumber(13)
-  set jsonOutput($core.String value) => $_setString(12, value);
+  set jsonOutput($core.String value) => $_setString(9, value);
   @$pb.TagNumber(13)
-  $core.bool hasJsonOutput() => $_has(12);
+  $core.bool hasJsonOutput() => $_has(9);
   @$pb.TagNumber(13)
   void clearJsonOutput() => $_clearField(13);
 
   /// Nothing reads performance or executed_on.
   @$pb.TagNumber(14)
-  PerformanceMetrics get performance => $_getN(13);
+  PerformanceMetrics get performance => $_getN(10);
   @$pb.TagNumber(14)
   set performance(PerformanceMetrics value) => $_setField(14, value);
   @$pb.TagNumber(14)
-  $core.bool hasPerformance() => $_has(13);
+  $core.bool hasPerformance() => $_has(10);
   @$pb.TagNumber(14)
   void clearPerformance() => $_clearField(14);
   @$pb.TagNumber(14)
-  PerformanceMetrics ensurePerformance() => $_ensure(13);
+  PerformanceMetrics ensurePerformance() => $_ensure(10);
 
   @$pb.TagNumber(15)
-  ExecutionTarget get executedOn => $_getN(14);
+  ExecutionTarget get executedOn => $_getN(11);
   @$pb.TagNumber(15)
   set executedOn(ExecutionTarget value) => $_setField(15, value);
   @$pb.TagNumber(15)
-  $core.bool hasExecutedOn() => $_has(14);
+  $core.bool hasExecutedOn() => $_has(11);
   @$pb.TagNumber(15)
   void clearExecutedOn() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $1.StructuredOutputValidation get structuredOutputValidation => $_getN(15);
+  $1.StructuredOutputValidation get structuredOutputValidation => $_getN(12);
   @$pb.TagNumber(16)
   set structuredOutputValidation($1.StructuredOutputValidation value) =>
       $_setField(16, value);
   @$pb.TagNumber(16)
-  $core.bool hasStructuredOutputValidation() => $_has(15);
+  $core.bool hasStructuredOutputValidation() => $_has(12);
   @$pb.TagNumber(16)
   void clearStructuredOutputValidation() => $_clearField(16);
   @$pb.TagNumber(16)
   $1.StructuredOutputValidation ensureStructuredOutputValidation() =>
-      $_ensure(15);
-
-  /// input_tokens + output_tokens.
-  @$pb.TagNumber(17)
-  $core.int get totalTokens => $_getIZ(16);
-  @$pb.TagNumber(17)
-  set totalTokens($core.int value) => $_setSignedInt32(16, value);
-  @$pb.TagNumber(17)
-  $core.bool hasTotalTokens() => $_has(16);
-  @$pb.TagNumber(17)
-  void clearTotalTokens() => $_clearField(17);
-
-  @$pb.TagNumber(18)
-  $core.String get errorMessage => $_getSZ(17);
-  @$pb.TagNumber(18)
-  set errorMessage($core.String value) => $_setString(17, value);
-  @$pb.TagNumber(18)
-  $core.bool hasErrorMessage() => $_has(17);
-  @$pb.TagNumber(18)
-  void clearErrorMessage() => $_clearField(18);
-
-  @$pb.TagNumber(19)
-  $core.int get errorCode => $_getIZ(18);
-  @$pb.TagNumber(19)
-  set errorCode($core.int value) => $_setSignedInt32(18, value);
-  @$pb.TagNumber(19)
-  $core.bool hasErrorCode() => $_has(18);
-  @$pb.TagNumber(19)
-  void clearErrorCode() => $_clearField(19);
+      $_ensure(12);
 
   @$pb.TagNumber(20)
-  $core.int get cachedPromptTokens => $_getIZ(19);
+  $core.int get cachedPromptTokens => $_getIZ(13);
   @$pb.TagNumber(20)
-  set cachedPromptTokens($core.int value) => $_setSignedInt32(19, value);
+  set cachedPromptTokens($core.int value) => $_setSignedInt32(13, value);
   @$pb.TagNumber(20)
-  $core.bool hasCachedPromptTokens() => $_has(19);
+  $core.bool hasCachedPromptTokens() => $_has(13);
   @$pb.TagNumber(20)
   void clearCachedPromptTokens() => $_clearField(20);
 
   @$pb.TagNumber(21)
-  $fixnum.Int64 get promptEvalTimeMs => $_getI64(20);
+  $fixnum.Int64 get promptEvalTimeMs => $_getI64(14);
   @$pb.TagNumber(21)
-  set promptEvalTimeMs($fixnum.Int64 value) => $_setInt64(20, value);
+  set promptEvalTimeMs($fixnum.Int64 value) => $_setInt64(14, value);
   @$pb.TagNumber(21)
-  $core.bool hasPromptEvalTimeMs() => $_has(20);
+  $core.bool hasPromptEvalTimeMs() => $_has(14);
   @$pb.TagNumber(21)
   void clearPromptEvalTimeMs() => $_clearField(21);
 
   @$pb.TagNumber(22)
-  $fixnum.Int64 get decodeTimeMs => $_getI64(21);
+  $fixnum.Int64 get decodeTimeMs => $_getI64(15);
   @$pb.TagNumber(22)
-  set decodeTimeMs($fixnum.Int64 value) => $_setInt64(21, value);
+  set decodeTimeMs($fixnum.Int64 value) => $_setInt64(15, value);
   @$pb.TagNumber(22)
-  $core.bool hasDecodeTimeMs() => $_has(21);
+  $core.bool hasDecodeTimeMs() => $_has(15);
   @$pb.TagNumber(22)
   void clearDecodeTimeMs() => $_clearField(22);
 
   @$pb.TagNumber(23)
-  $pb.PbList<$2.ToolCall> get toolCalls => $_getList(22);
+  $pb.PbList<$2.ToolCall> get toolCalls => $_getList(16);
 
   @$pb.TagNumber(24)
-  $pb.PbList<$2.ToolResult> get toolResults => $_getList(23);
+  $pb.PbList<$2.ToolResult> get toolResults => $_getList(17);
+
+  @$pb.TagNumber(25)
+  $3.TokenUsage get usage => $_getN(18);
+  @$pb.TagNumber(25)
+  set usage($3.TokenUsage value) => $_setField(25, value);
+  @$pb.TagNumber(25)
+  $core.bool hasUsage() => $_has(18);
+  @$pb.TagNumber(25)
+  void clearUsage() => $_clearField(25);
+  @$pb.TagNumber(25)
+  $3.TokenUsage ensureUsage() => $_ensure(18);
+
+  @$pb.TagNumber(26)
+  $4.SDKError get error => $_getN(19);
+  @$pb.TagNumber(26)
+  set error($4.SDKError value) => $_setField(26, value);
+  @$pb.TagNumber(26)
+  $core.bool hasError() => $_has(19);
+  @$pb.TagNumber(26)
+  void clearError() => $_clearField(26);
+  @$pb.TagNumber(26)
+  $4.SDKError ensureError() => $_ensure(19);
 }
 
 class LLMConfiguration extends $pb.GeneratedMessage {
   factory LLMConfiguration({
     $core.int? contextLength,
     $core.String? modelId,
-    $3.InferenceFramework? preferredFramework,
+    $5.InferenceFramework? preferredFramework,
     LLMGenerationOptions? defaultOptions,
   }) {
     final result = create();
@@ -676,8 +635,8 @@ class LLMConfiguration extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'contextLength')
     ..aOS(6, _omitFieldNames ? '' : 'modelId')
-    ..aE<$3.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework',
-        enumValues: $3.InferenceFramework.values)
+    ..aE<$5.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework',
+        enumValues: $5.InferenceFramework.values)
     ..aOM<LLMGenerationOptions>(8, _omitFieldNames ? '' : 'defaultOptions',
         subBuilder: LLMGenerationOptions.create)
     ..hasRequiredFields = false;
@@ -720,9 +679,9 @@ class LLMConfiguration extends $pb.GeneratedMessage {
   void clearModelId() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $3.InferenceFramework get preferredFramework => $_getN(2);
+  $5.InferenceFramework get preferredFramework => $_getN(2);
   @$pb.TagNumber(7)
-  set preferredFramework($3.InferenceFramework value) => $_setField(7, value);
+  set preferredFramework($5.InferenceFramework value) => $_setField(7, value);
   @$pb.TagNumber(7)
   $core.bool hasPreferredFramework() => $_has(2);
   @$pb.TagNumber(7)
@@ -824,17 +783,12 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
   factory PerformanceMetrics({
     $fixnum.Int64? latencyMs,
     $fixnum.Int64? memoryBytes,
-    $core.double? throughputTokensPerSec,
-    $core.int? inputTokens,
-    $core.int? outputTokens,
+    $3.TokenUsage? usage,
   }) {
     final result = create();
     if (latencyMs != null) result.latencyMs = latencyMs;
     if (memoryBytes != null) result.memoryBytes = memoryBytes;
-    if (throughputTokensPerSec != null)
-      result.throughputTokensPerSec = throughputTokensPerSec;
-    if (inputTokens != null) result.inputTokens = inputTokens;
-    if (outputTokens != null) result.outputTokens = outputTokens;
+    if (usage != null) result.usage = usage;
     return result;
   }
 
@@ -853,10 +807,8 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aInt64(1, _omitFieldNames ? '' : 'latencyMs')
     ..aInt64(2, _omitFieldNames ? '' : 'memoryBytes')
-    ..aD(3, _omitFieldNames ? '' : 'throughputTokensPerSec',
-        fieldType: $pb.PbFieldType.OF)
-    ..aI(4, _omitFieldNames ? '' : 'inputTokens')
-    ..aI(5, _omitFieldNames ? '' : 'outputTokens')
+    ..aOM<$3.TokenUsage>(6, _omitFieldNames ? '' : 'usage',
+        subBuilder: $3.TokenUsage.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -896,32 +848,16 @@ class PerformanceMetrics extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearMemoryBytes() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  $core.double get throughputTokensPerSec => $_getN(2);
-  @$pb.TagNumber(3)
-  set throughputTokensPerSec($core.double value) => $_setFloat(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasThroughputTokensPerSec() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearThroughputTokensPerSec() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get inputTokens => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set inputTokens($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasInputTokens() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearInputTokens() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get outputTokens => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set outputTokens($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasOutputTokens() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearOutputTokens() => $_clearField(5);
+  @$pb.TagNumber(6)
+  $3.TokenUsage get usage => $_getN(2);
+  @$pb.TagNumber(6)
+  set usage($3.TokenUsage value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasUsage() => $_has(2);
+  @$pb.TagNumber(6)
+  void clearUsage() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $3.TokenUsage ensureUsage() => $_ensure(2);
 }
 
 const $core.bool _omitFieldNames =

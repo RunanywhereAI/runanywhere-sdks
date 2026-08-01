@@ -8,12 +8,10 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere v2 IDL — ergonomic solution configs.
+// RunAnywhere IDL — prebuilt solution configs.
 //
-// Solution configs are sugar on top of PipelineSpec. The core converts each
-// solution config into a PipelineSpec internally. Frontends use these for
-// the "20-line developer API" — callers never construct PipelineSpec directly
-// for common use cases.
+// Consumed as the shape of the YAML solution config read by config_loader.cpp,
+// not as a wire message. Solution lifecycle verbs mirror rac_solution_handle_t.
 
 import SwiftProtobuf
 
@@ -27,12 +25,7 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// SolutionType — discriminator for the kind of solution backing a
-/// `SolutionConfig` / `SolutionHandle`. Mirrors the `SolutionConfig.config`
-/// oneof arms so frontends can switch on a single enum value rather than
-/// inspecting the oneof shape.
-/// ---------------------------------------------------------------------------
+/// Lets frontends switch on one enum instead of inspecting the oneof.
 public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -82,14 +75,10 @@ public nonisolated enum RASolutionType: SwiftProtobuf.Enum, Swift.CaseIterable {
 public nonisolated enum RAAudioSource: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
-
-  /// Platform mic (default)
   case microphone // = 1
-
-  /// Path supplied in audio_file_path
   case file // = 2
 
-  /// Frontend feeds frames via C ABI
+  /// Frontend feeds frames through the C ABI
   case callback // = 3
   case UNRECOGNIZED(Int)
 
@@ -131,10 +120,10 @@ public nonisolated enum RAVectorStore: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
-  /// default, in-process HNSW
+  /// in-process HNSW
   case usearch // = 1
 
-  /// remote, server deployments only
+  /// server deployments only, no on-device path
   case pgvector // = 2
   case UNRECOGNIZED(Int)
 
@@ -169,7 +158,6 @@ public nonisolated enum RAVectorStore: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-/// Top-level union dispatched to the matching solution loader.
 public nonisolated struct RASolutionConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -222,35 +210,18 @@ public nonisolated struct RASolutionConfig: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// SolutionHandle — opaque, serialisable descriptor for a started solution.
-///
-/// The native side owns a `rac_solution_handle_t`; this message is the
-/// language-agnostic shape that frontends (Swift `SolutionHandle` class,
-/// Kotlin/Flutter/RN/Web equivalents) carry across the C ABI to identify
-/// the underlying instance. Lifecycle verbs (start/stop/cancel/feed/destroy)
-/// are issued against the C handle keyed by `handle_id`.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RASolutionHandle: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Stable, opaque identifier minted by the core for this solution
-  /// instance. Used as the lookup key for lifecycle calls.
   public var handleID: String = String()
 
-  /// String discriminator for the solution kind, e.g. "voice_agent",
-  /// "rag", "time_series", "agent_loop". Free-form for
-  /// forward-compat with future solutions; canonical values match the
-  /// `SolutionType` enum names lower-cased.
   public var solutionType: String = String()
 
-  /// Wall-clock creation timestamp (ms since Unix epoch).
   public var createdAtMs: Int64 = 0
 
-  /// Optional engine-specific state string (e.g. "created", "running",
-  /// "stopped"). Empty when the host hasn't surfaced state.
+  /// Engine-specific, e.g. "running" or "stopped".
   public var state: String {
     get {_state ?? String()}
     set {_state = newValue}
@@ -267,47 +238,31 @@ public nonisolated struct RASolutionHandle: Sendable {
   fileprivate var _state: String? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// VoiceAgent — the canonical streaming voice AI loop.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAVoiceAgentConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Model identifiers — resolved against the model registry.
   public var llmModelID: String = String()
 
-  /// e.g. "whisper-base"
   public var sttModelID: String = String()
 
-  /// e.g. "kokoro"
   public var ttsModelID: String = String()
 
-  /// e.g. "silero-v5"
   public var vadModelID: String = String()
 
-  /// pass3-syn-025/030: explicit TTS voice id for multi-voice TTS engines
-  /// (Piper, eSpeak-NG, Sherpa-ONNX-TTS multi-voice). When unset, callers
-  /// fall back to using tts_model_id as the voice id — correct for
-  /// single-voice engines, wrong for multi-voice. Aligns the caller-facing
-  /// VoiceAgentConfig with the commons-facing RAVoiceAgentComposeConfig
-  /// (voice_agent_service.proto:214) which already exposes tts_voice_id.
   public var ttsVoiceID: String = String()
 
-  /// Audio configuration.
   public var sampleRateHz: Int32 = 0
 
-  /// default 20
   public var chunkMs: Int32 = 0
 
+  /// audio_file_path applies when audio_source is FILE.
   public var audioSource: RAAudioSource = .unspecified
 
-  /// Absolute path to an audio file. Required when `audio_source` is
-  /// `AUDIO_SOURCE_FILE`; ignored for MICROPHONE / CALLBACK sources.
   public var audioFilePath: String = String()
 
-  /// Barge-in behavior.
+  /// Unset means enabled.
   public var enableBargeIn: Bool {
     get {_enableBargeIn ?? false}
     set {_enableBargeIn = newValue}
@@ -317,7 +272,6 @@ public nonisolated struct RAVoiceAgentConfig: Sendable {
   /// Clears the value of `enableBargeIn`. Subsequent reads from it will return its default value.
   public mutating func clearEnableBargeIn() {self._enableBargeIn = nil}
 
-  /// default 200
   public var bargeInThresholdMs: Int32 = 0
 
   public var generation: RALLMGenerationOptions {
@@ -331,12 +285,9 @@ public nonisolated struct RAVoiceAgentConfig: Sendable {
 
   public var maxContextTokens: Int32 = 0
 
-  /// Emit partial transcripts as UserSaidEvent{is_final=false}.
+  /// Emit partial transcripts as non-final user-said events.
   public var emitPartials: Bool = false
 
-  /// Optional explicit solution-kind tag. Redundant with the `SolutionConfig`
-  /// oneof arm; provided so callers that pass this message standalone (or
-  /// log it) can read a single discriminator. Defaults to UNSPECIFIED.
   public var typeKind: RASolutionType {
     get {_typeKind ?? .unspecified}
     set {_typeKind = newValue}
@@ -355,47 +306,36 @@ public nonisolated struct RAVoiceAgentConfig: Sendable {
   fileprivate var _typeKind: RASolutionType? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// RAG — retrieve → rerank → prompt → LLM.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RARAGConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// e.g. "bge-small-en-v1.5"
   public var embedModelID: String = String()
 
-  /// e.g. "bge-reranker-v2-m3"
   public var rerankModelID: String = String()
 
   public var llmModelID: String = String()
 
-  /// Vector store — USearch (in-process HNSW, default) or remote pgvector.
   public var vectorStore: RAVectorStore = .unspecified
 
-  /// Local path for USearch index
   public var vectorStorePath: String = String()
 
-  /// default 24
+  /// Retrieve this many candidates, then keep this many after reranking.
   public var retrieveK: Int32 = 0
 
-  /// default 6
   public var rerankTop: Int32 = 0
 
-  /// BM25 parameters.
+  /// BM25 term-saturation and length-normalization parameters.
   public var bm25K1: Float = 0
 
-  /// default 0.75
   public var bm25B: Float = 0
 
-  /// RRF fusion parameter.
+  /// Reciprocal-rank-fusion smoothing constant.
   public var rrfK: Int32 = 0
 
-  /// Prompt template. Supports {{context}} and {{query}} placeholders.
   public var promptTemplate: String = String()
 
-  /// Optional explicit solution-kind tag. See `SolutionType`.
   public var typeKind: RASolutionType {
     get {_typeKind ?? .unspecified}
     set {_typeKind = newValue}
@@ -412,9 +352,6 @@ public nonisolated struct RARAGConfig: Sendable {
   fileprivate var _typeKind: RASolutionType? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// Agent loop — multi-turn LLM with tool calling.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAAgentLoopConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -426,12 +363,10 @@ public nonisolated struct RAAgentLoopConfig: Sendable {
 
   public var tools: [RAToolSpec] = []
 
-  /// default 10
   public var maxIterations: Int32 = 0
 
   public var maxContextTokens: Int32 = 0
 
-  /// Optional explicit solution-kind tag. See `SolutionType`.
   public var typeKind: RASolutionType {
     get {_typeKind ?? .unspecified}
     set {_typeKind = newValue}
@@ -457,7 +392,7 @@ public nonisolated struct RAToolSpec: Sendable {
 
   public var description_p: String = String()
 
-  /// Parameters schema, OpenAI-compatible
+  /// OpenAI-compatible parameters schema.
   public var jsonSchema: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -465,9 +400,6 @@ public nonisolated struct RAToolSpec: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Time series — window + anomaly_detect + generate_text.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RATimeSeriesConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -477,14 +409,13 @@ public nonisolated struct RATimeSeriesConfig: Sendable {
 
   public var llmModelID: String = String()
 
-  /// Samples per window
+  /// Samples per window, and how far the window advances each step.
   public var windowSize: Int32 = 0
 
   public var stride: Int32 = 0
 
   public var anomalyThreshold: Float = 0
 
-  /// Optional explicit solution-kind tag. See `SolutionType`.
   public var typeKind: RASolutionType {
     get {_typeKind ?? .unspecified}
     set {_typeKind = newValue}
@@ -519,7 +450,7 @@ nonisolated extension RAVectorStore: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RASolutionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SolutionConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_agent\0\u{1}rag\0\u{4}\u{2}agent_loop\0\u{3}time_series\0\u{b}wake_word\0\u{c}\u{3}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}voice_agent\0\u{1}rag\0\u{4}\u{2}agent_loop\0\u{3}time_series\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -669,7 +600,7 @@ nonisolated extension RASolutionHandle: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 nonisolated extension RAVoiceAgentConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}stt_model_id\0\u{3}tts_model_id\0\u{3}vad_model_id\0\u{3}sample_rate_hz\0\u{3}chunk_ms\0\u{3}audio_source\0\u{3}enable_barge_in\0\u{3}barge_in_threshold_ms\0\u{4}\u{2}max_context_tokens\0\u{4}\u{2}emit_partials\0\u{4}\u{2}audio_file_path\0\u{3}type_kind\0\u{3}tts_voice_id\0\u{1}generation\0\u{c}\u{a}\u{1}\u{c}\u{c}\u{1}\u{c}\u{e}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_model_id\0\u{3}stt_model_id\0\u{3}tts_model_id\0\u{3}vad_model_id\0\u{3}sample_rate_hz\0\u{3}chunk_ms\0\u{3}audio_source\0\u{3}enable_barge_in\0\u{3}barge_in_threshold_ms\0\u{4}\u{2}max_context_tokens\0\u{4}\u{2}emit_partials\0\u{4}\u{2}audio_file_path\0\u{3}type_kind\0\u{3}tts_voice_id\0\u{1}generation\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {

@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -55,17 +54,6 @@ public class TranscriptionMetadata(
     schemaIndex = 2,
   )
   public val audio_length_ms: Long = 0L,
-  /**
-   * processing_time_ms / audio_length_ms, set by the producer.
-   */
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "realTimeFactor",
-    schemaIndex = 3,
-  )
-  public val real_time_factor: Float = 0f,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TranscriptionMetadata, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -81,7 +69,6 @@ public class TranscriptionMetadata(
     if (model_id != other.model_id) return false
     if (processing_time_ms != other.processing_time_ms) return false
     if (audio_length_ms != other.audio_length_ms) return false
-    if (real_time_factor != other.real_time_factor) return false
     return true
   }
 
@@ -92,7 +79,6 @@ public class TranscriptionMetadata(
       result = result * 37 + model_id.hashCode()
       result = result * 37 + processing_time_ms.hashCode()
       result = result * 37 + audio_length_ms.hashCode()
-      result = result * 37 + real_time_factor.hashCode()
       super.hashCode = result
     }
     return result
@@ -103,7 +89,6 @@ public class TranscriptionMetadata(
     result += """model_id=${sanitize(model_id)}"""
     result += """processing_time_ms=$processing_time_ms"""
     result += """audio_length_ms=$audio_length_ms"""
-    result += """real_time_factor=$real_time_factor"""
     return result.joinToString(prefix = "TranscriptionMetadata{", separator = ", ", postfix = "}")
   }
 
@@ -111,9 +96,8 @@ public class TranscriptionMetadata(
     model_id: String = this.model_id,
     processing_time_ms: Long = this.processing_time_ms,
     audio_length_ms: Long = this.audio_length_ms,
-    real_time_factor: Float = this.real_time_factor,
     unknownFields: ByteString = this.unknownFields,
-  ): TranscriptionMetadata = TranscriptionMetadata(model_id, processing_time_ms, audio_length_ms, real_time_factor, unknownFields)
+  ): TranscriptionMetadata = TranscriptionMetadata(model_id, processing_time_ms, audio_length_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -137,9 +121,6 @@ public class TranscriptionMetadata(
         if (value.audio_length_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.audio_length_ms)
         }
-        if (!value.real_time_factor.equals(0f)) {
-          size += ProtoAdapter.FLOAT.encodedSizeWithTag(4, value.real_time_factor)
-        }
         return size
       }
 
@@ -153,17 +134,11 @@ public class TranscriptionMetadata(
         if (value.audio_length_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.audio_length_ms)
         }
-        if (!value.real_time_factor.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.real_time_factor)
-        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TranscriptionMetadata) {
         writer.writeBytes(value.unknownFields)
-        if (!value.real_time_factor.equals(0f)) {
-          ProtoAdapter.FLOAT.encodeWithTag(writer, 4, value.real_time_factor)
-        }
         if (value.audio_length_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.audio_length_ms)
         }
@@ -179,13 +154,11 @@ public class TranscriptionMetadata(
         var model_id: String = ""
         var processing_time_ms: Long = 0L
         var audio_length_ms: Long = 0L
-        var real_time_factor: Float = 0f
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> processing_time_ms = ProtoAdapter.INT64.decode(reader)
             3 -> audio_length_ms = ProtoAdapter.INT64.decode(reader)
-            4 -> real_time_factor = ProtoAdapter.FLOAT.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -193,7 +166,6 @@ public class TranscriptionMetadata(
           model_id = model_id,
           processing_time_ms = processing_time_ms,
           audio_length_ms = audio_length_ms,
-          real_time_factor = real_time_factor,
           unknownFields = unknownFields
         )
       }

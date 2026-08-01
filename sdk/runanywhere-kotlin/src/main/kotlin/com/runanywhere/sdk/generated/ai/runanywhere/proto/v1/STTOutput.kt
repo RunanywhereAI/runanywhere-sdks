@@ -89,21 +89,6 @@ public class STTOutput(
   )
   public val duration_ms: Long = 0L,
   speaker_ids: List<String> = emptyList(),
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 9,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 10,
-  )
-  public val error_code: Int = 0,
   /**
    * For long-running or streaming transcription.
    */
@@ -112,9 +97,15 @@ public class STTOutput(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "segmentIndex",
-    schemaIndex = 11,
+    schemaIndex = 9,
   )
   public val segment_index: Int = 0,
+  @field:WireField(
+    tag = 15,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 10,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTOutput, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -162,9 +153,8 @@ public class STTOutput(
     if (timestamp_ms != other.timestamp_ms) return false
     if (duration_ms != other.duration_ms) return false
     if (speaker_ids != other.speaker_ids) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
     if (segment_index != other.segment_index) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -181,9 +171,8 @@ public class STTOutput(
       result = result * 37 + timestamp_ms.hashCode()
       result = result * 37 + duration_ms.hashCode()
       result = result * 37 + speaker_ids.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
       result = result * 37 + segment_index.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -200,9 +189,8 @@ public class STTOutput(
     result += """timestamp_ms=$timestamp_ms"""
     result += """duration_ms=$duration_ms"""
     if (speaker_ids.isNotEmpty()) result += """speaker_ids=${sanitize(speaker_ids)}"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
     result += """segment_index=$segment_index"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "STTOutput{", separator = ", ", postfix = "}")
   }
 
@@ -216,11 +204,10 @@ public class STTOutput(
     timestamp_ms: Long = this.timestamp_ms,
     duration_ms: Long = this.duration_ms,
     speaker_ids: List<String> = this.speaker_ids,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
     segment_index: Int = this.segment_index,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): STTOutput = STTOutput(text, confidence, language, words, alternatives, metadata, timestamp_ms, duration_ms, speaker_ids, error_message, error_code, segment_index, unknownFields)
+  ): STTOutput = STTOutput(text, confidence, language, words, alternatives, metadata, timestamp_ms, duration_ms, speaker_ids, segment_index, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -253,13 +240,10 @@ public class STTOutput(
           size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.duration_ms)
         }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(10, value.speaker_ids)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.error_code)
-        }
         if (value.segment_index != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(13, value.segment_index)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(15, value.error)
         return size
       }
 
@@ -283,25 +267,19 @@ public class STTOutput(
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 10, value.speaker_ids)
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_code)
-        }
         if (value.segment_index != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 13, value.segment_index)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 15, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTOutput) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 15, value.error)
         if (value.segment_index != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 13, value.segment_index)
         }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 10, value.speaker_ids)
         if (value.duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.duration_ms)
@@ -333,9 +311,8 @@ public class STTOutput(
         var timestamp_ms: Long = 0L
         var duration_ms: Long = 0L
         val speaker_ids = mutableListOf<String>()
-        var error_message: String? = null
-        var error_code: Int = 0
         var segment_index: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -347,9 +324,8 @@ public class STTOutput(
             8 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
             9 -> duration_ms = ProtoAdapter.INT64.decode(reader)
             10 -> speaker_ids.add(ProtoAdapter.STRING.decode(reader))
-            11 -> error_message = ProtoAdapter.STRING.decode(reader)
-            12 -> error_code = ProtoAdapter.INT32.decode(reader)
             13 -> segment_index = ProtoAdapter.INT32.decode(reader)
+            15 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -363,9 +339,8 @@ public class STTOutput(
           timestamp_ms = timestamp_ms,
           duration_ms = duration_ms,
           speaker_ids = speaker_ids,
-          error_message = error_message,
-          error_code = error_code,
           segment_index = segment_index,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -374,6 +349,7 @@ public class STTOutput(
         words = value.words.redactElements(WordTimestamp.ADAPTER),
         alternatives = value.alternatives.redactElements(TranscriptionAlternative.ADAPTER),
         metadata = value.metadata?.let(TranscriptionMetadata.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

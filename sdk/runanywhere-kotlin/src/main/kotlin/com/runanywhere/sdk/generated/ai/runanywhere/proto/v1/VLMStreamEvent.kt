@@ -32,18 +32,11 @@ import okio.ByteString
 
 public class VLMStreamEvent(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val seq: Long = 0L,
-  @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
@@ -51,21 +44,21 @@ public class VLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val request_id: String = "",
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.VLMStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val kind: VLMStreamEventKind = VLMStreamEventKind.VLM_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val token: String = "",
   @field:WireField(
@@ -73,7 +66,7 @@ public class VLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "tokenIndex",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val token_index: Int = 0,
   @field:WireField(
@@ -81,7 +74,7 @@ public class VLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "isFinal",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val is_final: Boolean = false,
   @field:WireField(
@@ -89,30 +82,21 @@ public class VLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "tokensPerSecond",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val tokens_per_second: Float = 0f,
   @field:WireField(
     tag = 9,
     adapter = "ai.runanywhere.proto.v1.VLMResult#ADAPTER",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val result: VLMResult? = null,
   @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 9,
+    tag = 12,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 8,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 10,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMStreamEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -125,7 +109,6 @@ public class VLMStreamEvent(
     if (other === this) return true
     if (other !is VLMStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
-    if (seq != other.seq) return false
     if (timestamp_us != other.timestamp_us) return false
     if (request_id != other.request_id) return false
     if (kind != other.kind) return false
@@ -134,8 +117,7 @@ public class VLMStreamEvent(
     if (is_final != other.is_final) return false
     if (tokens_per_second != other.tokens_per_second) return false
     if (result != other.result) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -143,7 +125,6 @@ public class VLMStreamEvent(
     var result_ = super.hashCode
     if (result_ == 0) {
       result_ = unknownFields.hashCode()
-      result_ = result_ * 37 + seq.hashCode()
       result_ = result_ * 37 + timestamp_us.hashCode()
       result_ = result_ * 37 + request_id.hashCode()
       result_ = result_ * 37 + kind.hashCode()
@@ -152,8 +133,7 @@ public class VLMStreamEvent(
       result_ = result_ * 37 + is_final.hashCode()
       result_ = result_ * 37 + tokens_per_second.hashCode()
       result_ = result_ * 37 + (result?.hashCode() ?: 0)
-      result_ = result_ * 37 + (error_message?.hashCode() ?: 0)
-      result_ = result_ * 37 + error_code.hashCode()
+      result_ = result_ * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result_
     }
     return result_
@@ -161,7 +141,6 @@ public class VLMStreamEvent(
 
   override fun toString(): String {
     val result_ = mutableListOf<String>()
-    result_ += """seq=$seq"""
     result_ += """timestamp_us=$timestamp_us"""
     result_ += """request_id=${sanitize(request_id)}"""
     result_ += """kind=$kind"""
@@ -170,13 +149,11 @@ public class VLMStreamEvent(
     result_ += """is_final=$is_final"""
     result_ += """tokens_per_second=$tokens_per_second"""
     if (result != null) result_ += """result=$result"""
-    if (error_message != null) result_ += """error_message=${sanitize(error_message)}"""
-    result_ += """error_code=$error_code"""
+    if (error != null) result_ += """error=$error"""
     return result_.joinToString(prefix = "VLMStreamEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
     request_id: String = this.request_id,
     kind: VLMStreamEventKind = this.kind,
@@ -185,10 +162,9 @@ public class VLMStreamEvent(
     is_final: Boolean = this.is_final,
     tokens_per_second: Float = this.tokens_per_second,
     result: VLMResult? = this.result,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VLMStreamEvent = VLMStreamEvent(seq, timestamp_us, request_id, kind, token, token_index, is_final, tokens_per_second, result, error_message, error_code, unknownFields)
+  ): VLMStreamEvent = VLMStreamEvent(timestamp_us, request_id, kind, token, token_index, is_final, tokens_per_second, result, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -202,9 +178,6 @@ public class VLMStreamEvent(
     ) {
       override fun encodedSize(`value`: VLMStreamEvent): Int {
         var size = value.unknownFields.size
-        if (value.seq != 0L) {
-          size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
         }
@@ -227,17 +200,11 @@ public class VLMStreamEvent(
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(8, value.tokens_per_second)
         }
         size += VLMResult.ADAPTER.encodedSizeWithTag(9, value.result)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(11, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(12, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: VLMStreamEvent) {
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
@@ -260,19 +227,13 @@ public class VLMStreamEvent(
           ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.tokens_per_second)
         }
         VLMResult.ADAPTER.encodeWithTag(writer, 9, value.result)
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 12, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VLMStreamEvent) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 12, value.error)
         VLMResult.ADAPTER.encodeWithTag(writer, 9, value.result)
         if (!value.tokens_per_second.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 8, value.tokens_per_second)
@@ -295,13 +256,9 @@ public class VLMStreamEvent(
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
-        }
       }
 
       override fun decode(reader: ProtoReader): VLMStreamEvent {
-        var seq: Long = 0L
         var timestamp_us: Long = 0L
         var request_id: String = ""
         var kind: VLMStreamEventKind = VLMStreamEventKind.VLM_STREAM_EVENT_KIND_UNSPECIFIED
@@ -310,11 +267,9 @@ public class VLMStreamEvent(
         var is_final: Boolean = false
         var tokens_per_second: Float = 0f
         var result: VLMResult? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> seq = ProtoAdapter.UINT64.decode(reader)
             2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             3 -> request_id = ProtoAdapter.STRING.decode(reader)
             4 -> try {
@@ -327,13 +282,11 @@ public class VLMStreamEvent(
             7 -> is_final = ProtoAdapter.BOOL.decode(reader)
             8 -> tokens_per_second = ProtoAdapter.FLOAT.decode(reader)
             9 -> result = VLMResult.ADAPTER.decode(reader)
-            10 -> error_message = ProtoAdapter.STRING.decode(reader)
-            11 -> error_code = ProtoAdapter.INT32.decode(reader)
+            12 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VLMStreamEvent(
-          seq = seq,
           timestamp_us = timestamp_us,
           request_id = request_id,
           kind = kind,
@@ -342,14 +295,14 @@ public class VLMStreamEvent(
           is_final = is_final,
           tokens_per_second = tokens_per_second,
           result = result,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VLMStreamEvent): VLMStreamEvent = value.copy(
         result = value.result?.let(VLMResult.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

@@ -35,6 +35,7 @@
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "errors.pb.h"
 #include "model_types.pb.h"
 #include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
@@ -636,7 +637,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TranscriptionMetadata final : publi
     kModelIdFieldNumber = 1,
     kProcessingTimeMsFieldNumber = 2,
     kAudioLengthMsFieldNumber = 3,
-    kRealTimeFactorFieldNumber = 4,
   };
   // string model_id = 1;
   void clear_model_id() ;
@@ -673,21 +673,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TranscriptionMetadata final : publi
   void _internal_set_audio_length_ms(::int64_t value);
 
   public:
-  // float real_time_factor = 4;
-  void clear_real_time_factor() ;
-  [[nodiscard]] float real_time_factor() const;
-  void set_real_time_factor(float value);
-
-  private:
-  float _internal_real_time_factor() const;
-  void _internal_set_real_time_factor(float value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.TranscriptionMetadata)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<2, 4,
+      ::google::protobuf::internal::TcParseTable<2, 3,
                           0, 53,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -719,7 +709,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED TranscriptionMetadata final : publi
     ::google::protobuf::internal::ArenaStringPtr model_id_;
     ::int64_t processing_time_ms_;
     ::int64_t audio_length_ms_;
-    float real_time_factor_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -773,298 +762,6 @@ class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTTranscriptionRequest_MetadataEntr
       const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
       ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
   static constexpr auto InternalNewImpl_();
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTServiceState final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.STTServiceState) */ {
- public:
-  inline STTServiceState() : STTServiceState(nullptr) {}
-  ~STTServiceState() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(STTServiceState* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(STTServiceState));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr STTServiceState(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline STTServiceState(const STTServiceState& from) : STTServiceState(nullptr, from) {}
-  inline STTServiceState(STTServiceState&& from) noexcept : STTServiceState(nullptr, ::std::move(from)) {}
-  inline STTServiceState& operator=(const STTServiceState& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline STTServiceState& operator=(STTServiceState&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const STTServiceState& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<STTServiceState>(&STTServiceState_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 11;
-  friend void swap(STTServiceState& a, STTServiceState& b) { a.Swap(&b); }
-  inline void Swap(STTServiceState* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(STTServiceState* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] STTServiceState* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<STTServiceState>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const STTServiceState& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const STTServiceState& from) { STTServiceState::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(STTServiceState* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.STTServiceState"; }
-
-  explicit STTServiceState(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  STTServiceState(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const STTServiceState& from);
-  STTServiceState(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, STTServiceState&& from) noexcept
-      : STTServiceState(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kSupportedLanguageCodesFieldNumber = 4,
-    kCurrentModelFieldNumber = 2,
-    kErrorMessageFieldNumber = 5,
-    kIsReadyFieldNumber = 1,
-    kSupportsStreamingFieldNumber = 3,
-    kErrorCodeFieldNumber = 6,
-  };
-  // repeated string supported_language_codes = 4;
-  [[nodiscard]] int supported_language_codes_size()
-      const;
-  private:
-  int _internal_supported_language_codes_size() const;
-
-  public:
-  void clear_supported_language_codes() ;
-  [[nodiscard]] const ::std::string& supported_language_codes(int index) const;
-  ::std::string* PROTOBUF_NONNULL mutable_supported_language_codes(int index);
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_supported_language_codes(int index, Arg_&& value, Args_... args);
-  ::std::string* PROTOBUF_NONNULL add_supported_language_codes();
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void add_supported_language_codes(Arg_&& value, Args_... args);
-  [[nodiscard]] const
-      ::google::protobuf::RepeatedPtrField<::std::string>&
-      supported_language_codes() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>*
-      PROTOBUF_NONNULL
-      mutable_supported_language_codes();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_supported_language_codes() const;
-  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_supported_language_codes();
-
-  public:
-  // optional string current_model = 2;
-  [[nodiscard]] bool has_current_model()
-      const;
-  void clear_current_model() ;
-  [[nodiscard]] const ::std::string& current_model() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_current_model(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_current_model();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_current_model();
-  void set_allocated_current_model(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_current_model() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_current_model(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_current_model();
-
-  public:
-  // optional string error_message = 5;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
-  // bool is_ready = 1;
-  void clear_is_ready() ;
-  [[nodiscard]] bool is_ready() const;
-  void set_is_ready(bool value);
-
-  private:
-  bool _internal_is_ready() const;
-  void _internal_set_is_ready(bool value);
-
-  public:
-  // bool supports_streaming = 3;
-  void clear_supports_streaming() ;
-  [[nodiscard]] bool supports_streaming() const;
-  void set_supports_streaming(bool value);
-
-  private:
-  bool _internal_supports_streaming() const;
-  void _internal_set_supports_streaming(bool value);
-
-  public:
-  // int32 error_code = 6;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.STTServiceState)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
-                          0, 89,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const STTServiceState& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField<::std::string> supported_language_codes_;
-    ::google::protobuf::internal::ArenaStringPtr current_model_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
-    bool is_ready_;
-    bool supports_streaming_;
-    ::int32_t error_code_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_stt_5foptions_2eproto;
 };
 // -------------------------------------------------------------------
 
@@ -2614,6 +2311,285 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTTranscriptionRequest final : pub
 };
 // -------------------------------------------------------------------
 
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTServiceState final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.STTServiceState) */ {
+ public:
+  inline STTServiceState() : STTServiceState(nullptr) {}
+  ~STTServiceState() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(STTServiceState* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(STTServiceState));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr STTServiceState(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline STTServiceState(const STTServiceState& from) : STTServiceState(nullptr, from) {}
+  inline STTServiceState(STTServiceState&& from) noexcept : STTServiceState(nullptr, ::std::move(from)) {}
+  inline STTServiceState& operator=(const STTServiceState& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline STTServiceState& operator=(STTServiceState&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const STTServiceState& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<STTServiceState>(&STTServiceState_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 11;
+  friend void swap(STTServiceState& a, STTServiceState& b) { a.Swap(&b); }
+  inline void Swap(STTServiceState* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(STTServiceState* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] STTServiceState* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<STTServiceState>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const STTServiceState& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const STTServiceState& from) { STTServiceState::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(STTServiceState* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.STTServiceState"; }
+
+  explicit STTServiceState(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  STTServiceState(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const STTServiceState& from);
+  STTServiceState(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, STTServiceState&& from) noexcept
+      : STTServiceState(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kSupportedLanguageCodesFieldNumber = 4,
+    kCurrentModelFieldNumber = 2,
+    kErrorFieldNumber = 7,
+    kIsReadyFieldNumber = 1,
+    kSupportsStreamingFieldNumber = 3,
+  };
+  // repeated string supported_language_codes = 4;
+  [[nodiscard]] int supported_language_codes_size()
+      const;
+  private:
+  int _internal_supported_language_codes_size() const;
+
+  public:
+  void clear_supported_language_codes() ;
+  [[nodiscard]] const ::std::string& supported_language_codes(int index) const;
+  ::std::string* PROTOBUF_NONNULL mutable_supported_language_codes(int index);
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_supported_language_codes(int index, Arg_&& value, Args_... args);
+  ::std::string* PROTOBUF_NONNULL add_supported_language_codes();
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void add_supported_language_codes(Arg_&& value, Args_... args);
+  [[nodiscard]] const
+      ::google::protobuf::RepeatedPtrField<::std::string>&
+      supported_language_codes() const;
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>*
+      PROTOBUF_NONNULL
+      mutable_supported_language_codes();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_supported_language_codes() const;
+  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_supported_language_codes();
+
+  public:
+  // optional string current_model = 2;
+  [[nodiscard]] bool has_current_model()
+      const;
+  void clear_current_model() ;
+  [[nodiscard]] const ::std::string& current_model() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_current_model(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_current_model();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_current_model();
+  void set_allocated_current_model(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_current_model() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_current_model(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_current_model();
+
+  public:
+  // optional .runanywhere.v1.SDKError error = 7;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
+
+  private:
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
+
+  public:
+  // bool is_ready = 1;
+  void clear_is_ready() ;
+  [[nodiscard]] bool is_ready() const;
+  void set_is_ready(bool value);
+
+  private:
+  bool _internal_is_ready() const;
+  void _internal_set_is_ready(bool value);
+
+  public:
+  // bool supports_streaming = 3;
+  void clear_supports_streaming() ;
+  [[nodiscard]] bool supports_streaming() const;
+  void set_supports_streaming(bool value);
+
+  private:
+  bool _internal_supports_streaming() const;
+  void _internal_set_supports_streaming(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.STTServiceState)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<3, 5,
+                          1, 76,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const STTServiceState& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::RepeatedPtrField<::std::string> supported_language_codes_;
+    ::google::protobuf::internal::ArenaStringPtr current_model_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
+    bool is_ready_;
+    bool supports_streaming_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_stt_5foptions_2eproto;
+};
+// -------------------------------------------------------------------
+
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.STTOutput) */ {
  public:
@@ -2766,14 +2742,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
     kAlternativesFieldNumber = 5,
     kSpeakerIdsFieldNumber = 10,
     kTextFieldNumber = 1,
-    kErrorMessageFieldNumber = 11,
     kLanguageFieldNumber = 14,
     kMetadataFieldNumber = 6,
-    kConfidenceFieldNumber = 3,
-    kErrorCodeFieldNumber = 12,
+    kErrorFieldNumber = 15,
     kTimestampMsFieldNumber = 8,
-    kDurationMsFieldNumber = 9,
+    kConfidenceFieldNumber = 3,
     kSegmentIndexFieldNumber = 13,
+    kDurationMsFieldNumber = 9,
   };
   // repeated .runanywhere.v1.WordTimestamp words = 4;
   [[nodiscard]] int words_size()
@@ -2859,23 +2834,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_text();
 
   public:
-  // optional string error_message = 11;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
   // optional string language = 14;
   [[nodiscard]] bool has_language()
       const;
@@ -2909,24 +2867,20 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
   ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NONNULL _internal_mutable_metadata();
 
   public:
-  // float confidence = 3;
-  void clear_confidence() ;
-  [[nodiscard]] float confidence() const;
-  void set_confidence(float value);
+  // optional .runanywhere.v1.SDKError error = 15;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
 
   private:
-  float _internal_confidence() const;
-  void _internal_set_confidence(float value);
-
-  public:
-  // int32 error_code = 12;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
 
   public:
   // int64 timestamp_ms = 8;
@@ -2939,14 +2893,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
   void _internal_set_timestamp_ms(::int64_t value);
 
   public:
-  // int64 duration_ms = 9;
-  void clear_duration_ms() ;
-  [[nodiscard]] ::int64_t duration_ms() const;
-  void set_duration_ms(::int64_t value);
+  // float confidence = 3;
+  void clear_confidence() ;
+  [[nodiscard]] float confidence() const;
+  void set_confidence(float value);
 
   private:
-  ::int64_t _internal_duration_ms() const;
-  void _internal_set_duration_ms(::int64_t value);
+  float _internal_confidence() const;
+  void _internal_set_confidence(float value);
 
   public:
   // int32 segment_index = 13;
@@ -2959,12 +2913,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
   void _internal_set_segment_index(::int32_t value);
 
   public:
+  // int64 duration_ms = 9;
+  void clear_duration_ms() ;
+  [[nodiscard]] ::int64_t duration_ms() const;
+  void set_duration_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_duration_ms() const;
+  void _internal_set_duration_ms(::int64_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.STTOutput)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 12,
-                          3, 77,
+      ::google::protobuf::internal::TcParseTable<4, 11,
+                          4, 64,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2996,14 +2960,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOutput final : public ::google::
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::TranscriptionAlternative > alternatives_;
     ::google::protobuf::RepeatedPtrField<::std::string> speaker_ids_;
     ::google::protobuf::internal::ArenaStringPtr text_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
     ::google::protobuf::internal::ArenaStringPtr language_;
     ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NULLABLE metadata_;
-    float confidence_;
-    ::int32_t error_code_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     ::int64_t timestamp_ms_;
-    ::int64_t duration_ms_;
+    float confidence_;
     ::int32_t segment_index_;
+    ::int64_t duration_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -3527,13 +3490,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
   // accessors -------------------------------------------------------
   enum : int {
     kRequestIdFieldNumber = 3,
-    kErrorMessageFieldNumber = 7,
     kPartialFieldNumber = 5,
     kFinalOutputFieldNumber = 6,
-    kSeqFieldNumber = 1,
+    kErrorFieldNumber = 9,
     kTimestampUsFieldNumber = 2,
     kKindFieldNumber = 4,
-    kErrorCodeFieldNumber = 8,
   };
   // string request_id = 3;
   void clear_request_id() ;
@@ -3548,23 +3509,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
   const ::std::string& _internal_request_id() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
-
-  public:
-  // optional string error_message = 7;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
 
   public:
   // optional .runanywhere.v1.STTPartialResult partial = 5;
@@ -3599,14 +3543,20 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
   ::runanywhere::v1::STTOutput* PROTOBUF_NONNULL _internal_mutable_final_output();
 
   public:
-  // uint64 seq = 1;
-  void clear_seq() ;
-  [[nodiscard]] ::uint64_t seq() const;
-  void set_seq(::uint64_t value);
+  // optional .runanywhere.v1.SDKError error = 9;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
 
   private:
-  ::uint64_t _internal_seq() const;
-  void _internal_set_seq(::uint64_t value);
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
 
   public:
   // int64 timestamp_us = 2;
@@ -3629,22 +3579,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
   void _internal_set_kind(::runanywhere::v1::STTStreamEventKind value);
 
   public:
-  // int32 error_code = 8;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.STTStreamEvent)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 8,
-                          2, 69,
+      ::google::protobuf::internal::TcParseTable<3, 6,
+                          3, 48,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -3673,13 +3613,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr request_id_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
     ::runanywhere::v1::STTPartialResult* PROTOBUF_NULLABLE partial_;
     ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE final_output_;
-    ::uint64_t seq_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     ::int64_t timestamp_us_;
     int kind_;
-    ::int32_t error_code_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -5648,30 +5586,6 @@ inline void TranscriptionMetadata::_internal_set_audio_length_ms(::int64_t value
   _impl_.audio_length_ms_ = value;
 }
 
-// float real_time_factor = 4;
-inline void TranscriptionMetadata::clear_real_time_factor() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.real_time_factor_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
-}
-inline float TranscriptionMetadata::real_time_factor() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.TranscriptionMetadata.real_time_factor)
-  return _internal_real_time_factor();
-}
-inline void TranscriptionMetadata::set_real_time_factor(float value) {
-  _internal_set_real_time_factor(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.TranscriptionMetadata.real_time_factor)
-}
-inline float TranscriptionMetadata::_internal_real_time_factor() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.real_time_factor_;
-}
-inline void TranscriptionMetadata::_internal_set_real_time_factor(float value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.real_time_factor_ = value;
-}
-
 // -------------------------------------------------------------------
 
 // STTOutput
@@ -5744,7 +5658,7 @@ inline void STTOutput::set_allocated_text(::std::string* PROTOBUF_NULLABLE value
 inline void STTOutput::clear_confidence() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.confidence_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline float STTOutput::confidence() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.confidence)
@@ -5752,7 +5666,7 @@ inline float STTOutput::confidence() const {
 }
 inline void STTOutput::set_confidence(float value) {
   _internal_set_confidence(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.confidence)
 }
 inline float STTOutput::_internal_confidence() const {
@@ -5766,13 +5680,13 @@ inline void STTOutput::_internal_set_confidence(float value) {
 
 // optional string language = 14;
 inline bool STTOutput::has_language() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
   return value;
 }
 inline void STTOutput::clear_language() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.language_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline const ::std::string& STTOutput::language() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -5782,13 +5696,13 @@ inline const ::std::string& STTOutput::language() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void STTOutput::set_language(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   _impl_.language_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.language)
 }
 inline ::std::string* PROTOBUF_NONNULL STTOutput::mutable_language()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   ::std::string* _s = _internal_mutable_language();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.language)
   return _s;
@@ -5808,10 +5722,10 @@ inline ::std::string* PROTOBUF_NONNULL STTOutput::_internal_mutable_language() {
 inline ::std::string* PROTOBUF_NULLABLE STTOutput::release_language() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.STTOutput.language)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   auto* released = _impl_.language_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.language_.Set("", GetArena());
@@ -5821,9 +5735,9 @@ inline ::std::string* PROTOBUF_NULLABLE STTOutput::release_language() {
 inline void STTOutput::set_allocated_language(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
   }
   _impl_.language_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_.IsDefault()) {
@@ -5944,14 +5858,14 @@ STTOutput::_internal_mutable_alternatives() {
 
 // .runanywhere.v1.TranscriptionMetadata metadata = 6;
 inline bool STTOutput::has_metadata() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
   PROTOBUF_ASSUME(!value || _impl_.metadata_ != nullptr);
   return value;
 }
 inline void STTOutput::clear_metadata() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.metadata_ != nullptr) _impl_.metadata_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline const ::runanywhere::v1::TranscriptionMetadata& STTOutput::_internal_metadata() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -5970,16 +5884,16 @@ inline void STTOutput::unsafe_arena_set_allocated_metadata(
   }
   _impl_.metadata_ = reinterpret_cast<::runanywhere::v1::TranscriptionMetadata*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTOutput.metadata)
 }
 inline ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NULLABLE STTOutput::release_metadata() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   ::runanywhere::v1::TranscriptionMetadata* released = _impl_.metadata_;
   _impl_.metadata_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -5999,7 +5913,7 @@ inline ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NULLABLE STTOutput::un
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.STTOutput.metadata)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   ::runanywhere::v1::TranscriptionMetadata* temp = _impl_.metadata_;
   _impl_.metadata_ = nullptr;
   return temp;
@@ -6014,7 +5928,7 @@ inline ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NONNULL STTOutput::_in
 }
 inline ::runanywhere::v1::TranscriptionMetadata* PROTOBUF_NONNULL STTOutput::mutable_metadata()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   ::runanywhere::v1::TranscriptionMetadata* _msg = _internal_mutable_metadata();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.metadata)
   return _msg;
@@ -6031,9 +5945,9 @@ inline void STTOutput::set_allocated_metadata(::runanywhere::v1::TranscriptionMe
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   }
 
   _impl_.metadata_ = reinterpret_cast<::runanywhere::v1::TranscriptionMetadata*>(value);
@@ -6044,7 +5958,7 @@ inline void STTOutput::set_allocated_metadata(::runanywhere::v1::TranscriptionMe
 inline void STTOutput::clear_timestamp_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline ::int64_t STTOutput::timestamp_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.timestamp_ms)
@@ -6052,7 +5966,7 @@ inline ::int64_t STTOutput::timestamp_ms() const {
 }
 inline void STTOutput::set_timestamp_ms(::int64_t value) {
   _internal_set_timestamp_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.timestamp_ms)
 }
 inline ::int64_t STTOutput::_internal_timestamp_ms() const {
@@ -6160,103 +6074,11 @@ STTOutput::_internal_mutable_speaker_ids() {
   return &_impl_.speaker_ids_;
 }
 
-// optional string error_message = 11;
-inline bool STTOutput::has_error_message() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
-  return value;
-}
-inline void STTOutput::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline const ::std::string& STTOutput::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTOutput::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL STTOutput::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.error_message)
-  return _s;
-}
-inline const ::std::string& STTOutput::_internal_error_message() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
-}
-inline void STTOutput::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL STTOutput::_internal_mutable_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTOutput::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTOutput.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  return released;
-}
-inline void STTOutput::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-  }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTOutput.error_message)
-}
-
-// int32 error_code = 12;
-inline void STTOutput::clear_error_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
-}
-inline ::int32_t STTOutput::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.error_code)
-  return _internal_error_code();
-}
-inline void STTOutput::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.error_code)
-}
-inline ::int32_t STTOutput::_internal_error_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
-}
-inline void STTOutput::_internal_set_error_code(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
-}
-
 // int32 segment_index = 13;
 inline void STTOutput::clear_segment_index() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.segment_index_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
 inline ::int32_t STTOutput::segment_index() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.segment_index)
@@ -6264,7 +6086,7 @@ inline ::int32_t STTOutput::segment_index() const {
 }
 inline void STTOutput::set_segment_index(::int32_t value) {
   _internal_set_segment_index(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTOutput.segment_index)
 }
 inline ::int32_t STTOutput::_internal_segment_index() const {
@@ -6274,6 +6096,99 @@ inline ::int32_t STTOutput::_internal_segment_index() const {
 inline void STTOutput::_internal_set_segment_index(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.segment_index_ = value;
+}
+
+// optional .runanywhere.v1.SDKError error = 15;
+inline bool STTOutput::has_error() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::SDKError& STTOutput::_internal_error() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
+}
+inline const ::runanywhere::v1::SDKError& STTOutput::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.STTOutput.error)
+  return _internal_error();
+}
+inline void STTOutput::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTOutput.error)
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE STTOutput::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE STTOutput::unsafe_arena_release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.STTOutput.error)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL STTOutput::_internal_mutable_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL STTOutput::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTOutput.error)
+  return _msg;
+}
+inline void STTOutput::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTOutput.error)
 }
 
 // -------------------------------------------------------------------
@@ -6801,35 +6716,11 @@ inline void STTPartialResult::set_allocated_final_output(::runanywhere::v1::STTO
 
 // STTStreamEvent
 
-// uint64 seq = 1;
-inline void STTStreamEvent::clear_seq() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.seq_ = ::uint64_t{0u};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline ::uint64_t STTStreamEvent::seq() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.seq)
-  return _internal_seq();
-}
-inline void STTStreamEvent::set_seq(::uint64_t value) {
-  _internal_set_seq(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTStreamEvent.seq)
-}
-inline ::uint64_t STTStreamEvent::_internal_seq() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.seq_;
-}
-inline void STTStreamEvent::_internal_set_seq(::uint64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.seq_ = value;
-}
-
 // int64 timestamp_us = 2;
 inline void STTStreamEvent::clear_timestamp_us() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_us_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::int64_t STTStreamEvent::timestamp_us() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.timestamp_us)
@@ -6837,7 +6728,7 @@ inline ::int64_t STTStreamEvent::timestamp_us() const {
 }
 inline void STTStreamEvent::set_timestamp_us(::int64_t value) {
   _internal_set_timestamp_us(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTStreamEvent.timestamp_us)
 }
 inline ::int64_t STTStreamEvent::_internal_timestamp_us() const {
@@ -6917,7 +6808,7 @@ inline void STTStreamEvent::set_allocated_request_id(::std::string* PROTOBUF_NUL
 inline void STTStreamEvent::clear_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.kind_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::runanywhere::v1::STTStreamEventKind STTStreamEvent::kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.kind)
@@ -6925,7 +6816,7 @@ inline ::runanywhere::v1::STTStreamEventKind STTStreamEvent::kind() const {
 }
 inline void STTStreamEvent::set_kind(::runanywhere::v1::STTStreamEventKind value) {
   _internal_set_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTStreamEvent.kind)
 }
 inline ::runanywhere::v1::STTStreamEventKind STTStreamEvent::_internal_kind() const {
@@ -6939,14 +6830,14 @@ inline void STTStreamEvent::_internal_set_kind(::runanywhere::v1::STTStreamEvent
 
 // optional .runanywhere.v1.STTPartialResult partial = 5;
 inline bool STTStreamEvent::has_partial() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   PROTOBUF_ASSUME(!value || _impl_.partial_ != nullptr);
   return value;
 }
 inline void STTStreamEvent::clear_partial() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.partial_ != nullptr) _impl_.partial_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline const ::runanywhere::v1::STTPartialResult& STTStreamEvent::_internal_partial() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -6965,16 +6856,16 @@ inline void STTStreamEvent::unsafe_arena_set_allocated_partial(
   }
   _impl_.partial_ = reinterpret_cast<::runanywhere::v1::STTPartialResult*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTStreamEvent.partial)
 }
 inline ::runanywhere::v1::STTPartialResult* PROTOBUF_NULLABLE STTStreamEvent::release_partial() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::STTPartialResult* released = _impl_.partial_;
   _impl_.partial_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -6994,7 +6885,7 @@ inline ::runanywhere::v1::STTPartialResult* PROTOBUF_NULLABLE STTStreamEvent::un
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.STTStreamEvent.partial)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::STTPartialResult* temp = _impl_.partial_;
   _impl_.partial_ = nullptr;
   return temp;
@@ -7009,7 +6900,7 @@ inline ::runanywhere::v1::STTPartialResult* PROTOBUF_NONNULL STTStreamEvent::_in
 }
 inline ::runanywhere::v1::STTPartialResult* PROTOBUF_NONNULL STTStreamEvent::mutable_partial()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::STTPartialResult* _msg = _internal_mutable_partial();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTStreamEvent.partial)
   return _msg;
@@ -7026,9 +6917,9 @@ inline void STTStreamEvent::set_allocated_partial(::runanywhere::v1::STTPartialR
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
 
   _impl_.partial_ = reinterpret_cast<::runanywhere::v1::STTPartialResult*>(value);
@@ -7037,14 +6928,14 @@ inline void STTStreamEvent::set_allocated_partial(::runanywhere::v1::STTPartialR
 
 // optional .runanywhere.v1.STTOutput final_output = 6;
 inline bool STTStreamEvent::has_final_output() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   PROTOBUF_ASSUME(!value || _impl_.final_output_ != nullptr);
   return value;
 }
 inline void STTStreamEvent::clear_final_output() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.final_output_ != nullptr) _impl_.final_output_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline const ::runanywhere::v1::STTOutput& STTStreamEvent::_internal_final_output() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -7063,16 +6954,16 @@ inline void STTStreamEvent::unsafe_arena_set_allocated_final_output(
   }
   _impl_.final_output_ = reinterpret_cast<::runanywhere::v1::STTOutput*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTStreamEvent.final_output)
 }
 inline ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE STTStreamEvent::release_final_output() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::STTOutput* released = _impl_.final_output_;
   _impl_.final_output_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -7092,7 +6983,7 @@ inline ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE STTStreamEvent::unsafe_ar
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.STTStreamEvent.final_output)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::STTOutput* temp = _impl_.final_output_;
   _impl_.final_output_ = nullptr;
   return temp;
@@ -7107,7 +6998,7 @@ inline ::runanywhere::v1::STTOutput* PROTOBUF_NONNULL STTStreamEvent::_internal_
 }
 inline ::runanywhere::v1::STTOutput* PROTOBUF_NONNULL STTStreamEvent::mutable_final_output()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::STTOutput* _msg = _internal_mutable_final_output();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTStreamEvent.final_output)
   return _msg;
@@ -7124,105 +7015,106 @@ inline void STTStreamEvent::set_allocated_final_output(::runanywhere::v1::STTOut
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
 
   _impl_.final_output_ = reinterpret_cast<::runanywhere::v1::STTOutput*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTStreamEvent.final_output)
 }
 
-// optional string error_message = 7;
-inline bool STTStreamEvent::has_error_message() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+// optional .runanywhere.v1.SDKError error = 9;
+inline bool STTStreamEvent::has_error() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
   return value;
 }
-inline void STTStreamEvent::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& STTStreamEvent::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTStreamEvent::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTStreamEvent.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL STTStreamEvent::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTStreamEvent.error_message)
-  return _s;
-}
-inline const ::std::string& STTStreamEvent::_internal_error_message() const {
+inline const ::runanywhere::v1::SDKError& STTStreamEvent::_internal_error() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
 }
-inline void STTStreamEvent::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
+inline const ::runanywhere::v1::SDKError& STTStreamEvent::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.error)
+  return _internal_error();
 }
-inline ::std::string* PROTOBUF_NONNULL STTStreamEvent::_internal_mutable_error_message() {
+inline void STTStreamEvent::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTStreamEvent::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTStreamEvent.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTStreamEvent.error)
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE STTStreamEvent::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
   }
   return released;
 }
-inline void STTStreamEvent::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE STTStreamEvent::unsafe_arena_release_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTStreamEvent.error_message)
-}
+  // @@protoc_insertion_point(field_release:runanywhere.v1.STTStreamEvent.error)
 
-// int32 error_code = 8;
-inline void STTStreamEvent::clear_error_code() {
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL STTStreamEvent::_internal_mutable_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
 }
-inline ::int32_t STTStreamEvent::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.error_code)
-  return _internal_error_code();
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL STTStreamEvent::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTStreamEvent.error)
+  return _msg;
 }
-inline void STTStreamEvent::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTStreamEvent.error_code)
-}
-inline ::int32_t STTStreamEvent::_internal_error_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
-}
-inline void STTStreamEvent::_internal_set_error_code(::int32_t value) {
+inline void STTStreamEvent::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTStreamEvent.error)
 }
 
 // -------------------------------------------------------------------
@@ -7417,96 +7309,97 @@ STTServiceState::_internal_mutable_supported_language_codes() {
   return &_impl_.supported_language_codes_;
 }
 
-// optional string error_message = 5;
-inline bool STTServiceState::has_error_message() const {
+// optional .runanywhere.v1.SDKError error = 7;
+inline bool STTServiceState::has_error() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
   return value;
 }
-inline void STTServiceState::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline const ::std::string& STTServiceState::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTServiceState.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void STTServiceState::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTServiceState.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL STTServiceState::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTServiceState.error_message)
-  return _s;
-}
-inline const ::std::string& STTServiceState::_internal_error_message() const {
+inline const ::runanywhere::v1::SDKError& STTServiceState::_internal_error() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
 }
-inline void STTServiceState::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
+inline const ::runanywhere::v1::SDKError& STTServiceState::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.STTServiceState.error)
+  return _internal_error();
 }
-inline ::std::string* PROTOBUF_NONNULL STTServiceState::_internal_mutable_error_message() {
+inline void STTServiceState::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE STTServiceState::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.STTServiceState.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
-    return nullptr;
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  return released;
-}
-inline void STTServiceState::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTServiceState.error_message)
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.STTServiceState.error)
 }
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE STTServiceState::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
 
-// int32 error_code = 6;
-inline void STTServiceState::clear_error_code() {
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE STTServiceState::unsafe_arena_release_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.STTServiceState.error)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
 }
-inline ::int32_t STTServiceState::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.STTServiceState.error_code)
-  return _internal_error_code();
-}
-inline void STTServiceState::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.STTServiceState.error_code)
-}
-inline ::int32_t STTServiceState::_internal_error_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
-}
-inline void STTServiceState::_internal_set_error_code(::int32_t value) {
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL STTServiceState::_internal_mutable_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL STTServiceState::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.STTServiceState.error)
+  return _msg;
+}
+inline void STTServiceState::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTServiceState.error)
 }
 
 #ifdef __GNUC__

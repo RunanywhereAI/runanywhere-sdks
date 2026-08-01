@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum ToolParameterType {
     TOOL_PARAMETER_TYPE_UNSPECIFIED = 0,
@@ -94,11 +95,10 @@ export interface ToolResult {
     toolCallId: string;
     name: string;
     resultJson: string;
-    error?: string | undefined;
-    /** When false and error is empty, fall back to result_json semantics. */
-    success: boolean;
     startedAtMs: number;
     completedAtMs: number;
+    /** Unset means the tool ran successfully; fall back to result_json semantics. */
+    error?: SDKError | undefined;
 }
 export interface ToolCallingOptions {
     /** Empty means the SDK falls back to its registered tools. */
@@ -124,10 +124,9 @@ export interface ToolCallingResult {
     isComplete: boolean;
     conversationId?: string | undefined;
     iterationsUsed: number;
-    errorMessage?: string | undefined;
-    errorCode: number;
     rawText: string;
     thinkingContent?: string | undefined;
+    error?: SDKError | undefined;
 }
 export interface ToolParseRequest {
     text: string;
@@ -138,8 +137,7 @@ export interface ToolParseResult {
     toolCalls: ToolCall[];
     /** Model text left over after the calls were extracted. */
     remainingText: string;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export interface ToolPromptFormatRequest {
     userPrompt: string;
@@ -151,8 +149,7 @@ export interface ToolPromptFormatRequest {
 export interface ToolPromptFormatResult {
     formattedPrompt: string;
     format: ToolCallFormatName;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export interface ToolCallValidationRequest {
     toolCall?: ToolCall | undefined;
@@ -164,8 +161,7 @@ export interface ToolCallValidationResult {
     matchedTool?: ToolDefinition | undefined;
     /** Arguments coerced to the matched tool's parameter types. */
     normalizedArgumentsJson: string;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export declare const ToolValue: MessageFns<ToolValue>;
 export declare const ToolValueArray: MessageFns<ToolValueArray>;

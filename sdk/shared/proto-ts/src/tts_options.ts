@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import {
   AudioFormat,
   audioFormatFromJSON,
@@ -190,8 +191,6 @@ export interface TTSSynthesisMetadata {
   processingTimeMs: number;
   characterCount: number;
   audioDurationMs: number;
-  /** character_count / processing_time_ms, set by the producer. */
-  charactersPerSecond: number;
 }
 
 export interface TTSOutput {
@@ -215,8 +214,7 @@ export interface TTSOutput {
   chunkIndex: number;
   isFinal: boolean;
   audioSizeBytes: number;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 /**
@@ -234,8 +232,7 @@ export interface TTSSpeakResult {
     | undefined;
   /** Milliseconds since epoch, when speech completed. */
   timestampMs: number;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 export interface TTSVoiceInfo {
@@ -259,21 +256,21 @@ export interface TTSVoiceList {
 }
 
 export interface TTSStreamEvent {
-  seq: number;
   timestampUs: number;
   requestId: string;
   kind: TTSStreamEventKind;
   output?: TTSOutput | undefined;
   phoneme?: TTSPhonemeTimestamp | undefined;
-  speakResult?: TTSSpeakResult | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  speakResult?:
+    | TTSSpeakResult
+    | undefined;
   /** progress is 0.0-1.0 when known; total_chunks 0 = unknown. */
   progress: number;
   chunkIndex: number;
   totalChunks: number;
   elapsedMs: number;
   statusMessage: string;
+  error?: SDKError | undefined;
 }
 
 export interface TTSServiceState {
@@ -281,8 +278,7 @@ export interface TTSServiceState {
   currentVoice?: string | undefined;
   voices: TTSVoiceInfo[];
   supportedLanguageCodes: string[];
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 function createBaseTTSConfiguration(): TTSConfiguration {
@@ -982,14 +978,7 @@ export const TTSPhonemeTimestamp: MessageFns<TTSPhonemeTimestamp> = {
 };
 
 function createBaseTTSSynthesisMetadata(): TTSSynthesisMetadata {
-  return {
-    voiceId: "",
-    languageCode: "",
-    processingTimeMs: 0,
-    characterCount: 0,
-    audioDurationMs: 0,
-    charactersPerSecond: 0,
-  };
+  return { voiceId: "", languageCode: "", processingTimeMs: 0, characterCount: 0, audioDurationMs: 0 };
 }
 
 export const TTSSynthesisMetadata: MessageFns<TTSSynthesisMetadata> = {
@@ -1008,9 +997,6 @@ export const TTSSynthesisMetadata: MessageFns<TTSSynthesisMetadata> = {
     }
     if (message.audioDurationMs !== 0) {
       writer.uint32(40).int64(message.audioDurationMs);
-    }
-    if (message.charactersPerSecond !== 0) {
-      writer.uint32(53).float(message.charactersPerSecond);
     }
     return writer;
   },
@@ -1062,14 +1048,6 @@ export const TTSSynthesisMetadata: MessageFns<TTSSynthesisMetadata> = {
           message.audioDurationMs = longToNumber(reader.int64());
           continue;
         }
-        case 6: {
-          if (tag !== 53) {
-            break;
-          }
-
-          message.charactersPerSecond = reader.float();
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1106,11 +1084,6 @@ export const TTSSynthesisMetadata: MessageFns<TTSSynthesisMetadata> = {
         : isSet(object.audio_duration_ms)
         ? globalThis.Number(object.audio_duration_ms)
         : 0,
-      charactersPerSecond: isSet(object.charactersPerSecond)
-        ? globalThis.Number(object.charactersPerSecond)
-        : isSet(object.characters_per_second)
-        ? globalThis.Number(object.characters_per_second)
-        : 0,
     };
   },
 
@@ -1131,9 +1104,6 @@ export const TTSSynthesisMetadata: MessageFns<TTSSynthesisMetadata> = {
     if (message.audioDurationMs !== 0) {
       obj.audioDurationMs = Math.round(message.audioDurationMs);
     }
-    if (message.charactersPerSecond !== 0) {
-      obj.charactersPerSecond = message.charactersPerSecond;
-    }
     return obj;
   },
 
@@ -1147,7 +1117,6 @@ export const TTSSynthesisMetadata: MessageFns<TTSSynthesisMetadata> = {
     message.processingTimeMs = object.processingTimeMs ?? 0;
     message.characterCount = object.characterCount ?? 0;
     message.audioDurationMs = object.audioDurationMs ?? 0;
-    message.charactersPerSecond = object.charactersPerSecond ?? 0;
     return message;
   },
 };
@@ -1164,8 +1133,7 @@ function createBaseTTSOutput(): TTSOutput {
     chunkIndex: 0,
     isFinal: false,
     audioSizeBytes: 0,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
@@ -1201,11 +1169,8 @@ export const TTSOutput: MessageFns<TTSOutput> = {
     if (message.audioSizeBytes !== 0) {
       writer.uint32(80).int64(message.audioSizeBytes);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(90).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(96).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(106).fork()).join();
     }
     return writer;
   },
@@ -1297,20 +1262,12 @@ export const TTSOutput: MessageFns<TTSOutput> = {
           message.audioSizeBytes = longToNumber(reader.int64());
           continue;
         }
-        case 11: {
-          if (tag !== 90) {
+        case 13: {
+          if (tag !== 106) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1370,16 +1327,7 @@ export const TTSOutput: MessageFns<TTSOutput> = {
         : isSet(object.audio_size_bytes)
         ? globalThis.Number(object.audio_size_bytes)
         : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1415,11 +1363,8 @@ export const TTSOutput: MessageFns<TTSOutput> = {
     if (message.audioSizeBytes !== 0) {
       obj.audioSizeBytes = Math.round(message.audioSizeBytes);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1441,8 +1386,9 @@ export const TTSOutput: MessageFns<TTSOutput> = {
     message.chunkIndex = object.chunkIndex ?? 0;
     message.isFinal = object.isFinal ?? false;
     message.audioSizeBytes = object.audioSizeBytes ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1455,8 +1401,7 @@ function createBaseTTSSpeakResult(): TTSSpeakResult {
     audioSizeBytes: 0,
     metadata: undefined,
     timestampMs: 0,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
@@ -1480,11 +1425,8 @@ export const TTSSpeakResult: MessageFns<TTSSpeakResult> = {
     if (message.timestampMs !== 0) {
       writer.uint32(48).int64(message.timestampMs);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(58).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(64).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -1544,20 +1486,12 @@ export const TTSSpeakResult: MessageFns<TTSSpeakResult> = {
           message.timestampMs = longToNumber(reader.int64());
           continue;
         }
-        case 7: {
-          if (tag !== 58) {
+        case 9: {
+          if (tag !== 74) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1597,16 +1531,7 @@ export const TTSSpeakResult: MessageFns<TTSSpeakResult> = {
         : isSet(object.timestamp_ms)
         ? globalThis.Number(object.timestamp_ms)
         : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1630,11 +1555,8 @@ export const TTSSpeakResult: MessageFns<TTSSpeakResult> = {
     if (message.timestampMs !== 0) {
       obj.timestampMs = Math.round(message.timestampMs);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1652,8 +1574,9 @@ export const TTSSpeakResult: MessageFns<TTSSpeakResult> = {
       ? TTSSynthesisMetadata.fromPartial(object.metadata)
       : undefined;
     message.timestampMs = object.timestampMs ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1942,28 +1865,23 @@ export const TTSVoiceList: MessageFns<TTSVoiceList> = {
 
 function createBaseTTSStreamEvent(): TTSStreamEvent {
   return {
-    seq: 0,
     timestampUs: 0,
     requestId: "",
     kind: 0,
     output: undefined,
     phoneme: undefined,
     speakResult: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
     progress: 0,
     chunkIndex: 0,
     totalChunks: 0,
     elapsedMs: 0,
     statusMessage: "",
+    error: undefined,
   };
 }
 
 export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
   encode(message: TTSStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.seq !== 0) {
-      writer.uint32(8).uint64(message.seq);
-    }
     if (message.timestampUs !== 0) {
       writer.uint32(16).int64(message.timestampUs);
     }
@@ -1982,12 +1900,6 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
     if (message.speakResult !== undefined) {
       TTSSpeakResult.encode(message.speakResult, writer.uint32(58).fork()).join();
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(66).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(72).int32(message.errorCode);
-    }
     if (message.progress !== 0) {
       writer.uint32(85).float(message.progress);
     }
@@ -2003,6 +1915,9 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
     if (message.statusMessage !== "") {
       writer.uint32(114).string(message.statusMessage);
     }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(122).fork()).join();
+    }
     return writer;
   },
 
@@ -2013,14 +1928,6 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.seq = longToNumber(reader.uint64());
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -2069,22 +1976,6 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
           message.speakResult = TTSSpeakResult.decode(reader, reader.uint32());
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
         case 10: {
           if (tag !== 85) {
             break;
@@ -2125,6 +2016,14 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
           message.statusMessage = reader.string();
           continue;
         }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2136,7 +2035,6 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
 
   fromJSON(object: any): TTSStreamEvent {
     return {
-      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -2155,16 +2053,6 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
         : isSet(object.speak_result)
         ? TTSSpeakResult.fromJSON(object.speak_result)
         : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
       progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
       chunkIndex: isSet(object.chunkIndex)
         ? globalThis.Number(object.chunkIndex)
@@ -2186,14 +2074,12 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
         : isSet(object.status_message)
         ? globalThis.String(object.status_message)
         : "",
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: TTSStreamEvent): unknown {
     const obj: any = {};
-    if (message.seq !== 0) {
-      obj.seq = Math.round(message.seq);
-    }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
     }
@@ -2212,12 +2098,6 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
     if (message.speakResult !== undefined) {
       obj.speakResult = TTSSpeakResult.toJSON(message.speakResult);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
     if (message.progress !== 0) {
       obj.progress = message.progress;
     }
@@ -2233,6 +2113,9 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
     if (message.statusMessage !== "") {
       obj.statusMessage = message.statusMessage;
     }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
     return obj;
   },
 
@@ -2241,7 +2124,6 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
   },
   fromPartial<I extends Exact<DeepPartial<TTSStreamEvent>, I>>(object: I): TTSStreamEvent {
     const message = createBaseTTSStreamEvent();
-    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.requestId = object.requestId ?? "";
     message.kind = object.kind ?? 0;
@@ -2254,26 +2136,20 @@ export const TTSStreamEvent: MessageFns<TTSStreamEvent> = {
     message.speakResult = (object.speakResult !== undefined && object.speakResult !== null)
       ? TTSSpeakResult.fromPartial(object.speakResult)
       : undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     message.progress = object.progress ?? 0;
     message.chunkIndex = object.chunkIndex ?? 0;
     message.totalChunks = object.totalChunks ?? 0;
     message.elapsedMs = object.elapsedMs ?? 0;
     message.statusMessage = object.statusMessage ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
 function createBaseTTSServiceState(): TTSServiceState {
-  return {
-    isReady: false,
-    currentVoice: undefined,
-    voices: [],
-    supportedLanguageCodes: [],
-    errorMessage: undefined,
-    errorCode: 0,
-  };
+  return { isReady: false, currentVoice: undefined, voices: [], supportedLanguageCodes: [], error: undefined };
 }
 
 export const TTSServiceState: MessageFns<TTSServiceState> = {
@@ -2290,11 +2166,8 @@ export const TTSServiceState: MessageFns<TTSServiceState> = {
     for (const v of message.supportedLanguageCodes) {
       writer.uint32(34).string(v!);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(42).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(48).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -2338,20 +2211,12 @@ export const TTSServiceState: MessageFns<TTSServiceState> = {
           message.supportedLanguageCodes.push(reader.string());
           continue;
         }
-        case 5: {
-          if (tag !== 42) {
+        case 7: {
+          if (tag !== 58) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2381,16 +2246,7 @@ export const TTSServiceState: MessageFns<TTSServiceState> = {
         : globalThis.Array.isArray(object?.supported_language_codes)
         ? object.supported_language_codes.map((e: any) => globalThis.String(e))
         : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2408,11 +2264,8 @@ export const TTSServiceState: MessageFns<TTSServiceState> = {
     if (message.supportedLanguageCodes?.length) {
       obj.supportedLanguageCodes = message.supportedLanguageCodes;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2426,8 +2279,9 @@ export const TTSServiceState: MessageFns<TTSServiceState> = {
     message.currentVoice = object.currentVoice ?? undefined;
     message.voices = object.voices?.map((e) => TTSVoiceInfo.fromPartial(e)) || [];
     message.supportedLanguageCodes = object.supportedLanguageCodes?.map((e) => e) || [];
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

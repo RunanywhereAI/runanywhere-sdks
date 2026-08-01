@@ -8,17 +8,10 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere IDL — voice agent streaming service.
+// RunAnywhere IDL — voice agent composition and turn handling.
 //
-// gRPC-style service whose `Stream` rpc returns a server-streaming sequence
-// of `VoiceEvent` messages (defined in voice_events.proto). This is NOT
-// transported over network gRPC — frontends use the codegen-emitted client
-// stub purely for its idiomatic streaming type (AsyncStream / Flow / Stream
-// / AsyncIterable) and wire it to the in-process C callback via a thin
-// adapter (~150 LOC per language).
-//
-// The service definition is the abstract contract; the per-language
-// adapter is the only hand-written piece.
+// Commons owns the STT to LLM to TTS orchestration; platform adapters own mic
+// capture, playback, and audio-session ownership.
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -37,16 +30,12 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// Empty request type — the voice agent already has its config set via
-/// `rac_voice_agent_init()` at handle creation time. The Stream rpc just
-/// opens a new event subscription on an existing handle.
+/// Subscription parameters for the agent's event stream.
 public nonisolated struct RAVoiceAgentRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Optional: filter the stream to only certain VoiceEvent.payload arms
-  /// (e.g. "user_said,assistant_token"). Empty = all events.
   public var eventFilter: String = String()
 
   public var sessionID: String = String()
@@ -64,28 +53,16 @@ public nonisolated struct RAVoiceAgentRequest: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// One-shot voice-turn result.
-///
-/// Mirrors Swift `VoiceAgentResult`, Kotlin `VoiceAgentResult`, RN
-/// `VoiceTurnResult`, Web `VoiceAgentResult`, Flutter (TBD), and the C ABI
-/// `rac_voice_agent_result_t` (rac/features/voice_agent/rac_voice_agent.h).
-/// Returned by the `processVoiceTurn` ergonomic API where a single audio
-/// blob produces transcription + assistant response + synthesized audio in
-/// one call (as opposed to the streaming path served by the Stream rpc).
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Whether the input audio passed VAD's speech-detected check.
   public var speechDetected: Bool {
     get {_storage._speechDetected}
     set {_uniqueStorage()._speechDetected = newValue}
   }
 
-  /// Transcribed text from STT. Unset when speech_detected=false.
   public var transcription: String {
     get {_storage._transcription ?? String()}
     set {_uniqueStorage()._transcription = newValue}
@@ -95,8 +72,6 @@ public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
   /// Clears the value of `transcription`. Subsequent reads from it will return its default value.
   public mutating func clearTranscription() {_uniqueStorage()._transcription = nil}
 
-  /// Generated assistant response text from the LLM. Unset when STT
-  /// produced no transcription or LLM was skipped.
   public var assistantResponse: String {
     get {_storage._assistantResponse ?? String()}
     set {_uniqueStorage()._assistantResponse = newValue}
@@ -106,9 +81,6 @@ public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
   /// Clears the value of `assistantResponse`. Subsequent reads from it will return its default value.
   public mutating func clearAssistantResponse() {_uniqueStorage()._assistantResponse = nil}
 
-  /// Thinking content extracted from `<think>...</think>` tags
-  /// (qwen3, deepseek-r1). Unset when the active LLM does not emit
-  /// a chain-of-thought trace.
   public var thinkingContent: String {
     get {_storage._thinkingContent ?? String()}
     set {_uniqueStorage()._thinkingContent = newValue}
@@ -118,9 +90,6 @@ public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
   /// Clears the value of `thinkingContent`. Subsequent reads from it will return its default value.
   public mutating func clearThinkingContent() {_uniqueStorage()._thinkingContent = nil}
 
-  /// Synthesized audio data from TTS. Encoding follows AudioFrameEvent
-  /// conventions (typically PCM-F32-LE, sample rate per voice). Unset
-  /// when TTS was skipped or auto_play_tts=false in VoiceSessionConfig.
   public var synthesizedAudio: Data {
     get {_storage._synthesizedAudio ?? Data()}
     set {_uniqueStorage()._synthesizedAudio = newValue}
@@ -130,9 +99,6 @@ public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
   /// Clears the value of `synthesizedAudio`. Subsequent reads from it will return its default value.
   public mutating func clearSynthesizedAudio() {_uniqueStorage()._synthesizedAudio = nil}
 
-  /// Component states captured at the end of the turn — useful for UIs
-  /// surfacing readiness / partial-failure breakdowns alongside the
-  /// final result. Unset when the caller does not ask for it.
   public var finalState: RAVoiceAgentComponentStates {
     get {_storage._finalState ?? RAVoiceAgentComponentStates()}
     set {_uniqueStorage()._finalState = newValue}
@@ -142,8 +108,7 @@ public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
   /// Clears the value of `finalState`. Subsequent reads from it will return its default value.
   public mutating func clearFinalState() {_uniqueStorage()._finalState = nil}
 
-  /// Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
-  /// or unknown.
+  /// Required to interpret synthesized_audio.
   public var synthesizedAudioSampleRateHz: Int32 {
     get {_storage._synthesizedAudioSampleRateHz}
     set {_uniqueStorage()._synthesizedAudioSampleRateHz = newValue}
@@ -169,6 +134,7 @@ public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
     set {_uniqueStorage()._turnID = newValue}
   }
 
+  /// Per-stage timings, then the wall-clock total.
   public var sttTimeMs: Int64 {
     get {_storage._sttTimeMs}
     set {_uniqueStorage()._sttTimeMs = newValue}
@@ -189,19 +155,14 @@ public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
     set {_uniqueStorage()._totalTimeMs = newValue}
   }
 
-  public var errorMessage: String {
-    get {_storage._errorMessage ?? String()}
-    set {_uniqueStorage()._errorMessage = newValue}
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
-
-  public var errorCode: Int32 {
-    get {_storage._errorCode}
-    set {_uniqueStorage()._errorCode = newValue}
-  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -210,6 +171,7 @@ public nonisolated struct RAVoiceAgentResult: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
+/// One-shot turn: audio in, transcription plus response plus audio out.
 public nonisolated struct RAVoiceAgentTurnRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -245,8 +207,6 @@ public nonisolated struct RAVoiceAgentTurnRequest: Sendable {
   fileprivate var _sessionConfig: RAVoiceSessionConfig? = nil
 }
 
-/// One audio frame fed into a live voice-agent session. Replaces the
-/// seven-scalar rac_voice_agent_feed_audio_proto signature.
 public nonisolated struct RAVoiceAgentAudioFrame: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -260,7 +220,6 @@ public nonisolated struct RAVoiceAgentAudioFrame: Sendable {
 
   public var encoding: RAAudioEncoding = .unspecified
 
-  /// Marks the end of the utterance (flush).
   public var isFinal: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -268,44 +227,27 @@ public nonisolated struct RAVoiceAgentAudioFrame: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Voice session behavior configuration.
-///
-/// Mirrors Swift `VoiceSessionConfig` and Kotlin `VoiceSessionConfig`.
-/// Controls runtime behavior of the voice agent's session loop — silence
-/// timing, speech threshold, auto-TTS playback, continuous mode, and
-/// LLM thinking-mode toggle.
-/// ---------------------------------------------------------------------------
+/// Commons reads silence_duration_ms and max_tokens. The remaining fields are
+/// declared but not consumed by the C++ voice agent.
 public nonisolated struct RAVoiceSessionConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Silence duration (milliseconds) before processing the speech
-  /// buffer. Default per Swift/Kotlin: 1500 ms.
   public var silenceDurationMs: Int32 = 0
 
-  /// Minimum audio level to detect speech (0.0 - 1.0). Default per
-  /// Swift/Kotlin: 0.1.
   public var speechThreshold: Float = 0
 
-  /// Whether to auto-play TTS response after synthesis. Default true.
   public var autoPlayTts: Bool = false
 
-  /// Whether to auto-resume listening after TTS playback. Default true.
   public var continuousMode: Bool = false
 
-  /// Whether thinking mode is enabled for the LLM (qwen3, deepseek-r1).
-  /// Default false.
   public var thinkingModeEnabled: Bool = false
 
-  /// Optional per-turn LLM max token limit. 0 = LLM/default.
   public var maxTokens: Int32 = 0
 
-  /// Maximum recording duration before forcing an end-of-turn. 0 = default.
   public var maxRecordingDurationMs: Int32 = 0
 
-  /// Optional language/voice hints passed to STT/TTS adapters.
   public var languageCode: String {
     get {_languageCode ?? String()}
     set {_languageCode = newValue}
@@ -332,12 +274,6 @@ public nonisolated struct RAVoiceSessionConfig: Sendable {
   fileprivate var _voiceID: String? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// Audio pipeline state-manager configuration.
-///
-/// Mirrors rac_audio_pipeline_config_t and the Swift state-manager knobs used
-/// to prevent microphone/TTS feedback loops.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAAudioPipelineConfig: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -354,27 +290,13 @@ public nonisolated struct RAAudioPipelineConfig: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Aggregated voice-agent compose configuration.
-///
-/// Mirrors the C ABI `rac_voice_agent_config_t` and Swift
-/// `VoiceAgentConfiguration`. The existing `runanywhere.v1.VoiceAgentConfig`
-/// (idl/solutions.proto) is kept frozen for the SolutionConfig oneof — this
-/// new message provides the fine-grained sub-component view consumed by the
-/// `rac_voice_agent_initialize()` C entry-point.
-///
-/// Each sub-config string field uses a "model_id" naming convention; the
-/// runtime resolves IDs against the model registry. An empty string means
-/// "use the currently loaded model/voice for that capability".
-/// ---------------------------------------------------------------------------
+/// Each component takes a path, an id, or a name; commons resolves whichever is
+/// present through the model registry.
 public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// -------------------------------------------------------------------
-  /// STT sub-config (mirrors rac_voice_agent_stt_config_t).
-  /// -------------------------------------------------------------------
   public var sttModelPath: String {
     get {_storage._sttModelPath ?? String()}
     set {_uniqueStorage()._sttModelPath = newValue}
@@ -402,9 +324,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   /// Clears the value of `sttModelName`. Subsequent reads from it will return its default value.
   public mutating func clearSttModelName() {_uniqueStorage()._sttModelName = nil}
 
-  /// -------------------------------------------------------------------
-  /// LLM sub-config (mirrors rac_voice_agent_llm_config_t).
-  /// -------------------------------------------------------------------
   public var llmModelPath: String {
     get {_storage._llmModelPath ?? String()}
     set {_uniqueStorage()._llmModelPath = newValue}
@@ -432,9 +351,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   /// Clears the value of `llmModelName`. Subsequent reads from it will return its default value.
   public mutating func clearLlmModelName() {_uniqueStorage()._llmModelName = nil}
 
-  /// -------------------------------------------------------------------
-  /// TTS sub-config (mirrors rac_voice_agent_tts_config_t).
-  /// -------------------------------------------------------------------
   public var ttsVoicePath: String {
     get {_storage._ttsVoicePath ?? String()}
     set {_uniqueStorage()._ttsVoicePath = newValue}
@@ -471,8 +387,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   /// Clears the value of `vadConfig`. Subsequent reads from it will return its default value.
   public mutating func clearVadConfig() {_uniqueStorage()._vadConfig = nil}
 
-  /// LLM generation knobs for the response model (sampling, system prompt,
-  /// reasoning). Unset = voice-agent defaults from the generated pool.
   public var llmGeneration: RALLMGenerationOptions {
     get {_storage._llmGeneration ?? RALLMGenerationOptions()}
     set {_uniqueStorage()._llmGeneration = newValue}
@@ -482,10 +396,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   /// Clears the value of `llmGeneration`. Subsequent reads from it will return its default value.
   public mutating func clearLlmGeneration() {_uniqueStorage()._llmGeneration = nil}
 
-  /// -------------------------------------------------------------------
-  /// Session-behavior sub-config. Optional so the C ABI can be invoked
-  /// without runtime-behavior overrides (engine defaults applied).
-  /// -------------------------------------------------------------------
   public var sessionConfig: RAVoiceSessionConfig {
     get {_storage._sessionConfig ?? RAVoiceSessionConfig()}
     set {_uniqueStorage()._sessionConfig = newValue}
@@ -495,8 +405,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   /// Clears the value of `sessionConfig`. Subsequent reads from it will return its default value.
   public mutating func clearSessionConfig() {_uniqueStorage()._sessionConfig = nil}
 
-  /// Audio state-machine behavior. Optional so defaults can be applied by
-  /// the native voice-agent implementation.
   public var audioPipelineConfig: RAAudioPipelineConfig {
     get {_storage._audioPipelineConfig ?? RAAudioPipelineConfig()}
     set {_uniqueStorage()._audioPipelineConfig = newValue}
@@ -506,7 +414,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   /// Clears the value of `audioPipelineConfig`. Subsequent reads from it will return its default value.
   public mutating func clearAudioPipelineConfig() {_uniqueStorage()._audioPipelineConfig = nil}
 
-  /// Correlation and defaults for event streams and one-shot turn APIs.
   public var sessionID: String {
     get {_storage._sessionID ?? String()}
     set {_uniqueStorage()._sessionID = newValue}
@@ -532,7 +439,6 @@ public nonisolated struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-/// Helper-level proto requests for voice-agent sub-components.
 public nonisolated struct RAVoiceAgentTranscribeProtoRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -641,7 +547,7 @@ nonisolated extension RAVoiceAgentRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 nonisolated extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}speech_detected\0\u{1}transcription\0\u{3}assistant_response\0\u{3}thinking_content\0\u{3}synthesized_audio\0\u{3}final_state\0\u{3}synthesized_audio_sample_rate_hz\0\u{3}synthesized_audio_channels\0\u{3}synthesized_audio_encoding\0\u{3}session_id\0\u{3}turn_id\0\u{3}stt_time_ms\0\u{3}llm_time_ms\0\u{3}tts_time_ms\0\u{3}total_time_ms\0\u{3}error_message\0\u{3}error_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}speech_detected\0\u{1}transcription\0\u{3}assistant_response\0\u{3}thinking_content\0\u{3}synthesized_audio\0\u{3}final_state\0\u{3}synthesized_audio_sample_rate_hz\0\u{3}synthesized_audio_channels\0\u{3}synthesized_audio_encoding\0\u{3}session_id\0\u{3}turn_id\0\u{3}stt_time_ms\0\u{3}llm_time_ms\0\u{3}tts_time_ms\0\u{3}total_time_ms\0\u{2}\u{3}error\0")
 
   fileprivate class _StorageClass {
     var _speechDetected: Bool = false
@@ -659,8 +565,7 @@ nonisolated extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._
     var _llmTimeMs: Int64 = 0
     var _ttsTimeMs: Int64 = 0
     var _totalTimeMs: Int64 = 0
-    var _errorMessage: String? = nil
-    var _errorCode: Int32 = 0
+    var _error: RASDKError? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -686,8 +591,7 @@ nonisolated extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._
       _llmTimeMs = source._llmTimeMs
       _ttsTimeMs = source._ttsTimeMs
       _totalTimeMs = source._totalTimeMs
-      _errorMessage = source._errorMessage
-      _errorCode = source._errorCode
+      _error = source._error
     }
   }
 
@@ -721,8 +625,7 @@ nonisolated extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._
         case 13: try { try decoder.decodeSingularInt64Field(value: &_storage._llmTimeMs) }()
         case 14: try { try decoder.decodeSingularInt64Field(value: &_storage._ttsTimeMs) }()
         case 15: try { try decoder.decodeSingularInt64Field(value: &_storage._totalTimeMs) }()
-        case 16: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
-        case 17: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        case 18: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
         }
       }
@@ -780,12 +683,9 @@ nonisolated extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._
       if _storage._totalTimeMs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._totalTimeMs, fieldNumber: 15)
       }
-      try { if let v = _storage._errorMessage {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 16)
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
       } }()
-      if _storage._errorCode != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 17)
-      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -810,8 +710,7 @@ nonisolated extension RAVoiceAgentResult: SwiftProtobuf.Message, SwiftProtobuf._
         if _storage._llmTimeMs != rhs_storage._llmTimeMs {return false}
         if _storage._ttsTimeMs != rhs_storage._ttsTimeMs {return false}
         if _storage._totalTimeMs != rhs_storage._totalTimeMs {return false}
-        if _storage._errorMessage != rhs_storage._errorMessage {return false}
-        if _storage._errorCode != rhs_storage._errorCode {return false}
+        if _storage._error != rhs_storage._error {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1056,7 +955,7 @@ nonisolated extension RAAudioPipelineConfig: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentComposeConfig"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{4}\u{b}session_config\0\u{3}audio_pipeline_config\0\u{3}session_id\0\u{3}default_language_code\0\u{3}vad_config\0\u{3}llm_generation\0\u{b}wakeword_enabled\0\u{b}wakeword_model_path\0\u{b}wakeword_model_id\0\u{b}wakeword_phrase\0\u{b}wakeword_threshold\0\u{b}wakeword_embedding_model_path\0\u{b}wakeword_vad_model_path\0\u{c}\u{a}\u{3}\u{c}\u{d}\u{7}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_model_path\0\u{3}stt_model_id\0\u{3}stt_model_name\0\u{3}llm_model_path\0\u{3}llm_model_id\0\u{3}llm_model_name\0\u{3}tts_voice_path\0\u{3}tts_voice_id\0\u{3}tts_voice_name\0\u{4}\u{b}session_config\0\u{3}audio_pipeline_config\0\u{3}session_id\0\u{3}default_language_code\0\u{3}vad_config\0\u{3}llm_generation\0")
 
   fileprivate class _StorageClass {
     var _sttModelPath: String? = nil

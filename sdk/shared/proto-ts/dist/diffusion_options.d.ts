@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum DiffusionMode {
@@ -138,21 +139,18 @@ export interface DiffusionResult {
     totalTimeMs: number;
     safetyFlag: boolean;
     usedScheduler: DiffusionScheduler;
-    errorMessage?: string | undefined;
-    errorCode: number;
     imageMediaType?: string | undefined;
     batchImages: Uint8Array[];
     imagesGenerated: number;
+    error?: SDKError | undefined;
 }
 export interface DiffusionStreamEvent {
-    seq: number;
     timestampUs: number;
     requestId: string;
     kind: DiffusionStreamEventKind;
     progress?: DiffusionProgress | undefined;
     result?: DiffusionResult | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export declare const DiffusionTokenizerSource: MessageFns<DiffusionTokenizerSource>;
 export declare const DiffusionConfiguration: MessageFns<DiffusionConfiguration>;

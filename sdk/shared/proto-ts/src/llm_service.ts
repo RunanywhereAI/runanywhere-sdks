@@ -7,7 +7,9 @@
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ChatMessage } from "./chat";
+import { SDKError } from "./errors";
 import { LLMGenerationOptions } from "./llm_options";
+import { TokenUsage } from "./token_usage";
 import { ToolCall, ToolCallingResult, ToolResult } from "./tool_calling";
 import { TokenKind, tokenKindFromJSON, tokenKindToJSON } from "./voice_events";
 
@@ -107,24 +109,19 @@ export interface LLMGenerateRequest_MetadataEntry {
 export interface LLMStreamFinalResult {
   text: string;
   thinkingContent?: string | undefined;
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
   totalTimeMs: number;
   timeToFirstTokenMs: number;
-  tokensPerSecond: number;
   finishReason: string;
-  errorCode: number;
-  errorMessage: string;
   promptEvalTimeMs: number;
   decodeTimeMs: number;
   toolCalls: ToolCall[];
   toolResults: ToolResult[];
+  usage?: TokenUsage | undefined;
+  error?: SDKError | undefined;
 }
 
 /** `result` is populated only on the terminal event. */
 export interface LLMStreamEvent {
-  seq: number;
   timestampUs: number;
   token: string;
   isFinal: boolean;
@@ -132,9 +129,7 @@ export interface LLMStreamEvent {
   tokenId: number;
   logprob: number;
   finishReason: string;
-  errorMessage: string;
   result?: LLMStreamFinalResult | undefined;
-  errorCode: number;
   eventKind: LLMStreamEventKind;
   requestId: string;
   conversationId: string;
@@ -142,6 +137,7 @@ export interface LLMStreamEvent {
   completionTokensGenerated: number;
   elapsedMs: number;
   toolCall?: ToolCall | undefined;
+  error?: SDKError | undefined;
 }
 
 /** Tool-driven streaming uses this session path, not LLMGenerateRequest. */
@@ -456,19 +452,15 @@ function createBaseLLMStreamFinalResult(): LLMStreamFinalResult {
   return {
     text: "",
     thinkingContent: undefined,
-    inputTokens: 0,
-    outputTokens: 0,
-    totalTokens: 0,
     totalTimeMs: 0,
     timeToFirstTokenMs: 0,
-    tokensPerSecond: 0,
     finishReason: "",
-    errorCode: 0,
-    errorMessage: "",
     promptEvalTimeMs: 0,
     decodeTimeMs: 0,
     toolCalls: [],
     toolResults: [],
+    usage: undefined,
+    error: undefined,
   };
 }
 
@@ -480,32 +472,14 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
     if (message.thinkingContent !== undefined) {
       writer.uint32(18).string(message.thinkingContent);
     }
-    if (message.inputTokens !== 0) {
-      writer.uint32(24).int32(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      writer.uint32(32).int32(message.outputTokens);
-    }
-    if (message.totalTokens !== 0) {
-      writer.uint32(40).int32(message.totalTokens);
-    }
     if (message.totalTimeMs !== 0) {
       writer.uint32(48).int64(message.totalTimeMs);
     }
     if (message.timeToFirstTokenMs !== 0) {
       writer.uint32(56).int64(message.timeToFirstTokenMs);
     }
-    if (message.tokensPerSecond !== 0) {
-      writer.uint32(69).float(message.tokensPerSecond);
-    }
     if (message.finishReason !== "") {
       writer.uint32(74).string(message.finishReason);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(80).int32(message.errorCode);
-    }
-    if (message.errorMessage !== "") {
-      writer.uint32(90).string(message.errorMessage);
     }
     if (message.promptEvalTimeMs !== 0) {
       writer.uint32(96).int64(message.promptEvalTimeMs);
@@ -518,6 +492,12 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
     }
     for (const v of message.toolResults) {
       ToolResult.encode(v!, writer.uint32(122).fork()).join();
+    }
+    if (message.usage !== undefined) {
+      TokenUsage.encode(message.usage, writer.uint32(130).fork()).join();
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(138).fork()).join();
     }
     return writer;
   },
@@ -545,30 +525,6 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
           message.thinkingContent = reader.string();
           continue;
         }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.inputTokens = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.outputTokens = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.totalTokens = reader.int32();
-          continue;
-        }
         case 6: {
           if (tag !== 48) {
             break;
@@ -585,36 +541,12 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
           message.timeToFirstTokenMs = longToNumber(reader.int64());
           continue;
         }
-        case 8: {
-          if (tag !== 69) {
-            break;
-          }
-
-          message.tokensPerSecond = reader.float();
-          continue;
-        }
         case 9: {
           if (tag !== 74) {
             break;
           }
 
           message.finishReason = reader.string();
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
           continue;
         }
         case 12: {
@@ -649,6 +581,22 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
           message.toolResults.push(ToolResult.decode(reader, reader.uint32()));
           continue;
         }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.usage = TokenUsage.decode(reader, reader.uint32());
+          continue;
+        }
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -666,21 +614,6 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
         : isSet(object.thinking_content)
         ? globalThis.String(object.thinking_content)
         : undefined,
-      inputTokens: isSet(object.inputTokens)
-        ? globalThis.Number(object.inputTokens)
-        : isSet(object.input_tokens)
-        ? globalThis.Number(object.input_tokens)
-        : 0,
-      outputTokens: isSet(object.outputTokens)
-        ? globalThis.Number(object.outputTokens)
-        : isSet(object.output_tokens)
-        ? globalThis.Number(object.output_tokens)
-        : 0,
-      totalTokens: isSet(object.totalTokens)
-        ? globalThis.Number(object.totalTokens)
-        : isSet(object.total_tokens)
-        ? globalThis.Number(object.total_tokens)
-        : 0,
       totalTimeMs: isSet(object.totalTimeMs)
         ? globalThis.Number(object.totalTimeMs)
         : isSet(object.total_time_ms)
@@ -691,25 +624,10 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
         : isSet(object.time_to_first_token_ms)
         ? globalThis.Number(object.time_to_first_token_ms)
         : 0,
-      tokensPerSecond: isSet(object.tokensPerSecond)
-        ? globalThis.Number(object.tokensPerSecond)
-        : isSet(object.tokens_per_second)
-        ? globalThis.Number(object.tokens_per_second)
-        : 0,
       finishReason: isSet(object.finishReason)
         ? globalThis.String(object.finishReason)
         : isSet(object.finish_reason)
         ? globalThis.String(object.finish_reason)
-        : "",
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
         : "",
       promptEvalTimeMs: isSet(object.promptEvalTimeMs)
         ? globalThis.Number(object.promptEvalTimeMs)
@@ -731,6 +649,8 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
         : globalThis.Array.isArray(object?.tool_results)
         ? object.tool_results.map((e: any) => ToolResult.fromJSON(e))
         : [],
+      usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -742,32 +662,14 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
     if (message.thinkingContent !== undefined) {
       obj.thinkingContent = message.thinkingContent;
     }
-    if (message.inputTokens !== 0) {
-      obj.inputTokens = Math.round(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      obj.outputTokens = Math.round(message.outputTokens);
-    }
-    if (message.totalTokens !== 0) {
-      obj.totalTokens = Math.round(message.totalTokens);
-    }
     if (message.totalTimeMs !== 0) {
       obj.totalTimeMs = Math.round(message.totalTimeMs);
     }
     if (message.timeToFirstTokenMs !== 0) {
       obj.timeToFirstTokenMs = Math.round(message.timeToFirstTokenMs);
     }
-    if (message.tokensPerSecond !== 0) {
-      obj.tokensPerSecond = message.tokensPerSecond;
-    }
     if (message.finishReason !== "") {
       obj.finishReason = message.finishReason;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
     }
     if (message.promptEvalTimeMs !== 0) {
       obj.promptEvalTimeMs = Math.round(message.promptEvalTimeMs);
@@ -781,6 +683,12 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
     if (message.toolResults?.length) {
       obj.toolResults = message.toolResults.map((e) => ToolResult.toJSON(e));
     }
+    if (message.usage !== undefined) {
+      obj.usage = TokenUsage.toJSON(message.usage);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
     return obj;
   },
 
@@ -791,26 +699,25 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
     const message = createBaseLLMStreamFinalResult();
     message.text = object.text ?? "";
     message.thinkingContent = object.thinkingContent ?? undefined;
-    message.inputTokens = object.inputTokens ?? 0;
-    message.outputTokens = object.outputTokens ?? 0;
-    message.totalTokens = object.totalTokens ?? 0;
     message.totalTimeMs = object.totalTimeMs ?? 0;
     message.timeToFirstTokenMs = object.timeToFirstTokenMs ?? 0;
-    message.tokensPerSecond = object.tokensPerSecond ?? 0;
     message.finishReason = object.finishReason ?? "";
-    message.errorCode = object.errorCode ?? 0;
-    message.errorMessage = object.errorMessage ?? "";
     message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
     message.decodeTimeMs = object.decodeTimeMs ?? 0;
     message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
     message.toolResults = object.toolResults?.map((e) => ToolResult.fromPartial(e)) || [];
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? TokenUsage.fromPartial(object.usage)
+      : undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
 function createBaseLLMStreamEvent(): LLMStreamEvent {
   return {
-    seq: 0,
     timestampUs: 0,
     token: "",
     isFinal: false,
@@ -818,9 +725,7 @@ function createBaseLLMStreamEvent(): LLMStreamEvent {
     tokenId: 0,
     logprob: 0,
     finishReason: "",
-    errorMessage: "",
     result: undefined,
-    errorCode: 0,
     eventKind: 0,
     requestId: "",
     conversationId: "",
@@ -828,14 +733,12 @@ function createBaseLLMStreamEvent(): LLMStreamEvent {
     completionTokensGenerated: 0,
     elapsedMs: 0,
     toolCall: undefined,
+    error: undefined,
   };
 }
 
 export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
   encode(message: LLMStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.seq !== 0) {
-      writer.uint32(8).uint64(message.seq);
-    }
     if (message.timestampUs !== 0) {
       writer.uint32(16).int64(message.timestampUs);
     }
@@ -857,14 +760,8 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     if (message.finishReason !== "") {
       writer.uint32(66).string(message.finishReason);
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(74).string(message.errorMessage);
-    }
     if (message.result !== undefined) {
       LLMStreamFinalResult.encode(message.result, writer.uint32(82).fork()).join();
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(88).int32(message.errorCode);
     }
     if (message.eventKind !== 0) {
       writer.uint32(96).int32(message.eventKind);
@@ -887,6 +784,9 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     if (message.toolCall !== undefined) {
       ToolCall.encode(message.toolCall, writer.uint32(146).fork()).join();
     }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(154).fork()).join();
+    }
     return writer;
   },
 
@@ -897,14 +797,6 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.seq = longToNumber(reader.uint64());
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -961,28 +853,12 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
           message.finishReason = reader.string();
           continue;
         }
-        case 9: {
-          if (tag !== 74) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 10: {
           if (tag !== 82) {
             break;
           }
 
           message.result = LLMStreamFinalResult.decode(reader, reader.uint32());
-          continue;
-        }
-        case 11: {
-          if (tag !== 88) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
           continue;
         }
         case 12: {
@@ -1041,6 +917,14 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
           message.toolCall = ToolCall.decode(reader, reader.uint32());
           continue;
         }
+        case 19: {
+          if (tag !== 154) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1052,7 +936,6 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
 
   fromJSON(object: any): LLMStreamEvent {
     return {
-      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -1076,17 +959,7 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
         : isSet(object.finish_reason)
         ? globalThis.String(object.finish_reason)
         : "",
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       result: isSet(object.result) ? LLMStreamFinalResult.fromJSON(object.result) : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
       eventKind: isSet(object.eventKind)
         ? lLMStreamEventKindFromJSON(object.eventKind)
         : isSet(object.event_kind)
@@ -1122,14 +995,12 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
         : isSet(object.tool_call)
         ? ToolCall.fromJSON(object.tool_call)
         : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: LLMStreamEvent): unknown {
     const obj: any = {};
-    if (message.seq !== 0) {
-      obj.seq = Math.round(message.seq);
-    }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
     }
@@ -1151,14 +1022,8 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     if (message.finishReason !== "") {
       obj.finishReason = message.finishReason;
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.result !== undefined) {
       obj.result = LLMStreamFinalResult.toJSON(message.result);
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
     }
     if (message.eventKind !== 0) {
       obj.eventKind = lLMStreamEventKindToJSON(message.eventKind);
@@ -1181,6 +1046,9 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     if (message.toolCall !== undefined) {
       obj.toolCall = ToolCall.toJSON(message.toolCall);
     }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
     return obj;
   },
 
@@ -1189,7 +1057,6 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
   },
   fromPartial<I extends Exact<DeepPartial<LLMStreamEvent>, I>>(object: I): LLMStreamEvent {
     const message = createBaseLLMStreamEvent();
-    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.token = object.token ?? "";
     message.isFinal = object.isFinal ?? false;
@@ -1197,11 +1064,9 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     message.tokenId = object.tokenId ?? 0;
     message.logprob = object.logprob ?? 0;
     message.finishReason = object.finishReason ?? "";
-    message.errorMessage = object.errorMessage ?? "";
     message.result = (object.result !== undefined && object.result !== null)
       ? LLMStreamFinalResult.fromPartial(object.result)
       : undefined;
-    message.errorCode = object.errorCode ?? 0;
     message.eventKind = object.eventKind ?? 0;
     message.requestId = object.requestId ?? "";
     message.conversationId = object.conversationId ?? "";
@@ -1210,6 +1075,9 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     message.elapsedMs = object.elapsedMs ?? 0;
     message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
       ? ToolCall.fromPartial(object.toolCall)
+      : undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
       : undefined;
     return message;
   },

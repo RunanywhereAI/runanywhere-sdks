@@ -130,14 +130,12 @@ export interface SdkInitPhase2Request {
  * Returned by Phase 1, Phase 2, and retryHTTP.
  *
  * A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
- * to fail in offline mode, in which case success=true, http_configured=false,
+ * to fail in offline mode, in which case error is unset, http_configured=false,
  * and warning holds the offline notice while the SDK continues on cached
  * models.
  */
 export interface SdkInitResult {
   phase: SdkInitPhase;
-  /** The phase reached its terminal step. */
-  success: boolean;
   error?:
     | SDKError
     | undefined;
@@ -473,7 +471,6 @@ export const SdkInitPhase2Request: MessageFns<SdkInitPhase2Request> = {
 function createBaseSdkInitResult(): SdkInitResult {
   return {
     phase: 0,
-    success: false,
     error: undefined,
     httpConfigured: false,
     deviceRegistered: false,
@@ -490,9 +487,6 @@ export const SdkInitResult: MessageFns<SdkInitResult> = {
   encode(message: SdkInitResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.phase !== 0) {
       writer.uint32(8).int32(message.phase);
-    }
-    if (message.success !== false) {
-      writer.uint32(16).bool(message.success);
     }
     if (message.error !== undefined) {
       SDKError.encode(message.error, writer.uint32(26).fork()).join();
@@ -537,14 +531,6 @@ export const SdkInitResult: MessageFns<SdkInitResult> = {
           }
 
           message.phase = reader.int32() as any;
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.success = reader.bool();
           continue;
         }
         case 3: {
@@ -631,7 +617,6 @@ export const SdkInitResult: MessageFns<SdkInitResult> = {
   fromJSON(object: any): SdkInitResult {
     return {
       phase: isSet(object.phase) ? sdkInitPhaseFromJSON(object.phase) : 0,
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
       httpConfigured: isSet(object.httpConfigured)
         ? globalThis.Boolean(object.httpConfigured)
@@ -677,9 +662,6 @@ export const SdkInitResult: MessageFns<SdkInitResult> = {
     if (message.phase !== 0) {
       obj.phase = sdkInitPhaseToJSON(message.phase);
     }
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.error !== undefined) {
       obj.error = SDKError.toJSON(message.error);
     }
@@ -716,7 +698,6 @@ export const SdkInitResult: MessageFns<SdkInitResult> = {
   fromPartial<I extends Exact<DeepPartial<SdkInitResult>, I>>(object: I): SdkInitResult {
     const message = createBaseSdkInitResult();
     message.phase = object.phase ?? 0;
-    message.success = object.success ?? false;
     message.error = (object.error !== undefined && object.error !== null)
       ? SDKError.fromPartial(object.error)
       : undefined;

@@ -9,13 +9,6 @@
 //   https://github.com/apple/swift-protobuf/
 
 // RunAnywhere IDL — engine-router capability-query types.
-//
-// Moves per-SDK SDKComponent → ModelCategory →
-// framework mapping into commons. Frontends call
-// `rac_router_frameworks_for_capability_proto` with an
-// `SDKComponent` and receive the ordered list of `InferenceFramework`
-// values that can serve that capability, derived from the plugins
-// currently registered with the engine-router plugin registry.
 
 import SwiftProtobuf
 
@@ -29,12 +22,9 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// Request: ask commons which frameworks can serve a given SDK component.
-/// Maps to the engine-router plugin registry (not the model registry); this
-/// answers "which engines CAN run this capability on this host" independent
-/// of whether any matching model has been registered yet.
-/// ---------------------------------------------------------------------------
+/// Answers "which engines can run this capability on this host", from the
+/// engine-router plugin registry rather than the model registry, so it is
+/// independent of whether a matching model is registered.
 public nonisolated struct RAFrameworksForCapabilityRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -47,12 +37,8 @@ public nonisolated struct RAFrameworksForCapabilityRequest: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Response: ordered list of inference frameworks. Ordering matches the
-/// engine-router's priority-descending scan of registered plugins for the
-/// primitive(s) mapped from `component`. Duplicates are removed while
-/// preserving first-seen order.
-/// ---------------------------------------------------------------------------
+/// Ordered by the router's priority-descending scan of registered plugins.
+/// Duplicates removed, first-seen order preserved.
 public nonisolated struct RAFrameworksForCapabilityResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for

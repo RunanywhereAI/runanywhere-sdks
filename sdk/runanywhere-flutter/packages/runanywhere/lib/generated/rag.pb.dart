@@ -15,8 +15,10 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'errors.pb.dart' as $2;
 import 'llm_options.pb.dart' as $0;
 import 'rag.pbenum.dart';
+import 'token_usage.pb.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -679,13 +681,10 @@ class RAGResult extends $pb.GeneratedMessage {
     $fixnum.Int64? retrievalTimeMs,
     $fixnum.Int64? generationTimeMs,
     $fixnum.Int64? totalTimeMs,
-    $core.int? promptTokens,
-    $core.int? completionTokens,
-    $core.int? totalTokens,
-    $core.String? errorMessage,
-    $core.int? errorCode,
     $core.String? requestId,
     $core.String? thinkingContent,
+    $1.TokenUsage? usage,
+    $2.SDKError? error,
   }) {
     final result = create();
     if (answer != null) result.answer = answer;
@@ -694,13 +693,10 @@ class RAGResult extends $pb.GeneratedMessage {
     if (retrievalTimeMs != null) result.retrievalTimeMs = retrievalTimeMs;
     if (generationTimeMs != null) result.generationTimeMs = generationTimeMs;
     if (totalTimeMs != null) result.totalTimeMs = totalTimeMs;
-    if (promptTokens != null) result.promptTokens = promptTokens;
-    if (completionTokens != null) result.completionTokens = completionTokens;
-    if (totalTokens != null) result.totalTokens = totalTokens;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
     if (requestId != null) result.requestId = requestId;
     if (thinkingContent != null) result.thinkingContent = thinkingContent;
+    if (usage != null) result.usage = usage;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -724,13 +720,12 @@ class RAGResult extends $pb.GeneratedMessage {
     ..aInt64(4, _omitFieldNames ? '' : 'retrievalTimeMs')
     ..aInt64(5, _omitFieldNames ? '' : 'generationTimeMs')
     ..aInt64(6, _omitFieldNames ? '' : 'totalTimeMs')
-    ..aI(7, _omitFieldNames ? '' : 'promptTokens')
-    ..aI(8, _omitFieldNames ? '' : 'completionTokens')
-    ..aI(9, _omitFieldNames ? '' : 'totalTokens')
-    ..aOS(10, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(11, _omitFieldNames ? '' : 'errorCode')
     ..aOS(12, _omitFieldNames ? '' : 'requestId')
     ..aOS(13, _omitFieldNames ? '' : 'thinkingContent')
+    ..aOM<$1.TokenUsage>(14, _omitFieldNames ? '' : 'usage',
+        subBuilder: $1.TokenUsage.create)
+    ..aOM<$2.SDKError>(15, _omitFieldNames ? '' : 'error',
+        subBuilder: $2.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -799,70 +794,45 @@ class RAGResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearTotalTimeMs() => $_clearField(6);
 
-  /// These use the OpenAI legacy names; everything else in the IDL says
-  /// input_tokens / output_tokens.
-  @$pb.TagNumber(7)
-  $core.int get promptTokens => $_getIZ(6);
-  @$pb.TagNumber(7)
-  set promptTokens($core.int value) => $_setSignedInt32(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasPromptTokens() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearPromptTokens() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.int get completionTokens => $_getIZ(7);
-  @$pb.TagNumber(8)
-  set completionTokens($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasCompletionTokens() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearCompletionTokens() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.int get totalTokens => $_getIZ(8);
-  @$pb.TagNumber(9)
-  set totalTokens($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasTotalTokens() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearTotalTokens() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.String get errorMessage => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set errorMessage($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasErrorMessage() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearErrorMessage() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.int get errorCode => $_getIZ(10);
-  @$pb.TagNumber(11)
-  set errorCode($core.int value) => $_setSignedInt32(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasErrorCode() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearErrorCode() => $_clearField(11);
-
   @$pb.TagNumber(12)
-  $core.String get requestId => $_getSZ(11);
+  $core.String get requestId => $_getSZ(6);
   @$pb.TagNumber(12)
-  set requestId($core.String value) => $_setString(11, value);
+  set requestId($core.String value) => $_setString(6, value);
   @$pb.TagNumber(12)
-  $core.bool hasRequestId() => $_has(11);
+  $core.bool hasRequestId() => $_has(6);
   @$pb.TagNumber(12)
   void clearRequestId() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $core.String get thinkingContent => $_getSZ(12);
+  $core.String get thinkingContent => $_getSZ(7);
   @$pb.TagNumber(13)
-  set thinkingContent($core.String value) => $_setString(12, value);
+  set thinkingContent($core.String value) => $_setString(7, value);
   @$pb.TagNumber(13)
-  $core.bool hasThinkingContent() => $_has(12);
+  $core.bool hasThinkingContent() => $_has(7);
   @$pb.TagNumber(13)
   void clearThinkingContent() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $1.TokenUsage get usage => $_getN(8);
+  @$pb.TagNumber(14)
+  set usage($1.TokenUsage value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasUsage() => $_has(8);
+  @$pb.TagNumber(14)
+  void clearUsage() => $_clearField(14);
+  @$pb.TagNumber(14)
+  $1.TokenUsage ensureUsage() => $_ensure(8);
+
+  @$pb.TagNumber(15)
+  $2.SDKError get error => $_getN(9);
+  @$pb.TagNumber(15)
+  set error($2.SDKError value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasError() => $_has(9);
+  @$pb.TagNumber(15)
+  void clearError() => $_clearField(15);
+  @$pb.TagNumber(15)
+  $2.SDKError ensureError() => $_ensure(9);
 }
 
 class RAGStatistics extends $pb.GeneratedMessage {
@@ -876,8 +846,7 @@ class RAGStatistics extends $pb.GeneratedMessage {
     $fixnum.Int64? vectorStoreSizeBytes,
     $core.bool? isPersistent,
     $fixnum.Int64? lastQueryMs,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $2.SDKError? error,
   }) {
     final result = create();
     if (indexedDocuments != null) result.indexedDocuments = indexedDocuments;
@@ -891,8 +860,7 @@ class RAGStatistics extends $pb.GeneratedMessage {
       result.vectorStoreSizeBytes = vectorStoreSizeBytes;
     if (isPersistent != null) result.isPersistent = isPersistent;
     if (lastQueryMs != null) result.lastQueryMs = lastQueryMs;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -918,8 +886,8 @@ class RAGStatistics extends $pb.GeneratedMessage {
     ..aInt64(7, _omitFieldNames ? '' : 'vectorStoreSizeBytes')
     ..aOB(8, _omitFieldNames ? '' : 'isPersistent')
     ..aInt64(9, _omitFieldNames ? '' : 'lastQueryMs')
-    ..aOS(10, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(11, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$2.SDKError>(12, _omitFieldNames ? '' : 'error',
+        subBuilder: $2.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1022,47 +990,36 @@ class RAGStatistics extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearLastQueryMs() => $_clearField(9);
 
-  @$pb.TagNumber(10)
-  $core.String get errorMessage => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set errorMessage($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasErrorMessage() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearErrorMessage() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.int get errorCode => $_getIZ(10);
-  @$pb.TagNumber(11)
-  set errorCode($core.int value) => $_setSignedInt32(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasErrorCode() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearErrorCode() => $_clearField(11);
+  @$pb.TagNumber(12)
+  $2.SDKError get error => $_getN(9);
+  @$pb.TagNumber(12)
+  set error($2.SDKError value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasError() => $_has(9);
+  @$pb.TagNumber(12)
+  void clearError() => $_clearField(12);
+  @$pb.TagNumber(12)
+  $2.SDKError ensureError() => $_ensure(9);
 }
 
 class RAGStreamEvent extends $pb.GeneratedMessage {
   factory RAGStreamEvent({
-    $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
     $core.String? requestId,
     RAGStreamEventKind? kind,
     RAGSearchResult? chunk,
     $core.String? token,
     RAGResult? result,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $2.SDKError? error,
   }) {
     final result$ = create();
-    if (seq != null) result$.seq = seq;
     if (timestampUs != null) result$.timestampUs = timestampUs;
     if (requestId != null) result$.requestId = requestId;
     if (kind != null) result$.kind = kind;
     if (chunk != null) result$.chunk = chunk;
     if (token != null) result$.token = token;
     if (result != null) result$.result = result;
-    if (errorMessage != null) result$.errorMessage = errorMessage;
-    if (errorCode != null) result$.errorCode = errorCode;
+    if (error != null) result$.error = error;
     return result$;
   }
 
@@ -1079,8 +1036,6 @@ class RAGStreamEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'RAGStreamEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6,
-        defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(3, _omitFieldNames ? '' : 'requestId')
     ..aE<RAGStreamEventKind>(4, _omitFieldNames ? '' : 'kind',
@@ -1090,8 +1045,8 @@ class RAGStreamEvent extends $pb.GeneratedMessage {
     ..aOS(6, _omitFieldNames ? '' : 'token')
     ..aOM<RAGResult>(7, _omitFieldNames ? '' : 'result',
         subBuilder: RAGResult.create)
-    ..aOS(8, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(9, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$2.SDKError>(10, _omitFieldNames ? '' : 'error',
+        subBuilder: $2.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1113,90 +1068,74 @@ class RAGStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<RAGStreamEvent>(create);
   static RAGStreamEvent? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $fixnum.Int64 get seq => $_getI64(0);
-  @$pb.TagNumber(1)
-  set seq($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSeq() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSeq() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $fixnum.Int64 get timestampUs => $_getI64(1);
+  $fixnum.Int64 get timestampUs => $_getI64(0);
   @$pb.TagNumber(2)
-  set timestampUs($fixnum.Int64 value) => $_setInt64(1, value);
+  set timestampUs($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasTimestampUs() => $_has(1);
+  $core.bool hasTimestampUs() => $_has(0);
   @$pb.TagNumber(2)
   void clearTimestampUs() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get requestId => $_getSZ(2);
+  $core.String get requestId => $_getSZ(1);
   @$pb.TagNumber(3)
-  set requestId($core.String value) => $_setString(2, value);
+  set requestId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasRequestId() => $_has(2);
+  $core.bool hasRequestId() => $_has(1);
   @$pb.TagNumber(3)
   void clearRequestId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  RAGStreamEventKind get kind => $_getN(3);
+  RAGStreamEventKind get kind => $_getN(2);
   @$pb.TagNumber(4)
   set kind(RAGStreamEventKind value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasKind() => $_has(3);
+  $core.bool hasKind() => $_has(2);
   @$pb.TagNumber(4)
   void clearKind() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  RAGSearchResult get chunk => $_getN(4);
+  RAGSearchResult get chunk => $_getN(3);
   @$pb.TagNumber(5)
   set chunk(RAGSearchResult value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasChunk() => $_has(4);
+  $core.bool hasChunk() => $_has(3);
   @$pb.TagNumber(5)
   void clearChunk() => $_clearField(5);
   @$pb.TagNumber(5)
-  RAGSearchResult ensureChunk() => $_ensure(4);
+  RAGSearchResult ensureChunk() => $_ensure(3);
 
   @$pb.TagNumber(6)
-  $core.String get token => $_getSZ(5);
+  $core.String get token => $_getSZ(4);
   @$pb.TagNumber(6)
-  set token($core.String value) => $_setString(5, value);
+  set token($core.String value) => $_setString(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasToken() => $_has(5);
+  $core.bool hasToken() => $_has(4);
   @$pb.TagNumber(6)
   void clearToken() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  RAGResult get result => $_getN(6);
+  RAGResult get result => $_getN(5);
   @$pb.TagNumber(7)
   set result(RAGResult value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasResult() => $_has(6);
+  $core.bool hasResult() => $_has(5);
   @$pb.TagNumber(7)
   void clearResult() => $_clearField(7);
   @$pb.TagNumber(7)
-  RAGResult ensureResult() => $_ensure(6);
+  RAGResult ensureResult() => $_ensure(5);
 
-  @$pb.TagNumber(8)
-  $core.String get errorMessage => $_getSZ(7);
-  @$pb.TagNumber(8)
-  set errorMessage($core.String value) => $_setString(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasErrorMessage() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearErrorMessage() => $_clearField(8);
-
-  @$pb.TagNumber(9)
-  $core.int get errorCode => $_getIZ(8);
-  @$pb.TagNumber(9)
-  set errorCode($core.int value) => $_setSignedInt32(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasErrorCode() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearErrorCode() => $_clearField(9);
+  @$pb.TagNumber(10)
+  $2.SDKError get error => $_getN(6);
+  @$pb.TagNumber(10)
+  set error($2.SDKError value) => $_setField(10, value);
+  @$pb.TagNumber(10)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(10)
+  void clearError() => $_clearField(10);
+  @$pb.TagNumber(10)
+  $2.SDKError ensureError() => $_ensure(6);
 }
 
 const $core.bool _omitFieldNames =

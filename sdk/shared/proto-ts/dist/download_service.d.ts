@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { ModelFileDescriptor, ModelInfo } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum DownloadStage {
@@ -93,8 +94,6 @@ export interface DownloadProgress {
     state: DownloadState;
     /** 0 on first try */
     retryAttempt: number;
-    /** populated when state == FAILED */
-    errorMessage: string;
     taskId: string;
     /** 0-based within the planned file list */
     currentFileIndex: number;
@@ -110,6 +109,8 @@ export interface DownloadProgress {
     currentFileName: string;
     /** logical resume marker, not a native handle */
     resumeToken: string;
+    /** populated when state == FAILED */
+    error?: SDKError | undefined;
 }
 export interface DownloadPlanRequest {
     modelId: string;
@@ -140,12 +141,12 @@ export interface DownloadPlanResult {
     canResume: boolean;
     resumeFromBytes: number;
     warnings: string[];
-    errorMessage: string;
     storageNamespace: string;
     resumeToken: string;
     requiredFreeBytesAfterDownload: number;
-    /** structured companion to error_message */
+    /** structured companion to error */
     failureReason: DownloadFailureReason;
+    error?: SDKError | undefined;
 }
 export interface DownloadStartRequest {
     modelId: string;
@@ -159,10 +160,10 @@ export interface DownloadStartResult {
     taskId: string;
     modelId: string;
     initialProgress?: DownloadProgress | undefined;
-    errorMessage: string;
     resumeToken: string;
-    /** structured companion to error_message */
+    /** structured companion to error */
     failureReason: DownloadFailureReason;
+    error?: SDKError | undefined;
 }
 export interface DownloadCancelRequest {
     taskId: string;
@@ -170,14 +171,13 @@ export interface DownloadCancelRequest {
     deletePartialBytes: boolean;
 }
 export interface DownloadCancelResult {
-    success: boolean;
     taskId: string;
     modelId: string;
     partialBytesDeleted: number;
-    errorMessage: string;
     wasRunning: boolean;
     partialBytesPreserved: boolean;
     resumeToken: string;
+    error?: SDKError | undefined;
 }
 export interface DownloadResumeRequest {
     taskId: string;
@@ -191,10 +191,10 @@ export interface DownloadResumeResult {
     taskId: string;
     modelId: string;
     initialProgress?: DownloadProgress | undefined;
-    errorMessage: string;
     resumeToken: string;
-    /** structured companion to error_message */
+    /** structured companion to error */
     failureReason: DownloadFailureReason;
+    error?: SDKError | undefined;
 }
 export declare const DownloadSubscribeRequest: MessageFns<DownloadSubscribeRequest>;
 export declare const DownloadProgress: MessageFns<DownloadProgress>;

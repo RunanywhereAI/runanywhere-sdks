@@ -31,18 +31,11 @@ import okio.ByteString
 
 public class StructuredOutputStreamEvent(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val seq: Long = 0L,
-  @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
@@ -50,14 +43,14 @@ public class StructuredOutputStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val request_id: String = "",
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.StructuredOutputStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val kind:
       StructuredOutputStreamEventKind = StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED,
@@ -65,43 +58,34 @@ public class StructuredOutputStreamEvent(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val token: String = "",
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "partialJson",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val partial_json: String? = null,
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.StructuredOutputValidation#ADAPTER",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val validation: StructuredOutputValidation? = null,
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.StructuredOutputResult#ADAPTER",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val result: StructuredOutputResult? = null,
   @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 8,
+    tag = 11,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 7,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 9,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputStreamEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -114,7 +98,6 @@ public class StructuredOutputStreamEvent(
     if (other === this) return true
     if (other !is StructuredOutputStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
-    if (seq != other.seq) return false
     if (timestamp_us != other.timestamp_us) return false
     if (request_id != other.request_id) return false
     if (kind != other.kind) return false
@@ -122,8 +105,7 @@ public class StructuredOutputStreamEvent(
     if (partial_json != other.partial_json) return false
     if (validation != other.validation) return false
     if (result != other.result) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -131,7 +113,6 @@ public class StructuredOutputStreamEvent(
     var result_ = super.hashCode
     if (result_ == 0) {
       result_ = unknownFields.hashCode()
-      result_ = result_ * 37 + seq.hashCode()
       result_ = result_ * 37 + timestamp_us.hashCode()
       result_ = result_ * 37 + request_id.hashCode()
       result_ = result_ * 37 + kind.hashCode()
@@ -139,8 +120,7 @@ public class StructuredOutputStreamEvent(
       result_ = result_ * 37 + (partial_json?.hashCode() ?: 0)
       result_ = result_ * 37 + (validation?.hashCode() ?: 0)
       result_ = result_ * 37 + (result?.hashCode() ?: 0)
-      result_ = result_ * 37 + (error_message?.hashCode() ?: 0)
-      result_ = result_ * 37 + error_code.hashCode()
+      result_ = result_ * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result_
     }
     return result_
@@ -148,7 +128,6 @@ public class StructuredOutputStreamEvent(
 
   override fun toString(): String {
     val result_ = mutableListOf<String>()
-    result_ += """seq=$seq"""
     result_ += """timestamp_us=$timestamp_us"""
     result_ += """request_id=${sanitize(request_id)}"""
     result_ += """kind=$kind"""
@@ -156,13 +135,11 @@ public class StructuredOutputStreamEvent(
     if (partial_json != null) result_ += """partial_json=${sanitize(partial_json)}"""
     if (validation != null) result_ += """validation=$validation"""
     if (result != null) result_ += """result=$result"""
-    if (error_message != null) result_ += """error_message=${sanitize(error_message)}"""
-    result_ += """error_code=$error_code"""
+    if (error != null) result_ += """error=$error"""
     return result_.joinToString(prefix = "StructuredOutputStreamEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
     request_id: String = this.request_id,
     kind: StructuredOutputStreamEventKind = this.kind,
@@ -170,10 +147,9 @@ public class StructuredOutputStreamEvent(
     partial_json: String? = this.partial_json,
     validation: StructuredOutputValidation? = this.validation,
     result: StructuredOutputResult? = this.result,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): StructuredOutputStreamEvent = StructuredOutputStreamEvent(seq, timestamp_us, request_id, kind, token, partial_json, validation, result, error_message, error_code, unknownFields)
+  ): StructuredOutputStreamEvent = StructuredOutputStreamEvent(timestamp_us, request_id, kind, token, partial_json, validation, result, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -188,9 +164,6 @@ public class StructuredOutputStreamEvent(
     ) {
       override fun encodedSize(`value`: StructuredOutputStreamEvent): Int {
         var size = value.unknownFields.size
-        if (value.seq != 0L) {
-          size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
         }
@@ -206,17 +179,11 @@ public class StructuredOutputStreamEvent(
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.partial_json)
         size += StructuredOutputValidation.ADAPTER.encodedSizeWithTag(7, value.validation)
         size += StructuredOutputResult.ADAPTER.encodedSizeWithTag(8, value.result)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(11, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: StructuredOutputStreamEvent) {
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
@@ -232,19 +199,13 @@ public class StructuredOutputStreamEvent(
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.partial_json)
         StructuredOutputValidation.ADAPTER.encodeWithTag(writer, 7, value.validation)
         StructuredOutputResult.ADAPTER.encodeWithTag(writer, 8, value.result)
-        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputStreamEvent) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 10, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         StructuredOutputResult.ADAPTER.encodeWithTag(writer, 8, value.result)
         StructuredOutputValidation.ADAPTER.encodeWithTag(writer, 7, value.validation)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.partial_json)
@@ -260,13 +221,9 @@ public class StructuredOutputStreamEvent(
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
-        }
       }
 
       override fun decode(reader: ProtoReader): StructuredOutputStreamEvent {
-        var seq: Long = 0L
         var timestamp_us: Long = 0L
         var request_id: String = ""
         var kind: StructuredOutputStreamEventKind = StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED
@@ -274,11 +231,9 @@ public class StructuredOutputStreamEvent(
         var partial_json: String? = null
         var validation: StructuredOutputValidation? = null
         var result: StructuredOutputResult? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> seq = ProtoAdapter.UINT64.decode(reader)
             2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             3 -> request_id = ProtoAdapter.STRING.decode(reader)
             4 -> try {
@@ -290,13 +245,11 @@ public class StructuredOutputStreamEvent(
             6 -> partial_json = ProtoAdapter.STRING.decode(reader)
             7 -> validation = StructuredOutputValidation.ADAPTER.decode(reader)
             8 -> result = StructuredOutputResult.ADAPTER.decode(reader)
-            9 -> error_message = ProtoAdapter.STRING.decode(reader)
-            10 -> error_code = ProtoAdapter.INT32.decode(reader)
+            11 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return StructuredOutputStreamEvent(
-          seq = seq,
           timestamp_us = timestamp_us,
           request_id = request_id,
           kind = kind,
@@ -304,8 +257,7 @@ public class StructuredOutputStreamEvent(
           partial_json = partial_json,
           validation = validation,
           result = result,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -313,6 +265,7 @@ public class StructuredOutputStreamEvent(
       override fun redact(`value`: StructuredOutputStreamEvent): StructuredOutputStreamEvent = value.copy(
         validation = value.validation?.let(StructuredOutputValidation.ADAPTER::redact),
         result = value.result?.let(StructuredOutputResult.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

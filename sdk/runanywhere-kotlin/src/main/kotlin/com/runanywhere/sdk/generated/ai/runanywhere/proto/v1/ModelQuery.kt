@@ -97,11 +97,10 @@ public class ModelQuery(
   public val sort_field: ModelQuerySortField? = null,
   @field:WireField(
     tag = 10,
-    adapter = "ai.runanywhere.proto.v1.ModelQuerySortOrder#ADAPTER",
-    jsonName = "sortOrder",
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     schemaIndex = 9,
   )
-  public val sort_order: ModelQuerySortOrder? = null,
+  public val descending: Boolean? = null,
   @field:WireField(
     tag = 11,
     adapter = "ai.runanywhere.proto.v1.ModelRegistryStatus#ADAPTER",
@@ -130,7 +129,7 @@ public class ModelQuery(
     if (search_query != other.search_query) return false
     if (source != other.source) return false
     if (sort_field != other.sort_field) return false
-    if (sort_order != other.sort_order) return false
+    if (descending != other.descending) return false
     if (registry_status != other.registry_status) return false
     return true
   }
@@ -148,7 +147,7 @@ public class ModelQuery(
       result = result * 37 + search_query.hashCode()
       result = result * 37 + (source?.hashCode() ?: 0)
       result = result * 37 + (sort_field?.hashCode() ?: 0)
-      result = result * 37 + (sort_order?.hashCode() ?: 0)
+      result = result * 37 + (descending?.hashCode() ?: 0)
       result = result * 37 + (registry_status?.hashCode() ?: 0)
       super.hashCode = result
     }
@@ -166,7 +165,7 @@ public class ModelQuery(
     result += """search_query=${sanitize(search_query)}"""
     if (source != null) result += """source=$source"""
     if (sort_field != null) result += """sort_field=$sort_field"""
-    if (sort_order != null) result += """sort_order=$sort_order"""
+    if (descending != null) result += """descending=$descending"""
     if (registry_status != null) result += """registry_status=$registry_status"""
     return result.joinToString(prefix = "ModelQuery{", separator = ", ", postfix = "}")
   }
@@ -181,10 +180,10 @@ public class ModelQuery(
     search_query: String = this.search_query,
     source: ModelSource? = this.source,
     sort_field: ModelQuerySortField? = this.sort_field,
-    sort_order: ModelQuerySortOrder? = this.sort_order,
+    descending: Boolean? = this.descending,
     registry_status: ModelRegistryStatus? = this.registry_status,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelQuery = ModelQuery(framework, category, format, downloaded_only, available_only, max_size_bytes, search_query, source, sort_field, sort_order, registry_status, unknownFields)
+  ): ModelQuery = ModelQuery(framework, category, format, downloaded_only, available_only, max_size_bytes, search_query, source, sort_field, descending, registry_status, unknownFields)
 
   public companion object {
     @JvmField
@@ -209,7 +208,7 @@ public class ModelQuery(
         }
         size += ModelSource.ADAPTER.encodedSizeWithTag(8, value.source)
         size += ModelQuerySortField.ADAPTER.encodedSizeWithTag(9, value.sort_field)
-        size += ModelQuerySortOrder.ADAPTER.encodedSizeWithTag(10, value.sort_order)
+        size += ProtoAdapter.BOOL.encodedSizeWithTag(10, value.descending)
         size += ModelRegistryStatus.ADAPTER.encodedSizeWithTag(11, value.registry_status)
         return size
       }
@@ -226,7 +225,7 @@ public class ModelQuery(
         }
         ModelSource.ADAPTER.encodeWithTag(writer, 8, value.source)
         ModelQuerySortField.ADAPTER.encodeWithTag(writer, 9, value.sort_field)
-        ModelQuerySortOrder.ADAPTER.encodeWithTag(writer, 10, value.sort_order)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.descending)
         ModelRegistryStatus.ADAPTER.encodeWithTag(writer, 11, value.registry_status)
         writer.writeBytes(value.unknownFields)
       }
@@ -234,7 +233,7 @@ public class ModelQuery(
       override fun encode(writer: ReverseProtoWriter, `value`: ModelQuery) {
         writer.writeBytes(value.unknownFields)
         ModelRegistryStatus.ADAPTER.encodeWithTag(writer, 11, value.registry_status)
-        ModelQuerySortOrder.ADAPTER.encodeWithTag(writer, 10, value.sort_order)
+        ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.descending)
         ModelQuerySortField.ADAPTER.encodeWithTag(writer, 9, value.sort_field)
         ModelSource.ADAPTER.encodeWithTag(writer, 8, value.source)
         if (value.search_query != "") {
@@ -258,7 +257,7 @@ public class ModelQuery(
         var search_query: String = ""
         var source: ModelSource? = null
         var sort_field: ModelQuerySortField? = null
-        var sort_order: ModelQuerySortOrder? = null
+        var descending: Boolean? = null
         var registry_status: ModelRegistryStatus? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -291,11 +290,7 @@ public class ModelQuery(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            10 -> try {
-              sort_order = ModelQuerySortOrder.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
+            10 -> descending = ProtoAdapter.BOOL.decode(reader)
             11 -> try {
               registry_status = ModelRegistryStatus.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -314,7 +309,7 @@ public class ModelQuery(
           search_query = search_query,
           source = source,
           sort_field = sort_field,
-          sort_order = sort_order,
+          descending = descending,
           registry_status = registry_status,
           unknownFields = unknownFields
         )

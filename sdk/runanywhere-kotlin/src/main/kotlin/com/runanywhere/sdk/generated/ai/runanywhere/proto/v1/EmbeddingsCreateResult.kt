@@ -69,25 +69,12 @@ public class EmbeddingsCreateResult(
     schemaIndex = 3,
   )
   public val max_tokens: Int = 0,
-  /**
-   * Mirrors rac_result_t; negative on failure.
-   */
   @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 4,
   )
-  public val error_code: Int = 0,
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 5,
-  )
-  public val error_message: String = "",
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<EmbeddingsCreateResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -104,8 +91,7 @@ public class EmbeddingsCreateResult(
     if (model_id != other.model_id) return false
     if (dimension != other.dimension) return false
     if (max_tokens != other.max_tokens) return false
-    if (error_code != other.error_code) return false
-    if (error_message != other.error_message) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -117,8 +103,7 @@ public class EmbeddingsCreateResult(
       result = result * 37 + model_id.hashCode()
       result = result * 37 + dimension.hashCode()
       result = result * 37 + max_tokens.hashCode()
-      result = result * 37 + error_code.hashCode()
-      result = result * 37 + error_message.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -130,8 +115,7 @@ public class EmbeddingsCreateResult(
     result += """model_id=${sanitize(model_id)}"""
     result += """dimension=$dimension"""
     result += """max_tokens=$max_tokens"""
-    result += """error_code=$error_code"""
-    result += """error_message=${sanitize(error_message)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "EmbeddingsCreateResult{", separator = ", ", postfix = "}")
   }
 
@@ -140,10 +124,9 @@ public class EmbeddingsCreateResult(
     model_id: String = this.model_id,
     dimension: Int = this.dimension,
     max_tokens: Int = this.max_tokens,
-    error_code: Int = this.error_code,
-    error_message: String = this.error_message,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): EmbeddingsCreateResult = EmbeddingsCreateResult(handle, model_id, dimension, max_tokens, error_code, error_message, unknownFields)
+  ): EmbeddingsCreateResult = EmbeddingsCreateResult(handle, model_id, dimension, max_tokens, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -170,12 +153,7 @@ public class EmbeddingsCreateResult(
         if (value.max_tokens != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.max_tokens)
         }
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.error_code)
-        }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.error_message)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(7, value.error)
         return size
       }
 
@@ -192,23 +170,13 @@ public class EmbeddingsCreateResult(
         if (value.max_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 4, value.max_tokens)
         }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: EmbeddingsCreateResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
-        }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         if (value.max_tokens != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 4, value.max_tokens)
         }
@@ -228,16 +196,14 @@ public class EmbeddingsCreateResult(
         var model_id: String = ""
         var dimension: Int = 0
         var max_tokens: Int = 0
-        var error_code: Int = 0
-        var error_message: String = ""
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> handle = ProtoAdapter.UINT64.decode(reader)
             2 -> model_id = ProtoAdapter.STRING.decode(reader)
             3 -> dimension = ProtoAdapter.INT32.decode(reader)
             4 -> max_tokens = ProtoAdapter.INT32.decode(reader)
-            5 -> error_code = ProtoAdapter.INT32.decode(reader)
-            6 -> error_message = ProtoAdapter.STRING.decode(reader)
+            7 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -246,13 +212,13 @@ public class EmbeddingsCreateResult(
           model_id = model_id,
           dimension = dimension,
           max_tokens = max_tokens,
-          error_code = error_code,
-          error_message = error_message,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: EmbeddingsCreateResult): EmbeddingsCreateResult = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

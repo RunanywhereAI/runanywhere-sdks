@@ -825,375 +825,6 @@ const ::_pbi::ClassData* ToolValueObject_FieldsEntry_DoNotUse_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class ToolResult::_Internal {
- public:
-  using HasBits = decltype(::std::declval<ToolResult>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(ToolResult, _impl_._has_bits_);
-};
-
-constexpr ToolResult::ParseTableT_ ToolResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(ToolResult, _impl_._has_bits_),
-      0, // no _extensions_
-      9, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294966880,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      7,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::ToolResult>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // int64 started_at_ms = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ToolResult, _impl_.started_at_ms_), 4>(),
-       {64, 4, 0,
-        PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.started_at_ms_)}},
-      // string tool_call_id = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.tool_call_id_)}},
-      // string name = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 1, 0,
-        PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.name_)}},
-      // string result_json = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.result_json_)}},
-      // optional string error = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 3, 0,
-        PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.error_)}},
-      // bool success = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ToolResult, _impl_.success_), 6>(),
-       {40, 6, 0,
-        PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.success_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string tool_call_id = 1;
-      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.tool_call_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string name = 2;
-      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.name_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string result_json = 3;
-      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.result_json_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional string error = 4;
-      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.error_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // bool success = 5;
-      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.success_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // int64 started_at_ms = 8;
-      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.started_at_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int64 completed_at_ms = 9;
-      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.completed_at_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-    }},
-    // no aux_entries
-    {{
-      "\31\14\4\13\5\0\0\0"
-      "runanywhere.v1.ToolResult"
-      "tool_call_id"
-      "name"
-      "result_json"
-      "error"
-    }},
-  };
-}
-
-
-inline constexpr ToolResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        tool_call_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        name_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        result_json_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        started_at_ms_{::int64_t{0}},
-        completed_at_ms_{::int64_t{0}},
-        success_{false} {}
-
-template <typename>
-constexpr ToolResult::ToolResult(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL ToolResult::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) ToolResult(arena);
-}
-constexpr auto ToolResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolResult), alignof(ToolResult));
-}
-constexpr auto ToolResult::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &ToolResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<ToolResult>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &ToolResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<ToolResult>(), &ToolResult::ByteSizeLong,
-              &ToolResult::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(ToolResult, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[9],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_tool_5fcalling_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct ToolResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr ToolResultGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 ToolResult_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(ToolResult::InternalGenerateClassData_(
-            _default, &ToolResult_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<ToolResult>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~ToolResultGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) ToolResult _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<ToolResult>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(ToolResultGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ToolResultGlobalsTypeInternal ToolResult_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* ToolResult_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return ToolResult_globals_.GetClassData();
-#else
-  return ToolResult_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class ToolPromptFormatResult::_Internal {
- public:
-  using HasBits = decltype(::std::declval<ToolPromptFormatResult>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_._has_bits_);
-};
-
-constexpr ToolPromptFormatResult::ParseTableT_ ToolPromptFormatResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_._has_bits_),
-      0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967268,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::ToolPromptFormatResult>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // string formatted_prompt = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.formatted_prompt_)}},
-      // .runanywhere.v1.ToolCallFormatName format = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolPromptFormatResult, _impl_.format_), 2>(),
-       {16, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.format_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      // optional string error_message = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 1, 0,
-        PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.error_message_)}},
-      // int32 error_code = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolPromptFormatResult, _impl_.error_code_), 3>(),
-       {40, 3, 0,
-        PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.error_code_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string formatted_prompt = 1;
-      {PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.formatted_prompt_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.ToolCallFormatName format = 2;
-      {PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.format_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // optional string error_message = 4;
-      {PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 5;
-      {PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.error_code_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-    }},
-    // no aux_entries
-    {{
-      "\45\20\0\15\0\0\0\0"
-      "runanywhere.v1.ToolPromptFormatResult"
-      "formatted_prompt"
-      "error_message"
-    }},
-  };
-}
-
-
-inline constexpr ToolPromptFormatResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        formatted_prompt_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        format_{static_cast< ::runanywhere::v1::ToolCallFormatName >(0)},
-        error_code_{0} {}
-
-template <typename>
-constexpr ToolPromptFormatResult::ToolPromptFormatResult(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL ToolPromptFormatResult::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) ToolPromptFormatResult(arena);
-}
-constexpr auto ToolPromptFormatResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolPromptFormatResult), alignof(ToolPromptFormatResult));
-}
-constexpr auto ToolPromptFormatResult::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &ToolPromptFormatResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<ToolPromptFormatResult>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &ToolPromptFormatResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<ToolPromptFormatResult>(), &ToolPromptFormatResult::ByteSizeLong,
-              &ToolPromptFormatResult::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[15],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_tool_5fcalling_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct ToolPromptFormatResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr ToolPromptFormatResultGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 ToolPromptFormatResult_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(ToolPromptFormatResult::InternalGenerateClassData_(
-            _default, &ToolPromptFormatResult_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<ToolPromptFormatResult>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~ToolPromptFormatResultGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) ToolPromptFormatResult _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<ToolPromptFormatResult>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(ToolPromptFormatResultGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ToolPromptFormatResultGlobalsTypeInternal ToolPromptFormatResult_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* ToolPromptFormatResult_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return ToolPromptFormatResult_globals_.GetClassData();
-#else
-  return ToolPromptFormatResult_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 constexpr ToolDefinition_MetadataEntry_DoNotUse::ParseTableT_ ToolDefinition_MetadataEntry_DoNotUse::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
   return ParseTableT_{
     {
@@ -1526,196 +1157,6 @@ const ::_pbi::ClassData* ToolCall_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class ToolParseResult::_Internal {
- public:
-  using HasBits = decltype(::std::declval<ToolParseResult>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_._has_bits_);
-};
-
-constexpr ToolParseResult::ParseTableT_ ToolParseResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_._has_bits_),
-      0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::ToolParseResult>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // bool has_tool_call = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ToolParseResult, _impl_.has_tool_call_), 3>(),
-       {8, 3, 0,
-        PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.has_tool_call_)}},
-      // repeated .runanywhere.v1.ToolCall tool_calls = 2;
-      {::_pbi::TcParser::FastMtR1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.tool_calls_)}},
-      // string remaining_text = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 1, 0,
-        PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.remaining_text_)}},
-      // optional string error_message = 4;
-      {::_pbi::TcParser::FastUS1,
-       {34, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.error_message_)}},
-      // int32 error_code = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolParseResult, _impl_.error_code_), 4>(),
-       {40, 4, 0,
-        PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.error_code_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // bool has_tool_call = 1;
-      {PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.has_tool_call_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // repeated .runanywhere.v1.ToolCall tool_calls = 2;
-      {PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.tool_calls_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
-      // string remaining_text = 3;
-      {PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.remaining_text_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional string error_message = 4;
-      {PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 5;
-      {PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.error_code_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::ToolCall>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ToolCall_globals_},
-        #endif
-    }},
-    {{
-      "\36\0\0\16\15\0\0\0"
-      "runanywhere.v1.ToolParseResult"
-      "remaining_text"
-      "error_message"
-    }},
-  };
-}
-
-
-inline constexpr ToolParseResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        tool_calls_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::ToolParseResult,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseResult, _impl_.tool_calls_)>()
-         }
-        ,
-        remaining_text_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        has_tool_call_{false},
-        error_code_{0} {}
-
-template <typename>
-constexpr ToolParseResult::ToolParseResult(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL ToolParseResult::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) ToolParseResult(arena);
-}
-constexpr auto ToolParseResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolParseResult), alignof(ToolParseResult));
-}
-constexpr auto ToolParseResult::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &ToolParseResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<ToolParseResult>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &ToolParseResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<ToolParseResult>(), &ToolParseResult::ByteSizeLong,
-              &ToolParseResult::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[13],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_tool_5fcalling_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct ToolParseResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr ToolParseResultGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 ToolParseResult_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(ToolParseResult::InternalGenerateClassData_(
-            _default, &ToolParseResult_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<ToolParseResult>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~ToolParseResultGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) ToolParseResult _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<ToolParseResult>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(ToolParseResultGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ToolParseResultGlobalsTypeInternal ToolParseResult_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* ToolParseResult_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return ToolParseResult_globals_.GetClassData();
-#else
-  return ToolParseResult_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 class ToolParameter::_Internal {
  public:
   using HasBits = decltype(::std::declval<ToolParameter>()._impl_._has_bits_);
@@ -1922,252 +1363,6 @@ const ::_pbi::ClassData* ToolParameter_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class ToolCallingResult::_Internal {
- public:
-  using HasBits = decltype(::std::declval<ToolCallingResult>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_._has_bits_);
-};
-
-constexpr ToolCallingResult::ParseTableT_ ToolCallingResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_._has_bits_),
-      0, // no _extensions_
-      10, 120,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294966272,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      10,  // num_field_entries
-      2,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::ToolCallingResult>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // string text = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.text_)}},
-      // repeated .runanywhere.v1.ToolCall tool_calls = 2;
-      {::_pbi::TcParser::FastMtR1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.tool_calls_)}},
-      // repeated .runanywhere.v1.ToolResult tool_results = 3;
-      {::_pbi::TcParser::FastMtR1,
-       {26, 1, 1,
-        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.tool_results_)}},
-      // bool is_complete = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ToolCallingResult, _impl_.is_complete_), 7>(),
-       {32, 7, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.is_complete_)}},
-      // optional string conversation_id = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 3, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.conversation_id_)}},
-      // int32 iterations_used = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolCallingResult, _impl_.iterations_used_), 8>(),
-       {48, 8, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.iterations_used_)}},
-      // optional string error_message = 7;
-      {::_pbi::TcParser::FastUS1,
-       {58, 4, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_message_)}},
-      // int32 error_code = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolCallingResult, _impl_.error_code_), 9>(),
-       {64, 9, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_code_)}},
-      // string raw_text = 9;
-      {::_pbi::TcParser::FastUS1,
-       {74, 5, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.raw_text_)}},
-      // optional string thinking_content = 10;
-      {::_pbi::TcParser::FastUS1,
-       {82, 6, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.thinking_content_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string text = 1;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.text_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // repeated .runanywhere.v1.ToolCall tool_calls = 2;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.tool_calls_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
-      // repeated .runanywhere.v1.ToolResult tool_results = 3;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.tool_results_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
-      // bool is_complete = 4;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.is_complete_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // optional string conversation_id = 5;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.conversation_id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 iterations_used = 6;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.iterations_used_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional string error_message = 7;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_message_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 8;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_code_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // string raw_text = 9;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.raw_text_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional string thinking_content = 10;
-      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.thinking_content_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::ToolCall>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ToolCall_globals_},
-        #endif
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::ToolResult>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ToolResult_globals_},
-        #endif
-    }},
-    {{
-      "\40\4\0\0\0\17\0\15\0\10\20\0\0\0\0\0"
-      "runanywhere.v1.ToolCallingResult"
-      "text"
-      "conversation_id"
-      "error_message"
-      "raw_text"
-      "thinking_content"
-    }},
-  };
-}
-
-
-inline constexpr ToolCallingResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        tool_calls_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::ToolCallingResult,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.tool_calls_)>()
-         }
-        ,
-        tool_results_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::ToolCallingResult,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.tool_results_)>()
-         }
-        ,
-        text_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        conversation_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        raw_text_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        thinking_content_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        is_complete_{false},
-        iterations_used_{0},
-        error_code_{0} {}
-
-template <typename>
-constexpr ToolCallingResult::ToolCallingResult(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL ToolCallingResult::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) ToolCallingResult(arena);
-}
-constexpr auto ToolCallingResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolCallingResult), alignof(ToolCallingResult));
-}
-constexpr auto ToolCallingResult::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &ToolCallingResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<ToolCallingResult>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &ToolCallingResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<ToolCallingResult>(), &ToolCallingResult::ByteSizeLong,
-              &ToolCallingResult::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[11],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_tool_5fcalling_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct ToolCallingResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr ToolCallingResultGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 ToolCallingResult_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(ToolCallingResult::InternalGenerateClassData_(
-            _default, &ToolCallingResult_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<ToolCallingResult>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~ToolCallingResultGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) ToolCallingResult _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<ToolCallingResult>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(ToolCallingResultGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ToolCallingResultGlobalsTypeInternal ToolCallingResult_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* ToolCallingResult_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return ToolCallingResult_globals_.GetClassData();
-#else
-  return ToolCallingResult_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 class ToolDefinition::_Internal {
  public:
   using HasBits = decltype(::std::declval<ToolDefinition>()._impl_._has_bits_);
@@ -2370,6 +1565,539 @@ const ::_pbi::ClassData* ToolDefinition_get_class_data() {
   return ToolDefinition_globals_.GetClassData();
 #else
   return ToolDefinition_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
+class ToolResult::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<ToolResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ToolResult, _impl_._has_bits_);
+};
+
+constexpr ToolResult::ParseTableT_ ToolResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(ToolResult, _impl_._has_bits_),
+      0, // no _extensions_
+      10, 24,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294966392,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      6,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::ToolResult>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      // int64 started_at_ms = 8;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ToolResult, _impl_.started_at_ms_), 4>(),
+       {64, 4, 0,
+        PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.started_at_ms_)}},
+      // string tool_call_id = 1;
+      {::_pbi::TcParser::FastUS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.tool_call_id_)}},
+      // string name = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 1, 0,
+        PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.name_)}},
+      // string result_json = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 2, 0,
+        PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.result_json_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // string tool_call_id = 1;
+      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.tool_call_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string name = 2;
+      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.name_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string result_json = 3;
+      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.result_json_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int64 started_at_ms = 8;
+      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.started_at_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // int64 completed_at_ms = 9;
+      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.completed_at_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // optional .runanywhere.v1.SDKError error = 10;
+      {PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.error_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\31\14\4\13\0\0\0\0"
+      "runanywhere.v1.ToolResult"
+      "tool_call_id"
+      "name"
+      "result_json"
+    }},
+  };
+}
+
+
+inline constexpr ToolResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        tool_call_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        name_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        result_json_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
+        started_at_ms_{::int64_t{0}},
+        completed_at_ms_{::int64_t{0}} {}
+
+template <typename>
+constexpr ToolResult::ToolResult(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL ToolResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ToolResult(arena);
+}
+constexpr auto ToolResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolResult), alignof(ToolResult));
+}
+constexpr auto ToolResult::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &ToolResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ToolResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ToolResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ToolResult>(), &ToolResult::ByteSizeLong,
+              &ToolResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ToolResult, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[9],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_tool_5fcalling_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct ToolResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr ToolResultGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 ToolResult_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(ToolResult::InternalGenerateClassData_(
+            _default, &ToolResult_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<ToolResult>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~ToolResultGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) ToolResult _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<ToolResult>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(ToolResultGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ToolResultGlobalsTypeInternal ToolResult_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* ToolResult_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return ToolResult_globals_.GetClassData();
+#else
+  return ToolResult_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
+class ToolPromptFormatResult::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<ToolPromptFormatResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_._has_bits_);
+};
+
+constexpr ToolPromptFormatResult::ParseTableT_ ToolPromptFormatResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_._has_bits_),
+      0, // no _extensions_
+      6, 8,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967260,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      3,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::ToolPromptFormatResult>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      // .runanywhere.v1.ToolCallFormatName format = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolPromptFormatResult, _impl_.format_), 2>(),
+       {16, 2, 0,
+        PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.format_)}},
+      // string formatted_prompt = 1;
+      {::_pbi::TcParser::FastUS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.formatted_prompt_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // string formatted_prompt = 1;
+      {PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.formatted_prompt_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // .runanywhere.v1.ToolCallFormatName format = 2;
+      {PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.format_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // optional .runanywhere.v1.SDKError error = 6;
+      {PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.error_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\45\20\0\0\0\0\0\0"
+      "runanywhere.v1.ToolPromptFormatResult"
+      "formatted_prompt"
+    }},
+  };
+}
+
+
+inline constexpr ToolPromptFormatResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        formatted_prompt_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
+        format_{static_cast< ::runanywhere::v1::ToolCallFormatName >(0)} {}
+
+template <typename>
+constexpr ToolPromptFormatResult::ToolPromptFormatResult(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL ToolPromptFormatResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ToolPromptFormatResult(arena);
+}
+constexpr auto ToolPromptFormatResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolPromptFormatResult), alignof(ToolPromptFormatResult));
+}
+constexpr auto ToolPromptFormatResult::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &ToolPromptFormatResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ToolPromptFormatResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ToolPromptFormatResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ToolPromptFormatResult>(), &ToolPromptFormatResult::ByteSizeLong,
+              &ToolPromptFormatResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[15],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_tool_5fcalling_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct ToolPromptFormatResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr ToolPromptFormatResultGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 ToolPromptFormatResult_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(ToolPromptFormatResult::InternalGenerateClassData_(
+            _default, &ToolPromptFormatResult_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<ToolPromptFormatResult>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~ToolPromptFormatResultGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) ToolPromptFormatResult _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<ToolPromptFormatResult>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(ToolPromptFormatResultGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ToolPromptFormatResultGlobalsTypeInternal ToolPromptFormatResult_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* ToolPromptFormatResult_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return ToolPromptFormatResult_globals_.GetClassData();
+#else
+  return ToolPromptFormatResult_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
+class ToolParseResult::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<ToolParseResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_._has_bits_);
+};
+
+constexpr ToolParseResult::ParseTableT_ ToolParseResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_._has_bits_),
+      0, // no _extensions_
+      6, 56,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967256,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      4,  // num_field_entries
+      2,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::ToolParseResult>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // bool has_tool_call = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ToolParseResult, _impl_.has_tool_call_), 3>(),
+       {8, 3, 0,
+        PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.has_tool_call_)}},
+      // repeated .runanywhere.v1.ToolCall tool_calls = 2;
+      {::_pbi::TcParser::FastMtR1,
+       {18, 0, 0,
+        PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.tool_calls_)}},
+      // string remaining_text = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 1, 0,
+        PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.remaining_text_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // optional .runanywhere.v1.SDKError error = 6;
+      {::_pbi::TcParser::FastMtS1,
+       {50, 2, 1,
+        PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.error_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // bool has_tool_call = 1;
+      {PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.has_tool_call_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // repeated .runanywhere.v1.ToolCall tool_calls = 2;
+      {PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.tool_calls_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+      // string remaining_text = 3;
+      {PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.remaining_text_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional .runanywhere.v1.SDKError error = 6;
+      {PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.error_), _Internal::kHasBitsOffset + 2, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::ToolCall>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ToolCall_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\36\0\0\16\0\0\0\0"
+      "runanywhere.v1.ToolParseResult"
+      "remaining_text"
+    }},
+  };
+}
+
+
+inline constexpr ToolParseResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        tool_calls_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::ToolParseResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseResult, _impl_.tool_calls_)>()
+         }
+        ,
+        remaining_text_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
+        has_tool_call_{false} {}
+
+template <typename>
+constexpr ToolParseResult::ToolParseResult(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL ToolParseResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ToolParseResult(arena);
+}
+constexpr auto ToolParseResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolParseResult), alignof(ToolParseResult));
+}
+constexpr auto ToolParseResult::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &ToolParseResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ToolParseResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ToolParseResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ToolParseResult>(), &ToolParseResult::ByteSizeLong,
+              &ToolParseResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[13],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_tool_5fcalling_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct ToolParseResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr ToolParseResultGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 ToolParseResult_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(ToolParseResult::InternalGenerateClassData_(
+            _default, &ToolParseResult_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<ToolParseResult>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~ToolParseResultGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) ToolParseResult _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<ToolParseResult>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(ToolParseResultGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ToolParseResultGlobalsTypeInternal ToolParseResult_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* ToolParseResult_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return ToolParseResult_globals_.GetClassData();
+#else
+  return ToolParseResult_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -2605,12 +2333,12 @@ constexpr ToolCallValidationResult::ParseTableT_ ToolCallValidationResult::Inter
     {
       PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_._has_bits_),
       0, // no _extensions_
-      6, 56,  // max_field_number, fast_idx_mask
+      7, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967232,  // skipmap
+      4294967216,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      6,  // num_field_entries
-      1,  // num_aux_entries
+      5,  // num_field_entries
+      2,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -2630,21 +2358,18 @@ constexpr ToolCallValidationResult::ParseTableT_ ToolCallValidationResult::Inter
         PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.validation_errors_)}},
       // optional .runanywhere.v1.ToolDefinition matched_tool = 3;
       {::_pbi::TcParser::FastMtS1,
-       {26, 3, 0,
+       {26, 2, 0,
         PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.matched_tool_)}},
       // string normalized_arguments_json = 4;
       {::_pbi::TcParser::FastUS1,
        {34, 1, 0,
         PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.normalized_arguments_json_)}},
-      // optional string error_message = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.error_message_)}},
-      // int32 error_code = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolCallValidationResult, _impl_.error_code_), 5>(),
-       {48, 5, 0,
-        PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.error_code_)}},
       {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // optional .runanywhere.v1.SDKError error = 7;
+      {::_pbi::TcParser::FastMtS1,
+       {58, 3, 1,
+        PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.error_)}},
     }}, {{
       65535, 65535
     }}, {{
@@ -2653,13 +2378,11 @@ constexpr ToolCallValidationResult::ParseTableT_ ToolCallValidationResult::Inter
       // repeated string validation_errors = 2;
       {PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.validation_errors_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
       // optional .runanywhere.v1.ToolDefinition matched_tool = 3;
-      {PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.matched_tool_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      {PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.matched_tool_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // string normalized_arguments_json = 4;
       {PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.normalized_arguments_json_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional string error_message = 5;
-      {PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 6;
-      {PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.error_code_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // optional .runanywhere.v1.SDKError error = 7;
+      {PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.error_), _Internal::kHasBitsOffset + 3, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -2667,13 +2390,17 @@ constexpr ToolCallValidationResult::ParseTableT_ ToolCallValidationResult::Inter
         #else
         {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ToolDefinition_globals_},
         #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
     }},
     {{
-      "\47\0\21\0\31\15\0\0"
+      "\47\0\21\0\31\0\0\0"
       "runanywhere.v1.ToolCallValidationResult"
       "validation_errors"
       "normalized_arguments_json"
-      "error_message"
     }},
   };
 }
@@ -2691,12 +2418,9 @@ inline constexpr ToolCallValidationResult::Impl_::Impl_(
         normalized_arguments_json_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         matched_tool_{nullptr},
-        is_valid_{false},
-        error_code_{0} {}
+        error_{nullptr},
+        is_valid_{false} {}
 
 template <typename>
 constexpr ToolCallValidationResult::ToolCallValidationResult(::_pbi::ConstantInitialized,
@@ -3134,6 +2858,248 @@ const ::_pbi::ClassData* ToolParseRequest_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class ToolCallingResult::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<ToolCallingResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_._has_bits_);
+};
+
+constexpr ToolCallingResult::ParseTableT_ ToolCallingResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_._has_bits_),
+      0, // no _extensions_
+      11, 120,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294965440,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      9,  // num_field_entries
+      3,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::ToolCallingResult>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // string text = 1;
+      {::_pbi::TcParser::FastUS1,
+       {10, 2, 0,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.text_)}},
+      // repeated .runanywhere.v1.ToolCall tool_calls = 2;
+      {::_pbi::TcParser::FastMtR1,
+       {18, 0, 0,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.tool_calls_)}},
+      // repeated .runanywhere.v1.ToolResult tool_results = 3;
+      {::_pbi::TcParser::FastMtR1,
+       {26, 1, 1,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.tool_results_)}},
+      // bool is_complete = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ToolCallingResult, _impl_.is_complete_), 7>(),
+       {32, 7, 0,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.is_complete_)}},
+      // optional string conversation_id = 5;
+      {::_pbi::TcParser::FastUS1,
+       {42, 3, 0,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.conversation_id_)}},
+      // int32 iterations_used = 6;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ToolCallingResult, _impl_.iterations_used_), 8>(),
+       {48, 8, 0,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.iterations_used_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // string raw_text = 9;
+      {::_pbi::TcParser::FastUS1,
+       {74, 4, 0,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.raw_text_)}},
+      // optional string thinking_content = 10;
+      {::_pbi::TcParser::FastUS1,
+       {82, 5, 0,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.thinking_content_)}},
+      // optional .runanywhere.v1.SDKError error = 11;
+      {::_pbi::TcParser::FastMtS1,
+       {90, 6, 2,
+        PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // string text = 1;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.text_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // repeated .runanywhere.v1.ToolCall tool_calls = 2;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.tool_calls_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+      // repeated .runanywhere.v1.ToolResult tool_results = 3;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.tool_results_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+      // bool is_complete = 4;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.is_complete_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // optional string conversation_id = 5;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.conversation_id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int32 iterations_used = 6;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.iterations_used_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // string raw_text = 9;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.raw_text_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional string thinking_content = 10;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.thinking_content_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional .runanywhere.v1.SDKError error = 11;
+      {PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_), _Internal::kHasBitsOffset + 6, 2, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::ToolCall>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ToolCall_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::ToolResult>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ToolResult_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\40\4\0\0\0\17\0\10\20\0\0\0\0\0\0\0"
+      "runanywhere.v1.ToolCallingResult"
+      "text"
+      "conversation_id"
+      "raw_text"
+      "thinking_content"
+    }},
+  };
+}
+
+
+inline constexpr ToolCallingResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        tool_calls_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::ToolCallingResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.tool_calls_)>()
+         }
+        ,
+        tool_results_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::ToolCallingResult,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.tool_results_)>()
+         }
+        ,
+        text_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        conversation_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        raw_text_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        thinking_content_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
+        is_complete_{false},
+        iterations_used_{0} {}
+
+template <typename>
+constexpr ToolCallingResult::ToolCallingResult(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL ToolCallingResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ToolCallingResult(arena);
+}
+constexpr auto ToolCallingResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ToolCallingResult), alignof(ToolCallingResult));
+}
+constexpr auto ToolCallingResult::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &ToolCallingResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ToolCallingResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ToolCallingResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ToolCallingResult>(), &ToolCallingResult::ByteSizeLong,
+              &ToolCallingResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[11],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_tool_5fcalling_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct ToolCallingResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr ToolCallingResultGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 ToolCallingResult_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(ToolCallingResult::InternalGenerateClassData_(
+            _default, &ToolCallingResult_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<ToolCallingResult>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~ToolCallingResultGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) ToolCallingResult _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<ToolCallingResult>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(ToolCallingResultGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ToolCallingResultGlobalsTypeInternal ToolCallingResult_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* ToolCallingResult_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return ToolCallingResult_globals_.GetClassData();
+#else
+  return ToolCallingResult_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 class ToolCallValidationRequest::_Internal {
  public:
   using HasBits = decltype(::std::declval<ToolCallValidationRequest>()._impl_._has_bits_);
@@ -3389,21 +3355,19 @@ const ::uint32_t
         4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolResult, _impl_._has_bits_),
-        10, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolResult, _impl_.tool_call_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolResult, _impl_.name_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolResult, _impl_.result_json_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolResult, _impl_.error_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolResult, _impl_.success_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolResult, _impl_.started_at_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolResult, _impl_.completed_at_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolResult, _impl_.error_),
         0,
         1,
         2,
-        3,
-        6,
         4,
         5,
+        3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingOptions, _impl_._has_bits_),
         12, // hasbit index offset
@@ -3427,17 +3391,16 @@ const ::uint32_t
         5,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_._has_bits_),
-        13, // hasbit index offset
+        12, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.tool_calls_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.tool_results_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.is_complete_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.conversation_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.iterations_used_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.error_code_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.raw_text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.thinking_content_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallingResult, _impl_.error_),
         2,
         0,
         1,
@@ -3445,7 +3408,6 @@ const ::uint32_t
         3,
         8,
         4,
-        9,
         5,
         6,
         0x081, // bitmap
@@ -3457,17 +3419,15 @@ const ::uint32_t
         1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseResult, _impl_._has_bits_),
-        8, // hasbit index offset
+        7, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseResult, _impl_.has_tool_call_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseResult, _impl_.tool_calls_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseResult, _impl_.remaining_text_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseResult, _impl_.error_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseResult, _impl_.error_),
         3,
         0,
         1,
         2,
-        4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolPromptFormatRequest, _impl_._has_bits_),
         7, // hasbit index offset
@@ -3481,15 +3441,13 @@ const ::uint32_t
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolPromptFormatResult, _impl_._has_bits_),
-        7, // hasbit index offset
+        6, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolPromptFormatResult, _impl_.formatted_prompt_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolPromptFormatResult, _impl_.format_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolPromptFormatResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolPromptFormatResult, _impl_.error_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolPromptFormatResult, _impl_.error_),
         0,
         2,
         1,
-        3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallValidationRequest, _impl_._has_bits_),
         5, // hasbit index offset
@@ -3499,19 +3457,17 @@ const ::uint32_t
         1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallValidationResult, _impl_._has_bits_),
-        9, // hasbit index offset
+        8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallValidationResult, _impl_.is_valid_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallValidationResult, _impl_.validation_errors_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallValidationResult, _impl_.matched_tool_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallValidationResult, _impl_.normalized_arguments_json_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallValidationResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallValidationResult, _impl_.error_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallValidationResult, _impl_.error_),
         4,
         0,
-        3,
-        1,
         2,
-        5,
+        1,
+        3,
 };
 
 static const ::_pbi::MigrationSchema
@@ -3526,14 +3482,14 @@ static const ::_pbi::MigrationSchema
         {55, sizeof(::runanywhere::v1::ToolDefinition)},
         {70, sizeof(::runanywhere::v1::ToolCall)},
         {85, sizeof(::runanywhere::v1::ToolResult)},
-        {102, sizeof(::runanywhere::v1::ToolCallingOptions)},
-        {123, sizeof(::runanywhere::v1::ToolCallingResult)},
-        {146, sizeof(::runanywhere::v1::ToolParseRequest)},
-        {153, sizeof(::runanywhere::v1::ToolParseResult)},
-        {166, sizeof(::runanywhere::v1::ToolPromptFormatRequest)},
-        {177, sizeof(::runanywhere::v1::ToolPromptFormatResult)},
-        {188, sizeof(::runanywhere::v1::ToolCallValidationRequest)},
-        {195, sizeof(::runanywhere::v1::ToolCallValidationResult)},
+        {100, sizeof(::runanywhere::v1::ToolCallingOptions)},
+        {121, sizeof(::runanywhere::v1::ToolCallingResult)},
+        {142, sizeof(::runanywhere::v1::ToolParseRequest)},
+        {149, sizeof(::runanywhere::v1::ToolParseResult)},
+        {160, sizeof(::runanywhere::v1::ToolPromptFormatRequest)},
+        {171, sizeof(::runanywhere::v1::ToolPromptFormatResult)},
+        {180, sizeof(::runanywhere::v1::ToolCallValidationRequest)},
+        {187, sizeof(::runanywhere::v1::ToolCallValidationResult)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -3558,120 +3514,120 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_tool_5fcalling_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\022tool_calling.proto\022\016runanywhere.v1\032\021ra"
-    "c_options.proto\"\337\001\n\tToolValue\022\026\n\014string_"
-    "value\030\001 \001(\tH\000\022\026\n\014number_value\030\002 \001(\001H\000\022\024\n"
-    "\nbool_value\030\003 \001(\010H\000\0225\n\013array_value\030\004 \001(\013"
-    "2\036.runanywhere.v1.ToolValueArrayH\000\0227\n\014ob"
-    "ject_value\030\005 \001(\0132\037.runanywhere.v1.ToolVa"
-    "lueObjectH\000\022\024\n\nnull_value\030\006 \001(\010H\000B\006\n\004kin"
-    "d\";\n\016ToolValueArray\022)\n\006values\030\001 \003(\0132\031.ru"
-    "nanywhere.v1.ToolValue\"\230\001\n\017ToolValueObje"
-    "ct\022;\n\006fields\030\001 \003(\0132+.runanywhere.v1.Tool"
-    "ValueObject.FieldsEntry\032H\n\013FieldsEntry\022\013"
-    "\n\003key\030\001 \001(\t\022(\n\005value\030\002 \001(\0132\031.runanywhere"
-    ".v1.ToolValue:\0028\001\"\035\n\rToolValueJSON\022\014\n\004js"
-    "on\030\001 \001(\t\"\375\001\n\rToolParameter\022\014\n\004name\030\001 \001(\t"
-    "\022/\n\004type\030\002 \001(\0162!.runanywhere.v1.ToolPara"
-    "meterType\022\023\n\013description\030\003 \001(\t\022\020\n\010requir"
-    "ed\030\004 \001(\010\022\023\n\013enum_values\030\005 \003(\t\022\030\n\013json_sc"
-    "hema\030\006 \001(\tH\000\210\001\001\0225\n\rdefault_value\030\007 \001(\0132\031"
-    ".runanywhere.v1.ToolValueH\001\210\001\001B\016\n\014_json_"
-    "schemaB\020\n\016_default_value\"\245\002\n\016ToolDefinit"
-    "ion\022\014\n\004name\030\001 \001(\t\022\023\n\013description\030\002 \001(\t\0221"
-    "\n\nparameters\030\003 \003(\0132\035.runanywhere.v1.Tool"
-    "Parameter\022\030\n\013json_schema\030\005 \001(\tH\000\210\001\001\022\025\n\010c"
-    "ategory\030\004 \001(\tH\001\210\001\001\022>\n\010metadata\030\006 \003(\0132,.r"
-    "unanywhere.v1.ToolDefinition.MetadataEnt"
-    "ry\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005valu"
-    "e\030\002 \001(\t:\0028\001B\016\n\014_json_schemaB\013\n\t_category"
-    "\"\205\001\n\010ToolCall\022\n\n\002id\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022"
-    "\026\n\016arguments_json\030\003 \001(\t\022\014\n\004type\030\004 \001(\t\022\025\n"
-    "\rcreated_at_ms\030\007 \001(\003\022\025\n\010raw_text\030\010 \001(\tH\000"
-    "\210\001\001B\013\n\t_raw_text\"\244\001\n\nToolResult\022\024\n\014tool_"
-    "call_id\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022\023\n\013result_js"
-    "on\030\003 \001(\t\022\022\n\005error\030\004 \001(\tH\000\210\001\001\022\017\n\007success\030"
-    "\005 \001(\010\022\025\n\rstarted_at_ms\030\010 \001(\003\022\027\n\017complete"
-    "d_at_ms\030\t \001(\003B\010\n\006_error\"\276\003\n\022ToolCallingO"
-    "ptions\022-\n\005tools\030\001 \003(\0132\036.runanywhere.v1.T"
-    "oolDefinition\022#\n\014auto_execute\030\003 \001(\010B\010\212\265\030"
-    "\004trueH\000\210\001\001\022\035\n\025replace_system_prompt\030\007 \001("
-    "\010\022\034\n\024keep_tools_available\030\010 \001(\010\0227\n\006forma"
-    "t\030\n \001(\0162\".runanywhere.v1.ToolCallFormatN"
-    "ameH\001\210\001\001\022&\n\016max_tool_calls\030\014 \001(\005B\t\212\265\030\0015\240"
-    "\265\030\001H\002\210\001\001\0223\n\013tool_choice\030\r \001(\0162\036.runanywh"
-    "ere.v1.ToolChoiceMode\022\035\n\020forced_tool_nam"
-    "e\030\016 \001(\tH\003\210\001\001\022\036\n\026require_json_arguments\030\020"
-    " \001(\010B\017\n\r_auto_executeB\t\n\007_formatB\021\n\017_max"
-    "_tool_callsB\023\n\021_forced_tool_name\"\351\002\n\021Too"
-    "lCallingResult\022\014\n\004text\030\001 \001(\t\022,\n\ntool_cal"
-    "ls\030\002 \003(\0132\030.runanywhere.v1.ToolCall\0220\n\014to"
-    "ol_results\030\003 \003(\0132\032.runanywhere.v1.ToolRe"
-    "sult\022\023\n\013is_complete\030\004 \001(\010\022\034\n\017conversatio"
-    "n_id\030\005 \001(\tH\000\210\001\001\022\027\n\017iterations_used\030\006 \001(\005"
-    "\022\032\n\rerror_message\030\007 \001(\tH\001\210\001\001\022\022\n\nerror_co"
-    "de\030\010 \001(\005\022\020\n\010raw_text\030\t \001(\t\022\035\n\020thinking_c"
-    "ontent\030\n \001(\tH\002\210\001\001B\022\n\020_conversation_idB\020\n"
-    "\016_error_messageB\023\n\021_thinking_content\"f\n\020"
-    "ToolParseRequest\022\014\n\004text\030\001 \001(\t\0228\n\007option"
-    "s\030\002 \001(\0132\".runanywhere.v1.ToolCallingOpti"
-    "onsH\000\210\001\001B\n\n\010_options\"\260\001\n\017ToolParseResult"
-    "\022\025\n\rhas_tool_call\030\001 \001(\010\022,\n\ntool_calls\030\002 "
-    "\003(\0132\030.runanywhere.v1.ToolCall\022\026\n\016remaini"
-    "ng_text\030\003 \001(\t\022\032\n\rerror_message\030\004 \001(\tH\000\210\001"
-    "\001\022\022\n\nerror_code\030\005 \001(\005B\020\n\016_error_message\""
-    "\326\001\n\027ToolPromptFormatRequest\022\023\n\013user_prom"
-    "pt\030\001 \001(\t\0228\n\007options\030\002 \001(\0132\".runanywhere."
-    "v1.ToolCallingOptionsH\000\210\001\001\0220\n\014tool_resul"
-    "ts\030\003 \003(\0132\032.runanywhere.v1.ToolResult\022\033\n\016"
-    "assistant_text\030\004 \001(\tH\001\210\001\001B\n\n\010_optionsB\021\n"
-    "\017_assistant_text\"\250\001\n\026ToolPromptFormatRes"
-    "ult\022\030\n\020formatted_prompt\030\001 \001(\t\0222\n\006format\030"
-    "\002 \001(\0162\".runanywhere.v1.ToolCallFormatNam"
-    "e\022\032\n\rerror_message\030\004 \001(\tH\000\210\001\001\022\022\n\nerror_c"
-    "ode\030\005 \001(\005B\020\n\016_error_message\"\216\001\n\031ToolCall"
-    "ValidationRequest\022+\n\ttool_call\030\001 \001(\0132\030.r"
-    "unanywhere.v1.ToolCall\0228\n\007options\030\002 \001(\0132"
-    "\".runanywhere.v1.ToolCallingOptionsH\000\210\001\001"
-    "B\n\n\010_options\"\370\001\n\030ToolCallValidationResul"
-    "t\022\020\n\010is_valid\030\001 \001(\010\022\031\n\021validation_errors"
-    "\030\002 \003(\t\0229\n\014matched_tool\030\003 \001(\0132\036.runanywhe"
-    "re.v1.ToolDefinitionH\000\210\001\001\022!\n\031normalized_"
-    "arguments_json\030\004 \001(\t\022\032\n\rerror_message\030\005 "
-    "\001(\tH\001\210\001\001\022\022\n\nerror_code\030\006 \001(\005B\017\n\r_matched"
-    "_toolB\020\n\016_error_message*\330\001\n\021ToolParamete"
-    "rType\022#\n\037TOOL_PARAMETER_TYPE_UNSPECIFIED"
-    "\020\000\022\036\n\032TOOL_PARAMETER_TYPE_STRING\020\001\022\036\n\032TO"
-    "OL_PARAMETER_TYPE_NUMBER\020\002\022\037\n\033TOOL_PARAM"
-    "ETER_TYPE_BOOLEAN\020\003\022\036\n\032TOOL_PARAMETER_TY"
-    "PE_OBJECT\020\004\022\035\n\031TOOL_PARAMETER_TYPE_ARRAY"
-    "\020\005*{\n\022ToolCallFormatName\022%\n!TOOL_CALL_FO"
-    "RMAT_NAME_UNSPECIFIED\020\000\022\036\n\032TOOL_CALL_FOR"
-    "MAT_NAME_JSON\020\001\022\036\n\032TOOL_CALL_FORMAT_NAME"
-    "_LFM2\020\007*\246\001\n\016ToolChoiceMode\022 \n\034TOOL_CHOIC"
-    "E_MODE_UNSPECIFIED\020\000\022\031\n\025TOOL_CHOICE_MODE"
-    "_AUTO\020\001\022\031\n\025TOOL_CHOICE_MODE_NONE\020\002\022\035\n\031TO"
-    "OL_CHOICE_MODE_REQUIRED\020\003\022\035\n\031TOOL_CHOICE"
-    "_MODE_SPECIFIC\020\004B\213\001\n\027ai.runanywhere.prot"
-    "o.v1B\020ToolCallingProtoP\001Z<github.com/run"
-    "anywhere/runanywhere-sdks/idl/v1;runanyw"
-    "herev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006"
-    "proto3"
+    "\n\022tool_calling.proto\022\016runanywhere.v1\032\014er"
+    "rors.proto\032\021rac_options.proto\"\337\001\n\tToolVa"
+    "lue\022\026\n\014string_value\030\001 \001(\tH\000\022\026\n\014number_va"
+    "lue\030\002 \001(\001H\000\022\024\n\nbool_value\030\003 \001(\010H\000\0225\n\013arr"
+    "ay_value\030\004 \001(\0132\036.runanywhere.v1.ToolValu"
+    "eArrayH\000\0227\n\014object_value\030\005 \001(\0132\037.runanyw"
+    "here.v1.ToolValueObjectH\000\022\024\n\nnull_value\030"
+    "\006 \001(\010H\000B\006\n\004kind\";\n\016ToolValueArray\022)\n\006val"
+    "ues\030\001 \003(\0132\031.runanywhere.v1.ToolValue\"\230\001\n"
+    "\017ToolValueObject\022;\n\006fields\030\001 \003(\0132+.runan"
+    "ywhere.v1.ToolValueObject.FieldsEntry\032H\n"
+    "\013FieldsEntry\022\013\n\003key\030\001 \001(\t\022(\n\005value\030\002 \001(\013"
+    "2\031.runanywhere.v1.ToolValue:\0028\001\"\035\n\rToolV"
+    "alueJSON\022\014\n\004json\030\001 \001(\t\"\375\001\n\rToolParameter"
+    "\022\014\n\004name\030\001 \001(\t\022/\n\004type\030\002 \001(\0162!.runanywhe"
+    "re.v1.ToolParameterType\022\023\n\013description\030\003"
+    " \001(\t\022\020\n\010required\030\004 \001(\010\022\023\n\013enum_values\030\005 "
+    "\003(\t\022\030\n\013json_schema\030\006 \001(\tH\000\210\001\001\0225\n\rdefault"
+    "_value\030\007 \001(\0132\031.runanywhere.v1.ToolValueH"
+    "\001\210\001\001B\016\n\014_json_schemaB\020\n\016_default_value\"\245"
+    "\002\n\016ToolDefinition\022\014\n\004name\030\001 \001(\t\022\023\n\013descr"
+    "iption\030\002 \001(\t\0221\n\nparameters\030\003 \003(\0132\035.runan"
+    "ywhere.v1.ToolParameter\022\030\n\013json_schema\030\005"
+    " \001(\tH\000\210\001\001\022\025\n\010category\030\004 \001(\tH\001\210\001\001\022>\n\010meta"
+    "data\030\006 \003(\0132,.runanywhere.v1.ToolDefiniti"
+    "on.MetadataEntry\032/\n\rMetadataEntry\022\013\n\003key"
+    "\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\016\n\014_json_schem"
+    "aB\013\n\t_category\"\205\001\n\010ToolCall\022\n\n\002id\030\001 \001(\t\022"
+    "\014\n\004name\030\002 \001(\t\022\026\n\016arguments_json\030\003 \001(\t\022\014\n"
+    "\004type\030\004 \001(\t\022\025\n\rcreated_at_ms\030\007 \001(\003\022\025\n\010ra"
+    "w_text\030\010 \001(\tH\000\210\001\001B\013\n\t_raw_text\"\255\001\n\nToolR"
+    "esult\022\024\n\014tool_call_id\030\001 \001(\t\022\014\n\004name\030\002 \001("
+    "\t\022\023\n\013result_json\030\003 \001(\t\022\025\n\rstarted_at_ms\030"
+    "\010 \001(\003\022\027\n\017completed_at_ms\030\t \001(\003\022,\n\005error\030"
+    "\n \001(\0132\030.runanywhere.v1.SDKErrorH\000\210\001\001B\010\n\006"
+    "_error\"\276\003\n\022ToolCallingOptions\022-\n\005tools\030\001"
+    " \003(\0132\036.runanywhere.v1.ToolDefinition\022#\n\014"
+    "auto_execute\030\003 \001(\010B\010\212\265\030\004trueH\000\210\001\001\022\035\n\025rep"
+    "lace_system_prompt\030\007 \001(\010\022\034\n\024keep_tools_a"
+    "vailable\030\010 \001(\010\0227\n\006format\030\n \001(\0162\".runanyw"
+    "here.v1.ToolCallFormatNameH\001\210\001\001\022&\n\016max_t"
+    "ool_calls\030\014 \001(\005B\t\212\265\030\0015\240\265\030\001H\002\210\001\001\0223\n\013tool_"
+    "choice\030\r \001(\0162\036.runanywhere.v1.ToolChoice"
+    "Mode\022\035\n\020forced_tool_name\030\016 \001(\tH\003\210\001\001\022\036\n\026r"
+    "equire_json_arguments\030\020 \001(\010B\017\n\r_auto_exe"
+    "cuteB\t\n\007_formatB\021\n\017_max_tool_callsB\023\n\021_f"
+    "orced_tool_name\"\337\002\n\021ToolCallingResult\022\014\n"
+    "\004text\030\001 \001(\t\022,\n\ntool_calls\030\002 \003(\0132\030.runany"
+    "where.v1.ToolCall\0220\n\014tool_results\030\003 \003(\0132"
+    "\032.runanywhere.v1.ToolResult\022\023\n\013is_comple"
+    "te\030\004 \001(\010\022\034\n\017conversation_id\030\005 \001(\tH\000\210\001\001\022\027"
+    "\n\017iterations_used\030\006 \001(\005\022\020\n\010raw_text\030\t \001("
+    "\t\022\035\n\020thinking_content\030\n \001(\tH\001\210\001\001\022,\n\005erro"
+    "r\030\013 \001(\0132\030.runanywhere.v1.SDKErrorH\002\210\001\001B\022"
+    "\n\020_conversation_idB\023\n\021_thinking_contentB"
+    "\010\n\006_error\"f\n\020ToolParseRequest\022\014\n\004text\030\001 "
+    "\001(\t\0228\n\007options\030\002 \001(\0132\".runanywhere.v1.To"
+    "olCallingOptionsH\000\210\001\001B\n\n\010_options\"\246\001\n\017To"
+    "olParseResult\022\025\n\rhas_tool_call\030\001 \001(\010\022,\n\n"
+    "tool_calls\030\002 \003(\0132\030.runanywhere.v1.ToolCa"
+    "ll\022\026\n\016remaining_text\030\003 \001(\t\022,\n\005error\030\006 \001("
+    "\0132\030.runanywhere.v1.SDKErrorH\000\210\001\001B\010\n\006_err"
+    "or\"\326\001\n\027ToolPromptFormatRequest\022\023\n\013user_p"
+    "rompt\030\001 \001(\t\0228\n\007options\030\002 \001(\0132\".runanywhe"
+    "re.v1.ToolCallingOptionsH\000\210\001\001\0220\n\014tool_re"
+    "sults\030\003 \003(\0132\032.runanywhere.v1.ToolResult\022"
+    "\033\n\016assistant_text\030\004 \001(\tH\001\210\001\001B\n\n\010_options"
+    "B\021\n\017_assistant_text\"\236\001\n\026ToolPromptFormat"
+    "Result\022\030\n\020formatted_prompt\030\001 \001(\t\0222\n\006form"
+    "at\030\002 \001(\0162\".runanywhere.v1.ToolCallFormat"
+    "Name\022,\n\005error\030\006 \001(\0132\030.runanywhere.v1.SDK"
+    "ErrorH\000\210\001\001B\010\n\006_error\"\216\001\n\031ToolCallValidat"
+    "ionRequest\022+\n\ttool_call\030\001 \001(\0132\030.runanywh"
+    "ere.v1.ToolCall\0228\n\007options\030\002 \001(\0132\".runan"
+    "ywhere.v1.ToolCallingOptionsH\000\210\001\001B\n\n\010_op"
+    "tions\"\356\001\n\030ToolCallValidationResult\022\020\n\010is"
+    "_valid\030\001 \001(\010\022\031\n\021validation_errors\030\002 \003(\t\022"
+    "9\n\014matched_tool\030\003 \001(\0132\036.runanywhere.v1.T"
+    "oolDefinitionH\000\210\001\001\022!\n\031normalized_argumen"
+    "ts_json\030\004 \001(\t\022,\n\005error\030\007 \001(\0132\030.runanywhe"
+    "re.v1.SDKErrorH\001\210\001\001B\017\n\r_matched_toolB\010\n\006"
+    "_error*\330\001\n\021ToolParameterType\022#\n\037TOOL_PAR"
+    "AMETER_TYPE_UNSPECIFIED\020\000\022\036\n\032TOOL_PARAME"
+    "TER_TYPE_STRING\020\001\022\036\n\032TOOL_PARAMETER_TYPE"
+    "_NUMBER\020\002\022\037\n\033TOOL_PARAMETER_TYPE_BOOLEAN"
+    "\020\003\022\036\n\032TOOL_PARAMETER_TYPE_OBJECT\020\004\022\035\n\031TO"
+    "OL_PARAMETER_TYPE_ARRAY\020\005*{\n\022ToolCallFor"
+    "matName\022%\n!TOOL_CALL_FORMAT_NAME_UNSPECI"
+    "FIED\020\000\022\036\n\032TOOL_CALL_FORMAT_NAME_JSON\020\001\022\036"
+    "\n\032TOOL_CALL_FORMAT_NAME_LFM2\020\007*\246\001\n\016ToolC"
+    "hoiceMode\022 \n\034TOOL_CHOICE_MODE_UNSPECIFIE"
+    "D\020\000\022\031\n\025TOOL_CHOICE_MODE_AUTO\020\001\022\031\n\025TOOL_C"
+    "HOICE_MODE_NONE\020\002\022\035\n\031TOOL_CHOICE_MODE_RE"
+    "QUIRED\020\003\022\035\n\031TOOL_CHOICE_MODE_SPECIFIC\020\004B"
+    "\213\001\n\027ai.runanywhere.proto.v1B\020ToolCalling"
+    "ProtoP\001Z<github.com/runanywhere/runanywh"
+    "ere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252"
+    "\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_tool_5fcalling_2eproto_deps[1] = {
+    descriptor_table_tool_5fcalling_2eproto_deps[2] = {
+        &::descriptor_table_errors_2eproto,
         &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_tool_5fcalling_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_tool_5fcalling_2eproto = {
     false,
     false,
-    3926,
+    3909,
     descriptor_table_protodef_tool_5fcalling_2eproto,
     "tool_calling.proto",
     &descriptor_table_tool_5fcalling_2eproto_once,
     descriptor_table_tool_5fcalling_2eproto_deps,
-    1,
+    2,
     18,
     schemas,
     file_message_globals,
@@ -6036,6 +5992,11 @@ void ToolCall::InternalSwap(ToolCall* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) 
 }
 // ===================================================================
 
+void ToolResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
 ToolResult::ToolResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, ToolResult_get_class_data()) {
@@ -6053,8 +6014,7 @@ PROTOBUF_NDEBUG_INLINE ToolResult::Impl_::Impl_(
         _cached_size_{0},
         tool_call_id_(arena, from.tool_call_id_),
         name_(arena, from.name_),
-        result_json_(arena, from.result_json_),
-        error_(arena, from.error_) {}
+        result_json_(arena, from.result_json_) {}
 
 ToolResult::ToolResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -6070,13 +6030,17 @@ ToolResult::ToolResult(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, started_at_ms_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, started_at_ms_),
-           offsetof(Impl_, success_) -
+           offsetof(Impl_, completed_at_ms_) -
                offsetof(Impl_, started_at_ms_) +
-               sizeof(Impl_::success_));
+               sizeof(Impl_::completed_at_ms_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ToolResult)
 }
@@ -6086,17 +6050,16 @@ PROTOBUF_NDEBUG_INLINE ToolResult::Impl_::Impl_(
       : _cached_size_{0},
         tool_call_id_(arena),
         name_(arena),
-        result_json_(arena),
-        error_(arena) {}
+        result_json_(arena) {}
 
 inline void ToolResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, started_at_ms_),
+               offsetof(Impl_, error_),
            0,
-           offsetof(Impl_, success_) -
-               offsetof(Impl_, started_at_ms_) +
-               sizeof(Impl_::success_));
+           offsetof(Impl_, completed_at_ms_) -
+               offsetof(Impl_, error_) +
+               sizeof(Impl_::completed_at_ms_));
 }
 ToolResult::~ToolResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.ToolResult)
@@ -6112,7 +6075,7 @@ inline void ToolResult::SharedDtor(MessageLite& self) {
   this_._impl_.tool_call_id_.Destroy();
   this_._impl_.name_.Destroy();
   this_._impl_.result_json_.Destroy();
-  this_._impl_.error_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -6161,13 +6124,14 @@ PROTOBUF_NOINLINE void ToolResult::Clear() {
       _impl_.result_json_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _impl_.error_.ClearNonDefaultToEmpty();
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000070U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000030U)) {
     ::memset(&_impl_.started_at_ms_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.success_) -
-        reinterpret_cast<char*>(&_impl_.started_at_ms_)) + sizeof(_impl_.success_));
+        reinterpret_cast<char*>(&_impl_.completed_at_ms_) -
+        reinterpret_cast<char*>(&_impl_.started_at_ms_)) + sizeof(_impl_.completed_at_ms_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -6222,23 +6186,6 @@ PROTOBUF_NOINLINE void ToolResult::Clear() {
     }
   }
 
-  // optional string error = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    const ::std::string& _s = this_._internal_error();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ToolResult.error");
-    target = stream->WriteStringMaybeAliased(4, _s, target);
-  }
-
-  // bool success = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (this_._internal_success() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          5, this_._internal_success(), target);
-    }
-  }
-
   // int64 started_at_ms = 8;
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_started_at_ms() != 0) {
@@ -6255,6 +6202,13 @@ PROTOBUF_NOINLINE void ToolResult::Clear() {
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<9>(
               stream, this_._internal_completed_at_ms(), target);
     }
+  }
+
+  // optional .runanywhere.v1.SDKError error = 10;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        10, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -6282,7 +6236,7 @@ PROTOBUF_NOINLINE void ToolResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     // string tool_call_id = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_tool_call_id().empty()) {
@@ -6304,10 +6258,10 @@ PROTOBUF_NOINLINE void ToolResult::Clear() {
                                         this_._internal_result_json());
       }
     }
-    // optional string error = 4;
+    // optional .runanywhere.v1.SDKError error = 10;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error());
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // int64 started_at_ms = 8;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
@@ -6323,12 +6277,6 @@ PROTOBUF_NOINLINE void ToolResult::Clear() {
             this_._internal_completed_at_ms());
       }
     }
-    // bool success = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (this_._internal_success() != 0) {
-        total_size += 2;
-      }
-    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -6341,13 +6289,14 @@ void ToolResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.ToolResult)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_tool_call_id().empty()) {
         _this->_internal_set_tool_call_id(from._internal_tool_call_id());
@@ -6376,7 +6325,12 @@ void ToolResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      _this->_internal_set_error(from._internal_error());
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
+      }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_started_at_ms() != 0) {
@@ -6386,11 +6340,6 @@ void ToolResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_completed_at_ms() != 0) {
         _this->_impl_.completed_at_ms_ = from._impl_.completed_at_ms_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (from._internal_success() != 0) {
-        _this->_impl_.success_ = from._impl_.success_;
       }
     }
   }
@@ -6416,13 +6365,12 @@ void ToolResult::InternalSwap(ToolResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL oth
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.tool_call_id_, &other->_impl_.tool_call_id_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.name_, &other->_impl_.name_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.result_json_, &other->_impl_.result_json_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_, &other->_impl_.error_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.success_)
-      + sizeof(ToolResult::_impl_.success_)
-      - PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.started_at_ms_)>(
-          reinterpret_cast<char*>(&_impl_.started_at_ms_),
-          reinterpret_cast<char*>(&other->_impl_.started_at_ms_));
+      PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.completed_at_ms_)
+      + sizeof(ToolResult::_impl_.completed_at_ms_)
+      - PROTOBUF_FIELD_OFFSET(ToolResult, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata ToolResult::GetMetadata() const {
@@ -6830,6 +6778,11 @@ void ToolCallingOptions::InternalSwap(ToolCallingOptions* PROTOBUF_RESTRICT PROT
 }
 // ===================================================================
 
+void ToolCallingResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
 ToolCallingResult::ToolCallingResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, ToolCallingResult_get_class_data()) {
@@ -6861,7 +6814,6 @@ PROTOBUF_NDEBUG_INLINE ToolCallingResult::Impl_::Impl_(
         ,
         text_(arena, from.text_),
         conversation_id_(arena, from.conversation_id_),
-        error_message_(arena, from.error_message_),
         raw_text_(arena, from.raw_text_),
         thinking_content_(arena, from.thinking_content_) {}
 
@@ -6879,13 +6831,17 @@ ToolCallingResult::ToolCallingResult(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000040U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, is_complete_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, is_complete_),
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, iterations_used_) -
                offsetof(Impl_, is_complete_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::iterations_used_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ToolCallingResult)
 }
@@ -6905,18 +6861,17 @@ PROTOBUF_NDEBUG_INLINE ToolCallingResult::Impl_::Impl_(
         ,
         text_(arena),
         conversation_id_(arena),
-        error_message_(arena),
         raw_text_(arena),
         thinking_content_(arena) {}
 
 inline void ToolCallingResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, is_complete_),
+               offsetof(Impl_, error_),
            0,
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, is_complete_) +
-               sizeof(Impl_::error_code_));
+           offsetof(Impl_, iterations_used_) -
+               offsetof(Impl_, error_) +
+               sizeof(Impl_::iterations_used_));
 }
 ToolCallingResult::~ToolCallingResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.ToolCallingResult)
@@ -6931,9 +6886,9 @@ inline void ToolCallingResult::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.text_.Destroy();
   this_._impl_.conversation_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
   this_._impl_.raw_text_.Destroy();
   this_._impl_.thinking_content_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -6985,21 +6940,18 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
       _impl_.conversation_id_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _impl_.raw_text_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _impl_.thinking_content_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
   _impl_.is_complete_ = false;
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    ::memset(&_impl_.iterations_used_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.iterations_used_)) + sizeof(_impl_.error_code_));
-  }
+  _impl_.iterations_used_ = 0;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -7085,25 +7037,8 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
     }
   }
 
-  // optional string error_message = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ToolCallingResult.error_message");
-    target = stream->WriteStringMaybeAliased(7, _s, target);
-  }
-
-  // int32 error_code = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<8>(
-              stream, this_._internal_error_code(), target);
-    }
-  }
-
   // string raw_text = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (!this_._internal_raw_text().empty()) {
       const ::std::string& _s = this_._internal_raw_text();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -7113,11 +7048,18 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
   }
 
   // optional string thinking_content = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     const ::std::string& _s = this_._internal_thinking_content();
     ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
         _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ToolCallingResult.thinking_content");
     target = stream->WriteStringMaybeAliased(10, _s, target);
+  }
+
+  // optional .runanywhere.v1.SDKError error = 11;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        11, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -7172,22 +7114,22 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_conversation_id());
     }
-    // optional string error_message = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
-    }
     // string raw_text = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (!this_._internal_raw_text().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_raw_text());
       }
     }
     // optional string thinking_content = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_thinking_content());
+    }
+    // optional .runanywhere.v1.SDKError error = 11;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // bool is_complete = 4;
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
@@ -7196,19 +7138,12 @@ PROTOBUF_NOINLINE void ToolCallingResult::Clear() {
       }
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+   {
     // int32 iterations_used = 6;
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_iterations_used() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_iterations_used());
-      }
-    }
-    // int32 error_code = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
       }
     }
   }
@@ -7254,9 +7189,6 @@ void ToolCallingResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       _this->_internal_set_conversation_id(from._internal_conversation_id());
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (!from._internal_raw_text().empty()) {
         _this->_internal_set_raw_text(from._internal_raw_text());
       } else {
@@ -7265,8 +7197,16 @@ void ToolCallingResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _this->_internal_set_thinking_content(from._internal_thinking_content());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
+      }
     }
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_is_complete() != 0) {
@@ -7274,16 +7214,9 @@ void ToolCallingResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (from._internal_iterations_used() != 0) {
-        _this->_impl_.iterations_used_ = from._impl_.iterations_used_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
-      }
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (from._internal_iterations_used() != 0) {
+      _this->_impl_.iterations_used_ = from._impl_.iterations_used_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -7309,15 +7242,14 @@ void ToolCallingResult::InternalSwap(ToolCallingResult* PROTOBUF_RESTRICT PROTOB
   _impl_.tool_results_.InternalSwap(&other->_impl_.tool_results_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.text_, &other->_impl_.text_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.conversation_id_, &other->_impl_.conversation_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.raw_text_, &other->_impl_.raw_text_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.thinking_content_, &other->_impl_.thinking_content_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_code_)
-      + sizeof(ToolCallingResult::_impl_.error_code_)
-      - PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.is_complete_)>(
-          reinterpret_cast<char*>(&_impl_.is_complete_),
-          reinterpret_cast<char*>(&other->_impl_.is_complete_));
+      PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.iterations_used_)
+      + sizeof(ToolCallingResult::_impl_.iterations_used_)
+      - PROTOBUF_FIELD_OFFSET(ToolCallingResult, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata ToolCallingResult::GetMetadata() const {
@@ -7576,6 +7508,11 @@ void ToolParseRequest::InternalSwap(ToolParseRequest* PROTOBUF_RESTRICT PROTOBUF
 }
 // ===================================================================
 
+void ToolParseResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
 ToolParseResult::ToolParseResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, ToolParseResult_get_class_data()) {
@@ -7598,8 +7535,7 @@ PROTOBUF_NDEBUG_INLINE ToolParseResult::Impl_::Impl_(
           , from.tool_calls_
         }
         ,
-        remaining_text_(arena, from.remaining_text_),
-        error_message_(arena, from.error_message_) {}
+        remaining_text_(arena, from.remaining_text_) {}
 
 ToolParseResult::ToolParseResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -7615,13 +7551,11 @@ ToolParseResult::ToolParseResult(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, has_tool_call_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, has_tool_call_),
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, has_tool_call_) +
-               sizeof(Impl_::error_code_));
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
+  _impl_.has_tool_call_ = from._impl_.has_tool_call_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ToolParseResult)
 }
@@ -7634,17 +7568,16 @@ PROTOBUF_NDEBUG_INLINE ToolParseResult::Impl_::Impl_(
             PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolParseResult, _impl_.tool_calls_)>()
          }
         ,
-        remaining_text_(arena),
-        error_message_(arena) {}
+        remaining_text_(arena) {}
 
 inline void ToolParseResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, has_tool_call_),
+               offsetof(Impl_, error_),
            0,
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, has_tool_call_) +
-               sizeof(Impl_::error_code_));
+           offsetof(Impl_, has_tool_call_) -
+               offsetof(Impl_, error_) +
+               sizeof(Impl_::has_tool_call_));
 }
 ToolParseResult::~ToolParseResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.ToolParseResult)
@@ -7658,7 +7591,7 @@ inline void ToolParseResult::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.remaining_text_.Destroy();
-  this_._impl_.error_message_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -7704,14 +7637,11 @@ PROTOBUF_NOINLINE void ToolParseResult::Clear() {
       _impl_.remaining_text_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000018U)) {
-    ::memset(&_impl_.has_tool_call_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.has_tool_call_)) + sizeof(_impl_.error_code_));
-  }
+  _impl_.has_tool_call_ = false;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -7767,21 +7697,11 @@ PROTOBUF_NOINLINE void ToolParseResult::Clear() {
     }
   }
 
-  // optional string error_message = 4;
+  // optional .runanywhere.v1.SDKError error = 6;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ToolParseResult.error_message");
-    target = stream->WriteStringMaybeAliased(4, _s, target);
-  }
-
-  // int32 error_code = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
-              stream, this_._internal_error_code(), target);
-    }
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        6, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -7809,7 +7729,7 @@ PROTOBUF_NOINLINE void ToolParseResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     // repeated .runanywhere.v1.ToolCall tool_calls = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1UL * this_._internal_tool_calls_size();
@@ -7824,22 +7744,15 @@ PROTOBUF_NOINLINE void ToolParseResult::Clear() {
                                         this_._internal_remaining_text());
       }
     }
-    // optional string error_message = 4;
+    // optional .runanywhere.v1.SDKError error = 6;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // bool has_tool_call = 1;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_has_tool_call() != 0) {
         total_size += 2;
-      }
-    }
-    // int32 error_code = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
       }
     }
   }
@@ -7861,7 +7774,7 @@ void ToolParseResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_tool_calls()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
@@ -7877,16 +7790,16 @@ void ToolParseResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
+      }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_has_tool_call() != 0) {
         _this->_impl_.has_tool_call_ = from._impl_.has_tool_call_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
       }
     }
   }
@@ -7911,13 +7824,12 @@ void ToolParseResult::InternalSwap(ToolParseResult* PROTOBUF_RESTRICT PROTOBUF_N
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   _impl_.tool_calls_.InternalSwap(&other->_impl_.tool_calls_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.remaining_text_, &other->_impl_.remaining_text_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.error_code_)
-      + sizeof(ToolParseResult::_impl_.error_code_)
-      - PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.has_tool_call_)>(
-          reinterpret_cast<char*>(&_impl_.has_tool_call_),
-          reinterpret_cast<char*>(&other->_impl_.has_tool_call_));
+      PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.has_tool_call_)
+      + sizeof(ToolParseResult::_impl_.has_tool_call_)
+      - PROTOBUF_FIELD_OFFSET(ToolParseResult, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata ToolParseResult::GetMetadata() const {
@@ -8240,6 +8152,11 @@ void ToolPromptFormatRequest::InternalSwap(ToolPromptFormatRequest* PROTOBUF_RES
 }
 // ===================================================================
 
+void ToolPromptFormatResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
 ToolPromptFormatResult::ToolPromptFormatResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, ToolPromptFormatResult_get_class_data()) {
@@ -8255,8 +8172,7 @@ PROTOBUF_NDEBUG_INLINE ToolPromptFormatResult::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::ToolPromptFormatResult& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        formatted_prompt_(arena, from.formatted_prompt_),
-        error_message_(arena, from.error_message_) {}
+        formatted_prompt_(arena, from.formatted_prompt_) {}
 
 ToolPromptFormatResult::ToolPromptFormatResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -8272,13 +8188,11 @@ ToolPromptFormatResult::ToolPromptFormatResult(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, format_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, format_),
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, format_) +
-               sizeof(Impl_::error_code_));
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000002U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
+  _impl_.format_ = from._impl_.format_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ToolPromptFormatResult)
 }
@@ -8286,17 +8200,16 @@ PROTOBUF_NDEBUG_INLINE ToolPromptFormatResult::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        formatted_prompt_(arena),
-        error_message_(arena) {}
+        formatted_prompt_(arena) {}
 
 inline void ToolPromptFormatResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, format_),
+               offsetof(Impl_, error_),
            0,
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, format_) +
-               sizeof(Impl_::error_code_));
+           offsetof(Impl_, format_) -
+               offsetof(Impl_, error_) +
+               sizeof(Impl_::format_));
 }
 ToolPromptFormatResult::~ToolPromptFormatResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.ToolPromptFormatResult)
@@ -8310,7 +8223,7 @@ inline void ToolPromptFormatResult::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.formatted_prompt_.Destroy();
-  this_._impl_.error_message_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -8353,14 +8266,11 @@ PROTOBUF_NOINLINE void ToolPromptFormatResult::Clear() {
       _impl_.formatted_prompt_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000cU)) {
-    ::memset(&_impl_.format_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.format_)) + sizeof(_impl_.error_code_));
-  }
+  _impl_.format_ = 0;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -8403,21 +8313,11 @@ PROTOBUF_NOINLINE void ToolPromptFormatResult::Clear() {
     }
   }
 
-  // optional string error_message = 4;
+  // optional .runanywhere.v1.SDKError error = 6;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ToolPromptFormatResult.error_message");
-    target = stream->WriteStringMaybeAliased(4, _s, target);
-  }
-
-  // int32 error_code = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
-              stream, this_._internal_error_code(), target);
-    }
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        6, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -8445,7 +8345,7 @@ PROTOBUF_NOINLINE void ToolPromptFormatResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     // string formatted_prompt = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_formatted_prompt().empty()) {
@@ -8453,23 +8353,16 @@ PROTOBUF_NOINLINE void ToolPromptFormatResult::Clear() {
                                         this_._internal_formatted_prompt());
       }
     }
-    // optional string error_message = 4;
+    // optional .runanywhere.v1.SDKError error = 6;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // .runanywhere.v1.ToolCallFormatName format = 2;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_format() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_format());
-      }
-    }
-    // int32 error_code = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
       }
     }
   }
@@ -8484,13 +8377,14 @@ void ToolPromptFormatResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.ToolPromptFormatResult)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_formatted_prompt().empty()) {
         _this->_internal_set_formatted_prompt(from._internal_formatted_prompt());
@@ -8501,16 +8395,16 @@ void ToolPromptFormatResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
+      }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_format() != 0) {
         _this->_impl_.format_ = from._impl_.format_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
       }
     }
   }
@@ -8534,13 +8428,12 @@ void ToolPromptFormatResult::InternalSwap(ToolPromptFormatResult* PROTOBUF_RESTR
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.formatted_prompt_, &other->_impl_.formatted_prompt_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.error_code_)
-      + sizeof(ToolPromptFormatResult::_impl_.error_code_)
-      - PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.format_)>(
-          reinterpret_cast<char*>(&_impl_.format_),
-          reinterpret_cast<char*>(&other->_impl_.format_));
+      PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.format_)
+      + sizeof(ToolPromptFormatResult::_impl_.format_)
+      - PROTOBUF_FIELD_OFFSET(ToolPromptFormatResult, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata ToolPromptFormatResult::GetMetadata() const {
@@ -8802,6 +8695,11 @@ void ToolCallValidationRequest::InternalSwap(ToolCallValidationRequest* PROTOBUF
 }
 // ===================================================================
 
+void ToolCallValidationResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
 ToolCallValidationResult::ToolCallValidationResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, ToolCallValidationResult_get_class_data()) {
@@ -8824,8 +8722,7 @@ PROTOBUF_NDEBUG_INLINE ToolCallValidationResult::Impl_::Impl_(
           , from.validation_errors_
         }
         ,
-        normalized_arguments_json_(arena, from.normalized_arguments_json_),
-        error_message_(arena, from.error_message_) {}
+        normalized_arguments_json_(arena, from.normalized_arguments_json_) {}
 
 ToolCallValidationResult::ToolCallValidationResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -8842,16 +8739,13 @@ ToolCallValidationResult::ToolCallValidationResult(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.matched_tool_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+  _impl_.matched_tool_ = (CheckHasBit(cached_has_bits, 0x00000004U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.matched_tool_)
                 : nullptr;
-  ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, is_valid_),
-           reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, is_valid_),
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, is_valid_) +
-               sizeof(Impl_::error_code_));
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
+  _impl_.is_valid_ = from._impl_.is_valid_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ToolCallValidationResult)
 }
@@ -8864,17 +8758,16 @@ PROTOBUF_NDEBUG_INLINE ToolCallValidationResult::Impl_::Impl_(
             PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ToolCallValidationResult, _impl_.validation_errors_)>()
          }
         ,
-        normalized_arguments_json_(arena),
-        error_message_(arena) {}
+        normalized_arguments_json_(arena) {}
 
 inline void ToolCallValidationResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, matched_tool_),
            0,
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, is_valid_) -
                offsetof(Impl_, matched_tool_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::is_valid_));
 }
 ToolCallValidationResult::~ToolCallValidationResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.ToolCallValidationResult)
@@ -8888,8 +8781,8 @@ inline void ToolCallValidationResult::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.normalized_arguments_json_.Destroy();
-  this_._impl_.error_message_.Destroy();
   delete this_._impl_.matched_tool_;
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -8935,18 +8828,15 @@ PROTOBUF_NOINLINE void ToolCallValidationResult::Clear() {
       _impl_.normalized_arguments_json_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(_impl_.matched_tool_ != nullptr);
       _impl_.matched_tool_->Clear();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000030U)) {
-    ::memset(&_impl_.is_valid_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.is_valid_)) + sizeof(_impl_.error_code_));
-  }
+  _impl_.is_valid_ = false;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -8990,7 +8880,7 @@ PROTOBUF_NOINLINE void ToolCallValidationResult::Clear() {
   }
 
   // optional .runanywhere.v1.ToolDefinition matched_tool = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         3, *this_._impl_.matched_tool_, this_._impl_.matched_tool_->GetCachedSize(), target,
         stream);
@@ -9006,21 +8896,11 @@ PROTOBUF_NOINLINE void ToolCallValidationResult::Clear() {
     }
   }
 
-  // optional string error_message = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ToolCallValidationResult.error_message");
-    target = stream->WriteStringMaybeAliased(5, _s, target);
-  }
-
-  // int32 error_code = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
-              stream, this_._internal_error_code(), target);
-    }
+  // optional .runanywhere.v1.SDKError error = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        7, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -9048,7 +8928,7 @@ PROTOBUF_NOINLINE void ToolCallValidationResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     // repeated string validation_errors = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size +=
@@ -9065,27 +8945,20 @@ PROTOBUF_NOINLINE void ToolCallValidationResult::Clear() {
                                         this_._internal_normalized_arguments_json());
       }
     }
-    // optional string error_message = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
-    }
     // optional .runanywhere.v1.ToolDefinition matched_tool = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.matched_tool_);
+    }
+    // optional .runanywhere.v1.SDKError error = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // bool is_valid = 1;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_is_valid() != 0) {
         total_size += 2;
-      }
-    }
-    // int32 error_code = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
       }
     }
   }
@@ -9107,7 +8980,7 @@ void ToolCallValidationResult::MergeImpl(::google::protobuf::MessageLite& to_msg
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_validation_errors()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
@@ -9123,9 +8996,6 @@ void ToolCallValidationResult::MergeImpl(::google::protobuf::MessageLite& to_msg
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(from._impl_.matched_tool_ != nullptr);
       if (_this->_impl_.matched_tool_ == nullptr) {
         _this->_impl_.matched_tool_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.matched_tool_);
@@ -9133,14 +9003,17 @@ void ToolCallValidationResult::MergeImpl(::google::protobuf::MessageLite& to_msg
         _this->_impl_.matched_tool_->MergeFrom(*from._impl_.matched_tool_);
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
+      }
+    }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_is_valid() != 0) {
         _this->_impl_.is_valid_ = from._impl_.is_valid_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
       }
     }
   }
@@ -9165,10 +9038,9 @@ void ToolCallValidationResult::InternalSwap(ToolCallValidationResult* PROTOBUF_R
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   _impl_.validation_errors_.InternalSwap(&other->_impl_.validation_errors_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.normalized_arguments_json_, &other->_impl_.normalized_arguments_json_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.error_code_)
-      + sizeof(ToolCallValidationResult::_impl_.error_code_)
+      PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.is_valid_)
+      + sizeof(ToolCallValidationResult::_impl_.is_valid_)
       - PROTOBUF_FIELD_OFFSET(ToolCallValidationResult, _impl_.matched_tool_)>(
           reinterpret_cast<char*>(&_impl_.matched_tool_),
           reinterpret_cast<char*>(&other->_impl_.matched_tool_));

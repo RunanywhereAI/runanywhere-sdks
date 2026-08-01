@@ -5,52 +5,14 @@
 //   protoc               v7.35.1
 // source: embeddings_options.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.EmbeddingsCreateResult = exports.EmbeddingsCreateRequest = exports.EmbeddingsResult = exports.EmbeddingsRequest_MetadataEntry = exports.EmbeddingsRequest = exports.EmbeddingVector_MetadataEntry = exports.EmbeddingVector = exports.EmbeddingsOptions = exports.EmbeddingsConfiguration = exports.EmbeddingsPoolingStrategy = exports.EmbeddingsNormalizeMode = exports.protobufPackage = void 0;
-exports.embeddingsNormalizeModeFromJSON = embeddingsNormalizeModeFromJSON;
-exports.embeddingsNormalizeModeToJSON = embeddingsNormalizeModeToJSON;
+exports.EmbeddingsCreateResult = exports.EmbeddingsCreateRequest = exports.EmbeddingsResult = exports.EmbeddingsRequest_MetadataEntry = exports.EmbeddingsRequest = exports.EmbeddingVector_MetadataEntry = exports.EmbeddingVector = exports.EmbeddingsOptions = exports.EmbeddingsConfiguration = exports.EmbeddingsPoolingStrategy = exports.protobufPackage = void 0;
 exports.embeddingsPoolingStrategyFromJSON = embeddingsPoolingStrategyFromJSON;
 exports.embeddingsPoolingStrategyToJSON = embeddingsPoolingStrategyToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const errors_1 = require("./errors");
 const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
-var EmbeddingsNormalizeMode;
-(function (EmbeddingsNormalizeMode) {
-    EmbeddingsNormalizeMode[EmbeddingsNormalizeMode["EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"] = 0] = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED";
-    EmbeddingsNormalizeMode[EmbeddingsNormalizeMode["EMBEDDINGS_NORMALIZE_MODE_NONE"] = 1] = "EMBEDDINGS_NORMALIZE_MODE_NONE";
-    EmbeddingsNormalizeMode[EmbeddingsNormalizeMode["EMBEDDINGS_NORMALIZE_MODE_L2"] = 2] = "EMBEDDINGS_NORMALIZE_MODE_L2";
-    EmbeddingsNormalizeMode[EmbeddingsNormalizeMode["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(EmbeddingsNormalizeMode || (exports.EmbeddingsNormalizeMode = EmbeddingsNormalizeMode = {}));
-function embeddingsNormalizeModeFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED":
-            return EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED;
-        case 1:
-        case "EMBEDDINGS_NORMALIZE_MODE_NONE":
-            return EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_NONE;
-        case 2:
-        case "EMBEDDINGS_NORMALIZE_MODE_L2":
-            return EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return EmbeddingsNormalizeMode.UNRECOGNIZED;
-    }
-}
-function embeddingsNormalizeModeToJSON(object) {
-    switch (object) {
-        case EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED:
-            return "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED";
-        case EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_NONE:
-            return "EMBEDDINGS_NORMALIZE_MODE_NONE";
-        case EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2:
-            return "EMBEDDINGS_NORMALIZE_MODE_L2";
-        case EmbeddingsNormalizeMode.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 var EmbeddingsPoolingStrategy;
 (function (EmbeddingsPoolingStrategy) {
     EmbeddingsPoolingStrategy[EmbeddingsPoolingStrategy["EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED"] = 0] = "EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED";
@@ -100,7 +62,7 @@ function createBaseEmbeddingsConfiguration() {
         embeddingDimension: 0,
         maxSequenceLength: 0,
         preferredFramework: undefined,
-        normalizeMode: 0,
+        normalize: false,
         pooling: 0,
         configJson: undefined,
     };
@@ -119,8 +81,8 @@ exports.EmbeddingsConfiguration = {
         if (message.preferredFramework !== undefined) {
             writer.uint32(40).int32(message.preferredFramework);
         }
-        if (message.normalizeMode !== 0) {
-            writer.uint32(56).int32(message.normalizeMode);
+        if (message.normalize !== false) {
+            writer.uint32(56).bool(message.normalize);
         }
         if (message.pooling !== 0) {
             writer.uint32(64).int32(message.pooling);
@@ -169,7 +131,7 @@ exports.EmbeddingsConfiguration = {
                     if (tag !== 56) {
                         break;
                     }
-                    message.normalizeMode = reader.int32();
+                    message.normalize = reader.bool();
                     continue;
                 }
                 case 8: {
@@ -216,11 +178,7 @@ exports.EmbeddingsConfiguration = {
                 : isSet(object.preferred_framework)
                     ? (0, model_types_1.inferenceFrameworkFromJSON)(object.preferred_framework)
                     : undefined,
-            normalizeMode: isSet(object.normalizeMode)
-                ? embeddingsNormalizeModeFromJSON(object.normalizeMode)
-                : isSet(object.normalize_mode)
-                    ? embeddingsNormalizeModeFromJSON(object.normalize_mode)
-                    : 0,
+            normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : false,
             pooling: isSet(object.pooling) ? embeddingsPoolingStrategyFromJSON(object.pooling) : 0,
             configJson: isSet(object.configJson)
                 ? globalThis.String(object.configJson)
@@ -243,8 +201,8 @@ exports.EmbeddingsConfiguration = {
         if (message.preferredFramework !== undefined) {
             obj.preferredFramework = (0, model_types_1.inferenceFrameworkToJSON)(message.preferredFramework);
         }
-        if (message.normalizeMode !== 0) {
-            obj.normalizeMode = embeddingsNormalizeModeToJSON(message.normalizeMode);
+        if (message.normalize !== false) {
+            obj.normalize = message.normalize;
         }
         if (message.pooling !== 0) {
             obj.pooling = embeddingsPoolingStrategyToJSON(message.pooling);
@@ -263,14 +221,14 @@ exports.EmbeddingsConfiguration = {
         message.embeddingDimension = object.embeddingDimension ?? 0;
         message.maxSequenceLength = object.maxSequenceLength ?? 0;
         message.preferredFramework = object.preferredFramework ?? undefined;
-        message.normalizeMode = object.normalizeMode ?? 0;
+        message.normalize = object.normalize ?? false;
         message.pooling = object.pooling ?? 0;
         message.configJson = object.configJson ?? undefined;
         return message;
     },
 };
 function createBaseEmbeddingsOptions() {
-    return { truncate: undefined, batchSize: undefined, normalizeMode: 0, pooling: 0, nThreads: 0 };
+    return { truncate: undefined, batchSize: undefined, normalize: false, pooling: 0, nThreads: 0 };
 }
 exports.EmbeddingsOptions = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -280,8 +238,8 @@ exports.EmbeddingsOptions = {
         if (message.batchSize !== undefined) {
             writer.uint32(24).int32(message.batchSize);
         }
-        if (message.normalizeMode !== 0) {
-            writer.uint32(32).int32(message.normalizeMode);
+        if (message.normalize !== false) {
+            writer.uint32(32).bool(message.normalize);
         }
         if (message.pooling !== 0) {
             writer.uint32(40).int32(message.pooling);
@@ -316,7 +274,7 @@ exports.EmbeddingsOptions = {
                     if (tag !== 32) {
                         break;
                     }
-                    message.normalizeMode = reader.int32();
+                    message.normalize = reader.bool();
                     continue;
                 }
                 case 5: {
@@ -349,11 +307,7 @@ exports.EmbeddingsOptions = {
                 : isSet(object.batch_size)
                     ? globalThis.Number(object.batch_size)
                     : undefined,
-            normalizeMode: isSet(object.normalizeMode)
-                ? embeddingsNormalizeModeFromJSON(object.normalizeMode)
-                : isSet(object.normalize_mode)
-                    ? embeddingsNormalizeModeFromJSON(object.normalize_mode)
-                    : 0,
+            normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : false,
             pooling: isSet(object.pooling) ? embeddingsPoolingStrategyFromJSON(object.pooling) : 0,
             nThreads: isSet(object.nThreads)
                 ? globalThis.Number(object.nThreads)
@@ -370,8 +324,8 @@ exports.EmbeddingsOptions = {
         if (message.batchSize !== undefined) {
             obj.batchSize = Math.round(message.batchSize);
         }
-        if (message.normalizeMode !== 0) {
-            obj.normalizeMode = embeddingsNormalizeModeToJSON(message.normalizeMode);
+        if (message.normalize !== false) {
+            obj.normalize = message.normalize;
         }
         if (message.pooling !== 0) {
             obj.pooling = embeddingsPoolingStrategyToJSON(message.pooling);
@@ -388,7 +342,7 @@ exports.EmbeddingsOptions = {
         const message = createBaseEmbeddingsOptions();
         message.truncate = object.truncate ?? undefined;
         message.batchSize = object.batchSize ?? undefined;
-        message.normalizeMode = object.normalizeMode ?? 0;
+        message.normalize = object.normalize ?? false;
         message.pooling = object.pooling ?? 0;
         message.nThreads = object.nThreads ?? 0;
         return message;
@@ -839,9 +793,8 @@ function createBaseEmbeddingsResult() {
         processingTimeMs: 0,
         tokensUsed: 0,
         modelId: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
         requestId: "",
+        error: undefined,
     };
 }
 exports.EmbeddingsResult = {
@@ -861,14 +814,11 @@ exports.EmbeddingsResult = {
         if (message.modelId !== undefined) {
             writer.uint32(42).string(message.modelId);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(50).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(56).int32(message.errorCode);
-        }
         if (message.requestId !== "") {
             writer.uint32(66).string(message.requestId);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(74).fork()).join();
         }
         return writer;
     },
@@ -914,25 +864,18 @@ exports.EmbeddingsResult = {
                     message.modelId = reader.string();
                     continue;
                 }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
                 case 8: {
                     if (tag !== 66) {
                         break;
                     }
                     message.requestId = reader.string();
+                    continue;
+                }
+                case 9: {
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -964,21 +907,12 @@ exports.EmbeddingsResult = {
                 : isSet(object.model_id)
                     ? globalThis.String(object.model_id)
                     : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
             requestId: isSet(object.requestId)
                 ? globalThis.String(object.requestId)
                 : isSet(object.request_id)
                     ? globalThis.String(object.request_id)
                     : "",
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -998,14 +932,11 @@ exports.EmbeddingsResult = {
         if (message.modelId !== undefined) {
             obj.modelId = message.modelId;
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
         if (message.requestId !== "") {
             obj.requestId = message.requestId;
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1019,9 +950,10 @@ exports.EmbeddingsResult = {
         message.processingTimeMs = object.processingTimeMs ?? 0;
         message.tokensUsed = object.tokensUsed ?? 0;
         message.modelId = object.modelId ?? undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         message.requestId = object.requestId ?? "";
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1119,7 +1051,7 @@ exports.EmbeddingsCreateRequest = {
     },
 };
 function createBaseEmbeddingsCreateResult() {
-    return { handle: 0, modelId: "", dimension: 0, maxTokens: 0, errorCode: 0, errorMessage: "" };
+    return { handle: 0, modelId: "", dimension: 0, maxTokens: 0, error: undefined };
 }
 exports.EmbeddingsCreateResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1135,11 +1067,8 @@ exports.EmbeddingsCreateResult = {
         if (message.maxTokens !== 0) {
             writer.uint32(32).int32(message.maxTokens);
         }
-        if (message.errorCode !== 0) {
-            writer.uint32(40).int32(message.errorCode);
-        }
-        if (message.errorMessage !== "") {
-            writer.uint32(50).string(message.errorMessage);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(58).fork()).join();
         }
         return writer;
     },
@@ -1178,18 +1107,11 @@ exports.EmbeddingsCreateResult = {
                     message.maxTokens = reader.int32();
                     continue;
                 }
-                case 5: {
-                    if (tag !== 40) {
+                case 7: {
+                    if (tag !== 58) {
                         break;
                     }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1214,16 +1136,7 @@ exports.EmbeddingsCreateResult = {
                 : isSet(object.max_tokens)
                     ? globalThis.Number(object.max_tokens)
                     : 0,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1240,11 +1153,8 @@ exports.EmbeddingsCreateResult = {
         if (message.maxTokens !== 0) {
             obj.maxTokens = Math.round(message.maxTokens);
         }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1257,8 +1167,9 @@ exports.EmbeddingsCreateResult = {
         message.modelId = object.modelId ?? "";
         message.dimension = object.dimension ?? 0;
         message.maxTokens = object.maxTokens ?? 0;
-        message.errorCode = object.errorCode ?? 0;
-        message.errorMessage = object.errorMessage ?? "";
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };

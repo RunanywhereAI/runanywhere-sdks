@@ -8,15 +8,10 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere IDL — thinking tag pattern shared across LLM generation options
-// and model catalog metadata.
+// RunAnywhere IDL — reasoning control and thinking-tag pattern.
 //
-// Historically duplicated as `ThinkingTagPattern` (llm_options.proto, with
-// `opening_tag`/`closing_tag` fields) and `ModelThinkingTagPattern`
-// (model_types.proto, with `open_tag`/`close_tag` fields). This file
-// collapses both into this single canonical message. Extracted into its own
-// file so it can be shared between llm_options.proto and model_types.proto
-// without introducing a proto import cycle.
+// Its own file so llm_options.proto and model_types.proto can both import it
+// without a cycle.
 
 import SwiftProtobuf
 
@@ -30,26 +25,18 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// The single home for reasoning/thinking control. Replaces the retired
-/// per-message toggles (LLMGenerationOptions.disable_thinking,
-/// ToolCallingOptions.disable_thinking, RAGQueryOptions.disable_thinking,
-/// ToolCallingSessionCreateRequest.disable_thinking,
-/// LLMGenerateRequest.emit_thoughts). Referenced from LLM and VLM generation
-/// options; every composed surface (tool calling, RAG, voice agent) inherits
-/// it through the embedded LLMGenerationOptions.
-/// ---------------------------------------------------------------------------
+/// The single home for reasoning control. Composed surfaces (tool calling, RAG,
+/// voice agent) inherit it through the embedded LLMGenerationOptions.
 public nonisolated enum RAReasoningMode: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
 
-  /// Model default: reasoning-capable models think, others don't.
+  /// Reasoning-capable models think; others don't.
   case unspecified // = 0
 
-  /// Suppress the thinking phase (commons applies the model's no-think
-  /// directive at the prompt level).
+  /// Commons applies the model's no-think directive at the prompt level.
   case off // = 1
 
-  /// Request the thinking phase on models where it is optional.
+  /// Request thinking on models where it is optional.
   case on // = 2
   case UNRECOGNIZED(Int)
 
@@ -84,21 +71,18 @@ public nonisolated enum RAReasoningMode: SwiftProtobuf.Enum, Swift.CaseIterable 
 
 }
 
-/// ---------------------------------------------------------------------------
-/// Pattern used to extract a model's "thinking" / reasoning block from its
-/// raw output. Used by Qwen3 and LFM2 family models that emit
-/// <think>...</think> wrappers. Shared by LLM generation options (per-call
-/// override) and ModelInfo catalog metadata (default pattern for a model).
-/// ---------------------------------------------------------------------------
+/// Extracts a model's reasoning block from raw output, for families like Qwen3
+/// and LFM2 that wrap it in <think>...</think>. Used both per-call and as
+/// ModelInfo catalog metadata.
 public nonisolated struct RAThinkingTagPattern: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Opening tag string. Default if empty: "<think>".
+  /// Empty defaults to "<think>".
   public var openTag: String = String()
 
-  /// Closing tag string. Default if empty: "</think>".
+  /// Empty defaults to "</think>".
   public var closeTag: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -113,12 +97,11 @@ public nonisolated struct RAReasoningOptions: Sendable {
 
   public var mode: RAReasoningMode = .unspecified
 
-  /// Emit thought tokens/content to the caller (stream TokenKind.THOUGHT
-  /// events and result thinking_content). False = thinking is stripped.
+  /// Emit thought tokens to the caller as TokenKind.THOUGHT events plus
+  /// result thinking_content. False strips them.
   public var includeInOutput: Bool = false
 
-  /// Tag override for models whose thinking markers differ from the
-  /// catalog default.
+  /// For models whose thinking markers differ from the catalog default.
   public var pattern: RAThinkingTagPattern {
     get {_pattern ?? RAThinkingTagPattern()}
     set {_pattern = newValue}

@@ -59,10 +59,6 @@ namespace runanywhere {
 namespace v1 {
 enum HybridBackendKind : int;
 extern const uint32_t HybridBackendKind_internal_data_[];
-enum HybridModelType : int;
-extern const uint32_t HybridModelType_internal_data_[];
-enum HybridRank : int;
-extern const uint32_t HybridRank_internal_data_[];
 class BatteryFilter;
 struct BatteryFilterGlobalsTypeInternal;
 #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -174,12 +170,6 @@ namespace protobuf {
 template <>
 internal::EnumTraitsT<::runanywhere::v1::HybridBackendKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::HybridBackendKind>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::HybridModelType_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::HybridModelType>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::HybridRank_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::HybridRank>;
 }  // namespace protobuf
 }  // namespace google
 
@@ -226,88 +216,6 @@ template <>
 [[nodiscard]] inline bool HybridBackendKind_Parse(
     ::absl::string_view name, HybridBackendKind* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<HybridBackendKind>(HybridBackendKind_descriptor(), name,
-                                           value);
-}
-enum HybridModelType : int {
-  HYBRID_MODEL_TYPE_UNSPECIFIED = 0,
-  HYBRID_MODEL_TYPE_OFFLINE = 1,
-  HYBRID_MODEL_TYPE_ONLINE = 2,
-  HybridModelType_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  HybridModelType_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t HybridModelType_internal_data_[];
-inline constexpr HybridModelType HybridModelType_MIN =
-    static_cast<HybridModelType>(0);
-inline constexpr HybridModelType HybridModelType_MAX =
-    static_cast<HybridModelType>(2);
-[[nodiscard]] inline bool HybridModelType_IsValid(int value) {
-  return 0 <= value && value <= 2;
-}
-inline constexpr int HybridModelType_ARRAYSIZE = 2 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridModelType_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(HybridModelType) {
-  return HybridModelType_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& HybridModelType_Name(T value) {
-  static_assert(::std::is_same<T, HybridModelType>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to HybridModelType_Name().");
-  return HybridModelType_Name(static_cast<HybridModelType>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& HybridModelType_Name(HybridModelType value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<HybridModelType_descriptor, 0, 2>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool HybridModelType_Parse(
-    ::absl::string_view name, HybridModelType* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<HybridModelType>(HybridModelType_descriptor(), name,
-                                           value);
-}
-enum HybridRank : int {
-  HYBRID_RANK_UNSPECIFIED = 0,
-  HYBRID_RANK_PREFER_LOCAL_FIRST = 1,
-  HYBRID_RANK_PREFER_ONLINE_FIRST = 2,
-  HybridRank_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  HybridRank_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t HybridRank_internal_data_[];
-inline constexpr HybridRank HybridRank_MIN =
-    static_cast<HybridRank>(0);
-inline constexpr HybridRank HybridRank_MAX =
-    static_cast<HybridRank>(2);
-[[nodiscard]] inline bool HybridRank_IsValid(int value) {
-  return 0 <= value && value <= 2;
-}
-inline constexpr int HybridRank_ARRAYSIZE = 2 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridRank_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(HybridRank) {
-  return HybridRank_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& HybridRank_Name(T value) {
-  static_assert(::std::is_same<T, HybridRank>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to HybridRank_Name().");
-  return HybridRank_Name(static_cast<HybridRank>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& HybridRank_Name(HybridRank value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<HybridRank_descriptor, 0, 2>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool HybridRank_Parse(
-    ::absl::string_view name, HybridRank* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<HybridRank>(HybridRank_descriptor(), name,
                                            value);
 }
 using ::google::protobuf::internal::generated_enum::AbslParseFlag;
@@ -1119,7 +1027,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridModelDescriptor final : publi
   enum : int {
     kModelIdFieldNumber = 1,
     kProviderFieldNumber = 4,
-    kModelTypeFieldNumber = 2,
+    kIsLocalFieldNumber = 2,
     kBackendFieldNumber = 3,
   };
   // string model_id = 1;
@@ -1152,14 +1060,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridModelDescriptor final : publi
   ::std::string* PROTOBUF_NONNULL _internal_mutable_provider();
 
   public:
-  // .runanywhere.v1.HybridModelType model_type = 2;
-  void clear_model_type() ;
-  [[nodiscard]] ::runanywhere::v1::HybridModelType model_type() const;
-  void set_model_type(::runanywhere::v1::HybridModelType value);
+  // bool is_local = 2;
+  void clear_is_local() ;
+  [[nodiscard]] bool is_local() const;
+  void set_is_local(bool value);
 
   private:
-  ::runanywhere::v1::HybridModelType _internal_model_type() const;
-  void _internal_set_model_type(::runanywhere::v1::HybridModelType value);
+  bool _internal_is_local() const;
+  void _internal_set_is_local(bool value);
 
   public:
   // .runanywhere.v1.HybridBackendKind backend = 3;
@@ -1207,7 +1115,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridModelDescriptor final : publi
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
     ::google::protobuf::internal::ArenaStringPtr provider_;
-    int model_type_;
+    bool is_local_;
     int backend_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -3293,7 +3201,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutingPolicy final : public 
   enum : int {
     kHardFiltersFieldNumber = 1,
     kCascadeFieldNumber = 2,
-    kRankFieldNumber = 3,
+    kPreferLocalFieldNumber = 3,
   };
   // repeated .runanywhere.v1.HybridFilter hard_filters = 1;
   [[nodiscard]] int hard_filters_size()
@@ -3332,14 +3240,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutingPolicy final : public 
   ::runanywhere::v1::HybridCascade* PROTOBUF_NONNULL _internal_mutable_cascade();
 
   public:
-  // .runanywhere.v1.HybridRank rank = 3;
-  void clear_rank() ;
-  [[nodiscard]] ::runanywhere::v1::HybridRank rank() const;
-  void set_rank(::runanywhere::v1::HybridRank value);
+  // bool prefer_local = 3;
+  void clear_prefer_local() ;
+  [[nodiscard]] bool prefer_local() const;
+  void set_prefer_local(bool value);
 
   private:
-  ::runanywhere::v1::HybridRank _internal_rank() const;
-  void _internal_set_rank(::runanywhere::v1::HybridRank value);
+  bool _internal_prefer_local() const;
+  void _internal_set_prefer_local(bool value);
 
   public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.HybridRoutingPolicy)
@@ -3377,7 +3285,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HybridRoutingPolicy final : public 
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::HybridFilter > hard_filters_;
     ::runanywhere::v1::HybridCascade* PROTOBUF_NULLABLE cascade_;
-    int rank_;
+    bool prefer_local_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -4079,28 +3987,28 @@ inline void HybridRoutingPolicy::set_allocated_cascade(::runanywhere::v1::Hybrid
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridRoutingPolicy.cascade)
 }
 
-// .runanywhere.v1.HybridRank rank = 3;
-inline void HybridRoutingPolicy::clear_rank() {
+// bool prefer_local = 3;
+inline void HybridRoutingPolicy::clear_prefer_local() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.rank_ = 0;
+  _impl_.prefer_local_ = false;
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline ::runanywhere::v1::HybridRank HybridRoutingPolicy::rank() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutingPolicy.rank)
-  return _internal_rank();
+inline bool HybridRoutingPolicy::prefer_local() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridRoutingPolicy.prefer_local)
+  return _internal_prefer_local();
 }
-inline void HybridRoutingPolicy::set_rank(::runanywhere::v1::HybridRank value) {
-  _internal_set_rank(value);
+inline void HybridRoutingPolicy::set_prefer_local(bool value) {
+  _internal_set_prefer_local(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutingPolicy.rank)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridRoutingPolicy.prefer_local)
 }
-inline ::runanywhere::v1::HybridRank HybridRoutingPolicy::_internal_rank() const {
+inline bool HybridRoutingPolicy::_internal_prefer_local() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::HybridRank>(_impl_.rank_);
+  return _impl_.prefer_local_;
 }
-inline void HybridRoutingPolicy::_internal_set_rank(::runanywhere::v1::HybridRank value) {
+inline void HybridRoutingPolicy::_internal_set_prefer_local(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.rank_ = value;
+  _impl_.prefer_local_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -4171,28 +4079,28 @@ inline void HybridModelDescriptor::set_allocated_model_id(::std::string* PROTOBU
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HybridModelDescriptor.model_id)
 }
 
-// .runanywhere.v1.HybridModelType model_type = 2;
-inline void HybridModelDescriptor::clear_model_type() {
+// bool is_local = 2;
+inline void HybridModelDescriptor::clear_is_local() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_type_ = 0;
+  _impl_.is_local_ = false;
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline ::runanywhere::v1::HybridModelType HybridModelDescriptor::model_type() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridModelDescriptor.model_type)
-  return _internal_model_type();
+inline bool HybridModelDescriptor::is_local() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HybridModelDescriptor.is_local)
+  return _internal_is_local();
 }
-inline void HybridModelDescriptor::set_model_type(::runanywhere::v1::HybridModelType value) {
-  _internal_set_model_type(value);
+inline void HybridModelDescriptor::set_is_local(bool value) {
+  _internal_set_is_local(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridModelDescriptor.model_type)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HybridModelDescriptor.is_local)
 }
-inline ::runanywhere::v1::HybridModelType HybridModelDescriptor::_internal_model_type() const {
+inline bool HybridModelDescriptor::_internal_is_local() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::HybridModelType>(_impl_.model_type_);
+  return _impl_.is_local_;
 }
-inline void HybridModelDescriptor::_internal_set_model_type(::runanywhere::v1::HybridModelType value) {
+inline void HybridModelDescriptor::_internal_set_is_local(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.model_type_ = value;
+  _impl_.is_local_ = value;
 }
 
 // .runanywhere.v1.HybridBackendKind backend = 3;
@@ -5602,18 +5510,6 @@ struct is_proto_enum<::runanywhere::v1::HybridBackendKind> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HybridBackendKind>() {
   return ::runanywhere::v1::HybridBackendKind_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::HybridModelType> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HybridModelType>() {
-  return ::runanywhere::v1::HybridModelType_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::HybridRank> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::HybridRank>() {
-  return ::runanywhere::v1::HybridRank_descriptor();
 }
 
 }  // namespace protobuf

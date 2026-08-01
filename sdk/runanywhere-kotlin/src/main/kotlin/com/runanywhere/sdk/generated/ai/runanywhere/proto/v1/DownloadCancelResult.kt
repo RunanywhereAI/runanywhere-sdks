@@ -31,18 +31,11 @@ import okio.ByteString
 
 public class DownloadCancelResult(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "taskId",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val task_id: String = "",
   @field:WireField(
@@ -50,7 +43,7 @@ public class DownloadCancelResult(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelId",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val model_id: String = "",
   @field:WireField(
@@ -58,23 +51,15 @@ public class DownloadCancelResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "partialBytesDeleted",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val partial_bytes_deleted: Long = 0L,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 4,
-  )
-  public val error_message: String = "",
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "wasRunning",
-    schemaIndex = 5,
+    schemaIndex = 3,
   )
   public val was_running: Boolean = false,
   @field:WireField(
@@ -82,7 +67,7 @@ public class DownloadCancelResult(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "partialBytesPreserved",
-    schemaIndex = 6,
+    schemaIndex = 4,
   )
   public val partial_bytes_preserved: Boolean = false,
   @field:WireField(
@@ -90,9 +75,15 @@ public class DownloadCancelResult(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "resumeToken",
-    schemaIndex = 7,
+    schemaIndex = 5,
   )
   public val resume_token: String = "",
+  @field:WireField(
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 6,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadCancelResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -105,14 +96,13 @@ public class DownloadCancelResult(
     if (other === this) return true
     if (other !is DownloadCancelResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (task_id != other.task_id) return false
     if (model_id != other.model_id) return false
     if (partial_bytes_deleted != other.partial_bytes_deleted) return false
-    if (error_message != other.error_message) return false
     if (was_running != other.was_running) return false
     if (partial_bytes_preserved != other.partial_bytes_preserved) return false
     if (resume_token != other.resume_token) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -120,14 +110,13 @@ public class DownloadCancelResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + task_id.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + partial_bytes_deleted.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + was_running.hashCode()
       result = result * 37 + partial_bytes_preserved.hashCode()
       result = result * 37 + resume_token.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -135,28 +124,26 @@ public class DownloadCancelResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     result += """task_id=${sanitize(task_id)}"""
     result += """model_id=${sanitize(model_id)}"""
     result += """partial_bytes_deleted=$partial_bytes_deleted"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """was_running=$was_running"""
     result += """partial_bytes_preserved=$partial_bytes_preserved"""
     result += """resume_token=${sanitize(resume_token)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "DownloadCancelResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     task_id: String = this.task_id,
     model_id: String = this.model_id,
     partial_bytes_deleted: Long = this.partial_bytes_deleted,
-    error_message: String = this.error_message,
     was_running: Boolean = this.was_running,
     partial_bytes_preserved: Boolean = this.partial_bytes_preserved,
     resume_token: String = this.resume_token,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): DownloadCancelResult = DownloadCancelResult(success, task_id, model_id, partial_bytes_deleted, error_message, was_running, partial_bytes_preserved, resume_token, unknownFields)
+  ): DownloadCancelResult = DownloadCancelResult(task_id, model_id, partial_bytes_deleted, was_running, partial_bytes_preserved, resume_token, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -171,9 +158,6 @@ public class DownloadCancelResult(
     ) {
       override fun encodedSize(`value`: DownloadCancelResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         if (value.task_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.task_id)
         }
@@ -182,9 +166,6 @@ public class DownloadCancelResult(
         }
         if (value.partial_bytes_deleted != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.partial_bytes_deleted)
-        }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.error_message)
         }
         if (value.was_running != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.was_running)
@@ -195,13 +176,11 @@ public class DownloadCancelResult(
         if (value.resume_token != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.resume_token)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: DownloadCancelResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         if (value.task_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.task_id)
         }
@@ -210,9 +189,6 @@ public class DownloadCancelResult(
         }
         if (value.partial_bytes_deleted != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.partial_bytes_deleted)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
         }
         if (value.was_running != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.was_running)
@@ -223,11 +199,13 @@ public class DownloadCancelResult(
         if (value.resume_token != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 8, value.resume_token)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadCancelResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         if (value.resume_token != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 8, value.resume_token)
         }
@@ -236,9 +214,6 @@ public class DownloadCancelResult(
         }
         if (value.was_running != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.was_running)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
         }
         if (value.partial_bytes_deleted != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.partial_bytes_deleted)
@@ -249,47 +224,42 @@ public class DownloadCancelResult(
         if (value.task_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.task_id)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): DownloadCancelResult {
-        var success: Boolean = false
         var task_id: String = ""
         var model_id: String = ""
         var partial_bytes_deleted: Long = 0L
-        var error_message: String = ""
         var was_running: Boolean = false
         var partial_bytes_preserved: Boolean = false
         var resume_token: String = ""
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> task_id = ProtoAdapter.STRING.decode(reader)
             3 -> model_id = ProtoAdapter.STRING.decode(reader)
             4 -> partial_bytes_deleted = ProtoAdapter.INT64.decode(reader)
-            5 -> error_message = ProtoAdapter.STRING.decode(reader)
             6 -> was_running = ProtoAdapter.BOOL.decode(reader)
             7 -> partial_bytes_preserved = ProtoAdapter.BOOL.decode(reader)
             8 -> resume_token = ProtoAdapter.STRING.decode(reader)
+            9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return DownloadCancelResult(
-          success = success,
           task_id = task_id,
           model_id = model_id,
           partial_bytes_deleted = partial_bytes_deleted,
-          error_message = error_message,
           was_running = was_running,
           partial_bytes_preserved = partial_bytes_preserved,
           resume_token = resume_token,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: DownloadCancelResult): DownloadCancelResult = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

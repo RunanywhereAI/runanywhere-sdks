@@ -65,25 +65,17 @@ public class ComponentLifecycleSnapshot(
   )
   public val updated_at_ms: Long = 0L,
   @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 4,
-  )
-  public val error_message: String = "",
-  @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.ModelCategory#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val category: ModelCategory = ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
   @field:WireField(
@@ -91,7 +83,7 @@ public class ComponentLifecycleSnapshot(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "resolvedPath",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val resolved_path: String = "",
   @field:WireField(
@@ -99,16 +91,22 @@ public class ComponentLifecycleSnapshot(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "loadedAtUnixMs",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val loaded_at_unix_ms: Long = 0L,
   @field:WireField(
     tag = 10,
     adapter = "ai.runanywhere.proto.v1.ModelInfo#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 9,
+    schemaIndex = 8,
   )
   public val model: ModelInfo? = null,
+  @field:WireField(
+    tag = 11,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 9,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ComponentLifecycleSnapshot, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -125,12 +123,12 @@ public class ComponentLifecycleSnapshot(
     if (state != other.state) return false
     if (model_id != other.model_id) return false
     if (updated_at_ms != other.updated_at_ms) return false
-    if (error_message != other.error_message) return false
     if (category != other.category) return false
     if (framework != other.framework) return false
     if (resolved_path != other.resolved_path) return false
     if (loaded_at_unix_ms != other.loaded_at_unix_ms) return false
     if (model != other.model) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -142,12 +140,12 @@ public class ComponentLifecycleSnapshot(
       result = result * 37 + state.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + updated_at_ms.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + category.hashCode()
       result = result * 37 + framework.hashCode()
       result = result * 37 + resolved_path.hashCode()
       result = result * 37 + loaded_at_unix_ms.hashCode()
       result = result * 37 + (model?.hashCode() ?: 0)
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -159,12 +157,12 @@ public class ComponentLifecycleSnapshot(
     result += """state=$state"""
     result += """model_id=${sanitize(model_id)}"""
     result += """updated_at_ms=$updated_at_ms"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """category=$category"""
     result += """framework=$framework"""
     result += """resolved_path=${sanitize(resolved_path)}"""
     result += """loaded_at_unix_ms=$loaded_at_unix_ms"""
     if (model != null) result += """model=$model"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ComponentLifecycleSnapshot{", separator = ", ", postfix = "}")
   }
 
@@ -173,14 +171,14 @@ public class ComponentLifecycleSnapshot(
     state: ComponentLifecycleState = this.state,
     model_id: String = this.model_id,
     updated_at_ms: Long = this.updated_at_ms,
-    error_message: String = this.error_message,
     category: ModelCategory = this.category,
     framework: InferenceFramework = this.framework,
     resolved_path: String = this.resolved_path,
     loaded_at_unix_ms: Long = this.loaded_at_unix_ms,
     model: ModelInfo? = this.model,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ComponentLifecycleSnapshot = ComponentLifecycleSnapshot(component, state, model_id, updated_at_ms, error_message, category, framework, resolved_path, loaded_at_unix_ms, model, unknownFields)
+  ): ComponentLifecycleSnapshot = ComponentLifecycleSnapshot(component, state, model_id, updated_at_ms, category, framework, resolved_path, loaded_at_unix_ms, model, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -207,9 +205,6 @@ public class ComponentLifecycleSnapshot(
         if (value.updated_at_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.updated_at_ms)
         }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.error_message)
-        }
         if (value.category != ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_UNSPECIFIED) {
           size += ModelCategory.ADAPTER.encodedSizeWithTag(6, value.category)
         }
@@ -225,6 +220,7 @@ public class ComponentLifecycleSnapshot(
         if (value.model != null) {
           size += ModelInfo.ADAPTER.encodedSizeWithTag(10, value.model)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(11, value.error)
         return size
       }
 
@@ -241,9 +237,6 @@ public class ComponentLifecycleSnapshot(
         if (value.updated_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.updated_at_ms)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
-        }
         if (value.category != ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_UNSPECIFIED) {
           ModelCategory.ADAPTER.encodeWithTag(writer, 6, value.category)
         }
@@ -259,11 +252,13 @@ public class ComponentLifecycleSnapshot(
         if (value.model != null) {
           ModelInfo.ADAPTER.encodeWithTag(writer, 10, value.model)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ComponentLifecycleSnapshot) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         if (value.model != null) {
           ModelInfo.ADAPTER.encodeWithTag(writer, 10, value.model)
         }
@@ -278,9 +273,6 @@ public class ComponentLifecycleSnapshot(
         }
         if (value.category != ai.runanywhere.proto.v1.ModelCategory.MODEL_CATEGORY_UNSPECIFIED) {
           ModelCategory.ADAPTER.encodeWithTag(writer, 6, value.category)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
         }
         if (value.updated_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.updated_at_ms)
@@ -301,12 +293,12 @@ public class ComponentLifecycleSnapshot(
         var state: ComponentLifecycleState = ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED
         var model_id: String = ""
         var updated_at_ms: Long = 0L
-        var error_message: String = ""
         var category: ModelCategory = ModelCategory.MODEL_CATEGORY_UNSPECIFIED
         var framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
         var resolved_path: String = ""
         var loaded_at_unix_ms: Long = 0L
         var model: ModelInfo? = null
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -321,7 +313,6 @@ public class ComponentLifecycleSnapshot(
             }
             3 -> model_id = ProtoAdapter.STRING.decode(reader)
             4 -> updated_at_ms = ProtoAdapter.INT64.decode(reader)
-            5 -> error_message = ProtoAdapter.STRING.decode(reader)
             6 -> try {
               category = ModelCategory.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -335,6 +326,7 @@ public class ComponentLifecycleSnapshot(
             8 -> resolved_path = ProtoAdapter.STRING.decode(reader)
             9 -> loaded_at_unix_ms = ProtoAdapter.INT64.decode(reader)
             10 -> model = ModelInfo.ADAPTER.decode(reader)
+            11 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -343,18 +335,19 @@ public class ComponentLifecycleSnapshot(
           state = state,
           model_id = model_id,
           updated_at_ms = updated_at_ms,
-          error_message = error_message,
           category = category,
           framework = framework,
           resolved_path = resolved_path,
           loaded_at_unix_ms = loaded_at_unix_ms,
           model = model,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ComponentLifecycleSnapshot): ComponentLifecycleSnapshot = value.copy(
         model = value.model?.let(ModelInfo.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

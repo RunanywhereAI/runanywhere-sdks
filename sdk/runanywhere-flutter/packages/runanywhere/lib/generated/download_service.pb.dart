@@ -16,7 +16,8 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'download_service.pbenum.dart';
-import 'model_types.pb.dart' as $0;
+import 'errors.pb.dart' as $0;
+import 'model_types.pb.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -100,7 +101,6 @@ class DownloadProgress extends $pb.GeneratedMessage {
     $fixnum.Int64? etaSeconds,
     DownloadState? state,
     $core.int? retryAttempt,
-    $core.String? errorMessage,
     $core.String? taskId,
     $core.int? currentFileIndex,
     $core.int? totalFiles,
@@ -111,6 +111,7 @@ class DownloadProgress extends $pb.GeneratedMessage {
     $fixnum.Int64? updatedAtUnixMs,
     $core.String? currentFileName,
     $core.String? resumeToken,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
@@ -122,7 +123,6 @@ class DownloadProgress extends $pb.GeneratedMessage {
     if (etaSeconds != null) result.etaSeconds = etaSeconds;
     if (state != null) result.state = state;
     if (retryAttempt != null) result.retryAttempt = retryAttempt;
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (taskId != null) result.taskId = taskId;
     if (currentFileIndex != null) result.currentFileIndex = currentFileIndex;
     if (totalFiles != null) result.totalFiles = totalFiles;
@@ -133,6 +133,7 @@ class DownloadProgress extends $pb.GeneratedMessage {
     if (updatedAtUnixMs != null) result.updatedAtUnixMs = updatedAtUnixMs;
     if (currentFileName != null) result.currentFileName = currentFileName;
     if (resumeToken != null) result.resumeToken = resumeToken;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -162,7 +163,6 @@ class DownloadProgress extends $pb.GeneratedMessage {
     ..aE<DownloadState>(8, _omitFieldNames ? '' : 'state',
         enumValues: DownloadState.values)
     ..aI(9, _omitFieldNames ? '' : 'retryAttempt')
-    ..aOS(10, _omitFieldNames ? '' : 'errorMessage')
     ..aOS(11, _omitFieldNames ? '' : 'taskId')
     ..aI(12, _omitFieldNames ? '' : 'currentFileIndex')
     ..aI(13, _omitFieldNames ? '' : 'totalFiles')
@@ -174,6 +174,8 @@ class DownloadProgress extends $pb.GeneratedMessage {
     ..aInt64(18, _omitFieldNames ? '' : 'updatedAtUnixMs')
     ..aOS(19, _omitFieldNames ? '' : 'currentFileName')
     ..aOS(20, _omitFieldNames ? '' : 'resumeToken')
+    ..aOM<$0.SDKError>(21, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -276,110 +278,112 @@ class DownloadProgress extends $pb.GeneratedMessage {
   @$pb.TagNumber(9)
   void clearRetryAttempt() => $_clearField(9);
 
-  @$pb.TagNumber(10)
-  $core.String get errorMessage => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set errorMessage($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasErrorMessage() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearErrorMessage() => $_clearField(10);
-
   @$pb.TagNumber(11)
-  $core.String get taskId => $_getSZ(10);
+  $core.String get taskId => $_getSZ(9);
   @$pb.TagNumber(11)
-  set taskId($core.String value) => $_setString(10, value);
+  set taskId($core.String value) => $_setString(9, value);
   @$pb.TagNumber(11)
-  $core.bool hasTaskId() => $_has(10);
+  $core.bool hasTaskId() => $_has(9);
   @$pb.TagNumber(11)
   void clearTaskId() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  $core.int get currentFileIndex => $_getIZ(11);
+  $core.int get currentFileIndex => $_getIZ(10);
   @$pb.TagNumber(12)
-  set currentFileIndex($core.int value) => $_setSignedInt32(11, value);
+  set currentFileIndex($core.int value) => $_setSignedInt32(10, value);
   @$pb.TagNumber(12)
-  $core.bool hasCurrentFileIndex() => $_has(11);
+  $core.bool hasCurrentFileIndex() => $_has(10);
   @$pb.TagNumber(12)
   void clearCurrentFileIndex() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $core.int get totalFiles => $_getIZ(12);
+  $core.int get totalFiles => $_getIZ(11);
   @$pb.TagNumber(13)
-  set totalFiles($core.int value) => $_setSignedInt32(12, value);
+  set totalFiles($core.int value) => $_setSignedInt32(11, value);
   @$pb.TagNumber(13)
-  $core.bool hasTotalFiles() => $_has(12);
+  $core.bool hasTotalFiles() => $_has(11);
   @$pb.TagNumber(13)
   void clearTotalFiles() => $_clearField(13);
 
   @$pb.TagNumber(14)
-  $core.String get storageKey => $_getSZ(13);
+  $core.String get storageKey => $_getSZ(12);
   @$pb.TagNumber(14)
-  set storageKey($core.String value) => $_setString(13, value);
+  set storageKey($core.String value) => $_setString(12, value);
   @$pb.TagNumber(14)
-  $core.bool hasStorageKey() => $_has(13);
+  $core.bool hasStorageKey() => $_has(12);
   @$pb.TagNumber(14)
   void clearStorageKey() => $_clearField(14);
 
   @$pb.TagNumber(15)
-  $core.String get localPath => $_getSZ(14);
+  $core.String get localPath => $_getSZ(13);
   @$pb.TagNumber(15)
-  set localPath($core.String value) => $_setString(14, value);
+  set localPath($core.String value) => $_setString(13, value);
   @$pb.TagNumber(15)
-  $core.bool hasLocalPath() => $_has(14);
+  $core.bool hasLocalPath() => $_has(13);
   @$pb.TagNumber(15)
   void clearLocalPath() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $core.double get overallProgress => $_getN(15);
+  $core.double get overallProgress => $_getN(14);
   @$pb.TagNumber(16)
-  set overallProgress($core.double value) => $_setFloat(15, value);
+  set overallProgress($core.double value) => $_setFloat(14, value);
   @$pb.TagNumber(16)
-  $core.bool hasOverallProgress() => $_has(15);
+  $core.bool hasOverallProgress() => $_has(14);
   @$pb.TagNumber(16)
   void clearOverallProgress() => $_clearField(16);
 
   @$pb.TagNumber(17)
-  $fixnum.Int64 get startedAtUnixMs => $_getI64(16);
+  $fixnum.Int64 get startedAtUnixMs => $_getI64(15);
   @$pb.TagNumber(17)
-  set startedAtUnixMs($fixnum.Int64 value) => $_setInt64(16, value);
+  set startedAtUnixMs($fixnum.Int64 value) => $_setInt64(15, value);
   @$pb.TagNumber(17)
-  $core.bool hasStartedAtUnixMs() => $_has(16);
+  $core.bool hasStartedAtUnixMs() => $_has(15);
   @$pb.TagNumber(17)
   void clearStartedAtUnixMs() => $_clearField(17);
 
   @$pb.TagNumber(18)
-  $fixnum.Int64 get updatedAtUnixMs => $_getI64(17);
+  $fixnum.Int64 get updatedAtUnixMs => $_getI64(16);
   @$pb.TagNumber(18)
-  set updatedAtUnixMs($fixnum.Int64 value) => $_setInt64(17, value);
+  set updatedAtUnixMs($fixnum.Int64 value) => $_setInt64(16, value);
   @$pb.TagNumber(18)
-  $core.bool hasUpdatedAtUnixMs() => $_has(17);
+  $core.bool hasUpdatedAtUnixMs() => $_has(16);
   @$pb.TagNumber(18)
   void clearUpdatedAtUnixMs() => $_clearField(18);
 
   @$pb.TagNumber(19)
-  $core.String get currentFileName => $_getSZ(18);
+  $core.String get currentFileName => $_getSZ(17);
   @$pb.TagNumber(19)
-  set currentFileName($core.String value) => $_setString(18, value);
+  set currentFileName($core.String value) => $_setString(17, value);
   @$pb.TagNumber(19)
-  $core.bool hasCurrentFileName() => $_has(18);
+  $core.bool hasCurrentFileName() => $_has(17);
   @$pb.TagNumber(19)
   void clearCurrentFileName() => $_clearField(19);
 
   @$pb.TagNumber(20)
-  $core.String get resumeToken => $_getSZ(19);
+  $core.String get resumeToken => $_getSZ(18);
   @$pb.TagNumber(20)
-  set resumeToken($core.String value) => $_setString(19, value);
+  set resumeToken($core.String value) => $_setString(18, value);
   @$pb.TagNumber(20)
-  $core.bool hasResumeToken() => $_has(19);
+  $core.bool hasResumeToken() => $_has(18);
   @$pb.TagNumber(20)
   void clearResumeToken() => $_clearField(20);
+
+  @$pb.TagNumber(21)
+  $0.SDKError get error => $_getN(19);
+  @$pb.TagNumber(21)
+  set error($0.SDKError value) => $_setField(21, value);
+  @$pb.TagNumber(21)
+  $core.bool hasError() => $_has(19);
+  @$pb.TagNumber(21)
+  void clearError() => $_clearField(21);
+  @$pb.TagNumber(21)
+  $0.SDKError ensureError() => $_ensure(19);
 }
 
 class DownloadPlanRequest extends $pb.GeneratedMessage {
   factory DownloadPlanRequest({
     $core.String? modelId,
-    $0.ModelInfo? model,
+    $1.ModelInfo? model,
     $core.bool? resumeExisting,
     $fixnum.Int64? availableStorageBytes,
     $core.bool? allowMeteredNetwork,
@@ -419,8 +423,8 @@ class DownloadPlanRequest extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOM<$0.ModelInfo>(2, _omitFieldNames ? '' : 'model',
-        subBuilder: $0.ModelInfo.create)
+    ..aOM<$1.ModelInfo>(2, _omitFieldNames ? '' : 'model',
+        subBuilder: $1.ModelInfo.create)
     ..aOB(3, _omitFieldNames ? '' : 'resumeExisting')
     ..aInt64(4, _omitFieldNames ? '' : 'availableStorageBytes')
     ..aOB(5, _omitFieldNames ? '' : 'allowMeteredNetwork')
@@ -459,15 +463,15 @@ class DownloadPlanRequest extends $pb.GeneratedMessage {
   void clearModelId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  $0.ModelInfo get model => $_getN(1);
+  $1.ModelInfo get model => $_getN(1);
   @$pb.TagNumber(2)
-  set model($0.ModelInfo value) => $_setField(2, value);
+  set model($1.ModelInfo value) => $_setField(2, value);
   @$pb.TagNumber(2)
   $core.bool hasModel() => $_has(1);
   @$pb.TagNumber(2)
   void clearModel() => $_clearField(2);
   @$pb.TagNumber(2)
-  $0.ModelInfo ensureModel() => $_ensure(1);
+  $1.ModelInfo ensureModel() => $_ensure(1);
 
   @$pb.TagNumber(3)
   $core.bool get resumeExisting => $_getBF(2);
@@ -536,7 +540,7 @@ class DownloadPlanRequest extends $pb.GeneratedMessage {
 
 class DownloadFilePlan extends $pb.GeneratedMessage {
   factory DownloadFilePlan({
-    $0.ModelFileDescriptor? file,
+    $1.ModelFileDescriptor? file,
     $core.String? storageKey,
     $core.String? destinationPath,
     $fixnum.Int64? expectedBytes,
@@ -569,8 +573,8 @@ class DownloadFilePlan extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'DownloadFilePlan',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOM<$0.ModelFileDescriptor>(1, _omitFieldNames ? '' : 'file',
-        subBuilder: $0.ModelFileDescriptor.create)
+    ..aOM<$1.ModelFileDescriptor>(1, _omitFieldNames ? '' : 'file',
+        subBuilder: $1.ModelFileDescriptor.create)
     ..aOS(2, _omitFieldNames ? '' : 'storageKey')
     ..aOS(3, _omitFieldNames ? '' : 'destinationPath')
     ..aInt64(4, _omitFieldNames ? '' : 'expectedBytes')
@@ -599,15 +603,15 @@ class DownloadFilePlan extends $pb.GeneratedMessage {
   static DownloadFilePlan? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $0.ModelFileDescriptor get file => $_getN(0);
+  $1.ModelFileDescriptor get file => $_getN(0);
   @$pb.TagNumber(1)
-  set file($0.ModelFileDescriptor value) => $_setField(1, value);
+  set file($1.ModelFileDescriptor value) => $_setField(1, value);
   @$pb.TagNumber(1)
   $core.bool hasFile() => $_has(0);
   @$pb.TagNumber(1)
   void clearFile() => $_clearField(1);
   @$pb.TagNumber(1)
-  $0.ModelFileDescriptor ensureFile() => $_ensure(0);
+  $1.ModelFileDescriptor ensureFile() => $_ensure(0);
 
   @$pb.TagNumber(2)
   $core.String get storageKey => $_getSZ(1);
@@ -674,11 +678,11 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
     $core.bool? canResume,
     $fixnum.Int64? resumeFromBytes,
     $core.Iterable<$core.String>? warnings,
-    $core.String? errorMessage,
     $core.String? storageNamespace,
     $core.String? resumeToken,
     $fixnum.Int64? requiredFreeBytesAfterDownload,
     DownloadFailureReason? failureReason,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (canStart != null) result.canStart = canStart;
@@ -690,12 +694,12 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
     if (canResume != null) result.canResume = canResume;
     if (resumeFromBytes != null) result.resumeFromBytes = resumeFromBytes;
     if (warnings != null) result.warnings.addAll(warnings);
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (storageNamespace != null) result.storageNamespace = storageNamespace;
     if (resumeToken != null) result.resumeToken = resumeToken;
     if (requiredFreeBytesAfterDownload != null)
       result.requiredFreeBytesAfterDownload = requiredFreeBytesAfterDownload;
     if (failureReason != null) result.failureReason = failureReason;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -721,12 +725,13 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
     ..aOB(6, _omitFieldNames ? '' : 'canResume')
     ..aInt64(7, _omitFieldNames ? '' : 'resumeFromBytes')
     ..pPS(8, _omitFieldNames ? '' : 'warnings')
-    ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
     ..aOS(10, _omitFieldNames ? '' : 'storageNamespace')
     ..aOS(11, _omitFieldNames ? '' : 'resumeToken')
     ..aInt64(12, _omitFieldNames ? '' : 'requiredFreeBytesAfterDownload')
     ..aE<DownloadFailureReason>(13, _omitFieldNames ? '' : 'failureReason',
         enumValues: DownloadFailureReason.values)
+    ..aOM<$0.SDKError>(14, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -808,51 +813,53 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   $pb.PbList<$core.String> get warnings => $_getList(7);
 
-  @$pb.TagNumber(9)
-  $core.String get errorMessage => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set errorMessage($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasErrorMessage() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearErrorMessage() => $_clearField(9);
-
   @$pb.TagNumber(10)
-  $core.String get storageNamespace => $_getSZ(9);
+  $core.String get storageNamespace => $_getSZ(8);
   @$pb.TagNumber(10)
-  set storageNamespace($core.String value) => $_setString(9, value);
+  set storageNamespace($core.String value) => $_setString(8, value);
   @$pb.TagNumber(10)
-  $core.bool hasStorageNamespace() => $_has(9);
+  $core.bool hasStorageNamespace() => $_has(8);
   @$pb.TagNumber(10)
   void clearStorageNamespace() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $core.String get resumeToken => $_getSZ(10);
+  $core.String get resumeToken => $_getSZ(9);
   @$pb.TagNumber(11)
-  set resumeToken($core.String value) => $_setString(10, value);
+  set resumeToken($core.String value) => $_setString(9, value);
   @$pb.TagNumber(11)
-  $core.bool hasResumeToken() => $_has(10);
+  $core.bool hasResumeToken() => $_has(9);
   @$pb.TagNumber(11)
   void clearResumeToken() => $_clearField(11);
 
   @$pb.TagNumber(12)
-  $fixnum.Int64 get requiredFreeBytesAfterDownload => $_getI64(11);
+  $fixnum.Int64 get requiredFreeBytesAfterDownload => $_getI64(10);
   @$pb.TagNumber(12)
   set requiredFreeBytesAfterDownload($fixnum.Int64 value) =>
-      $_setInt64(11, value);
+      $_setInt64(10, value);
   @$pb.TagNumber(12)
-  $core.bool hasRequiredFreeBytesAfterDownload() => $_has(11);
+  $core.bool hasRequiredFreeBytesAfterDownload() => $_has(10);
   @$pb.TagNumber(12)
   void clearRequiredFreeBytesAfterDownload() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  DownloadFailureReason get failureReason => $_getN(12);
+  DownloadFailureReason get failureReason => $_getN(11);
   @$pb.TagNumber(13)
   set failureReason(DownloadFailureReason value) => $_setField(13, value);
   @$pb.TagNumber(13)
-  $core.bool hasFailureReason() => $_has(12);
+  $core.bool hasFailureReason() => $_has(11);
   @$pb.TagNumber(13)
   void clearFailureReason() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $0.SDKError get error => $_getN(12);
+  @$pb.TagNumber(14)
+  set error($0.SDKError value) => $_setField(14, value);
+  @$pb.TagNumber(14)
+  $core.bool hasError() => $_has(12);
+  @$pb.TagNumber(14)
+  void clearError() => $_clearField(14);
+  @$pb.TagNumber(14)
+  $0.SDKError ensureError() => $_ensure(12);
 }
 
 class DownloadStartRequest extends $pb.GeneratedMessage {
@@ -967,18 +974,18 @@ class DownloadStartResult extends $pb.GeneratedMessage {
     $core.String? taskId,
     $core.String? modelId,
     DownloadProgress? initialProgress,
-    $core.String? errorMessage,
     $core.String? resumeToken,
     DownloadFailureReason? failureReason,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (accepted != null) result.accepted = accepted;
     if (taskId != null) result.taskId = taskId;
     if (modelId != null) result.modelId = modelId;
     if (initialProgress != null) result.initialProgress = initialProgress;
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (resumeToken != null) result.resumeToken = resumeToken;
     if (failureReason != null) result.failureReason = failureReason;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1000,10 +1007,11 @@ class DownloadStartResult extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'modelId')
     ..aOM<DownloadProgress>(4, _omitFieldNames ? '' : 'initialProgress',
         subBuilder: DownloadProgress.create)
-    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
     ..aOS(6, _omitFieldNames ? '' : 'resumeToken')
     ..aE<DownloadFailureReason>(7, _omitFieldNames ? '' : 'failureReason',
         enumValues: DownloadFailureReason.values)
+    ..aOM<$0.SDKError>(8, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1063,32 +1071,34 @@ class DownloadStartResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   DownloadProgress ensureInitialProgress() => $_ensure(3);
 
-  @$pb.TagNumber(5)
-  $core.String get errorMessage => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set errorMessage($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorMessage() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearErrorMessage() => $_clearField(5);
-
   @$pb.TagNumber(6)
-  $core.String get resumeToken => $_getSZ(5);
+  $core.String get resumeToken => $_getSZ(4);
   @$pb.TagNumber(6)
-  set resumeToken($core.String value) => $_setString(5, value);
+  set resumeToken($core.String value) => $_setString(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasResumeToken() => $_has(5);
+  $core.bool hasResumeToken() => $_has(4);
   @$pb.TagNumber(6)
   void clearResumeToken() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  DownloadFailureReason get failureReason => $_getN(6);
+  DownloadFailureReason get failureReason => $_getN(5);
   @$pb.TagNumber(7)
   set failureReason(DownloadFailureReason value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasFailureReason() => $_has(6);
+  $core.bool hasFailureReason() => $_has(5);
   @$pb.TagNumber(7)
   void clearFailureReason() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $0.SDKError get error => $_getN(6);
+  @$pb.TagNumber(8)
+  set error($0.SDKError value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(8)
+  void clearError() => $_clearField(8);
+  @$pb.TagNumber(8)
+  $0.SDKError ensureError() => $_ensure(6);
 }
 
 class DownloadCancelRequest extends $pb.GeneratedMessage {
@@ -1173,26 +1183,24 @@ class DownloadCancelRequest extends $pb.GeneratedMessage {
 
 class DownloadCancelResult extends $pb.GeneratedMessage {
   factory DownloadCancelResult({
-    $core.bool? success,
     $core.String? taskId,
     $core.String? modelId,
     $fixnum.Int64? partialBytesDeleted,
-    $core.String? errorMessage,
     $core.bool? wasRunning,
     $core.bool? partialBytesPreserved,
     $core.String? resumeToken,
+    $0.SDKError? error,
   }) {
     final result = create();
-    if (success != null) result.success = success;
     if (taskId != null) result.taskId = taskId;
     if (modelId != null) result.modelId = modelId;
     if (partialBytesDeleted != null)
       result.partialBytesDeleted = partialBytesDeleted;
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (wasRunning != null) result.wasRunning = wasRunning;
     if (partialBytesPreserved != null)
       result.partialBytesPreserved = partialBytesPreserved;
     if (resumeToken != null) result.resumeToken = resumeToken;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1209,14 +1217,14 @@ class DownloadCancelResult extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'DownloadCancelResult',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'success')
     ..aOS(2, _omitFieldNames ? '' : 'taskId')
     ..aOS(3, _omitFieldNames ? '' : 'modelId')
     ..aInt64(4, _omitFieldNames ? '' : 'partialBytesDeleted')
-    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
     ..aOB(6, _omitFieldNames ? '' : 'wasRunning')
     ..aOB(7, _omitFieldNames ? '' : 'partialBytesPreserved')
     ..aOS(8, _omitFieldNames ? '' : 'resumeToken')
+    ..aOM<$0.SDKError>(9, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1238,77 +1246,70 @@ class DownloadCancelResult extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<DownloadCancelResult>(create);
   static DownloadCancelResult? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $core.bool get success => $_getBF(0);
-  @$pb.TagNumber(1)
-  set success($core.bool value) => $_setBool(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSuccess() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSuccess() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $core.String get taskId => $_getSZ(1);
+  $core.String get taskId => $_getSZ(0);
   @$pb.TagNumber(2)
-  set taskId($core.String value) => $_setString(1, value);
+  set taskId($core.String value) => $_setString(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasTaskId() => $_has(1);
+  $core.bool hasTaskId() => $_has(0);
   @$pb.TagNumber(2)
   void clearTaskId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get modelId => $_getSZ(2);
+  $core.String get modelId => $_getSZ(1);
   @$pb.TagNumber(3)
-  set modelId($core.String value) => $_setString(2, value);
+  set modelId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasModelId() => $_has(2);
+  $core.bool hasModelId() => $_has(1);
   @$pb.TagNumber(3)
   void clearModelId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $fixnum.Int64 get partialBytesDeleted => $_getI64(3);
+  $fixnum.Int64 get partialBytesDeleted => $_getI64(2);
   @$pb.TagNumber(4)
-  set partialBytesDeleted($fixnum.Int64 value) => $_setInt64(3, value);
+  set partialBytesDeleted($fixnum.Int64 value) => $_setInt64(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasPartialBytesDeleted() => $_has(3);
+  $core.bool hasPartialBytesDeleted() => $_has(2);
   @$pb.TagNumber(4)
   void clearPartialBytesDeleted() => $_clearField(4);
 
-  @$pb.TagNumber(5)
-  $core.String get errorMessage => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set errorMessage($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorMessage() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearErrorMessage() => $_clearField(5);
-
   @$pb.TagNumber(6)
-  $core.bool get wasRunning => $_getBF(5);
+  $core.bool get wasRunning => $_getBF(3);
   @$pb.TagNumber(6)
-  set wasRunning($core.bool value) => $_setBool(5, value);
+  set wasRunning($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(6)
-  $core.bool hasWasRunning() => $_has(5);
+  $core.bool hasWasRunning() => $_has(3);
   @$pb.TagNumber(6)
   void clearWasRunning() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.bool get partialBytesPreserved => $_getBF(6);
+  $core.bool get partialBytesPreserved => $_getBF(4);
   @$pb.TagNumber(7)
-  set partialBytesPreserved($core.bool value) => $_setBool(6, value);
+  set partialBytesPreserved($core.bool value) => $_setBool(4, value);
   @$pb.TagNumber(7)
-  $core.bool hasPartialBytesPreserved() => $_has(6);
+  $core.bool hasPartialBytesPreserved() => $_has(4);
   @$pb.TagNumber(7)
   void clearPartialBytesPreserved() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.String get resumeToken => $_getSZ(7);
+  $core.String get resumeToken => $_getSZ(5);
   @$pb.TagNumber(8)
-  set resumeToken($core.String value) => $_setString(7, value);
+  set resumeToken($core.String value) => $_setString(5, value);
   @$pb.TagNumber(8)
-  $core.bool hasResumeToken() => $_has(7);
+  $core.bool hasResumeToken() => $_has(5);
   @$pb.TagNumber(8)
   void clearResumeToken() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $0.SDKError get error => $_getN(6);
+  @$pb.TagNumber(9)
+  set error($0.SDKError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $0.SDKError ensureError() => $_ensure(6);
 }
 
 class DownloadResumeRequest extends $pb.GeneratedMessage {
@@ -1421,18 +1422,18 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
     $core.String? taskId,
     $core.String? modelId,
     DownloadProgress? initialProgress,
-    $core.String? errorMessage,
     $core.String? resumeToken,
     DownloadFailureReason? failureReason,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (accepted != null) result.accepted = accepted;
     if (taskId != null) result.taskId = taskId;
     if (modelId != null) result.modelId = modelId;
     if (initialProgress != null) result.initialProgress = initialProgress;
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (resumeToken != null) result.resumeToken = resumeToken;
     if (failureReason != null) result.failureReason = failureReason;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1454,10 +1455,11 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'modelId')
     ..aOM<DownloadProgress>(4, _omitFieldNames ? '' : 'initialProgress',
         subBuilder: DownloadProgress.create)
-    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
     ..aOS(6, _omitFieldNames ? '' : 'resumeToken')
     ..aE<DownloadFailureReason>(7, _omitFieldNames ? '' : 'failureReason',
         enumValues: DownloadFailureReason.values)
+    ..aOM<$0.SDKError>(8, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1517,32 +1519,34 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   DownloadProgress ensureInitialProgress() => $_ensure(3);
 
-  @$pb.TagNumber(5)
-  $core.String get errorMessage => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set errorMessage($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorMessage() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearErrorMessage() => $_clearField(5);
-
   @$pb.TagNumber(6)
-  $core.String get resumeToken => $_getSZ(5);
+  $core.String get resumeToken => $_getSZ(4);
   @$pb.TagNumber(6)
-  set resumeToken($core.String value) => $_setString(5, value);
+  set resumeToken($core.String value) => $_setString(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasResumeToken() => $_has(5);
+  $core.bool hasResumeToken() => $_has(4);
   @$pb.TagNumber(6)
   void clearResumeToken() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  DownloadFailureReason get failureReason => $_getN(6);
+  DownloadFailureReason get failureReason => $_getN(5);
   @$pb.TagNumber(7)
   set failureReason(DownloadFailureReason value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasFailureReason() => $_has(6);
+  $core.bool hasFailureReason() => $_has(5);
   @$pb.TagNumber(7)
   void clearFailureReason() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $0.SDKError get error => $_getN(6);
+  @$pb.TagNumber(8)
+  set error($0.SDKError value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(8)
+  void clearError() => $_clearField(8);
+  @$pb.TagNumber(8)
+  $0.SDKError ensureError() => $_ensure(6);
 }
 
 const $core.bool _omitFieldNames =

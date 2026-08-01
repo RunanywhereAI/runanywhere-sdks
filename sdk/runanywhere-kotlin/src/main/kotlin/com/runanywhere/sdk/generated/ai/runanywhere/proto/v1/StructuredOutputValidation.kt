@@ -49,24 +49,17 @@ public class StructuredOutputValidation(
   )
   public val contains_json: Boolean = false,
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 2,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "rawOutput",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val raw_output: String? = null,
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "extractedJson",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val extracted_json: String? = null,
   validation_errors: List<String> = emptyList(),
@@ -75,9 +68,15 @@ public class StructuredOutputValidation(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "validationTimeMs",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val validation_time_ms: Long = 0L,
+  @field:WireField(
+    tag = 8,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 6,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputValidation, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -85,7 +84,7 @@ public class StructuredOutputValidation(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
     jsonName = "validationErrors",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val validation_errors: List<String> =
       immutableCopyOf("validation_errors", validation_errors)
@@ -102,11 +101,11 @@ public class StructuredOutputValidation(
     if (unknownFields != other.unknownFields) return false
     if (is_valid != other.is_valid) return false
     if (contains_json != other.contains_json) return false
-    if (error_message != other.error_message) return false
     if (raw_output != other.raw_output) return false
     if (extracted_json != other.extracted_json) return false
     if (validation_errors != other.validation_errors) return false
     if (validation_time_ms != other.validation_time_ms) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -116,11 +115,11 @@ public class StructuredOutputValidation(
       result = unknownFields.hashCode()
       result = result * 37 + is_valid.hashCode()
       result = result * 37 + contains_json.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
       result = result * 37 + (raw_output?.hashCode() ?: 0)
       result = result * 37 + (extracted_json?.hashCode() ?: 0)
       result = result * 37 + validation_errors.hashCode()
       result = result * 37 + validation_time_ms.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -130,24 +129,24 @@ public class StructuredOutputValidation(
     val result = mutableListOf<String>()
     result += """is_valid=$is_valid"""
     result += """contains_json=$contains_json"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
     if (raw_output != null) result += """raw_output=${sanitize(raw_output)}"""
     if (extracted_json != null) result += """extracted_json=${sanitize(extracted_json)}"""
     if (validation_errors.isNotEmpty()) result += """validation_errors=${sanitize(validation_errors)}"""
     result += """validation_time_ms=$validation_time_ms"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "StructuredOutputValidation{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     is_valid: Boolean = this.is_valid,
     contains_json: Boolean = this.contains_json,
-    error_message: String? = this.error_message,
     raw_output: String? = this.raw_output,
     extracted_json: String? = this.extracted_json,
     validation_errors: List<String> = this.validation_errors,
     validation_time_ms: Long = this.validation_time_ms,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): StructuredOutputValidation = StructuredOutputValidation(is_valid, contains_json, error_message, raw_output, extracted_json, validation_errors, validation_time_ms, unknownFields)
+  ): StructuredOutputValidation = StructuredOutputValidation(is_valid, contains_json, raw_output, extracted_json, validation_errors, validation_time_ms, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -168,13 +167,13 @@ public class StructuredOutputValidation(
         if (value.contains_json != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.contains_json)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.error_message)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.raw_output)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.extracted_json)
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(6, value.validation_errors)
         if (value.validation_time_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.validation_time_ms)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(8, value.error)
         return size
       }
 
@@ -185,25 +184,25 @@ public class StructuredOutputValidation(
         if (value.contains_json != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.contains_json)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.raw_output)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.extracted_json)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.validation_errors)
         if (value.validation_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.validation_time_ms)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 8, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputValidation) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 8, value.error)
         if (value.validation_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.validation_time_ms)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.validation_errors)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.extracted_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.raw_output)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
         if (value.contains_json != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.contains_json)
         }
@@ -215,36 +214,37 @@ public class StructuredOutputValidation(
       override fun decode(reader: ProtoReader): StructuredOutputValidation {
         var is_valid: Boolean = false
         var contains_json: Boolean = false
-        var error_message: String? = null
         var raw_output: String? = null
         var extracted_json: String? = null
         val validation_errors = mutableListOf<String>()
         var validation_time_ms: Long = 0L
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_valid = ProtoAdapter.BOOL.decode(reader)
             2 -> contains_json = ProtoAdapter.BOOL.decode(reader)
-            3 -> error_message = ProtoAdapter.STRING.decode(reader)
             4 -> raw_output = ProtoAdapter.STRING.decode(reader)
             5 -> extracted_json = ProtoAdapter.STRING.decode(reader)
             6 -> validation_errors.add(ProtoAdapter.STRING.decode(reader))
             7 -> validation_time_ms = ProtoAdapter.INT64.decode(reader)
+            8 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return StructuredOutputValidation(
           is_valid = is_valid,
           contains_json = contains_json,
-          error_message = error_message,
           raw_output = raw_output,
           extracted_json = extracted_json,
           validation_errors = validation_errors,
           validation_time_ms = validation_time_ms,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: StructuredOutputValidation): StructuredOutputValidation = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

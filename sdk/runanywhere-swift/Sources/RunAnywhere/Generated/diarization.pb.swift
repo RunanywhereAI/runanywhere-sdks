@@ -32,47 +32,6 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// Raw PCM encodings accepted at the SDK boundary. Commons validates complete
-/// sample frames and normalizes either representation to float samples before
-/// dispatching to an engine.
-public nonisolated enum RADiarizationAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case pcmF32Le // = 1
-  case pcmS16Le // = 2
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .pcmF32Le
-    case 2: self = .pcmS16Le
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .pcmF32Le: return 1
-    case .pcmS16Le: return 2
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RADiarizationAudioEncoding] = [
-    .unspecified,
-    .pcmF32Le,
-    .pcmS16Le,
-  ]
-
-}
-
 public nonisolated enum RADiarizationStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -142,7 +101,9 @@ public nonisolated struct RADiarizationOptions: Sendable {
   /// Clears the value of `channels`. Subsequent reads from it will return its default value.
   public mutating func clearChannels() {self._channels = nil}
 
-  public var encoding: RADiarizationAudioEncoding {
+  /// Commons normalizes either PCM representation to float samples before
+  /// dispatching to an engine.
+  public var encoding: RAAudioEncoding {
     get {_encoding ?? .unspecified}
     set {_encoding = newValue}
   }
@@ -170,7 +131,7 @@ public nonisolated struct RADiarizationOptions: Sendable {
 
   fileprivate var _sampleRate: Int32? = nil
   fileprivate var _channels: Int32? = nil
-  fileprivate var _encoding: RADiarizationAudioEncoding? = nil
+  fileprivate var _encoding: RAAudioEncoding? = nil
   fileprivate var _threshold: Float? = nil
 }
 
@@ -248,11 +209,6 @@ public nonisolated struct RADiarizationStreamEvent: @unchecked Sendable {
     set {_uniqueStorage()._sessionID = newValue}
   }
 
-  public var seq: UInt64 {
-    get {_storage._seq}
-    set {_uniqueStorage()._seq = newValue}
-  }
-
   public var timestampUs: Int64 {
     get {_storage._timestampUs}
     set {_uniqueStorage()._timestampUs = newValue}
@@ -291,10 +247,6 @@ public nonisolated struct RADiarizationStreamEvent: @unchecked Sendable {
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
-
-nonisolated extension RADiarizationAudioEncoding: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIARIZATION_AUDIO_ENCODING_UNSPECIFIED\0\u{1}DIARIZATION_AUDIO_ENCODING_PCM_F32_LE\0\u{1}DIARIZATION_AUDIO_ENCODING_PCM_S16_LE\0")
-}
 
 nonisolated extension RADiarizationStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}DIARIZATION_STREAM_EVENT_KIND_STARTED\0\u{1}DIARIZATION_STREAM_EVENT_KIND_UPDATE\0\u{1}DIARIZATION_STREAM_EVENT_KIND_FINAL\0\u{1}DIARIZATION_STREAM_EVENT_KIND_ERROR\0")
@@ -495,11 +447,10 @@ nonisolated extension RADiarizationResult: SwiftProtobuf.Message, SwiftProtobuf.
 
 nonisolated extension RADiarizationStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiarizationStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_id\0\u{1}seq\0\u{3}timestamp_us\0\u{1}kind\0\u{1}result\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_id\0\u{4}\u{2}timestamp_us\0\u{1}kind\0\u{1}result\0\u{1}error\0")
 
   fileprivate class _StorageClass {
     var _sessionID: UInt64 = 0
-    var _seq: UInt64 = 0
     var _timestampUs: Int64 = 0
     var _kind: RADiarizationStreamEventKind = .unspecified
     var _result: RADiarizationResult? = nil
@@ -515,7 +466,6 @@ nonisolated extension RADiarizationStreamEvent: SwiftProtobuf.Message, SwiftProt
 
     init(copying source: _StorageClass) {
       _sessionID = source._sessionID
-      _seq = source._seq
       _timestampUs = source._timestampUs
       _kind = source._kind
       _result = source._result
@@ -539,7 +489,6 @@ nonisolated extension RADiarizationStreamEvent: SwiftProtobuf.Message, SwiftProt
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._sessionID) }()
-        case 2: try { try decoder.decodeSingularUInt64Field(value: &_storage._seq) }()
         case 3: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
         case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
@@ -558,9 +507,6 @@ nonisolated extension RADiarizationStreamEvent: SwiftProtobuf.Message, SwiftProt
       // https://github.com/apple/swift-protobuf/issues/1182
       if _storage._sessionID != 0 {
         try visitor.visitSingularUInt64Field(value: _storage._sessionID, fieldNumber: 1)
-      }
-      if _storage._seq != 0 {
-        try visitor.visitSingularUInt64Field(value: _storage._seq, fieldNumber: 2)
       }
       if _storage._timestampUs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 3)
@@ -584,7 +530,6 @@ nonisolated extension RADiarizationStreamEvent: SwiftProtobuf.Message, SwiftProt
         let _storage = _args.0
         let rhs_storage = _args.1
         if _storage._sessionID != rhs_storage._sessionID {return false}
-        if _storage._seq != rhs_storage._seq {return false}
         if _storage._timestampUs != rhs_storage._timestampUs {return false}
         if _storage._kind != rhs_storage._kind {return false}
         if _storage._result != rhs_storage._result {return false}

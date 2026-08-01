@@ -10,7 +10,9 @@ exports.rAGStreamEventKindFromJSON = rAGStreamEventKindFromJSON;
 exports.rAGStreamEventKindToJSON = rAGStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const errors_1 = require("./errors");
 const llm_options_1 = require("./llm_options");
+const token_usage_1 = require("./token_usage");
 exports.protobufPackage = "runanywhere.v1";
 var RAGStreamEventKind;
 (function (RAGStreamEventKind) {
@@ -1157,13 +1159,10 @@ function createBaseRAGResult() {
         retrievalTimeMs: 0,
         generationTimeMs: 0,
         totalTimeMs: 0,
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        errorMessage: undefined,
-        errorCode: 0,
         requestId: "",
         thinkingContent: undefined,
+        usage: undefined,
+        error: undefined,
     };
 }
 exports.RAGResult = {
@@ -1186,26 +1185,17 @@ exports.RAGResult = {
         if (message.totalTimeMs !== 0) {
             writer.uint32(48).int64(message.totalTimeMs);
         }
-        if (message.promptTokens !== 0) {
-            writer.uint32(56).int32(message.promptTokens);
-        }
-        if (message.completionTokens !== 0) {
-            writer.uint32(64).int32(message.completionTokens);
-        }
-        if (message.totalTokens !== 0) {
-            writer.uint32(72).int32(message.totalTokens);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(82).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(88).int32(message.errorCode);
-        }
         if (message.requestId !== "") {
             writer.uint32(98).string(message.requestId);
         }
         if (message.thinkingContent !== undefined) {
             writer.uint32(106).string(message.thinkingContent);
+        }
+        if (message.usage !== undefined) {
+            token_usage_1.TokenUsage.encode(message.usage, writer.uint32(114).fork()).join();
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(122).fork()).join();
         }
         return writer;
     },
@@ -1258,41 +1248,6 @@ exports.RAGResult = {
                     message.totalTimeMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.promptTokens = reader.int32();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.completionTokens = reader.int32();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.totalTokens = reader.int32();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
                 case 12: {
                     if (tag !== 98) {
                         break;
@@ -1305,6 +1260,20 @@ exports.RAGResult = {
                         break;
                     }
                     message.thinkingContent = reader.string();
+                    continue;
+                }
+                case 14: {
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.usage = token_usage_1.TokenUsage.decode(reader, reader.uint32());
+                    continue;
+                }
+                case 15: {
+                    if (tag !== 122) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1343,31 +1312,6 @@ exports.RAGResult = {
                 : isSet(object.total_time_ms)
                     ? globalThis.Number(object.total_time_ms)
                     : 0,
-            promptTokens: isSet(object.promptTokens)
-                ? globalThis.Number(object.promptTokens)
-                : isSet(object.prompt_tokens)
-                    ? globalThis.Number(object.prompt_tokens)
-                    : 0,
-            completionTokens: isSet(object.completionTokens)
-                ? globalThis.Number(object.completionTokens)
-                : isSet(object.completion_tokens)
-                    ? globalThis.Number(object.completion_tokens)
-                    : 0,
-            totalTokens: isSet(object.totalTokens)
-                ? globalThis.Number(object.totalTokens)
-                : isSet(object.total_tokens)
-                    ? globalThis.Number(object.total_tokens)
-                    : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
             requestId: isSet(object.requestId)
                 ? globalThis.String(object.requestId)
                 : isSet(object.request_id)
@@ -1378,6 +1322,8 @@ exports.RAGResult = {
                 : isSet(object.thinking_content)
                     ? globalThis.String(object.thinking_content)
                     : undefined,
+            usage: isSet(object.usage) ? token_usage_1.TokenUsage.fromJSON(object.usage) : undefined,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1400,26 +1346,17 @@ exports.RAGResult = {
         if (message.totalTimeMs !== 0) {
             obj.totalTimeMs = Math.round(message.totalTimeMs);
         }
-        if (message.promptTokens !== 0) {
-            obj.promptTokens = Math.round(message.promptTokens);
-        }
-        if (message.completionTokens !== 0) {
-            obj.completionTokens = Math.round(message.completionTokens);
-        }
-        if (message.totalTokens !== 0) {
-            obj.totalTokens = Math.round(message.totalTokens);
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
         if (message.requestId !== "") {
             obj.requestId = message.requestId;
         }
         if (message.thinkingContent !== undefined) {
             obj.thinkingContent = message.thinkingContent;
+        }
+        if (message.usage !== undefined) {
+            obj.usage = token_usage_1.TokenUsage.toJSON(message.usage);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1434,13 +1371,14 @@ exports.RAGResult = {
         message.retrievalTimeMs = object.retrievalTimeMs ?? 0;
         message.generationTimeMs = object.generationTimeMs ?? 0;
         message.totalTimeMs = object.totalTimeMs ?? 0;
-        message.promptTokens = object.promptTokens ?? 0;
-        message.completionTokens = object.completionTokens ?? 0;
-        message.totalTokens = object.totalTokens ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         message.requestId = object.requestId ?? "";
         message.thinkingContent = object.thinkingContent ?? undefined;
+        message.usage = (object.usage !== undefined && object.usage !== null)
+            ? token_usage_1.TokenUsage.fromPartial(object.usage)
+            : undefined;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1455,8 +1393,7 @@ function createBaseRAGStatistics() {
         vectorStoreSizeBytes: 0,
         isPersistent: false,
         lastQueryMs: 0,
-        errorMessage: undefined,
-        errorCode: 0,
+        error: undefined,
     };
 }
 exports.RAGStatistics = {
@@ -1488,11 +1425,8 @@ exports.RAGStatistics = {
         if (message.lastQueryMs !== 0) {
             writer.uint32(72).int64(message.lastQueryMs);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(82).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(88).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(98).fork()).join();
         }
         return writer;
     },
@@ -1566,18 +1500,11 @@ exports.RAGStatistics = {
                     message.lastQueryMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 10: {
-                    if (tag !== 82) {
+                case 12: {
+                    if (tag !== 98) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 11: {
-                    if (tag !== 88) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1635,16 +1562,7 @@ exports.RAGStatistics = {
                 : isSet(object.last_query_ms)
                     ? globalThis.Number(object.last_query_ms)
                     : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1676,11 +1594,8 @@ exports.RAGStatistics = {
         if (message.lastQueryMs !== 0) {
             obj.lastQueryMs = Math.round(message.lastQueryMs);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1698,29 +1613,17 @@ exports.RAGStatistics = {
         message.vectorStoreSizeBytes = object.vectorStoreSizeBytes ?? 0;
         message.isPersistent = object.isPersistent ?? false;
         message.lastQueryMs = object.lastQueryMs ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
 function createBaseRAGStreamEvent() {
-    return {
-        seq: 0,
-        timestampUs: 0,
-        requestId: "",
-        kind: 0,
-        chunk: undefined,
-        token: "",
-        result: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
-    };
+    return { timestampUs: 0, requestId: "", kind: 0, chunk: undefined, token: "", result: undefined, error: undefined };
 }
 exports.RAGStreamEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.seq !== 0) {
-            writer.uint32(8).uint64(message.seq);
-        }
         if (message.timestampUs !== 0) {
             writer.uint32(16).int64(message.timestampUs);
         }
@@ -1739,11 +1642,8 @@ exports.RAGStreamEvent = {
         if (message.result !== undefined) {
             exports.RAGResult.encode(message.result, writer.uint32(58).fork()).join();
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(66).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(72).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(82).fork()).join();
         }
         return writer;
     },
@@ -1754,13 +1654,6 @@ exports.RAGStreamEvent = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.seq = longToNumber(reader.uint64());
-                    continue;
-                }
                 case 2: {
                     if (tag !== 16) {
                         break;
@@ -1803,18 +1696,11 @@ exports.RAGStreamEvent = {
                     message.result = exports.RAGResult.decode(reader, reader.uint32());
                     continue;
                 }
-                case 8: {
-                    if (tag !== 66) {
+                case 10: {
+                    if (tag !== 82) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1827,7 +1713,6 @@ exports.RAGStreamEvent = {
     },
     fromJSON(object) {
         return {
-            seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
             timestampUs: isSet(object.timestampUs)
                 ? globalThis.Number(object.timestampUs)
                 : isSet(object.timestamp_us)
@@ -1842,23 +1727,11 @@ exports.RAGStreamEvent = {
             chunk: isSet(object.chunk) ? exports.RAGSearchResult.fromJSON(object.chunk) : undefined,
             token: isSet(object.token) ? globalThis.String(object.token) : "",
             result: isSet(object.result) ? exports.RAGResult.fromJSON(object.result) : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.seq !== 0) {
-            obj.seq = Math.round(message.seq);
-        }
         if (message.timestampUs !== 0) {
             obj.timestampUs = Math.round(message.timestampUs);
         }
@@ -1877,11 +1750,8 @@ exports.RAGStreamEvent = {
         if (message.result !== undefined) {
             obj.result = exports.RAGResult.toJSON(message.result);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1890,7 +1760,6 @@ exports.RAGStreamEvent = {
     },
     fromPartial(object) {
         const message = createBaseRAGStreamEvent();
-        message.seq = object.seq ?? 0;
         message.timestampUs = object.timestampUs ?? 0;
         message.requestId = object.requestId ?? "";
         message.kind = object.kind ?? 0;
@@ -1901,8 +1770,9 @@ exports.RAGStreamEvent = {
         message.result = (object.result !== undefined && object.result !== null)
             ? exports.RAGResult.fromPartial(object.result)
             : undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };

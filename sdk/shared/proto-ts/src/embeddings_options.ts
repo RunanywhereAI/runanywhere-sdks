@@ -6,48 +6,10 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 
 export const protobufPackage = "runanywhere.v1";
-
-export enum EmbeddingsNormalizeMode {
-  EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED = 0,
-  EMBEDDINGS_NORMALIZE_MODE_NONE = 1,
-  EMBEDDINGS_NORMALIZE_MODE_L2 = 2,
-  UNRECOGNIZED = -1,
-}
-
-export function embeddingsNormalizeModeFromJSON(object: any): EmbeddingsNormalizeMode {
-  switch (object) {
-    case 0:
-    case "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED":
-      return EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED;
-    case 1:
-    case "EMBEDDINGS_NORMALIZE_MODE_NONE":
-      return EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_NONE;
-    case 2:
-    case "EMBEDDINGS_NORMALIZE_MODE_L2":
-      return EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return EmbeddingsNormalizeMode.UNRECOGNIZED;
-  }
-}
-
-export function embeddingsNormalizeModeToJSON(object: EmbeddingsNormalizeMode): string {
-  switch (object) {
-    case EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED:
-      return "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED";
-    case EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_NONE:
-      return "EMBEDDINGS_NORMALIZE_MODE_NONE";
-    case EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2:
-      return "EMBEDDINGS_NORMALIZE_MODE_L2";
-    case EmbeddingsNormalizeMode.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
 
 export enum EmbeddingsPoolingStrategy {
   EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0,
@@ -106,7 +68,7 @@ export interface EmbeddingsConfiguration {
   /** Truncation or sliding window past this length is backend-decided. */
   maxSequenceLength: number;
   preferredFramework?: InferenceFramework | undefined;
-  normalizeMode: EmbeddingsNormalizeMode;
+  normalize: boolean;
   pooling: EmbeddingsPoolingStrategy;
   /** Backend-specific config such as tokenizer or vocab companion paths. */
   configJson?: string | undefined;
@@ -122,11 +84,8 @@ export interface EmbeddingsOptions {
     | boolean
     | undefined;
   /** Unset = backend chooses (512, capped at 8192). */
-  batchSize?:
-    | number
-    | undefined;
-  /** UNSPECIFIED = use the component config. */
-  normalizeMode: EmbeddingsNormalizeMode;
+  batchSize?: number | undefined;
+  normalize: boolean;
   pooling: EmbeddingsPoolingStrategy;
   /** 0 = auto */
   nThreads: number;
@@ -177,9 +136,8 @@ export interface EmbeddingsResult {
   /** Across all inputs, post-truncation. */
   tokensUsed: number;
   modelId?: string | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
   requestId: string;
+  error?: SDKError | undefined;
 }
 
 export interface EmbeddingsCreateRequest {
@@ -201,9 +159,7 @@ export interface EmbeddingsCreateResult {
   /** Backend-resolved after load. 0 = unknown until the first embed call. */
   dimension: number;
   maxTokens: number;
-  /** Mirrors rac_result_t; negative on failure. */
-  errorCode: number;
-  errorMessage: string;
+  error?: SDKError | undefined;
 }
 
 function createBaseEmbeddingsConfiguration(): EmbeddingsConfiguration {
@@ -212,7 +168,7 @@ function createBaseEmbeddingsConfiguration(): EmbeddingsConfiguration {
     embeddingDimension: 0,
     maxSequenceLength: 0,
     preferredFramework: undefined,
-    normalizeMode: 0,
+    normalize: false,
     pooling: 0,
     configJson: undefined,
   };
@@ -232,8 +188,8 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
     if (message.preferredFramework !== undefined) {
       writer.uint32(40).int32(message.preferredFramework);
     }
-    if (message.normalizeMode !== 0) {
-      writer.uint32(56).int32(message.normalizeMode);
+    if (message.normalize !== false) {
+      writer.uint32(56).bool(message.normalize);
     }
     if (message.pooling !== 0) {
       writer.uint32(64).int32(message.pooling);
@@ -288,7 +244,7 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
             break;
           }
 
-          message.normalizeMode = reader.int32() as any;
+          message.normalize = reader.bool();
           continue;
         }
         case 8: {
@@ -338,11 +294,7 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
         : isSet(object.preferred_framework)
         ? inferenceFrameworkFromJSON(object.preferred_framework)
         : undefined,
-      normalizeMode: isSet(object.normalizeMode)
-        ? embeddingsNormalizeModeFromJSON(object.normalizeMode)
-        : isSet(object.normalize_mode)
-        ? embeddingsNormalizeModeFromJSON(object.normalize_mode)
-        : 0,
+      normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : false,
       pooling: isSet(object.pooling) ? embeddingsPoolingStrategyFromJSON(object.pooling) : 0,
       configJson: isSet(object.configJson)
         ? globalThis.String(object.configJson)
@@ -366,8 +318,8 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
     if (message.preferredFramework !== undefined) {
       obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
     }
-    if (message.normalizeMode !== 0) {
-      obj.normalizeMode = embeddingsNormalizeModeToJSON(message.normalizeMode);
+    if (message.normalize !== false) {
+      obj.normalize = message.normalize;
     }
     if (message.pooling !== 0) {
       obj.pooling = embeddingsPoolingStrategyToJSON(message.pooling);
@@ -387,7 +339,7 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
     message.embeddingDimension = object.embeddingDimension ?? 0;
     message.maxSequenceLength = object.maxSequenceLength ?? 0;
     message.preferredFramework = object.preferredFramework ?? undefined;
-    message.normalizeMode = object.normalizeMode ?? 0;
+    message.normalize = object.normalize ?? false;
     message.pooling = object.pooling ?? 0;
     message.configJson = object.configJson ?? undefined;
     return message;
@@ -395,7 +347,7 @@ export const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration> = {
 };
 
 function createBaseEmbeddingsOptions(): EmbeddingsOptions {
-  return { truncate: undefined, batchSize: undefined, normalizeMode: 0, pooling: 0, nThreads: 0 };
+  return { truncate: undefined, batchSize: undefined, normalize: false, pooling: 0, nThreads: 0 };
 }
 
 export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
@@ -406,8 +358,8 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
     if (message.batchSize !== undefined) {
       writer.uint32(24).int32(message.batchSize);
     }
-    if (message.normalizeMode !== 0) {
-      writer.uint32(32).int32(message.normalizeMode);
+    if (message.normalize !== false) {
+      writer.uint32(32).bool(message.normalize);
     }
     if (message.pooling !== 0) {
       writer.uint32(40).int32(message.pooling);
@@ -446,7 +398,7 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
             break;
           }
 
-          message.normalizeMode = reader.int32() as any;
+          message.normalize = reader.bool();
           continue;
         }
         case 5: {
@@ -482,11 +434,7 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
         : isSet(object.batch_size)
         ? globalThis.Number(object.batch_size)
         : undefined,
-      normalizeMode: isSet(object.normalizeMode)
-        ? embeddingsNormalizeModeFromJSON(object.normalizeMode)
-        : isSet(object.normalize_mode)
-        ? embeddingsNormalizeModeFromJSON(object.normalize_mode)
-        : 0,
+      normalize: isSet(object.normalize) ? globalThis.Boolean(object.normalize) : false,
       pooling: isSet(object.pooling) ? embeddingsPoolingStrategyFromJSON(object.pooling) : 0,
       nThreads: isSet(object.nThreads)
         ? globalThis.Number(object.nThreads)
@@ -504,8 +452,8 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
     if (message.batchSize !== undefined) {
       obj.batchSize = Math.round(message.batchSize);
     }
-    if (message.normalizeMode !== 0) {
-      obj.normalizeMode = embeddingsNormalizeModeToJSON(message.normalizeMode);
+    if (message.normalize !== false) {
+      obj.normalize = message.normalize;
     }
     if (message.pooling !== 0) {
       obj.pooling = embeddingsPoolingStrategyToJSON(message.pooling);
@@ -523,7 +471,7 @@ export const EmbeddingsOptions: MessageFns<EmbeddingsOptions> = {
     const message = createBaseEmbeddingsOptions();
     message.truncate = object.truncate ?? undefined;
     message.batchSize = object.batchSize ?? undefined;
-    message.normalizeMode = object.normalizeMode ?? 0;
+    message.normalize = object.normalize ?? false;
     message.pooling = object.pooling ?? 0;
     message.nThreads = object.nThreads ?? 0;
     return message;
@@ -1033,9 +981,8 @@ function createBaseEmbeddingsResult(): EmbeddingsResult {
     processingTimeMs: 0,
     tokensUsed: 0,
     modelId: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
     requestId: "",
+    error: undefined,
   };
 }
 
@@ -1056,14 +1003,11 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
     if (message.modelId !== undefined) {
       writer.uint32(42).string(message.modelId);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(50).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(56).int32(message.errorCode);
-    }
     if (message.requestId !== "") {
       writer.uint32(66).string(message.requestId);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -1115,28 +1059,20 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
           message.modelId = reader.string();
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
         case 8: {
           if (tag !== 66) {
             break;
           }
 
           message.requestId = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1169,21 +1105,12 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
         : isSet(object.model_id)
         ? globalThis.String(object.model_id)
         : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
       requestId: isSet(object.requestId)
         ? globalThis.String(object.requestId)
         : isSet(object.request_id)
         ? globalThis.String(object.request_id)
         : "",
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1204,14 +1131,11 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
     if (message.modelId !== undefined) {
       obj.modelId = message.modelId;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
     if (message.requestId !== "") {
       obj.requestId = message.requestId;
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1226,9 +1150,10 @@ export const EmbeddingsResult: MessageFns<EmbeddingsResult> = {
     message.processingTimeMs = object.processingTimeMs ?? 0;
     message.tokensUsed = object.tokensUsed ?? 0;
     message.modelId = object.modelId ?? undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     message.requestId = object.requestId ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1336,7 +1261,7 @@ export const EmbeddingsCreateRequest: MessageFns<EmbeddingsCreateRequest> = {
 };
 
 function createBaseEmbeddingsCreateResult(): EmbeddingsCreateResult {
-  return { handle: 0, modelId: "", dimension: 0, maxTokens: 0, errorCode: 0, errorMessage: "" };
+  return { handle: 0, modelId: "", dimension: 0, maxTokens: 0, error: undefined };
 }
 
 export const EmbeddingsCreateResult: MessageFns<EmbeddingsCreateResult> = {
@@ -1353,11 +1278,8 @@ export const EmbeddingsCreateResult: MessageFns<EmbeddingsCreateResult> = {
     if (message.maxTokens !== 0) {
       writer.uint32(32).int32(message.maxTokens);
     }
-    if (message.errorCode !== 0) {
-      writer.uint32(40).int32(message.errorCode);
-    }
-    if (message.errorMessage !== "") {
-      writer.uint32(50).string(message.errorMessage);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -1401,20 +1323,12 @@ export const EmbeddingsCreateResult: MessageFns<EmbeddingsCreateResult> = {
           message.maxTokens = reader.int32();
           continue;
         }
-        case 5: {
-          if (tag !== 40) {
+        case 7: {
+          if (tag !== 58) {
             break;
           }
 
-          message.errorCode = reader.int32();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1440,16 +1354,7 @@ export const EmbeddingsCreateResult: MessageFns<EmbeddingsCreateResult> = {
         : isSet(object.max_tokens)
         ? globalThis.Number(object.max_tokens)
         : 0,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1467,11 +1372,8 @@ export const EmbeddingsCreateResult: MessageFns<EmbeddingsCreateResult> = {
     if (message.maxTokens !== 0) {
       obj.maxTokens = Math.round(message.maxTokens);
     }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1485,8 +1387,9 @@ export const EmbeddingsCreateResult: MessageFns<EmbeddingsCreateResult> = {
     message.modelId = object.modelId ?? "";
     message.dimension = object.dimension ?? 0;
     message.maxTokens = object.maxTokens ?? 0;
-    message.errorCode = object.errorCode ?? 0;
-    message.errorMessage = object.errorMessage ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

@@ -10,81 +10,14 @@
 
 // RunAnywhere IDL — custom proto field/enum-value annotations.
 //
-// Phase 4 of the Swift simplification plan introduces a small set of
-// FieldOptions / EnumValueOptions extensions that codegen post-processors
-// can read to emit defaults(), validate(), and wire-string accessors
-// automatically, replacing hand-written equivalents scattered across SDKs.
+// Codegen post-processors read these to emit defaults(), validate(), and
+// wire-string accessors instead of hand-writing them per SDK.
 //
-// SCHEMA OVERVIEW
+// The generated validate() is not called automatically. Callers invoke it
+// explicitly, and commons enforces its own bounds independently.
 //
-//   FieldOptions extensions (annotate individual message fields):
-//     rac_default      (50001, string) — string-form default value applied
-//                                         by generated defaults() / init().
-//                                         Codegen parses the string per the
-//                                         field's declared type (int, float,
-//                                         bool, string, enum).
-//     rac_required     (50002, bool)   — when true, validate() rejects the
-//                                         field's proto3-zero value.
-//     rac_min          (50004, int32)  — inclusive numeric minimum used by
-//                                         validate() for integer fields.
-//     rac_max          (50005, int32)  — inclusive numeric maximum used by
-//                                         validate() for integer fields.
-//     rac_min_float    (50006, double) — inclusive numeric minimum used by
-//                                         validate() for float/double fields.
-//     rac_max_float    (50007, double) — inclusive numeric maximum used by
-//                                         validate() for float/double fields.
-//
-//   EnumValueOptions extensions (annotate individual enum constants):
-//     rac_display_name (50010, string) — human-readable label for UI / docs.
-//     rac_analytics_key(50011, string) — stable string used in analytics
-//                                         events instead of the proto name.
-//     rac_wire_string  (50012, string) — canonical wire-string override.
-//                                         When set, this string (not the
-//                                         proto enum constant name) is the
-//                                         "wire name" used for cross-SDK
-//                                         interop with hand-rolled strings.
-//
-// NUMBERING
-//
-//   50000–99999 is Google's documented field-number range for internal /
-//   organization-private extensions (extensions not registered in the
-//   protobuf-global extension registry). Numbers 50001–50012 are reserved
-//   here for RunAnywhere; gaps (50003, 50008-50009) are intentional and
-//   left open for forward extension (e.g. rac_pattern, rac_alias, etc.).
-//
-// USAGE
-//
-//   This file only DEFINES the option extensions. Annotations are opt-in
-//   per field. Current adopters: model_types.proto (rac_wire_string on
-//   enums), embeddings_options.proto, rag.proto, stt_options.proto,
-//   tts_options.proto, vad_options.proto (rac_default / rac_required /
-//   rac_min / rac_max). See those files for usage examples before
-//   annotating a new schema. Importing this file in a schema unlocks
-//   annotations like:
-//
-//       import "rac_options.proto";
-//
-//       message Foo {
-//           int32 retries = 1 [(runanywhere.v1.rac_default) = "3",
-//                              (runanywhere.v1.rac_min)     = 0,
-//                              (runanywhere.v1.rac_max)     = 10];
-//       }
-//
-//       enum Mode {
-//           MODE_UNSPECIFIED = 0;
-//           MODE_FAST = 1 [(runanywhere.v1.rac_wire_string) = "fast"];
-//       }
-//
-// CROSS-LANGUAGE NOTE
-//
-//   Every supported codegen (apple/swift-protobuf, square/wire, ts-proto,
-//   dart-protobuf, protoc-gen-cpp) parses unknown extensions in
-//   FieldOptions / EnumValueOptions without error and surfaces them as
-//   message-level options on the descriptor. Codegen post-processors (e.g.
-//   P4-T2 Swift defaults emitter) read them by inspecting the descriptor
-//   FileDescriptorProto / DescriptorProto, NOT through the generated
-//   typed accessors — so the generated bindings stay schema-agnostic and
-//   adding new annotations later does not break any committed SDK output.
+// 50000-99999 is Google's range for organization-private extensions. Gaps
+// (50003, 50008-50009) are left open.
 
 import SwiftProtobuf
 
@@ -109,7 +42,7 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
 
 nonisolated extension SwiftProtobuf.Google_Protobuf_EnumValueOptions {
 
-  /// Human-readable label for UI / documentation surfaces.
+  /// Human-readable label for UI and docs.
   public var RAracDisplayName: String {
     get {return getExtensionValue(ext: RAExtensions_rac_display_name) ?? String()}
     set {setExtensionValue(ext: RAExtensions_rac_display_name, value: newValue)}
@@ -125,8 +58,7 @@ nonisolated extension SwiftProtobuf.Google_Protobuf_EnumValueOptions {
     clearExtensionValue(ext: RAExtensions_rac_display_name)
   }
 
-  /// Stable string used in analytics / telemetry instead of the proto
-  /// enum-constant name. Decouples enum renames from analytics history.
+  /// Stable analytics key, so enum renames don't break analytics history.
   public var RAracAnalyticsKey: String {
     get {return getExtensionValue(ext: RAExtensions_rac_analytics_key) ?? String()}
     set {setExtensionValue(ext: RAExtensions_rac_analytics_key, value: newValue)}
@@ -142,10 +74,8 @@ nonisolated extension SwiftProtobuf.Google_Protobuf_EnumValueOptions {
     clearExtensionValue(ext: RAExtensions_rac_analytics_key)
   }
 
-  /// Canonical wire-string override. When SDKs need to interop with a
-  /// hand-rolled string protocol (older JSON fixtures, third-party APIs),
-  /// codegen uses this string as the "wire name" instead of the proto
-  /// enum constant name.
+  /// Wire-string override for interop with hand-rolled string protocols.
+  /// Codegen uses this instead of the proto constant name.
   public var RAracWireString: String {
     get {return getExtensionValue(ext: RAExtensions_rac_wire_string) ?? String()}
     set {setExtensionValue(ext: RAExtensions_rac_wire_string, value: newValue)}
@@ -164,9 +94,8 @@ nonisolated extension SwiftProtobuf.Google_Protobuf_EnumValueOptions {
 
 nonisolated extension SwiftProtobuf.Google_Protobuf_FieldOptions {
 
-  /// String-form default value. Codegen parses per the field's declared
-  /// type — e.g. "3" for int32, "0.7" for float, "true" for bool, "auto"
-  /// for string, or the proto constant name for an enum field.
+  /// Parsed per the field's declared type: "3" for int32, "0.7" for float,
+  /// "true" for bool, "auto" for string, the constant name for an enum.
   public var RAracDefault: String {
     get {return getExtensionValue(ext: RAExtensions_rac_default) ?? String()}
     set {setExtensionValue(ext: RAExtensions_rac_default, value: newValue)}
@@ -182,7 +111,7 @@ nonisolated extension SwiftProtobuf.Google_Protobuf_FieldOptions {
     clearExtensionValue(ext: RAExtensions_rac_default)
   }
 
-  /// When true, validate() rejects this field's proto3-zero value.
+  /// validate() rejects this field's proto3-zero value.
   public var RAracRequired: Bool {
     get {return getExtensionValue(ext: RAExtensions_rac_required) ?? false}
     set {setExtensionValue(ext: RAExtensions_rac_required, value: newValue)}
@@ -198,7 +127,7 @@ nonisolated extension SwiftProtobuf.Google_Protobuf_FieldOptions {
     clearExtensionValue(ext: RAExtensions_rac_required)
   }
 
-  /// Inclusive numeric minimum used by validate() for integer fields.
+  /// Inclusive bounds for integer fields.
   public var RAracMin: Int32 {
     get {return getExtensionValue(ext: RAExtensions_rac_min) ?? 0}
     set {setExtensionValue(ext: RAExtensions_rac_min, value: newValue)}
@@ -214,7 +143,6 @@ nonisolated extension SwiftProtobuf.Google_Protobuf_FieldOptions {
     clearExtensionValue(ext: RAExtensions_rac_min)
   }
 
-  /// Inclusive numeric maximum used by validate() for integer fields.
   public var RAracMax: Int32 {
     get {return getExtensionValue(ext: RAExtensions_rac_max) ?? 0}
     set {setExtensionValue(ext: RAExtensions_rac_max, value: newValue)}
@@ -230,7 +158,7 @@ nonisolated extension SwiftProtobuf.Google_Protobuf_FieldOptions {
     clearExtensionValue(ext: RAExtensions_rac_max)
   }
 
-  /// Inclusive numeric minimum used by validate() for float/double fields.
+  /// Inclusive bounds for float/double fields.
   public var RAracMinFloat: Double {
     get {return getExtensionValue(ext: RAExtensions_rac_min_float) ?? 0}
     set {setExtensionValue(ext: RAExtensions_rac_min_float, value: newValue)}
@@ -246,7 +174,6 @@ nonisolated extension SwiftProtobuf.Google_Protobuf_FieldOptions {
     clearExtensionValue(ext: RAExtensions_rac_min_float)
   }
 
-  /// Inclusive numeric maximum used by validate() for float/double fields.
   public var RAracMaxFloat: Double {
     get {return getExtensionValue(ext: RAExtensions_rac_max_float) ?? 0}
     set {setExtensionValue(ext: RAExtensions_rac_max_float, value: newValue)}
@@ -286,61 +213,55 @@ public nonisolated let RARacOptions_Extensions: SwiftProtobuf.SimpleExtensionMap
 // constructing a `SimpleExtensionMap`, otherwise, use the above _Extension Properties_
 // accessors for the extension fields on the messages directly.
 
-/// String-form default value. Codegen parses per the field's declared
-/// type — e.g. "3" for int32, "0.7" for float, "true" for bool, "auto"
-/// for string, or the proto constant name for an enum field.
+/// Parsed per the field's declared type: "3" for int32, "0.7" for float,
+/// "true" for bool, "auto" for string, the constant name for an enum.
 public nonisolated let RAExtensions_rac_default = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufString>, SwiftProtobuf.Google_Protobuf_FieldOptions>(
   _protobuf_fieldNumber: 50001,
   fieldName: "runanywhere.v1.rac_default"
 )
 
-/// When true, validate() rejects this field's proto3-zero value.
+/// validate() rejects this field's proto3-zero value.
 public nonisolated let RAExtensions_rac_required = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufBool>, SwiftProtobuf.Google_Protobuf_FieldOptions>(
   _protobuf_fieldNumber: 50002,
   fieldName: "runanywhere.v1.rac_required"
 )
 
-/// Inclusive numeric minimum used by validate() for integer fields.
+/// Inclusive bounds for integer fields.
 public nonisolated let RAExtensions_rac_min = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufInt32>, SwiftProtobuf.Google_Protobuf_FieldOptions>(
   _protobuf_fieldNumber: 50004,
   fieldName: "runanywhere.v1.rac_min"
 )
 
-/// Inclusive numeric maximum used by validate() for integer fields.
 public nonisolated let RAExtensions_rac_max = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufInt32>, SwiftProtobuf.Google_Protobuf_FieldOptions>(
   _protobuf_fieldNumber: 50005,
   fieldName: "runanywhere.v1.rac_max"
 )
 
-/// Inclusive numeric minimum used by validate() for float/double fields.
+/// Inclusive bounds for float/double fields.
 public nonisolated let RAExtensions_rac_min_float = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufDouble>, SwiftProtobuf.Google_Protobuf_FieldOptions>(
   _protobuf_fieldNumber: 50006,
   fieldName: "runanywhere.v1.rac_min_float"
 )
 
-/// Inclusive numeric maximum used by validate() for float/double fields.
 public nonisolated let RAExtensions_rac_max_float = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufDouble>, SwiftProtobuf.Google_Protobuf_FieldOptions>(
   _protobuf_fieldNumber: 50007,
   fieldName: "runanywhere.v1.rac_max_float"
 )
 
-/// Human-readable label for UI / documentation surfaces.
+/// Human-readable label for UI and docs.
 public nonisolated let RAExtensions_rac_display_name = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufString>, SwiftProtobuf.Google_Protobuf_EnumValueOptions>(
   _protobuf_fieldNumber: 50010,
   fieldName: "runanywhere.v1.rac_display_name"
 )
 
-/// Stable string used in analytics / telemetry instead of the proto
-/// enum-constant name. Decouples enum renames from analytics history.
+/// Stable analytics key, so enum renames don't break analytics history.
 public nonisolated let RAExtensions_rac_analytics_key = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufString>, SwiftProtobuf.Google_Protobuf_EnumValueOptions>(
   _protobuf_fieldNumber: 50011,
   fieldName: "runanywhere.v1.rac_analytics_key"
 )
 
-/// Canonical wire-string override. When SDKs need to interop with a
-/// hand-rolled string protocol (older JSON fixtures, third-party APIs),
-/// codegen uses this string as the "wire name" instead of the proto
-/// enum constant name.
+/// Wire-string override for interop with hand-rolled string protocols.
+/// Codegen uses this instead of the proto constant name.
 public nonisolated let RAExtensions_rac_wire_string = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufString>, SwiftProtobuf.Google_Protobuf_EnumValueOptions>(
   _protobuf_fieldNumber: 50012,
   fieldName: "runanywhere.v1.rac_wire_string"

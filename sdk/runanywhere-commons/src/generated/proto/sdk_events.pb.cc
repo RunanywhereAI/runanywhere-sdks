@@ -100,11 +100,11 @@ constexpr VoiceLifecycleEvent::ParseTableT_ VoiceLifecycleEvent::InternalGenerat
     {
       PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_._has_bits_),
       0, // no _extensions_
-      27, 248,  // max_field_number, fast_idx_mask
+      26, 248,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4160749568,  // skipmap
+      4227989504,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      27,  // num_field_entries
+      25,  // num_field_entries
       0,  // num_aux_entries
       offsetof(ParseTableT_, field_names),  // no aux_entries
       class_data,
@@ -181,48 +181,42 @@ constexpr VoiceLifecycleEvent::ParseTableT_ VoiceLifecycleEvent::InternalGenerat
         PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.audio_size_bytes_)}},
       // int32 word_count = 17;
       {::_pbi::TcParser::FastV32S2,
-       {392, 18, 0,
+       {392, 17, 0,
         PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.word_count_)}},
-      // double real_time_factor = 18;
-      {::_pbi::TcParser::FastF64S2,
-       {401, 17, 0,
-        PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.real_time_factor_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // string language = 19;
       {::_pbi::TcParser::FastUS2,
        {410, 10, 0,
         PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.language_)}},
       // int32 sample_rate = 20;
       {::_pbi::TcParser::FastV32S2,
-       {416, 19, 0,
+       {416, 18, 0,
         PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.sample_rate_)}},
       // bool is_streaming = 21;
       {::_pbi::TcParser::FastV8S2,
-       {424, 20, 0,
+       {424, 19, 0,
         PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.is_streaming_)}},
       // int32 framework = 22;
       {::_pbi::TcParser::FastV32S2,
-       {432, 21, 0,
+       {432, 20, 0,
         PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.framework_)}},
       // int32 character_count = 23;
       {::_pbi::TcParser::FastV32S2,
-       {440, 23, 0,
+       {440, 22, 0,
         PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.character_count_)}},
       // int64 audio_duration_ms = 24;
       {::_pbi::TcParser::FastV64S2,
-       {448, 22, 0,
+       {448, 21, 0,
         PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.audio_duration_ms_)}},
       // int32 audio_size_bytes_tts = 25;
       {::_pbi::TcParser::FastV32S2,
-       {456, 24, 0,
+       {456, 23, 0,
         PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.audio_size_bytes_tts_)}},
       // int64 processing_duration_ms = 26;
       {::_pbi::TcParser::FastV64S2,
-       {464, 25, 0,
+       {464, 24, 0,
         PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.processing_duration_ms_)}},
-      // double characters_per_second = 27;
-      {::_pbi::TcParser::FastF64S2,
-       {473, 26, 0,
-        PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.characters_per_second_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
@@ -263,31 +257,27 @@ constexpr VoiceLifecycleEvent::ParseTableT_ VoiceLifecycleEvent::InternalGenerat
       // int32 audio_size_bytes = 16;
       {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.audio_size_bytes_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 word_count = 17;
-      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.word_count_), _Internal::kHasBitsOffset + 18, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // double real_time_factor = 18;
-      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.real_time_factor_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
+      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.word_count_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // string language = 19;
       {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.language_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int32 sample_rate = 20;
-      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.sample_rate_), _Internal::kHasBitsOffset + 19, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.sample_rate_), _Internal::kHasBitsOffset + 18, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // bool is_streaming = 21;
-      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.is_streaming_), _Internal::kHasBitsOffset + 20, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.is_streaming_), _Internal::kHasBitsOffset + 19, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // int32 framework = 22;
-      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.framework_), _Internal::kHasBitsOffset + 21, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.framework_), _Internal::kHasBitsOffset + 20, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 character_count = 23;
-      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.character_count_), _Internal::kHasBitsOffset + 23, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.character_count_), _Internal::kHasBitsOffset + 22, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int64 audio_duration_ms = 24;
-      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.audio_duration_ms_), _Internal::kHasBitsOffset + 22, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.audio_duration_ms_), _Internal::kHasBitsOffset + 21, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // int32 audio_size_bytes_tts = 25;
-      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.audio_size_bytes_tts_), _Internal::kHasBitsOffset + 24, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.audio_size_bytes_tts_), _Internal::kHasBitsOffset + 23, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int64 processing_duration_ms = 26;
-      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.processing_duration_ms_), _Internal::kHasBitsOffset + 25, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // double characters_per_second = 27;
-      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.characters_per_second_), _Internal::kHasBitsOffset + 26, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
+      {PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.processing_duration_ms_), _Internal::kHasBitsOffset + 24, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     }},
     // no aux_entries
     {{
-      "\42\0\12\4\0\15\14\0\0\15\15\21\5\10\12\0\0\0\0\10\0\0\0\0\0\0\0\0\0\0\0\0"
+      "\42\0\12\4\0\15\14\0\0\15\15\21\5\10\12\0\0\0\10\0\0\0\0\0\0\0\0\0\0\0\0\0"
       "runanywhere.v1.VoiceLifecycleEvent"
       "session_id"
       "text"
@@ -348,7 +338,6 @@ inline constexpr VoiceLifecycleEvent::Impl_::Impl_(
         audio_level_{0},
         audio_size_bytes_{0},
         audio_length_ms_{::int64_t{0}},
-        real_time_factor_{0},
         word_count_{0},
         sample_rate_{0},
         is_streaming_{false},
@@ -356,8 +345,7 @@ inline constexpr VoiceLifecycleEvent::Impl_::Impl_(
         audio_duration_ms_{::int64_t{0}},
         character_count_{0},
         audio_size_bytes_tts_{0},
-        processing_duration_ms_{::int64_t{0}},
-        characters_per_second_{0} {}
+        processing_duration_ms_{::int64_t{0}} {}
 
 template <typename>
 constexpr VoiceLifecycleEvent::VoiceLifecycleEvent(::_pbi::ConstantInitialized,
@@ -3082,281 +3070,6 @@ const ::_pbi::ClassData* ConfigurationEvent_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class ComponentInitializationEvent::_Internal {
- public:
-  using HasBits = decltype(::std::declval<ComponentInitializationEvent>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_._has_bits_);
-};
-
-constexpr ComponentInitializationEvent::ParseTableT_ ComponentInitializationEvent::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_._has_bits_),
-      0, // no _extensions_
-      16, 120,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294901760,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      16,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::ComponentInitializationEvent>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // .runanywhere.v1.ComponentLifecycleState current_lifecycle_state = 16;
-      {::_pbi::TcParser::FastV32S2,
-       {384, 15, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.current_lifecycle_state_)}},
-      // .runanywhere.v1.ComponentInitializationEventKind kind = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentInitializationEvent, _impl_.kind_), 7>(),
-       {8, 7, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.kind_)}},
-      // .runanywhere.v1.SDKComponent component = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentInitializationEvent, _impl_.component_), 8>(),
-       {16, 8, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.component_)}},
-      // string model_id = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 3, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.model_id_)}},
-      // int64 size_bytes = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ComponentInitializationEvent, _impl_.size_bytes_), 9>(),
-       {32, 9, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.size_bytes_)}},
-      // float progress = 5;
-      {::_pbi::TcParser::FastF32S1,
-       {45, 10, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.progress_)}},
-      // string error = 6;
-      {::_pbi::TcParser::FastUS1,
-       {50, 4, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.error_)}},
-      // string old_state = 7;
-      {::_pbi::TcParser::FastUS1,
-       {58, 5, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.old_state_)}},
-      // string new_state = 8;
-      {::_pbi::TcParser::FastUS1,
-       {66, 6, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.new_state_)}},
-      // repeated .runanywhere.v1.SDKComponent components = 9;
-      {::_pbi::TcParser::FastV32P1,
-       {74, 0, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.components_)}},
-      // repeated .runanywhere.v1.SDKComponent ready_components = 10;
-      {::_pbi::TcParser::FastV32P1,
-       {82, 1, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.ready_components_)}},
-      // repeated .runanywhere.v1.SDKComponent pending_components = 11;
-      {::_pbi::TcParser::FastV32P1,
-       {90, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.pending_components_)}},
-      // bool init_success = 12;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ComponentInitializationEvent, _impl_.init_success_), 11>(),
-       {96, 11, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.init_success_)}},
-      // int32 ready_count = 13;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentInitializationEvent, _impl_.ready_count_), 12>(),
-       {104, 12, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.ready_count_)}},
-      // int32 failed_count = 14;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentInitializationEvent, _impl_.failed_count_), 13>(),
-       {112, 13, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.failed_count_)}},
-      // .runanywhere.v1.ComponentLifecycleState previous_lifecycle_state = 15;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentInitializationEvent, _impl_.previous_lifecycle_state_), 14>(),
-       {120, 14, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.previous_lifecycle_state_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // .runanywhere.v1.ComponentInitializationEventKind kind = 1;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.kind_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // .runanywhere.v1.SDKComponent component = 2;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.component_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // string model_id = 3;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.model_id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int64 size_bytes = 4;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.size_bytes_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // float progress = 5;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.progress_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // string error = 6;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.error_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string old_state = 7;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.old_state_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // string new_state = 8;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.new_state_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // repeated .runanywhere.v1.SDKComponent components = 9;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.components_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
-      // repeated .runanywhere.v1.SDKComponent ready_components = 10;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.ready_components_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
-      // repeated .runanywhere.v1.SDKComponent pending_components = 11;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.pending_components_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
-      // bool init_success = 12;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.init_success_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // int32 ready_count = 13;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.ready_count_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 failed_count = 14;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.failed_count_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // .runanywhere.v1.ComponentLifecycleState previous_lifecycle_state = 15;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.previous_lifecycle_state_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // .runanywhere.v1.ComponentLifecycleState current_lifecycle_state = 16;
-      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.current_lifecycle_state_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-    }},
-    // no aux_entries
-    {{
-      "\53\0\0\10\0\0\5\11\11\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
-      "runanywhere.v1.ComponentInitializationEvent"
-      "model_id"
-      "error"
-      "old_state"
-      "new_state"
-    }},
-  };
-}
-
-
-inline constexpr ComponentInitializationEvent::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        components_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::ComponentInitializationEvent,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.components_)>()
-         }
-        ,
-        _components_cached_byte_size_{0},
-        ready_components_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::ComponentInitializationEvent,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.ready_components_)>()
-         }
-        ,
-        _ready_components_cached_byte_size_{0},
-        pending_components_ { visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::ComponentInitializationEvent,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.pending_components_)>()
-         }
-        ,
-        _pending_components_cached_byte_size_{0},
-        model_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        old_state_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        new_state_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        kind_{static_cast< ::runanywhere::v1::ComponentInitializationEventKind >(0)},
-        component_{static_cast< ::runanywhere::v1::SDKComponent >(0)},
-        size_bytes_{::int64_t{0}},
-        progress_{0},
-        init_success_{false},
-        ready_count_{0},
-        failed_count_{0},
-        previous_lifecycle_state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)},
-        current_lifecycle_state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)} {}
-
-template <typename>
-constexpr ComponentInitializationEvent::ComponentInitializationEvent(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL ComponentInitializationEvent::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) ComponentInitializationEvent(arena);
-}
-constexpr auto ComponentInitializationEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ComponentInitializationEvent), alignof(ComponentInitializationEvent));
-}
-constexpr auto ComponentInitializationEvent::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &ComponentInitializationEvent::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<ComponentInitializationEvent>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &ComponentInitializationEvent::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<ComponentInitializationEvent>(), &ComponentInitializationEvent::ByteSizeLong,
-              &ComponentInitializationEvent::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[2],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_sdk_5fevents_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct ComponentInitializationEventGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr ComponentInitializationEventGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 ComponentInitializationEvent_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(ComponentInitializationEvent::InternalGenerateClassData_(
-            _default, &ComponentInitializationEvent_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<ComponentInitializationEvent>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~ComponentInitializationEventGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) ComponentInitializationEvent _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<ComponentInitializationEvent>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(ComponentInitializationEventGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ComponentInitializationEventGlobalsTypeInternal ComponentInitializationEvent_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* ComponentInitializationEvent_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return ComponentInitializationEvent_globals_.GetClassData();
-#else
-  return ComponentInitializationEvent_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 class CapabilityOperationEvent::_Internal {
  public:
   using HasBits = decltype(::std::declval<CapabilityOperationEvent>()._impl_._has_bits_);
@@ -4342,6 +4055,677 @@ const ::_pbi::ClassData* HardwareRoutingEvent_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class FailureEvent::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<FailureEvent>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_._has_bits_);
+};
+
+constexpr FailureEvent::ParseTableT_ FailureEvent::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_._has_bits_),
+      0, // no _extensions_
+      4, 24,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294967280,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      4,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::FailureEvent>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      // bool recoverable = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(FailureEvent, _impl_.recoverable_), 3>(),
+       {32, 3, 0,
+        PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.recoverable_)}},
+      // .runanywhere.v1.SDKComponent component = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(FailureEvent, _impl_.component_), 2>(),
+       {8, 2, 0,
+        PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.component_)}},
+      // string operation = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 0, 0,
+        PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.operation_)}},
+      // .runanywhere.v1.SDKError error = 3;
+      {::_pbi::TcParser::FastMtS1,
+       {26, 1, 0,
+        PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.error_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // .runanywhere.v1.SDKComponent component = 1;
+      {PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.component_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // string operation = 2;
+      {PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.operation_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // .runanywhere.v1.SDKError error = 3;
+      {PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.error_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // bool recoverable = 4;
+      {PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.recoverable_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\33\0\11\0\0\0\0\0"
+      "runanywhere.v1.FailureEvent"
+      "operation"
+    }},
+  };
+}
+
+
+inline constexpr FailureEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        operation_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
+        component_{static_cast< ::runanywhere::v1::SDKComponent >(0)},
+        recoverable_{false} {}
+
+template <typename>
+constexpr FailureEvent::FailureEvent(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL FailureEvent::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) FailureEvent(arena);
+}
+constexpr auto FailureEvent::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(FailureEvent), alignof(FailureEvent));
+}
+constexpr auto FailureEvent::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &FailureEvent::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<FailureEvent>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &FailureEvent::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<FailureEvent>(), &FailureEvent::ByteSizeLong,
+              &FailureEvent::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[24],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_sdk_5fevents_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct FailureEventGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr FailureEventGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 FailureEvent_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(FailureEvent::InternalGenerateClassData_(
+            _default, &FailureEvent_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<FailureEvent>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~FailureEventGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) FailureEvent _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<FailureEvent>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(FailureEventGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST FailureEventGlobalsTypeInternal FailureEvent_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* FailureEvent_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return FailureEvent_globals_.GetClassData();
+#else
+  return FailureEvent_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
+class ComponentInitializationEvent::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<ComponentInitializationEvent>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_._has_bits_);
+};
+
+constexpr ComponentInitializationEvent::ParseTableT_ ComponentInitializationEvent::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_._has_bits_),
+      0, // no _extensions_
+      17, 120,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294838304,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      15,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::ComponentInitializationEvent>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      // .runanywhere.v1.ComponentLifecycleState current_lifecycle_state = 16;
+      {::_pbi::TcParser::FastV32S2,
+       {384, 14, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.current_lifecycle_state_)}},
+      // .runanywhere.v1.ComponentInitializationEventKind kind = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentInitializationEvent, _impl_.kind_), 7>(),
+       {8, 7, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.kind_)}},
+      // .runanywhere.v1.SDKComponent component = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentInitializationEvent, _impl_.component_), 8>(),
+       {16, 8, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.component_)}},
+      // string model_id = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 3, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.model_id_)}},
+      // int64 size_bytes = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ComponentInitializationEvent, _impl_.size_bytes_), 9>(),
+       {32, 9, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.size_bytes_)}},
+      // float progress = 5;
+      {::_pbi::TcParser::FastF32S1,
+       {45, 10, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.progress_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // string old_state = 7;
+      {::_pbi::TcParser::FastUS1,
+       {58, 4, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.old_state_)}},
+      // string new_state = 8;
+      {::_pbi::TcParser::FastUS1,
+       {66, 5, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.new_state_)}},
+      // repeated .runanywhere.v1.SDKComponent components = 9;
+      {::_pbi::TcParser::FastV32P1,
+       {74, 0, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.components_)}},
+      // repeated .runanywhere.v1.SDKComponent ready_components = 10;
+      {::_pbi::TcParser::FastV32P1,
+       {82, 1, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.ready_components_)}},
+      // repeated .runanywhere.v1.SDKComponent pending_components = 11;
+      {::_pbi::TcParser::FastV32P1,
+       {90, 2, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.pending_components_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // int32 ready_count = 13;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentInitializationEvent, _impl_.ready_count_), 11>(),
+       {104, 11, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.ready_count_)}},
+      // int32 failed_count = 14;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentInitializationEvent, _impl_.failed_count_), 12>(),
+       {112, 12, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.failed_count_)}},
+      // .runanywhere.v1.ComponentLifecycleState previous_lifecycle_state = 15;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentInitializationEvent, _impl_.previous_lifecycle_state_), 13>(),
+       {120, 13, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.previous_lifecycle_state_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // .runanywhere.v1.ComponentInitializationEventKind kind = 1;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.kind_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // .runanywhere.v1.SDKComponent component = 2;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.component_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // string model_id = 3;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.model_id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int64 size_bytes = 4;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.size_bytes_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // float progress = 5;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.progress_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // string old_state = 7;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.old_state_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string new_state = 8;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.new_state_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // repeated .runanywhere.v1.SDKComponent components = 9;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.components_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
+      // repeated .runanywhere.v1.SDKComponent ready_components = 10;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.ready_components_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
+      // repeated .runanywhere.v1.SDKComponent pending_components = 11;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.pending_components_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcRepeated | ::_fl::kPackedOpenEnum)},
+      // int32 ready_count = 13;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.ready_count_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int32 failed_count = 14;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.failed_count_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // .runanywhere.v1.ComponentLifecycleState previous_lifecycle_state = 15;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.previous_lifecycle_state_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // .runanywhere.v1.ComponentLifecycleState current_lifecycle_state = 16;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.current_lifecycle_state_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // optional .runanywhere.v1.SDKError error = 17;
+      {PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.error_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\53\0\0\10\0\0\11\11\0\0\0\0\0\0\0\0"
+      "runanywhere.v1.ComponentInitializationEvent"
+      "model_id"
+      "old_state"
+      "new_state"
+    }},
+  };
+}
+
+
+inline constexpr ComponentInitializationEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        components_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::ComponentInitializationEvent,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.components_)>()
+         }
+        ,
+        _components_cached_byte_size_{0},
+        ready_components_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::ComponentInitializationEvent,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.ready_components_)>()
+         }
+        ,
+        _ready_components_cached_byte_size_{0},
+        pending_components_ { visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::ComponentInitializationEvent,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.pending_components_)>()
+         }
+        ,
+        _pending_components_cached_byte_size_{0},
+        model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        old_state_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        new_state_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
+        kind_{static_cast< ::runanywhere::v1::ComponentInitializationEventKind >(0)},
+        component_{static_cast< ::runanywhere::v1::SDKComponent >(0)},
+        size_bytes_{::int64_t{0}},
+        progress_{0},
+        ready_count_{0},
+        failed_count_{0},
+        previous_lifecycle_state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)},
+        current_lifecycle_state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)} {}
+
+template <typename>
+constexpr ComponentInitializationEvent::ComponentInitializationEvent(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL ComponentInitializationEvent::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ComponentInitializationEvent(arena);
+}
+constexpr auto ComponentInitializationEvent::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ComponentInitializationEvent), alignof(ComponentInitializationEvent));
+}
+constexpr auto ComponentInitializationEvent::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &ComponentInitializationEvent::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ComponentInitializationEvent>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ComponentInitializationEvent::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ComponentInitializationEvent>(), &ComponentInitializationEvent::ByteSizeLong,
+              &ComponentInitializationEvent::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[2],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_sdk_5fevents_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct ComponentInitializationEventGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr ComponentInitializationEventGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 ComponentInitializationEvent_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(ComponentInitializationEvent::InternalGenerateClassData_(
+            _default, &ComponentInitializationEvent_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<ComponentInitializationEvent>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~ComponentInitializationEventGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) ComponentInitializationEvent _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<ComponentInitializationEvent>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(ComponentInitializationEventGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ComponentInitializationEventGlobalsTypeInternal ComponentInitializationEvent_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* ComponentInitializationEvent_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return ComponentInitializationEvent_globals_.GetClassData();
+#else
+  return ComponentInitializationEvent_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
+class ComponentLifecycleSnapshot::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<ComponentLifecycleSnapshot>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_._has_bits_);
+};
+
+constexpr ComponentLifecycleSnapshot::ParseTableT_ ComponentLifecycleSnapshot::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_._has_bits_),
+      0, // no _extensions_
+      11, 120,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294965264,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      10,  // num_field_entries
+      2,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::ComponentLifecycleSnapshot>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.SDKComponent component = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentLifecycleSnapshot, _impl_.component_), 4>(),
+       {8, 4, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.component_)}},
+      // .runanywhere.v1.ComponentLifecycleState state = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentLifecycleSnapshot, _impl_.state_), 5>(),
+       {16, 5, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.state_)}},
+      // string model_id = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 0, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.model_id_)}},
+      // int64 updated_at_ms = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ComponentLifecycleSnapshot, _impl_.updated_at_ms_), 6>(),
+       {32, 6, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.updated_at_ms_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.ModelCategory category = 6;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentLifecycleSnapshot, _impl_.category_), 7>(),
+       {48, 7, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.category_)}},
+      // .runanywhere.v1.InferenceFramework framework = 7;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentLifecycleSnapshot, _impl_.framework_), 8>(),
+       {56, 8, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.framework_)}},
+      // string resolved_path = 8;
+      {::_pbi::TcParser::FastUS1,
+       {66, 1, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.resolved_path_)}},
+      // int64 loaded_at_unix_ms = 9;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ComponentLifecycleSnapshot, _impl_.loaded_at_unix_ms_), 9>(),
+       {72, 9, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.loaded_at_unix_ms_)}},
+      // .runanywhere.v1.ModelInfo model = 10;
+      {::_pbi::TcParser::FastMtS1,
+       {82, 2, 0,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.model_)}},
+      // optional .runanywhere.v1.SDKError error = 11;
+      {::_pbi::TcParser::FastMtS1,
+       {90, 3, 1,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.error_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // .runanywhere.v1.SDKComponent component = 1;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.component_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // .runanywhere.v1.ComponentLifecycleState state = 2;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.state_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // string model_id = 3;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int64 updated_at_ms = 4;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.updated_at_ms_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // .runanywhere.v1.ModelCategory category = 6;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.category_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // .runanywhere.v1.InferenceFramework framework = 7;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.framework_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // string resolved_path = 8;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.resolved_path_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int64 loaded_at_unix_ms = 9;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.loaded_at_unix_ms_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // .runanywhere.v1.ModelInfo model = 10;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.model_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional .runanywhere.v1.SDKError error = 11;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.error_), _Internal::kHasBitsOffset + 3, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::ModelInfo>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ModelInfo_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\51\0\0\10\0\0\0\15\0\0\0\0\0\0\0\0"
+      "runanywhere.v1.ComponentLifecycleSnapshot"
+      "model_id"
+      "resolved_path"
+    }},
+  };
+}
+
+
+inline constexpr ComponentLifecycleSnapshot::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        resolved_path_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        model_{nullptr},
+        error_{nullptr},
+        component_{static_cast< ::runanywhere::v1::SDKComponent >(0)},
+        state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)},
+        updated_at_ms_{::int64_t{0}},
+        category_{static_cast< ::runanywhere::v1::ModelCategory >(0)},
+        framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)},
+        loaded_at_unix_ms_{::int64_t{0}} {}
+
+template <typename>
+constexpr ComponentLifecycleSnapshot::ComponentLifecycleSnapshot(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL ComponentLifecycleSnapshot::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ComponentLifecycleSnapshot(arena);
+}
+constexpr auto ComponentLifecycleSnapshot::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ComponentLifecycleSnapshot), alignof(ComponentLifecycleSnapshot));
+}
+constexpr auto ComponentLifecycleSnapshot::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &ComponentLifecycleSnapshot::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ComponentLifecycleSnapshot>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ComponentLifecycleSnapshot::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ComponentLifecycleSnapshot>(), &ComponentLifecycleSnapshot::ByteSizeLong,
+              &ComponentLifecycleSnapshot::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[3],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_sdk_5fevents_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct ComponentLifecycleSnapshotGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr ComponentLifecycleSnapshotGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 ComponentLifecycleSnapshot_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(ComponentLifecycleSnapshot::InternalGenerateClassData_(
+            _default, &ComponentLifecycleSnapshot_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<ComponentLifecycleSnapshot>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~ComponentLifecycleSnapshotGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) ComponentLifecycleSnapshot _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<ComponentLifecycleSnapshot>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ComponentLifecycleSnapshotGlobalsTypeInternal ComponentLifecycleSnapshot_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* ComponentLifecycleSnapshot_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return ComponentLifecycleSnapshot_globals_.GetClassData();
+#else
+  return ComponentLifecycleSnapshot_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 class StorageLifecycleEvent::_Internal {
  public:
   using HasBits = decltype(::std::declval<StorageLifecycleEvent>()._impl_._has_bits_);
@@ -4554,179 +4938,6 @@ const ::_pbi::ClassData* StorageLifecycleEvent_get_class_data() {
   return StorageLifecycleEvent_globals_.GetClassData();
 #else
   return StorageLifecycleEvent_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class FailureEvent::_Internal {
- public:
-  using HasBits = decltype(::std::declval<FailureEvent>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_._has_bits_);
-};
-
-constexpr FailureEvent::ParseTableT_ FailureEvent::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_._has_bits_),
-      0, // no _extensions_
-      4, 24,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967280,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      4,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::FailureEvent>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // bool recoverable = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(FailureEvent, _impl_.recoverable_), 3>(),
-       {32, 3, 0,
-        PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.recoverable_)}},
-      // .runanywhere.v1.SDKComponent component = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(FailureEvent, _impl_.component_), 2>(),
-       {8, 2, 0,
-        PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.component_)}},
-      // string operation = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.operation_)}},
-      // .runanywhere.v1.SDKError error = 3;
-      {::_pbi::TcParser::FastMtS1,
-       {26, 1, 0,
-        PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.error_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // .runanywhere.v1.SDKComponent component = 1;
-      {PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.component_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // string operation = 2;
-      {PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.operation_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.SDKError error = 3;
-      {PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.error_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // bool recoverable = 4;
-      {PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_.recoverable_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
-        #endif
-    }},
-    {{
-      "\33\0\11\0\0\0\0\0"
-      "runanywhere.v1.FailureEvent"
-      "operation"
-    }},
-  };
-}
-
-
-inline constexpr FailureEvent::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        operation_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_{nullptr},
-        component_{static_cast< ::runanywhere::v1::SDKComponent >(0)},
-        recoverable_{false} {}
-
-template <typename>
-constexpr FailureEvent::FailureEvent(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL FailureEvent::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) FailureEvent(arena);
-}
-constexpr auto FailureEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(FailureEvent), alignof(FailureEvent));
-}
-constexpr auto FailureEvent::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &FailureEvent::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<FailureEvent>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &FailureEvent::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<FailureEvent>(), &FailureEvent::ByteSizeLong,
-              &FailureEvent::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(FailureEvent, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[24],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_sdk_5fevents_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct FailureEventGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr FailureEventGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 FailureEvent_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(FailureEvent::InternalGenerateClassData_(
-            _default, &FailureEvent_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<FailureEvent>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~FailureEventGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) FailureEvent _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<FailureEvent>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(FailureEventGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST FailureEventGlobalsTypeInternal FailureEvent_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* FailureEvent_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return FailureEvent_globals_.GetClassData();
-#else
-  return FailureEvent_class_data_.base();
 #endif  // PROTOBUF_MESSAGE_GLOBALS
 }
 }  // namespace
@@ -4944,233 +5155,6 @@ const ::_pbi::ClassData* DownloadEvent_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class ComponentLifecycleSnapshot::_Internal {
- public:
-  using HasBits = decltype(::std::declval<ComponentLifecycleSnapshot>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_._has_bits_);
-};
-
-constexpr ComponentLifecycleSnapshot::ParseTableT_ ComponentLifecycleSnapshot::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_._has_bits_),
-      0, // no _extensions_
-      10, 120,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294966272,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      10,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::ComponentLifecycleSnapshot>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // .runanywhere.v1.SDKComponent component = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentLifecycleSnapshot, _impl_.component_), 4>(),
-       {8, 4, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.component_)}},
-      // .runanywhere.v1.ComponentLifecycleState state = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentLifecycleSnapshot, _impl_.state_), 5>(),
-       {16, 5, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.state_)}},
-      // string model_id = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 0, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.model_id_)}},
-      // int64 updated_at_ms = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ComponentLifecycleSnapshot, _impl_.updated_at_ms_), 6>(),
-       {32, 6, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.updated_at_ms_)}},
-      // string error_message = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 1, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.error_message_)}},
-      // .runanywhere.v1.ModelCategory category = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentLifecycleSnapshot, _impl_.category_), 7>(),
-       {48, 7, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.category_)}},
-      // .runanywhere.v1.InferenceFramework framework = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentLifecycleSnapshot, _impl_.framework_), 8>(),
-       {56, 8, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.framework_)}},
-      // string resolved_path = 8;
-      {::_pbi::TcParser::FastUS1,
-       {66, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.resolved_path_)}},
-      // int64 loaded_at_unix_ms = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(ComponentLifecycleSnapshot, _impl_.loaded_at_unix_ms_), 9>(),
-       {72, 9, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.loaded_at_unix_ms_)}},
-      // .runanywhere.v1.ModelInfo model = 10;
-      {::_pbi::TcParser::FastMtS1,
-       {82, 3, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.model_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // .runanywhere.v1.SDKComponent component = 1;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.component_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // .runanywhere.v1.ComponentLifecycleState state = 2;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.state_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // string model_id = 3;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int64 updated_at_ms = 4;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.updated_at_ms_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // string error_message = 5;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.ModelCategory category = 6;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.category_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // .runanywhere.v1.InferenceFramework framework = 7;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.framework_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // string resolved_path = 8;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.resolved_path_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int64 loaded_at_unix_ms = 9;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.loaded_at_unix_ms_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // .runanywhere.v1.ModelInfo model = 10;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.model_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::ModelInfo>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ModelInfo_globals_},
-        #endif
-    }},
-    {{
-      "\51\0\0\10\0\15\0\0\15\0\0\0\0\0\0\0"
-      "runanywhere.v1.ComponentLifecycleSnapshot"
-      "model_id"
-      "error_message"
-      "resolved_path"
-    }},
-  };
-}
-
-
-inline constexpr ComponentLifecycleSnapshot::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        model_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        resolved_path_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        model_{nullptr},
-        component_{static_cast< ::runanywhere::v1::SDKComponent >(0)},
-        state_{static_cast< ::runanywhere::v1::ComponentLifecycleState >(0)},
-        updated_at_ms_{::int64_t{0}},
-        category_{static_cast< ::runanywhere::v1::ModelCategory >(0)},
-        framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)},
-        loaded_at_unix_ms_{::int64_t{0}} {}
-
-template <typename>
-constexpr ComponentLifecycleSnapshot::ComponentLifecycleSnapshot(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL ComponentLifecycleSnapshot::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) ComponentLifecycleSnapshot(arena);
-}
-constexpr auto ComponentLifecycleSnapshot::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ComponentLifecycleSnapshot), alignof(ComponentLifecycleSnapshot));
-}
-constexpr auto ComponentLifecycleSnapshot::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &ComponentLifecycleSnapshot::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<ComponentLifecycleSnapshot>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &ComponentLifecycleSnapshot::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<ComponentLifecycleSnapshot>(), &ComponentLifecycleSnapshot::ByteSizeLong,
-              &ComponentLifecycleSnapshot::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[3],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_sdk_5fevents_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct ComponentLifecycleSnapshotGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr ComponentLifecycleSnapshotGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 ComponentLifecycleSnapshot_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(ComponentLifecycleSnapshot::InternalGenerateClassData_(
-            _default, &ComponentLifecycleSnapshot_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<ComponentLifecycleSnapshot>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~ComponentLifecycleSnapshotGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) ComponentLifecycleSnapshot _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<ComponentLifecycleSnapshot>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST ComponentLifecycleSnapshotGlobalsTypeInternal ComponentLifecycleSnapshot_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* ComponentLifecycleSnapshot_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return ComponentLifecycleSnapshot_globals_.GetClassData();
-#else
-  return ComponentLifecycleSnapshot_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 class ComponentLifecycleSnapshotResult::_Internal {
  public:
   using HasBits = decltype(::std::declval<ComponentLifecycleSnapshotResult>()._impl_._has_bits_);
@@ -5183,12 +5167,12 @@ constexpr ComponentLifecycleSnapshotResult::ParseTableT_ ComponentLifecycleSnaps
     {
       PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotResult, _impl_._has_bits_),
       0, // no _extensions_
-      3, 24,  // max_field_number, fast_idx_mask
+      4, 24,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967288,  // skipmap
+      4294967285,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      3,  // num_field_entries
-      1,  // num_aux_entries
+      2,  // num_field_entries
+      2,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -5197,28 +5181,23 @@ constexpr ComponentLifecycleSnapshotResult::ParseTableT_ ComponentLifecycleSnaps
       ::_pbi::TcParser::GetTable<::runanywhere::v1::ComponentLifecycleSnapshotResult>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
+      // optional .runanywhere.v1.SDKError error = 4;
+      {::_pbi::TcParser::FastMtS1,
+       {34, 1, 1,
+        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotResult, _impl_.error_)}},
       {::_pbi::TcParser::MiniParse, {}},
-      // bool success = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ComponentLifecycleSnapshotResult, _impl_.success_), 2>(),
-       {8, 2, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotResult, _impl_.success_)}},
       // repeated .runanywhere.v1.ComponentLifecycleSnapshot snapshots = 2;
       {::_pbi::TcParser::FastMtR1,
        {18, 0, 0,
         PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotResult, _impl_.snapshots_)}},
-      // string error_message = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 1, 0,
-        PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotResult, _impl_.error_message_)}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
-      // bool success = 1;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotResult, _impl_.success_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // repeated .runanywhere.v1.ComponentLifecycleSnapshot snapshots = 2;
       {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotResult, _impl_.snapshots_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
-      // string error_message = 3;
-      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotResult, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional .runanywhere.v1.SDKError error = 4;
+      {PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshotResult, _impl_.error_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -5226,11 +5205,13 @@ constexpr ComponentLifecycleSnapshotResult::ParseTableT_ ComponentLifecycleSnaps
         #else
         {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ComponentLifecycleSnapshot_globals_},
         #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
     }},
     {{
-      "\57\0\0\15\0\0\0\0"
-      "runanywhere.v1.ComponentLifecycleSnapshotResult"
-      "error_message"
     }},
   };
 }
@@ -5245,10 +5226,7 @@ inline constexpr ComponentLifecycleSnapshotResult::Impl_::Impl_(
             PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotResult, _impl_.snapshots_)>()
          }
         ,
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        success_{false} {}
+        error_{nullptr} {}
 
 template <typename>
 constexpr ComponentLifecycleSnapshotResult::ComponentLifecycleSnapshotResult(::_pbi::ConstantInitialized,
@@ -6322,23 +6300,22 @@ const ::uint32_t
         7,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_._has_bits_),
-        19, // hasbit index offset
+        18, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.kind_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.component_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.size_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.progress_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.error_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.old_state_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.new_state_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.components_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.ready_components_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.pending_components_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.init_success_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.ready_count_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.failed_count_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.previous_lifecycle_state_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.current_lifecycle_state_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentInitializationEvent, _impl_.error_),
         7,
         8,
         3,
@@ -6346,7 +6323,6 @@ const ::uint32_t
         10,
         4,
         5,
-        6,
         0,
         1,
         2,
@@ -6354,7 +6330,7 @@ const ::uint32_t
         12,
         13,
         14,
-        15,
+        6,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_._has_bits_),
         13, // hasbit index offset
@@ -6362,29 +6338,27 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_.state_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_.model_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_.updated_at_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_.error_message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_.category_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_.framework_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_.resolved_path_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_.loaded_at_unix_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_.model_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshot, _impl_.error_),
         4,
         5,
         0,
         6,
-        1,
         7,
         8,
-        2,
+        1,
         9,
+        2,
         3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotResult, _impl_._has_bits_),
-        6, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotResult, _impl_.success_),
+        5, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotResult, _impl_.snapshots_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotResult, _impl_.error_message_),
-        2,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotResult, _impl_.error_),
         0,
         1,
         0x085, // bitmap
@@ -6510,7 +6484,7 @@ const ::uint32_t
         32,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_._has_bits_),
-        30, // hasbit index offset
+        28, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.kind_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.session_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.text_),
@@ -6528,7 +6502,6 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.audio_length_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.audio_size_bytes_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.word_count_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.real_time_factor_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.language_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.sample_rate_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.is_streaming_),
@@ -6537,7 +6510,6 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.audio_duration_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.audio_size_bytes_tts_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.processing_duration_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceLifecycleEvent, _impl_.characters_per_second_),
         11,
         0,
         1,
@@ -6554,17 +6526,15 @@ const ::uint32_t
         9,
         16,
         15,
-        18,
         17,
         10,
+        18,
         19,
         20,
+        22,
         21,
         23,
-        22,
         24,
-        25,
-        26,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::CapabilityOperationEvent, _impl_._has_bits_),
         13, // hasbit index offset
@@ -6972,30 +6942,30 @@ static const ::_pbi::MigrationSchema
         {0, sizeof(::runanywhere::v1::InitializationEvent)},
         {11, sizeof(::runanywhere::v1::ConfigurationEvent)},
         {34, sizeof(::runanywhere::v1::ComponentInitializationEvent)},
-        {69, sizeof(::runanywhere::v1::ComponentLifecycleSnapshot)},
-        {92, sizeof(::runanywhere::v1::ComponentLifecycleSnapshotResult)},
-        {101, sizeof(::runanywhere::v1::ComponentLifecycleEvent)},
-        {134, sizeof(::runanywhere::v1::SessionEvent)},
-        {151, sizeof(::runanywhere::v1::GenerationEvent)},
-        {222, sizeof(::runanywhere::v1::VoiceLifecycleEvent)},
-        {279, sizeof(::runanywhere::v1::CapabilityOperationEvent)},
-        {302, sizeof(::runanywhere::v1::ModelEvent)},
-        {337, sizeof(::runanywhere::v1::ModelRegistryEvent)},
-        {370, sizeof(::runanywhere::v1::DownloadEvent)},
-        {393, sizeof(::runanywhere::v1::StorageEvent)},
-        {416, sizeof(::runanywhere::v1::StorageLifecycleEvent)},
-        {439, sizeof(::runanywhere::v1::AuthEvent)},
-        {452, sizeof(::runanywhere::v1::DeviceEvent)},
-        {483, sizeof(::runanywhere::v1::NetworkEvent)},
-        {498, sizeof(::runanywhere::v1::FrameworkEvent)},
-        {517, sizeof(::runanywhere::v1::HardwareRoutingEvent)},
-        {536, sizeof(::runanywhere::v1::PerformanceEvent)},
-        {551, sizeof(::runanywhere::v1::TelemetryEvent_AttributesEntry_DoNotUse)},
-        {558, sizeof(::runanywhere::v1::TelemetryEvent)},
-        {571, sizeof(::runanywhere::v1::CancellationEvent)},
-        {584, sizeof(::runanywhere::v1::FailureEvent)},
-        {595, sizeof(::runanywhere::v1::SDKEvent_PropertiesEntry_DoNotUse)},
-        {602, sizeof(::runanywhere::v1::SDKEvent)},
+        {67, sizeof(::runanywhere::v1::ComponentLifecycleSnapshot)},
+        {90, sizeof(::runanywhere::v1::ComponentLifecycleSnapshotResult)},
+        {97, sizeof(::runanywhere::v1::ComponentLifecycleEvent)},
+        {130, sizeof(::runanywhere::v1::SessionEvent)},
+        {147, sizeof(::runanywhere::v1::GenerationEvent)},
+        {218, sizeof(::runanywhere::v1::VoiceLifecycleEvent)},
+        {271, sizeof(::runanywhere::v1::CapabilityOperationEvent)},
+        {294, sizeof(::runanywhere::v1::ModelEvent)},
+        {329, sizeof(::runanywhere::v1::ModelRegistryEvent)},
+        {362, sizeof(::runanywhere::v1::DownloadEvent)},
+        {385, sizeof(::runanywhere::v1::StorageEvent)},
+        {408, sizeof(::runanywhere::v1::StorageLifecycleEvent)},
+        {431, sizeof(::runanywhere::v1::AuthEvent)},
+        {444, sizeof(::runanywhere::v1::DeviceEvent)},
+        {475, sizeof(::runanywhere::v1::NetworkEvent)},
+        {490, sizeof(::runanywhere::v1::FrameworkEvent)},
+        {509, sizeof(::runanywhere::v1::HardwareRoutingEvent)},
+        {528, sizeof(::runanywhere::v1::PerformanceEvent)},
+        {543, sizeof(::runanywhere::v1::TelemetryEvent_AttributesEntry_DoNotUse)},
+        {550, sizeof(::runanywhere::v1::TelemetryEvent)},
+        {563, sizeof(::runanywhere::v1::CancellationEvent)},
+        {576, sizeof(::runanywhere::v1::FailureEvent)},
+        {587, sizeof(::runanywhere::v1::SDKEvent_PropertiesEntry_DoNotUse)},
+        {594, sizeof(::runanywhere::v1::SDKEvent)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -7043,611 +7013,612 @@ const char descriptor_table_protodef_sdk_5fevents_2eproto[] ABSL_ATTRIBUTE_SECTI
     "ings_json\030\005 \001(\t\022\026\n\016routing_policy\030\006 \001(\t\022"
     "\024\n\014privacy_mode\030\007 \001(\t\022\031\n\021analytics_enabl"
     "ed\030\010 \001(\010\022\026\n\016old_value_json\030\t \001(\t\022\026\n\016new_"
-    "value_json\030\n \001(\t\"\366\004\n\034ComponentInitializa"
+    "value_json\030\n \001(\t\"\211\005\n\034ComponentInitializa"
     "tionEvent\022>\n\004kind\030\001 \001(\01620.runanywhere.v1"
     ".ComponentInitializationEventKind\022/\n\tcom"
     "ponent\030\002 \001(\0162\034.runanywhere.v1.SDKCompone"
     "nt\022\020\n\010model_id\030\003 \001(\t\022\022\n\nsize_bytes\030\004 \001(\003"
-    "\022\020\n\010progress\030\005 \001(\002\022\r\n\005error\030\006 \001(\t\022\021\n\told"
-    "_state\030\007 \001(\t\022\021\n\tnew_state\030\010 \001(\t\0220\n\ncompo"
-    "nents\030\t \003(\0162\034.runanywhere.v1.SDKComponen"
-    "t\0226\n\020ready_components\030\n \003(\0162\034.runanywher"
-    "e.v1.SDKComponent\0228\n\022pending_components\030"
-    "\013 \003(\0162\034.runanywhere.v1.SDKComponent\022\024\n\014i"
-    "nit_success\030\014 \001(\010\022\023\n\013ready_count\030\r \001(\005\022\024"
-    "\n\014failed_count\030\016 \001(\005\022I\n\030previous_lifecyc"
-    "le_state\030\017 \001(\0162\'.runanywhere.v1.Componen"
-    "tLifecycleState\022H\n\027current_lifecycle_sta"
-    "te\030\020 \001(\0162\'.runanywhere.v1.ComponentLifec"
-    "ycleState\"\211\003\n\032ComponentLifecycleSnapshot"
-    "\022/\n\tcomponent\030\001 \001(\0162\034.runanywhere.v1.SDK"
-    "Component\0226\n\005state\030\002 \001(\0162\'.runanywhere.v"
-    "1.ComponentLifecycleState\022\020\n\010model_id\030\003 "
-    "\001(\t\022\025\n\rupdated_at_ms\030\004 \001(\003\022\025\n\rerror_mess"
-    "age\030\005 \001(\t\022/\n\010category\030\006 \001(\0162\035.runanywher"
-    "e.v1.ModelCategory\0225\n\tframework\030\007 \001(\0162\"."
-    "runanywhere.v1.InferenceFramework\022\025\n\rres"
-    "olved_path\030\010 \001(\t\022\031\n\021loaded_at_unix_ms\030\t "
-    "\001(\003\022(\n\005model\030\n \001(\0132\031.runanywhere.v1.Mode"
-    "lInfo\"\211\001\n ComponentLifecycleSnapshotResu"
-    "lt\022\017\n\007success\030\001 \001(\010\022=\n\tsnapshots\030\002 \003(\0132*"
-    ".runanywhere.v1.ComponentLifecycleSnapsh"
-    "ot\022\025\n\rerror_message\030\003 \001(\t\"\337\006\n\027ComponentL"
-    "ifecycleEvent\022/\n\tcomponent\030\001 \001(\0162\034.runan"
-    "ywhere.v1.SDKComponent\022\?\n\016previous_state"
-    "\030\002 \001(\0162\'.runanywhere.v1.ComponentLifecyc"
-    "leState\022>\n\rcurrent_state\030\003 \001(\0162\'.runanyw"
-    "here.v1.ComponentLifecycleState\022\020\n\010model"
-    "_id\030\004 \001(\t\022\024\n\014timestamp_ms\030\005 \001(\003\022<\n\021model"
-    "_load_result\030\n \001(\0132\037.runanywhere.v1.Mode"
-    "lLoadResultH\000\022@\n\023model_unload_result\030\013 \001"
-    "(\0132!.runanywhere.v1.ModelUnloadResultH\000\022"
-    "@\n\023model_delete_result\030\014 \001(\0132!.runanywhe"
-    "re.v1.ModelDeleteResultH\000\022=\n\021download_pr"
-    "ogress\030\r \001(\0132 .runanywhere.v1.DownloadPr"
-    "ogressH\000\022I\n\024storage_availability\030\016 \001(\0132)"
-    ".runanywhere.v1.StorageAvailabilityResul"
-    "tH\000\022D\n\025storage_delete_result\030\017 \001(\0132#.run"
-    "anywhere.v1.StorageDeleteResultH\000\022>\n\010sna"
-    "pshot\030\020 \001(\0132*.runanywhere.v1.ComponentLi"
-    "fecycleSnapshotH\000\022K\n\017snapshot_result\030\021 \001"
-    "(\01320.runanywhere.v1.ComponentLifecycleSn"
-    "apshotResultH\000\022@\n\023storage_delete_plan\030\022 "
-    "\001(\0132!.runanywhere.v1.StorageDeletePlanH\000"
-    "B\t\n\007payload\"\256\001\n\014SessionEvent\022.\n\004kind\030\001 \001"
-    "(\0162 .runanywhere.v1.SessionEventKind\022\022\n\n"
-    "session_id\030\002 \001(\t\022\017\n\007user_id\030\003 \001(\t\022\016\n\006rea"
-    "son\030\004 \001(\t\022\r\n\005error\030\005 \001(\t\022\025\n\rstarted_at_m"
-    "s\030\006 \001(\003\022\023\n\013ended_at_ms\030\007 \001(\003\"\264\006\n\017Generat"
-    "ionEvent\0221\n\004kind\030\001 \001(\0162#.runanywhere.v1."
-    "GenerationEventKind\022\022\n\nsession_id\030\002 \001(\t\022"
-    "\016\n\006prompt\030\003 \001(\t\022\r\n\005token\030\004 \001(\t\022\026\n\016stream"
-    "ing_text\030\005 \001(\t\022\024\n\014tokens_count\030\006 \001(\005\022\020\n\010"
-    "response\030\007 \001(\t\022\023\n\013tokens_used\030\010 \001(\005\022\022\n\nl"
-    "atency_ms\030\t \001(\003\022\036\n\026first_token_latency_m"
-    "s\030\n \001(\003\022\r\n\005error\030\013 \001(\t\022\020\n\010model_id\030\014 \001(\t"
-    "\022\023\n\013cost_amount\030\r \001(\001\022\031\n\021cost_saved_amou"
-    "nt\030\016 \001(\001\022\026\n\016routing_target\030\017 \001(\t\022\026\n\016rout"
-    "ing_reason\030\020 \001(\t\022\025\n\rcancel_reason\030\021 \001(\t\022"
-    "\024\n\014tool_call_id\030\022 \001(\t\022\021\n\ttool_name\030\023 \001(\t"
-    "\022\031\n\021tool_payload_json\030\024 \001(\t\022\036\n\026structure"
-    "d_schema_json\030\025 \001(\t\022\036\n\026structured_output"
-    "_json\030\026 \001(\t\022\025\n\rthinking_text\030\027 \001(\t\022\024\n\014in"
-    "put_tokens\030\030 \001(\005\022\031\n\021tokens_per_second\030\031 "
-    "\001(\001\022\036\n\026time_to_first_token_ms\030\032 \001(\003\022\024\n\014i"
-    "s_streaming\030\033 \001(\010\022\023\n\013temperature\030\034 \001(\002\022\022"
-    "\n\nmax_tokens\030\035 \001(\005\022\026\n\016context_length\030\036 \001"
-    "(\005\022\022\n\nmodel_name\030\037 \001(\t\022\023\n\013duration_ms\030  "
-    "\001(\001\022\021\n\tframework\030! \001(\005\022\033\n\023prompt_eval_ti"
-    "me_ms\030\" \001(\003\"\220\005\n\023VoiceLifecycleEvent\022,\n\004k"
-    "ind\030\001 \001(\0162\036.runanywhere.v1.VoiceEventKin"
-    "d\022\022\n\nsession_id\030\002 \001(\t\022\014\n\004text\030\003 \001(\t\022\022\n\nc"
-    "onfidence\030\004 \001(\002\022\025\n\rresponse_text\030\005 \001(\t\022\024"
-    "\n\014audio_base64\030\006 \001(\t\022\023\n\013duration_ms\030\007 \001("
-    "\003\022\023\n\013audio_level\030\010 \001(\002\022\025\n\rtranscription\030"
-    "\t \001(\t\022\025\n\rturn_response\030\n \001(\t\022\031\n\021turn_aud"
-    "io_base64\030\013 \001(\t\022\r\n\005error\030\014 \001(\t\022\020\n\010model_"
-    "id\030\r \001(\t\022\022\n\nmodel_name\030\016 \001(\t\022\027\n\017audio_le"
-    "ngth_ms\030\017 \001(\003\022\030\n\020audio_size_bytes\030\020 \001(\005\022"
-    "\022\n\nword_count\030\021 \001(\005\022\030\n\020real_time_factor\030"
-    "\022 \001(\001\022\020\n\010language\030\023 \001(\t\022\023\n\013sample_rate\030\024"
-    " \001(\005\022\024\n\014is_streaming\030\025 \001(\010\022\021\n\tframework\030"
-    "\026 \001(\005\022\027\n\017character_count\030\027 \001(\005\022\031\n\021audio_"
-    "duration_ms\030\030 \001(\003\022\034\n\024audio_size_bytes_tt"
-    "s\030\031 \001(\005\022\036\n\026processing_duration_ms\030\032 \001(\003\022"
-    "\035\n\025characters_per_second\030\033 \001(\001\"\243\002\n\030Capab"
-    "ilityOperationEvent\022:\n\004kind\030\001 \001(\0162,.runa"
-    "nywhere.v1.CapabilityOperationEventKind\022"
-    "/\n\tcomponent\030\002 \001(\0162\034.runanywhere.v1.SDKC"
-    "omponent\022\020\n\010model_id\030\003 \001(\t\022\024\n\014operation_"
-    "id\030\004 \001(\t\022\021\n\toperation\030\005 \001(\t\022\020\n\010progress\030"
-    "\006 \001(\002\022\023\n\013input_count\030\007 \001(\003\022\024\n\014output_cou"
-    "nt\030\010 \001(\003\022\023\n\013result_json\030\t \001(\t\022\r\n\005error\030\n"
-    " \001(\t\"\371\002\n\nModelEvent\022,\n\004kind\030\001 \001(\0162\036.runa"
-    "nywhere.v1.ModelEventKind\022\020\n\010model_id\030\002 "
-    "\001(\t\022\017\n\007task_id\030\003 \001(\t\022\020\n\010progress\030\004 \001(\002\022\030"
-    "\n\020bytes_downloaded\030\005 \001(\003\022\023\n\013total_bytes\030"
-    "\006 \001(\003\022\026\n\016download_state\030\007 \001(\t\022\022\n\nlocal_p"
-    "ath\030\010 \001(\t\022\r\n\005error\030\t \001(\t\022\023\n\013model_count\030"
-    "\n \001(\005\022\031\n\021custom_model_name\030\013 \001(\t\022\030\n\020cust"
-    "om_model_url\030\014 \001(\t\022\022\n\nmodel_name\030\r \001(\t\022\030"
-    "\n\020model_size_bytes\030\016 \001(\003\022\023\n\013duration_ms\030"
-    "\017 \001(\003\022\021\n\tframework\030\020 \001(\005\"\322\005\n\022ModelRegist"
-    "ryEvent\0224\n\004kind\030\001 \001(\0162&.runanywhere.v1.M"
-    "odelRegistryEventKind\022\020\n\010model_id\030\002 \001(\t\022"
-    "\025\n\rassignment_id\030\003 \001(\t\0228\n\022assigned_compo"
-    "nent\030\004 \001(\0162\034.runanywhere.v1.SDKComponent"
-    "\0225\n\tframework\030\005 \001(\0162\".runanywhere.v1.Inf"
-    "erenceFramework\022\023\n\013source_path\030\006 \001(\t\022\r\n\005"
-    "error\030\007 \001(\t\022D\n\016refresh_result\030\024 \001(\0132*.ru"
-    "nanywhere.v1.ModelRegistryRefreshResultH"
-    "\000\0226\n\013list_result\030\025 \001(\0132\037.runanywhere.v1."
-    "ModelListResultH\000\0224\n\nget_result\030\026 \001(\0132\036."
-    "runanywhere.v1.ModelGetResultH\000\022:\n\rimpor"
-    "t_result\030\027 \001(\0132!.runanywhere.v1.ModelImp"
-    "ortResultH\000\022@\n\020discovery_result\030\030 \001(\0132$."
-    "runanywhere.v1.ModelDiscoveryResultH\000\022H\n"
-    "\024compatibility_result\030\031 \001(\0132(.runanywher"
-    "e.v1.ModelCompatibilityResultH\000\022B\n\024curre"
-    "nt_model_result\030\032 \001(\0132\".runanywhere.v1.C"
-    "urrentModelResultH\000B\010\n\006result\"\251\003\n\rDownlo"
-    "adEvent\022/\n\004kind\030\001 \001(\0162!.runanywhere.v1.D"
-    "ownloadEventKind\022\020\n\010model_id\030\002 \001(\t\022\017\n\007ta"
-    "sk_id\030\003 \001(\t\022\r\n\005error\030\004 \001(\t\0229\n\013plan_resul"
-    "t\030\024 \001(\0132\".runanywhere.v1.DownloadPlanRes"
-    "ultH\000\022;\n\014start_result\030\025 \001(\0132#.runanywher"
-    "e.v1.DownloadStartResultH\000\0224\n\010progress\030\026"
-    " \001(\0132 .runanywhere.v1.DownloadProgressH\000"
-    "\022=\n\rcancel_result\030\027 \001(\0132$.runanywhere.v1"
-    ".DownloadCancelResultH\000\022=\n\rresume_result"
-    "\030\030 \001(\0132$.runanywhere.v1.DownloadResumeRe"
-    "sultH\000B\t\n\007payload\"\374\001\n\014StorageEvent\022.\n\004ki"
-    "nd\030\001 \001(\0162 .runanywhere.v1.StorageEventKi"
-    "nd\022\020\n\010model_id\030\002 \001(\t\022\r\n\005error\030\003 \001(\t\022\023\n\013t"
-    "otal_bytes\030\004 \001(\003\022\027\n\017available_bytes\030\005 \001("
-    "\003\022\022\n\nused_bytes\030\006 \001(\003\022\032\n\022stored_model_co"
-    "unt\030\007 \001(\005\022\021\n\tcache_key\030\010 \001(\t\022\025\n\revicted_"
-    "bytes\030\t \001(\003\022\023\n\013freed_bytes\030\n \001(\003\"\231\003\n\025Sto"
-    "rageLifecycleEvent\0227\n\004kind\030\001 \001(\0162).runan"
-    "ywhere.v1.StorageLifecycleEventKind\022\020\n\010m"
-    "odel_id\030\002 \001(\t\022\021\n\tcache_key\030\003 \001(\t\022\r\n\005byte"
-    "s\030\004 \001(\003\022\r\n\005error\030\005 \001(\t\0228\n\013info_result\030\024 "
-    "\001(\0132!.runanywhere.v1.StorageInfoResultH\000"
-    "\022H\n\023availability_result\030\025 \001(\0132).runanywh"
-    "ere.v1.StorageAvailabilityResultH\000\0228\n\013de"
-    "lete_plan\030\026 \001(\0132!.runanywhere.v1.Storage"
-    "DeletePlanH\000\022<\n\rdelete_result\030\027 \001(\0132#.ru"
-    "nanywhere.v1.StorageDeleteResultH\000B\010\n\006re"
-    "sult\"|\n\tAuthEvent\022+\n\004kind\030\001 \001(\0162\035.runany"
-    "where.v1.AuthEventKind\022\020\n\010provider\030\002 \001(\t"
-    "\022\022\n\nsubject_id\030\003 \001(\t\022\r\n\005scope\030\004 \001(\t\022\r\n\005e"
-    "rror\030\005 \001(\t\"\274\002\n\013DeviceEvent\022-\n\004kind\030\001 \001(\016"
-    "2\037.runanywhere.v1.DeviceEventKind\022\021\n\tdev"
-    "ice_id\030\002 \001(\t\022\017\n\007os_name\030\003 \001(\t\022\022\n\nos_vers"
-    "ion\030\004 \001(\t\022\r\n\005model\030\005 \001(\t\022\r\n\005error\030\006 \001(\t\022"
-    "\020\n\010property\030\007 \001(\t\022\021\n\tnew_value\030\010 \001(\t\022\021\n\t"
-    "old_value\030\t \001(\t\022\025\n\rbattery_level\030\n \001(\002\022\023"
-    "\n\013is_charging\030\013 \001(\010\022\025\n\rthermal_state\030\014 \001"
-    "(\t\022\024\n\014is_connected\030\r \001(\010\022\027\n\017connection_t"
-    "ype\030\016 \001(\t\"\226\001\n\014NetworkEvent\022.\n\004kind\030\001 \001(\016"
-    "2 .runanywhere.v1.NetworkEventKind\022\013\n\003ur"
-    "l\030\002 \001(\t\022\023\n\013status_code\030\003 \001(\005\022\021\n\tis_onlin"
-    "e\030\004 \001(\010\022\r\n\005error\030\005 \001(\t\022\022\n\nlatency_ms\030\006 \001"
-    "(\003\"\321\001\n\016FrameworkEvent\0220\n\004kind\030\001 \001(\0162\".ru"
-    "nanywhere.v1.FrameworkEventKind\022\021\n\tframe"
-    "work\030\002 \001(\005\022\024\n\014adapter_name\030\003 \001(\t\022\025\n\radap"
-    "ter_count\030\004 \001(\005\022\027\n\017framework_count\030\005 \001(\005"
-    "\022\023\n\013model_count\030\006 \001(\005\022\020\n\010modality\030\007 \001(\t\022"
-    "\r\n\005error\030\010 \001(\t\"\271\002\n\024HardwareRoutingEvent\022"
-    "6\n\004kind\030\001 \001(\0162(.runanywhere.v1.HardwareR"
-    "outingEventKind\022/\n\tcomponent\030\002 \001(\0162\034.run"
-    "anywhere.v1.SDKComponent\0225\n\tframework\030\003 "
-    "\001(\0162\".runanywhere.v1.InferenceFramework\022"
-    "\022\n\ncapability\030\004 \001(\t\022\r\n\005route\030\005 \001(\t\022\016\n\006re"
-    "ason\030\006 \001(\t\022\r\n\005error\030\007 \001(\t\022\?\n\020hardware_pr"
-    "ofile\030\024 \001(\0132%.runanywhere.v1.HardwarePro"
-    "fileResult\"\267\001\n\020PerformanceEvent\0222\n\004kind\030"
-    "\001 \001(\0162$.runanywhere.v1.PerformanceEventK"
-    "ind\022\024\n\014memory_bytes\030\002 \001(\003\022\025\n\rthermal_sta"
-    "te\030\003 \001(\t\022\021\n\toperation\030\004 \001(\t\022\024\n\014milliseco"
-    "nds\030\005 \001(\003\022\031\n\021tokens_per_second\030\006 \001(\001\"\344\001\n"
-    "\016TelemetryEvent\0220\n\004kind\030\001 \001(\0162\".runanywh"
-    "ere.v1.TelemetryEventKind\022\014\n\004name\030\002 \001(\t\022"
-    "B\n\nattributes\030\003 \003(\0132..runanywhere.v1.Tel"
-    "emetryEvent.AttributesEntry\022\r\n\005value\030\004 \001"
-    "(\001\022\014\n\004unit\030\005 \001(\t\0321\n\017AttributesEntry\022\013\n\003k"
-    "ey\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\267\001\n\021Cancella"
-    "tionEvent\0223\n\004kind\030\001 \001(\0162%.runanywhere.v1"
-    ".CancellationEventKind\022/\n\tcomponent\030\002 \001("
-    "\0162\034.runanywhere.v1.SDKComponent\022\024\n\014opera"
-    "tion_id\030\003 \001(\t\022\016\n\006reason\030\004 \001(\t\022\026\n\016user_in"
-    "itiated\030\005 \001(\010\"\220\001\n\014FailureEvent\022/\n\tcompon"
-    "ent\030\001 \001(\0162\034.runanywhere.v1.SDKComponent\022"
-    "\021\n\toperation\030\002 \001(\t\022\'\n\005error\030\003 \001(\0132\030.runa"
-    "nywhere.v1.SDKError\022\023\n\013recoverable\030\004 \001(\010"
-    "\"\233\016\n\010SDKEvent\022\024\n\014timestamp_ms\030\001 \001(\003\022/\n\010s"
-    "everity\030\002 \001(\0162\035.runanywhere.v1.ErrorSeve"
-    "rity\022/\n\010category\030\024 \001(\0162\035.runanywhere.v1."
-    "EventCategory\022/\n\tcomponent\030\025 \001(\0162\034.runan"
-    "ywhere.v1.SDKComponent\022,\n\005error\030\026 \001(\0132\030."
-    "runanywhere.v1.SDKErrorH\001\210\001\001\022\n\n\002id\030\r \001(\t"
-    "\022\022\n\nsession_id\030\016 \001(\t\0225\n\013destination\030\017 \001("
-    "\0162 .runanywhere.v1.EventDestination\022<\n\np"
-    "roperties\030\020 \003(\0132(.runanywhere.v1.SDKEven"
-    "t.PropertiesEntry\022\024\n\014operation_id\030! \001(\t\022"
-    "\026\n\016correlation_id\030\" \001(\t\022\016\n\006source\030# \001(\t\022"
-    "\020\n\010trace_id\030$ \001(\t\022=\n\016initialization\030\003 \001("
-    "\0132#.runanywhere.v1.InitializationEventH\000"
-    "\022;\n\rconfiguration\030\004 \001(\0132\".runanywhere.v1"
-    ".ConfigurationEventH\000\0225\n\ngeneration\030\005 \001("
-    "\0132\037.runanywhere.v1.GenerationEventH\000\022+\n\005"
-    "model\030\006 \001(\0132\032.runanywhere.v1.ModelEventH"
-    "\000\0227\n\013performance\030\007 \001(\0132 .runanywhere.v1."
-    "PerformanceEventH\000\022/\n\007network\030\010 \001(\0132\034.ru"
-    "nanywhere.v1.NetworkEventH\000\022/\n\007storage\030\t"
-    " \001(\0132\034.runanywhere.v1.StorageEventH\000\0223\n\t"
-    "framework\030\n \001(\0132\036.runanywhere.v1.Framewo"
-    "rkEventH\000\022-\n\006device\030\013 \001(\0132\033.runanywhere."
-    "v1.DeviceEventH\000\022F\n\016component_init\030\014 \001(\013"
-    "2,.runanywhere.v1.ComponentInitializatio"
-    "nEventH\000\0224\n\005voice\030\021 \001(\0132#.runanywhere.v1"
-    ".VoiceLifecycleEventH\000\0224\n\016voice_pipeline"
-    "\030\022 \001(\0132\032.runanywhere.v1.VoiceEventH\000\022F\n\023"
-    "component_lifecycle\030\023 \001(\0132\'.runanywhere."
-    "v1.ComponentLifecycleEventH\000\022/\n\007session\030"
-    "\027 \001(\0132\034.runanywhere.v1.SessionEventH\000\022)\n"
-    "\004auth\030\030 \001(\0132\031.runanywhere.v1.AuthEventH\000"
-    "\022<\n\016model_registry\030\031 \001(\0132\".runanywhere.v"
-    "1.ModelRegistryEventH\000\0221\n\010download\030\032 \001(\013"
-    "2\035.runanywhere.v1.DownloadEventH\000\022B\n\021sto"
-    "rage_lifecycle\030\033 \001(\0132%.runanywhere.v1.St"
-    "orageLifecycleEventH\000\022@\n\020hardware_routin"
-    "g\030\034 \001(\0132$.runanywhere.v1.HardwareRouting"
-    "EventH\000\022>\n\ncapability\030\035 \001(\0132(.runanywher"
-    "e.v1.CapabilityOperationEventH\000\0223\n\ttelem"
-    "etry\030\036 \001(\0132\036.runanywhere.v1.TelemetryEve"
-    "ntH\000\0229\n\014cancellation\030\037 \001(\0132!.runanywhere"
-    ".v1.CancellationEventH\000\022/\n\007failure\030  \001(\013"
-    "2\034.runanywhere.v1.FailureEventH\000\0321\n\017Prop"
-    "ertiesEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:"
-    "\0028\001B\007\n\005eventB\010\n\006_error*\227\003\n\014SDKComponent\022"
-    "\035\n\031SDK_COMPONENT_UNSPECIFIED\020\000\022\025\n\021SDK_CO"
-    "MPONENT_STT\020\001\022\025\n\021SDK_COMPONENT_TTS\020\002\022\025\n\021"
-    "SDK_COMPONENT_VAD\020\003\022\025\n\021SDK_COMPONENT_LLM"
-    "\020\004\022\025\n\021SDK_COMPONENT_VLM\020\005\022\033\n\027SDK_COMPONE"
-    "NT_DIFFUSION\020\006\022\025\n\021SDK_COMPONENT_RAG\020\007\022\034\n"
-    "\030SDK_COMPONENT_EMBEDDINGS\020\010\022\035\n\031SDK_COMPO"
-    "NENT_VOICE_AGENT\020\t\022\032\n\026SDK_COMPONENT_WAKE"
-    "WORD\020\n\022%\n!SDK_COMPONENT_SPEAKER_DIARIZAT"
-    "ION\020\013\022\'\n#SDK_COMPONENT_SEMANTIC_SEGMENTA"
-    "TION\020\014\022\030\n\024SDK_COMPONENT_RERANK\020\r*\252\001\n\020Eve"
-    "ntDestination\022!\n\035EVENT_DESTINATION_UNSPE"
-    "CIFIED\020\000\022\034\n\030EVENT_DESTINATION_PUBLIC\020\001\022\037"
-    "\n\033EVENT_DESTINATION_TELEMETRY\020\002\022\031\n\025EVENT"
-    "_DESTINATION_ALL\020\003\022\031\n\025EVENT_DESTINATION_"
-    "LOG\020\004*\244\002\n\023InitializationStage\022$\n INITIAL"
-    "IZATION_STAGE_UNSPECIFIED\020\000\022 \n\034INITIALIZ"
-    "ATION_STAGE_STARTED\020\001\022-\n)INITIALIZATION_"
-    "STAGE_CONFIGURATION_LOADED\020\002\022.\n*INITIALI"
-    "ZATION_STAGE_SERVICES_BOOTSTRAPPED\020\003\022\"\n\036"
-    "INITIALIZATION_STAGE_COMPLETED\020\004\022\037\n\033INIT"
-    "IALIZATION_STAGE_FAILED\020\005\022!\n\035INITIALIZAT"
-    "ION_STAGE_SHUTDOWN\020\006*\223\007\n\026ConfigurationEv"
-    "entKind\022(\n$CONFIGURATION_EVENT_KIND_UNSP"
-    "ECIFIED\020\000\022*\n&CONFIGURATION_EVENT_KIND_FE"
-    "TCH_STARTED\020\001\022,\n(CONFIGURATION_EVENT_KIN"
-    "D_FETCH_COMPLETED\020\002\022)\n%CONFIGURATION_EVE"
-    "NT_KIND_FETCH_FAILED\020\003\022#\n\037CONFIGURATION_"
-    "EVENT_KIND_LOADED\020\004\022$\n CONFIGURATION_EVE"
-    "NT_KIND_UPDATED\020\005\022)\n%CONFIGURATION_EVENT"
-    "_KIND_SYNC_STARTED\020\006\022+\n\'CONFIGURATION_EV"
-    "ENT_KIND_SYNC_COMPLETED\020\007\022(\n$CONFIGURATI"
-    "ON_EVENT_KIND_SYNC_FAILED\020\010\022+\n\'CONFIGURA"
-    "TION_EVENT_KIND_SYNC_REQUESTED\020\t\022/\n+CONF"
-    "IGURATION_EVENT_KIND_SETTINGS_REQUESTED\020"
-    "\n\022/\n+CONFIGURATION_EVENT_KIND_SETTINGS_R"
-    "ETRIEVED\020\013\0225\n1CONFIGURATION_EVENT_KIND_R"
-    "OUTING_POLICY_REQUESTED\020\014\0225\n1CONFIGURATI"
-    "ON_EVENT_KIND_ROUTING_POLICY_RETRIEVED\020\r"
-    "\0223\n/CONFIGURATION_EVENT_KIND_PRIVACY_MOD"
-    "E_REQUESTED\020\016\0223\n/CONFIGURATION_EVENT_KIN"
-    "D_PRIVACY_MODE_RETRIEVED\020\017\0227\n3CONFIGURAT"
-    "ION_EVENT_KIND_ANALYTICS_STATUS_REQUESTE"
-    "D\020\020\0227\n3CONFIGURATION_EVENT_KIND_ANALYTIC"
-    "S_STATUS_RETRIEVED\020\021\022$\n CONFIGURATION_EV"
-    "ENT_KIND_CHANGED\020\022*\372\006\n ComponentInitiali"
-    "zationEventKind\022)\n%COMPONENT_INIT_EVENT_"
-    "KIND_UNSPECIFIED\020\000\0224\n0COMPONENT_INIT_EVE"
-    "NT_KIND_INITIALIZATION_STARTED\020\001\0226\n2COMP"
-    "ONENT_INIT_EVENT_KIND_INITIALIZATION_COM"
-    "PLETED\020\002\0225\n1COMPONENT_INIT_EVENT_KIND_CO"
-    "MPONENT_STATE_CHANGED\020\003\0220\n,COMPONENT_INI"
-    "T_EVENT_KIND_COMPONENT_CHECKING\020\004\0229\n5COM"
-    "PONENT_INIT_EVENT_KIND_COMPONENT_DOWNLOA"
-    "D_REQUIRED\020\005\0228\n4COMPONENT_INIT_EVENT_KIN"
-    "D_COMPONENT_DOWNLOAD_STARTED\020\006\0229\n5COMPON"
-    "ENT_INIT_EVENT_KIND_COMPONENT_DOWNLOAD_P"
-    "ROGRESS\020\007\022:\n6COMPONENT_INIT_EVENT_KIND_C"
-    "OMPONENT_DOWNLOAD_COMPLETED\020\010\0224\n0COMPONE"
-    "NT_INIT_EVENT_KIND_COMPONENT_INITIALIZIN"
-    "G\020\t\022-\n)COMPONENT_INIT_EVENT_KIND_COMPONE"
-    "NT_READY\020\n\022.\n*COMPONENT_INIT_EVENT_KIND_"
-    "COMPONENT_FAILED\020\013\0223\n/COMPONENT_INIT_EVE"
-    "NT_KIND_PARALLEL_INIT_STARTED\020\014\0225\n1COMPO"
-    "NENT_INIT_EVENT_KIND_SEQUENTIAL_INIT_STA"
-    "RTED\020\r\0222\n.COMPONENT_INIT_EVENT_KIND_ALL_"
-    "COMPONENTS_READY\020\016\0223\n/COMPONENT_INIT_EVE"
-    "NT_KIND_SOME_COMPONENTS_READY\020\017*\222\002\n\020Sess"
-    "ionEventKind\022\"\n\036SESSION_EVENT_KIND_UNSPE"
-    "CIFIED\020\000\022\036\n\032SESSION_EVENT_KIND_CREATED\020\001"
-    "\022\036\n\032SESSION_EVENT_KIND_STARTED\020\002\022\036\n\032SESS"
-    "ION_EVENT_KIND_RESUMED\020\003\022\035\n\031SESSION_EVEN"
-    "T_KIND_PAUSED\020\004\022\034\n\030SESSION_EVENT_KIND_EN"
-    "DED\020\005\022\036\n\032SESSION_EVENT_KIND_EXPIRED\020\006\022\035\n"
-    "\031SESSION_EVENT_KIND_FAILED\020\007*\324\010\n\023Generat"
-    "ionEventKind\022%\n!GENERATION_EVENT_KIND_UN"
-    "SPECIFIED\020\000\022)\n%GENERATION_EVENT_KIND_SES"
-    "SION_STARTED\020\001\022\'\n#GENERATION_EVENT_KIND_"
-    "SESSION_ENDED\020\002\022!\n\035GENERATION_EVENT_KIND"
-    "_STARTED\020\003\022/\n+GENERATION_EVENT_KIND_FIRS"
-    "T_TOKEN_GENERATED\020\004\022)\n%GENERATION_EVENT_"
-    "KIND_TOKEN_GENERATED\020\005\022*\n&GENERATION_EVE"
-    "NT_KIND_STREAMING_UPDATE\020\006\022#\n\037GENERATION"
-    "_EVENT_KIND_COMPLETED\020\007\022 \n\034GENERATION_EV"
-    "ENT_KIND_FAILED\020\010\022&\n\"GENERATION_EVENT_KI"
-    "ND_MODEL_LOADED\020\t\022(\n$GENERATION_EVENT_KI"
-    "ND_MODEL_UNLOADED\020\n\022)\n%GENERATION_EVENT_"
-    "KIND_COST_CALCULATED\020\013\022*\n&GENERATION_EVE"
-    "NT_KIND_ROUTING_DECISION\020\014\022*\n&GENERATION"
-    "_EVENT_KIND_STREAM_COMPLETED\020\r\022*\n&GENERA"
-    "TION_EVENT_KIND_CANCEL_REQUESTED\020\016\022#\n\037GE"
-    "NERATION_EVENT_KIND_CANCELLED\020\017\022+\n\'GENER"
-    "ATION_EVENT_KIND_TOOL_CALL_STARTED\020\020\022-\n)"
-    "GENERATION_EVENT_KIND_TOOL_CALL_COMPLETE"
-    "D\020\021\022*\n&GENERATION_EVENT_KIND_TOOL_CALL_F"
-    "AILED\020\022\0223\n/GENERATION_EVENT_KIND_STRUCTU"
-    "RED_OUTPUT_STARTED\020\023\0225\n1GENERATION_EVENT"
-    "_KIND_STRUCTURED_OUTPUT_COMPLETED\020\024\0222\n.G"
-    "ENERATION_EVENT_KIND_STRUCTURED_OUTPUT_F"
-    "AILED\020\025\022*\n&GENERATION_EVENT_KIND_THINKIN"
-    "G_STARTED\020\026\022(\n$GENERATION_EVENT_KIND_THI"
-    "NKING_DELTA\020\027\022,\n(GENERATION_EVENT_KIND_T"
-    "HINKING_COMPLETED\020\030*\332\017\n\016VoiceEventKind\022 "
-    "\n\034VOICE_EVENT_KIND_UNSPECIFIED\020\000\022&\n\"VOIC"
-    "E_EVENT_KIND_LISTENING_STARTED\020\001\022$\n VOIC"
-    "E_EVENT_KIND_LISTENING_ENDED\020\002\022$\n VOICE_"
-    "EVENT_KIND_SPEECH_DETECTED\020\003\022*\n&VOICE_EV"
-    "ENT_KIND_TRANSCRIPTION_STARTED\020\004\022*\n&VOIC"
-    "E_EVENT_KIND_TRANSCRIPTION_PARTIAL\020\005\022(\n$"
-    "VOICE_EVENT_KIND_TRANSCRIPTION_FINAL\020\006\022\'"
-    "\n#VOICE_EVENT_KIND_RESPONSE_GENERATED\020\007\022"
-    "&\n\"VOICE_EVENT_KIND_SYNTHESIS_STARTED\020\010\022"
-    "$\n VOICE_EVENT_KIND_AUDIO_GENERATED\020\t\022(\n"
-    "$VOICE_EVENT_KIND_SYNTHESIS_COMPLETED\020\n\022"
-    "%\n!VOICE_EVENT_KIND_SYNTHESIS_FAILED\020\013\022%"
-    "\n!VOICE_EVENT_KIND_PIPELINE_STARTED\020\014\022\'\n"
-    "#VOICE_EVENT_KIND_PIPELINE_COMPLETED\020\r\022#"
-    "\n\037VOICE_EVENT_KIND_PIPELINE_ERROR\020\016\022 \n\034V"
-    "OICE_EVENT_KIND_VAD_STARTED\020\017\022!\n\035VOICE_E"
-    "VENT_KIND_VAD_DETECTED\020\020\022\036\n\032VOICE_EVENT_"
-    "KIND_VAD_ENDED\020\021\022$\n VOICE_EVENT_KIND_VAD"
-    "_INITIALIZED\020\022\022 \n\034VOICE_EVENT_KIND_VAD_S"
-    "TOPPED\020\023\022#\n\037VOICE_EVENT_KIND_VAD_CLEANED"
-    "_UP\020\024\022#\n\037VOICE_EVENT_KIND_SPEECH_STARTED"
-    "\020\025\022!\n\035VOICE_EVENT_KIND_SPEECH_ENDED\020\026\022#\n"
-    "\037VOICE_EVENT_KIND_STT_PROCESSING\020\027\022\'\n#VO"
-    "ICE_EVENT_KIND_STT_PARTIAL_RESULT\020\030\022\"\n\036V"
-    "OICE_EVENT_KIND_STT_COMPLETED\020\031\022\037\n\033VOICE"
-    "_EVENT_KIND_STT_FAILED\020\032\022#\n\037VOICE_EVENT_"
-    "KIND_LLM_PROCESSING\020\033\022#\n\037VOICE_EVENT_KIN"
-    "D_TTS_PROCESSING\020\034\022&\n\"VOICE_EVENT_KIND_R"
-    "ECORDING_STARTED\020\035\022&\n\"VOICE_EVENT_KIND_R"
-    "ECORDING_STOPPED\020\036\022%\n!VOICE_EVENT_KIND_P"
-    "LAYBACK_STARTED\020\037\022\'\n#VOICE_EVENT_KIND_PL"
-    "AYBACK_COMPLETED\020 \022%\n!VOICE_EVENT_KIND_P"
-    "LAYBACK_STOPPED\020!\022$\n VOICE_EVENT_KIND_PL"
-    "AYBACK_PAUSED\020\"\022%\n!VOICE_EVENT_KIND_PLAY"
-    "BACK_RESUMED\020#\022$\n VOICE_EVENT_KIND_PLAYB"
-    "ACK_FAILED\020$\022*\n&VOICE_EVENT_KIND_VOICE_S"
-    "ESSION_STARTED\020%\022,\n(VOICE_EVENT_KIND_VOI"
-    "CE_SESSION_LISTENING\020&\0221\n-VOICE_EVENT_KI"
-    "ND_VOICE_SESSION_SPEECH_STARTED\020\'\022/\n+VOI"
-    "CE_EVENT_KIND_VOICE_SESSION_SPEECH_ENDED"
-    "\020(\022-\n)VOICE_EVENT_KIND_VOICE_SESSION_PRO"
-    "CESSING\020)\022.\n*VOICE_EVENT_KIND_VOICE_SESS"
-    "ION_TRANSCRIBED\020*\022,\n(VOICE_EVENT_KIND_VO"
-    "ICE_SESSION_RESPONDED\020+\022+\n\'VOICE_EVENT_K"
-    "IND_VOICE_SESSION_SPEAKING\020,\0221\n-VOICE_EV"
-    "ENT_KIND_VOICE_SESSION_TURN_COMPLETED\020-\022"
-    "*\n&VOICE_EVENT_KIND_VOICE_SESSION_STOPPE"
-    "D\020.\022(\n$VOICE_EVENT_KIND_VOICE_SESSION_ER"
-    "ROR\020/\022\037\n\033VOICE_EVENT_KIND_VAD_PAUSED\0200\022 "
-    "\n\034VOICE_EVENT_KIND_VAD_RESUMED\0201*\231\010\n\034Cap"
-    "abilityOperationEventKind\022/\n+CAPABILITY_"
-    "OPERATION_EVENT_KIND_UNSPECIFIED\020\000\022/\n+CA"
-    "PABILITY_OPERATION_EVENT_KIND_VLM_STARTE"
-    "D\020\001\0221\n-CAPABILITY_OPERATION_EVENT_KIND_V"
-    "LM_COMPLETED\020\002\022.\n*CAPABILITY_OPERATION_E"
-    "VENT_KIND_VLM_FAILED\020\003\0225\n1CAPABILITY_OPE"
-    "RATION_EVENT_KIND_DIFFUSION_STARTED\020\004\0226\n"
-    "2CAPABILITY_OPERATION_EVENT_KIND_DIFFUSI"
-    "ON_PROGRESS\020\005\0227\n3CAPABILITY_OPERATION_EV"
-    "ENT_KIND_DIFFUSION_COMPLETED\020\006\0224\n0CAPABI"
-    "LITY_OPERATION_EVENT_KIND_DIFFUSION_FAIL"
-    "ED\020\007\0226\n2CAPABILITY_OPERATION_EVENT_KIND_"
-    "EMBEDDINGS_STARTED\020\010\0228\n4CAPABILITY_OPERA"
-    "TION_EVENT_KIND_EMBEDDINGS_COMPLETED\020\t\0225"
-    "\n1CAPABILITY_OPERATION_EVENT_KIND_EMBEDD"
-    "INGS_FAILED\020\n\0229\n5CAPABILITY_OPERATION_EV"
-    "ENT_KIND_RAG_INGESTION_STARTED\020\013\022;\n7CAPA"
-    "BILITY_OPERATION_EVENT_KIND_RAG_INGESTIO"
-    "N_COMPLETED\020\014\0225\n1CAPABILITY_OPERATION_EV"
-    "ENT_KIND_RAG_QUERY_STARTED\020\r\0227\n3CAPABILI"
-    "TY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLE"
-    "TED\020\016\022.\n*CAPABILITY_OPERATION_EVENT_KIND"
-    "_RAG_FAILED\020\017\0221\n-CAPABILITY_OPERATION_EV"
-    "ENT_KIND_LORA_ATTACHED\020\020\0221\n-CAPABILITY_O"
-    "PERATION_EVENT_KIND_LORA_DETACHED\020\021\022/\n+C"
-    "APABILITY_OPERATION_EVENT_KIND_LORA_FAIL"
-    "ED\020\022*\361\007\n\016ModelEventKind\022 \n\034MODEL_EVENT_K"
-    "IND_UNSPECIFIED\020\000\022!\n\035MODEL_EVENT_KIND_LO"
-    "AD_STARTED\020\001\022\"\n\036MODEL_EVENT_KIND_LOAD_PR"
-    "OGRESS\020\002\022#\n\037MODEL_EVENT_KIND_LOAD_COMPLE"
-    "TED\020\003\022 \n\034MODEL_EVENT_KIND_LOAD_FAILED\020\004\022"
-    "#\n\037MODEL_EVENT_KIND_UNLOAD_STARTED\020\005\022%\n!"
-    "MODEL_EVENT_KIND_UNLOAD_COMPLETED\020\006\022\"\n\036M"
-    "ODEL_EVENT_KIND_UNLOAD_FAILED\020\007\022%\n!MODEL"
-    "_EVENT_KIND_DOWNLOAD_STARTED\020\010\022&\n\"MODEL_"
-    "EVENT_KIND_DOWNLOAD_PROGRESS\020\t\022\'\n#MODEL_"
-    "EVENT_KIND_DOWNLOAD_COMPLETED\020\n\022$\n MODEL"
-    "_EVENT_KIND_DOWNLOAD_FAILED\020\013\022\'\n#MODEL_E"
-    "VENT_KIND_DOWNLOAD_CANCELLED\020\014\022#\n\037MODEL_"
-    "EVENT_KIND_LIST_REQUESTED\020\r\022#\n\037MODEL_EVE"
-    "NT_KIND_LIST_COMPLETED\020\016\022 \n\034MODEL_EVENT_"
-    "KIND_LIST_FAILED\020\017\022#\n\037MODEL_EVENT_KIND_C"
-    "ATALOG_LOADED\020\020\022#\n\037MODEL_EVENT_KIND_DELE"
-    "TE_STARTED\020\021\022%\n!MODEL_EVENT_KIND_DELETE_"
-    "COMPLETED\020\022\022\"\n\036MODEL_EVENT_KIND_DELETE_F"
-    "AILED\020\023\022\'\n#MODEL_EVENT_KIND_CUSTOM_MODEL"
-    "_ADDED\020\024\022(\n$MODEL_EVENT_KIND_BUILT_IN_RE"
-    "GISTERED\020\025\022\'\n#MODEL_EVENT_KIND_EXTRACTIO"
-    "N_STARTED\020\026\022(\n$MODEL_EVENT_KIND_EXTRACTI"
-    "ON_PROGRESS\020\027\022)\n%MODEL_EVENT_KIND_EXTRAC"
-    "TION_COMPLETED\020\030\022&\n\"MODEL_EVENT_KIND_EXT"
-    "RACTION_FAILED\020\031*\303\007\n\026ModelRegistryEventK"
-    "ind\022)\n%MODEL_REGISTRY_EVENT_KIND_UNSPECI"
-    "FIED\020\000\022-\n)MODEL_REGISTRY_EVENT_KIND_REFR"
-    "ESH_STARTED\020\001\022/\n+MODEL_REGISTRY_EVENT_KI"
-    "ND_REFRESH_COMPLETED\020\002\022,\n(MODEL_REGISTRY"
-    "_EVENT_KIND_REFRESH_FAILED\020\003\0220\n,MODEL_RE"
-    "GISTRY_EVENT_KIND_ASSIGNMENT_STARTED\020\004\0222"
-    "\n.MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_C"
-    "OMPLETED\020\005\022/\n+MODEL_REGISTRY_EVENT_KIND_"
-    "ASSIGNMENT_FAILED\020\006\022,\n(MODEL_REGISTRY_EV"
-    "ENT_KIND_IMPORT_STARTED\020\007\022.\n*MODEL_REGIS"
-    "TRY_EVENT_KIND_IMPORT_COMPLETED\020\010\022+\n\'MOD"
-    "EL_REGISTRY_EVENT_KIND_IMPORT_FAILED\020\t\022/"
-    "\n+MODEL_REGISTRY_EVENT_KIND_DISCOVERY_ST"
-    "ARTED\020\n\0221\n-MODEL_REGISTRY_EVENT_KIND_DIS"
-    "COVERY_COMPLETED\020\013\022.\n*MODEL_REGISTRY_EVE"
-    "NT_KIND_DISCOVERY_FAILED\020\014\0223\n/MODEL_REGI"
-    "STRY_EVENT_KIND_CURRENT_MODEL_CHANGED\020\r\022"
-    "*\n&MODEL_REGISTRY_EVENT_KIND_LIST_STARTE"
-    "D\020\016\022,\n(MODEL_REGISTRY_EVENT_KIND_LIST_CO"
-    "MPLETED\020\017\022)\n%MODEL_REGISTRY_EVENT_KIND_L"
-    "IST_FAILED\020\020\022)\n%MODEL_REGISTRY_EVENT_KIN"
-    "D_GET_STARTED\020\021\022+\n\'MODEL_REGISTRY_EVENT_"
-    "KIND_GET_COMPLETED\020\022\022(\n$MODEL_REGISTRY_E"
-    "VENT_KIND_GET_FAILED\020\023*\230\004\n\021DownloadEvent"
-    "Kind\022#\n\037DOWNLOAD_EVENT_KIND_UNSPECIFIED\020"
-    "\000\022$\n DOWNLOAD_EVENT_KIND_PLAN_STARTED\020\001\022"
-    "&\n\"DOWNLOAD_EVENT_KIND_PLAN_COMPLETED\020\002\022"
-    "#\n\037DOWNLOAD_EVENT_KIND_PLAN_FAILED\020\003\022\037\n\033"
-    "DOWNLOAD_EVENT_KIND_STARTED\020\004\022 \n\034DOWNLOA"
-    "D_EVENT_KIND_PROGRESS\020\005\022(\n$DOWNLOAD_EVEN"
-    "T_KIND_CANCEL_REQUESTED\020\006\022!\n\035DOWNLOAD_EV"
-    "ENT_KIND_CANCELLED\020\007\022(\n$DOWNLOAD_EVENT_K"
-    "IND_RESUME_REQUESTED\020\010\022\037\n\033DOWNLOAD_EVENT"
-    "_KIND_RESUMED\020\t\022!\n\035DOWNLOAD_EVENT_KIND_C"
-    "OMPLETED\020\n\022\036\n\032DOWNLOAD_EVENT_KIND_FAILED"
-    "\020\013\022\036\n\032DOWNLOAD_EVENT_KIND_PAUSED\020\014\022-\n)DO"
-    "WNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED\020"
-    "\r*\355\005\n\020StorageEventKind\022\"\n\036STORAGE_EVENT_"
-    "KIND_UNSPECIFIED\020\000\022%\n!STORAGE_EVENT_KIND"
-    "_INFO_REQUESTED\020\001\022%\n!STORAGE_EVENT_KIND_"
-    "INFO_RETRIEVED\020\002\022\'\n#STORAGE_EVENT_KIND_M"
-    "ODELS_REQUESTED\020\003\022\'\n#STORAGE_EVENT_KIND_"
-    "MODELS_RETRIEVED\020\004\022*\n&STORAGE_EVENT_KIND"
-    "_CLEAR_CACHE_STARTED\020\005\022,\n(STORAGE_EVENT_"
-    "KIND_CLEAR_CACHE_COMPLETED\020\006\022)\n%STORAGE_"
-    "EVENT_KIND_CLEAR_CACHE_FAILED\020\007\022)\n%STORA"
-    "GE_EVENT_KIND_CLEAN_TEMP_STARTED\020\010\022+\n\'ST"
-    "ORAGE_EVENT_KIND_CLEAN_TEMP_COMPLETED\020\t\022"
-    "(\n$STORAGE_EVENT_KIND_CLEAN_TEMP_FAILED\020"
-    "\n\022+\n\'STORAGE_EVENT_KIND_DELETE_MODEL_STA"
-    "RTED\020\013\022-\n)STORAGE_EVENT_KIND_DELETE_MODE"
-    "L_COMPLETED\020\014\022*\n&STORAGE_EVENT_KIND_DELE"
-    "TE_MODEL_FAILED\020\r\022 \n\034STORAGE_EVENT_KIND_"
-    "CACHE_HIT\020\016\022!\n\035STORAGE_EVENT_KIND_CACHE_"
-    "MISS\020\017\022\037\n\033STORAGE_EVENT_KIND_EVICTION\020\020\022"
-    " \n\034STORAGE_EVENT_KIND_DISK_FULL\020\021*\371\005\n\031St"
-    "orageLifecycleEventKind\022,\n(STORAGE_LIFEC"
-    "YCLE_EVENT_KIND_UNSPECIFIED\020\000\022-\n)STORAGE"
-    "_LIFECYCLE_EVENT_KIND_INFO_STARTED\020\001\022/\n+"
-    "STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLE"
-    "TED\020\002\0225\n1STORAGE_LIFECYCLE_EVENT_KIND_AV"
-    "AILABILITY_CHECKED\020\003\0224\n0STORAGE_LIFECYCL"
-    "E_EVENT_KIND_DELETE_PLAN_CREATED\020\004\022/\n+ST"
-    "ORAGE_LIFECYCLE_EVENT_KIND_DELETE_STARTE"
-    "D\020\005\0221\n-STORAGE_LIFECYCLE_EVENT_KIND_DELE"
-    "TE_COMPLETED\020\006\022.\n*STORAGE_LIFECYCLE_EVEN"
-    "T_KIND_DELETE_FAILED\020\007\0226\n2STORAGE_LIFECY"
-    "CLE_EVENT_KIND_CACHE_CLEANUP_STARTED\020\010\0228"
-    "\n4STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLE"
-    "ANUP_COMPLETED\020\t\0225\n1STORAGE_LIFECYCLE_EV"
-    "ENT_KIND_CACHE_CLEANUP_FAILED\020\n\0224\n0STORA"
-    "GE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAI"
-    "LED\020\013\0223\n/STORAGE_LIFECYCLE_EVENT_KIND_DE"
-    "LETE_PLAN_FAILED\020\014\0229\n5STORAGE_LIFECYCLE_"
-    "EVENT_KIND_DELETE_DRY_RUN_COMPLETED\020\r*\251\002"
-    "\n\rAuthEventKind\022\037\n\033AUTH_EVENT_KIND_UNSPE"
-    "CIFIED\020\000\022\035\n\031AUTH_EVENT_KIND_REQUESTED\020\001\022"
-    "\035\n\031AUTH_EVENT_KIND_SUCCEEDED\020\002\022\032\n\026AUTH_E"
-    "VENT_KIND_FAILED\020\003\022#\n\037AUTH_EVENT_KIND_TO"
-    "KEN_REFRESHED\020\004\022!\n\035AUTH_EVENT_KIND_TOKEN"
-    "_EXPIRED\020\005\022%\n!AUTH_EVENT_KIND_DEVICE_REG"
-    "ISTERED\020\006\022.\n*AUTH_EVENT_KIND_DEVICE_REGI"
-    "STRATION_FAILED\020\007*\325\004\n\017DeviceEventKind\022!\n"
-    "\035DEVICE_EVENT_KIND_UNSPECIFIED\020\000\022+\n\'DEVI"
-    "CE_EVENT_KIND_DEVICE_INFO_COLLECTED\020\001\0223\n"
-    "/DEVICE_EVENT_KIND_DEVICE_INFO_COLLECTIO"
-    "N_FAILED\020\002\022+\n\'DEVICE_EVENT_KIND_DEVICE_I"
-    "NFO_REFRESHED\020\003\022.\n*DEVICE_EVENT_KIND_DEV"
-    "ICE_INFO_SYNC_STARTED\020\004\0220\n,DEVICE_EVENT_"
-    "KIND_DEVICE_INFO_SYNC_COMPLETED\020\005\022-\n)DEV"
-    "ICE_EVENT_KIND_DEVICE_INFO_SYNC_FAILED\020\006"
-    "\022*\n&DEVICE_EVENT_KIND_DEVICE_STATE_CHANG"
-    "ED\020\007\022%\n!DEVICE_EVENT_KIND_BATTERY_CHANGE"
-    "D\020\010\022%\n!DEVICE_EVENT_KIND_THERMAL_CHANGED"
-    "\020\t\022*\n&DEVICE_EVENT_KIND_CONNECTIVITY_CHA"
-    "NGED\020\n\022\'\n#DEVICE_EVENT_KIND_DEVICE_REGIS"
-    "TERED\020\013\0220\n,DEVICE_EVENT_KIND_DEVICE_REGI"
-    "STRATION_FAILED\020\014*\204\002\n\020NetworkEventKind\022\""
-    "\n\036NETWORK_EVENT_KIND_UNSPECIFIED\020\000\022&\n\"NE"
-    "TWORK_EVENT_KIND_REQUEST_STARTED\020\001\022(\n$NE"
-    "TWORK_EVENT_KIND_REQUEST_COMPLETED\020\002\022%\n!"
-    "NETWORK_EVENT_KIND_REQUEST_FAILED\020\003\022&\n\"N"
-    "ETWORK_EVENT_KIND_REQUEST_TIMEOUT\020\004\022+\n\'N"
-    "ETWORK_EVENT_KIND_CONNECTIVITY_CHANGED\020\005"
-    "*\272\005\n\022FrameworkEventKind\022$\n FRAMEWORK_EVE"
-    "NT_KIND_UNSPECIFIED\020\000\022+\n\'FRAMEWORK_EVENT"
-    "_KIND_ADAPTER_REGISTERED\020\001\022-\n)FRAMEWORK_"
-    "EVENT_KIND_ADAPTER_UNREGISTERED\020\002\022+\n\'FRA"
-    "MEWORK_EVENT_KIND_ADAPTERS_REQUESTED\020\003\022+"
-    "\n\'FRAMEWORK_EVENT_KIND_ADAPTERS_RETRIEVE"
-    "D\020\004\022-\n)FRAMEWORK_EVENT_KIND_FRAMEWORKS_R"
-    "EQUESTED\020\005\022-\n)FRAMEWORK_EVENT_KIND_FRAME"
-    "WORKS_RETRIEVED\020\006\022/\n+FRAMEWORK_EVENT_KIN"
-    "D_AVAILABILITY_REQUESTED\020\007\022/\n+FRAMEWORK_"
-    "EVENT_KIND_AVAILABILITY_RETRIEVED\020\010\0227\n3F"
-    "RAMEWORK_EVENT_KIND_MODELS_FOR_FRAMEWORK"
-    "_REQUESTED\020\t\0227\n3FRAMEWORK_EVENT_KIND_MOD"
-    "ELS_FOR_FRAMEWORK_RETRIEVED\020\n\022:\n6FRAMEWO"
-    "RK_EVENT_KIND_FRAMEWORKS_FOR_MODALITY_RE"
-    "QUESTED\020\013\022:\n6FRAMEWORK_EVENT_KIND_FRAMEW"
-    "ORKS_FOR_MODALITY_RETRIEVED\020\014\022\036\n\032FRAMEWO"
-    "RK_EVENT_KIND_ERROR\020\r*\267\003\n\030HardwareRoutin"
-    "gEventKind\022+\n\'HARDWARE_ROUTING_EVENT_KIN"
-    "D_UNSPECIFIED\020\000\022/\n+HARDWARE_ROUTING_EVEN"
-    "T_KIND_PROFILE_STARTED\020\001\0221\n-HARDWARE_ROU"
-    "TING_EVENT_KIND_PROFILE_COMPLETED\020\002\022.\n*H"
-    "ARDWARE_ROUTING_EVENT_KIND_PROFILE_FAILE"
-    "D\020\003\022.\n*HARDWARE_ROUTING_EVENT_KIND_ROUTE"
-    "_SELECTED\020\004\022-\n)HARDWARE_ROUTING_EVENT_KI"
-    "ND_ROUTE_CHANGED\020\005\022=\n9HARDWARE_ROUTING_E"
-    "VENT_KIND_FRAMEWORK_CAPABILITY_DETECTED\020"
-    "\006\022<\n8HARDWARE_ROUTING_EVENT_KIND_FRAMEWO"
-    "RK_CAPABILITY_MISSING\020\007*\370\001\n\024PerformanceE"
-    "ventKind\022&\n\"PERFORMANCE_EVENT_KIND_UNSPE"
-    "CIFIED\020\000\022)\n%PERFORMANCE_EVENT_KIND_MEMOR"
-    "Y_WARNING\020\001\0220\n,PERFORMANCE_EVENT_KIND_TH"
-    "ERMAL_STATE_CHANGED\020\002\022+\n\'PERFORMANCE_EVE"
-    "NT_KIND_LATENCY_MEASURED\020\003\022.\n*PERFORMANC"
-    "E_EVENT_KIND_THROUGHPUT_MEASURED\020\004*\300\001\n\022T"
-    "elemetryEventKind\022$\n TELEMETRY_EVENT_KIN"
-    "D_UNSPECIFIED\020\000\022 \n\034TELEMETRY_EVENT_KIND_"
-    "COUNTER\020\001\022\036\n\032TELEMETRY_EVENT_KIND_GAUGE\020"
-    "\002\022\"\n\036TELEMETRY_EVENT_KIND_HISTOGRAM\020\003\022\036\n"
-    "\032TELEMETRY_EVENT_KIND_TRACE\020\004*\334\001\n\025Cancel"
-    "lationEventKind\022\'\n#CANCELLATION_EVENT_KI"
-    "ND_UNSPECIFIED\020\000\022%\n!CANCELLATION_EVENT_K"
-    "IND_REQUESTED\020\001\022(\n$CANCELLATION_EVENT_KI"
-    "ND_ACKNOWLEDGED\020\002\022%\n!CANCELLATION_EVENT_"
-    "KIND_COMPLETED\020\003\022\"\n\036CANCELLATION_EVENT_K"
-    "IND_FAILED\020\004B\211\001\n\027ai.runanywhere.proto.v1"
-    "B\016SdkEventsProtoP\001Z<github.com/runanywhe"
-    "re/runanywhere-sdks/idl/v1;runanywherev1"
-    "\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "\022\020\n\010progress\030\005 \001(\002\022\021\n\told_state\030\007 \001(\t\022\021\n"
+    "\tnew_state\030\010 \001(\t\0220\n\ncomponents\030\t \003(\0162\034.r"
+    "unanywhere.v1.SDKComponent\0226\n\020ready_comp"
+    "onents\030\n \003(\0162\034.runanywhere.v1.SDKCompone"
+    "nt\0228\n\022pending_components\030\013 \003(\0162\034.runanyw"
+    "here.v1.SDKComponent\022\023\n\013ready_count\030\r \001("
+    "\005\022\024\n\014failed_count\030\016 \001(\005\022I\n\030previous_life"
+    "cycle_state\030\017 \001(\0162\'.runanywhere.v1.Compo"
+    "nentLifecycleState\022H\n\027current_lifecycle_"
+    "state\030\020 \001(\0162\'.runanywhere.v1.ComponentLi"
+    "fecycleState\022,\n\005error\030\021 \001(\0132\030.runanywher"
+    "e.v1.SDKErrorH\000\210\001\001B\010\n\006_error\"\252\003\n\032Compone"
+    "ntLifecycleSnapshot\022/\n\tcomponent\030\001 \001(\0162\034"
+    ".runanywhere.v1.SDKComponent\0226\n\005state\030\002 "
+    "\001(\0162\'.runanywhere.v1.ComponentLifecycleS"
+    "tate\022\020\n\010model_id\030\003 \001(\t\022\025\n\rupdated_at_ms\030"
+    "\004 \001(\003\022/\n\010category\030\006 \001(\0162\035.runanywhere.v1"
+    ".ModelCategory\0225\n\tframework\030\007 \001(\0162\".runa"
+    "nywhere.v1.InferenceFramework\022\025\n\rresolve"
+    "d_path\030\010 \001(\t\022\031\n\021loaded_at_unix_ms\030\t \001(\003\022"
+    "(\n\005model\030\n \001(\0132\031.runanywhere.v1.ModelInf"
+    "o\022,\n\005error\030\013 \001(\0132\030.runanywhere.v1.SDKErr"
+    "orH\000\210\001\001B\010\n\006_error\"\231\001\n ComponentLifecycle"
+    "SnapshotResult\022=\n\tsnapshots\030\002 \003(\0132*.runa"
+    "nywhere.v1.ComponentLifecycleSnapshot\022,\n"
+    "\005error\030\004 \001(\0132\030.runanywhere.v1.SDKErrorH\000"
+    "\210\001\001B\010\n\006_error\"\337\006\n\027ComponentLifecycleEven"
+    "t\022/\n\tcomponent\030\001 \001(\0162\034.runanywhere.v1.SD"
+    "KComponent\022\?\n\016previous_state\030\002 \001(\0162\'.run"
+    "anywhere.v1.ComponentLifecycleState\022>\n\rc"
+    "urrent_state\030\003 \001(\0162\'.runanywhere.v1.Comp"
+    "onentLifecycleState\022\020\n\010model_id\030\004 \001(\t\022\024\n"
+    "\014timestamp_ms\030\005 \001(\003\022<\n\021model_load_result"
+    "\030\n \001(\0132\037.runanywhere.v1.ModelLoadResultH"
+    "\000\022@\n\023model_unload_result\030\013 \001(\0132!.runanyw"
+    "here.v1.ModelUnloadResultH\000\022@\n\023model_del"
+    "ete_result\030\014 \001(\0132!.runanywhere.v1.ModelD"
+    "eleteResultH\000\022=\n\021download_progress\030\r \001(\013"
+    "2 .runanywhere.v1.DownloadProgressH\000\022I\n\024"
+    "storage_availability\030\016 \001(\0132).runanywhere"
+    ".v1.StorageAvailabilityResultH\000\022D\n\025stora"
+    "ge_delete_result\030\017 \001(\0132#.runanywhere.v1."
+    "StorageDeleteResultH\000\022>\n\010snapshot\030\020 \001(\0132"
+    "*.runanywhere.v1.ComponentLifecycleSnaps"
+    "hotH\000\022K\n\017snapshot_result\030\021 \001(\01320.runanyw"
+    "here.v1.ComponentLifecycleSnapshotResult"
+    "H\000\022@\n\023storage_delete_plan\030\022 \001(\0132!.runany"
+    "where.v1.StorageDeletePlanH\000B\t\n\007payload\""
+    "\256\001\n\014SessionEvent\022.\n\004kind\030\001 \001(\0162 .runanyw"
+    "here.v1.SessionEventKind\022\022\n\nsession_id\030\002"
+    " \001(\t\022\017\n\007user_id\030\003 \001(\t\022\016\n\006reason\030\004 \001(\t\022\r\n"
+    "\005error\030\005 \001(\t\022\025\n\rstarted_at_ms\030\006 \001(\003\022\023\n\013e"
+    "nded_at_ms\030\007 \001(\003\"\264\006\n\017GenerationEvent\0221\n\004"
+    "kind\030\001 \001(\0162#.runanywhere.v1.GenerationEv"
+    "entKind\022\022\n\nsession_id\030\002 \001(\t\022\016\n\006prompt\030\003 "
+    "\001(\t\022\r\n\005token\030\004 \001(\t\022\026\n\016streaming_text\030\005 \001"
+    "(\t\022\024\n\014tokens_count\030\006 \001(\005\022\020\n\010response\030\007 \001"
+    "(\t\022\023\n\013tokens_used\030\010 \001(\005\022\022\n\nlatency_ms\030\t "
+    "\001(\003\022\036\n\026first_token_latency_ms\030\n \001(\003\022\r\n\005e"
+    "rror\030\013 \001(\t\022\020\n\010model_id\030\014 \001(\t\022\023\n\013cost_amo"
+    "unt\030\r \001(\001\022\031\n\021cost_saved_amount\030\016 \001(\001\022\026\n\016"
+    "routing_target\030\017 \001(\t\022\026\n\016routing_reason\030\020"
+    " \001(\t\022\025\n\rcancel_reason\030\021 \001(\t\022\024\n\014tool_call"
+    "_id\030\022 \001(\t\022\021\n\ttool_name\030\023 \001(\t\022\031\n\021tool_pay"
+    "load_json\030\024 \001(\t\022\036\n\026structured_schema_jso"
+    "n\030\025 \001(\t\022\036\n\026structured_output_json\030\026 \001(\t\022"
+    "\025\n\rthinking_text\030\027 \001(\t\022\024\n\014input_tokens\030\030"
+    " \001(\005\022\031\n\021tokens_per_second\030\031 \001(\001\022\036\n\026time_"
+    "to_first_token_ms\030\032 \001(\003\022\024\n\014is_streaming\030"
+    "\033 \001(\010\022\023\n\013temperature\030\034 \001(\002\022\022\n\nmax_tokens"
+    "\030\035 \001(\005\022\026\n\016context_length\030\036 \001(\005\022\022\n\nmodel_"
+    "name\030\037 \001(\t\022\023\n\013duration_ms\030  \001(\001\022\021\n\tframe"
+    "work\030! \001(\005\022\033\n\023prompt_eval_time_ms\030\" \001(\003\""
+    "\327\004\n\023VoiceLifecycleEvent\022,\n\004kind\030\001 \001(\0162\036."
+    "runanywhere.v1.VoiceEventKind\022\022\n\nsession"
+    "_id\030\002 \001(\t\022\014\n\004text\030\003 \001(\t\022\022\n\nconfidence\030\004 "
+    "\001(\002\022\025\n\rresponse_text\030\005 \001(\t\022\024\n\014audio_base"
+    "64\030\006 \001(\t\022\023\n\013duration_ms\030\007 \001(\003\022\023\n\013audio_l"
+    "evel\030\010 \001(\002\022\025\n\rtranscription\030\t \001(\t\022\025\n\rtur"
+    "n_response\030\n \001(\t\022\031\n\021turn_audio_base64\030\013 "
+    "\001(\t\022\r\n\005error\030\014 \001(\t\022\020\n\010model_id\030\r \001(\t\022\022\n\n"
+    "model_name\030\016 \001(\t\022\027\n\017audio_length_ms\030\017 \001("
+    "\003\022\030\n\020audio_size_bytes\030\020 \001(\005\022\022\n\nword_coun"
+    "t\030\021 \001(\005\022\020\n\010language\030\023 \001(\t\022\023\n\013sample_rate"
+    "\030\024 \001(\005\022\024\n\014is_streaming\030\025 \001(\010\022\021\n\tframewor"
+    "k\030\026 \001(\005\022\027\n\017character_count\030\027 \001(\005\022\031\n\021audi"
+    "o_duration_ms\030\030 \001(\003\022\034\n\024audio_size_bytes_"
+    "tts\030\031 \001(\005\022\036\n\026processing_duration_ms\030\032 \001("
+    "\003\"\243\002\n\030CapabilityOperationEvent\022:\n\004kind\030\001"
+    " \001(\0162,.runanywhere.v1.CapabilityOperatio"
+    "nEventKind\022/\n\tcomponent\030\002 \001(\0162\034.runanywh"
+    "ere.v1.SDKComponent\022\020\n\010model_id\030\003 \001(\t\022\024\n"
+    "\014operation_id\030\004 \001(\t\022\021\n\toperation\030\005 \001(\t\022\020"
+    "\n\010progress\030\006 \001(\002\022\023\n\013input_count\030\007 \001(\003\022\024\n"
+    "\014output_count\030\010 \001(\003\022\023\n\013result_json\030\t \001(\t"
+    "\022\r\n\005error\030\n \001(\t\"\371\002\n\nModelEvent\022,\n\004kind\030\001"
+    " \001(\0162\036.runanywhere.v1.ModelEventKind\022\020\n\010"
+    "model_id\030\002 \001(\t\022\017\n\007task_id\030\003 \001(\t\022\020\n\010progr"
+    "ess\030\004 \001(\002\022\030\n\020bytes_downloaded\030\005 \001(\003\022\023\n\013t"
+    "otal_bytes\030\006 \001(\003\022\026\n\016download_state\030\007 \001(\t"
+    "\022\022\n\nlocal_path\030\010 \001(\t\022\r\n\005error\030\t \001(\t\022\023\n\013m"
+    "odel_count\030\n \001(\005\022\031\n\021custom_model_name\030\013 "
+    "\001(\t\022\030\n\020custom_model_url\030\014 \001(\t\022\022\n\nmodel_n"
+    "ame\030\r \001(\t\022\030\n\020model_size_bytes\030\016 \001(\003\022\023\n\013d"
+    "uration_ms\030\017 \001(\003\022\021\n\tframework\030\020 \001(\005\"\322\005\n\022"
+    "ModelRegistryEvent\0224\n\004kind\030\001 \001(\0162&.runan"
+    "ywhere.v1.ModelRegistryEventKind\022\020\n\010mode"
+    "l_id\030\002 \001(\t\022\025\n\rassignment_id\030\003 \001(\t\0228\n\022ass"
+    "igned_component\030\004 \001(\0162\034.runanywhere.v1.S"
+    "DKComponent\0225\n\tframework\030\005 \001(\0162\".runanyw"
+    "here.v1.InferenceFramework\022\023\n\013source_pat"
+    "h\030\006 \001(\t\022\r\n\005error\030\007 \001(\t\022D\n\016refresh_result"
+    "\030\024 \001(\0132*.runanywhere.v1.ModelRegistryRef"
+    "reshResultH\000\0226\n\013list_result\030\025 \001(\0132\037.runa"
+    "nywhere.v1.ModelListResultH\000\0224\n\nget_resu"
+    "lt\030\026 \001(\0132\036.runanywhere.v1.ModelGetResult"
+    "H\000\022:\n\rimport_result\030\027 \001(\0132!.runanywhere."
+    "v1.ModelImportResultH\000\022@\n\020discovery_resu"
+    "lt\030\030 \001(\0132$.runanywhere.v1.ModelDiscovery"
+    "ResultH\000\022H\n\024compatibility_result\030\031 \001(\0132("
+    ".runanywhere.v1.ModelCompatibilityResult"
+    "H\000\022B\n\024current_model_result\030\032 \001(\0132\".runan"
+    "ywhere.v1.CurrentModelResultH\000B\010\n\006result"
+    "\"\251\003\n\rDownloadEvent\022/\n\004kind\030\001 \001(\0162!.runan"
+    "ywhere.v1.DownloadEventKind\022\020\n\010model_id\030"
+    "\002 \001(\t\022\017\n\007task_id\030\003 \001(\t\022\r\n\005error\030\004 \001(\t\0229\n"
+    "\013plan_result\030\024 \001(\0132\".runanywhere.v1.Down"
+    "loadPlanResultH\000\022;\n\014start_result\030\025 \001(\0132#"
+    ".runanywhere.v1.DownloadStartResultH\000\0224\n"
+    "\010progress\030\026 \001(\0132 .runanywhere.v1.Downloa"
+    "dProgressH\000\022=\n\rcancel_result\030\027 \001(\0132$.run"
+    "anywhere.v1.DownloadCancelResultH\000\022=\n\rre"
+    "sume_result\030\030 \001(\0132$.runanywhere.v1.Downl"
+    "oadResumeResultH\000B\t\n\007payload\"\374\001\n\014Storage"
+    "Event\022.\n\004kind\030\001 \001(\0162 .runanywhere.v1.Sto"
+    "rageEventKind\022\020\n\010model_id\030\002 \001(\t\022\r\n\005error"
+    "\030\003 \001(\t\022\023\n\013total_bytes\030\004 \001(\003\022\027\n\017available"
+    "_bytes\030\005 \001(\003\022\022\n\nused_bytes\030\006 \001(\003\022\032\n\022stor"
+    "ed_model_count\030\007 \001(\005\022\021\n\tcache_key\030\010 \001(\t\022"
+    "\025\n\revicted_bytes\030\t \001(\003\022\023\n\013freed_bytes\030\n "
+    "\001(\003\"\231\003\n\025StorageLifecycleEvent\0227\n\004kind\030\001 "
+    "\001(\0162).runanywhere.v1.StorageLifecycleEve"
+    "ntKind\022\020\n\010model_id\030\002 \001(\t\022\021\n\tcache_key\030\003 "
+    "\001(\t\022\r\n\005bytes\030\004 \001(\003\022\r\n\005error\030\005 \001(\t\0228\n\013inf"
+    "o_result\030\024 \001(\0132!.runanywhere.v1.StorageI"
+    "nfoResultH\000\022H\n\023availability_result\030\025 \001(\013"
+    "2).runanywhere.v1.StorageAvailabilityRes"
+    "ultH\000\0228\n\013delete_plan\030\026 \001(\0132!.runanywhere"
+    ".v1.StorageDeletePlanH\000\022<\n\rdelete_result"
+    "\030\027 \001(\0132#.runanywhere.v1.StorageDeleteRes"
+    "ultH\000B\010\n\006result\"|\n\tAuthEvent\022+\n\004kind\030\001 \001"
+    "(\0162\035.runanywhere.v1.AuthEventKind\022\020\n\010pro"
+    "vider\030\002 \001(\t\022\022\n\nsubject_id\030\003 \001(\t\022\r\n\005scope"
+    "\030\004 \001(\t\022\r\n\005error\030\005 \001(\t\"\274\002\n\013DeviceEvent\022-\n"
+    "\004kind\030\001 \001(\0162\037.runanywhere.v1.DeviceEvent"
+    "Kind\022\021\n\tdevice_id\030\002 \001(\t\022\017\n\007os_name\030\003 \001(\t"
+    "\022\022\n\nos_version\030\004 \001(\t\022\r\n\005model\030\005 \001(\t\022\r\n\005e"
+    "rror\030\006 \001(\t\022\020\n\010property\030\007 \001(\t\022\021\n\tnew_valu"
+    "e\030\010 \001(\t\022\021\n\told_value\030\t \001(\t\022\025\n\rbattery_le"
+    "vel\030\n \001(\002\022\023\n\013is_charging\030\013 \001(\010\022\025\n\rtherma"
+    "l_state\030\014 \001(\t\022\024\n\014is_connected\030\r \001(\010\022\027\n\017c"
+    "onnection_type\030\016 \001(\t\"\226\001\n\014NetworkEvent\022.\n"
+    "\004kind\030\001 \001(\0162 .runanywhere.v1.NetworkEven"
+    "tKind\022\013\n\003url\030\002 \001(\t\022\023\n\013status_code\030\003 \001(\005\022"
+    "\021\n\tis_online\030\004 \001(\010\022\r\n\005error\030\005 \001(\t\022\022\n\nlat"
+    "ency_ms\030\006 \001(\003\"\321\001\n\016FrameworkEvent\0220\n\004kind"
+    "\030\001 \001(\0162\".runanywhere.v1.FrameworkEventKi"
+    "nd\022\021\n\tframework\030\002 \001(\005\022\024\n\014adapter_name\030\003 "
+    "\001(\t\022\025\n\radapter_count\030\004 \001(\005\022\027\n\017framework_"
+    "count\030\005 \001(\005\022\023\n\013model_count\030\006 \001(\005\022\020\n\010moda"
+    "lity\030\007 \001(\t\022\r\n\005error\030\010 \001(\t\"\271\002\n\024HardwareRo"
+    "utingEvent\0226\n\004kind\030\001 \001(\0162(.runanywhere.v"
+    "1.HardwareRoutingEventKind\022/\n\tcomponent\030"
+    "\002 \001(\0162\034.runanywhere.v1.SDKComponent\0225\n\tf"
+    "ramework\030\003 \001(\0162\".runanywhere.v1.Inferenc"
+    "eFramework\022\022\n\ncapability\030\004 \001(\t\022\r\n\005route\030"
+    "\005 \001(\t\022\016\n\006reason\030\006 \001(\t\022\r\n\005error\030\007 \001(\t\022\?\n\020"
+    "hardware_profile\030\024 \001(\0132%.runanywhere.v1."
+    "HardwareProfileResult\"\267\001\n\020PerformanceEve"
+    "nt\0222\n\004kind\030\001 \001(\0162$.runanywhere.v1.Perfor"
+    "manceEventKind\022\024\n\014memory_bytes\030\002 \001(\003\022\025\n\r"
+    "thermal_state\030\003 \001(\t\022\021\n\toperation\030\004 \001(\t\022\024"
+    "\n\014milliseconds\030\005 \001(\003\022\031\n\021tokens_per_secon"
+    "d\030\006 \001(\001\"\344\001\n\016TelemetryEvent\0220\n\004kind\030\001 \001(\016"
+    "2\".runanywhere.v1.TelemetryEventKind\022\014\n\004"
+    "name\030\002 \001(\t\022B\n\nattributes\030\003 \003(\0132..runanyw"
+    "here.v1.TelemetryEvent.AttributesEntry\022\r"
+    "\n\005value\030\004 \001(\001\022\014\n\004unit\030\005 \001(\t\0321\n\017Attribute"
+    "sEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\267"
+    "\001\n\021CancellationEvent\0223\n\004kind\030\001 \001(\0162%.run"
+    "anywhere.v1.CancellationEventKind\022/\n\tcom"
+    "ponent\030\002 \001(\0162\034.runanywhere.v1.SDKCompone"
+    "nt\022\024\n\014operation_id\030\003 \001(\t\022\016\n\006reason\030\004 \001(\t"
+    "\022\026\n\016user_initiated\030\005 \001(\010\"\220\001\n\014FailureEven"
+    "t\022/\n\tcomponent\030\001 \001(\0162\034.runanywhere.v1.SD"
+    "KComponent\022\021\n\toperation\030\002 \001(\t\022\'\n\005error\030\003"
+    " \001(\0132\030.runanywhere.v1.SDKError\022\023\n\013recove"
+    "rable\030\004 \001(\010\"\233\016\n\010SDKEvent\022\024\n\014timestamp_ms"
+    "\030\001 \001(\003\022/\n\010severity\030\002 \001(\0162\035.runanywhere.v"
+    "1.ErrorSeverity\022/\n\010category\030\024 \001(\0162\035.runa"
+    "nywhere.v1.EventCategory\022/\n\tcomponent\030\025 "
+    "\001(\0162\034.runanywhere.v1.SDKComponent\022,\n\005err"
+    "or\030\026 \001(\0132\030.runanywhere.v1.SDKErrorH\001\210\001\001\022"
+    "\n\n\002id\030\r \001(\t\022\022\n\nsession_id\030\016 \001(\t\0225\n\013desti"
+    "nation\030\017 \001(\0162 .runanywhere.v1.EventDesti"
+    "nation\022<\n\nproperties\030\020 \003(\0132(.runanywhere"
+    ".v1.SDKEvent.PropertiesEntry\022\024\n\014operatio"
+    "n_id\030! \001(\t\022\026\n\016correlation_id\030\" \001(\t\022\016\n\006so"
+    "urce\030# \001(\t\022\020\n\010trace_id\030$ \001(\t\022=\n\016initiali"
+    "zation\030\003 \001(\0132#.runanywhere.v1.Initializa"
+    "tionEventH\000\022;\n\rconfiguration\030\004 \001(\0132\".run"
+    "anywhere.v1.ConfigurationEventH\000\0225\n\ngene"
+    "ration\030\005 \001(\0132\037.runanywhere.v1.Generation"
+    "EventH\000\022+\n\005model\030\006 \001(\0132\032.runanywhere.v1."
+    "ModelEventH\000\0227\n\013performance\030\007 \001(\0132 .runa"
+    "nywhere.v1.PerformanceEventH\000\022/\n\007network"
+    "\030\010 \001(\0132\034.runanywhere.v1.NetworkEventH\000\022/"
+    "\n\007storage\030\t \001(\0132\034.runanywhere.v1.Storage"
+    "EventH\000\0223\n\tframework\030\n \001(\0132\036.runanywhere"
+    ".v1.FrameworkEventH\000\022-\n\006device\030\013 \001(\0132\033.r"
+    "unanywhere.v1.DeviceEventH\000\022F\n\016component"
+    "_init\030\014 \001(\0132,.runanywhere.v1.ComponentIn"
+    "itializationEventH\000\0224\n\005voice\030\021 \001(\0132#.run"
+    "anywhere.v1.VoiceLifecycleEventH\000\0224\n\016voi"
+    "ce_pipeline\030\022 \001(\0132\032.runanywhere.v1.Voice"
+    "EventH\000\022F\n\023component_lifecycle\030\023 \001(\0132\'.r"
+    "unanywhere.v1.ComponentLifecycleEventH\000\022"
+    "/\n\007session\030\027 \001(\0132\034.runanywhere.v1.Sessio"
+    "nEventH\000\022)\n\004auth\030\030 \001(\0132\031.runanywhere.v1."
+    "AuthEventH\000\022<\n\016model_registry\030\031 \001(\0132\".ru"
+    "nanywhere.v1.ModelRegistryEventH\000\0221\n\010dow"
+    "nload\030\032 \001(\0132\035.runanywhere.v1.DownloadEve"
+    "ntH\000\022B\n\021storage_lifecycle\030\033 \001(\0132%.runany"
+    "where.v1.StorageLifecycleEventH\000\022@\n\020hard"
+    "ware_routing\030\034 \001(\0132$.runanywhere.v1.Hard"
+    "wareRoutingEventH\000\022>\n\ncapability\030\035 \001(\0132("
+    ".runanywhere.v1.CapabilityOperationEvent"
+    "H\000\0223\n\ttelemetry\030\036 \001(\0132\036.runanywhere.v1.T"
+    "elemetryEventH\000\0229\n\014cancellation\030\037 \001(\0132!."
+    "runanywhere.v1.CancellationEventH\000\022/\n\007fa"
+    "ilure\030  \001(\0132\034.runanywhere.v1.FailureEven"
+    "tH\000\0321\n\017PropertiesEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005v"
+    "alue\030\002 \001(\t:\0028\001B\007\n\005eventB\010\n\006_error*\227\003\n\014SD"
+    "KComponent\022\035\n\031SDK_COMPONENT_UNSPECIFIED\020"
+    "\000\022\025\n\021SDK_COMPONENT_STT\020\001\022\025\n\021SDK_COMPONEN"
+    "T_TTS\020\002\022\025\n\021SDK_COMPONENT_VAD\020\003\022\025\n\021SDK_CO"
+    "MPONENT_LLM\020\004\022\025\n\021SDK_COMPONENT_VLM\020\005\022\033\n\027"
+    "SDK_COMPONENT_DIFFUSION\020\006\022\025\n\021SDK_COMPONE"
+    "NT_RAG\020\007\022\034\n\030SDK_COMPONENT_EMBEDDINGS\020\010\022\035"
+    "\n\031SDK_COMPONENT_VOICE_AGENT\020\t\022\032\n\026SDK_COM"
+    "PONENT_WAKEWORD\020\n\022%\n!SDK_COMPONENT_SPEAK"
+    "ER_DIARIZATION\020\013\022\'\n#SDK_COMPONENT_SEMANT"
+    "IC_SEGMENTATION\020\014\022\030\n\024SDK_COMPONENT_RERAN"
+    "K\020\r*\252\001\n\020EventDestination\022!\n\035EVENT_DESTIN"
+    "ATION_UNSPECIFIED\020\000\022\034\n\030EVENT_DESTINATION"
+    "_PUBLIC\020\001\022\037\n\033EVENT_DESTINATION_TELEMETRY"
+    "\020\002\022\031\n\025EVENT_DESTINATION_ALL\020\003\022\031\n\025EVENT_D"
+    "ESTINATION_LOG\020\004*\244\002\n\023InitializationStage"
+    "\022$\n INITIALIZATION_STAGE_UNSPECIFIED\020\000\022 "
+    "\n\034INITIALIZATION_STAGE_STARTED\020\001\022-\n)INIT"
+    "IALIZATION_STAGE_CONFIGURATION_LOADED\020\002\022"
+    ".\n*INITIALIZATION_STAGE_SERVICES_BOOTSTR"
+    "APPED\020\003\022\"\n\036INITIALIZATION_STAGE_COMPLETE"
+    "D\020\004\022\037\n\033INITIALIZATION_STAGE_FAILED\020\005\022!\n\035"
+    "INITIALIZATION_STAGE_SHUTDOWN\020\006*\223\007\n\026Conf"
+    "igurationEventKind\022(\n$CONFIGURATION_EVEN"
+    "T_KIND_UNSPECIFIED\020\000\022*\n&CONFIGURATION_EV"
+    "ENT_KIND_FETCH_STARTED\020\001\022,\n(CONFIGURATIO"
+    "N_EVENT_KIND_FETCH_COMPLETED\020\002\022)\n%CONFIG"
+    "URATION_EVENT_KIND_FETCH_FAILED\020\003\022#\n\037CON"
+    "FIGURATION_EVENT_KIND_LOADED\020\004\022$\n CONFIG"
+    "URATION_EVENT_KIND_UPDATED\020\005\022)\n%CONFIGUR"
+    "ATION_EVENT_KIND_SYNC_STARTED\020\006\022+\n\'CONFI"
+    "GURATION_EVENT_KIND_SYNC_COMPLETED\020\007\022(\n$"
+    "CONFIGURATION_EVENT_KIND_SYNC_FAILED\020\010\022+"
+    "\n\'CONFIGURATION_EVENT_KIND_SYNC_REQUESTE"
+    "D\020\t\022/\n+CONFIGURATION_EVENT_KIND_SETTINGS"
+    "_REQUESTED\020\n\022/\n+CONFIGURATION_EVENT_KIND"
+    "_SETTINGS_RETRIEVED\020\013\0225\n1CONFIGURATION_E"
+    "VENT_KIND_ROUTING_POLICY_REQUESTED\020\014\0225\n1"
+    "CONFIGURATION_EVENT_KIND_ROUTING_POLICY_"
+    "RETRIEVED\020\r\0223\n/CONFIGURATION_EVENT_KIND_"
+    "PRIVACY_MODE_REQUESTED\020\016\0223\n/CONFIGURATIO"
+    "N_EVENT_KIND_PRIVACY_MODE_RETRIEVED\020\017\0227\n"
+    "3CONFIGURATION_EVENT_KIND_ANALYTICS_STAT"
+    "US_REQUESTED\020\020\0227\n3CONFIGURATION_EVENT_KI"
+    "ND_ANALYTICS_STATUS_RETRIEVED\020\021\022$\n CONFI"
+    "GURATION_EVENT_KIND_CHANGED\020\022*\372\006\n Compon"
+    "entInitializationEventKind\022)\n%COMPONENT_"
+    "INIT_EVENT_KIND_UNSPECIFIED\020\000\0224\n0COMPONE"
+    "NT_INIT_EVENT_KIND_INITIALIZATION_STARTE"
+    "D\020\001\0226\n2COMPONENT_INIT_EVENT_KIND_INITIAL"
+    "IZATION_COMPLETED\020\002\0225\n1COMPONENT_INIT_EV"
+    "ENT_KIND_COMPONENT_STATE_CHANGED\020\003\0220\n,CO"
+    "MPONENT_INIT_EVENT_KIND_COMPONENT_CHECKI"
+    "NG\020\004\0229\n5COMPONENT_INIT_EVENT_KIND_COMPON"
+    "ENT_DOWNLOAD_REQUIRED\020\005\0228\n4COMPONENT_INI"
+    "T_EVENT_KIND_COMPONENT_DOWNLOAD_STARTED\020"
+    "\006\0229\n5COMPONENT_INIT_EVENT_KIND_COMPONENT"
+    "_DOWNLOAD_PROGRESS\020\007\022:\n6COMPONENT_INIT_E"
+    "VENT_KIND_COMPONENT_DOWNLOAD_COMPLETED\020\010"
+    "\0224\n0COMPONENT_INIT_EVENT_KIND_COMPONENT_"
+    "INITIALIZING\020\t\022-\n)COMPONENT_INIT_EVENT_K"
+    "IND_COMPONENT_READY\020\n\022.\n*COMPONENT_INIT_"
+    "EVENT_KIND_COMPONENT_FAILED\020\013\0223\n/COMPONE"
+    "NT_INIT_EVENT_KIND_PARALLEL_INIT_STARTED"
+    "\020\014\0225\n1COMPONENT_INIT_EVENT_KIND_SEQUENTI"
+    "AL_INIT_STARTED\020\r\0222\n.COMPONENT_INIT_EVEN"
+    "T_KIND_ALL_COMPONENTS_READY\020\016\0223\n/COMPONE"
+    "NT_INIT_EVENT_KIND_SOME_COMPONENTS_READY"
+    "\020\017*\222\002\n\020SessionEventKind\022\"\n\036SESSION_EVENT"
+    "_KIND_UNSPECIFIED\020\000\022\036\n\032SESSION_EVENT_KIN"
+    "D_CREATED\020\001\022\036\n\032SESSION_EVENT_KIND_STARTE"
+    "D\020\002\022\036\n\032SESSION_EVENT_KIND_RESUMED\020\003\022\035\n\031S"
+    "ESSION_EVENT_KIND_PAUSED\020\004\022\034\n\030SESSION_EV"
+    "ENT_KIND_ENDED\020\005\022\036\n\032SESSION_EVENT_KIND_E"
+    "XPIRED\020\006\022\035\n\031SESSION_EVENT_KIND_FAILED\020\007*"
+    "\324\010\n\023GenerationEventKind\022%\n!GENERATION_EV"
+    "ENT_KIND_UNSPECIFIED\020\000\022)\n%GENERATION_EVE"
+    "NT_KIND_SESSION_STARTED\020\001\022\'\n#GENERATION_"
+    "EVENT_KIND_SESSION_ENDED\020\002\022!\n\035GENERATION"
+    "_EVENT_KIND_STARTED\020\003\022/\n+GENERATION_EVEN"
+    "T_KIND_FIRST_TOKEN_GENERATED\020\004\022)\n%GENERA"
+    "TION_EVENT_KIND_TOKEN_GENERATED\020\005\022*\n&GEN"
+    "ERATION_EVENT_KIND_STREAMING_UPDATE\020\006\022#\n"
+    "\037GENERATION_EVENT_KIND_COMPLETED\020\007\022 \n\034GE"
+    "NERATION_EVENT_KIND_FAILED\020\010\022&\n\"GENERATI"
+    "ON_EVENT_KIND_MODEL_LOADED\020\t\022(\n$GENERATI"
+    "ON_EVENT_KIND_MODEL_UNLOADED\020\n\022)\n%GENERA"
+    "TION_EVENT_KIND_COST_CALCULATED\020\013\022*\n&GEN"
+    "ERATION_EVENT_KIND_ROUTING_DECISION\020\014\022*\n"
+    "&GENERATION_EVENT_KIND_STREAM_COMPLETED\020"
+    "\r\022*\n&GENERATION_EVENT_KIND_CANCEL_REQUES"
+    "TED\020\016\022#\n\037GENERATION_EVENT_KIND_CANCELLED"
+    "\020\017\022+\n\'GENERATION_EVENT_KIND_TOOL_CALL_ST"
+    "ARTED\020\020\022-\n)GENERATION_EVENT_KIND_TOOL_CA"
+    "LL_COMPLETED\020\021\022*\n&GENERATION_EVENT_KIND_"
+    "TOOL_CALL_FAILED\020\022\0223\n/GENERATION_EVENT_K"
+    "IND_STRUCTURED_OUTPUT_STARTED\020\023\0225\n1GENER"
+    "ATION_EVENT_KIND_STRUCTURED_OUTPUT_COMPL"
+    "ETED\020\024\0222\n.GENERATION_EVENT_KIND_STRUCTUR"
+    "ED_OUTPUT_FAILED\020\025\022*\n&GENERATION_EVENT_K"
+    "IND_THINKING_STARTED\020\026\022(\n$GENERATION_EVE"
+    "NT_KIND_THINKING_DELTA\020\027\022,\n(GENERATION_E"
+    "VENT_KIND_THINKING_COMPLETED\020\030*\332\017\n\016Voice"
+    "EventKind\022 \n\034VOICE_EVENT_KIND_UNSPECIFIE"
+    "D\020\000\022&\n\"VOICE_EVENT_KIND_LISTENING_STARTE"
+    "D\020\001\022$\n VOICE_EVENT_KIND_LISTENING_ENDED\020"
+    "\002\022$\n VOICE_EVENT_KIND_SPEECH_DETECTED\020\003\022"
+    "*\n&VOICE_EVENT_KIND_TRANSCRIPTION_STARTE"
+    "D\020\004\022*\n&VOICE_EVENT_KIND_TRANSCRIPTION_PA"
+    "RTIAL\020\005\022(\n$VOICE_EVENT_KIND_TRANSCRIPTIO"
+    "N_FINAL\020\006\022\'\n#VOICE_EVENT_KIND_RESPONSE_G"
+    "ENERATED\020\007\022&\n\"VOICE_EVENT_KIND_SYNTHESIS"
+    "_STARTED\020\010\022$\n VOICE_EVENT_KIND_AUDIO_GEN"
+    "ERATED\020\t\022(\n$VOICE_EVENT_KIND_SYNTHESIS_C"
+    "OMPLETED\020\n\022%\n!VOICE_EVENT_KIND_SYNTHESIS"
+    "_FAILED\020\013\022%\n!VOICE_EVENT_KIND_PIPELINE_S"
+    "TARTED\020\014\022\'\n#VOICE_EVENT_KIND_PIPELINE_CO"
+    "MPLETED\020\r\022#\n\037VOICE_EVENT_KIND_PIPELINE_E"
+    "RROR\020\016\022 \n\034VOICE_EVENT_KIND_VAD_STARTED\020\017"
+    "\022!\n\035VOICE_EVENT_KIND_VAD_DETECTED\020\020\022\036\n\032V"
+    "OICE_EVENT_KIND_VAD_ENDED\020\021\022$\n VOICE_EVE"
+    "NT_KIND_VAD_INITIALIZED\020\022\022 \n\034VOICE_EVENT"
+    "_KIND_VAD_STOPPED\020\023\022#\n\037VOICE_EVENT_KIND_"
+    "VAD_CLEANED_UP\020\024\022#\n\037VOICE_EVENT_KIND_SPE"
+    "ECH_STARTED\020\025\022!\n\035VOICE_EVENT_KIND_SPEECH"
+    "_ENDED\020\026\022#\n\037VOICE_EVENT_KIND_STT_PROCESS"
+    "ING\020\027\022\'\n#VOICE_EVENT_KIND_STT_PARTIAL_RE"
+    "SULT\020\030\022\"\n\036VOICE_EVENT_KIND_STT_COMPLETED"
+    "\020\031\022\037\n\033VOICE_EVENT_KIND_STT_FAILED\020\032\022#\n\037V"
+    "OICE_EVENT_KIND_LLM_PROCESSING\020\033\022#\n\037VOIC"
+    "E_EVENT_KIND_TTS_PROCESSING\020\034\022&\n\"VOICE_E"
+    "VENT_KIND_RECORDING_STARTED\020\035\022&\n\"VOICE_E"
+    "VENT_KIND_RECORDING_STOPPED\020\036\022%\n!VOICE_E"
+    "VENT_KIND_PLAYBACK_STARTED\020\037\022\'\n#VOICE_EV"
+    "ENT_KIND_PLAYBACK_COMPLETED\020 \022%\n!VOICE_E"
+    "VENT_KIND_PLAYBACK_STOPPED\020!\022$\n VOICE_EV"
+    "ENT_KIND_PLAYBACK_PAUSED\020\"\022%\n!VOICE_EVEN"
+    "T_KIND_PLAYBACK_RESUMED\020#\022$\n VOICE_EVENT"
+    "_KIND_PLAYBACK_FAILED\020$\022*\n&VOICE_EVENT_K"
+    "IND_VOICE_SESSION_STARTED\020%\022,\n(VOICE_EVE"
+    "NT_KIND_VOICE_SESSION_LISTENING\020&\0221\n-VOI"
+    "CE_EVENT_KIND_VOICE_SESSION_SPEECH_START"
+    "ED\020\'\022/\n+VOICE_EVENT_KIND_VOICE_SESSION_S"
+    "PEECH_ENDED\020(\022-\n)VOICE_EVENT_KIND_VOICE_"
+    "SESSION_PROCESSING\020)\022.\n*VOICE_EVENT_KIND"
+    "_VOICE_SESSION_TRANSCRIBED\020*\022,\n(VOICE_EV"
+    "ENT_KIND_VOICE_SESSION_RESPONDED\020+\022+\n\'VO"
+    "ICE_EVENT_KIND_VOICE_SESSION_SPEAKING\020,\022"
+    "1\n-VOICE_EVENT_KIND_VOICE_SESSION_TURN_C"
+    "OMPLETED\020-\022*\n&VOICE_EVENT_KIND_VOICE_SES"
+    "SION_STOPPED\020.\022(\n$VOICE_EVENT_KIND_VOICE"
+    "_SESSION_ERROR\020/\022\037\n\033VOICE_EVENT_KIND_VAD"
+    "_PAUSED\0200\022 \n\034VOICE_EVENT_KIND_VAD_RESUME"
+    "D\0201*\231\010\n\034CapabilityOperationEventKind\022/\n+"
+    "CAPABILITY_OPERATION_EVENT_KIND_UNSPECIF"
+    "IED\020\000\022/\n+CAPABILITY_OPERATION_EVENT_KIND"
+    "_VLM_STARTED\020\001\0221\n-CAPABILITY_OPERATION_E"
+    "VENT_KIND_VLM_COMPLETED\020\002\022.\n*CAPABILITY_"
+    "OPERATION_EVENT_KIND_VLM_FAILED\020\003\0225\n1CAP"
+    "ABILITY_OPERATION_EVENT_KIND_DIFFUSION_S"
+    "TARTED\020\004\0226\n2CAPABILITY_OPERATION_EVENT_K"
+    "IND_DIFFUSION_PROGRESS\020\005\0227\n3CAPABILITY_O"
+    "PERATION_EVENT_KIND_DIFFUSION_COMPLETED\020"
+    "\006\0224\n0CAPABILITY_OPERATION_EVENT_KIND_DIF"
+    "FUSION_FAILED\020\007\0226\n2CAPABILITY_OPERATION_"
+    "EVENT_KIND_EMBEDDINGS_STARTED\020\010\0228\n4CAPAB"
+    "ILITY_OPERATION_EVENT_KIND_EMBEDDINGS_CO"
+    "MPLETED\020\t\0225\n1CAPABILITY_OPERATION_EVENT_"
+    "KIND_EMBEDDINGS_FAILED\020\n\0229\n5CAPABILITY_O"
+    "PERATION_EVENT_KIND_RAG_INGESTION_STARTE"
+    "D\020\013\022;\n7CAPABILITY_OPERATION_EVENT_KIND_R"
+    "AG_INGESTION_COMPLETED\020\014\0225\n1CAPABILITY_O"
+    "PERATION_EVENT_KIND_RAG_QUERY_STARTED\020\r\022"
+    "7\n3CAPABILITY_OPERATION_EVENT_KIND_RAG_Q"
+    "UERY_COMPLETED\020\016\022.\n*CAPABILITY_OPERATION"
+    "_EVENT_KIND_RAG_FAILED\020\017\0221\n-CAPABILITY_O"
+    "PERATION_EVENT_KIND_LORA_ATTACHED\020\020\0221\n-C"
+    "APABILITY_OPERATION_EVENT_KIND_LORA_DETA"
+    "CHED\020\021\022/\n+CAPABILITY_OPERATION_EVENT_KIN"
+    "D_LORA_FAILED\020\022*\361\007\n\016ModelEventKind\022 \n\034MO"
+    "DEL_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035MODEL_EV"
+    "ENT_KIND_LOAD_STARTED\020\001\022\"\n\036MODEL_EVENT_K"
+    "IND_LOAD_PROGRESS\020\002\022#\n\037MODEL_EVENT_KIND_"
+    "LOAD_COMPLETED\020\003\022 \n\034MODEL_EVENT_KIND_LOA"
+    "D_FAILED\020\004\022#\n\037MODEL_EVENT_KIND_UNLOAD_ST"
+    "ARTED\020\005\022%\n!MODEL_EVENT_KIND_UNLOAD_COMPL"
+    "ETED\020\006\022\"\n\036MODEL_EVENT_KIND_UNLOAD_FAILED"
+    "\020\007\022%\n!MODEL_EVENT_KIND_DOWNLOAD_STARTED\020"
+    "\010\022&\n\"MODEL_EVENT_KIND_DOWNLOAD_PROGRESS\020"
+    "\t\022\'\n#MODEL_EVENT_KIND_DOWNLOAD_COMPLETED"
+    "\020\n\022$\n MODEL_EVENT_KIND_DOWNLOAD_FAILED\020\013"
+    "\022\'\n#MODEL_EVENT_KIND_DOWNLOAD_CANCELLED\020"
+    "\014\022#\n\037MODEL_EVENT_KIND_LIST_REQUESTED\020\r\022#"
+    "\n\037MODEL_EVENT_KIND_LIST_COMPLETED\020\016\022 \n\034M"
+    "ODEL_EVENT_KIND_LIST_FAILED\020\017\022#\n\037MODEL_E"
+    "VENT_KIND_CATALOG_LOADED\020\020\022#\n\037MODEL_EVEN"
+    "T_KIND_DELETE_STARTED\020\021\022%\n!MODEL_EVENT_K"
+    "IND_DELETE_COMPLETED\020\022\022\"\n\036MODEL_EVENT_KI"
+    "ND_DELETE_FAILED\020\023\022\'\n#MODEL_EVENT_KIND_C"
+    "USTOM_MODEL_ADDED\020\024\022(\n$MODEL_EVENT_KIND_"
+    "BUILT_IN_REGISTERED\020\025\022\'\n#MODEL_EVENT_KIN"
+    "D_EXTRACTION_STARTED\020\026\022(\n$MODEL_EVENT_KI"
+    "ND_EXTRACTION_PROGRESS\020\027\022)\n%MODEL_EVENT_"
+    "KIND_EXTRACTION_COMPLETED\020\030\022&\n\"MODEL_EVE"
+    "NT_KIND_EXTRACTION_FAILED\020\031*\303\007\n\026ModelReg"
+    "istryEventKind\022)\n%MODEL_REGISTRY_EVENT_K"
+    "IND_UNSPECIFIED\020\000\022-\n)MODEL_REGISTRY_EVEN"
+    "T_KIND_REFRESH_STARTED\020\001\022/\n+MODEL_REGIST"
+    "RY_EVENT_KIND_REFRESH_COMPLETED\020\002\022,\n(MOD"
+    "EL_REGISTRY_EVENT_KIND_REFRESH_FAILED\020\003\022"
+    "0\n,MODEL_REGISTRY_EVENT_KIND_ASSIGNMENT_"
+    "STARTED\020\004\0222\n.MODEL_REGISTRY_EVENT_KIND_A"
+    "SSIGNMENT_COMPLETED\020\005\022/\n+MODEL_REGISTRY_"
+    "EVENT_KIND_ASSIGNMENT_FAILED\020\006\022,\n(MODEL_"
+    "REGISTRY_EVENT_KIND_IMPORT_STARTED\020\007\022.\n*"
+    "MODEL_REGISTRY_EVENT_KIND_IMPORT_COMPLET"
+    "ED\020\010\022+\n\'MODEL_REGISTRY_EVENT_KIND_IMPORT"
+    "_FAILED\020\t\022/\n+MODEL_REGISTRY_EVENT_KIND_D"
+    "ISCOVERY_STARTED\020\n\0221\n-MODEL_REGISTRY_EVE"
+    "NT_KIND_DISCOVERY_COMPLETED\020\013\022.\n*MODEL_R"
+    "EGISTRY_EVENT_KIND_DISCOVERY_FAILED\020\014\0223\n"
+    "/MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL"
+    "_CHANGED\020\r\022*\n&MODEL_REGISTRY_EVENT_KIND_"
+    "LIST_STARTED\020\016\022,\n(MODEL_REGISTRY_EVENT_K"
+    "IND_LIST_COMPLETED\020\017\022)\n%MODEL_REGISTRY_E"
+    "VENT_KIND_LIST_FAILED\020\020\022)\n%MODEL_REGISTR"
+    "Y_EVENT_KIND_GET_STARTED\020\021\022+\n\'MODEL_REGI"
+    "STRY_EVENT_KIND_GET_COMPLETED\020\022\022(\n$MODEL"
+    "_REGISTRY_EVENT_KIND_GET_FAILED\020\023*\230\004\n\021Do"
+    "wnloadEventKind\022#\n\037DOWNLOAD_EVENT_KIND_U"
+    "NSPECIFIED\020\000\022$\n DOWNLOAD_EVENT_KIND_PLAN"
+    "_STARTED\020\001\022&\n\"DOWNLOAD_EVENT_KIND_PLAN_C"
+    "OMPLETED\020\002\022#\n\037DOWNLOAD_EVENT_KIND_PLAN_F"
+    "AILED\020\003\022\037\n\033DOWNLOAD_EVENT_KIND_STARTED\020\004"
+    "\022 \n\034DOWNLOAD_EVENT_KIND_PROGRESS\020\005\022(\n$DO"
+    "WNLOAD_EVENT_KIND_CANCEL_REQUESTED\020\006\022!\n\035"
+    "DOWNLOAD_EVENT_KIND_CANCELLED\020\007\022(\n$DOWNL"
+    "OAD_EVENT_KIND_RESUME_REQUESTED\020\010\022\037\n\033DOW"
+    "NLOAD_EVENT_KIND_RESUMED\020\t\022!\n\035DOWNLOAD_E"
+    "VENT_KIND_COMPLETED\020\n\022\036\n\032DOWNLOAD_EVENT_"
+    "KIND_FAILED\020\013\022\036\n\032DOWNLOAD_EVENT_KIND_PAU"
+    "SED\020\014\022-\n)DOWNLOAD_EVENT_KIND_PARTIAL_BYT"
+    "ES_DELETED\020\r*\355\005\n\020StorageEventKind\022\"\n\036STO"
+    "RAGE_EVENT_KIND_UNSPECIFIED\020\000\022%\n!STORAGE"
+    "_EVENT_KIND_INFO_REQUESTED\020\001\022%\n!STORAGE_"
+    "EVENT_KIND_INFO_RETRIEVED\020\002\022\'\n#STORAGE_E"
+    "VENT_KIND_MODELS_REQUESTED\020\003\022\'\n#STORAGE_"
+    "EVENT_KIND_MODELS_RETRIEVED\020\004\022*\n&STORAGE"
+    "_EVENT_KIND_CLEAR_CACHE_STARTED\020\005\022,\n(STO"
+    "RAGE_EVENT_KIND_CLEAR_CACHE_COMPLETED\020\006\022"
+    ")\n%STORAGE_EVENT_KIND_CLEAR_CACHE_FAILED"
+    "\020\007\022)\n%STORAGE_EVENT_KIND_CLEAN_TEMP_STAR"
+    "TED\020\010\022+\n\'STORAGE_EVENT_KIND_CLEAN_TEMP_C"
+    "OMPLETED\020\t\022(\n$STORAGE_EVENT_KIND_CLEAN_T"
+    "EMP_FAILED\020\n\022+\n\'STORAGE_EVENT_KIND_DELET"
+    "E_MODEL_STARTED\020\013\022-\n)STORAGE_EVENT_KIND_"
+    "DELETE_MODEL_COMPLETED\020\014\022*\n&STORAGE_EVEN"
+    "T_KIND_DELETE_MODEL_FAILED\020\r\022 \n\034STORAGE_"
+    "EVENT_KIND_CACHE_HIT\020\016\022!\n\035STORAGE_EVENT_"
+    "KIND_CACHE_MISS\020\017\022\037\n\033STORAGE_EVENT_KIND_"
+    "EVICTION\020\020\022 \n\034STORAGE_EVENT_KIND_DISK_FU"
+    "LL\020\021*\371\005\n\031StorageLifecycleEventKind\022,\n(ST"
+    "ORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED\020\000"
+    "\022-\n)STORAGE_LIFECYCLE_EVENT_KIND_INFO_ST"
+    "ARTED\020\001\022/\n+STORAGE_LIFECYCLE_EVENT_KIND_"
+    "INFO_COMPLETED\020\002\0225\n1STORAGE_LIFECYCLE_EV"
+    "ENT_KIND_AVAILABILITY_CHECKED\020\003\0224\n0STORA"
+    "GE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_CREA"
+    "TED\020\004\022/\n+STORAGE_LIFECYCLE_EVENT_KIND_DE"
+    "LETE_STARTED\020\005\0221\n-STORAGE_LIFECYCLE_EVEN"
+    "T_KIND_DELETE_COMPLETED\020\006\022.\n*STORAGE_LIF"
+    "ECYCLE_EVENT_KIND_DELETE_FAILED\020\007\0226\n2STO"
+    "RAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_"
+    "STARTED\020\010\0228\n4STORAGE_LIFECYCLE_EVENT_KIN"
+    "D_CACHE_CLEANUP_COMPLETED\020\t\0225\n1STORAGE_L"
+    "IFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED"
+    "\020\n\0224\n0STORAGE_LIFECYCLE_EVENT_KIND_AVAIL"
+    "ABILITY_FAILED\020\013\0223\n/STORAGE_LIFECYCLE_EV"
+    "ENT_KIND_DELETE_PLAN_FAILED\020\014\0229\n5STORAGE"
+    "_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COM"
+    "PLETED\020\r*\251\002\n\rAuthEventKind\022\037\n\033AUTH_EVENT"
+    "_KIND_UNSPECIFIED\020\000\022\035\n\031AUTH_EVENT_KIND_R"
+    "EQUESTED\020\001\022\035\n\031AUTH_EVENT_KIND_SUCCEEDED\020"
+    "\002\022\032\n\026AUTH_EVENT_KIND_FAILED\020\003\022#\n\037AUTH_EV"
+    "ENT_KIND_TOKEN_REFRESHED\020\004\022!\n\035AUTH_EVENT"
+    "_KIND_TOKEN_EXPIRED\020\005\022%\n!AUTH_EVENT_KIND"
+    "_DEVICE_REGISTERED\020\006\022.\n*AUTH_EVENT_KIND_"
+    "DEVICE_REGISTRATION_FAILED\020\007*\325\004\n\017DeviceE"
+    "ventKind\022!\n\035DEVICE_EVENT_KIND_UNSPECIFIE"
+    "D\020\000\022+\n\'DEVICE_EVENT_KIND_DEVICE_INFO_COL"
+    "LECTED\020\001\0223\n/DEVICE_EVENT_KIND_DEVICE_INF"
+    "O_COLLECTION_FAILED\020\002\022+\n\'DEVICE_EVENT_KI"
+    "ND_DEVICE_INFO_REFRESHED\020\003\022.\n*DEVICE_EVE"
+    "NT_KIND_DEVICE_INFO_SYNC_STARTED\020\004\0220\n,DE"
+    "VICE_EVENT_KIND_DEVICE_INFO_SYNC_COMPLET"
+    "ED\020\005\022-\n)DEVICE_EVENT_KIND_DEVICE_INFO_SY"
+    "NC_FAILED\020\006\022*\n&DEVICE_EVENT_KIND_DEVICE_"
+    "STATE_CHANGED\020\007\022%\n!DEVICE_EVENT_KIND_BAT"
+    "TERY_CHANGED\020\010\022%\n!DEVICE_EVENT_KIND_THER"
+    "MAL_CHANGED\020\t\022*\n&DEVICE_EVENT_KIND_CONNE"
+    "CTIVITY_CHANGED\020\n\022\'\n#DEVICE_EVENT_KIND_D"
+    "EVICE_REGISTERED\020\013\0220\n,DEVICE_EVENT_KIND_"
+    "DEVICE_REGISTRATION_FAILED\020\014*\204\002\n\020Network"
+    "EventKind\022\"\n\036NETWORK_EVENT_KIND_UNSPECIF"
+    "IED\020\000\022&\n\"NETWORK_EVENT_KIND_REQUEST_STAR"
+    "TED\020\001\022(\n$NETWORK_EVENT_KIND_REQUEST_COMP"
+    "LETED\020\002\022%\n!NETWORK_EVENT_KIND_REQUEST_FA"
+    "ILED\020\003\022&\n\"NETWORK_EVENT_KIND_REQUEST_TIM"
+    "EOUT\020\004\022+\n\'NETWORK_EVENT_KIND_CONNECTIVIT"
+    "Y_CHANGED\020\005*\272\005\n\022FrameworkEventKind\022$\n FR"
+    "AMEWORK_EVENT_KIND_UNSPECIFIED\020\000\022+\n\'FRAM"
+    "EWORK_EVENT_KIND_ADAPTER_REGISTERED\020\001\022-\n"
+    ")FRAMEWORK_EVENT_KIND_ADAPTER_UNREGISTER"
+    "ED\020\002\022+\n\'FRAMEWORK_EVENT_KIND_ADAPTERS_RE"
+    "QUESTED\020\003\022+\n\'FRAMEWORK_EVENT_KIND_ADAPTE"
+    "RS_RETRIEVED\020\004\022-\n)FRAMEWORK_EVENT_KIND_F"
+    "RAMEWORKS_REQUESTED\020\005\022-\n)FRAMEWORK_EVENT"
+    "_KIND_FRAMEWORKS_RETRIEVED\020\006\022/\n+FRAMEWOR"
+    "K_EVENT_KIND_AVAILABILITY_REQUESTED\020\007\022/\n"
+    "+FRAMEWORK_EVENT_KIND_AVAILABILITY_RETRI"
+    "EVED\020\010\0227\n3FRAMEWORK_EVENT_KIND_MODELS_FO"
+    "R_FRAMEWORK_REQUESTED\020\t\0227\n3FRAMEWORK_EVE"
+    "NT_KIND_MODELS_FOR_FRAMEWORK_RETRIEVED\020\n"
+    "\022:\n6FRAMEWORK_EVENT_KIND_FRAMEWORKS_FOR_"
+    "MODALITY_REQUESTED\020\013\022:\n6FRAMEWORK_EVENT_"
+    "KIND_FRAMEWORKS_FOR_MODALITY_RETRIEVED\020\014"
+    "\022\036\n\032FRAMEWORK_EVENT_KIND_ERROR\020\r*\267\003\n\030Har"
+    "dwareRoutingEventKind\022+\n\'HARDWARE_ROUTIN"
+    "G_EVENT_KIND_UNSPECIFIED\020\000\022/\n+HARDWARE_R"
+    "OUTING_EVENT_KIND_PROFILE_STARTED\020\001\0221\n-H"
+    "ARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPL"
+    "ETED\020\002\022.\n*HARDWARE_ROUTING_EVENT_KIND_PR"
+    "OFILE_FAILED\020\003\022.\n*HARDWARE_ROUTING_EVENT"
+    "_KIND_ROUTE_SELECTED\020\004\022-\n)HARDWARE_ROUTI"
+    "NG_EVENT_KIND_ROUTE_CHANGED\020\005\022=\n9HARDWAR"
+    "E_ROUTING_EVENT_KIND_FRAMEWORK_CAPABILIT"
+    "Y_DETECTED\020\006\022<\n8HARDWARE_ROUTING_EVENT_K"
+    "IND_FRAMEWORK_CAPABILITY_MISSING\020\007*\370\001\n\024P"
+    "erformanceEventKind\022&\n\"PERFORMANCE_EVENT"
+    "_KIND_UNSPECIFIED\020\000\022)\n%PERFORMANCE_EVENT"
+    "_KIND_MEMORY_WARNING\020\001\0220\n,PERFORMANCE_EV"
+    "ENT_KIND_THERMAL_STATE_CHANGED\020\002\022+\n\'PERF"
+    "ORMANCE_EVENT_KIND_LATENCY_MEASURED\020\003\022.\n"
+    "*PERFORMANCE_EVENT_KIND_THROUGHPUT_MEASU"
+    "RED\020\004*\300\001\n\022TelemetryEventKind\022$\n TELEMETR"
+    "Y_EVENT_KIND_UNSPECIFIED\020\000\022 \n\034TELEMETRY_"
+    "EVENT_KIND_COUNTER\020\001\022\036\n\032TELEMETRY_EVENT_"
+    "KIND_GAUGE\020\002\022\"\n\036TELEMETRY_EVENT_KIND_HIS"
+    "TOGRAM\020\003\022\036\n\032TELEMETRY_EVENT_KIND_TRACE\020\004"
+    "*\334\001\n\025CancellationEventKind\022\'\n#CANCELLATI"
+    "ON_EVENT_KIND_UNSPECIFIED\020\000\022%\n!CANCELLAT"
+    "ION_EVENT_KIND_REQUESTED\020\001\022(\n$CANCELLATI"
+    "ON_EVENT_KIND_ACKNOWLEDGED\020\002\022%\n!CANCELLA"
+    "TION_EVENT_KIND_COMPLETED\020\003\022\"\n\036CANCELLAT"
+    "ION_EVENT_KIND_FAILED\020\004B\211\001\n\027ai.runanywhe"
+    "re.proto.v1B\016SdkEventsProtoP\001Z<github.co"
+    "m/runanywhere/runanywhere-sdks/idl/v1;ru"
+    "nanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002"
+    "\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_sdk_5fevents_2eproto_deps[7] = {
@@ -7663,7 +7634,7 @@ static ::absl::once_flag descriptor_table_sdk_5fevents_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_sdk_5fevents_2eproto = {
     false,
     false,
-    24760,
+    24771,
     descriptor_table_protodef_sdk_5fevents_2eproto,
     "sdk_events.proto",
     &descriptor_table_sdk_5fevents_2eproto_once,
@@ -8671,6 +8642,11 @@ void ConfigurationEvent::InternalSwap(ConfigurationEvent* PROTOBUF_RESTRICT PROT
 }
 // ===================================================================
 
+void ComponentInitializationEvent::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+}
 ComponentInitializationEvent::ComponentInitializationEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, ComponentInitializationEvent_get_class_data()) {
@@ -8711,7 +8687,6 @@ PROTOBUF_NDEBUG_INLINE ComponentInitializationEvent::Impl_::Impl_(
         ,
         _pending_components_cached_byte_size_{0},
         model_id_(arena, from.model_id_),
-        error_(arena, from.error_),
         old_state_(arena, from.old_state_),
         new_state_(arena, from.new_state_) {}
 
@@ -8729,6 +8704,10 @@ ComponentInitializationEvent::ComponentInitializationEvent(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000040U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, kind_),
            reinterpret_cast<const char*>(&from._impl_) +
@@ -8762,17 +8741,16 @@ PROTOBUF_NDEBUG_INLINE ComponentInitializationEvent::Impl_::Impl_(
         ,
         _pending_components_cached_byte_size_{0},
         model_id_(arena),
-        error_(arena),
         old_state_(arena),
         new_state_(arena) {}
 
 inline void ComponentInitializationEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, kind_),
+               offsetof(Impl_, error_),
            0,
            offsetof(Impl_, current_lifecycle_state_) -
-               offsetof(Impl_, kind_) +
+               offsetof(Impl_, error_) +
                sizeof(Impl_::current_lifecycle_state_));
 }
 ComponentInitializationEvent::~ComponentInitializationEvent() {
@@ -8787,9 +8765,9 @@ inline void ComponentInitializationEvent::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.model_id_.Destroy();
-  this_._impl_.error_.Destroy();
   this_._impl_.old_state_.Destroy();
   this_._impl_.new_state_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -8841,17 +8819,18 @@ PROTOBUF_NOINLINE void ComponentInitializationEvent::Clear() {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      _impl_.error_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _impl_.old_state_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       _impl_.new_state_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
   _impl_.kind_ = 0;
-  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00007f00U)) {
     ::memset(&_impl_.component_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.current_lifecycle_state_) -
         reinterpret_cast<char*>(&_impl_.component_)) + sizeof(_impl_.current_lifecycle_state_));
@@ -8925,18 +8904,8 @@ PROTOBUF_NOINLINE void ComponentInitializationEvent::Clear() {
     }
   }
 
-  // string error = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (!this_._internal_error().empty()) {
-      const ::std::string& _s = this_._internal_error();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ComponentInitializationEvent.error");
-      target = stream->WriteStringMaybeAliased(6, _s, target);
-    }
-  }
-
   // string old_state = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (!this_._internal_old_state().empty()) {
       const ::std::string& _s = this_._internal_old_state();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -8946,7 +8915,7 @@ PROTOBUF_NOINLINE void ComponentInitializationEvent::Clear() {
   }
 
   // string new_state = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (!this_._internal_new_state().empty()) {
       const ::std::string& _s = this_._internal_new_state();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -8988,17 +8957,8 @@ PROTOBUF_NOINLINE void ComponentInitializationEvent::Clear() {
     }
   }
 
-  // bool init_success = 12;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-    if (this_._internal_init_success() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          12, this_._internal_init_success(), target);
-    }
-  }
-
   // int32 ready_count = 13;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     if (this_._internal_ready_count() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<13>(
@@ -9007,7 +8967,7 @@ PROTOBUF_NOINLINE void ComponentInitializationEvent::Clear() {
   }
 
   // int32 failed_count = 14;
-  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
     if (this_._internal_failed_count() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<14>(
@@ -9016,7 +8976,7 @@ PROTOBUF_NOINLINE void ComponentInitializationEvent::Clear() {
   }
 
   // .runanywhere.v1.ComponentLifecycleState previous_lifecycle_state = 15;
-  if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
     if (this_._internal_previous_lifecycle_state() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -9025,12 +8985,19 @@ PROTOBUF_NOINLINE void ComponentInitializationEvent::Clear() {
   }
 
   // .runanywhere.v1.ComponentLifecycleState current_lifecycle_state = 16;
-  if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00004000U)) {
     if (this_._internal_current_lifecycle_state() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
           16, this_._internal_current_lifecycle_state(), target);
     }
+  }
+
+  // optional .runanywhere.v1.SDKError error = 17;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        17, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -9081,26 +9048,24 @@ PROTOBUF_NOINLINE void ComponentInitializationEvent::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // string error = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (!this_._internal_error().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_error());
-      }
-    }
     // string old_state = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (!this_._internal_old_state().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_old_state());
       }
     }
     // string new_state = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (!this_._internal_new_state().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_new_state());
       }
+    }
+    // optional .runanywhere.v1.SDKError error = 17;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      total_size += 2 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // .runanywhere.v1.ComponentInitializationEventKind kind = 1;
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
@@ -9110,7 +9075,7 @@ PROTOBUF_NOINLINE void ComponentInitializationEvent::Clear() {
       }
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00007f00U)) {
     // .runanywhere.v1.SDKComponent component = 2;
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_component() != 0) {
@@ -9131,35 +9096,29 @@ PROTOBUF_NOINLINE void ComponentInitializationEvent::Clear() {
         total_size += 5;
       }
     }
-    // bool init_success = 12;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (this_._internal_init_success() != 0) {
-        total_size += 2;
-      }
-    }
     // int32 ready_count = 13;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (this_._internal_ready_count() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_ready_count());
       }
     }
     // int32 failed_count = 14;
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (this_._internal_failed_count() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_failed_count());
       }
     }
     // .runanywhere.v1.ComponentLifecycleState previous_lifecycle_state = 15;
-    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (this_._internal_previous_lifecycle_state() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_previous_lifecycle_state());
       }
     }
     // .runanywhere.v1.ComponentLifecycleState current_lifecycle_state = 16;
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
       if (this_._internal_current_lifecycle_state() != 0) {
         total_size += 2 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_current_lifecycle_state());
@@ -9177,6 +9136,7 @@ void ComponentInitializationEvent::MergeImpl(::google::protobuf::MessageLite& to
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.ComponentInitializationEvent)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
@@ -9203,15 +9163,6 @@ void ComponentInitializationEvent::MergeImpl(::google::protobuf::MessageLite& to
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (!from._internal_error().empty()) {
-        _this->_internal_set_error(from._internal_error());
-      } else {
-        if (_this->_impl_.error_.IsDefault()) {
-          _this->_internal_set_error("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (!from._internal_old_state().empty()) {
         _this->_internal_set_old_state(from._internal_old_state());
       } else {
@@ -9220,7 +9171,7 @@ void ComponentInitializationEvent::MergeImpl(::google::protobuf::MessageLite& to
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (!from._internal_new_state().empty()) {
         _this->_internal_set_new_state(from._internal_new_state());
       } else {
@@ -9229,13 +9180,21 @@ void ComponentInitializationEvent::MergeImpl(::google::protobuf::MessageLite& to
         }
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
+      }
+    }
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_kind() != 0) {
         _this->_impl_.kind_ = from._impl_.kind_;
       }
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00007f00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (from._internal_component() != 0) {
         _this->_impl_.component_ = from._impl_.component_;
@@ -9252,26 +9211,21 @@ void ComponentInitializationEvent::MergeImpl(::google::protobuf::MessageLite& to
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (from._internal_init_success() != 0) {
-        _this->_impl_.init_success_ = from._impl_.init_success_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (from._internal_ready_count() != 0) {
         _this->_impl_.ready_count_ = from._impl_.ready_count_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (from._internal_failed_count() != 0) {
         _this->_impl_.failed_count_ = from._impl_.failed_count_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (from._internal_previous_lifecycle_state() != 0) {
         _this->_impl_.previous_lifecycle_state_ = from._impl_.previous_lifecycle_state_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
       if (from._internal_current_lifecycle_state() != 0) {
         _this->_impl_.current_lifecycle_state_ = from._impl_.current_lifecycle_state_;
       }
@@ -9300,15 +9254,14 @@ void ComponentInitializationEvent::InternalSwap(ComponentInitializationEvent* PR
   _impl_.ready_components_.InternalSwap(&other->_impl_.ready_components_);
   _impl_.pending_components_.InternalSwap(&other->_impl_.pending_components_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_, &other->_impl_.error_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.old_state_, &other->_impl_.old_state_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.new_state_, &other->_impl_.new_state_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.current_lifecycle_state_)
       + sizeof(ComponentInitializationEvent::_impl_.current_lifecycle_state_)
-      - PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.kind_)>(
-          reinterpret_cast<char*>(&_impl_.kind_),
-          reinterpret_cast<char*>(&other->_impl_.kind_));
+      - PROTOBUF_FIELD_OFFSET(ComponentInitializationEvent, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata ComponentInitializationEvent::GetMetadata() const {
@@ -9319,6 +9272,11 @@ void ComponentInitializationEvent::InternalSwap(ComponentInitializationEvent* PR
 void ComponentLifecycleSnapshot::clear_model() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.model_ != nullptr) _impl_.model_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
+void ComponentLifecycleSnapshot::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
   ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
 }
 ComponentLifecycleSnapshot::ComponentLifecycleSnapshot(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
@@ -9337,7 +9295,6 @@ PROTOBUF_NDEBUG_INLINE ComponentLifecycleSnapshot::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         model_id_(arena, from.model_id_),
-        error_message_(arena, from.error_message_),
         resolved_path_(arena, from.resolved_path_) {}
 
 ComponentLifecycleSnapshot::ComponentLifecycleSnapshot(
@@ -9355,8 +9312,11 @@ ComponentLifecycleSnapshot::ComponentLifecycleSnapshot(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.model_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+  _impl_.model_ = (CheckHasBit(cached_has_bits, 0x00000004U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.model_)
+                : nullptr;
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, component_),
@@ -9373,7 +9333,6 @@ PROTOBUF_NDEBUG_INLINE ComponentLifecycleSnapshot::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         model_id_(arena),
-        error_message_(arena),
         resolved_path_(arena) {}
 
 inline void ComponentLifecycleSnapshot::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
@@ -9397,9 +9356,9 @@ inline void ComponentLifecycleSnapshot::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.model_id_.Destroy();
-  this_._impl_.error_message_.Destroy();
   this_._impl_.resolved_path_.Destroy();
   delete this_._impl_.model_;
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -9442,14 +9401,15 @@ PROTOBUF_NOINLINE void ComponentLifecycleSnapshot::Clear() {
       _impl_.model_id_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       _impl_.resolved_path_.ClearNonDefaultToEmpty();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(_impl_.model_ != nullptr);
       _impl_.model_->Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x000000f0U)) {
@@ -9522,16 +9482,6 @@ PROTOBUF_NOINLINE void ComponentLifecycleSnapshot::Clear() {
     }
   }
 
-  // string error_message = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_error_message().empty()) {
-      const ::std::string& _s = this_._internal_error_message();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ComponentLifecycleSnapshot.error_message");
-      target = stream->WriteStringMaybeAliased(5, _s, target);
-    }
-  }
-
   // .runanywhere.v1.ModelCategory category = 6;
   if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_category() != 0) {
@@ -9551,7 +9501,7 @@ PROTOBUF_NOINLINE void ComponentLifecycleSnapshot::Clear() {
   }
 
   // string resolved_path = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (!this_._internal_resolved_path().empty()) {
       const ::std::string& _s = this_._internal_resolved_path();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -9570,9 +9520,16 @@ PROTOBUF_NOINLINE void ComponentLifecycleSnapshot::Clear() {
   }
 
   // .runanywhere.v1.ModelInfo model = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         10, *this_._impl_.model_, this_._impl_.model_->GetCachedSize(), target,
+        stream);
+  }
+
+  // optional .runanywhere.v1.SDKError error = 11;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        11, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
         stream);
   }
 
@@ -9609,24 +9566,22 @@ PROTOBUF_NOINLINE void ComponentLifecycleSnapshot::Clear() {
                                         this_._internal_model_id());
       }
     }
-    // string error_message = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_error_message().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_error_message());
-      }
-    }
     // string resolved_path = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (!this_._internal_resolved_path().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_resolved_path());
       }
     }
     // .runanywhere.v1.ModelInfo model = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.model_);
+    }
+    // optional .runanywhere.v1.SDKError error = 11;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // .runanywhere.v1.SDKComponent component = 1;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
@@ -9702,15 +9657,6 @@ void ComponentLifecycleSnapshot::MergeImpl(::google::protobuf::MessageLite& to_m
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_error_message().empty()) {
-        _this->_internal_set_error_message(from._internal_error_message());
-      } else {
-        if (_this->_impl_.error_message_.IsDefault()) {
-          _this->_internal_set_error_message("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (!from._internal_resolved_path().empty()) {
         _this->_internal_set_resolved_path(from._internal_resolved_path());
       } else {
@@ -9719,12 +9665,20 @@ void ComponentLifecycleSnapshot::MergeImpl(::google::protobuf::MessageLite& to_m
         }
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       ABSL_DCHECK(from._impl_.model_ != nullptr);
       if (_this->_impl_.model_ == nullptr) {
         _this->_impl_.model_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.model_);
       } else {
         _this->_impl_.model_->MergeFrom(*from._impl_.model_);
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
@@ -9780,7 +9734,6 @@ void ComponentLifecycleSnapshot::InternalSwap(ComponentLifecycleSnapshot* PROTOB
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.resolved_path_, &other->_impl_.resolved_path_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(ComponentLifecycleSnapshot, _impl_.loaded_at_unix_ms_)
@@ -9795,6 +9748,11 @@ void ComponentLifecycleSnapshot::InternalSwap(ComponentLifecycleSnapshot* PROTOB
 }
 // ===================================================================
 
+void ComponentLifecycleSnapshotResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
 ComponentLifecycleSnapshotResult::ComponentLifecycleSnapshotResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, ComponentLifecycleSnapshotResult_get_class_data()) {
@@ -9816,8 +9774,7 @@ PROTOBUF_NDEBUG_INLINE ComponentLifecycleSnapshotResult::Impl_::Impl_(
               PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotResult, _impl_.snapshots_)>()
           , from.snapshots_
         }
-        ,
-        error_message_(arena, from.error_message_) {}
+     {}
 
 ComponentLifecycleSnapshotResult::ComponentLifecycleSnapshotResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -9833,7 +9790,10 @@ ComponentLifecycleSnapshotResult::ComponentLifecycleSnapshotResult(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  _impl_.success_ = from._impl_.success_;
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000002U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ComponentLifecycleSnapshotResult)
 }
@@ -9845,12 +9805,11 @@ PROTOBUF_NDEBUG_INLINE ComponentLifecycleSnapshotResult::Impl_::Impl_(
             ::runanywhere::v1::ComponentLifecycleSnapshotResult,
             PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentLifecycleSnapshotResult, _impl_.snapshots_)>()
          }
-        ,
-        error_message_(arena) {}
+     {}
 
 inline void ComponentLifecycleSnapshotResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.success_ = {};
+  _impl_.error_ = {};
 }
 ComponentLifecycleSnapshotResult::~ComponentLifecycleSnapshotResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.ComponentLifecycleSnapshotResult)
@@ -9863,7 +9822,7 @@ inline void ComponentLifecycleSnapshotResult::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
-  this_._impl_.error_message_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -9906,10 +9865,10 @@ PROTOBUF_NOINLINE void ComponentLifecycleSnapshotResult::Clear() {
       _impl_.snapshots_.Clear();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
-  _impl_.success_ = false;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -9933,15 +9892,6 @@ PROTOBUF_NOINLINE void ComponentLifecycleSnapshotResult::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // bool success = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_success() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteBoolToArray(
-          1, this_._internal_success(), target);
-    }
-  }
-
   // repeated .runanywhere.v1.ComponentLifecycleSnapshot snapshots = 2;
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     for (unsigned i = 0, n = static_cast<unsigned>(
@@ -9955,14 +9905,11 @@ PROTOBUF_NOINLINE void ComponentLifecycleSnapshotResult::Clear() {
     }
   }
 
-  // string error_message = 3;
+  // optional .runanywhere.v1.SDKError error = 4;
   if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-    if (!this_._internal_error_message().empty()) {
-      const ::std::string& _s = this_._internal_error_message();
-      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ComponentLifecycleSnapshotResult.error_message");
-      target = stream->WriteStringMaybeAliased(3, _s, target);
-    }
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        4, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -9990,7 +9937,7 @@ PROTOBUF_NOINLINE void ComponentLifecycleSnapshotResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     // repeated .runanywhere.v1.ComponentLifecycleSnapshot snapshots = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1UL * this_._internal_snapshots_size();
@@ -9998,18 +9945,10 @@ PROTOBUF_NOINLINE void ComponentLifecycleSnapshotResult::Clear() {
         total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
       }
     }
-    // string error_message = 3;
+    // optional .runanywhere.v1.SDKError error = 4;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!this_._internal_error_message().empty()) {
-        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                        this_._internal_error_message());
-      }
-    }
-    // bool success = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_success() != 0) {
-        total_size += 2;
-      }
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -10030,24 +9969,18 @@ void ComponentLifecycleSnapshotResult::MergeImpl(::google::protobuf::MessageLite
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_snapshots()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
           from._internal_snapshots());
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
-      if (!from._internal_error_message().empty()) {
-        _this->_internal_set_error_message(from._internal_error_message());
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
       } else {
-        if (_this->_impl_.error_message_.IsDefault()) {
-          _this->_internal_set_error_message("");
-        }
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_success() != 0) {
-        _this->_impl_.success_ = from._impl_.success_;
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
       }
     }
   }
@@ -10066,13 +9999,10 @@ void ComponentLifecycleSnapshotResult::CopyFrom(const ComponentLifecycleSnapshot
 
 void ComponentLifecycleSnapshotResult::InternalSwap(ComponentLifecycleSnapshotResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
-  auto* arena = GetArena();
-  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   _impl_.snapshots_.InternalSwap(&other->_impl_.snapshots_);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
-  swap(_impl_.success_, other->_impl_.success_);
+  swap(_impl_.error_, other->_impl_.error_);
 }
 
 ::google::protobuf::Metadata ComponentLifecycleSnapshotResult::GetMetadata() const {
@@ -12535,9 +12465,9 @@ VoiceLifecycleEvent::VoiceLifecycleEvent(
                offsetof(Impl_, kind_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, kind_),
-           offsetof(Impl_, characters_per_second_) -
+           offsetof(Impl_, processing_duration_ms_) -
                offsetof(Impl_, kind_) +
-               sizeof(Impl_::characters_per_second_));
+               sizeof(Impl_::processing_duration_ms_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VoiceLifecycleEvent)
 }
@@ -12562,9 +12492,9 @@ inline void VoiceLifecycleEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE aren
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, kind_),
            0,
-           offsetof(Impl_, characters_per_second_) -
+           offsetof(Impl_, processing_duration_ms_) -
                offsetof(Impl_, kind_) +
-               sizeof(Impl_::characters_per_second_));
+               sizeof(Impl_::processing_duration_ms_));
 }
 VoiceLifecycleEvent::~VoiceLifecycleEvent() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VoiceLifecycleEvent)
@@ -12669,14 +12599,10 @@ PROTOBUF_NOINLINE void VoiceLifecycleEvent::Clear() {
   }
   if (BatchCheckHasBit(cached_has_bits, 0x00ff0000U)) {
     ::memset(&_impl_.audio_length_ms_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.character_count_) -
-        reinterpret_cast<char*>(&_impl_.audio_length_ms_)) + sizeof(_impl_.character_count_));
+        reinterpret_cast<char*>(&_impl_.audio_size_bytes_tts_) -
+        reinterpret_cast<char*>(&_impl_.audio_length_ms_)) + sizeof(_impl_.audio_size_bytes_tts_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x07000000U)) {
-    ::memset(&_impl_.audio_size_bytes_tts_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.characters_per_second_) -
-        reinterpret_cast<char*>(&_impl_.audio_size_bytes_tts_)) + sizeof(_impl_.characters_per_second_));
-  }
+  _impl_.processing_duration_ms_ = ::int64_t{0};
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -12855,20 +12781,11 @@ PROTOBUF_NOINLINE void VoiceLifecycleEvent::Clear() {
   }
 
   // int32 word_count = 17;
-  if (CheckHasBit(cached_has_bits, 0x00040000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00020000U)) {
     if (this_._internal_word_count() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt32ToArray(
           17, this_._internal_word_count(), target);
-    }
-  }
-
-  // double real_time_factor = 18;
-  if (CheckHasBit(cached_has_bits, 0x00020000U)) {
-    if (::absl::bit_cast<::uint64_t>(this_._internal_real_time_factor()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteDoubleToArray(
-          18, this_._internal_real_time_factor(), target);
     }
   }
 
@@ -12883,7 +12800,7 @@ PROTOBUF_NOINLINE void VoiceLifecycleEvent::Clear() {
   }
 
   // int32 sample_rate = 20;
-  if (CheckHasBit(cached_has_bits, 0x00080000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00040000U)) {
     if (this_._internal_sample_rate() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt32ToArray(
@@ -12892,7 +12809,7 @@ PROTOBUF_NOINLINE void VoiceLifecycleEvent::Clear() {
   }
 
   // bool is_streaming = 21;
-  if (CheckHasBit(cached_has_bits, 0x00100000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00080000U)) {
     if (this_._internal_is_streaming() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -12901,7 +12818,7 @@ PROTOBUF_NOINLINE void VoiceLifecycleEvent::Clear() {
   }
 
   // int32 framework = 22;
-  if (CheckHasBit(cached_has_bits, 0x00200000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00100000U)) {
     if (this_._internal_framework() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt32ToArray(
@@ -12910,7 +12827,7 @@ PROTOBUF_NOINLINE void VoiceLifecycleEvent::Clear() {
   }
 
   // int32 character_count = 23;
-  if (CheckHasBit(cached_has_bits, 0x00800000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00400000U)) {
     if (this_._internal_character_count() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt32ToArray(
@@ -12919,7 +12836,7 @@ PROTOBUF_NOINLINE void VoiceLifecycleEvent::Clear() {
   }
 
   // int64 audio_duration_ms = 24;
-  if (CheckHasBit(cached_has_bits, 0x00400000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00200000U)) {
     if (this_._internal_audio_duration_ms() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt64ToArray(
@@ -12928,7 +12845,7 @@ PROTOBUF_NOINLINE void VoiceLifecycleEvent::Clear() {
   }
 
   // int32 audio_size_bytes_tts = 25;
-  if (CheckHasBit(cached_has_bits, 0x01000000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00800000U)) {
     if (this_._internal_audio_size_bytes_tts() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt32ToArray(
@@ -12937,20 +12854,11 @@ PROTOBUF_NOINLINE void VoiceLifecycleEvent::Clear() {
   }
 
   // int64 processing_duration_ms = 26;
-  if (CheckHasBit(cached_has_bits, 0x02000000U)) {
+  if (CheckHasBit(cached_has_bits, 0x01000000U)) {
     if (this_._internal_processing_duration_ms() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt64ToArray(
           26, this_._internal_processing_duration_ms(), target);
-    }
-  }
-
-  // double characters_per_second = 27;
-  if (CheckHasBit(cached_has_bits, 0x04000000U)) {
-    if (::absl::bit_cast<::uint64_t>(this_._internal_characters_per_second()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteDoubleToArray(
-          27, this_._internal_characters_per_second(), target);
     }
   }
 
@@ -13101,73 +13009,61 @@ PROTOBUF_NOINLINE void VoiceLifecycleEvent::Clear() {
             this_._internal_audio_length_ms());
       }
     }
-    // double real_time_factor = 18;
-    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
-      if (::absl::bit_cast<::uint64_t>(this_._internal_real_time_factor()) != 0) {
-        total_size += 10;
-      }
-    }
     // int32 word_count = 17;
-    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
       if (this_._internal_word_count() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
                                         this_._internal_word_count());
       }
     }
     // int32 sample_rate = 20;
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
       if (this_._internal_sample_rate() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
                                         this_._internal_sample_rate());
       }
     }
     // bool is_streaming = 21;
-    if (CheckHasBit(cached_has_bits, 0x00100000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
       if (this_._internal_is_streaming() != 0) {
         total_size += 3;
       }
     }
     // int32 framework = 22;
-    if (CheckHasBit(cached_has_bits, 0x00200000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00100000U)) {
       if (this_._internal_framework() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
                                         this_._internal_framework());
       }
     }
     // int64 audio_duration_ms = 24;
-    if (CheckHasBit(cached_has_bits, 0x00400000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00200000U)) {
       if (this_._internal_audio_duration_ms() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int64Size(
                                         this_._internal_audio_duration_ms());
       }
     }
     // int32 character_count = 23;
-    if (CheckHasBit(cached_has_bits, 0x00800000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00400000U)) {
       if (this_._internal_character_count() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
                                         this_._internal_character_count());
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x07000000U)) {
     // int32 audio_size_bytes_tts = 25;
-    if (CheckHasBit(cached_has_bits, 0x01000000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00800000U)) {
       if (this_._internal_audio_size_bytes_tts() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
                                         this_._internal_audio_size_bytes_tts());
       }
     }
+  }
+   {
     // int64 processing_duration_ms = 26;
-    if (CheckHasBit(cached_has_bits, 0x02000000U)) {
+    if (CheckHasBit(cached_has_bits, 0x01000000U)) {
       if (this_._internal_processing_duration_ms() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int64Size(
                                         this_._internal_processing_duration_ms());
-      }
-    }
-    // double characters_per_second = 27;
-    if (CheckHasBit(cached_has_bits, 0x04000000U)) {
-      if (::absl::bit_cast<::uint64_t>(this_._internal_characters_per_second()) != 0) {
-        total_size += 10;
       }
     }
   }
@@ -13323,56 +13219,44 @@ void VoiceLifecycleEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00020000U)) {
-      if (::absl::bit_cast<::uint64_t>(from._internal_real_time_factor()) != 0) {
-        _this->_impl_.real_time_factor_ = from._impl_.real_time_factor_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
       if (from._internal_word_count() != 0) {
         _this->_impl_.word_count_ = from._impl_.word_count_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
       if (from._internal_sample_rate() != 0) {
         _this->_impl_.sample_rate_ = from._impl_.sample_rate_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00100000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
       if (from._internal_is_streaming() != 0) {
         _this->_impl_.is_streaming_ = from._impl_.is_streaming_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00200000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00100000U)) {
       if (from._internal_framework() != 0) {
         _this->_impl_.framework_ = from._impl_.framework_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00400000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00200000U)) {
       if (from._internal_audio_duration_ms() != 0) {
         _this->_impl_.audio_duration_ms_ = from._impl_.audio_duration_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00800000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00400000U)) {
       if (from._internal_character_count() != 0) {
         _this->_impl_.character_count_ = from._impl_.character_count_;
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x07000000U)) {
-    if (CheckHasBit(cached_has_bits, 0x01000000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00800000U)) {
       if (from._internal_audio_size_bytes_tts() != 0) {
         _this->_impl_.audio_size_bytes_tts_ = from._impl_.audio_size_bytes_tts_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x02000000U)) {
-      if (from._internal_processing_duration_ms() != 0) {
-        _this->_impl_.processing_duration_ms_ = from._impl_.processing_duration_ms_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x04000000U)) {
-      if (::absl::bit_cast<::uint64_t>(from._internal_characters_per_second()) != 0) {
-        _this->_impl_.characters_per_second_ = from._impl_.characters_per_second_;
-      }
+  }
+  if (CheckHasBit(cached_has_bits, 0x01000000U)) {
+    if (from._internal_processing_duration_ms() != 0) {
+      _this->_impl_.processing_duration_ms_ = from._impl_.processing_duration_ms_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -13406,8 +13290,8 @@ void VoiceLifecycleEvent::InternalSwap(VoiceLifecycleEvent* PROTOBUF_RESTRICT PR
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_name_, &other->_impl_.model_name_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.language_, &other->_impl_.language_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.characters_per_second_)
-      + sizeof(VoiceLifecycleEvent::_impl_.characters_per_second_)
+      PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.processing_duration_ms_)
+      + sizeof(VoiceLifecycleEvent::_impl_.processing_duration_ms_)
       - PROTOBUF_FIELD_OFFSET(VoiceLifecycleEvent, _impl_.kind_)>(
           reinterpret_cast<char*>(&_impl_.kind_),
           reinterpret_cast<char*>(&other->_impl_.kind_));

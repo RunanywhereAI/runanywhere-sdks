@@ -12,6 +12,7 @@ exports.tTSStreamEventKindFromJSON = tTSStreamEventKindFromJSON;
 exports.tTSStreamEventKindToJSON = tTSStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const errors_1 = require("./errors");
 const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
 var TTSVoiceGender;
@@ -751,14 +752,7 @@ exports.TTSPhonemeTimestamp = {
     },
 };
 function createBaseTTSSynthesisMetadata() {
-    return {
-        voiceId: "",
-        languageCode: "",
-        processingTimeMs: 0,
-        characterCount: 0,
-        audioDurationMs: 0,
-        charactersPerSecond: 0,
-    };
+    return { voiceId: "", languageCode: "", processingTimeMs: 0, characterCount: 0, audioDurationMs: 0 };
 }
 exports.TTSSynthesisMetadata = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -776,9 +770,6 @@ exports.TTSSynthesisMetadata = {
         }
         if (message.audioDurationMs !== 0) {
             writer.uint32(40).int64(message.audioDurationMs);
-        }
-        if (message.charactersPerSecond !== 0) {
-            writer.uint32(53).float(message.charactersPerSecond);
         }
         return writer;
     },
@@ -824,13 +815,6 @@ exports.TTSSynthesisMetadata = {
                     message.audioDurationMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 6: {
-                    if (tag !== 53) {
-                        break;
-                    }
-                    message.charactersPerSecond = reader.float();
-                    continue;
-                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -866,11 +850,6 @@ exports.TTSSynthesisMetadata = {
                 : isSet(object.audio_duration_ms)
                     ? globalThis.Number(object.audio_duration_ms)
                     : 0,
-            charactersPerSecond: isSet(object.charactersPerSecond)
-                ? globalThis.Number(object.charactersPerSecond)
-                : isSet(object.characters_per_second)
-                    ? globalThis.Number(object.characters_per_second)
-                    : 0,
         };
     },
     toJSON(message) {
@@ -890,9 +869,6 @@ exports.TTSSynthesisMetadata = {
         if (message.audioDurationMs !== 0) {
             obj.audioDurationMs = Math.round(message.audioDurationMs);
         }
-        if (message.charactersPerSecond !== 0) {
-            obj.charactersPerSecond = message.charactersPerSecond;
-        }
         return obj;
     },
     create(base) {
@@ -905,7 +881,6 @@ exports.TTSSynthesisMetadata = {
         message.processingTimeMs = object.processingTimeMs ?? 0;
         message.characterCount = object.characterCount ?? 0;
         message.audioDurationMs = object.audioDurationMs ?? 0;
-        message.charactersPerSecond = object.charactersPerSecond ?? 0;
         return message;
     },
 };
@@ -921,8 +896,7 @@ function createBaseTTSOutput() {
         chunkIndex: 0,
         isFinal: false,
         audioSizeBytes: 0,
-        errorMessage: undefined,
-        errorCode: 0,
+        error: undefined,
     };
 }
 exports.TTSOutput = {
@@ -957,11 +931,8 @@ exports.TTSOutput = {
         if (message.audioSizeBytes !== 0) {
             writer.uint32(80).int64(message.audioSizeBytes);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(90).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(96).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(106).fork()).join();
         }
         return writer;
     },
@@ -1042,18 +1013,11 @@ exports.TTSOutput = {
                     message.audioSizeBytes = longToNumber(reader.int64());
                     continue;
                 }
-                case 11: {
-                    if (tag !== 90) {
+                case 13: {
+                    if (tag !== 106) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1112,16 +1076,7 @@ exports.TTSOutput = {
                 : isSet(object.audio_size_bytes)
                     ? globalThis.Number(object.audio_size_bytes)
                     : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1156,11 +1111,8 @@ exports.TTSOutput = {
         if (message.audioSizeBytes !== 0) {
             obj.audioSizeBytes = Math.round(message.audioSizeBytes);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1181,8 +1133,9 @@ exports.TTSOutput = {
         message.chunkIndex = object.chunkIndex ?? 0;
         message.isFinal = object.isFinal ?? false;
         message.audioSizeBytes = object.audioSizeBytes ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1194,8 +1147,7 @@ function createBaseTTSSpeakResult() {
         audioSizeBytes: 0,
         metadata: undefined,
         timestampMs: 0,
-        errorMessage: undefined,
-        errorCode: 0,
+        error: undefined,
     };
 }
 exports.TTSSpeakResult = {
@@ -1218,11 +1170,8 @@ exports.TTSSpeakResult = {
         if (message.timestampMs !== 0) {
             writer.uint32(48).int64(message.timestampMs);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(58).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(64).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(74).fork()).join();
         }
         return writer;
     },
@@ -1275,18 +1224,11 @@ exports.TTSSpeakResult = {
                     message.timestampMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 7: {
-                    if (tag !== 58) {
+                case 9: {
+                    if (tag !== 74) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1325,16 +1267,7 @@ exports.TTSSpeakResult = {
                 : isSet(object.timestamp_ms)
                     ? globalThis.Number(object.timestamp_ms)
                     : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1357,11 +1290,8 @@ exports.TTSSpeakResult = {
         if (message.timestampMs !== 0) {
             obj.timestampMs = Math.round(message.timestampMs);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1378,8 +1308,9 @@ exports.TTSSpeakResult = {
             ? exports.TTSSynthesisMetadata.fromPartial(object.metadata)
             : undefined;
         message.timestampMs = object.timestampMs ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1645,27 +1576,22 @@ exports.TTSVoiceList = {
 };
 function createBaseTTSStreamEvent() {
     return {
-        seq: 0,
         timestampUs: 0,
         requestId: "",
         kind: 0,
         output: undefined,
         phoneme: undefined,
         speakResult: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
         progress: 0,
         chunkIndex: 0,
         totalChunks: 0,
         elapsedMs: 0,
         statusMessage: "",
+        error: undefined,
     };
 }
 exports.TTSStreamEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.seq !== 0) {
-            writer.uint32(8).uint64(message.seq);
-        }
         if (message.timestampUs !== 0) {
             writer.uint32(16).int64(message.timestampUs);
         }
@@ -1684,12 +1610,6 @@ exports.TTSStreamEvent = {
         if (message.speakResult !== undefined) {
             exports.TTSSpeakResult.encode(message.speakResult, writer.uint32(58).fork()).join();
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(66).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(72).int32(message.errorCode);
-        }
         if (message.progress !== 0) {
             writer.uint32(85).float(message.progress);
         }
@@ -1705,6 +1625,9 @@ exports.TTSStreamEvent = {
         if (message.statusMessage !== "") {
             writer.uint32(114).string(message.statusMessage);
         }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(122).fork()).join();
+        }
         return writer;
     },
     decode(input, length) {
@@ -1714,13 +1637,6 @@ exports.TTSStreamEvent = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.seq = longToNumber(reader.uint64());
-                    continue;
-                }
                 case 2: {
                     if (tag !== 16) {
                         break;
@@ -1763,20 +1679,6 @@ exports.TTSStreamEvent = {
                     message.speakResult = exports.TTSSpeakResult.decode(reader, reader.uint32());
                     continue;
                 }
-                case 8: {
-                    if (tag !== 66) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 9: {
-                    if (tag !== 72) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
                 case 10: {
                     if (tag !== 85) {
                         break;
@@ -1812,6 +1714,13 @@ exports.TTSStreamEvent = {
                     message.statusMessage = reader.string();
                     continue;
                 }
+                case 15: {
+                    if (tag !== 122) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1822,7 +1731,6 @@ exports.TTSStreamEvent = {
     },
     fromJSON(object) {
         return {
-            seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
             timestampUs: isSet(object.timestampUs)
                 ? globalThis.Number(object.timestampUs)
                 : isSet(object.timestamp_us)
@@ -1841,16 +1749,6 @@ exports.TTSStreamEvent = {
                 : isSet(object.speak_result)
                     ? exports.TTSSpeakResult.fromJSON(object.speak_result)
                     : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
             progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
             chunkIndex: isSet(object.chunkIndex)
                 ? globalThis.Number(object.chunkIndex)
@@ -1872,13 +1770,11 @@ exports.TTSStreamEvent = {
                 : isSet(object.status_message)
                     ? globalThis.String(object.status_message)
                     : "",
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.seq !== 0) {
-            obj.seq = Math.round(message.seq);
-        }
         if (message.timestampUs !== 0) {
             obj.timestampUs = Math.round(message.timestampUs);
         }
@@ -1897,12 +1793,6 @@ exports.TTSStreamEvent = {
         if (message.speakResult !== undefined) {
             obj.speakResult = exports.TTSSpeakResult.toJSON(message.speakResult);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
         if (message.progress !== 0) {
             obj.progress = message.progress;
         }
@@ -1918,6 +1808,9 @@ exports.TTSStreamEvent = {
         if (message.statusMessage !== "") {
             obj.statusMessage = message.statusMessage;
         }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
+        }
         return obj;
     },
     create(base) {
@@ -1925,7 +1818,6 @@ exports.TTSStreamEvent = {
     },
     fromPartial(object) {
         const message = createBaseTTSStreamEvent();
-        message.seq = object.seq ?? 0;
         message.timestampUs = object.timestampUs ?? 0;
         message.requestId = object.requestId ?? "";
         message.kind = object.kind ?? 0;
@@ -1938,25 +1830,19 @@ exports.TTSStreamEvent = {
         message.speakResult = (object.speakResult !== undefined && object.speakResult !== null)
             ? exports.TTSSpeakResult.fromPartial(object.speakResult)
             : undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         message.progress = object.progress ?? 0;
         message.chunkIndex = object.chunkIndex ?? 0;
         message.totalChunks = object.totalChunks ?? 0;
         message.elapsedMs = object.elapsedMs ?? 0;
         message.statusMessage = object.statusMessage ?? "";
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
 function createBaseTTSServiceState() {
-    return {
-        isReady: false,
-        currentVoice: undefined,
-        voices: [],
-        supportedLanguageCodes: [],
-        errorMessage: undefined,
-        errorCode: 0,
-    };
+    return { isReady: false, currentVoice: undefined, voices: [], supportedLanguageCodes: [], error: undefined };
 }
 exports.TTSServiceState = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1972,11 +1858,8 @@ exports.TTSServiceState = {
         for (const v of message.supportedLanguageCodes) {
             writer.uint32(34).string(v);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(42).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(48).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(58).fork()).join();
         }
         return writer;
     },
@@ -2015,18 +1898,11 @@ exports.TTSServiceState = {
                     message.supportedLanguageCodes.push(reader.string());
                     continue;
                 }
-                case 5: {
-                    if (tag !== 42) {
+                case 7: {
+                    if (tag !== 58) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -2055,16 +1931,7 @@ exports.TTSServiceState = {
                 : globalThis.Array.isArray(object?.supported_language_codes)
                     ? object.supported_language_codes.map((e) => globalThis.String(e))
                     : [],
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -2081,11 +1948,8 @@ exports.TTSServiceState = {
         if (message.supportedLanguageCodes?.length) {
             obj.supportedLanguageCodes = message.supportedLanguageCodes;
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -2098,8 +1962,9 @@ exports.TTSServiceState = {
         message.currentVoice = object.currentVoice ?? undefined;
         message.voices = object.voices?.map((e) => exports.TTSVoiceInfo.fromPartial(e)) || [];
         message.supportedLanguageCodes = object.supportedLanguageCodes?.map((e) => e) || [];
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };

@@ -151,20 +151,11 @@ public class VoiceAgentResult(
   )
   public val total_time_ms: Long = 0L,
   @field:WireField(
-    tag = 16,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    tag = 18,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 15,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 17,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 16,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceAgentResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -192,8 +183,7 @@ public class VoiceAgentResult(
     if (llm_time_ms != other.llm_time_ms) return false
     if (tts_time_ms != other.tts_time_ms) return false
     if (total_time_ms != other.total_time_ms) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -216,8 +206,7 @@ public class VoiceAgentResult(
       result = result * 37 + llm_time_ms.hashCode()
       result = result * 37 + tts_time_ms.hashCode()
       result = result * 37 + total_time_ms.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -240,8 +229,7 @@ public class VoiceAgentResult(
     result += """llm_time_ms=$llm_time_ms"""
     result += """tts_time_ms=$tts_time_ms"""
     result += """total_time_ms=$total_time_ms"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "VoiceAgentResult{", separator = ", ", postfix = "}")
   }
 
@@ -261,10 +249,9 @@ public class VoiceAgentResult(
     llm_time_ms: Long = this.llm_time_ms,
     tts_time_ms: Long = this.tts_time_ms,
     total_time_ms: Long = this.total_time_ms,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceAgentResult = VoiceAgentResult(speech_detected, transcription, assistant_response, thinking_content, synthesized_audio, final_state, synthesized_audio_sample_rate_hz, synthesized_audio_channels, synthesized_audio_encoding, session_id, turn_id, stt_time_ms, llm_time_ms, tts_time_ms, total_time_ms, error_message, error_code, unknownFields)
+  ): VoiceAgentResult = VoiceAgentResult(speech_detected, transcription, assistant_response, thinking_content, synthesized_audio, final_state, synthesized_audio_sample_rate_hz, synthesized_audio_channels, synthesized_audio_encoding, session_id, turn_id, stt_time_ms, llm_time_ms, tts_time_ms, total_time_ms, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -313,10 +300,7 @@ public class VoiceAgentResult(
         if (value.total_time_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(15, value.total_time_ms)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(16, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(17, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(18, value.error)
         return size
       }
 
@@ -356,19 +340,13 @@ public class VoiceAgentResult(
         if (value.total_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 15, value.total_time_ms)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 16, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 17, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 18, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 17, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 16, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 18, value.error)
         if (value.total_time_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 15, value.total_time_ms)
         }
@@ -422,8 +400,7 @@ public class VoiceAgentResult(
         var llm_time_ms: Long = 0L
         var tts_time_ms: Long = 0L
         var total_time_ms: Long = 0L
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> speech_detected = ProtoAdapter.BOOL.decode(reader)
@@ -445,8 +422,7 @@ public class VoiceAgentResult(
             13 -> llm_time_ms = ProtoAdapter.INT64.decode(reader)
             14 -> tts_time_ms = ProtoAdapter.INT64.decode(reader)
             15 -> total_time_ms = ProtoAdapter.INT64.decode(reader)
-            16 -> error_message = ProtoAdapter.STRING.decode(reader)
-            17 -> error_code = ProtoAdapter.INT32.decode(reader)
+            18 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -466,14 +442,14 @@ public class VoiceAgentResult(
           llm_time_ms = llm_time_ms,
           tts_time_ms = tts_time_ms,
           total_time_ms = total_time_ms,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VoiceAgentResult): VoiceAgentResult = value.copy(
         final_state = value.final_state?.let(VoiceAgentComponentStates.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

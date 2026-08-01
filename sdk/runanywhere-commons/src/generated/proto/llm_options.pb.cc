@@ -217,13 +217,13 @@ constexpr PerformanceMetrics::ParseTableT_ PerformanceMetrics::InternalGenerateP
     {
       PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_._has_bits_),
       0, // no _extensions_
-      5, 56,  // max_field_number, fast_idx_mask
+      6, 8,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967264,  // skipmap
+      4294967260,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
+      3,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
       ::_pbi::TcParser::GenericFallback,  // fallback
@@ -231,44 +231,31 @@ constexpr PerformanceMetrics::ParseTableT_ PerformanceMetrics::InternalGenerateP
       ::_pbi::TcParser::GetTable<::runanywhere::v1::PerformanceMetrics>(),  // to_prefetch
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // int64 latency_ms = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(PerformanceMetrics, _impl_.latency_ms_), 0>(),
-       {8, 0, 0,
-        PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.latency_ms_)}},
       // int64 memory_bytes = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(PerformanceMetrics, _impl_.memory_bytes_), 1>(),
-       {16, 1, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(PerformanceMetrics, _impl_.memory_bytes_), 2>(),
+       {16, 2, 0,
         PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.memory_bytes_)}},
-      // float throughput_tokens_per_sec = 3;
-      {::_pbi::TcParser::FastF32S1,
-       {29, 2, 0,
-        PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.throughput_tokens_per_sec_)}},
-      // int32 input_tokens = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(PerformanceMetrics, _impl_.input_tokens_), 3>(),
-       {32, 3, 0,
-        PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.input_tokens_)}},
-      // int32 output_tokens = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(PerformanceMetrics, _impl_.output_tokens_), 4>(),
-       {40, 4, 0,
-        PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.output_tokens_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // int64 latency_ms = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(PerformanceMetrics, _impl_.latency_ms_), 1>(),
+       {8, 1, 0,
+        PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.latency_ms_)}},
     }}, {{
       65535, 65535
     }}, {{
       // int64 latency_ms = 1;
-      {PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.latency_ms_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.latency_ms_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // int64 memory_bytes = 2;
-      {PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.memory_bytes_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // float throughput_tokens_per_sec = 3;
-      {PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.throughput_tokens_per_sec_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int32 input_tokens = 4;
-      {PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.input_tokens_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 output_tokens = 5;
-      {PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.output_tokens_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.memory_bytes_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // .runanywhere.v1.TokenUsage usage = 6;
+      {PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.usage_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
-    // no aux_entries
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::TokenUsage>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::TokenUsage_globals_},
+        #endif
+    }},
     {{
     }},
   };
@@ -279,11 +266,9 @@ inline constexpr PerformanceMetrics::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
+        usage_{nullptr},
         latency_ms_{::int64_t{0}},
-        memory_bytes_{::int64_t{0}},
-        throughput_tokens_per_sec_{0},
-        input_tokens_{0},
-        output_tokens_{0} {}
+        memory_bytes_{::int64_t{0}} {}
 
 template <typename>
 constexpr PerformanceMetrics::PerformanceMetrics(::_pbi::ConstantInitialized,
@@ -389,12 +374,12 @@ constexpr LLMGenerationResult::ParseTableT_ LLMGenerationResult::InternalGenerat
     {
       PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_._has_bits_),
       0, // no _extensions_
-      24, 248,  // max_field_number, fast_idx_mask
+      26, 248,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4278190080,  // skipmap
+      4228317324,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      24,  // num_field_entries
-      4,  // num_aux_entries
+      20,  // num_field_entries
+      6,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
       nullptr,  // post_loop_handler
@@ -412,30 +397,21 @@ constexpr LLMGenerationResult::ParseTableT_ LLMGenerationResult::InternalGenerat
       {::_pbi::TcParser::FastUS1,
        {18, 3, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.thinking_content_)}},
-      // int32 input_tokens = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMGenerationResult, _impl_.input_tokens_), 11>(),
-       {24, 11, 0,
-        PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.input_tokens_)}},
-      // int32 output_tokens = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMGenerationResult, _impl_.output_tokens_), 12>(),
-       {32, 12, 0,
-        PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.output_tokens_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
       // string model_used = 5;
       {::_pbi::TcParser::FastUS1,
        {42, 4, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.model_used_)}},
       // double generation_time_ms = 6;
       {::_pbi::TcParser::FastF64S1,
-       {49, 13, 0,
+       {49, 12, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.generation_time_ms_)}},
       // optional double ttft_ms = 7;
       {::_pbi::TcParser::FastF64S1,
-       {57, 14, 0,
+       {57, 13, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.ttft_ms_)}},
-      // double tokens_per_second = 8;
-      {::_pbi::TcParser::FastF64S1,
-       {65, 15, 0,
-        PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.tokens_per_second_)}},
+      {::_pbi::TcParser::MiniParse, {}},
       // optional string framework = 9;
       {::_pbi::TcParser::FastUS1,
        {74, 5, 0,
@@ -445,12 +421,12 @@ constexpr LLMGenerationResult::ParseTableT_ LLMGenerationResult::InternalGenerat
        {82, 6, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.finish_reason_)}},
       // int32 thinking_tokens = 11;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMGenerationResult, _impl_.thinking_tokens_), 16>(),
-       {88, 16, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMGenerationResult, _impl_.thinking_tokens_), 14>(),
+       {88, 14, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.thinking_tokens_)}},
       // int32 response_tokens = 12;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMGenerationResult, _impl_.response_tokens_), 17>(),
-       {96, 17, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMGenerationResult, _impl_.response_tokens_), 15>(),
+       {96, 15, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.response_tokens_)}},
       // optional string json_output = 13;
       {::_pbi::TcParser::FastUS1,
@@ -458,39 +434,30 @@ constexpr LLMGenerationResult::ParseTableT_ LLMGenerationResult::InternalGenerat
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.json_output_)}},
       // optional .runanywhere.v1.PerformanceMetrics performance = 14;
       {::_pbi::TcParser::FastMtS1,
-       {114, 9, 0,
+       {114, 8, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.performance_)}},
       // optional .runanywhere.v1.ExecutionTarget executed_on = 15;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMGenerationResult, _impl_.executed_on_), 18>(),
-       {120, 18, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMGenerationResult, _impl_.executed_on_), 16>(),
+       {120, 16, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.executed_on_)}},
       // optional .runanywhere.v1.StructuredOutputValidation structured_output_validation = 16;
       {::_pbi::TcParser::FastMtS2,
-       {386, 10, 1,
+       {386, 9, 1,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.structured_output_validation_)}},
-      // int32 total_tokens = 17;
-      {::_pbi::TcParser::FastV32S2,
-       {392, 19, 0,
-        PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.total_tokens_)}},
-      // optional string error_message = 18;
-      {::_pbi::TcParser::FastUS2,
-       {402, 8, 0,
-        PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.error_message_)}},
-      // int32 error_code = 19;
-      {::_pbi::TcParser::FastV32S2,
-       {408, 20, 0,
-        PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.error_code_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
       // int32 cached_prompt_tokens = 20;
       {::_pbi::TcParser::FastV32S2,
-       {416, 21, 0,
+       {416, 17, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.cached_prompt_tokens_)}},
       // int64 prompt_eval_time_ms = 21;
       {::_pbi::TcParser::FastV64S2,
-       {424, 22, 0,
+       {424, 18, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.prompt_eval_time_ms_)}},
       // int64 decode_time_ms = 22;
       {::_pbi::TcParser::FastV64S2,
-       {432, 23, 0,
+       {432, 19, 0,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.decode_time_ms_)}},
       // repeated .runanywhere.v1.ToolCall tool_calls = 23;
       {::_pbi::TcParser::FastMtR2,
@@ -500,8 +467,14 @@ constexpr LLMGenerationResult::ParseTableT_ LLMGenerationResult::InternalGenerat
       {::_pbi::TcParser::FastMtR2,
        {450, 1, 3,
         PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.tool_results_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // .runanywhere.v1.TokenUsage usage = 25;
+      {::_pbi::TcParser::FastMtS2,
+       {458, 10, 4,
+        PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.usage_)}},
+      // optional .runanywhere.v1.SDKError error = 26;
+      {::_pbi::TcParser::FastMtS2,
+       {466, 11, 5,
+        PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.error_)}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
       {::_pbi::TcParser::MiniParse, {}},
@@ -514,50 +487,42 @@ constexpr LLMGenerationResult::ParseTableT_ LLMGenerationResult::InternalGenerat
       {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.text_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // optional string thinking_content = 2;
       {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.thinking_content_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 input_tokens = 3;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.input_tokens_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 output_tokens = 4;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.output_tokens_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // string model_used = 5;
       {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.model_used_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // double generation_time_ms = 6;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.generation_time_ms_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.generation_time_ms_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
       // optional double ttft_ms = 7;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.ttft_ms_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
-      // double tokens_per_second = 8;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.tokens_per_second_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.ttft_ms_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
       // optional string framework = 9;
       {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.framework_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string finish_reason = 10;
       {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.finish_reason_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int32 thinking_tokens = 11;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.thinking_tokens_), _Internal::kHasBitsOffset + 16, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.thinking_tokens_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 response_tokens = 12;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.response_tokens_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.response_tokens_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // optional string json_output = 13;
       {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.json_output_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // optional .runanywhere.v1.PerformanceMetrics performance = 14;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.performance_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.performance_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // optional .runanywhere.v1.ExecutionTarget executed_on = 15;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.executed_on_), _Internal::kHasBitsOffset + 18, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.executed_on_), _Internal::kHasBitsOffset + 16, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional .runanywhere.v1.StructuredOutputValidation structured_output_validation = 16;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.structured_output_validation_), _Internal::kHasBitsOffset + 10, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // int32 total_tokens = 17;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.total_tokens_), _Internal::kHasBitsOffset + 19, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // optional string error_message = 18;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.error_message_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 19;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.error_code_), _Internal::kHasBitsOffset + 20, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.structured_output_validation_), _Internal::kHasBitsOffset + 9, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // int32 cached_prompt_tokens = 20;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.cached_prompt_tokens_), _Internal::kHasBitsOffset + 21, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.cached_prompt_tokens_), _Internal::kHasBitsOffset + 17, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int64 prompt_eval_time_ms = 21;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.prompt_eval_time_ms_), _Internal::kHasBitsOffset + 22, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.prompt_eval_time_ms_), _Internal::kHasBitsOffset + 18, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // int64 decode_time_ms = 22;
-      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.decode_time_ms_), _Internal::kHasBitsOffset + 23, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.decode_time_ms_), _Internal::kHasBitsOffset + 19, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // repeated .runanywhere.v1.ToolCall tool_calls = 23;
       {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.tool_calls_), _Internal::kHasBitsOffset + 0, 2, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
       // repeated .runanywhere.v1.ToolResult tool_results = 24;
       {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.tool_results_), _Internal::kHasBitsOffset + 1, 3, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
+      // .runanywhere.v1.TokenUsage usage = 25;
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.usage_), _Internal::kHasBitsOffset + 10, 4, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional .runanywhere.v1.SDKError error = 26;
+      {PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.error_), _Internal::kHasBitsOffset + 11, 5, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -580,9 +545,19 @@ constexpr LLMGenerationResult::ParseTableT_ LLMGenerationResult::InternalGenerat
         #else
         {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::ToolResult_globals_},
         #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::TokenUsage>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::TokenUsage_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
     }},
     {{
-      "\42\4\20\0\0\12\0\0\0\11\15\0\0\13\0\0\0\0\15\0\0\0\0\0\0\0\0\0\0\0\0\0"
+      "\42\4\20\12\0\0\11\15\0\0\13\0\0\0\0\0\0\0\0\0\0\0\0\0"
       "runanywhere.v1.LLMGenerationResult"
       "text"
       "thinking_content"
@@ -590,7 +565,6 @@ constexpr LLMGenerationResult::ParseTableT_ LLMGenerationResult::InternalGenerat
       "framework"
       "finish_reason"
       "json_output"
-      "error_message"
     }},
   };
 }
@@ -628,21 +602,15 @@ inline constexpr LLMGenerationResult::Impl_::Impl_(
         json_output_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
         performance_{nullptr},
         structured_output_validation_{nullptr},
-        input_tokens_{0},
-        output_tokens_{0},
+        usage_{nullptr},
+        error_{nullptr},
         generation_time_ms_{0},
         ttft_ms_{0},
-        tokens_per_second_{0},
         thinking_tokens_{0},
         response_tokens_{0},
         executed_on_{static_cast< ::runanywhere::v1::ExecutionTarget >(0)},
-        total_tokens_{0},
-        error_code_{0},
         cached_prompt_tokens_{0},
         prompt_eval_time_ms_{::int64_t{0}},
         decode_time_ms_{::int64_t{0}} {}
@@ -1270,15 +1238,12 @@ const ::uint32_t
         4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_._has_bits_),
-        27, // hasbit index offset
+        23, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.thinking_content_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.input_tokens_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.output_tokens_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.model_used_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.generation_time_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.ttft_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.tokens_per_second_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.framework_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.finish_reason_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.thinking_tokens_),
@@ -1287,38 +1252,33 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.performance_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.executed_on_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.structured_output_validation_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.total_tokens_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.error_code_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.cached_prompt_tokens_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.prompt_eval_time_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.decode_time_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.tool_calls_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.tool_results_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.usage_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMGenerationResult, _impl_.error_),
         2,
         3,
-        11,
-        12,
         4,
+        12,
         13,
-        14,
-        15,
         5,
         6,
-        16,
-        17,
+        14,
+        15,
         7,
-        9,
-        18,
-        10,
-        19,
         8,
-        20,
-        21,
-        22,
-        23,
+        16,
+        9,
+        17,
+        18,
+        19,
         0,
         1,
+        10,
+        11,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMConfiguration, _impl_._has_bits_),
         7, // hasbit index offset
@@ -1341,26 +1301,22 @@ const ::uint32_t
         2,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PerformanceMetrics, _impl_._has_bits_),
-        8, // hasbit index offset
+        6, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PerformanceMetrics, _impl_.latency_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PerformanceMetrics, _impl_.memory_bytes_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PerformanceMetrics, _impl_.throughput_tokens_per_sec_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PerformanceMetrics, _impl_.input_tokens_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PerformanceMetrics, _impl_.output_tokens_),
-        0,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::PerformanceMetrics, _impl_.usage_),
         1,
         2,
-        3,
-        4,
+        0,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::LLMGenerationOptions)},
         {41, sizeof(::runanywhere::v1::LLMGenerationResult)},
-        {92, sizeof(::runanywhere::v1::LLMConfiguration)},
-        {103, sizeof(::runanywhere::v1::StreamToken)},
-        {112, sizeof(::runanywhere::v1::PerformanceMetrics)},
+        {84, sizeof(::runanywhere::v1::LLMConfiguration)},
+        {95, sizeof(::runanywhere::v1::StreamToken)},
+        {104, sizeof(::runanywhere::v1::PerformanceMetrics)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -1372,94 +1328,95 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_llm_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\021llm_options.proto\022\016runanywhere.v1\032\021mod"
-    "el_types.proto\032\021rac_options.proto\032\027struc"
-    "tured_output.proto\032\032thinking_tag_pattern"
-    ".proto\032\022tool_calling.proto\"\376\006\n\024LLMGenera"
-    "tionOptions\022&\n\021max_output_tokens\030\001 \001(\005B\013"
-    "\212\265\030\003512\240\265\030\000\0222\n\013temperature\030\002 \001(\002B\035\212\265\030\0030."
-    "7\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\000@\022,\n\005top_p\030\003 \001(\002B\035"
-    "\212\265\030\0031.0\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\030\n\005top_k\030\004"
-    " \001(\005B\t\212\265\030\0010\240\265\030\000\022.\n\022repetition_penalty\030\005 "
-    "\001(\002B\022\212\265\030\0031.0\261\265\030\000\000\000\000\000\000\000\000\022\026\n\016stop_sequence"
-    "s\030\006 \003(\t\022\?\n\023preferred_framework\030\010 \001(\0162\".r"
-    "unanywhere.v1.InferenceFramework\022\032\n\rsyst"
-    "em_prompt\030\t \001(\tH\000\210\001\001\0228\n\treasoning\030\013 \001(\0132"
-    " .runanywhere.v1.ReasoningOptionsH\001\210\001\001\022>"
-    "\n\020execution_target\030\014 \001(\0162\037.runanywhere.v"
-    "1.ExecutionTargetH\002\210\001\001\022G\n\021structured_out"
-    "put\030\r \001(\0132\'.runanywhere.v1.StructuredOut"
-    "putOptionsH\003\210\001\001\022\023\n\004seed\030\017 \001(\003B\005\212\265\030\0010\022\"\n\021"
-    "frequency_penalty\030\020 \001(\002B\007\212\265\030\0030.0\022!\n\020pres"
-    "ence_penalty\030\021 \001(\002B\007\212\265\030\0030.0\022\034\n\rrepeat_la"
-    "st_n\030\022 \001(\005B\005\212\265\030\0010\022\026\n\005min_p\030\023 \001(\002B\007\212\265\030\0030."
-    "0\022\023\n\013echo_prompt\030\026 \001(\010\022\030\n\tn_threads\030\027 \001("
-    "\005B\005\212\265\030\0010\022=\n\014tool_calling\030\030 \001(\0132\".runanyw"
-    "here.v1.ToolCallingOptionsH\004\210\001\001B\020\n\016_syst"
-    "em_promptB\014\n\n_reasoningB\023\n\021_execution_ta"
-    "rgetB\024\n\022_structured_outputB\017\n\r_tool_call"
-    "ing\"\246\007\n\023LLMGenerationResult\022\014\n\004text\030\001 \001("
-    "\t\022\035\n\020thinking_content\030\002 \001(\tH\000\210\001\001\022\024\n\014inpu"
-    "t_tokens\030\003 \001(\005\022\025\n\routput_tokens\030\004 \001(\005\022\022\n"
-    "\nmodel_used\030\005 \001(\t\022\032\n\022generation_time_ms\030"
-    "\006 \001(\001\022\024\n\007ttft_ms\030\007 \001(\001H\001\210\001\001\022\031\n\021tokens_pe"
-    "r_second\030\010 \001(\001\022\026\n\tframework\030\t \001(\tH\002\210\001\001\022\025"
-    "\n\rfinish_reason\030\n \001(\t\022\027\n\017thinking_tokens"
-    "\030\013 \001(\005\022\027\n\017response_tokens\030\014 \001(\005\022\030\n\013json_"
-    "output\030\r \001(\tH\003\210\001\001\022<\n\013performance\030\016 \001(\0132\""
-    ".runanywhere.v1.PerformanceMetricsH\004\210\001\001\022"
-    "9\n\013executed_on\030\017 \001(\0162\037.runanywhere.v1.Ex"
-    "ecutionTargetH\005\210\001\001\022U\n\034structured_output_"
-    "validation\030\020 \001(\0132*.runanywhere.v1.Struct"
-    "uredOutputValidationH\006\210\001\001\022\024\n\014total_token"
-    "s\030\021 \001(\005\022\032\n\rerror_message\030\022 \001(\tH\007\210\001\001\022\022\n\ne"
-    "rror_code\030\023 \001(\005\022\034\n\024cached_prompt_tokens\030"
-    "\024 \001(\005\022\033\n\023prompt_eval_time_ms\030\025 \001(\003\022\026\n\016de"
-    "code_time_ms\030\026 \001(\003\022,\n\ntool_calls\030\027 \003(\0132\030"
-    ".runanywhere.v1.ToolCall\0220\n\014tool_results"
-    "\030\030 \003(\0132\032.runanywhere.v1.ToolResultB\023\n\021_t"
-    "hinking_contentB\n\n\010_ttft_msB\014\n\n_framewor"
-    "kB\016\n\014_json_outputB\016\n\014_performanceB\016\n\014_ex"
-    "ecuted_onB\037\n\035_structured_output_validati"
-    "onB\020\n\016_error_message\"\216\002\n\020LLMConfiguratio"
-    "n\022 \n\016context_length\030\001 \001(\005B\010\212\265\030\0042048\022\025\n\010m"
-    "odel_id\030\006 \001(\tH\000\210\001\001\022D\n\023preferred_framewor"
-    "k\030\007 \001(\0162\".runanywhere.v1.InferenceFramew"
-    "orkH\001\210\001\001\022B\n\017default_options\030\010 \001(\0132$.runa"
-    "nywhere.v1.LLMGenerationOptionsH\002\210\001\001B\013\n\t"
-    "_model_idB\026\n\024_preferred_frameworkB\022\n\020_de"
-    "fault_options\"@\n\013StreamToken\022\014\n\004text\030\001 \001"
-    "(\t\022\024\n\014timestamp_ms\030\002 \001(\003\022\r\n\005index\030\003 \001(\005\""
-    "\216\001\n\022PerformanceMetrics\022\022\n\nlatency_ms\030\001 \001"
-    "(\003\022\024\n\014memory_bytes\030\002 \001(\003\022!\n\031throughput_t"
-    "okens_per_sec\030\003 \001(\002\022\024\n\014input_tokens\030\004 \001("
-    "\005\022\025\n\routput_tokens\030\005 \001(\005*\212\001\n\017ExecutionTa"
-    "rget\022 \n\034EXECUTION_TARGET_UNSPECIFIED\020\000\022\036"
-    "\n\032EXECUTION_TARGET_ON_DEVICE\020\001\022\032\n\026EXECUT"
-    "ION_TARGET_CLOUD\020\002\022\031\n\025EXECUTION_TARGET_A"
-    "UTO\020\003B\212\001\n\027ai.runanywhere.proto.v1B\017LLMOp"
-    "tionsProtoP\001Z<github.com/runanywhere/run"
-    "anywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004"
-    "RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "\n\021llm_options.proto\022\016runanywhere.v1\032\014err"
+    "ors.proto\032\021model_types.proto\032\021rac_option"
+    "s.proto\032\027structured_output.proto\032\032thinki"
+    "ng_tag_pattern.proto\032\021token_usage.proto\032"
+    "\022tool_calling.proto\"\376\006\n\024LLMGenerationOpt"
+    "ions\022&\n\021max_output_tokens\030\001 \001(\005B\013\212\265\030\003512"
+    "\240\265\030\000\0222\n\013temperature\030\002 \001(\002B\035\212\265\030\0030.7\261\265\030\000\000\000"
+    "\000\000\000\000\000\271\265\030\000\000\000\000\000\000\000@\022,\n\005top_p\030\003 \001(\002B\035\212\265\030\0031.0"
+    "\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\030\n\005top_k\030\004 \001(\005B\t\212"
+    "\265\030\0010\240\265\030\000\022.\n\022repetition_penalty\030\005 \001(\002B\022\212\265"
+    "\030\0031.0\261\265\030\000\000\000\000\000\000\000\000\022\026\n\016stop_sequences\030\006 \003(\t"
+    "\022\?\n\023preferred_framework\030\010 \001(\0162\".runanywh"
+    "ere.v1.InferenceFramework\022\032\n\rsystem_prom"
+    "pt\030\t \001(\tH\000\210\001\001\0228\n\treasoning\030\013 \001(\0132 .runan"
+    "ywhere.v1.ReasoningOptionsH\001\210\001\001\022>\n\020execu"
+    "tion_target\030\014 \001(\0162\037.runanywhere.v1.Execu"
+    "tionTargetH\002\210\001\001\022G\n\021structured_output\030\r \001"
+    "(\0132\'.runanywhere.v1.StructuredOutputOpti"
+    "onsH\003\210\001\001\022\023\n\004seed\030\017 \001(\003B\005\212\265\030\0010\022\"\n\021frequen"
+    "cy_penalty\030\020 \001(\002B\007\212\265\030\0030.0\022!\n\020presence_pe"
+    "nalty\030\021 \001(\002B\007\212\265\030\0030.0\022\034\n\rrepeat_last_n\030\022 "
+    "\001(\005B\005\212\265\030\0010\022\026\n\005min_p\030\023 \001(\002B\007\212\265\030\0030.0\022\023\n\013ec"
+    "ho_prompt\030\026 \001(\010\022\030\n\tn_threads\030\027 \001(\005B\005\212\265\030\001"
+    "0\022=\n\014tool_calling\030\030 \001(\0132\".runanywhere.v1"
+    ".ToolCallingOptionsH\004\210\001\001B\020\n\016_system_prom"
+    "ptB\014\n\n_reasoningB\023\n\021_execution_targetB\024\n"
+    "\022_structured_outputB\017\n\r_tool_calling\"\351\006\n"
+    "\023LLMGenerationResult\022\014\n\004text\030\001 \001(\t\022\035\n\020th"
+    "inking_content\030\002 \001(\tH\000\210\001\001\022\022\n\nmodel_used\030"
+    "\005 \001(\t\022\032\n\022generation_time_ms\030\006 \001(\001\022\024\n\007ttf"
+    "t_ms\030\007 \001(\001H\001\210\001\001\022\026\n\tframework\030\t \001(\tH\002\210\001\001\022"
+    "\025\n\rfinish_reason\030\n \001(\t\022\027\n\017thinking_token"
+    "s\030\013 \001(\005\022\027\n\017response_tokens\030\014 \001(\005\022\030\n\013json"
+    "_output\030\r \001(\tH\003\210\001\001\022<\n\013performance\030\016 \001(\0132"
+    "\".runanywhere.v1.PerformanceMetricsH\004\210\001\001"
+    "\0229\n\013executed_on\030\017 \001(\0162\037.runanywhere.v1.E"
+    "xecutionTargetH\005\210\001\001\022U\n\034structured_output"
+    "_validation\030\020 \001(\0132*.runanywhere.v1.Struc"
+    "turedOutputValidationH\006\210\001\001\022\034\n\024cached_pro"
+    "mpt_tokens\030\024 \001(\005\022\033\n\023prompt_eval_time_ms\030"
+    "\025 \001(\003\022\026\n\016decode_time_ms\030\026 \001(\003\022,\n\ntool_ca"
+    "lls\030\027 \003(\0132\030.runanywhere.v1.ToolCall\0220\n\014t"
+    "ool_results\030\030 \003(\0132\032.runanywhere.v1.ToolR"
+    "esult\022)\n\005usage\030\031 \001(\0132\032.runanywhere.v1.To"
+    "kenUsage\022,\n\005error\030\032 \001(\0132\030.runanywhere.v1"
+    ".SDKErrorH\007\210\001\001B\023\n\021_thinking_contentB\n\n\010_"
+    "ttft_msB\014\n\n_frameworkB\016\n\014_json_outputB\016\n"
+    "\014_performanceB\016\n\014_executed_onB\037\n\035_struct"
+    "ured_output_validationB\010\n\006_error\"\216\002\n\020LLM"
+    "Configuration\022 \n\016context_length\030\001 \001(\005B\010\212"
+    "\265\030\0042048\022\025\n\010model_id\030\006 \001(\tH\000\210\001\001\022D\n\023prefer"
+    "red_framework\030\007 \001(\0162\".runanywhere.v1.Inf"
+    "erenceFrameworkH\001\210\001\001\022B\n\017default_options\030"
+    "\010 \001(\0132$.runanywhere.v1.LLMGenerationOpti"
+    "onsH\002\210\001\001B\013\n\t_model_idB\026\n\024_preferred_fram"
+    "eworkB\022\n\020_default_options\"@\n\013StreamToken"
+    "\022\014\n\004text\030\001 \001(\t\022\024\n\014timestamp_ms\030\002 \001(\003\022\r\n\005"
+    "index\030\003 \001(\005\"i\n\022PerformanceMetrics\022\022\n\nlat"
+    "ency_ms\030\001 \001(\003\022\024\n\014memory_bytes\030\002 \001(\003\022)\n\005u"
+    "sage\030\006 \001(\0132\032.runanywhere.v1.TokenUsage*\212"
+    "\001\n\017ExecutionTarget\022 \n\034EXECUTION_TARGET_U"
+    "NSPECIFIED\020\000\022\036\n\032EXECUTION_TARGET_ON_DEVI"
+    "CE\020\001\022\032\n\026EXECUTION_TARGET_CLOUD\020\002\022\031\n\025EXEC"
+    "UTION_TARGET_AUTO\020\003B\212\001\n\027ai.runanywhere.p"
+    "roto.v1B\017LLMOptionsProtoP\001Z<github.com/r"
+    "unanywhere/runanywhere-sdks/idl/v1;runan"
+    "ywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA"
+    "b\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_llm_5foptions_2eproto_deps[5] = {
+    descriptor_table_llm_5foptions_2eproto_deps[7] = {
+        &::descriptor_table_errors_2eproto,
         &::descriptor_table_model_5ftypes_2eproto,
         &::descriptor_table_rac_5foptions_2eproto,
         &::descriptor_table_structured_5foutput_2eproto,
         &::descriptor_table_thinking_5ftag_5fpattern_2eproto,
+        &::descriptor_table_token_5fusage_2eproto,
         &::descriptor_table_tool_5fcalling_2eproto,
 };
 static ::absl::once_flag descriptor_table_llm_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_llm_5foptions_2eproto = {
     false,
     false,
-    2754,
+    2688,
     descriptor_table_protodef_llm_5foptions_2eproto,
     "llm_options.proto",
     &descriptor_table_llm_5foptions_2eproto_once,
     descriptor_table_llm_5foptions_2eproto_deps,
-    5,
+    7,
     5,
     schemas,
     file_message_globals,
@@ -2154,7 +2111,7 @@ void LLMGenerationOptions::InternalSwap(LLMGenerationOptions* PROTOBUF_RESTRICT 
 void LLMGenerationResult::clear_structured_output_validation() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.structured_output_validation_ != nullptr) _impl_.structured_output_validation_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
 void LLMGenerationResult::clear_tool_calls() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
@@ -2165,6 +2122,16 @@ void LLMGenerationResult::clear_tool_results() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.tool_results_.Clear();
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+}
+void LLMGenerationResult::clear_usage() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.usage_ != nullptr) _impl_.usage_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+}
+void LLMGenerationResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
 }
 LLMGenerationResult::LLMGenerationResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
@@ -2200,8 +2167,7 @@ PROTOBUF_NDEBUG_INLINE LLMGenerationResult::Impl_::Impl_(
         model_used_(arena, from.model_used_),
         framework_(arena, from.framework_),
         finish_reason_(arena, from.finish_reason_),
-        json_output_(arena, from.json_output_),
-        error_message_(arena, from.error_message_) {}
+        json_output_(arena, from.json_output_) {}
 
 LLMGenerationResult::LLMGenerationResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -2218,18 +2184,24 @@ LLMGenerationResult::LLMGenerationResult(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.performance_ = (CheckHasBit(cached_has_bits, 0x00000200U))
+  _impl_.performance_ = (CheckHasBit(cached_has_bits, 0x00000100U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.performance_)
                 : nullptr;
-  _impl_.structured_output_validation_ = (CheckHasBit(cached_has_bits, 0x00000400U))
+  _impl_.structured_output_validation_ = (CheckHasBit(cached_has_bits, 0x00000200U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.structured_output_validation_)
                 : nullptr;
+  _impl_.usage_ = (CheckHasBit(cached_has_bits, 0x00000400U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.usage_)
+                : nullptr;
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000800U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, input_tokens_),
+               offsetof(Impl_, generation_time_ms_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, input_tokens_),
+               offsetof(Impl_, generation_time_ms_),
            offsetof(Impl_, decode_time_ms_) -
-               offsetof(Impl_, input_tokens_) +
+               offsetof(Impl_, generation_time_ms_) +
                sizeof(Impl_::decode_time_ms_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.LLMGenerationResult)
@@ -2253,8 +2225,7 @@ PROTOBUF_NDEBUG_INLINE LLMGenerationResult::Impl_::Impl_(
         model_used_(arena),
         framework_(arena),
         finish_reason_(arena),
-        json_output_(arena),
-        error_message_(arena) {}
+        json_output_(arena) {}
 
 inline void LLMGenerationResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -2282,9 +2253,10 @@ inline void LLMGenerationResult::SharedDtor(MessageLite& self) {
   this_._impl_.framework_.Destroy();
   this_._impl_.finish_reason_.Destroy();
   this_._impl_.json_output_.Destroy();
-  this_._impl_.error_message_.Destroy();
   delete this_._impl_.performance_;
   delete this_._impl_.structured_output_validation_;
+  delete this_._impl_.usage_;
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -2348,28 +2320,33 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
       _impl_.json_output_.ClearNonDefaultToEmpty();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000700U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       ABSL_DCHECK(_impl_.performance_ != nullptr);
       _impl_.performance_->Clear();
     }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       ABSL_DCHECK(_impl_.structured_output_validation_ != nullptr);
       _impl_.structured_output_validation_->Clear();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      ABSL_DCHECK(_impl_.usage_ != nullptr);
+      _impl_.usage_->Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000f800U)) {
-    ::memset(&_impl_.input_tokens_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.tokens_per_second_) -
-        reinterpret_cast<char*>(&_impl_.input_tokens_)) + sizeof(_impl_.tokens_per_second_));
+  if (BatchCheckHasBit(cached_has_bits, 0x0000f000U)) {
+    ::memset(&_impl_.generation_time_ms_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.response_tokens_) -
+        reinterpret_cast<char*>(&_impl_.generation_time_ms_)) + sizeof(_impl_.response_tokens_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00ff0000U)) {
-    ::memset(&_impl_.thinking_tokens_, 0, static_cast<::size_t>(
+  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
+    ::memset(&_impl_.executed_on_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.decode_time_ms_) -
-        reinterpret_cast<char*>(&_impl_.thinking_tokens_)) + sizeof(_impl_.decode_time_ms_));
+        reinterpret_cast<char*>(&_impl_.executed_on_)) + sizeof(_impl_.decode_time_ms_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -2412,24 +2389,6 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
     target = stream->WriteStringMaybeAliased(2, _s, target);
   }
 
-  // int32 input_tokens = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-    if (this_._internal_input_tokens() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
-              stream, this_._internal_input_tokens(), target);
-    }
-  }
-
-  // int32 output_tokens = 4;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-    if (this_._internal_output_tokens() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
-              stream, this_._internal_output_tokens(), target);
-    }
-  }
-
   // string model_used = 5;
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (!this_._internal_model_used().empty()) {
@@ -2441,7 +2400,7 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
   }
 
   // double generation_time_ms = 6;
-  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
     if (::absl::bit_cast<::uint64_t>(this_._internal_generation_time_ms()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteDoubleToArray(
@@ -2450,19 +2409,10 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
   }
 
   // optional double ttft_ms = 7;
-  if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteDoubleToArray(
         7, this_._internal_ttft_ms(), target);
-  }
-
-  // double tokens_per_second = 8;
-  if (CheckHasBit(cached_has_bits, 0x00008000U)) {
-    if (::absl::bit_cast<::uint64_t>(this_._internal_tokens_per_second()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteDoubleToArray(
-          8, this_._internal_tokens_per_second(), target);
-    }
   }
 
   // optional string framework = 9;
@@ -2484,7 +2434,7 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
   }
 
   // int32 thinking_tokens = 11;
-  if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00004000U)) {
     if (this_._internal_thinking_tokens() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<11>(
@@ -2493,7 +2443,7 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
   }
 
   // int32 response_tokens = 12;
-  if (CheckHasBit(cached_has_bits, 0x00020000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00008000U)) {
     if (this_._internal_response_tokens() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<12>(
@@ -2510,54 +2460,28 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
   }
 
   // optional .runanywhere.v1.PerformanceMetrics performance = 14;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         14, *this_._impl_.performance_, this_._impl_.performance_->GetCachedSize(), target,
         stream);
   }
 
   // optional .runanywhere.v1.ExecutionTarget executed_on = 15;
-  if (CheckHasBit(cached_has_bits, 0x00040000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00010000U)) {
     target = stream->EnsureSpace(target);
     target = ::_pbi::WireFormatLite::WriteEnumToArray(
         15, this_._internal_executed_on(), target);
   }
 
   // optional .runanywhere.v1.StructuredOutputValidation structured_output_validation = 16;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         16, *this_._impl_.structured_output_validation_, this_._impl_.structured_output_validation_->GetCachedSize(), target,
         stream);
   }
 
-  // int32 total_tokens = 17;
-  if (CheckHasBit(cached_has_bits, 0x00080000U)) {
-    if (this_._internal_total_tokens() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteInt32ToArray(
-          17, this_._internal_total_tokens(), target);
-    }
-  }
-
-  // optional string error_message = 18;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.LLMGenerationResult.error_message");
-    target = stream->WriteStringMaybeAliased(18, _s, target);
-  }
-
-  // int32 error_code = 19;
-  if (CheckHasBit(cached_has_bits, 0x00100000U)) {
-    if (this_._internal_error_code() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteInt32ToArray(
-          19, this_._internal_error_code(), target);
-    }
-  }
-
   // int32 cached_prompt_tokens = 20;
-  if (CheckHasBit(cached_has_bits, 0x00200000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00020000U)) {
     if (this_._internal_cached_prompt_tokens() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt32ToArray(
@@ -2566,7 +2490,7 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
   }
 
   // int64 prompt_eval_time_ms = 21;
-  if (CheckHasBit(cached_has_bits, 0x00400000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00040000U)) {
     if (this_._internal_prompt_eval_time_ms() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt64ToArray(
@@ -2575,7 +2499,7 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
   }
 
   // int64 decode_time_ms = 22;
-  if (CheckHasBit(cached_has_bits, 0x00800000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00080000U)) {
     if (this_._internal_decode_time_ms() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt64ToArray(
@@ -2609,6 +2533,20 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
     }
   }
 
+  // .runanywhere.v1.TokenUsage usage = 25;
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        25, *this_._impl_.usage_, this_._impl_.usage_->GetCachedSize(), target,
+        stream);
+  }
+
+  // optional .runanywhere.v1.SDKError error = 26;
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        26, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -2634,7 +2572,7 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  total_size += static_cast<bool>(0x00004000U & cached_has_bits) * 9;
+  total_size += static_cast<bool>(0x00002000U & cached_has_bits) * 9;
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // repeated .runanywhere.v1.ToolCall tool_calls = 23;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
@@ -2687,99 +2625,70 @@ PROTOBUF_NOINLINE void LLMGenerationResult::Clear() {
                                       this_._internal_json_output());
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000bf00U)) {
-    // optional string error_message = 18;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      total_size += 2 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
-    }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000df00U)) {
     // optional .runanywhere.v1.PerformanceMetrics performance = 14;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.performance_);
     }
     // optional .runanywhere.v1.StructuredOutputValidation structured_output_validation = 16;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       total_size += 2 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.structured_output_validation_);
     }
-    // int32 input_tokens = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (this_._internal_input_tokens() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_input_tokens());
-      }
+    // .runanywhere.v1.TokenUsage usage = 25;
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      total_size += 2 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.usage_);
     }
-    // int32 output_tokens = 4;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (this_._internal_output_tokens() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_output_tokens());
-      }
+    // optional .runanywhere.v1.SDKError error = 26;
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+      total_size += 2 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // double generation_time_ms = 6;
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (::absl::bit_cast<::uint64_t>(this_._internal_generation_time_ms()) != 0) {
         total_size += 9;
       }
     }
-    // double tokens_per_second = 8;
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
-      if (::absl::bit_cast<::uint64_t>(this_._internal_tokens_per_second()) != 0) {
-        total_size += 9;
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00ff0000U)) {
     // int32 thinking_tokens = 11;
-    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
       if (this_._internal_thinking_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_thinking_tokens());
       }
     }
     // int32 response_tokens = 12;
-    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
       if (this_._internal_response_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_response_tokens());
       }
     }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
     // optional .runanywhere.v1.ExecutionTarget executed_on = 15;
-    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
       total_size += 1 +
                     ::_pbi::WireFormatLite::EnumSize(this_._internal_executed_on());
     }
-    // int32 total_tokens = 17;
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
-      if (this_._internal_total_tokens() != 0) {
-        total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
-                                        this_._internal_total_tokens());
-      }
-    }
-    // int32 error_code = 19;
-    if (CheckHasBit(cached_has_bits, 0x00100000U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
-                                        this_._internal_error_code());
-      }
-    }
     // int32 cached_prompt_tokens = 20;
-    if (CheckHasBit(cached_has_bits, 0x00200000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
       if (this_._internal_cached_prompt_tokens() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
                                         this_._internal_cached_prompt_tokens());
       }
     }
     // int64 prompt_eval_time_ms = 21;
-    if (CheckHasBit(cached_has_bits, 0x00400000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
       if (this_._internal_prompt_eval_time_ms() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int64Size(
                                         this_._internal_prompt_eval_time_ms());
       }
     }
     // int64 decode_time_ms = 22;
-    if (CheckHasBit(cached_has_bits, 0x00800000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
       if (this_._internal_decode_time_ms() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int64Size(
                                         this_._internal_decode_time_ms());
@@ -2854,9 +2763,6 @@ void LLMGenerationResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       ABSL_DCHECK(from._impl_.performance_ != nullptr);
       if (_this->_impl_.performance_ == nullptr) {
         _this->_impl_.performance_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.performance_);
@@ -2864,7 +2770,7 @@ void LLMGenerationResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.performance_->MergeFrom(*from._impl_.performance_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       ABSL_DCHECK(from._impl_.structured_output_validation_ != nullptr);
       if (_this->_impl_.structured_output_validation_ == nullptr) {
         _this->_impl_.structured_output_validation_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.structured_output_validation_);
@@ -2872,65 +2778,56 @@ void LLMGenerationResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.structured_output_validation_->MergeFrom(*from._impl_.structured_output_validation_);
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      ABSL_DCHECK(from._impl_.usage_ != nullptr);
+      if (_this->_impl_.usage_ == nullptr) {
+        _this->_impl_.usage_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.usage_);
+      } else {
+        _this->_impl_.usage_->MergeFrom(*from._impl_.usage_);
+      }
+    }
     if (CheckHasBit(cached_has_bits, 0x00000800U)) {
-      if (from._internal_input_tokens() != 0) {
-        _this->_impl_.input_tokens_ = from._impl_.input_tokens_;
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (from._internal_output_tokens() != 0) {
-        _this->_impl_.output_tokens_ = from._impl_.output_tokens_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (::absl::bit_cast<::uint64_t>(from._internal_generation_time_ms()) != 0) {
         _this->_impl_.generation_time_ms_ = from._impl_.generation_time_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       _this->_impl_.ttft_ms_ = from._impl_.ttft_ms_;
     }
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
-      if (::absl::bit_cast<::uint64_t>(from._internal_tokens_per_second()) != 0) {
-        _this->_impl_.tokens_per_second_ = from._impl_.tokens_per_second_;
-      }
-    }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00ff0000U)) {
-    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
       if (from._internal_thinking_tokens() != 0) {
         _this->_impl_.thinking_tokens_ = from._impl_.thinking_tokens_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
       if (from._internal_response_tokens() != 0) {
         _this->_impl_.response_tokens_ = from._impl_.response_tokens_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x000f0000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
       _this->_impl_.executed_on_ = from._impl_.executed_on_;
     }
-    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
-      if (from._internal_total_tokens() != 0) {
-        _this->_impl_.total_tokens_ = from._impl_.total_tokens_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00100000U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00200000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00020000U)) {
       if (from._internal_cached_prompt_tokens() != 0) {
         _this->_impl_.cached_prompt_tokens_ = from._impl_.cached_prompt_tokens_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00400000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00040000U)) {
       if (from._internal_prompt_eval_time_ms() != 0) {
         _this->_impl_.prompt_eval_time_ms_ = from._impl_.prompt_eval_time_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00800000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00080000U)) {
       if (from._internal_decode_time_ms() != 0) {
         _this->_impl_.decode_time_ms_ = from._impl_.decode_time_ms_;
       }
@@ -2963,7 +2860,6 @@ void LLMGenerationResult::InternalSwap(LLMGenerationResult* PROTOBUF_RESTRICT PR
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.framework_, &other->_impl_.framework_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.finish_reason_, &other->_impl_.finish_reason_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.json_output_, &other->_impl_.json_output_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(LLMGenerationResult, _impl_.decode_time_ms_)
       + sizeof(LLMGenerationResult::_impl_.decode_time_ms_)
@@ -3559,6 +3455,11 @@ void StreamToken::InternalSwap(StreamToken* PROTOBUF_RESTRICT PROTOBUF_NONNULL o
 }
 // ===================================================================
 
+void PerformanceMetrics::clear_usage() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.usage_ != nullptr) _impl_.usage_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+}
 PerformanceMetrics::PerformanceMetrics(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, PerformanceMetrics_get_class_data()) {
@@ -3568,16 +3469,40 @@ PerformanceMetrics::PerformanceMetrics(::google::protobuf::Arena* PROTOBUF_NULLA
   SharedCtor(arena);
   // @@protoc_insertion_point(arena_constructor:runanywhere.v1.PerformanceMetrics)
 }
+PROTOBUF_NDEBUG_INLINE PerformanceMetrics::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::PerformanceMetrics& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0} {}
+
 PerformanceMetrics::PerformanceMetrics(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const PerformanceMetrics& from)
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const PerformanceMetrics& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, PerformanceMetrics_get_class_data()),
+    : ::google::protobuf::Message(arena, PerformanceMetrics_get_class_data()) {
+
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena),
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
-      _impl_(from._impl_) {
+  PerformanceMetrics* const _this = this;
+  (void)_this;
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.usage_ = (CheckHasBit(cached_has_bits, 0x00000001U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.usage_)
+                : nullptr;
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, latency_ms_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, latency_ms_),
+           offsetof(Impl_, memory_bytes_) -
+               offsetof(Impl_, latency_ms_) +
+               sizeof(Impl_::memory_bytes_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.PerformanceMetrics)
 }
 PROTOBUF_NDEBUG_INLINE PerformanceMetrics::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
@@ -3587,11 +3512,11 @@ PROTOBUF_NDEBUG_INLINE PerformanceMetrics::Impl_::Impl_(
 inline void PerformanceMetrics::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, latency_ms_),
+               offsetof(Impl_, usage_),
            0,
-           offsetof(Impl_, output_tokens_) -
-               offsetof(Impl_, latency_ms_) +
-               sizeof(Impl_::output_tokens_));
+           offsetof(Impl_, memory_bytes_) -
+               offsetof(Impl_, usage_) +
+               sizeof(Impl_::memory_bytes_));
 }
 PerformanceMetrics::~PerformanceMetrics() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.PerformanceMetrics)
@@ -3604,6 +3529,7 @@ inline void PerformanceMetrics::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
+  delete this_._impl_.usage_;
   this_._impl_.~Impl_();
 }
 
@@ -3641,10 +3567,14 @@ PROTOBUF_NOINLINE void PerformanceMetrics::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    ABSL_DCHECK(_impl_.usage_ != nullptr);
+    _impl_.usage_->Clear();
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000006U)) {
     ::memset(&_impl_.latency_ms_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.output_tokens_) -
-        reinterpret_cast<char*>(&_impl_.latency_ms_)) + sizeof(_impl_.output_tokens_));
+        reinterpret_cast<char*>(&_impl_.memory_bytes_) -
+        reinterpret_cast<char*>(&_impl_.latency_ms_)) + sizeof(_impl_.memory_bytes_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -3670,7 +3600,7 @@ PROTOBUF_NOINLINE void PerformanceMetrics::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // int64 latency_ms = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_latency_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<1>(
@@ -3679,7 +3609,7 @@ PROTOBUF_NOINLINE void PerformanceMetrics::Clear() {
   }
 
   // int64 memory_bytes = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_memory_bytes() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
@@ -3687,31 +3617,11 @@ PROTOBUF_NOINLINE void PerformanceMetrics::Clear() {
     }
   }
 
-  // float throughput_tokens_per_sec = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_throughput_tokens_per_sec()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          3, this_._internal_throughput_tokens_per_sec(), target);
-    }
-  }
-
-  // int32 input_tokens = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-    if (this_._internal_input_tokens() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
-              stream, this_._internal_input_tokens(), target);
-    }
-  }
-
-  // int32 output_tokens = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_output_tokens() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
-              stream, this_._internal_output_tokens(), target);
-    }
+  // .runanywhere.v1.TokenUsage usage = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        6, *this_._impl_.usage_, this_._impl_.usage_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -3739,39 +3649,24 @@ PROTOBUF_NOINLINE void PerformanceMetrics::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    // int64 latency_ms = 1;
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    // .runanywhere.v1.TokenUsage usage = 6;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.usage_);
+    }
+    // int64 latency_ms = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_latency_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_latency_ms());
       }
     }
     // int64 memory_bytes = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_memory_bytes() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_memory_bytes());
-      }
-    }
-    // float throughput_tokens_per_sec = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_throughput_tokens_per_sec()) != 0) {
-        total_size += 5;
-      }
-    }
-    // int32 input_tokens = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (this_._internal_input_tokens() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_input_tokens());
-      }
-    }
-    // int32 output_tokens = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_output_tokens() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_output_tokens());
       }
     }
   }
@@ -3786,36 +3681,30 @@ void PerformanceMetrics::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.PerformanceMetrics)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      ABSL_DCHECK(from._impl_.usage_ != nullptr);
+      if (_this->_impl_.usage_ == nullptr) {
+        _this->_impl_.usage_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.usage_);
+      } else {
+        _this->_impl_.usage_->MergeFrom(*from._impl_.usage_);
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (from._internal_latency_ms() != 0) {
         _this->_impl_.latency_ms_ = from._impl_.latency_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_memory_bytes() != 0) {
         _this->_impl_.memory_bytes_ = from._impl_.memory_bytes_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_throughput_tokens_per_sec()) != 0) {
-        _this->_impl_.throughput_tokens_per_sec_ = from._impl_.throughput_tokens_per_sec_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
-      if (from._internal_input_tokens() != 0) {
-        _this->_impl_.input_tokens_ = from._impl_.input_tokens_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_output_tokens() != 0) {
-        _this->_impl_.output_tokens_ = from._impl_.output_tokens_;
       }
     }
   }
@@ -3837,11 +3726,11 @@ void PerformanceMetrics::InternalSwap(PerformanceMetrics* PROTOBUF_RESTRICT PROT
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.output_tokens_)
-      + sizeof(PerformanceMetrics::_impl_.output_tokens_)
-      - PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.latency_ms_)>(
-          reinterpret_cast<char*>(&_impl_.latency_ms_),
-          reinterpret_cast<char*>(&other->_impl_.latency_ms_));
+      PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.memory_bytes_)
+      + sizeof(PerformanceMetrics::_impl_.memory_bytes_)
+      - PROTOBUF_FIELD_OFFSET(PerformanceMetrics, _impl_.usage_)>(
+          reinterpret_cast<char*>(&_impl_.usage_),
+          reinterpret_cast<char*>(&other->_impl_.usage_));
 }
 
 ::google::protobuf::Metadata PerformanceMetrics::GetMetadata() const {

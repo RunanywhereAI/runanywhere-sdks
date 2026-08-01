@@ -54,20 +54,11 @@ public class ToolParseResult(
   )
   public val remaining_text: String = "",
   @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 3,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 4,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolParseResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -92,8 +83,7 @@ public class ToolParseResult(
     if (has_tool_call != other.has_tool_call) return false
     if (tool_calls != other.tool_calls) return false
     if (remaining_text != other.remaining_text) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -104,8 +94,7 @@ public class ToolParseResult(
       result = result * 37 + has_tool_call.hashCode()
       result = result * 37 + tool_calls.hashCode()
       result = result * 37 + remaining_text.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -116,8 +105,7 @@ public class ToolParseResult(
     result += """has_tool_call=$has_tool_call"""
     if (tool_calls.isNotEmpty()) result += """tool_calls=$tool_calls"""
     result += """remaining_text=${sanitize(remaining_text)}"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ToolParseResult{", separator = ", ", postfix = "}")
   }
 
@@ -125,10 +113,9 @@ public class ToolParseResult(
     has_tool_call: Boolean = this.has_tool_call,
     tool_calls: List<ToolCall> = this.tool_calls,
     remaining_text: String = this.remaining_text,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolParseResult = ToolParseResult(has_tool_call, tool_calls, remaining_text, error_message, error_code, unknownFields)
+  ): ToolParseResult = ToolParseResult(has_tool_call, tool_calls, remaining_text, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -149,10 +136,7 @@ public class ToolParseResult(
         if (value.remaining_text != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.remaining_text)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
@@ -164,19 +148,13 @@ public class ToolParseResult(
         if (value.remaining_text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.remaining_text)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolParseResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         if (value.remaining_text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.remaining_text)
         }
@@ -190,15 +168,13 @@ public class ToolParseResult(
         var has_tool_call: Boolean = false
         val tool_calls = mutableListOf<ToolCall>()
         var remaining_text: String = ""
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> has_tool_call = ProtoAdapter.BOOL.decode(reader)
             2 -> tool_calls.add(ToolCall.ADAPTER.decode(reader))
             3 -> remaining_text = ProtoAdapter.STRING.decode(reader)
-            4 -> error_message = ProtoAdapter.STRING.decode(reader)
-            5 -> error_code = ProtoAdapter.INT32.decode(reader)
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -206,14 +182,14 @@ public class ToolParseResult(
           has_tool_call = has_tool_call,
           tool_calls = tool_calls,
           remaining_text = remaining_text,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ToolParseResult): ToolParseResult = value.copy(
         tool_calls = value.tool_calls.redactElements(ToolCall.ADAPTER),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

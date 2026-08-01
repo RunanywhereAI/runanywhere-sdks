@@ -2548,8 +2548,6 @@ export interface ComponentInitializationEvent {
   sizeBytes: number;
   /** For COMPONENT_DOWNLOAD_PROGRESS — 0.0..1.0. */
   progress: number;
-  /** For COMPONENT_FAILED / *_FAILED. */
-  error: string;
   /** For COMPONENT_STATE_CHANGED — RN events.ts:274-278. */
   oldState: string;
   newState: string;
@@ -2561,10 +2559,9 @@ export interface ComponentInitializationEvent {
   readyComponents: SDKComponent[];
   pendingComponents: SDKComponent[];
   /**
-   * For INITIALIZATION_COMPLETED — InitializationResult summary
-   * (success bool + count). Full result travels via dedicated RPC.
+   * For INITIALIZATION_COMPLETED — InitializationResult summary count.
+   * Full result travels via dedicated RPC.
    */
-  initSuccess: boolean;
   readyCount: number;
   failedCount: number;
   /**
@@ -2573,6 +2570,8 @@ export interface ComponentInitializationEvent {
    */
   previousLifecycleState: ComponentLifecycleState;
   currentLifecycleState: ComponentLifecycleState;
+  /** Set on COMPONENT_FAILED / *_FAILED and failed completions. */
+  error?: SDKError | undefined;
 }
 
 /** Snapshot of a component's current model-backed lifecycle state. */
@@ -2581,18 +2580,17 @@ export interface ComponentLifecycleSnapshot {
   state: ComponentLifecycleState;
   modelId: string;
   updatedAtMs: number;
-  errorMessage: string;
   category: ModelCategory;
   framework: InferenceFramework;
   resolvedPath: string;
   loadedAtUnixMs: number;
   model?: ModelInfo | undefined;
+  error?: SDKError | undefined;
 }
 
 export interface ComponentLifecycleSnapshotResult {
-  success: boolean;
   snapshots: ComponentLifecycleSnapshot[];
-  errorMessage: string;
+  error?: SDKError | undefined;
 }
 
 /**
@@ -2759,8 +2757,6 @@ export interface VoiceLifecycleEvent {
   /** STT */
   wordCount: number;
   /** STT */
-  realTimeFactor: number;
-  /** STT */
   language: string;
   /** STT + TTS */
   sampleRate: number;
@@ -2775,7 +2771,6 @@ export interface VoiceLifecycleEvent {
   audioSizeBytesTts: number;
   /** telemetry processing_time_ms */
   processingDurationMs: number;
-  charactersPerSecond: number;
 }
 
 /**
@@ -3541,17 +3536,16 @@ function createBaseComponentInitializationEvent(): ComponentInitializationEvent 
     modelId: "",
     sizeBytes: 0,
     progress: 0,
-    error: "",
     oldState: "",
     newState: "",
     components: [],
     readyComponents: [],
     pendingComponents: [],
-    initSuccess: false,
     readyCount: 0,
     failedCount: 0,
     previousLifecycleState: 0,
     currentLifecycleState: 0,
+    error: undefined,
   };
 }
 
@@ -3571,9 +3565,6 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
     }
     if (message.progress !== 0) {
       writer.uint32(45).float(message.progress);
-    }
-    if (message.error !== "") {
-      writer.uint32(50).string(message.error);
     }
     if (message.oldState !== "") {
       writer.uint32(58).string(message.oldState);
@@ -3596,9 +3587,6 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
       writer.int32(v);
     }
     writer.join();
-    if (message.initSuccess !== false) {
-      writer.uint32(96).bool(message.initSuccess);
-    }
     if (message.readyCount !== 0) {
       writer.uint32(104).int32(message.readyCount);
     }
@@ -3610,6 +3598,9 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
     }
     if (message.currentLifecycleState !== 0) {
       writer.uint32(128).int32(message.currentLifecycleState);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(138).fork()).join();
     }
     return writer;
   },
@@ -3659,14 +3650,6 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
           }
 
           message.progress = reader.float();
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.error = reader.string();
           continue;
         }
         case 7: {
@@ -3739,14 +3722,6 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
 
           break;
         }
-        case 12: {
-          if (tag !== 96) {
-            break;
-          }
-
-          message.initSuccess = reader.bool();
-          continue;
-        }
         case 13: {
           if (tag !== 104) {
             break;
@@ -3779,6 +3754,14 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
           message.currentLifecycleState = reader.int32() as any;
           continue;
         }
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -3803,7 +3786,6 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
         ? globalThis.Number(object.size_bytes)
         : 0,
       progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
-      error: isSet(object.error) ? globalThis.String(object.error) : "",
       oldState: isSet(object.oldState)
         ? globalThis.String(object.oldState)
         : isSet(object.old_state)
@@ -3827,11 +3809,6 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
         : globalThis.Array.isArray(object?.pending_components)
         ? object.pending_components.map((e: any) => sDKComponentFromJSON(e))
         : [],
-      initSuccess: isSet(object.initSuccess)
-        ? globalThis.Boolean(object.initSuccess)
-        : isSet(object.init_success)
-        ? globalThis.Boolean(object.init_success)
-        : false,
       readyCount: isSet(object.readyCount)
         ? globalThis.Number(object.readyCount)
         : isSet(object.ready_count)
@@ -3852,6 +3829,7 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
         : isSet(object.current_lifecycle_state)
         ? componentLifecycleStateFromJSON(object.current_lifecycle_state)
         : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -3872,9 +3850,6 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
     if (message.progress !== 0) {
       obj.progress = message.progress;
     }
-    if (message.error !== "") {
-      obj.error = message.error;
-    }
     if (message.oldState !== "") {
       obj.oldState = message.oldState;
     }
@@ -3890,9 +3865,6 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
     if (message.pendingComponents?.length) {
       obj.pendingComponents = message.pendingComponents.map((e) => sDKComponentToJSON(e));
     }
-    if (message.initSuccess !== false) {
-      obj.initSuccess = message.initSuccess;
-    }
     if (message.readyCount !== 0) {
       obj.readyCount = Math.round(message.readyCount);
     }
@@ -3904,6 +3876,9 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
     }
     if (message.currentLifecycleState !== 0) {
       obj.currentLifecycleState = componentLifecycleStateToJSON(message.currentLifecycleState);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -3918,17 +3893,18 @@ export const ComponentInitializationEvent: MessageFns<ComponentInitializationEve
     message.modelId = object.modelId ?? "";
     message.sizeBytes = object.sizeBytes ?? 0;
     message.progress = object.progress ?? 0;
-    message.error = object.error ?? "";
     message.oldState = object.oldState ?? "";
     message.newState = object.newState ?? "";
     message.components = object.components?.map((e) => e) || [];
     message.readyComponents = object.readyComponents?.map((e) => e) || [];
     message.pendingComponents = object.pendingComponents?.map((e) => e) || [];
-    message.initSuccess = object.initSuccess ?? false;
     message.readyCount = object.readyCount ?? 0;
     message.failedCount = object.failedCount ?? 0;
     message.previousLifecycleState = object.previousLifecycleState ?? 0;
     message.currentLifecycleState = object.currentLifecycleState ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -3939,12 +3915,12 @@ function createBaseComponentLifecycleSnapshot(): ComponentLifecycleSnapshot {
     state: 0,
     modelId: "",
     updatedAtMs: 0,
-    errorMessage: "",
     category: 0,
     framework: 0,
     resolvedPath: "",
     loadedAtUnixMs: 0,
     model: undefined,
+    error: undefined,
   };
 }
 
@@ -3962,9 +3938,6 @@ export const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot> 
     if (message.updatedAtMs !== 0) {
       writer.uint32(32).int64(message.updatedAtMs);
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(42).string(message.errorMessage);
-    }
     if (message.category !== 0) {
       writer.uint32(48).int32(message.category);
     }
@@ -3979,6 +3952,9 @@ export const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot> 
     }
     if (message.model !== undefined) {
       ModelInfo.encode(message.model, writer.uint32(82).fork()).join();
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -4022,14 +3998,6 @@ export const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot> 
           message.updatedAtMs = longToNumber(reader.int64());
           continue;
         }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 6: {
           if (tag !== 48) {
             break;
@@ -4070,6 +4038,14 @@ export const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot> 
           message.model = ModelInfo.decode(reader, reader.uint32());
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4093,11 +4069,6 @@ export const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot> 
         : isSet(object.updated_at_ms)
         ? globalThis.Number(object.updated_at_ms)
         : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       category: isSet(object.category) ? modelCategoryFromJSON(object.category) : 0,
       framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : 0,
       resolvedPath: isSet(object.resolvedPath)
@@ -4111,6 +4082,7 @@ export const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot> 
         ? globalThis.Number(object.loaded_at_unix_ms)
         : 0,
       model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -4128,9 +4100,6 @@ export const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot> 
     if (message.updatedAtMs !== 0) {
       obj.updatedAtMs = Math.round(message.updatedAtMs);
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.category !== 0) {
       obj.category = modelCategoryToJSON(message.category);
     }
@@ -4146,6 +4115,9 @@ export const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot> 
     if (message.model !== undefined) {
       obj.model = ModelInfo.toJSON(message.model);
     }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
     return obj;
   },
 
@@ -4158,7 +4130,6 @@ export const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot> 
     message.state = object.state ?? 0;
     message.modelId = object.modelId ?? "";
     message.updatedAtMs = object.updatedAtMs ?? 0;
-    message.errorMessage = object.errorMessage ?? "";
     message.category = object.category ?? 0;
     message.framework = object.framework ?? 0;
     message.resolvedPath = object.resolvedPath ?? "";
@@ -4166,24 +4137,24 @@ export const ComponentLifecycleSnapshot: MessageFns<ComponentLifecycleSnapshot> 
     message.model = (object.model !== undefined && object.model !== null)
       ? ModelInfo.fromPartial(object.model)
       : undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
 function createBaseComponentLifecycleSnapshotResult(): ComponentLifecycleSnapshotResult {
-  return { success: false, snapshots: [], errorMessage: "" };
+  return { snapshots: [], error: undefined };
 }
 
 export const ComponentLifecycleSnapshotResult: MessageFns<ComponentLifecycleSnapshotResult> = {
   encode(message: ComponentLifecycleSnapshotResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     for (const v of message.snapshots) {
       ComponentLifecycleSnapshot.encode(v!, writer.uint32(18).fork()).join();
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(26).string(message.errorMessage);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(34).fork()).join();
     }
     return writer;
   },
@@ -4195,14 +4166,6 @@ export const ComponentLifecycleSnapshotResult: MessageFns<ComponentLifecycleSnap
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
@@ -4211,12 +4174,12 @@ export const ComponentLifecycleSnapshotResult: MessageFns<ComponentLifecycleSnap
           message.snapshots.push(ComponentLifecycleSnapshot.decode(reader, reader.uint32()));
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
+        case 4: {
+          if (tag !== 34) {
             break;
           }
 
-          message.errorMessage = reader.string();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -4230,28 +4193,20 @@ export const ComponentLifecycleSnapshotResult: MessageFns<ComponentLifecycleSnap
 
   fromJSON(object: any): ComponentLifecycleSnapshotResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       snapshots: globalThis.Array.isArray(object?.snapshots)
         ? object.snapshots.map((e: any) => ComponentLifecycleSnapshot.fromJSON(e))
         : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: ComponentLifecycleSnapshotResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.snapshots?.length) {
       obj.snapshots = message.snapshots.map((e) => ComponentLifecycleSnapshot.toJSON(e));
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -4265,9 +4220,10 @@ export const ComponentLifecycleSnapshotResult: MessageFns<ComponentLifecycleSnap
     object: I,
   ): ComponentLifecycleSnapshotResult {
     const message = createBaseComponentLifecycleSnapshotResult();
-    message.success = object.success ?? false;
     message.snapshots = object.snapshots?.map((e) => ComponentLifecycleSnapshot.fromPartial(e)) || [];
-    message.errorMessage = object.errorMessage ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -5543,7 +5499,6 @@ function createBaseVoiceLifecycleEvent(): VoiceLifecycleEvent {
     audioLengthMs: 0,
     audioSizeBytes: 0,
     wordCount: 0,
-    realTimeFactor: 0,
     language: "",
     sampleRate: 0,
     isStreaming: false,
@@ -5552,7 +5507,6 @@ function createBaseVoiceLifecycleEvent(): VoiceLifecycleEvent {
     audioDurationMs: 0,
     audioSizeBytesTts: 0,
     processingDurationMs: 0,
-    charactersPerSecond: 0,
   };
 }
 
@@ -5609,9 +5563,6 @@ export const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent> = {
     if (message.wordCount !== 0) {
       writer.uint32(136).int32(message.wordCount);
     }
-    if (message.realTimeFactor !== 0) {
-      writer.uint32(145).double(message.realTimeFactor);
-    }
     if (message.language !== "") {
       writer.uint32(154).string(message.language);
     }
@@ -5635,9 +5586,6 @@ export const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent> = {
     }
     if (message.processingDurationMs !== 0) {
       writer.uint32(208).int64(message.processingDurationMs);
-    }
-    if (message.charactersPerSecond !== 0) {
-      writer.uint32(217).double(message.charactersPerSecond);
     }
     return writer;
   },
@@ -5785,14 +5733,6 @@ export const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent> = {
           message.wordCount = reader.int32();
           continue;
         }
-        case 18: {
-          if (tag !== 145) {
-            break;
-          }
-
-          message.realTimeFactor = reader.double();
-          continue;
-        }
         case 19: {
           if (tag !== 154) {
             break;
@@ -5855,14 +5795,6 @@ export const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent> = {
           }
 
           message.processingDurationMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 27: {
-          if (tag !== 217) {
-            break;
-          }
-
-          message.charactersPerSecond = reader.double();
           continue;
         }
       }
@@ -5941,11 +5873,6 @@ export const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent> = {
         : isSet(object.word_count)
         ? globalThis.Number(object.word_count)
         : 0,
-      realTimeFactor: isSet(object.realTimeFactor)
-        ? globalThis.Number(object.realTimeFactor)
-        : isSet(object.real_time_factor)
-        ? globalThis.Number(object.real_time_factor)
-        : 0,
       language: isSet(object.language) ? globalThis.String(object.language) : "",
       sampleRate: isSet(object.sampleRate)
         ? globalThis.Number(object.sampleRate)
@@ -5977,11 +5904,6 @@ export const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent> = {
         ? globalThis.Number(object.processingDurationMs)
         : isSet(object.processing_duration_ms)
         ? globalThis.Number(object.processing_duration_ms)
-        : 0,
-      charactersPerSecond: isSet(object.charactersPerSecond)
-        ? globalThis.Number(object.charactersPerSecond)
-        : isSet(object.characters_per_second)
-        ? globalThis.Number(object.characters_per_second)
         : 0,
     };
   },
@@ -6039,9 +5961,6 @@ export const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent> = {
     if (message.wordCount !== 0) {
       obj.wordCount = Math.round(message.wordCount);
     }
-    if (message.realTimeFactor !== 0) {
-      obj.realTimeFactor = message.realTimeFactor;
-    }
     if (message.language !== "") {
       obj.language = message.language;
     }
@@ -6065,9 +5984,6 @@ export const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent> = {
     }
     if (message.processingDurationMs !== 0) {
       obj.processingDurationMs = Math.round(message.processingDurationMs);
-    }
-    if (message.charactersPerSecond !== 0) {
-      obj.charactersPerSecond = message.charactersPerSecond;
     }
     return obj;
   },
@@ -6094,7 +6010,6 @@ export const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent> = {
     message.audioLengthMs = object.audioLengthMs ?? 0;
     message.audioSizeBytes = object.audioSizeBytes ?? 0;
     message.wordCount = object.wordCount ?? 0;
-    message.realTimeFactor = object.realTimeFactor ?? 0;
     message.language = object.language ?? "";
     message.sampleRate = object.sampleRate ?? 0;
     message.isStreaming = object.isStreaming ?? false;
@@ -6103,7 +6018,6 @@ export const VoiceLifecycleEvent: MessageFns<VoiceLifecycleEvent> = {
     message.audioDurationMs = object.audioDurationMs ?? 0;
     message.audioSizeBytesTts = object.audioSizeBytesTts ?? 0;
     message.processingDurationMs = object.processingDurationMs ?? 0;
-    message.charactersPerSecond = object.charactersPerSecond ?? 0;
     return message;
   },
 };

@@ -32,31 +32,22 @@ import kotlin.collections.List
 import okio.ByteString
 
 public class ModelUnloadResult(
-  @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
   unloaded_model_ids: List<String> = emptyList(),
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 2,
-  )
-  public val error_message: String = "",
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "unloadedAtUnixMs",
-    schemaIndex = 3,
+    schemaIndex = 1,
   )
   public val unloaded_at_unix_ms: Long = 0L,
   warnings: List<String> = emptyList(),
+  @field:WireField(
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 3,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelUnloadResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -64,7 +55,7 @@ public class ModelUnloadResult(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
     jsonName = "unloadedModelIds",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val unloaded_model_ids: List<String> =
       immutableCopyOf("unloaded_model_ids", unloaded_model_ids)
@@ -73,7 +64,7 @@ public class ModelUnloadResult(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
-    schemaIndex = 4,
+    schemaIndex = 2,
   )
   public val warnings: List<String> = immutableCopyOf("warnings", warnings)
 
@@ -87,11 +78,10 @@ public class ModelUnloadResult(
     if (other === this) return true
     if (other !is ModelUnloadResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (unloaded_model_ids != other.unloaded_model_ids) return false
-    if (error_message != other.error_message) return false
     if (unloaded_at_unix_ms != other.unloaded_at_unix_ms) return false
     if (warnings != other.warnings) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -99,11 +89,10 @@ public class ModelUnloadResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + unloaded_model_ids.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + unloaded_at_unix_ms.hashCode()
       result = result * 37 + warnings.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -111,22 +100,20 @@ public class ModelUnloadResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     if (unloaded_model_ids.isNotEmpty()) result += """unloaded_model_ids=${sanitize(unloaded_model_ids)}"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """unloaded_at_unix_ms=$unloaded_at_unix_ms"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ModelUnloadResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     unloaded_model_ids: List<String> = this.unloaded_model_ids,
-    error_message: String = this.error_message,
     unloaded_at_unix_ms: Long = this.unloaded_at_unix_ms,
     warnings: List<String> = this.warnings,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelUnloadResult = ModelUnloadResult(success, unloaded_model_ids, error_message, unloaded_at_unix_ms, warnings, unknownFields)
+  ): ModelUnloadResult = ModelUnloadResult(unloaded_model_ids, unloaded_at_unix_ms, warnings, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -140,77 +127,60 @@ public class ModelUnloadResult(
     ) {
       override fun encodedSize(`value`: ModelUnloadResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(2, value.unloaded_model_ids)
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.error_message)
-        }
         if (value.unloaded_at_unix_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.unloaded_at_unix_ms)
         }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.warnings)
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ModelUnloadResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 2, value.unloaded_model_ids)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
-        }
         if (value.unloaded_at_unix_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.unloaded_at_unix_ms)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelUnloadResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
         if (value.unloaded_at_unix_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.unloaded_at_unix_ms)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
-        }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 2, value.unloaded_model_ids)
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): ModelUnloadResult {
-        var success: Boolean = false
         val unloaded_model_ids = mutableListOf<String>()
-        var error_message: String = ""
         var unloaded_at_unix_ms: Long = 0L
         val warnings = mutableListOf<String>()
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> unloaded_model_ids.add(ProtoAdapter.STRING.decode(reader))
-            3 -> error_message = ProtoAdapter.STRING.decode(reader)
             4 -> unloaded_at_unix_ms = ProtoAdapter.INT64.decode(reader)
             5 -> warnings.add(ProtoAdapter.STRING.decode(reader))
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ModelUnloadResult(
-          success = success,
           unloaded_model_ids = unloaded_model_ids,
-          error_message = error_message,
           unloaded_at_unix_ms = unloaded_at_unix_ms,
           warnings = warnings,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelUnloadResult): ModelUnloadResult = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

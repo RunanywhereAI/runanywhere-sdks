@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -45,13 +44,11 @@ public class LoraAdapterCatalogGetResult(
   )
   public val entry: LoraAdapterCatalogEntry? = null,
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
+    tag = 4,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 2,
   )
-  public val error_message: String = "",
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoraAdapterCatalogGetResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -66,7 +63,7 @@ public class LoraAdapterCatalogGetResult(
     if (unknownFields != other.unknownFields) return false
     if (found != other.found) return false
     if (entry != other.entry) return false
-    if (error_message != other.error_message) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -76,7 +73,7 @@ public class LoraAdapterCatalogGetResult(
       result = unknownFields.hashCode()
       result = result * 37 + found.hashCode()
       result = result * 37 + (entry?.hashCode() ?: 0)
-      result = result * 37 + error_message.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -86,16 +83,16 @@ public class LoraAdapterCatalogGetResult(
     val result = mutableListOf<String>()
     result += """found=$found"""
     if (entry != null) result += """entry=$entry"""
-    result += """error_message=${sanitize(error_message)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "LoraAdapterCatalogGetResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     found: Boolean = this.found,
     entry: LoraAdapterCatalogEntry? = this.entry,
-    error_message: String = this.error_message,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LoraAdapterCatalogGetResult = LoraAdapterCatalogGetResult(found, entry, error_message, unknownFields)
+  ): LoraAdapterCatalogGetResult = LoraAdapterCatalogGetResult(found, entry, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -116,9 +113,7 @@ public class LoraAdapterCatalogGetResult(
         if (value.entry != null) {
           size += LoraAdapterCatalogEntry.ADAPTER.encodedSizeWithTag(2, value.entry)
         }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.error_message)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(4, value.error)
         return size
       }
 
@@ -129,17 +124,13 @@ public class LoraAdapterCatalogGetResult(
         if (value.entry != null) {
           LoraAdapterCatalogEntry.ADAPTER.encodeWithTag(writer, 2, value.entry)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 4, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoraAdapterCatalogGetResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 4, value.error)
         if (value.entry != null) {
           LoraAdapterCatalogEntry.ADAPTER.encodeWithTag(writer, 2, value.entry)
         }
@@ -151,25 +142,26 @@ public class LoraAdapterCatalogGetResult(
       override fun decode(reader: ProtoReader): LoraAdapterCatalogGetResult {
         var found: Boolean = false
         var entry: LoraAdapterCatalogEntry? = null
-        var error_message: String = ""
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> found = ProtoAdapter.BOOL.decode(reader)
             2 -> entry = LoraAdapterCatalogEntry.ADAPTER.decode(reader)
-            3 -> error_message = ProtoAdapter.STRING.decode(reader)
+            4 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LoraAdapterCatalogGetResult(
           found = found,
           entry = entry,
-          error_message = error_message,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LoraAdapterCatalogGetResult): LoraAdapterCatalogGetResult = value.copy(
         entry = value.entry?.let(LoraAdapterCatalogEntry.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

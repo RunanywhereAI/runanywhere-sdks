@@ -43,27 +43,11 @@ public class LoRAApplyResult(
   public val request_id: String = "",
   adapters: List<LoRAAdapterInfo> = emptyList(),
   @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 2,
   )
-  public val success: Boolean = false,
-  @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 3,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 4,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoRAApplyResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -86,9 +70,7 @@ public class LoRAApplyResult(
     if (unknownFields != other.unknownFields) return false
     if (request_id != other.request_id) return false
     if (adapters != other.adapters) return false
-    if (success != other.success) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -98,9 +80,7 @@ public class LoRAApplyResult(
       result = unknownFields.hashCode()
       result = result * 37 + request_id.hashCode()
       result = result * 37 + adapters.hashCode()
-      result = result * 37 + success.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -110,20 +90,16 @@ public class LoRAApplyResult(
     val result = mutableListOf<String>()
     result += """request_id=${sanitize(request_id)}"""
     if (adapters.isNotEmpty()) result += """adapters=$adapters"""
-    result += """success=$success"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "LoRAApplyResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     request_id: String = this.request_id,
     adapters: List<LoRAAdapterInfo> = this.adapters,
-    success: Boolean = this.success,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LoRAApplyResult = LoRAApplyResult(request_id, adapters, success, error_message, error_code, unknownFields)
+  ): LoRAApplyResult = LoRAApplyResult(request_id, adapters, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -141,13 +117,7 @@ public class LoRAApplyResult(
           size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.request_id)
         }
         size += LoRAAdapterInfo.ADAPTER.asRepeated().encodedSizeWithTag(2, value.adapters)
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.success)
-        }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
@@ -156,25 +126,13 @@ public class LoRAApplyResult(
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.request_id)
         }
         LoRAAdapterInfo.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.adapters)
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.success)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoRAApplyResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error_message)
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.success)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         LoRAAdapterInfo.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.adapters)
         if (value.request_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 1, value.request_id)
@@ -184,31 +142,26 @@ public class LoRAApplyResult(
       override fun decode(reader: ProtoReader): LoRAApplyResult {
         var request_id: String = ""
         val adapters = mutableListOf<LoRAAdapterInfo>()
-        var success: Boolean = false
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> request_id = ProtoAdapter.STRING.decode(reader)
             2 -> adapters.add(LoRAAdapterInfo.ADAPTER.decode(reader))
-            3 -> success = ProtoAdapter.BOOL.decode(reader)
-            4 -> error_message = ProtoAdapter.STRING.decode(reader)
-            5 -> error_code = ProtoAdapter.INT32.decode(reader)
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LoRAApplyResult(
           request_id = request_id,
           adapters = adapters,
-          success = success,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LoRAApplyResult): LoRAApplyResult = value.copy(
         adapters = value.adapters.redactElements(LoRAAdapterInfo.ADAPTER),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

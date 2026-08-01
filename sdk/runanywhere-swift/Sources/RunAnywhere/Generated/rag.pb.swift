@@ -8,19 +8,11 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere v2 IDL — RAG (Retrieval-Augmented Generation) runtime types.
+// RunAnywhere IDL — retrieval-augmented generation.
 //
-// Companion to solutions.proto::RAGConfig (which is the *solution-spec* sugar
-// fed into PipelineSpec). This file holds the *runtime* types — the inputs
-// and outputs that flow through the RAG pipeline at query time:
-//   - RAGConfiguration   (low-level pipeline config, carries model ids)
-//   - RAGQueryOptions    (per-query sampling options)
-//   - RAGSearchResult    (a single retrieved chunk)
-//   - RAGResult          (full query result: answer + chunks + timings)
-//   - RAGStatistics      (index-level counters)
-//
-// All SDKs consume these generated messages directly so configuration,
-// metadata, results, and statistics have one portable shape.
+// Commons resolves model ids to on-disk paths through the global model
+// registry, so callers must register their embedding, LLM, and reranker models
+// before configuring a session.
 
 import SwiftProtobuf
 
@@ -88,34 +80,15 @@ public nonisolated enum RARAGStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
 
 }
 
-/// ---------------------------------------------------------------------------
-/// RAGConfiguration — low-level pipeline config.
-///
-/// This message carries *model ids*, not filesystem paths.
-/// The commons RAG session ABI (rac_rag_session_create_proto) is responsible
-/// for resolving those ids to on-disk paths through the canonical model
-/// registry. SDK callers MUST register the embedding / LLM / reranker models
-/// first and pass only their ids here.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RARAGConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Registered id of the embedding model (required, e.g. "bge-small-en-v1.5").
-  /// Commons resolves this to the primary artifact path via the model registry.
   public var embeddingModelID: String = String()
 
-  /// Registered id of the LLM model (e.g. "qwen3-4b-q4_k_m"). Optional —
-  /// leave empty to create an embed-only / retrieval-only pipeline.
   public var llmModelID: String = String()
 
-  /// Embedding vector dimension — must match the embedding model.
-  /// Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-  /// Leave UNSET: commons derives the dimension from the loaded embedding
-  /// model at session create (rac_embeddings_get_info). Set only to
-  /// override. No rac_default on purpose — a generated defaults() that
-  /// stamped 384 would mark the field present and defeat the derivation.
   public var embeddingDimension: Int32 {
     get {_embeddingDimension ?? 0}
     set {_embeddingDimension = newValue}
@@ -125,8 +98,7 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// Clears the value of `embeddingDimension`. Subsequent reads from it will return its default value.
   public mutating func clearEmbeddingDimension() {self._embeddingDimension = nil}
 
-  /// Number of top chunks to retrieve per query.
-  /// Optional so callers can distinguish "unset" from an explicit value.
+  /// Retrieval depth, not sampling top_k.
   public var topK: Int32 {
     get {_topK ?? 0}
     set {_topK = newValue}
@@ -136,16 +108,6 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// Clears the value of `topK`. Subsequent reads from it will return its default value.
   public mutating func clearTopK() {self._topK = nil}
 
-  /// Minimum cosine similarity threshold (0.0–1.0). Chunks below this
-  /// score are discarded before being passed to the LLM as context.
-  /// Optional so callers can distinguish "unset" from explicit 0.0
-  /// (accept-everything) without losing the canonical default.
-  /// Default is 0.0 (accept-everything): MiniLM-class sentence embeddings
-  /// produce cosine similarities that rarely exceed ~0.5 even for relevant
-  /// chunks, and chunking a document lowers each chunk's similarity further, so
-  /// any positive floor filters out real matches — a multi-chunk document then
-  /// retrieves nothing and the answer model reports "no information". top_k
-  /// bounds the result count instead of a similarity floor.
   public var similarityThreshold: Float {
     get {_similarityThreshold ?? 0}
     set {_similarityThreshold = newValue}
@@ -155,8 +117,7 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// Clears the value of `similarityThreshold`. Subsequent reads from it will return its default value.
   public mutating func clearSimilarityThreshold() {self._similarityThreshold = nil}
 
-  /// Tokens per chunk when splitting documents during ingestion.
-  /// Optional so callers can distinguish "unset" from an explicit value.
+  /// Tokens per chunk, and the overlap carried between adjacent chunks.
   public var chunkSize: Int32 {
     get {_chunkSize ?? 0}
     set {_chunkSize = newValue}
@@ -166,9 +127,6 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// Clears the value of `chunkSize`. Subsequent reads from it will return its default value.
   public mutating func clearChunkSize() {self._chunkSize = nil}
 
-  /// Overlap tokens between consecutive chunks. Must be < chunk_size.
-  /// Optional so callers can explicitly request zero overlap (no overlap)
-  /// without it being silently replaced by the canonical default of 64.
   public var chunkOverlap: Int32 {
     get {_chunkOverlap ?? 0}
     set {_chunkOverlap = newValue}
@@ -178,8 +136,6 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// Clears the value of `chunkOverlap`. Subsequent reads from it will return its default value.
   public mutating func clearChunkOverlap() {self._chunkOverlap = nil}
 
-  /// Maximum tokens of retrieved context passed to the LLM.
-  /// Optional so callers can distinguish "unset" from an explicit value.
   public var maxContextTokens: Int32 {
     get {_maxContextTokens ?? 0}
     set {_maxContextTokens = newValue}
@@ -189,7 +145,6 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// Clears the value of `maxContextTokens`. Subsequent reads from it will return its default value.
   public mutating func clearMaxContextTokens() {self._maxContextTokens = nil}
 
-  /// Prompt template with `{context}` and `{query}` placeholders.
   public var promptTemplate: String {
     get {_promptTemplate ?? String()}
     set {_promptTemplate = newValue}
@@ -199,7 +154,6 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// Clears the value of `promptTemplate`. Subsequent reads from it will return its default value.
   public mutating func clearPromptTemplate() {self._promptTemplate = nil}
 
-  /// Backend-specific config JSON passed to the embedding model/provider.
   public var embeddingConfigJson: String {
     get {_embeddingConfigJson ?? String()}
     set {_embeddingConfigJson = newValue}
@@ -209,7 +163,6 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// Clears the value of `embeddingConfigJson`. Subsequent reads from it will return its default value.
   public mutating func clearEmbeddingConfigJson() {self._embeddingConfigJson = nil}
 
-  /// Backend-specific config JSON passed to the LLM provider.
   public var llmConfigJson: String {
     get {_llmConfigJson ?? String()}
     set {_llmConfigJson = newValue}
@@ -219,7 +172,7 @@ public nonisolated struct RARAGConfiguration: Sendable {
   /// Clears the value of `llmConfigJson`. Subsequent reads from it will return its default value.
   public mutating func clearLlmConfigJson() {self._llmConfigJson = nil}
 
-  /// Index persistence and retrieval behavior. Empty path = in-memory index.
+  /// Where the vector index lives, and whether it survives the session.
   public var indexPath: String {
     get {_indexPath ?? String()}
     set {_indexPath = newValue}
@@ -233,7 +186,6 @@ public nonisolated struct RARAGConfiguration: Sendable {
 
   public var rerankResults: Bool = false
 
-  /// Registered id of the reranker model (optional).
   public var rerankerModelID: String {
     get {_rerankerModelID ?? String()}
     set {_rerankerModelID = newValue}
@@ -260,25 +212,17 @@ public nonisolated struct RARAGConfiguration: Sendable {
   fileprivate var _rerankerModelID: String? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// RAGDocument — batch-ingest input item.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RARAGDocument: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Optional caller-supplied document id.
   public var id: String = String()
 
-  /// Plain text content to chunk/embed.
   public var text: String = String()
 
-  /// Typed metadata map for generated-proto callers.
   public var metadata: Dictionary<String,String> = [:]
 
-  /// Adapter-normalized document source. Pickers, sandbox bookmarks, and
-  /// platform file access remain SDK-owned.
   public var sourceUri: String {
     get {_sourceUri ?? String()}
     set {_sourceUri = newValue}
@@ -317,39 +261,13 @@ public nonisolated struct RARAGDocument: Sendable {
   fileprivate var _mediaType: String? = nil
 }
 
-public nonisolated struct RARAGIngestRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var requestID: String = String()
-
-  public var documents: [RARAGDocument] = []
-
-  public var replaceExisting: Bool = false
-
-  public var metadata: Dictionary<String,String> = [:]
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// ---------------------------------------------------------------------------
-/// RAGQueryOptions — per-query sampling and prompt overrides.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RARAGQueryOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// The user question to answer. Required (empty = no-op).
   public var question: String = String()
 
-  /// Answer-generation knobs (sampling, system prompt, reasoning). Unset =
-  /// pipeline defaults. RAG-appropriate defaults (e.g. max_output_tokens
-  /// 512, temperature 0.7) are applied by the pipeline when unset, not
-  /// re-declared here.
   public var generation: RALLMGenerationOptions {
     get {_generation ?? RALLMGenerationOptions()}
     set {_generation = newValue}
@@ -359,12 +277,9 @@ public nonisolated struct RARAGQueryOptions: Sendable {
   /// Clears the value of `generation`. Subsequent reads from it will return its default value.
   public mutating func clearGeneration() {self._generation = nil}
 
-  /// Retrieval overrides. 0/unset = use RAGConfiguration defaults.
+  /// Retrieval depth for this call, overriding RAGConfiguration.top_k.
   public var retrievalTopK: Int32 = 0
 
-  /// Per-query similarity floor. `optional` so an explicit 0.0 (accept
-  /// everything) is distinguishable from "unset" and can override a positive
-  /// session-level default; unset falls back to RAGConfiguration.
   public var similarityThreshold: Float {
     get {_similarityThreshold ?? 0}
     set {_similarityThreshold = newValue}
@@ -376,10 +291,7 @@ public nonisolated struct RARAGQueryOptions: Sendable {
 
   public var stream: Bool = false
 
-  /// Multi-query expansion: when true, the answer LLM rewrites the question
-  /// into `multi_query_count` variants; retrieval runs for the original plus
-  /// each variant and the rankings are RRF-fused before rerank. Falls back to
-  /// a single query if expansion yields nothing.
+  /// Expand the question into several queries and merge the results.
   public var enableMultiQuery: Bool = false
 
   public var multiQueryCount: Int32 {
@@ -391,9 +303,7 @@ public nonisolated struct RARAGQueryOptions: Sendable {
   /// Clears the value of `multiQueryCount`. Subsequent reads from it will return its default value.
   public mutating func clearMultiQueryCount() {self._multiQueryCount = nil}
 
-  /// Scoped retrieval: when set, only chunks whose document id begins with
-  /// this prefix are eligible (e.g. a chat/collection namespace). Unset =
-  /// search the whole index.
+  /// Restrict retrieval to chunks whose source matches this prefix.
   public var scopePrefix: String {
     get {_scopePrefix ?? String()}
     set {_scopePrefix = newValue}
@@ -413,50 +323,17 @@ public nonisolated struct RARAGQueryOptions: Sendable {
   fileprivate var _scopePrefix: String? = nil
 }
 
-public nonisolated struct RARAGQueryRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var requestID: String = String()
-
-  public var options: RARAGQueryOptions {
-    get {_options ?? RARAGQueryOptions()}
-    set {_options = newValue}
-  }
-  /// Returns true if `options` has been explicitly set.
-  public var hasOptions: Bool {self._options != nil}
-  /// Clears the value of `options`. Subsequent reads from it will return its default value.
-  public mutating func clearOptions() {self._options = nil}
-
-  public var metadata: Dictionary<String,String> = [:]
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _options: RARAGQueryOptions? = nil
-}
-
-/// ---------------------------------------------------------------------------
-/// RAGSearchResult — a single retrieved document chunk with similarity score.
-/// ---------------------------------------------------------------------------
 public nonisolated struct RARAGSearchResult: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Unique identifier of the chunk (assigned at ingestion time).
   public var chunkID: String = String()
 
-  /// Text content of the chunk (the actual snippet shown to the LLM).
   public var text: String = String()
 
-  /// Cosine similarity score (0.0–1.0). Higher = more relevant.
   public var similarityScore: Float = 0
 
-  /// Optional source document identifier (filename, URL, or document ID).
-  /// Set when the chunk's origin is tracked at ingestion time.
   public var sourceDocument: String {
     get {_sourceDocument ?? String()}
     set {_sourceDocument = newValue}
@@ -466,12 +343,11 @@ public nonisolated struct RARAGSearchResult: Sendable {
   /// Clears the value of `sourceDocument`. Subsequent reads from it will return its default value.
   public mutating func clearSourceDocument() {self._sourceDocument = nil}
 
-  /// Free-form metadata associated with the chunk (e.g. page number, section,
-  /// ingestion timestamp).
   public var metadata: Dictionary<String,String> = [:]
 
   public var rank: Int32 = 0
 
+  /// Character offsets into the source document.
   public var startOffset: Int32 = 0
 
   public var endOffset: Int32 = 0
@@ -485,192 +361,158 @@ public nonisolated struct RARAGSearchResult: Sendable {
   fileprivate var _sourceDocument: String? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// RAGResult — the full result of a RAG query.
-/// ---------------------------------------------------------------------------
-public nonisolated struct RARAGResult: Sendable {
+public nonisolated struct RARAGResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// The LLM-generated answer grounded in the retrieved context.
-  public var answer: String = String()
-
-  /// Document chunks retrieved during vector search and used as context.
-  /// Order matches retrieval rank (highest similarity first).
-  public var retrievedChunks: [RARAGSearchResult] = []
-
-  /// Full context string passed to the LLM (chunks joined into a prompt).
-  /// May be empty for queries with no matching chunks.
-  public var contextUsed: String = String()
-
-  /// Time spent in the retrieval phase (vector search), in milliseconds.
-  public var retrievalTimeMs: Int64 = 0
-
-  /// Time spent in the LLM generation phase, in milliseconds.
-  public var generationTimeMs: Int64 = 0
-
-  /// Total end-to-end query time (retrieval + generation + overhead),
-  /// in milliseconds.
-  public var totalTimeMs: Int64 = 0
-
-  public var promptTokens: Int32 = 0
-
-  public var completionTokens: Int32 = 0
-
-  public var totalTokens: Int32 = 0
-
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
+  public var answer: String {
+    get {_storage._answer}
+    set {_uniqueStorage()._answer = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
 
-  public var errorCode: Int32 = 0
+  public var retrievedChunks: [RARAGSearchResult] {
+    get {_storage._retrievedChunks}
+    set {_uniqueStorage()._retrievedChunks = newValue}
+  }
 
-  public var requestID: String = String()
+  public var contextUsed: String {
+    get {_storage._contextUsed}
+    set {_uniqueStorage()._contextUsed = newValue}
+  }
 
-  /// Optional thinking/reasoning content extracted from the answer.
+  public var retrievalTimeMs: Int64 {
+    get {_storage._retrievalTimeMs}
+    set {_uniqueStorage()._retrievalTimeMs = newValue}
+  }
+
+  public var generationTimeMs: Int64 {
+    get {_storage._generationTimeMs}
+    set {_uniqueStorage()._generationTimeMs = newValue}
+  }
+
+  public var totalTimeMs: Int64 {
+    get {_storage._totalTimeMs}
+    set {_uniqueStorage()._totalTimeMs = newValue}
+  }
+
+  public var requestID: String {
+    get {_storage._requestID}
+    set {_uniqueStorage()._requestID = newValue}
+  }
+
   public var thinkingContent: String {
-    get {_thinkingContent ?? String()}
-    set {_thinkingContent = newValue}
+    get {_storage._thinkingContent ?? String()}
+    set {_uniqueStorage()._thinkingContent = newValue}
   }
   /// Returns true if `thinkingContent` has been explicitly set.
-  public var hasThinkingContent: Bool {self._thinkingContent != nil}
+  public var hasThinkingContent: Bool {_storage._thinkingContent != nil}
   /// Clears the value of `thinkingContent`. Subsequent reads from it will return its default value.
-  public mutating func clearThinkingContent() {self._thinkingContent = nil}
+  public mutating func clearThinkingContent() {_uniqueStorage()._thinkingContent = nil}
+
+  public var usage: RATokenUsage {
+    get {_storage._usage ?? RATokenUsage()}
+    set {_uniqueStorage()._usage = newValue}
+  }
+  /// Returns true if `usage` has been explicitly set.
+  public var hasUsage: Bool {_storage._usage != nil}
+  /// Clears the value of `usage`. Subsequent reads from it will return its default value.
+  public mutating func clearUsage() {_uniqueStorage()._usage = nil}
+
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _errorMessage: String? = nil
-  fileprivate var _thinkingContent: String? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-/// ---------------------------------------------------------------------------
-/// RAGStatistics — index-level counters for the RAG pipeline.
-///
-/// Returned by RunAnywhere.rag.statistics() / ragGetStatistics().
-/// ---------------------------------------------------------------------------
-public nonisolated struct RARAGStatistics: Sendable {
+public nonisolated struct RARAGStatistics: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Total number of documents ever ingested into the index.
-  public var indexedDocuments: Int64 = 0
+  public var indexedDocuments: Int64 {
+    get {_storage._indexedDocuments}
+    set {_uniqueStorage()._indexedDocuments = newValue}
+  }
 
-  /// Total number of chunks across all indexed documents.
-  public var indexedChunks: Int64 = 0
+  public var indexedChunks: Int64 {
+    get {_storage._indexedChunks}
+    set {_uniqueStorage()._indexedChunks = newValue}
+  }
 
-  /// Approximate total token count across all indexed chunks.
-  public var totalTokensIndexed: Int64 = 0
+  public var totalTokensIndexed: Int64 {
+    get {_storage._totalTokensIndexed}
+    set {_uniqueStorage()._totalTokensIndexed = newValue}
+  }
 
-  /// Wall-clock timestamp of the most recent ingestion, in milliseconds
-  /// since Unix epoch. 0 = no ingestion yet.
-  public var lastUpdatedMs: Int64 = 0
+  public var lastUpdatedMs: Int64 {
+    get {_storage._lastUpdatedMs}
+    set {_uniqueStorage()._lastUpdatedMs = newValue}
+  }
 
-  /// Filesystem path to the on-disk index, when applicable. Unset for
-  /// in-memory-only indexes.
   public var indexPath: String {
-    get {_indexPath ?? String()}
-    set {_indexPath = newValue}
+    get {_storage._indexPath ?? String()}
+    set {_uniqueStorage()._indexPath = newValue}
   }
   /// Returns true if `indexPath` has been explicitly set.
-  public var hasIndexPath: Bool {self._indexPath != nil}
+  public var hasIndexPath: Bool {_storage._indexPath != nil}
   /// Clears the value of `indexPath`. Subsequent reads from it will return its default value.
-  public mutating func clearIndexPath() {self._indexPath = nil}
+  public mutating func clearIndexPath() {_uniqueStorage()._indexPath = nil}
 
-  /// Raw backend statistics JSON for implementations that cannot yet project
-  /// every counter into typed fields.
   public var statsJson: String {
-    get {_statsJson ?? String()}
-    set {_statsJson = newValue}
+    get {_storage._statsJson ?? String()}
+    set {_uniqueStorage()._statsJson = newValue}
   }
   /// Returns true if `statsJson` has been explicitly set.
-  public var hasStatsJson: Bool {self._statsJson != nil}
+  public var hasStatsJson: Bool {_storage._statsJson != nil}
   /// Clears the value of `statsJson`. Subsequent reads from it will return its default value.
-  public mutating func clearStatsJson() {self._statsJson = nil}
+  public mutating func clearStatsJson() {_uniqueStorage()._statsJson = nil}
 
-  /// Approximate vector-store footprint in bytes, when known.
-  public var vectorStoreSizeBytes: Int64 = 0
-
-  public var isPersistent: Bool = false
-
-  public var lastQueryMs: Int64 = 0
-
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
+  public var vectorStoreSizeBytes: Int64 {
+    get {_storage._vectorStoreSizeBytes}
+    set {_uniqueStorage()._vectorStoreSizeBytes = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
 
-  public var errorCode: Int32 = 0
+  public var isPersistent: Bool {
+    get {_storage._isPersistent}
+    set {_uniqueStorage()._isPersistent = newValue}
+  }
+
+  public var lastQueryMs: Int64 {
+    get {_storage._lastQueryMs}
+    set {_uniqueStorage()._lastQueryMs = newValue}
+  }
+
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _indexPath: String? = nil
-  fileprivate var _statsJson: String? = nil
-  fileprivate var _errorMessage: String? = nil
-}
-
-public nonisolated struct RARAGIngestResult: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var requestID: String = String()
-
-  public var documentsIngested: Int64 = 0
-
-  public var chunksIngested: Int64 = 0
-
-  public var statistics: RARAGStatistics {
-    get {_statistics ?? RARAGStatistics()}
-    set {_statistics = newValue}
-  }
-  /// Returns true if `statistics` has been explicitly set.
-  public var hasStatistics: Bool {self._statistics != nil}
-  /// Clears the value of `statistics`. Subsequent reads from it will return its default value.
-  public mutating func clearStatistics() {self._statistics = nil}
-
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
-  }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
-
-  public var errorCode: Int32 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _statistics: RARAGStatistics? = nil
-  fileprivate var _errorMessage: String? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 public nonisolated struct RARAGStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
-
-  public var seq: UInt64 {
-    get {_storage._seq}
-    set {_uniqueStorage()._seq = newValue}
-  }
 
   public var timestampUs: Int64 {
     get {_storage._timestampUs}
@@ -710,78 +552,14 @@ public nonisolated struct RARAGStreamEvent: @unchecked Sendable {
   /// Clears the value of `result`. Subsequent reads from it will return its default value.
   public mutating func clearResult() {_uniqueStorage()._result = nil}
 
-  public var errorMessage: String {
-    get {_storage._errorMessage ?? String()}
-    set {_uniqueStorage()._errorMessage = newValue}
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
-
-  public var errorCode: Int32 {
-    get {_storage._errorCode}
-    set {_uniqueStorage()._errorCode = newValue}
-  }
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _storage = _StorageClass.defaultInstance
-}
-
-public nonisolated struct RARAGServiceState: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var isReady: Bool {
-    get {_storage._isReady}
-    set {_uniqueStorage()._isReady = newValue}
-  }
-
-  public var statistics: RARAGStatistics {
-    get {_storage._statistics ?? RARAGStatistics()}
-    set {_uniqueStorage()._statistics = newValue}
-  }
-  /// Returns true if `statistics` has been explicitly set.
-  public var hasStatistics: Bool {_storage._statistics != nil}
-  /// Clears the value of `statistics`. Subsequent reads from it will return its default value.
-  public mutating func clearStatistics() {_uniqueStorage()._statistics = nil}
-
-  public var isIndexing: Bool {
-    get {_storage._isIndexing}
-    set {_uniqueStorage()._isIndexing = newValue}
-  }
-
-  public var isQuerying: Bool {
-    get {_storage._isQuerying}
-    set {_uniqueStorage()._isQuerying = newValue}
-  }
-
-  public var activeRequestID: String {
-    get {_storage._activeRequestID ?? String()}
-    set {_uniqueStorage()._activeRequestID = newValue}
-  }
-  /// Returns true if `activeRequestID` has been explicitly set.
-  public var hasActiveRequestID: Bool {_storage._activeRequestID != nil}
-  /// Clears the value of `activeRequestID`. Subsequent reads from it will return its default value.
-  public mutating func clearActiveRequestID() {_uniqueStorage()._activeRequestID = nil}
-
-  public var errorMessage: String {
-    get {_storage._errorMessage ?? String()}
-    set {_uniqueStorage()._errorMessage = newValue}
-  }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
-
-  public var errorCode: Int32 {
-    get {_storage._errorCode}
-    set {_uniqueStorage()._errorCode = newValue}
-  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -904,7 +682,7 @@ nonisolated extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGDocument"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{2}\u{2}metadata\0\u{3}source_uri\0\u{3}adapter_handle\0\u{3}media_type\0\u{3}size_bytes\0\u{c}\u{3}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{2}\u{2}metadata\0\u{3}source_uri\0\u{3}adapter_handle\0\u{3}media_type\0\u{3}size_bytes\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -961,51 +739,6 @@ nonisolated extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._Messa
     if lhs._adapterHandle != rhs._adapterHandle {return false}
     if lhs._mediaType != rhs._mediaType {return false}
     if lhs.sizeBytes != rhs.sizeBytes {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RARAGIngestRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RAGIngestRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}documents\0\u{3}replace_existing\0\u{1}metadata\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
-      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.documents) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.replaceExisting) }()
-      case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
-    }
-    if !self.documents.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.documents, fieldNumber: 2)
-    }
-    if self.replaceExisting != false {
-      try visitor.visitSingularBoolField(value: self.replaceExisting, fieldNumber: 3)
-    }
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 4)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RARAGIngestRequest, rhs: RARAGIngestRequest) -> Bool {
-    if lhs.requestID != rhs.requestID {return false}
-    if lhs.documents != rhs.documents {return false}
-    if lhs.replaceExisting != rhs.replaceExisting {return false}
-    if lhs.metadata != rhs.metadata {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1080,53 +813,9 @@ nonisolated extension RARAGQueryOptions: SwiftProtobuf.Message, SwiftProtobuf._M
   }
 }
 
-nonisolated extension RARAGQueryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RAGQueryRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}options\0\u{1}metadata\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._options) }()
-      case 3: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
-    }
-    try { if let v = self._options {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 3)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RARAGQueryRequest, rhs: RARAGQueryRequest) -> Bool {
-    if lhs.requestID != rhs.requestID {return false}
-    if lhs._options != rhs._options {return false}
-    if lhs.metadata != rhs.metadata {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 nonisolated extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGSearchResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{2}\u{2}rank\0\u{3}start_offset\0\u{3}end_offset\0\u{3}token_count\0\u{c}\u{6}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{2}\u{2}rank\0\u{3}start_offset\0\u{3}end_offset\0\u{3}token_count\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1200,255 +889,19 @@ nonisolated extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RARAGResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}answer\0\u{3}retrieved_chunks\0\u{3}context_used\0\u{3}retrieval_time_ms\0\u{3}generation_time_ms\0\u{3}total_time_ms\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}error_message\0\u{3}error_code\0\u{3}request_id\0\u{3}thinking_content\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.answer) }()
-      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.retrievedChunks) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.contextUsed) }()
-      case 4: try { try decoder.decodeSingularInt64Field(value: &self.retrievalTimeMs) }()
-      case 5: try { try decoder.decodeSingularInt64Field(value: &self.generationTimeMs) }()
-      case 6: try { try decoder.decodeSingularInt64Field(value: &self.totalTimeMs) }()
-      case 7: try { try decoder.decodeSingularInt32Field(value: &self.promptTokens) }()
-      case 8: try { try decoder.decodeSingularInt32Field(value: &self.completionTokens) }()
-      case 9: try { try decoder.decodeSingularInt32Field(value: &self.totalTokens) }()
-      case 10: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 11: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
-      case 12: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
-      case 13: try { try decoder.decodeSingularStringField(value: &self._thinkingContent) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.answer.isEmpty {
-      try visitor.visitSingularStringField(value: self.answer, fieldNumber: 1)
-    }
-    if !self.retrievedChunks.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.retrievedChunks, fieldNumber: 2)
-    }
-    if !self.contextUsed.isEmpty {
-      try visitor.visitSingularStringField(value: self.contextUsed, fieldNumber: 3)
-    }
-    if self.retrievalTimeMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.retrievalTimeMs, fieldNumber: 4)
-    }
-    if self.generationTimeMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.generationTimeMs, fieldNumber: 5)
-    }
-    if self.totalTimeMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.totalTimeMs, fieldNumber: 6)
-    }
-    if self.promptTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.promptTokens, fieldNumber: 7)
-    }
-    if self.completionTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.completionTokens, fieldNumber: 8)
-    }
-    if self.totalTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.totalTokens, fieldNumber: 9)
-    }
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
-    } }()
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 11)
-    }
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 12)
-    }
-    try { if let v = self._thinkingContent {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 13)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RARAGResult, rhs: RARAGResult) -> Bool {
-    if lhs.answer != rhs.answer {return false}
-    if lhs.retrievedChunks != rhs.retrievedChunks {return false}
-    if lhs.contextUsed != rhs.contextUsed {return false}
-    if lhs.retrievalTimeMs != rhs.retrievalTimeMs {return false}
-    if lhs.generationTimeMs != rhs.generationTimeMs {return false}
-    if lhs.totalTimeMs != rhs.totalTimeMs {return false}
-    if lhs.promptTokens != rhs.promptTokens {return false}
-    if lhs.completionTokens != rhs.completionTokens {return false}
-    if lhs.totalTokens != rhs.totalTokens {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
-    if lhs.requestID != rhs.requestID {return false}
-    if lhs._thinkingContent != rhs._thinkingContent {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RAGStatistics"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}indexed_documents\0\u{3}indexed_chunks\0\u{3}total_tokens_indexed\0\u{3}last_updated_ms\0\u{3}index_path\0\u{3}stats_json\0\u{3}vector_store_size_bytes\0\u{3}is_persistent\0\u{3}last_query_ms\0\u{3}error_message\0\u{3}error_code\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt64Field(value: &self.indexedDocuments) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.indexedChunks) }()
-      case 3: try { try decoder.decodeSingularInt64Field(value: &self.totalTokensIndexed) }()
-      case 4: try { try decoder.decodeSingularInt64Field(value: &self.lastUpdatedMs) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._indexPath) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._statsJson) }()
-      case 7: try { try decoder.decodeSingularInt64Field(value: &self.vectorStoreSizeBytes) }()
-      case 8: try { try decoder.decodeSingularBoolField(value: &self.isPersistent) }()
-      case 9: try { try decoder.decodeSingularInt64Field(value: &self.lastQueryMs) }()
-      case 10: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 11: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.indexedDocuments != 0 {
-      try visitor.visitSingularInt64Field(value: self.indexedDocuments, fieldNumber: 1)
-    }
-    if self.indexedChunks != 0 {
-      try visitor.visitSingularInt64Field(value: self.indexedChunks, fieldNumber: 2)
-    }
-    if self.totalTokensIndexed != 0 {
-      try visitor.visitSingularInt64Field(value: self.totalTokensIndexed, fieldNumber: 3)
-    }
-    if self.lastUpdatedMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.lastUpdatedMs, fieldNumber: 4)
-    }
-    try { if let v = self._indexPath {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._statsJson {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-    } }()
-    if self.vectorStoreSizeBytes != 0 {
-      try visitor.visitSingularInt64Field(value: self.vectorStoreSizeBytes, fieldNumber: 7)
-    }
-    if self.isPersistent != false {
-      try visitor.visitSingularBoolField(value: self.isPersistent, fieldNumber: 8)
-    }
-    if self.lastQueryMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.lastQueryMs, fieldNumber: 9)
-    }
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
-    } }()
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 11)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RARAGStatistics, rhs: RARAGStatistics) -> Bool {
-    if lhs.indexedDocuments != rhs.indexedDocuments {return false}
-    if lhs.indexedChunks != rhs.indexedChunks {return false}
-    if lhs.totalTokensIndexed != rhs.totalTokensIndexed {return false}
-    if lhs.lastUpdatedMs != rhs.lastUpdatedMs {return false}
-    if lhs._indexPath != rhs._indexPath {return false}
-    if lhs._statsJson != rhs._statsJson {return false}
-    if lhs.vectorStoreSizeBytes != rhs.vectorStoreSizeBytes {return false}
-    if lhs.isPersistent != rhs.isPersistent {return false}
-    if lhs.lastQueryMs != rhs.lastQueryMs {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RARAGIngestResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RAGIngestResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}documents_ingested\0\u{3}chunks_ingested\0\u{1}statistics\0\u{3}error_message\0\u{3}error_code\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.documentsIngested) }()
-      case 3: try { try decoder.decodeSingularInt64Field(value: &self.chunksIngested) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._statistics) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 6: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
-    }
-    if self.documentsIngested != 0 {
-      try visitor.visitSingularInt64Field(value: self.documentsIngested, fieldNumber: 2)
-    }
-    if self.chunksIngested != 0 {
-      try visitor.visitSingularInt64Field(value: self.chunksIngested, fieldNumber: 3)
-    }
-    try { if let v = self._statistics {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 6)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RARAGIngestResult, rhs: RARAGIngestResult) -> Bool {
-    if lhs.requestID != rhs.requestID {return false}
-    if lhs.documentsIngested != rhs.documentsIngested {return false}
-    if lhs.chunksIngested != rhs.chunksIngested {return false}
-    if lhs._statistics != rhs._statistics {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RAGStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}chunk\0\u{1}token\0\u{1}result\0\u{3}error_message\0\u{3}error_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}answer\0\u{3}retrieved_chunks\0\u{3}context_used\0\u{3}retrieval_time_ms\0\u{3}generation_time_ms\0\u{3}total_time_ms\0\u{4}\u{6}request_id\0\u{3}thinking_content\0\u{1}usage\0\u{1}error\0")
 
   fileprivate class _StorageClass {
-    var _seq: UInt64 = 0
-    var _timestampUs: Int64 = 0
+    var _answer: String = String()
+    var _retrievedChunks: [RARAGSearchResult] = []
+    var _contextUsed: String = String()
+    var _retrievalTimeMs: Int64 = 0
+    var _generationTimeMs: Int64 = 0
+    var _totalTimeMs: Int64 = 0
     var _requestID: String = String()
-    var _kind: RARAGStreamEventKind = .unspecified
-    var _chunk: RARAGSearchResult? = nil
-    var _token: String = String()
-    var _result: RARAGResult? = nil
-    var _errorMessage: String? = nil
-    var _errorCode: Int32 = 0
+    var _thinkingContent: String? = nil
+    var _usage: RATokenUsage? = nil
+    var _error: RASDKError? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1459,15 +912,16 @@ nonisolated extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
     private init() {}
 
     init(copying source: _StorageClass) {
-      _seq = source._seq
-      _timestampUs = source._timestampUs
+      _answer = source._answer
+      _retrievedChunks = source._retrievedChunks
+      _contextUsed = source._contextUsed
+      _retrievalTimeMs = source._retrievalTimeMs
+      _generationTimeMs = source._generationTimeMs
+      _totalTimeMs = source._totalTimeMs
       _requestID = source._requestID
-      _kind = source._kind
-      _chunk = source._chunk
-      _token = source._token
-      _result = source._result
-      _errorMessage = source._errorMessage
-      _errorCode = source._errorCode
+      _thinkingContent = source._thinkingContent
+      _usage = source._usage
+      _error = source._error
     }
   }
 
@@ -1486,15 +940,16 @@ nonisolated extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
         // allocates stack space for every case branch when no optimizations are
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
-        case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._seq) }()
-        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
-        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
-        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._chunk) }()
-        case 6: try { try decoder.decodeSingularStringField(value: &_storage._token) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
-        case 9: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._answer) }()
+        case 2: try { try decoder.decodeRepeatedMessageField(value: &_storage._retrievedChunks) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._contextUsed) }()
+        case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._retrievalTimeMs) }()
+        case 5: try { try decoder.decodeSingularInt64Field(value: &_storage._generationTimeMs) }()
+        case 6: try { try decoder.decodeSingularInt64Field(value: &_storage._totalTimeMs) }()
+        case 12: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 13: try { try decoder.decodeSingularStringField(value: &_storage._thinkingContent) }()
+        case 14: try { try decoder.decodeSingularMessageField(value: &_storage._usage) }()
+        case 15: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
         }
       }
@@ -1507,9 +962,263 @@ nonisolated extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       // allocates stack space for every if/case branch local when no optimizations
       // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
       // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._seq != 0 {
-        try visitor.visitSingularUInt64Field(value: _storage._seq, fieldNumber: 1)
+      if !_storage._answer.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._answer, fieldNumber: 1)
       }
+      if !_storage._retrievedChunks.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._retrievedChunks, fieldNumber: 2)
+      }
+      if !_storage._contextUsed.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._contextUsed, fieldNumber: 3)
+      }
+      if _storage._retrievalTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._retrievalTimeMs, fieldNumber: 4)
+      }
+      if _storage._generationTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._generationTimeMs, fieldNumber: 5)
+      }
+      if _storage._totalTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._totalTimeMs, fieldNumber: 6)
+      }
+      if !_storage._requestID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 12)
+      }
+      try { if let v = _storage._thinkingContent {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 13)
+      } }()
+      try { if let v = _storage._usage {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 14)
+      } }()
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 15)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RARAGResult, rhs: RARAGResult) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._answer != rhs_storage._answer {return false}
+        if _storage._retrievedChunks != rhs_storage._retrievedChunks {return false}
+        if _storage._contextUsed != rhs_storage._contextUsed {return false}
+        if _storage._retrievalTimeMs != rhs_storage._retrievalTimeMs {return false}
+        if _storage._generationTimeMs != rhs_storage._generationTimeMs {return false}
+        if _storage._totalTimeMs != rhs_storage._totalTimeMs {return false}
+        if _storage._requestID != rhs_storage._requestID {return false}
+        if _storage._thinkingContent != rhs_storage._thinkingContent {return false}
+        if _storage._usage != rhs_storage._usage {return false}
+        if _storage._error != rhs_storage._error {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RARAGStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RAGStatistics"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}indexed_documents\0\u{3}indexed_chunks\0\u{3}total_tokens_indexed\0\u{3}last_updated_ms\0\u{3}index_path\0\u{3}stats_json\0\u{3}vector_store_size_bytes\0\u{3}is_persistent\0\u{3}last_query_ms\0\u{2}\u{3}error\0")
+
+  fileprivate class _StorageClass {
+    var _indexedDocuments: Int64 = 0
+    var _indexedChunks: Int64 = 0
+    var _totalTokensIndexed: Int64 = 0
+    var _lastUpdatedMs: Int64 = 0
+    var _indexPath: String? = nil
+    var _statsJson: String? = nil
+    var _vectorStoreSizeBytes: Int64 = 0
+    var _isPersistent: Bool = false
+    var _lastQueryMs: Int64 = 0
+    var _error: RASDKError? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _indexedDocuments = source._indexedDocuments
+      _indexedChunks = source._indexedChunks
+      _totalTokensIndexed = source._totalTokensIndexed
+      _lastUpdatedMs = source._lastUpdatedMs
+      _indexPath = source._indexPath
+      _statsJson = source._statsJson
+      _vectorStoreSizeBytes = source._vectorStoreSizeBytes
+      _isPersistent = source._isPersistent
+      _lastQueryMs = source._lastQueryMs
+      _error = source._error
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularInt64Field(value: &_storage._indexedDocuments) }()
+        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._indexedChunks) }()
+        case 3: try { try decoder.decodeSingularInt64Field(value: &_storage._totalTokensIndexed) }()
+        case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._lastUpdatedMs) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._indexPath) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._statsJson) }()
+        case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._vectorStoreSizeBytes) }()
+        case 8: try { try decoder.decodeSingularBoolField(value: &_storage._isPersistent) }()
+        case 9: try { try decoder.decodeSingularInt64Field(value: &_storage._lastQueryMs) }()
+        case 12: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._indexedDocuments != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._indexedDocuments, fieldNumber: 1)
+      }
+      if _storage._indexedChunks != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._indexedChunks, fieldNumber: 2)
+      }
+      if _storage._totalTokensIndexed != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._totalTokensIndexed, fieldNumber: 3)
+      }
+      if _storage._lastUpdatedMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._lastUpdatedMs, fieldNumber: 4)
+      }
+      try { if let v = _storage._indexPath {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._statsJson {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+      } }()
+      if _storage._vectorStoreSizeBytes != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._vectorStoreSizeBytes, fieldNumber: 7)
+      }
+      if _storage._isPersistent != false {
+        try visitor.visitSingularBoolField(value: _storage._isPersistent, fieldNumber: 8)
+      }
+      if _storage._lastQueryMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._lastQueryMs, fieldNumber: 9)
+      }
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RARAGStatistics, rhs: RARAGStatistics) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._indexedDocuments != rhs_storage._indexedDocuments {return false}
+        if _storage._indexedChunks != rhs_storage._indexedChunks {return false}
+        if _storage._totalTokensIndexed != rhs_storage._totalTokensIndexed {return false}
+        if _storage._lastUpdatedMs != rhs_storage._lastUpdatedMs {return false}
+        if _storage._indexPath != rhs_storage._indexPath {return false}
+        if _storage._statsJson != rhs_storage._statsJson {return false}
+        if _storage._vectorStoreSizeBytes != rhs_storage._vectorStoreSizeBytes {return false}
+        if _storage._isPersistent != rhs_storage._isPersistent {return false}
+        if _storage._lastQueryMs != rhs_storage._lastQueryMs {return false}
+        if _storage._error != rhs_storage._error {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RAGStreamEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}chunk\0\u{1}token\0\u{1}result\0\u{2}\u{3}error\0")
+
+  fileprivate class _StorageClass {
+    var _timestampUs: Int64 = 0
+    var _requestID: String = String()
+    var _kind: RARAGStreamEventKind = .unspecified
+    var _chunk: RARAGSearchResult? = nil
+    var _token: String = String()
+    var _result: RARAGResult? = nil
+    var _error: RASDKError? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _timestampUs = source._timestampUs
+      _requestID = source._requestID
+      _kind = source._kind
+      _chunk = source._chunk
+      _token = source._token
+      _result = source._result
+      _error = source._error
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._chunk) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._token) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
       if _storage._timestampUs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
       }
@@ -1528,12 +1237,9 @@ nonisolated extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       try { if let v = _storage._result {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
       } }()
-      try { if let v = _storage._errorMessage {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
       } }()
-      if _storage._errorCode != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 9)
-      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1543,127 +1249,13 @@ nonisolated extension RARAGStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
         let _storage = _args.0
         let rhs_storage = _args.1
-        if _storage._seq != rhs_storage._seq {return false}
         if _storage._timestampUs != rhs_storage._timestampUs {return false}
         if _storage._requestID != rhs_storage._requestID {return false}
         if _storage._kind != rhs_storage._kind {return false}
         if _storage._chunk != rhs_storage._chunk {return false}
         if _storage._token != rhs_storage._token {return false}
         if _storage._result != rhs_storage._result {return false}
-        if _storage._errorMessage != rhs_storage._errorMessage {return false}
-        if _storage._errorCode != rhs_storage._errorCode {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RARAGServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RAGServiceState"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{1}statistics\0\u{3}is_indexing\0\u{3}is_querying\0\u{3}active_request_id\0\u{3}error_message\0\u{3}error_code\0")
-
-  fileprivate class _StorageClass {
-    var _isReady: Bool = false
-    var _statistics: RARAGStatistics? = nil
-    var _isIndexing: Bool = false
-    var _isQuerying: Bool = false
-    var _activeRequestID: String? = nil
-    var _errorMessage: String? = nil
-    var _errorCode: Int32 = 0
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _isReady = source._isReady
-      _statistics = source._statistics
-      _isIndexing = source._isIndexing
-      _isQuerying = source._isQuerying
-      _activeRequestID = source._activeRequestID
-      _errorMessage = source._errorMessage
-      _errorCode = source._errorCode
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._isReady) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._statistics) }()
-        case 3: try { try decoder.decodeSingularBoolField(value: &_storage._isIndexing) }()
-        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._isQuerying) }()
-        case 5: try { try decoder.decodeSingularStringField(value: &_storage._activeRequestID) }()
-        case 6: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
-        case 7: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
-        default: break
-        }
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._isReady != false {
-        try visitor.visitSingularBoolField(value: _storage._isReady, fieldNumber: 1)
-      }
-      try { if let v = _storage._statistics {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      if _storage._isIndexing != false {
-        try visitor.visitSingularBoolField(value: _storage._isIndexing, fieldNumber: 3)
-      }
-      if _storage._isQuerying != false {
-        try visitor.visitSingularBoolField(value: _storage._isQuerying, fieldNumber: 4)
-      }
-      try { if let v = _storage._activeRequestID {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-      } }()
-      try { if let v = _storage._errorMessage {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-      } }()
-      if _storage._errorCode != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 7)
-      }
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RARAGServiceState, rhs: RARAGServiceState) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._isReady != rhs_storage._isReady {return false}
-        if _storage._statistics != rhs_storage._statistics {return false}
-        if _storage._isIndexing != rhs_storage._isIndexing {return false}
-        if _storage._isQuerying != rhs_storage._isQuerying {return false}
-        if _storage._activeRequestID != rhs_storage._activeRequestID {return false}
-        if _storage._errorMessage != rhs_storage._errorMessage {return false}
-        if _storage._errorCode != rhs_storage._errorCode {return false}
+        if _storage._error != rhs_storage._error {return false}
         return true
       }
       if !storagesAreEqual {return false}

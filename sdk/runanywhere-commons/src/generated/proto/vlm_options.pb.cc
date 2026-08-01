@@ -54,455 +54,6 @@ PROTOBUF_CONSTINIT ::google::protobuf::internal::ReflectionData
 #endif
 namespace runanywhere {
 namespace v1 {
-class VLMServiceState::_Internal {
- public:
-  using HasBits = decltype(::std::declval<VLMServiceState>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_._has_bits_);
-};
-
-constexpr VLMServiceState::ParseTableT_ VLMServiceState::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_._has_bits_),
-      0, // no _extensions_
-      8, 56,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294967040,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      8,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::VLMServiceState>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      // int32 error_code = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMServiceState, _impl_.error_code_), 7>(),
-       {64, 7, 0,
-        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.error_code_)}},
-      // bool is_ready = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMServiceState, _impl_.is_ready_), 4>(),
-       {8, 4, 0,
-        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.is_ready_)}},
-      // optional string current_model = 2;
-      {::_pbi::TcParser::FastUS1,
-       {18, 0, 0,
-        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.current_model_)}},
-      // int32 context_length = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMServiceState, _impl_.context_length_), 3>(),
-       {24, 3, 0,
-        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.context_length_)}},
-      // bool supports_streaming = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMServiceState, _impl_.supports_streaming_), 5>(),
-       {32, 5, 0,
-        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.supports_streaming_)}},
-      // bool supports_multiple_images = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMServiceState, _impl_.supports_multiple_images_), 6>(),
-       {40, 6, 0,
-        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.supports_multiple_images_)}},
-      // optional string vision_encoder_type = 6;
-      {::_pbi::TcParser::FastUS1,
-       {50, 1, 0,
-        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.vision_encoder_type_)}},
-      // optional string error_message = 7;
-      {::_pbi::TcParser::FastUS1,
-       {58, 2, 0,
-        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.error_message_)}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // bool is_ready = 1;
-      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.is_ready_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // optional string current_model = 2;
-      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.current_model_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 context_length = 3;
-      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.context_length_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // bool supports_streaming = 4;
-      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.supports_streaming_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // bool supports_multiple_images = 5;
-      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.supports_multiple_images_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // optional string vision_encoder_type = 6;
-      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.vision_encoder_type_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional string error_message = 7;
-      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 8;
-      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.error_code_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-    }},
-    // no aux_entries
-    {{
-      "\36\0\15\0\0\0\23\15\0\0\0\0\0\0\0\0"
-      "runanywhere.v1.VLMServiceState"
-      "current_model"
-      "vision_encoder_type"
-      "error_message"
-    }},
-  };
-}
-
-
-inline constexpr VLMServiceState::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        current_model_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        vision_encoder_type_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        context_length_{0},
-        is_ready_{false},
-        supports_streaming_{false},
-        supports_multiple_images_{false},
-        error_code_{0} {}
-
-template <typename>
-constexpr VLMServiceState::VLMServiceState(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL VLMServiceState::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) VLMServiceState(arena);
-}
-constexpr auto VLMServiceState::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VLMServiceState), alignof(VLMServiceState));
-}
-constexpr auto VLMServiceState::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &VLMServiceState::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<VLMServiceState>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &VLMServiceState::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<VLMServiceState>(), &VLMServiceState::ByteSizeLong,
-              &VLMServiceState::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[9],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_vlm_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct VLMServiceStateGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr VLMServiceStateGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 VLMServiceState_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(VLMServiceState::InternalGenerateClassData_(
-            _default, &VLMServiceState_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<VLMServiceState>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~VLMServiceStateGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) VLMServiceState _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<VLMServiceState>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(VLMServiceStateGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST VLMServiceStateGlobalsTypeInternal VLMServiceState_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* VLMServiceState_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return VLMServiceState_globals_.GetClassData();
-#else
-  return VLMServiceState_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
-class VLMResult::_Internal {
- public:
-  using HasBits = decltype(::std::declval<VLMResult>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(VLMResult, _impl_._has_bits_);
-};
-
-constexpr VLMResult::ParseTableT_ VLMResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(VLMResult, _impl_._has_bits_),
-      0, // no _extensions_
-      14, 120,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294950912,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      14,  // num_field_entries
-      0,  // num_aux_entries
-      offsetof(ParseTableT_, field_names),  // no aux_entries
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::VLMResult>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // string text = 1;
-      {::_pbi::TcParser::FastUS1,
-       {10, 0, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.text_)}},
-      // int32 input_tokens = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.input_tokens_), 4>(),
-       {16, 4, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.input_tokens_)}},
-      // int32 output_tokens = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.output_tokens_), 5>(),
-       {24, 5, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.output_tokens_)}},
-      // int64 total_tokens = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMResult, _impl_.total_tokens_), 6>(),
-       {32, 6, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.total_tokens_)}},
-      // int64 processing_time_ms = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMResult, _impl_.processing_time_ms_), 7>(),
-       {40, 7, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.processing_time_ms_)}},
-      // float tokens_per_second = 6;
-      {::_pbi::TcParser::FastF32S1,
-       {53, 8, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.tokens_per_second_)}},
-      // int32 image_tokens = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.image_tokens_), 9>(),
-       {56, 9, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.image_tokens_)}},
-      // int64 time_to_first_token_ms = 8;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMResult, _impl_.time_to_first_token_ms_), 10>(),
-       {64, 10, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.time_to_first_token_ms_)}},
-      // int64 image_encode_time_ms = 9;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMResult, _impl_.image_encode_time_ms_), 11>(),
-       {72, 11, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.image_encode_time_ms_)}},
-      // optional string hardware_used = 10;
-      {::_pbi::TcParser::FastUS1,
-       {82, 1, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.hardware_used_)}},
-      // optional string error_message = 11;
-      {::_pbi::TcParser::FastUS1,
-       {90, 2, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.error_message_)}},
-      // int32 error_code = 12;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.error_code_), 12>(),
-       {96, 12, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.error_code_)}},
-      // string finish_reason = 13;
-      {::_pbi::TcParser::FastUS1,
-       {106, 3, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.finish_reason_)}},
-      // int32 images_processed = 14;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.images_processed_), 13>(),
-       {112, 13, 0,
-        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.images_processed_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // string text = 1;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.text_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 input_tokens = 2;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.input_tokens_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int32 output_tokens = 3;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.output_tokens_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int64 total_tokens = 4;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.total_tokens_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int64 processing_time_ms = 5;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.processing_time_ms_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // float tokens_per_second = 6;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.tokens_per_second_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // int32 image_tokens = 7;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.image_tokens_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // int64 time_to_first_token_ms = 8;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.time_to_first_token_ms_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // int64 image_encode_time_ms = 9;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.image_encode_time_ms_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // optional string hardware_used = 10;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.hardware_used_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // optional string error_message = 11;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 12;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.error_code_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // string finish_reason = 13;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.finish_reason_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 images_processed = 14;
-      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.images_processed_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-    }},
-    // no aux_entries
-    {{
-      "\30\4\0\0\0\0\0\0\0\0\15\15\0\15\0\0"
-      "runanywhere.v1.VLMResult"
-      "text"
-      "hardware_used"
-      "error_message"
-      "finish_reason"
-    }},
-  };
-}
-
-
-inline constexpr VLMResult::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        text_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        hardware_used_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        finish_reason_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        input_tokens_{0},
-        output_tokens_{0},
-        total_tokens_{::int64_t{0}},
-        processing_time_ms_{::int64_t{0}},
-        tokens_per_second_{0},
-        image_tokens_{0},
-        time_to_first_token_ms_{::int64_t{0}},
-        image_encode_time_ms_{::int64_t{0}},
-        error_code_{0},
-        images_processed_{0} {}
-
-template <typename>
-constexpr VLMResult::VLMResult(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL VLMResult::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) VLMResult(arena);
-}
-constexpr auto VLMResult::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VLMResult), alignof(VLMResult));
-}
-constexpr auto VLMResult::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &VLMResult::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<VLMResult>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &VLMResult::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<VLMResult>(), &VLMResult::ByteSizeLong,
-              &VLMResult::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(VLMResult, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[7],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_vlm_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct VLMResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr VLMResultGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 VLMResult_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(VLMResult::InternalGenerateClassData_(
-            _default, &VLMResult_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<VLMResult>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~VLMResultGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) VLMResult _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<VLMResult>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(VLMResultGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST VLMResultGlobalsTypeInternal VLMResult_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* VLMResult_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return VLMResult_globals_.GetClassData();
-#else
-  return VLMResult_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 constexpr VLMImage_MetadataEntry_DoNotUse::ParseTableT_ VLMImage_MetadataEntry_DoNotUse::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
   return ParseTableT_{
     {
@@ -1142,239 +693,6 @@ const ::_pbi::ClassData* VLMChatTemplate_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
-class VLMStreamEvent::_Internal {
- public:
-  using HasBits = decltype(::std::declval<VLMStreamEvent>()._impl_._has_bits_);
-  static constexpr ::int32_t kHasBitsOffset =
-      8 * PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_._has_bits_);
-};
-
-constexpr VLMStreamEvent::ParseTableT_ VLMStreamEvent::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
-  return ParseTableT_{
-    {
-      PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_._has_bits_),
-      0, // no _extensions_
-      11, 120,  // max_field_number, fast_idx_mask
-      offsetof(ParseTableT_, field_lookup_table),
-      4294965248,  // skipmap
-      offsetof(ParseTableT_, field_entries),
-      11,  // num_field_entries
-      1,  // num_aux_entries
-      offsetof(ParseTableT_, aux_entries),
-      class_data,
-      nullptr,  // post_loop_handler
-      ::_pbi::TcParser::GenericFallback,  // fallback
-      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
-      ::_pbi::TcParser::GetTable<::runanywhere::v1::VLMStreamEvent>(),  // to_prefetch
-      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
-    }, {{
-      {::_pbi::TcParser::MiniParse, {}},
-      // uint64 seq = 1;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMStreamEvent, _impl_.seq_), 4>(),
-       {8, 4, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.seq_)}},
-      // int64 timestamp_us = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMStreamEvent, _impl_.timestamp_us_), 5>(),
-       {16, 5, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.timestamp_us_)}},
-      // string request_id = 3;
-      {::_pbi::TcParser::FastUS1,
-       {26, 0, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.request_id_)}},
-      // .runanywhere.v1.VLMStreamEventKind kind = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMStreamEvent, _impl_.kind_), 6>(),
-       {32, 6, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.kind_)}},
-      // string token = 5;
-      {::_pbi::TcParser::FastUS1,
-       {42, 1, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.token_)}},
-      // int32 token_index = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMStreamEvent, _impl_.token_index_), 7>(),
-       {48, 7, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.token_index_)}},
-      // bool is_final = 7;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMStreamEvent, _impl_.is_final_), 8>(),
-       {56, 8, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.is_final_)}},
-      // float tokens_per_second = 8;
-      {::_pbi::TcParser::FastF32S1,
-       {69, 9, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.tokens_per_second_)}},
-      // optional .runanywhere.v1.VLMResult result = 9;
-      {::_pbi::TcParser::FastMtS1,
-       {74, 3, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.result_)}},
-      // optional string error_message = 10;
-      {::_pbi::TcParser::FastUS1,
-       {82, 2, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.error_message_)}},
-      // int32 error_code = 11;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMStreamEvent, _impl_.error_code_), 10>(),
-       {88, 10, 0,
-        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.error_code_)}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
-    }}, {{
-      65535, 65535
-    }}, {{
-      // uint64 seq = 1;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.seq_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
-      // int64 timestamp_us = 2;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
-      // string request_id = 3;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.request_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.VLMStreamEventKind kind = 4;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-      // string token = 5;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.token_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 token_index = 6;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.token_index_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-      // bool is_final = 7;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.is_final_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-      // float tokens_per_second = 8;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.tokens_per_second_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
-      // optional .runanywhere.v1.VLMResult result = 9;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.result_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // optional string error_message = 10;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // int32 error_code = 11;
-      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.error_code_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-    }},
-    {{
-        #ifndef PROTOBUF_MESSAGE_GLOBALS
-        {::_pbi::TcParser::GetTable<::runanywhere::v1::VLMResult>()},
-        #else
-        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::VLMResult_globals_},
-        #endif
-    }},
-    {{
-      "\35\0\0\12\0\5\0\0\0\0\15\0\0\0\0\0"
-      "runanywhere.v1.VLMStreamEvent"
-      "request_id"
-      "token"
-      "error_message"
-    }},
-  };
-}
-
-
-inline constexpr VLMStreamEvent::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        request_id_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        token_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        error_message_(
-            &::google::protobuf::internal::fixed_address_empty_string,
-            ::_pbi::ConstantInitialized()),
-        result_{nullptr},
-        seq_{::uint64_t{0u}},
-        timestamp_us_{::int64_t{0}},
-        kind_{static_cast< ::runanywhere::v1::VLMStreamEventKind >(0)},
-        token_index_{0},
-        is_final_{false},
-        tokens_per_second_{0},
-        error_code_{0} {}
-
-template <typename>
-constexpr VLMStreamEvent::VLMStreamEvent(::_pbi::ConstantInitialized,
-                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
-    : ::google::protobuf::Message(
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          class_data
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          ),
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-inline void* PROTOBUF_NONNULL VLMStreamEvent::PlacementNew_(
-    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
-  return ::new (mem) VLMStreamEvent(arena);
-}
-constexpr auto VLMStreamEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VLMStreamEvent), alignof(VLMStreamEvent));
-}
-constexpr auto VLMStreamEvent::InternalGenerateClassData_(
-    const MessageLite& prototype,
-    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
-  return ::google::protobuf::internal::ClassDataFull{
-      ::google::protobuf::internal::ClassData{
-          &prototype,
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-          &_table_.header,
-#else
-          tc_table,
-#endif
-          nullptr,  // IsInitialized
-          &VLMStreamEvent::MergeImpl,
-          ::google::protobuf::Message::GetNewImpl<VLMStreamEvent>(),
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-          &VLMStreamEvent::SharedDtor,
-          ::google::protobuf::Message::GetClearImpl<VLMStreamEvent>(), &VLMStreamEvent::ByteSizeLong,
-              &VLMStreamEvent::_InternalSerialize,
-#endif  // PROTOBUF_CUSTOM_VTABLE
-          PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_._cached_size_),
-          false,
-      },
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-      &file_reflection_data[8],
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-      &::_pbi::kDescriptorMethods,
-      &descriptor_table_vlm_5foptions_2eproto,
-      nullptr,  // tracker
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  };
-}
-struct VLMStreamEventGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
-  constexpr VLMStreamEventGlobalsTypeInternal()
-      :
-#ifndef PROTOBUF_MESSAGE_GLOBALS
-        _default(::_pbi::ConstantInitialized{},
-                 VLMStreamEvent_class_data_.base())
-#else   // !PROTOBUF_MESSAGE_GLOBALS
-        MessageGlobalsBase(VLMStreamEvent::InternalGenerateClassData_(
-            _default, &VLMStreamEvent_globals_._table.header)),
-        _default(::_pbi::ConstantInitialized{}, GetClassData()),
-        _table(::_pbi::PrivateAccess::GenerateParseTable<VLMStreamEvent>(
-            GetClassData()))
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-  {
-  }
-  ~VLMStreamEventGlobalsTypeInternal() {}
-  union {
-    alignas(::_pbi::kMaxMessageAlignment) VLMStreamEvent _default;
-  };
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  decltype(::_pbi::PrivateAccess::GenerateParseTable<VLMStreamEvent>(
-      ::std::declval<const ::_pbi::ClassData*>())) _table;
-#endif
-};
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-static_assert(PROTOBUF_FIELD_OFFSET(VLMStreamEventGlobalsTypeInternal, _default) ==
-              ::_pbi::MessageGlobalsBase::OffsetToDefault());
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST VLMStreamEventGlobalsTypeInternal VLMStreamEvent_globals_
-        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-namespace {
-const ::_pbi::ClassData* VLMStreamEvent_get_class_data() {
-#ifdef PROTOBUF_MESSAGE_GLOBALS
-  return VLMStreamEvent_globals_.GetClassData();
-#else
-  return VLMStreamEvent_class_data_.base();
-#endif  // PROTOBUF_MESSAGE_GLOBALS
-}
-}  // namespace
-#endif  // PROTOBUF_CUSTOM_VTABLE
 class VLMImage::_Internal {
  public:
   using HasBits = decltype(::std::declval<VLMImage>()._impl_._has_bits_);
@@ -1887,6 +1205,433 @@ const ::_pbi::ClassData* VLMGenerationOptions_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class VLMServiceState::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<VLMServiceState>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_._has_bits_);
+};
+
+constexpr VLMServiceState::ParseTableT_ VLMServiceState::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_._has_bits_),
+      0, // no _extensions_
+      9, 56,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294966976,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      7,  // num_field_entries
+      1,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::VLMServiceState>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      // bool is_ready = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMServiceState, _impl_.is_ready_), 4>(),
+       {8, 4, 0,
+        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.is_ready_)}},
+      // optional string current_model = 2;
+      {::_pbi::TcParser::FastUS1,
+       {18, 0, 0,
+        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.current_model_)}},
+      // int32 context_length = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMServiceState, _impl_.context_length_), 3>(),
+       {24, 3, 0,
+        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.context_length_)}},
+      // bool supports_streaming = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMServiceState, _impl_.supports_streaming_), 5>(),
+       {32, 5, 0,
+        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.supports_streaming_)}},
+      // bool supports_multiple_images = 5;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMServiceState, _impl_.supports_multiple_images_), 6>(),
+       {40, 6, 0,
+        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.supports_multiple_images_)}},
+      // optional string vision_encoder_type = 6;
+      {::_pbi::TcParser::FastUS1,
+       {50, 1, 0,
+        PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.vision_encoder_type_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // bool is_ready = 1;
+      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.is_ready_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // optional string current_model = 2;
+      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.current_model_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int32 context_length = 3;
+      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.context_length_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // bool supports_streaming = 4;
+      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.supports_streaming_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // bool supports_multiple_images = 5;
+      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.supports_multiple_images_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // optional string vision_encoder_type = 6;
+      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.vision_encoder_type_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // optional .runanywhere.v1.SDKError error = 9;
+      {PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.error_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\36\0\15\0\0\0\23\0"
+      "runanywhere.v1.VLMServiceState"
+      "current_model"
+      "vision_encoder_type"
+    }},
+  };
+}
+
+
+inline constexpr VLMServiceState::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        current_model_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        vision_encoder_type_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_{nullptr},
+        context_length_{0},
+        is_ready_{false},
+        supports_streaming_{false},
+        supports_multiple_images_{false} {}
+
+template <typename>
+constexpr VLMServiceState::VLMServiceState(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL VLMServiceState::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) VLMServiceState(arena);
+}
+constexpr auto VLMServiceState::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VLMServiceState), alignof(VLMServiceState));
+}
+constexpr auto VLMServiceState::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &VLMServiceState::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<VLMServiceState>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &VLMServiceState::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<VLMServiceState>(), &VLMServiceState::ByteSizeLong,
+              &VLMServiceState::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[9],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_vlm_5foptions_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct VLMServiceStateGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr VLMServiceStateGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 VLMServiceState_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(VLMServiceState::InternalGenerateClassData_(
+            _default, &VLMServiceState_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<VLMServiceState>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~VLMServiceStateGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) VLMServiceState _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<VLMServiceState>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(VLMServiceStateGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST VLMServiceStateGlobalsTypeInternal VLMServiceState_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* VLMServiceState_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return VLMServiceState_globals_.GetClassData();
+#else
+  return VLMServiceState_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
+class VLMResult::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<VLMResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(VLMResult, _impl_._has_bits_);
+};
+
+constexpr VLMResult::ParseTableT_ VLMResult::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(VLMResult, _impl_._has_bits_),
+      0, // no _extensions_
+      16, 120,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294904878,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      10,  // num_field_entries
+      2,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::VLMResult>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      // optional .runanywhere.v1.SDKError error = 16;
+      {::_pbi::TcParser::FastMtS2,
+       {386, 4, 1,
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.error_)}},
+      // string text = 1;
+      {::_pbi::TcParser::FastUS1,
+       {10, 0, 0,
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.text_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // int64 processing_time_ms = 5;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMResult, _impl_.processing_time_ms_), 5>(),
+       {40, 5, 0,
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.processing_time_ms_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // int32 image_tokens = 7;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.image_tokens_), 8>(),
+       {56, 8, 0,
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.image_tokens_)}},
+      // int64 time_to_first_token_ms = 8;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMResult, _impl_.time_to_first_token_ms_), 6>(),
+       {64, 6, 0,
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.time_to_first_token_ms_)}},
+      // int64 image_encode_time_ms = 9;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMResult, _impl_.image_encode_time_ms_), 7>(),
+       {72, 7, 0,
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.image_encode_time_ms_)}},
+      // optional string hardware_used = 10;
+      {::_pbi::TcParser::FastUS1,
+       {82, 1, 0,
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.hardware_used_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // string finish_reason = 13;
+      {::_pbi::TcParser::FastUS1,
+       {106, 2, 0,
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.finish_reason_)}},
+      // int32 images_processed = 14;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMResult, _impl_.images_processed_), 9>(),
+       {112, 9, 0,
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.images_processed_)}},
+      // .runanywhere.v1.TokenUsage usage = 15;
+      {::_pbi::TcParser::FastMtS1,
+       {122, 3, 0,
+        PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.usage_)}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // string text = 1;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.text_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int64 processing_time_ms = 5;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.processing_time_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // int32 image_tokens = 7;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.image_tokens_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // int64 time_to_first_token_ms = 8;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.time_to_first_token_ms_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // int64 image_encode_time_ms = 9;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.image_encode_time_ms_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // optional string hardware_used = 10;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.hardware_used_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // string finish_reason = 13;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.finish_reason_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int32 images_processed = 14;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.images_processed_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // .runanywhere.v1.TokenUsage usage = 15;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.usage_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional .runanywhere.v1.SDKError error = 16;
+      {PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.error_), _Internal::kHasBitsOffset + 4, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::TokenUsage>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::TokenUsage_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\30\4\0\0\0\0\15\15\0\0\0\0\0\0\0\0"
+      "runanywhere.v1.VLMResult"
+      "text"
+      "hardware_used"
+      "finish_reason"
+    }},
+  };
+}
+
+
+inline constexpr VLMResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        text_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        hardware_used_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        finish_reason_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        usage_{nullptr},
+        error_{nullptr},
+        processing_time_ms_{::int64_t{0}},
+        time_to_first_token_ms_{::int64_t{0}},
+        image_encode_time_ms_{::int64_t{0}},
+        image_tokens_{0},
+        images_processed_{0} {}
+
+template <typename>
+constexpr VLMResult::VLMResult(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL VLMResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) VLMResult(arena);
+}
+constexpr auto VLMResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VLMResult), alignof(VLMResult));
+}
+constexpr auto VLMResult::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &VLMResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<VLMResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &VLMResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<VLMResult>(), &VLMResult::ByteSizeLong,
+              &VLMResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(VLMResult, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[7],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_vlm_5foptions_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct VLMResultGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr VLMResultGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 VLMResult_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(VLMResult::InternalGenerateClassData_(
+            _default, &VLMResult_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<VLMResult>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~VLMResultGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) VLMResult _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<VLMResult>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(VLMResultGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST VLMResultGlobalsTypeInternal VLMResult_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* VLMResult_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return VLMResult_globals_.GetClassData();
+#else
+  return VLMResult_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 class VLMGenerationRequest::_Internal {
  public:
   using HasBits = decltype(::std::declval<VLMGenerationRequest>()._impl_._has_bits_);
@@ -2082,6 +1827,229 @@ const ::_pbi::ClassData* VLMGenerationRequest_get_class_data() {
 }
 }  // namespace
 #endif  // PROTOBUF_CUSTOM_VTABLE
+class VLMStreamEvent::_Internal {
+ public:
+  using HasBits = decltype(::std::declval<VLMStreamEvent>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_._has_bits_);
+};
+
+constexpr VLMStreamEvent::ParseTableT_ VLMStreamEvent::InternalGenerateParseTable_(const ::_pbi::ClassData* class_data) {
+  return ParseTableT_{
+    {
+      PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_._has_bits_),
+      0, // no _extensions_
+      12, 120,  // max_field_number, fast_idx_mask
+      offsetof(ParseTableT_, field_lookup_table),
+      4294964737,  // skipmap
+      offsetof(ParseTableT_, field_entries),
+      9,  // num_field_entries
+      2,  // num_aux_entries
+      offsetof(ParseTableT_, aux_entries),
+      class_data,
+      nullptr,  // post_loop_handler
+      ::_pbi::TcParser::GenericFallback,  // fallback
+      #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+      ::_pbi::TcParser::GetTable<::runanywhere::v1::VLMStreamEvent>(),  // to_prefetch
+      #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+    }, {{
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // int64 timestamp_us = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VLMStreamEvent, _impl_.timestamp_us_), 4>(),
+       {16, 4, 0,
+        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.timestamp_us_)}},
+      // string request_id = 3;
+      {::_pbi::TcParser::FastUS1,
+       {26, 0, 0,
+        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.request_id_)}},
+      // .runanywhere.v1.VLMStreamEventKind kind = 4;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMStreamEvent, _impl_.kind_), 5>(),
+       {32, 5, 0,
+        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.kind_)}},
+      // string token = 5;
+      {::_pbi::TcParser::FastUS1,
+       {42, 1, 0,
+        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.token_)}},
+      // int32 token_index = 6;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VLMStreamEvent, _impl_.token_index_), 6>(),
+       {48, 6, 0,
+        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.token_index_)}},
+      // bool is_final = 7;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VLMStreamEvent, _impl_.is_final_), 7>(),
+       {56, 7, 0,
+        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.is_final_)}},
+      // float tokens_per_second = 8;
+      {::_pbi::TcParser::FastF32S1,
+       {69, 8, 0,
+        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.tokens_per_second_)}},
+      // optional .runanywhere.v1.VLMResult result = 9;
+      {::_pbi::TcParser::FastMtS1,
+       {74, 2, 0,
+        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.result_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // optional .runanywhere.v1.SDKError error = 12;
+      {::_pbi::TcParser::FastMtS1,
+       {98, 3, 1,
+        PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.error_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+    }}, {{
+      65535, 65535
+    }}, {{
+      // int64 timestamp_us = 2;
+      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      // string request_id = 3;
+      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.request_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // .runanywhere.v1.VLMStreamEventKind kind = 4;
+      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // string token = 5;
+      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.token_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+      // int32 token_index = 6;
+      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.token_index_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      // bool is_final = 7;
+      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.is_final_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      // float tokens_per_second = 8;
+      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.tokens_per_second_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      // optional .runanywhere.v1.VLMResult result = 9;
+      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.result_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+      // optional .runanywhere.v1.SDKError error = 12;
+      {PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.error_), _Internal::kHasBitsOffset + 3, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    }},
+    {{
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::VLMResult>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::VLMResult_globals_},
+        #endif
+        #ifndef PROTOBUF_MESSAGE_GLOBALS
+        {::_pbi::TcParser::GetTable<::runanywhere::v1::SDKError>()},
+        #else
+        {::_pbi::FieldAuxMessageGlobals(), &::runanywhere::v1::SDKError_globals_},
+        #endif
+    }},
+    {{
+      "\35\0\12\0\5\0\0\0\0\0\0\0\0\0\0\0"
+      "runanywhere.v1.VLMStreamEvent"
+      "request_id"
+      "token"
+    }},
+  };
+}
+
+
+inline constexpr VLMStreamEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        request_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        token_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        result_{nullptr},
+        error_{nullptr},
+        timestamp_us_{::int64_t{0}},
+        kind_{static_cast< ::runanywhere::v1::VLMStreamEventKind >(0)},
+        token_index_{0},
+        is_final_{false},
+        tokens_per_second_{0} {}
+
+template <typename>
+constexpr VLMStreamEvent::VLMStreamEvent(::_pbi::ConstantInitialized,
+                       const ::_pbi::ClassData* PROTOBUF_NONNULL class_data)
+    : ::google::protobuf::Message(
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          class_data
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          ),
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+inline void* PROTOBUF_NONNULL VLMStreamEvent::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) VLMStreamEvent(arena);
+}
+constexpr auto VLMStreamEvent::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VLMStreamEvent), alignof(VLMStreamEvent));
+}
+constexpr auto VLMStreamEvent::InternalGenerateClassData_(
+    const MessageLite& prototype,
+    const ::google::protobuf::internal::TcParseTableBase* tc_table) {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &prototype,
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+          &_table_.header,
+#else
+          tc_table,
+#endif
+          nullptr,  // IsInitialized
+          &VLMStreamEvent::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<VLMStreamEvent>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &VLMStreamEvent::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<VLMStreamEvent>(), &VLMStreamEvent::ByteSizeLong,
+              &VLMStreamEvent::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_._cached_size_),
+          false,
+      },
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+      &file_reflection_data[8],
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+      &::_pbi::kDescriptorMethods,
+      &descriptor_table_vlm_5foptions_2eproto,
+      nullptr,  // tracker
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  };
+}
+struct VLMStreamEventGlobalsTypeInternal : ::_pbi::MessageGlobalsBase {
+  constexpr VLMStreamEventGlobalsTypeInternal()
+      :
+#ifndef PROTOBUF_MESSAGE_GLOBALS
+        _default(::_pbi::ConstantInitialized{},
+                 VLMStreamEvent_class_data_.base())
+#else   // !PROTOBUF_MESSAGE_GLOBALS
+        MessageGlobalsBase(VLMStreamEvent::InternalGenerateClassData_(
+            _default, &VLMStreamEvent_globals_._table.header)),
+        _default(::_pbi::ConstantInitialized{}, GetClassData()),
+        _table(::_pbi::PrivateAccess::GenerateParseTable<VLMStreamEvent>(
+            GetClassData()))
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+  {
+  }
+  ~VLMStreamEventGlobalsTypeInternal() {}
+  union {
+    alignas(::_pbi::kMaxMessageAlignment) VLMStreamEvent _default;
+  };
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  decltype(::_pbi::PrivateAccess::GenerateParseTable<VLMStreamEvent>(
+      ::std::declval<const ::_pbi::ClassData*>())) _table;
+#endif
+};
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+static_assert(PROTOBUF_FIELD_OFFSET(VLMStreamEventGlobalsTypeInternal, _default) ==
+              ::_pbi::MessageGlobalsBase::OffsetToDefault());
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 PROTOBUF_MESSAGE_GLOBALS_CONST VLMStreamEventGlobalsTypeInternal VLMStreamEvent_globals_
+        PROTOBUF_MESSAGE_GLOBALS_SECTION(.data.rel.ro);
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+namespace {
+const ::_pbi::ClassData* VLMStreamEvent_get_class_data() {
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  return VLMStreamEvent_globals_.GetClassData();
+#else
+  return VLMStreamEvent_class_data_.base();
+#endif  // PROTOBUF_MESSAGE_GLOBALS
+}
+}  // namespace
+#endif  // PROTOBUF_CUSTOM_VTABLE
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
@@ -2214,39 +2182,30 @@ const ::uint32_t
         4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_._has_bits_),
-        17, // hasbit index offset
+        13, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.text_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.input_tokens_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.output_tokens_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.total_tokens_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.processing_time_ms_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.tokens_per_second_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.image_tokens_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.time_to_first_token_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.image_encode_time_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.hardware_used_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.error_code_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.finish_reason_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.images_processed_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.usage_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMResult, _impl_.error_),
         0,
-        4,
         5,
+        8,
         6,
         7,
-        8,
-        9,
-        10,
-        11,
         1,
         2,
-        12,
+        9,
         3,
-        13,
+        4,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_._has_bits_),
-        14, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_.seq_),
+        12, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_.timestamp_us_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_.request_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_.kind_),
@@ -2255,30 +2214,26 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_.is_final_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_.tokens_per_second_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_.result_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_.error_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMStreamEvent, _impl_.error_),
         4,
-        5,
         0,
-        6,
+        5,
         1,
+        6,
         7,
         8,
-        9,
-        3,
         2,
-        10,
+        3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMServiceState, _impl_._has_bits_),
-        11, // hasbit index offset
+        10, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMServiceState, _impl_.is_ready_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMServiceState, _impl_.current_model_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMServiceState, _impl_.context_length_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMServiceState, _impl_.supports_streaming_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMServiceState, _impl_.supports_multiple_images_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMServiceState, _impl_.vision_encoder_type_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMServiceState, _impl_.error_message_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMServiceState, _impl_.error_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VLMServiceState, _impl_.error_),
         4,
         0,
         3,
@@ -2286,7 +2241,6 @@ const ::uint32_t
         6,
         1,
         2,
-        7,
 };
 
 static const ::_pbi::MigrationSchema
@@ -2299,8 +2253,8 @@ static const ::_pbi::MigrationSchema
         {101, sizeof(::runanywhere::v1::VLMGenerationRequest_MetadataEntry_DoNotUse)},
         {108, sizeof(::runanywhere::v1::VLMGenerationRequest)},
         {121, sizeof(::runanywhere::v1::VLMResult)},
-        {152, sizeof(::runanywhere::v1::VLMStreamEvent)},
-        {177, sizeof(::runanywhere::v1::VLMServiceState)},
+        {144, sizeof(::runanywhere::v1::VLMStreamEvent)},
+        {165, sizeof(::runanywhere::v1::VLMServiceState)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -2317,120 +2271,120 @@ static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
 };
 const char descriptor_table_protodef_vlm_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\021vlm_options.proto\022\016runanywhere.v1\032\021mod"
-    "el_types.proto\032\021rac_options.proto\032\032think"
-    "ing_tag_pattern.proto\"\222\001\n\017VLMChatTemplat"
-    "e\022\025\n\rtemplate_text\030\001 \001(\t\022\031\n\014image_marker"
-    "\030\002 \001(\tH\000\210\001\001\022\"\n\025default_system_prompt\030\003 \001"
-    "(\tH\001\210\001\001B\017\n\r_image_markerB\030\n\026_default_sys"
-    "tem_prompt\"\363\002\n\010VLMImage\022\023\n\tfile_path\030\001 \001"
-    "(\tH\000\022\021\n\007encoded\030\002 \001(\014H\000\022\021\n\007raw_rgb\030\003 \001(\014"
-    "H\000\022\020\n\006base64\030\004 \001(\tH\000\022\r\n\005width\030\005 \001(\005\022\016\n\006h"
-    "eight\030\006 \001(\005\022.\n\006format\030\007 \001(\0162\036.runanywher"
-    "e.v1.VLMImageFormat\022\027\n\nmedia_type\030\010 \001(\tH"
-    "\001\210\001\001\022\021\n\004name\030\t \001(\tH\002\210\001\001\022\022\n\nsize_bytes\030\n "
-    "\001(\003\0228\n\010metadata\030\013 \003(\0132&.runanywhere.v1.V"
-    "LMImage.MetadataEntry\032/\n\rMetadataEntry\022\013"
-    "\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\010\n\006source"
-    "B\r\n\013_media_typeB\007\n\005_name\"\247\002\n\020VLMConfigur"
-    "ation\022\020\n\010model_id\030\001 \001(\t\022\031\n\021max_image_siz"
-    "e_px\030\002 \001(\005\022\022\n\nmax_tokens\030\003 \001(\005\022\026\n\016contex"
-    "t_length\030\004 \001(\005\022\023\n\013temperature\030\005 \001(\002\022\032\n\rs"
-    "ystem_prompt\030\006 \001(\tH\000\210\001\001\022\031\n\021streaming_ena"
-    "bled\030\007 \001(\010\022D\n\023preferred_framework\030\010 \001(\0162"
-    "\".runanywhere.v1.InferenceFrameworkH\001\210\001\001"
-    "B\020\n\016_system_promptB\026\n\024_preferred_framewo"
-    "rk\"\345\005\n\024VLMGenerationOptions\022\016\n\006prompt\030\001 "
-    "\001(\t\022\'\n\021max_output_tokens\030\002 \001(\005B\014\212\265\030\0042048"
-    "\240\265\030\000\0222\n\013temperature\030\003 \001(\002B\035\212\265\030\0030.7\261\265\030\000\000\000"
-    "\000\000\000\000\000\271\265\030\000\000\000\000\000\000\000@\022,\n\005top_p\030\004 \001(\002B\035\212\265\030\0030.9"
-    "\261\265\030\000\000\000\000\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\030\n\005top_k\030\005 \001(\005B\t\212"
-    "\265\030\0010\240\265\030\000\022\026\n\016stop_sequences\030\006 \003(\t\022\032\n\rsyst"
-    "em_prompt\030\010 \001(\tH\000\210\001\001\022\026\n\016max_image_size\030\t"
-    " \001(\005\022\021\n\tn_threads\030\n \001(\005\022\031\n\007use_gpu\030\013 \001(\010"
-    "B\010\212\265\030\004true\0224\n\014model_family\030\014 \001(\0162\036.runan"
-    "ywhere.v1.VLMModelFamily\022B\n\024custom_chat_"
-    "template\030\r \001(\0132\037.runanywhere.v1.VLMChatT"
-    "emplateH\001\210\001\001\022\"\n\025image_marker_override\030\016 "
-    "\001(\tH\002\210\001\001\022\014\n\004seed\030\017 \001(\003\022.\n\022repetition_pen"
-    "alty\030\020 \001(\002B\022\212\265\030\0031.1\261\265\030\000\000\000\000\000\000\000\000\022\026\n\005min_p\030"
-    "\021 \001(\002B\007\212\265\030\0030.0\022\035\n\025emit_image_embeddings\030"
-    "\022 \001(\010\0228\n\treasoning\030\023 \001(\0132 .runanywhere.v"
-    "1.ReasoningOptionsH\003\210\001\001B\020\n\016_system_promp"
-    "tB\027\n\025_custom_chat_templateB\030\n\026_image_mar"
-    "ker_overrideB\014\n\n_reasoning\"\267\002\n\024VLMGenera"
-    "tionRequest\022\022\n\nrequest_id\030\001 \001(\t\022(\n\006image"
-    "s\030\002 \003(\0132\030.runanywhere.v1.VLMImage\022:\n\007opt"
-    "ions\030\003 \001(\0132$.runanywhere.v1.VLMGeneratio"
-    "nOptionsH\000\210\001\001\022\025\n\010model_id\030\004 \001(\tH\001\210\001\001\022D\n\010"
-    "metadata\030\005 \003(\01322.runanywhere.v1.VLMGener"
-    "ationRequest.MetadataEntry\032/\n\rMetadataEn"
-    "try\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\n\n\010_"
-    "optionsB\013\n\t_model_id\"\210\003\n\tVLMResult\022\014\n\004te"
-    "xt\030\001 \001(\t\022\024\n\014input_tokens\030\002 \001(\005\022\025\n\routput"
-    "_tokens\030\003 \001(\005\022\024\n\014total_tokens\030\004 \001(\003\022\032\n\022p"
-    "rocessing_time_ms\030\005 \001(\003\022\031\n\021tokens_per_se"
-    "cond\030\006 \001(\002\022\024\n\014image_tokens\030\007 \001(\005\022\036\n\026time"
-    "_to_first_token_ms\030\010 \001(\003\022\034\n\024image_encode"
-    "_time_ms\030\t \001(\003\022\032\n\rhardware_used\030\n \001(\tH\000\210"
-    "\001\001\022\032\n\rerror_message\030\013 \001(\tH\001\210\001\001\022\022\n\nerror_"
-    "code\030\014 \001(\005\022\025\n\rfinish_reason\030\r \001(\t\022\030\n\020ima"
-    "ges_processed\030\016 \001(\005B\020\n\016_hardware_usedB\020\n"
-    "\016_error_message\"\307\002\n\016VLMStreamEvent\022\013\n\003se"
-    "q\030\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequest"
-    "_id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162\".runanywhere.v1"
-    ".VLMStreamEventKind\022\r\n\005token\030\005 \001(\t\022\023\n\013to"
-    "ken_index\030\006 \001(\005\022\020\n\010is_final\030\007 \001(\010\022\031\n\021tok"
-    "ens_per_second\030\010 \001(\002\022.\n\006result\030\t \001(\0132\031.r"
-    "unanywhere.v1.VLMResultH\000\210\001\001\022\032\n\rerror_me"
-    "ssage\030\n \001(\tH\001\210\001\001\022\022\n\nerror_code\030\013 \001(\005B\t\n\007"
-    "_resultB\020\n\016_error_message\"\243\002\n\017VLMService"
-    "State\022\020\n\010is_ready\030\001 \001(\010\022\032\n\rcurrent_model"
-    "\030\002 \001(\tH\000\210\001\001\022\026\n\016context_length\030\003 \001(\005\022\032\n\022s"
-    "upports_streaming\030\004 \001(\010\022 \n\030supports_mult"
-    "iple_images\030\005 \001(\010\022 \n\023vision_encoder_type"
-    "\030\006 \001(\tH\001\210\001\001\022\032\n\rerror_message\030\007 \001(\tH\002\210\001\001\022"
-    "\022\n\nerror_code\030\010 \001(\005B\020\n\016_current_modelB\026\n"
-    "\024_vision_encoder_typeB\020\n\016_error_message*"
-    "\374\001\n\016VLMImageFormat\022 \n\034VLM_IMAGE_FORMAT_U"
-    "NSPECIFIED\020\000\022\031\n\025VLM_IMAGE_FORMAT_JPEG\020\001\022"
-    "\030\n\024VLM_IMAGE_FORMAT_PNG\020\002\022\031\n\025VLM_IMAGE_F"
-    "ORMAT_WEBP\020\003\022\034\n\030VLM_IMAGE_FORMAT_RAW_RGB"
-    "\020\004\022\035\n\031VLM_IMAGE_FORMAT_RAW_RGBA\020\005\022\033\n\027VLM"
-    "_IMAGE_FORMAT_BASE64\020\006\022\036\n\032VLM_IMAGE_FORM"
-    "AT_FILE_PATH\020\007*\303\001\n\016VLMModelFamily\022 \n\034VLM"
-    "_MODEL_FAMILY_UNSPECIFIED\020\000\022\031\n\025VLM_MODEL"
-    "_FAMILY_AUTO\020\001\022\035\n\031VLM_MODEL_FAMILY_QWEN2"
-    "_VL\020\002\022\034\n\030VLM_MODEL_FAMILY_SMOLVLM\020\003\022\032\n\026V"
-    "LM_MODEL_FAMILY_LLAVA\020\004\022\033\n\027VLM_MODEL_FAM"
-    "ILY_CUSTOM\020c*\356\001\n\022VLMStreamEventKind\022%\n!V"
-    "LM_STREAM_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035VL"
-    "M_STREAM_EVENT_KIND_STARTED\020\001\022\'\n#VLM_STR"
-    "EAM_EVENT_KIND_IMAGE_ENCODED\020\002\022\037\n\033VLM_ST"
-    "REAM_EVENT_KIND_TOKEN\020\003\022#\n\037VLM_STREAM_EV"
-    "ENT_KIND_COMPLETED\020\004\022\037\n\033VLM_STREAM_EVENT"
-    "_KIND_ERROR\020\005B\212\001\n\027ai.runanywhere.proto.v"
-    "1B\017VlmOptionsProtoP\001Z<github.com/runanyw"
-    "here/runanywhere-sdks/idl/v1;runanywhere"
-    "v1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006prot"
-    "o3"
+    "\n\021vlm_options.proto\022\016runanywhere.v1\032\014err"
+    "ors.proto\032\021model_types.proto\032\021rac_option"
+    "s.proto\032\032thinking_tag_pattern.proto\032\021tok"
+    "en_usage.proto\"\222\001\n\017VLMChatTemplate\022\025\n\rte"
+    "mplate_text\030\001 \001(\t\022\031\n\014image_marker\030\002 \001(\tH"
+    "\000\210\001\001\022\"\n\025default_system_prompt\030\003 \001(\tH\001\210\001\001"
+    "B\017\n\r_image_markerB\030\n\026_default_system_pro"
+    "mpt\"\363\002\n\010VLMImage\022\023\n\tfile_path\030\001 \001(\tH\000\022\021\n"
+    "\007encoded\030\002 \001(\014H\000\022\021\n\007raw_rgb\030\003 \001(\014H\000\022\020\n\006b"
+    "ase64\030\004 \001(\tH\000\022\r\n\005width\030\005 \001(\005\022\016\n\006height\030\006"
+    " \001(\005\022.\n\006format\030\007 \001(\0162\036.runanywhere.v1.VL"
+    "MImageFormat\022\027\n\nmedia_type\030\010 \001(\tH\001\210\001\001\022\021\n"
+    "\004name\030\t \001(\tH\002\210\001\001\022\022\n\nsize_bytes\030\n \001(\003\0228\n\010"
+    "metadata\030\013 \003(\0132&.runanywhere.v1.VLMImage"
+    ".MetadataEntry\032/\n\rMetadataEntry\022\013\n\003key\030\001"
+    " \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\010\n\006sourceB\r\n\013_me"
+    "dia_typeB\007\n\005_name\"\247\002\n\020VLMConfiguration\022\020"
+    "\n\010model_id\030\001 \001(\t\022\031\n\021max_image_size_px\030\002 "
+    "\001(\005\022\022\n\nmax_tokens\030\003 \001(\005\022\026\n\016context_lengt"
+    "h\030\004 \001(\005\022\023\n\013temperature\030\005 \001(\002\022\032\n\rsystem_p"
+    "rompt\030\006 \001(\tH\000\210\001\001\022\031\n\021streaming_enabled\030\007 "
+    "\001(\010\022D\n\023preferred_framework\030\010 \001(\0162\".runan"
+    "ywhere.v1.InferenceFrameworkH\001\210\001\001B\020\n\016_sy"
+    "stem_promptB\026\n\024_preferred_framework\"\345\005\n\024"
+    "VLMGenerationOptions\022\016\n\006prompt\030\001 \001(\t\022\'\n\021"
+    "max_output_tokens\030\002 \001(\005B\014\212\265\030\0042048\240\265\030\000\0222\n"
+    "\013temperature\030\003 \001(\002B\035\212\265\030\0030.7\261\265\030\000\000\000\000\000\000\000\000\271\265"
+    "\030\000\000\000\000\000\000\000@\022,\n\005top_p\030\004 \001(\002B\035\212\265\030\0030.9\261\265\030\000\000\000\000"
+    "\000\000\000\000\271\265\030\000\000\000\000\000\000\360\?\022\030\n\005top_k\030\005 \001(\005B\t\212\265\030\0010\240\265\030"
+    "\000\022\026\n\016stop_sequences\030\006 \003(\t\022\032\n\rsystem_prom"
+    "pt\030\010 \001(\tH\000\210\001\001\022\026\n\016max_image_size\030\t \001(\005\022\021\n"
+    "\tn_threads\030\n \001(\005\022\031\n\007use_gpu\030\013 \001(\010B\010\212\265\030\004t"
+    "rue\0224\n\014model_family\030\014 \001(\0162\036.runanywhere."
+    "v1.VLMModelFamily\022B\n\024custom_chat_templat"
+    "e\030\r \001(\0132\037.runanywhere.v1.VLMChatTemplate"
+    "H\001\210\001\001\022\"\n\025image_marker_override\030\016 \001(\tH\002\210\001"
+    "\001\022\014\n\004seed\030\017 \001(\003\022.\n\022repetition_penalty\030\020 "
+    "\001(\002B\022\212\265\030\0031.1\261\265\030\000\000\000\000\000\000\000\000\022\026\n\005min_p\030\021 \001(\002B\007"
+    "\212\265\030\0030.0\022\035\n\025emit_image_embeddings\030\022 \001(\010\0228"
+    "\n\treasoning\030\023 \001(\0132 .runanywhere.v1.Reaso"
+    "ningOptionsH\003\210\001\001B\020\n\016_system_promptB\027\n\025_c"
+    "ustom_chat_templateB\030\n\026_image_marker_ove"
+    "rrideB\014\n\n_reasoning\"\267\002\n\024VLMGenerationReq"
+    "uest\022\022\n\nrequest_id\030\001 \001(\t\022(\n\006images\030\002 \003(\013"
+    "2\030.runanywhere.v1.VLMImage\022:\n\007options\030\003 "
+    "\001(\0132$.runanywhere.v1.VLMGenerationOption"
+    "sH\000\210\001\001\022\025\n\010model_id\030\004 \001(\tH\001\210\001\001\022D\n\010metadat"
+    "a\030\005 \003(\01322.runanywhere.v1.VLMGenerationRe"
+    "quest.MetadataEntry\032/\n\rMetadataEntry\022\013\n\003"
+    "key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\n\n\010_options"
+    "B\013\n\t_model_id\"\313\002\n\tVLMResult\022\014\n\004text\030\001 \001("
+    "\t\022\032\n\022processing_time_ms\030\005 \001(\003\022\024\n\014image_t"
+    "okens\030\007 \001(\005\022\036\n\026time_to_first_token_ms\030\010 "
+    "\001(\003\022\034\n\024image_encode_time_ms\030\t \001(\003\022\032\n\rhar"
+    "dware_used\030\n \001(\tH\000\210\001\001\022\025\n\rfinish_reason\030\r"
+    " \001(\t\022\030\n\020images_processed\030\016 \001(\005\022)\n\005usage\030"
+    "\017 \001(\0132\032.runanywhere.v1.TokenUsage\022,\n\005err"
+    "or\030\020 \001(\0132\030.runanywhere.v1.SDKErrorH\001\210\001\001B"
+    "\020\n\016_hardware_usedB\010\n\006_error\"\260\002\n\016VLMStrea"
+    "mEvent\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequest_"
+    "id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162\".runanywhere.v1."
+    "VLMStreamEventKind\022\r\n\005token\030\005 \001(\t\022\023\n\013tok"
+    "en_index\030\006 \001(\005\022\020\n\010is_final\030\007 \001(\010\022\031\n\021toke"
+    "ns_per_second\030\010 \001(\002\022.\n\006result\030\t \001(\0132\031.ru"
+    "nanywhere.v1.VLMResultH\000\210\001\001\022,\n\005error\030\014 \001"
+    "(\0132\030.runanywhere.v1.SDKErrorH\001\210\001\001B\t\n\007_re"
+    "sultB\010\n\006_error\"\231\002\n\017VLMServiceState\022\020\n\010is"
+    "_ready\030\001 \001(\010\022\032\n\rcurrent_model\030\002 \001(\tH\000\210\001\001"
+    "\022\026\n\016context_length\030\003 \001(\005\022\032\n\022supports_str"
+    "eaming\030\004 \001(\010\022 \n\030supports_multiple_images"
+    "\030\005 \001(\010\022 \n\023vision_encoder_type\030\006 \001(\tH\001\210\001\001"
+    "\022,\n\005error\030\t \001(\0132\030.runanywhere.v1.SDKErro"
+    "rH\002\210\001\001B\020\n\016_current_modelB\026\n\024_vision_enco"
+    "der_typeB\010\n\006_error*\374\001\n\016VLMImageFormat\022 \n"
+    "\034VLM_IMAGE_FORMAT_UNSPECIFIED\020\000\022\031\n\025VLM_I"
+    "MAGE_FORMAT_JPEG\020\001\022\030\n\024VLM_IMAGE_FORMAT_P"
+    "NG\020\002\022\031\n\025VLM_IMAGE_FORMAT_WEBP\020\003\022\034\n\030VLM_I"
+    "MAGE_FORMAT_RAW_RGB\020\004\022\035\n\031VLM_IMAGE_FORMA"
+    "T_RAW_RGBA\020\005\022\033\n\027VLM_IMAGE_FORMAT_BASE64\020"
+    "\006\022\036\n\032VLM_IMAGE_FORMAT_FILE_PATH\020\007*\303\001\n\016VL"
+    "MModelFamily\022 \n\034VLM_MODEL_FAMILY_UNSPECI"
+    "FIED\020\000\022\031\n\025VLM_MODEL_FAMILY_AUTO\020\001\022\035\n\031VLM"
+    "_MODEL_FAMILY_QWEN2_VL\020\002\022\034\n\030VLM_MODEL_FA"
+    "MILY_SMOLVLM\020\003\022\032\n\026VLM_MODEL_FAMILY_LLAVA"
+    "\020\004\022\033\n\027VLM_MODEL_FAMILY_CUSTOM\020c*\356\001\n\022VLMS"
+    "treamEventKind\022%\n!VLM_STREAM_EVENT_KIND_"
+    "UNSPECIFIED\020\000\022!\n\035VLM_STREAM_EVENT_KIND_S"
+    "TARTED\020\001\022\'\n#VLM_STREAM_EVENT_KIND_IMAGE_"
+    "ENCODED\020\002\022\037\n\033VLM_STREAM_EVENT_KIND_TOKEN"
+    "\020\003\022#\n\037VLM_STREAM_EVENT_KIND_COMPLETED\020\004\022"
+    "\037\n\033VLM_STREAM_EVENT_KIND_ERROR\020\005B\212\001\n\027ai."
+    "runanywhere.proto.v1B\017VlmOptionsProtoP\001Z"
+    "<github.com/runanywhere/runanywhere-sdks"
+    "/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runany"
+    "where.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_vlm_5foptions_2eproto_deps[3] = {
+    descriptor_table_vlm_5foptions_2eproto_deps[5] = {
+        &::descriptor_table_errors_2eproto,
         &::descriptor_table_model_5ftypes_2eproto,
         &::descriptor_table_rac_5foptions_2eproto,
         &::descriptor_table_thinking_5ftag_5fpattern_2eproto,
+        &::descriptor_table_token_5fusage_2eproto,
 };
 static ::absl::once_flag descriptor_table_vlm_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_vlm_5foptions_2eproto = {
     false,
     false,
-    3842,
+    3781,
     descriptor_table_protodef_vlm_5foptions_2eproto,
     "vlm_options.proto",
     &descriptor_table_vlm_5foptions_2eproto_once,
     descriptor_table_vlm_5foptions_2eproto_deps,
-    3,
+    5,
     10,
     schemas,
     file_message_globals,
@@ -4783,6 +4737,16 @@ void VLMGenerationRequest::InternalSwap(VLMGenerationRequest* PROTOBUF_RESTRICT 
 }
 // ===================================================================
 
+void VLMResult::clear_usage() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.usage_ != nullptr) _impl_.usage_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
+void VLMResult::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
 VLMResult::VLMResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, VLMResult_get_class_data()) {
@@ -4800,7 +4764,6 @@ PROTOBUF_NDEBUG_INLINE VLMResult::Impl_::Impl_(
         _cached_size_{0},
         text_(arena, from.text_),
         hardware_used_(arena, from.hardware_used_),
-        error_message_(arena, from.error_message_),
         finish_reason_(arena, from.finish_reason_) {}
 
 VLMResult::VLMResult(
@@ -4817,12 +4780,19 @@ VLMResult::VLMResult(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.usage_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.usage_)
+                : nullptr;
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000010U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, input_tokens_),
+               offsetof(Impl_, processing_time_ms_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, input_tokens_),
+               offsetof(Impl_, processing_time_ms_),
            offsetof(Impl_, images_processed_) -
-               offsetof(Impl_, input_tokens_) +
+               offsetof(Impl_, processing_time_ms_) +
                sizeof(Impl_::images_processed_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VLMResult)
@@ -4833,16 +4803,15 @@ PROTOBUF_NDEBUG_INLINE VLMResult::Impl_::Impl_(
       : _cached_size_{0},
         text_(arena),
         hardware_used_(arena),
-        error_message_(arena),
         finish_reason_(arena) {}
 
 inline void VLMResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, input_tokens_),
+               offsetof(Impl_, usage_),
            0,
            offsetof(Impl_, images_processed_) -
-               offsetof(Impl_, input_tokens_) +
+               offsetof(Impl_, usage_) +
                sizeof(Impl_::images_processed_));
 }
 VLMResult::~VLMResult() {
@@ -4858,8 +4827,9 @@ inline void VLMResult::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.text_.Destroy();
   this_._impl_.hardware_used_.Destroy();
-  this_._impl_.error_message_.Destroy();
   this_._impl_.finish_reason_.Destroy();
+  delete this_._impl_.usage_;
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -4897,7 +4867,7 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.text_.ClearNonDefaultToEmpty();
     }
@@ -4905,21 +4875,26 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
       _impl_.hardware_used_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       _impl_.finish_reason_.ClearNonDefaultToEmpty();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(_impl_.usage_ != nullptr);
+      _impl_.usage_->Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000f0U)) {
-    ::memset(&_impl_.input_tokens_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.processing_time_ms_) -
-        reinterpret_cast<char*>(&_impl_.input_tokens_)) + sizeof(_impl_.processing_time_ms_));
+  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
+    ::memset(&_impl_.processing_time_ms_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.image_encode_time_ms_) -
+        reinterpret_cast<char*>(&_impl_.processing_time_ms_)) + sizeof(_impl_.image_encode_time_ms_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00003f00U)) {
-    ::memset(&_impl_.tokens_per_second_, 0, static_cast<::size_t>(
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    ::memset(&_impl_.image_tokens_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.images_processed_) -
-        reinterpret_cast<char*>(&_impl_.tokens_per_second_)) + sizeof(_impl_.images_processed_));
+        reinterpret_cast<char*>(&_impl_.image_tokens_)) + sizeof(_impl_.images_processed_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -4954,35 +4929,8 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
     }
   }
 
-  // int32 input_tokens = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_input_tokens() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
-              stream, this_._internal_input_tokens(), target);
-    }
-  }
-
-  // int32 output_tokens = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-    if (this_._internal_output_tokens() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
-              stream, this_._internal_output_tokens(), target);
-    }
-  }
-
-  // int64 total_tokens = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-    if (this_._internal_total_tokens() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<4>(
-              stream, this_._internal_total_tokens(), target);
-    }
-  }
-
   // int64 processing_time_ms = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_processing_time_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<5>(
@@ -4990,17 +4938,8 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
     }
   }
 
-  // float tokens_per_second = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-    if (::absl::bit_cast<::uint32_t>(this_._internal_tokens_per_second()) != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteFloatToArray(
-          6, this_._internal_tokens_per_second(), target);
-    }
-  }
-
   // int32 image_tokens = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (this_._internal_image_tokens() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
@@ -5009,7 +4948,7 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
   }
 
   // int64 time_to_first_token_ms = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_time_to_first_token_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<8>(
@@ -5018,7 +4957,7 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
   }
 
   // int64 image_encode_time_ms = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_image_encode_time_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<9>(
@@ -5034,25 +4973,8 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
     target = stream->WriteStringMaybeAliased(10, _s, target);
   }
 
-  // optional string error_message = 11;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VLMResult.error_message");
-    target = stream->WriteStringMaybeAliased(11, _s, target);
-  }
-
-  // int32 error_code = 12;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<12>(
-              stream, this_._internal_error_code(), target);
-    }
-  }
-
   // string finish_reason = 13;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (!this_._internal_finish_reason().empty()) {
       const ::std::string& _s = this_._internal_finish_reason();
       ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
@@ -5062,12 +4984,26 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
   }
 
   // int32 images_processed = 14;
-  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (this_._internal_images_processed() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<14>(
               stream, this_._internal_images_processed(), target);
     }
+  }
+
+  // .runanywhere.v1.TokenUsage usage = 15;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        15, *this_._impl_.usage_, this_._impl_.usage_->GetCachedSize(), target,
+        stream);
+  }
+
+  // optional .runanywhere.v1.SDKError error = 16;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        16, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -5108,84 +5044,55 @@ PROTOBUF_NOINLINE void VLMResult::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_hardware_used());
     }
-    // optional string error_message = 11;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
-    }
     // string finish_reason = 13;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (!this_._internal_finish_reason().empty()) {
         total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                         this_._internal_finish_reason());
       }
     }
-    // int32 input_tokens = 2;
+    // .runanywhere.v1.TokenUsage usage = 15;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.usage_);
+    }
+    // optional .runanywhere.v1.SDKError error = 16;
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_input_tokens() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_input_tokens());
-      }
-    }
-    // int32 output_tokens = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (this_._internal_output_tokens() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_output_tokens());
-      }
-    }
-    // int64 total_tokens = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (this_._internal_total_tokens() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
-            this_._internal_total_tokens());
-      }
+      total_size += 2 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // int64 processing_time_ms = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_processing_time_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_processing_time_ms());
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00003f00U)) {
-    // float tokens_per_second = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (::absl::bit_cast<::uint32_t>(this_._internal_tokens_per_second()) != 0) {
-        total_size += 5;
-      }
-    }
-    // int32 image_tokens = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (this_._internal_image_tokens() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_image_tokens());
-      }
-    }
     // int64 time_to_first_token_ms = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_time_to_first_token_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_time_to_first_token_ms());
       }
     }
     // int64 image_encode_time_ms = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_image_encode_time_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_image_encode_time_ms());
       }
     }
-    // int32 error_code = 12;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (this_._internal_error_code() != 0) {
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    // int32 image_tokens = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (this_._internal_image_tokens() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
+            this_._internal_image_tokens());
       }
     }
     // int32 images_processed = 14;
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (this_._internal_images_processed() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_images_processed());
@@ -5203,6 +5110,7 @@ void VLMResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.VLMResult)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
@@ -5223,9 +5131,6 @@ void VLMResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
       _this->_internal_set_hardware_used(from._internal_hardware_used());
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (!from._internal_finish_reason().empty()) {
         _this->_internal_set_finish_reason(from._internal_finish_reason());
       } else {
@@ -5234,54 +5139,45 @@ void VLMResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(from._impl_.usage_ != nullptr);
+      if (_this->_impl_.usage_ == nullptr) {
+        _this->_impl_.usage_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.usage_);
+      } else {
+        _this->_impl_.usage_->MergeFrom(*from._impl_.usage_);
+      }
+    }
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_input_tokens() != 0) {
-        _this->_impl_.input_tokens_ = from._impl_.input_tokens_;
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
-      if (from._internal_output_tokens() != 0) {
-        _this->_impl_.output_tokens_ = from._impl_.output_tokens_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
-      if (from._internal_total_tokens() != 0) {
-        _this->_impl_.total_tokens_ = from._impl_.total_tokens_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_processing_time_ms() != 0) {
         _this->_impl_.processing_time_ms_ = from._impl_.processing_time_ms_;
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00003f00U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_tokens_per_second()) != 0) {
-        _this->_impl_.tokens_per_second_ = from._impl_.tokens_per_second_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (from._internal_image_tokens() != 0) {
-        _this->_impl_.image_tokens_ = from._impl_.image_tokens_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_time_to_first_token_ms() != 0) {
         _this->_impl_.time_to_first_token_ms_ = from._impl_.time_to_first_token_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_image_encode_time_ms() != 0) {
         _this->_impl_.image_encode_time_ms_ = from._impl_.image_encode_time_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000300U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (from._internal_image_tokens() != 0) {
+        _this->_impl_.image_tokens_ = from._impl_.image_tokens_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (from._internal_images_processed() != 0) {
         _this->_impl_.images_processed_ = from._impl_.images_processed_;
       }
@@ -5308,14 +5204,13 @@ void VLMResult::InternalSwap(VLMResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.text_, &other->_impl_.text_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.hardware_used_, &other->_impl_.hardware_used_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.finish_reason_, &other->_impl_.finish_reason_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.images_processed_)
       + sizeof(VLMResult::_impl_.images_processed_)
-      - PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.input_tokens_)>(
-          reinterpret_cast<char*>(&_impl_.input_tokens_),
-          reinterpret_cast<char*>(&other->_impl_.input_tokens_));
+      - PROTOBUF_FIELD_OFFSET(VLMResult, _impl_.usage_)>(
+          reinterpret_cast<char*>(&_impl_.usage_),
+          reinterpret_cast<char*>(&other->_impl_.usage_));
 }
 
 ::google::protobuf::Metadata VLMResult::GetMetadata() const {
@@ -5323,6 +5218,11 @@ void VLMResult::InternalSwap(VLMResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other
 }
 // ===================================================================
 
+void VLMStreamEvent::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
 VLMStreamEvent::VLMStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, VLMStreamEvent_get_class_data()) {
@@ -5339,8 +5239,7 @@ PROTOBUF_NDEBUG_INLINE VLMStreamEvent::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         request_id_(arena, from.request_id_),
-        token_(arena, from.token_),
-        error_message_(arena, from.error_message_) {}
+        token_(arena, from.token_) {}
 
 VLMStreamEvent::VLMStreamEvent(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -5357,16 +5256,19 @@ VLMStreamEvent::VLMStreamEvent(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.result_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+  _impl_.result_ = (CheckHasBit(cached_has_bits, 0x00000004U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.result_)
                 : nullptr;
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000008U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, seq_),
+               offsetof(Impl_, timestamp_us_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, seq_),
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, seq_) +
-               sizeof(Impl_::error_code_));
+               offsetof(Impl_, timestamp_us_),
+           offsetof(Impl_, tokens_per_second_) -
+               offsetof(Impl_, timestamp_us_) +
+               sizeof(Impl_::tokens_per_second_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VLMStreamEvent)
 }
@@ -5375,17 +5277,16 @@ PROTOBUF_NDEBUG_INLINE VLMStreamEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         request_id_(arena),
-        token_(arena),
-        error_message_(arena) {}
+        token_(arena) {}
 
 inline void VLMStreamEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, result_),
            0,
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, tokens_per_second_) -
                offsetof(Impl_, result_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::tokens_per_second_));
 }
 VLMStreamEvent::~VLMStreamEvent() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VLMStreamEvent)
@@ -5400,8 +5301,8 @@ inline void VLMStreamEvent::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.request_id_.Destroy();
   this_._impl_.token_.Destroy();
-  this_._impl_.error_message_.Destroy();
   delete this_._impl_.result_;
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -5447,23 +5348,20 @@ PROTOBUF_NOINLINE void VLMStreamEvent::Clear() {
       _impl_.token_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(_impl_.result_ != nullptr);
       _impl_.result_->Clear();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
+    }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x000000f0U)) {
-    ::memset(&_impl_.seq_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.token_index_) -
-        reinterpret_cast<char*>(&_impl_.seq_)) + sizeof(_impl_.token_index_));
+    ::memset(&_impl_.timestamp_us_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.is_final_) -
+        reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.is_final_));
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000700U)) {
-    ::memset(&_impl_.is_final_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.is_final_)) + sizeof(_impl_.error_code_));
-  }
+  _impl_.tokens_per_second_ = 0;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -5487,17 +5385,8 @@ PROTOBUF_NOINLINE void VLMStreamEvent::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // uint64 seq = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-    if (this_._internal_seq() != 0) {
-      target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteUInt64ToArray(
-          1, this_._internal_seq(), target);
-    }
-  }
-
   // int64 timestamp_us = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_timestamp_us() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
@@ -5516,7 +5405,7 @@ PROTOBUF_NOINLINE void VLMStreamEvent::Clear() {
   }
 
   // .runanywhere.v1.VLMStreamEventKind kind = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_kind() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -5535,7 +5424,7 @@ PROTOBUF_NOINLINE void VLMStreamEvent::Clear() {
   }
 
   // int32 token_index = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_token_index() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
@@ -5544,7 +5433,7 @@ PROTOBUF_NOINLINE void VLMStreamEvent::Clear() {
   }
 
   // bool is_final = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_is_final() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -5553,7 +5442,7 @@ PROTOBUF_NOINLINE void VLMStreamEvent::Clear() {
   }
 
   // float tokens_per_second = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_tokens_per_second()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -5562,27 +5451,17 @@ PROTOBUF_NOINLINE void VLMStreamEvent::Clear() {
   }
 
   // optional .runanywhere.v1.VLMResult result = 9;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         9, *this_._impl_.result_, this_._impl_.result_->GetCachedSize(), target,
         stream);
   }
 
-  // optional string error_message = 10;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VLMStreamEvent.error_message");
-    target = stream->WriteStringMaybeAliased(10, _s, target);
-  }
-
-  // int32 error_code = 11;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<11>(
-              stream, this_._internal_error_code(), target);
-    }
+  // optional .runanywhere.v1.SDKError error = 12;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        12, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -5625,63 +5504,49 @@ PROTOBUF_NOINLINE void VLMStreamEvent::Clear() {
                                         this_._internal_token());
       }
     }
-    // optional string error_message = 10;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
-    }
     // optional .runanywhere.v1.VLMResult result = 9;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.result_);
     }
-    // uint64 seq = 1;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (this_._internal_seq() != 0) {
-        total_size += ::_pbi::WireFormatLite::UInt64SizePlusOne(
-            this_._internal_seq());
-      }
+    // optional .runanywhere.v1.SDKError error = 12;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // int64 timestamp_us = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_timestamp_us() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_us());
       }
     }
     // .runanywhere.v1.VLMStreamEventKind kind = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_kind() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_kind());
       }
     }
     // int32 token_index = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_token_index() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_token_index());
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000700U)) {
     // bool is_final = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_is_final() != 0) {
         total_size += 2;
       }
     }
+  }
+   {
     // float tokens_per_second = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_tokens_per_second()) != 0) {
         total_size += 5;
-      }
-    }
-    // int32 error_code = 11;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
       }
     }
   }
@@ -5723,9 +5588,6 @@ void VLMStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(from._impl_.result_ != nullptr);
       if (_this->_impl_.result_ == nullptr) {
         _this->_impl_.result_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.result_);
@@ -5733,42 +5595,38 @@ void VLMStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.result_->MergeFrom(*from._impl_.result_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
-      if (from._internal_seq() != 0) {
-        _this->_impl_.seq_ = from._impl_.seq_;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_timestamp_us() != 0) {
         _this->_impl_.timestamp_us_ = from._impl_.timestamp_us_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_kind() != 0) {
         _this->_impl_.kind_ = from._impl_.kind_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_token_index() != 0) {
         _this->_impl_.token_index_ = from._impl_.token_index_;
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000700U)) {
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_is_final() != 0) {
         _this->_impl_.is_final_ = from._impl_.is_final_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
-      if (::absl::bit_cast<::uint32_t>(from._internal_tokens_per_second()) != 0) {
-        _this->_impl_.tokens_per_second_ = from._impl_.tokens_per_second_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
-      }
+  }
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (::absl::bit_cast<::uint32_t>(from._internal_tokens_per_second()) != 0) {
+      _this->_impl_.tokens_per_second_ = from._impl_.tokens_per_second_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -5792,10 +5650,9 @@ void VLMStreamEvent::InternalSwap(VLMStreamEvent* PROTOBUF_RESTRICT PROTOBUF_NON
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.request_id_, &other->_impl_.request_id_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.token_, &other->_impl_.token_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.error_code_)
-      + sizeof(VLMStreamEvent::_impl_.error_code_)
+      PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.tokens_per_second_)
+      + sizeof(VLMStreamEvent::_impl_.tokens_per_second_)
       - PROTOBUF_FIELD_OFFSET(VLMStreamEvent, _impl_.result_)>(
           reinterpret_cast<char*>(&_impl_.result_),
           reinterpret_cast<char*>(&other->_impl_.result_));
@@ -5806,6 +5663,11 @@ void VLMStreamEvent::InternalSwap(VLMStreamEvent* PROTOBUF_RESTRICT PROTOBUF_NON
 }
 // ===================================================================
 
+void VLMServiceState::clear_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ != nullptr) _impl_.error_->Clear();
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+}
 VLMServiceState::VLMServiceState(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, VLMServiceState_get_class_data()) {
@@ -5822,8 +5684,7 @@ PROTOBUF_NDEBUG_INLINE VLMServiceState::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         current_model_(arena, from.current_model_),
-        vision_encoder_type_(arena, from.vision_encoder_type_),
-        error_message_(arena, from.error_message_) {}
+        vision_encoder_type_(arena, from.vision_encoder_type_) {}
 
 VLMServiceState::VLMServiceState(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -5839,13 +5700,17 @@ VLMServiceState::VLMServiceState(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::uint32_t cached_has_bits = _impl_._has_bits_[0];
+  _impl_.error_ = (CheckHasBit(cached_has_bits, 0x00000004U))
+                ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
+                : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, context_length_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, context_length_),
-           offsetof(Impl_, error_code_) -
+           offsetof(Impl_, supports_multiple_images_) -
                offsetof(Impl_, context_length_) +
-               sizeof(Impl_::error_code_));
+               sizeof(Impl_::supports_multiple_images_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VLMServiceState)
 }
@@ -5854,17 +5719,16 @@ PROTOBUF_NDEBUG_INLINE VLMServiceState::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         current_model_(arena),
-        vision_encoder_type_(arena),
-        error_message_(arena) {}
+        vision_encoder_type_(arena) {}
 
 inline void VLMServiceState::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, context_length_),
+               offsetof(Impl_, error_),
            0,
-           offsetof(Impl_, error_code_) -
-               offsetof(Impl_, context_length_) +
-               sizeof(Impl_::error_code_));
+           offsetof(Impl_, supports_multiple_images_) -
+               offsetof(Impl_, error_) +
+               sizeof(Impl_::supports_multiple_images_));
 }
 VLMServiceState::~VLMServiceState() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VLMServiceState)
@@ -5879,7 +5743,7 @@ inline void VLMServiceState::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.current_model_.Destroy();
   this_._impl_.vision_encoder_type_.Destroy();
-  this_._impl_.error_message_.Destroy();
+  delete this_._impl_.error_;
   this_._impl_.~Impl_();
 }
 
@@ -5925,13 +5789,14 @@ PROTOBUF_NOINLINE void VLMServiceState::Clear() {
       _impl_.vision_encoder_type_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _impl_.error_message_.ClearNonDefaultToEmpty();
+      ABSL_DCHECK(_impl_.error_ != nullptr);
+      _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x000000f8U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000078U)) {
     ::memset(&_impl_.context_length_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.error_code_) -
-        reinterpret_cast<char*>(&_impl_.context_length_)) + sizeof(_impl_.error_code_));
+        reinterpret_cast<char*>(&_impl_.supports_multiple_images_) -
+        reinterpret_cast<char*>(&_impl_.context_length_)) + sizeof(_impl_.supports_multiple_images_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -6008,21 +5873,11 @@ PROTOBUF_NOINLINE void VLMServiceState::Clear() {
     target = stream->WriteStringMaybeAliased(6, _s, target);
   }
 
-  // optional string error_message = 7;
+  // optional .runanywhere.v1.SDKError error = 9;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    const ::std::string& _s = this_._internal_error_message();
-    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
-        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VLMServiceState.error_message");
-    target = stream->WriteStringMaybeAliased(7, _s, target);
-  }
-
-  // int32 error_code = 8;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-    if (this_._internal_error_code() != 0) {
-      target =
-          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<8>(
-              stream, this_._internal_error_code(), target);
-    }
+    target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+        9, *this_._impl_.error_, this_._impl_.error_->GetCachedSize(), target,
+        stream);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -6050,7 +5905,7 @@ PROTOBUF_NOINLINE void VLMServiceState::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     // optional string current_model = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
@@ -6061,10 +5916,10 @@ PROTOBUF_NOINLINE void VLMServiceState::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_vision_encoder_type());
     }
-    // optional string error_message = 7;
+    // optional .runanywhere.v1.SDKError error = 9;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
-                                      this_._internal_error_message());
+      total_size += 1 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
     // int32 context_length = 3;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
@@ -6091,13 +5946,6 @@ PROTOBUF_NOINLINE void VLMServiceState::Clear() {
         total_size += 2;
       }
     }
-    // int32 error_code = 8;
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (this_._internal_error_code() != 0) {
-        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
-            this_._internal_error_code());
-      }
-    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -6110,13 +5958,14 @@ void VLMServiceState::MergeImpl(::google::protobuf::MessageLite& to_msg,
   if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
     from.CheckHasBitConsistency();
   }
+  ::google::protobuf::Arena* arena = _this->GetArena();
   // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.VLMServiceState)
   ABSL_DCHECK_NE(&from, _this);
   ::uint32_t cached_has_bits = 0;
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _this->_internal_set_current_model(from._internal_current_model());
     }
@@ -6124,7 +5973,12 @@ void VLMServiceState::MergeImpl(::google::protobuf::MessageLite& to_msg,
       _this->_internal_set_vision_encoder_type(from._internal_vision_encoder_type());
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      _this->_internal_set_error_message(from._internal_error_message());
+      ABSL_DCHECK(from._impl_.error_ != nullptr);
+      if (_this->_impl_.error_ == nullptr) {
+        _this->_impl_.error_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_);
+      } else {
+        _this->_impl_.error_->MergeFrom(*from._impl_.error_);
+      }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_context_length() != 0) {
@@ -6144,11 +5998,6 @@ void VLMServiceState::MergeImpl(::google::protobuf::MessageLite& to_msg,
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_supports_multiple_images() != 0) {
         _this->_impl_.supports_multiple_images_ = from._impl_.supports_multiple_images_;
-      }
-    }
-    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (from._internal_error_code() != 0) {
-        _this->_impl_.error_code_ = from._impl_.error_code_;
       }
     }
   }
@@ -6173,13 +6022,12 @@ void VLMServiceState::InternalSwap(VLMServiceState* PROTOBUF_RESTRICT PROTOBUF_N
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.current_model_, &other->_impl_.current_model_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.vision_encoder_type_, &other->_impl_.vision_encoder_type_, arena);
-  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.error_code_)
-      + sizeof(VLMServiceState::_impl_.error_code_)
-      - PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.context_length_)>(
-          reinterpret_cast<char*>(&_impl_.context_length_),
-          reinterpret_cast<char*>(&other->_impl_.context_length_));
+      PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.supports_multiple_images_)
+      + sizeof(VLMServiceState::_impl_.supports_multiple_images_)
+      - PROTOBUF_FIELD_OFFSET(VLMServiceState, _impl_.error_)>(
+          reinterpret_cast<char*>(&_impl_.error_),
+          reinterpret_cast<char*>(&other->_impl_.error_));
 }
 
 ::google::protobuf::Metadata VLMServiceState::GetMetadata() const {

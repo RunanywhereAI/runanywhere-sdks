@@ -33,18 +33,11 @@ import okio.ByteString
 
 public class ModelDeleteResult(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelId",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val model_id: String = "",
   @field:WireField(
@@ -52,7 +45,7 @@ public class ModelDeleteResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "deletedBytes",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val deleted_bytes: Long = 0L,
   @field:WireField(
@@ -60,7 +53,7 @@ public class ModelDeleteResult(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "filesDeleted",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val files_deleted: Boolean = false,
   @field:WireField(
@@ -68,7 +61,7 @@ public class ModelDeleteResult(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "registryUpdated",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val registry_updated: Boolean = false,
   @field:WireField(
@@ -76,25 +69,23 @@ public class ModelDeleteResult(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "wasLoaded",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val was_loaded: Boolean = false,
+  warnings: List<String> = emptyList(),
   @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 6,
   )
-  public val error_message: String = "",
-  warnings: List<String> = emptyList(),
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelDeleteResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
-    schemaIndex = 7,
+    schemaIndex = 5,
   )
   public val warnings: List<String> = immutableCopyOf("warnings", warnings)
 
@@ -108,14 +99,13 @@ public class ModelDeleteResult(
     if (other === this) return true
     if (other !is ModelDeleteResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (model_id != other.model_id) return false
     if (deleted_bytes != other.deleted_bytes) return false
     if (files_deleted != other.files_deleted) return false
     if (registry_updated != other.registry_updated) return false
     if (was_loaded != other.was_loaded) return false
-    if (error_message != other.error_message) return false
     if (warnings != other.warnings) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -123,14 +113,13 @@ public class ModelDeleteResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + deleted_bytes.hashCode()
       result = result * 37 + files_deleted.hashCode()
       result = result * 37 + registry_updated.hashCode()
       result = result * 37 + was_loaded.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + warnings.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -138,28 +127,26 @@ public class ModelDeleteResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     result += """model_id=${sanitize(model_id)}"""
     result += """deleted_bytes=$deleted_bytes"""
     result += """files_deleted=$files_deleted"""
     result += """registry_updated=$registry_updated"""
     result += """was_loaded=$was_loaded"""
-    result += """error_message=${sanitize(error_message)}"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ModelDeleteResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     model_id: String = this.model_id,
     deleted_bytes: Long = this.deleted_bytes,
     files_deleted: Boolean = this.files_deleted,
     registry_updated: Boolean = this.registry_updated,
     was_loaded: Boolean = this.was_loaded,
-    error_message: String = this.error_message,
     warnings: List<String> = this.warnings,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelDeleteResult = ModelDeleteResult(success, model_id, deleted_bytes, files_deleted, registry_updated, was_loaded, error_message, warnings, unknownFields)
+  ): ModelDeleteResult = ModelDeleteResult(model_id, deleted_bytes, files_deleted, registry_updated, was_loaded, warnings, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -173,9 +160,6 @@ public class ModelDeleteResult(
     ) {
       override fun encodedSize(`value`: ModelDeleteResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.model_id)
         }
@@ -191,17 +175,12 @@ public class ModelDeleteResult(
         if (value.was_loaded != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(6, value.was_loaded)
         }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.error_message)
-        }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(8, value.warnings)
+        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ModelDeleteResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.model_id)
         }
@@ -217,19 +196,15 @@ public class ModelDeleteResult(
         if (value.was_loaded != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.was_loaded)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
-        }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelDeleteResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
-        }
         if (value.was_loaded != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.was_loaded)
         }
@@ -245,47 +220,42 @@ public class ModelDeleteResult(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.model_id)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): ModelDeleteResult {
-        var success: Boolean = false
         var model_id: String = ""
         var deleted_bytes: Long = 0L
         var files_deleted: Boolean = false
         var registry_updated: Boolean = false
         var was_loaded: Boolean = false
-        var error_message: String = ""
         val warnings = mutableListOf<String>()
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> model_id = ProtoAdapter.STRING.decode(reader)
             3 -> deleted_bytes = ProtoAdapter.INT64.decode(reader)
             4 -> files_deleted = ProtoAdapter.BOOL.decode(reader)
             5 -> registry_updated = ProtoAdapter.BOOL.decode(reader)
             6 -> was_loaded = ProtoAdapter.BOOL.decode(reader)
-            7 -> error_message = ProtoAdapter.STRING.decode(reader)
             8 -> warnings.add(ProtoAdapter.STRING.decode(reader))
+            9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ModelDeleteResult(
-          success = success,
           model_id = model_id,
           deleted_bytes = deleted_bytes,
           files_deleted = files_deleted,
           registry_updated = registry_updated,
           was_loaded = was_loaded,
-          error_message = error_message,
           warnings = warnings,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelDeleteResult): ModelDeleteResult = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

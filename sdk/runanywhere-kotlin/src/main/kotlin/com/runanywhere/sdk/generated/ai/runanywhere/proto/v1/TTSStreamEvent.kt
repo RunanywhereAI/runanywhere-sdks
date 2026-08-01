@@ -32,18 +32,11 @@ import okio.ByteString
 
 public class TTSStreamEvent(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val seq: Long = 0L,
-  @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
@@ -51,50 +44,35 @@ public class TTSStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val request_id: String = "",
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.TTSStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val kind: TTSStreamEventKind = TTSStreamEventKind.TTS_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.TTSOutput#ADAPTER",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val output: TTSOutput? = null,
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.TTSPhonemeTimestamp#ADAPTER",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val phoneme: TTSPhonemeTimestamp? = null,
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.TTSSpeakResult#ADAPTER",
     jsonName = "speakResult",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val speak_result: TTSSpeakResult? = null,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 7,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 8,
-  )
-  public val error_code: Int = 0,
   /**
    * progress is 0.0-1.0 when known; total_chunks 0 = unknown.
    */
@@ -102,7 +80,7 @@ public class TTSStreamEvent(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 9,
+    schemaIndex = 6,
   )
   public val progress: Float = 0f,
   @field:WireField(
@@ -110,7 +88,7 @@ public class TTSStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "chunkIndex",
-    schemaIndex = 10,
+    schemaIndex = 7,
   )
   public val chunk_index: Int = 0,
   @field:WireField(
@@ -118,7 +96,7 @@ public class TTSStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "totalChunks",
-    schemaIndex = 11,
+    schemaIndex = 8,
   )
   public val total_chunks: Int = 0,
   @field:WireField(
@@ -126,7 +104,7 @@ public class TTSStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "elapsedMs",
-    schemaIndex = 12,
+    schemaIndex = 9,
   )
   public val elapsed_ms: Long = 0L,
   @field:WireField(
@@ -134,9 +112,15 @@ public class TTSStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "statusMessage",
-    schemaIndex = 13,
+    schemaIndex = 10,
   )
   public val status_message: String = "",
+  @field:WireField(
+    tag = 15,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 11,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSStreamEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -149,20 +133,18 @@ public class TTSStreamEvent(
     if (other === this) return true
     if (other !is TTSStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
-    if (seq != other.seq) return false
     if (timestamp_us != other.timestamp_us) return false
     if (request_id != other.request_id) return false
     if (kind != other.kind) return false
     if (output != other.output) return false
     if (phoneme != other.phoneme) return false
     if (speak_result != other.speak_result) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
     if (progress != other.progress) return false
     if (chunk_index != other.chunk_index) return false
     if (total_chunks != other.total_chunks) return false
     if (elapsed_ms != other.elapsed_ms) return false
     if (status_message != other.status_message) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -170,20 +152,18 @@ public class TTSStreamEvent(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + seq.hashCode()
       result = result * 37 + timestamp_us.hashCode()
       result = result * 37 + request_id.hashCode()
       result = result * 37 + kind.hashCode()
       result = result * 37 + (output?.hashCode() ?: 0)
       result = result * 37 + (phoneme?.hashCode() ?: 0)
       result = result * 37 + (speak_result?.hashCode() ?: 0)
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
       result = result * 37 + progress.hashCode()
       result = result * 37 + chunk_index.hashCode()
       result = result * 37 + total_chunks.hashCode()
       result = result * 37 + elapsed_ms.hashCode()
       result = result * 37 + status_message.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -191,40 +171,36 @@ public class TTSStreamEvent(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """seq=$seq"""
     result += """timestamp_us=$timestamp_us"""
     result += """request_id=${sanitize(request_id)}"""
     result += """kind=$kind"""
     if (output != null) result += """output=$output"""
     if (phoneme != null) result += """phoneme=$phoneme"""
     if (speak_result != null) result += """speak_result=$speak_result"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
     result += """progress=$progress"""
     result += """chunk_index=$chunk_index"""
     result += """total_chunks=$total_chunks"""
     result += """elapsed_ms=$elapsed_ms"""
     result += """status_message=${sanitize(status_message)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "TTSStreamEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
     request_id: String = this.request_id,
     kind: TTSStreamEventKind = this.kind,
     output: TTSOutput? = this.output,
     phoneme: TTSPhonemeTimestamp? = this.phoneme,
     speak_result: TTSSpeakResult? = this.speak_result,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
     progress: Float = this.progress,
     chunk_index: Int = this.chunk_index,
     total_chunks: Int = this.total_chunks,
     elapsed_ms: Long = this.elapsed_ms,
     status_message: String = this.status_message,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): TTSStreamEvent = TTSStreamEvent(seq, timestamp_us, request_id, kind, output, phoneme, speak_result, error_message, error_code, progress, chunk_index, total_chunks, elapsed_ms, status_message, unknownFields)
+  ): TTSStreamEvent = TTSStreamEvent(timestamp_us, request_id, kind, output, phoneme, speak_result, progress, chunk_index, total_chunks, elapsed_ms, status_message, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -238,9 +214,6 @@ public class TTSStreamEvent(
     ) {
       override fun encodedSize(`value`: TTSStreamEvent): Int {
         var size = value.unknownFields.size
-        if (value.seq != 0L) {
-          size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
         }
@@ -253,10 +226,6 @@ public class TTSStreamEvent(
         size += TTSOutput.ADAPTER.encodedSizeWithTag(5, value.output)
         size += TTSPhonemeTimestamp.ADAPTER.encodedSizeWithTag(6, value.phoneme)
         size += TTSSpeakResult.ADAPTER.encodedSizeWithTag(7, value.speak_result)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.error_code)
-        }
         if (!value.progress.equals(0f)) {
           size += ProtoAdapter.FLOAT.encodedSizeWithTag(10, value.progress)
         }
@@ -272,13 +241,11 @@ public class TTSStreamEvent(
         if (value.status_message != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.status_message)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(15, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: TTSStreamEvent) {
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
@@ -291,10 +258,6 @@ public class TTSStreamEvent(
         TTSOutput.ADAPTER.encodeWithTag(writer, 5, value.output)
         TTSPhonemeTimestamp.ADAPTER.encodeWithTag(writer, 6, value.phoneme)
         TTSSpeakResult.ADAPTER.encodeWithTag(writer, 7, value.speak_result)
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.error_code)
-        }
         if (!value.progress.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 10, value.progress)
         }
@@ -310,11 +273,13 @@ public class TTSStreamEvent(
         if (value.status_message != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 14, value.status_message)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 15, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSStreamEvent) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 15, value.error)
         if (value.status_message != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 14, value.status_message)
         }
@@ -330,10 +295,6 @@ public class TTSStreamEvent(
         if (!value.progress.equals(0f)) {
           ProtoAdapter.FLOAT.encodeWithTag(writer, 10, value.progress)
         }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
         TTSSpeakResult.ADAPTER.encodeWithTag(writer, 7, value.speak_result)
         TTSPhonemeTimestamp.ADAPTER.encodeWithTag(writer, 6, value.phoneme)
         TTSOutput.ADAPTER.encodeWithTag(writer, 5, value.output)
@@ -346,29 +307,23 @@ public class TTSStreamEvent(
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
-        }
       }
 
       override fun decode(reader: ProtoReader): TTSStreamEvent {
-        var seq: Long = 0L
         var timestamp_us: Long = 0L
         var request_id: String = ""
         var kind: TTSStreamEventKind = TTSStreamEventKind.TTS_STREAM_EVENT_KIND_UNSPECIFIED
         var output: TTSOutput? = null
         var phoneme: TTSPhonemeTimestamp? = null
         var speak_result: TTSSpeakResult? = null
-        var error_message: String? = null
-        var error_code: Int = 0
         var progress: Float = 0f
         var chunk_index: Int = 0
         var total_chunks: Int = 0
         var elapsed_ms: Long = 0L
         var status_message: String = ""
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> seq = ProtoAdapter.UINT64.decode(reader)
             2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             3 -> request_id = ProtoAdapter.STRING.decode(reader)
             4 -> try {
@@ -379,31 +334,28 @@ public class TTSStreamEvent(
             5 -> output = TTSOutput.ADAPTER.decode(reader)
             6 -> phoneme = TTSPhonemeTimestamp.ADAPTER.decode(reader)
             7 -> speak_result = TTSSpeakResult.ADAPTER.decode(reader)
-            8 -> error_message = ProtoAdapter.STRING.decode(reader)
-            9 -> error_code = ProtoAdapter.INT32.decode(reader)
             10 -> progress = ProtoAdapter.FLOAT.decode(reader)
             11 -> chunk_index = ProtoAdapter.INT32.decode(reader)
             12 -> total_chunks = ProtoAdapter.INT32.decode(reader)
             13 -> elapsed_ms = ProtoAdapter.INT64.decode(reader)
             14 -> status_message = ProtoAdapter.STRING.decode(reader)
+            15 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return TTSStreamEvent(
-          seq = seq,
           timestamp_us = timestamp_us,
           request_id = request_id,
           kind = kind,
           output = output,
           phoneme = phoneme,
           speak_result = speak_result,
-          error_message = error_message,
-          error_code = error_code,
           progress = progress,
           chunk_index = chunk_index,
           total_chunks = total_chunks,
           elapsed_ms = elapsed_ms,
           status_message = status_message,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -412,6 +364,7 @@ public class TTSStreamEvent(
         output = value.output?.let(TTSOutput.ADAPTER::redact),
         phoneme = value.phoneme?.let(TTSPhonemeTimestamp.ADAPTER::redact),
         speak_result = value.speak_result?.let(TTSSpeakResult.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

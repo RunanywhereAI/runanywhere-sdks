@@ -145,44 +145,6 @@ public nonisolated enum RATokenKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public nonisolated enum RAAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case pcmF32Le // = 1
-  case pcmS16Le // = 2
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .pcmF32Le
-    case 2: self = .pcmS16Le
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .pcmF32Le: return 1
-    case .pcmS16Le: return 2
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAAudioEncoding] = [
-    .unspecified,
-    .pcmF32Le,
-    .pcmS16Le,
-  ]
-
-}
-
 public nonisolated enum RAInterruptReason: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -929,44 +891,65 @@ public nonisolated struct RAComponentProgressEvent: Sendable {
 /// the old enum's `COMPONENT_LOAD_STATE_LOADED` value was used to mean "this
 /// component is ready to use", callers now use
 /// `COMPONENT_LIFECYCLE_STATE_READY`.
-public nonisolated struct RAVoiceAgentComponentStates: Sendable {
+public nonisolated struct RAVoiceAgentComponentStates: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var sttState: RAComponentLifecycleState = .unspecified
+  public var sttState: RAComponentLifecycleState {
+    get {_storage._sttState}
+    set {_uniqueStorage()._sttState = newValue}
+  }
 
-  public var llmState: RAComponentLifecycleState = .unspecified
+  public var llmState: RAComponentLifecycleState {
+    get {_storage._llmState}
+    set {_uniqueStorage()._llmState = newValue}
+  }
 
-  public var ttsState: RAComponentLifecycleState = .unspecified
+  public var ttsState: RAComponentLifecycleState {
+    get {_storage._ttsState}
+    set {_uniqueStorage()._ttsState = newValue}
+  }
 
-  public var vadState: RAComponentLifecycleState = .unspecified
+  public var vadState: RAComponentLifecycleState {
+    get {_storage._vadState}
+    set {_uniqueStorage()._vadState = newValue}
+  }
 
   /// Computed: true when stt_state, llm_state, tts_state, vad_state are all
   /// COMPONENT_LIFECYCLE_STATE_READY. Producer sets this; consumers must NOT
   /// recompute.
-  public var ready: Bool = false
+  public var ready: Bool {
+    get {_storage._ready}
+    set {_uniqueStorage()._ready = newValue}
+  }
 
   /// Computed: true when any of the four states is
   /// COMPONENT_LIFECYCLE_STATE_LOADING.
-  public var anyLoading: Bool = false
-
-  public var wakewordState: RAComponentLifecycleState = .unspecified
-
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
+  public var anyLoading: Bool {
+    get {_storage._anyLoading}
+    set {_uniqueStorage()._anyLoading = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
+
+  public var wakewordState: RAComponentLifecycleState {
+    get {_storage._wakewordState}
+    set {_uniqueStorage()._wakewordState = newValue}
+  }
+
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _errorMessage: String? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 public nonisolated struct RAVoiceSessionError: Sendable {
@@ -1132,10 +1115,6 @@ nonisolated extension RAVoicePipelineComponent: SwiftProtobuf._ProtoNameProvidin
 
 nonisolated extension RATokenKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0TOKEN_KIND_UNSPECIFIED\0\u{1}TOKEN_KIND_ANSWER\0\u{1}TOKEN_KIND_THOUGHT\0\u{1}TOKEN_KIND_TOOL_CALL\0")
-}
-
-nonisolated extension RAAudioEncoding: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AUDIO_ENCODING_UNSPECIFIED\0\u{1}AUDIO_ENCODING_PCM_F32_LE\0\u{1}AUDIO_ENCODING_PCM_S16_LE\0")
 }
 
 nonisolated extension RAInterruptReason: SwiftProtobuf._ProtoNameProviding {
@@ -2146,68 +2125,118 @@ nonisolated extension RAComponentProgressEvent: SwiftProtobuf.Message, SwiftProt
 
 nonisolated extension RAVoiceAgentComponentStates: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceAgentComponentStates"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_state\0\u{3}llm_state\0\u{3}tts_state\0\u{3}vad_state\0\u{1}ready\0\u{3}any_loading\0\u{3}wakeword_state\0\u{3}error_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}stt_state\0\u{3}llm_state\0\u{3}tts_state\0\u{3}vad_state\0\u{1}ready\0\u{3}any_loading\0\u{3}wakeword_state\0\u{2}\u{2}error\0")
+
+  fileprivate class _StorageClass {
+    var _sttState: RAComponentLifecycleState = .unspecified
+    var _llmState: RAComponentLifecycleState = .unspecified
+    var _ttsState: RAComponentLifecycleState = .unspecified
+    var _vadState: RAComponentLifecycleState = .unspecified
+    var _ready: Bool = false
+    var _anyLoading: Bool = false
+    var _wakewordState: RAComponentLifecycleState = .unspecified
+    var _error: RASDKError? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _sttState = source._sttState
+      _llmState = source._llmState
+      _ttsState = source._ttsState
+      _vadState = source._vadState
+      _ready = source._ready
+      _anyLoading = source._anyLoading
+      _wakewordState = source._wakewordState
+      _error = source._error
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularEnumField(value: &self.sttState) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.llmState) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self.ttsState) }()
-      case 4: try { try decoder.decodeSingularEnumField(value: &self.vadState) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.ready) }()
-      case 6: try { try decoder.decodeSingularBoolField(value: &self.anyLoading) }()
-      case 7: try { try decoder.decodeSingularEnumField(value: &self.wakewordState) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularEnumField(value: &_storage._sttState) }()
+        case 2: try { try decoder.decodeSingularEnumField(value: &_storage._llmState) }()
+        case 3: try { try decoder.decodeSingularEnumField(value: &_storage._ttsState) }()
+        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._vadState) }()
+        case 5: try { try decoder.decodeSingularBoolField(value: &_storage._ready) }()
+        case 6: try { try decoder.decodeSingularBoolField(value: &_storage._anyLoading) }()
+        case 7: try { try decoder.decodeSingularEnumField(value: &_storage._wakewordState) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.sttState != .unspecified {
-      try visitor.visitSingularEnumField(value: self.sttState, fieldNumber: 1)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._sttState != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._sttState, fieldNumber: 1)
+      }
+      if _storage._llmState != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._llmState, fieldNumber: 2)
+      }
+      if _storage._ttsState != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._ttsState, fieldNumber: 3)
+      }
+      if _storage._vadState != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._vadState, fieldNumber: 4)
+      }
+      if _storage._ready != false {
+        try visitor.visitSingularBoolField(value: _storage._ready, fieldNumber: 5)
+      }
+      if _storage._anyLoading != false {
+        try visitor.visitSingularBoolField(value: _storage._anyLoading, fieldNumber: 6)
+      }
+      if _storage._wakewordState != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._wakewordState, fieldNumber: 7)
+      }
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
     }
-    if self.llmState != .unspecified {
-      try visitor.visitSingularEnumField(value: self.llmState, fieldNumber: 2)
-    }
-    if self.ttsState != .unspecified {
-      try visitor.visitSingularEnumField(value: self.ttsState, fieldNumber: 3)
-    }
-    if self.vadState != .unspecified {
-      try visitor.visitSingularEnumField(value: self.vadState, fieldNumber: 4)
-    }
-    if self.ready != false {
-      try visitor.visitSingularBoolField(value: self.ready, fieldNumber: 5)
-    }
-    if self.anyLoading != false {
-      try visitor.visitSingularBoolField(value: self.anyLoading, fieldNumber: 6)
-    }
-    if self.wakewordState != .unspecified {
-      try visitor.visitSingularEnumField(value: self.wakewordState, fieldNumber: 7)
-    }
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAVoiceAgentComponentStates, rhs: RAVoiceAgentComponentStates) -> Bool {
-    if lhs.sttState != rhs.sttState {return false}
-    if lhs.llmState != rhs.llmState {return false}
-    if lhs.ttsState != rhs.ttsState {return false}
-    if lhs.vadState != rhs.vadState {return false}
-    if lhs.ready != rhs.ready {return false}
-    if lhs.anyLoading != rhs.anyLoading {return false}
-    if lhs.wakewordState != rhs.wakewordState {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._sttState != rhs_storage._sttState {return false}
+        if _storage._llmState != rhs_storage._llmState {return false}
+        if _storage._ttsState != rhs_storage._ttsState {return false}
+        if _storage._vadState != rhs_storage._vadState {return false}
+        if _storage._ready != rhs_storage._ready {return false}
+        if _storage._anyLoading != rhs_storage._anyLoading {return false}
+        if _storage._wakewordState != rhs_storage._wakewordState {return false}
+        if _storage._error != rhs_storage._error {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -57,14 +57,12 @@ export interface SdkInitPhase2Request {
  * Returned by Phase 1, Phase 2, and retryHTTP.
  *
  * A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
- * to fail in offline mode, in which case success=true, http_configured=false,
+ * to fail in offline mode, in which case error is unset, http_configured=false,
  * and warning holds the offline notice while the SDK continues on cached
  * models.
  */
 export interface SdkInitResult {
     phase: SdkInitPhase;
-    /** The phase reached its terminal step. */
-    success: boolean;
     error?: SDKError | undefined;
     /** HTTP transport wired at this call site. */
     httpConfigured: boolean;

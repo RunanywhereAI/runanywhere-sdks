@@ -35,6 +35,7 @@
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "errors.pb.h"
 #include "model_types.pb.h"
 #include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
@@ -616,375 +617,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionTokenizerSource final : pu
     ::google::protobuf::internal::ArenaStringPtr custom_path_;
     int kind_;
     bool auto_download_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_diffusion_5foptions_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionResult final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.DiffusionResult) */ {
- public:
-  inline DiffusionResult() : DiffusionResult(nullptr) {}
-  ~DiffusionResult() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(DiffusionResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(DiffusionResult));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr DiffusionResult(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline DiffusionResult(const DiffusionResult& from) : DiffusionResult(nullptr, from) {}
-  inline DiffusionResult(DiffusionResult&& from) noexcept : DiffusionResult(nullptr, ::std::move(from)) {}
-  inline DiffusionResult& operator=(const DiffusionResult& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline DiffusionResult& operator=(DiffusionResult&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const DiffusionResult& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<DiffusionResult>(&DiffusionResult_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 6;
-  friend void swap(DiffusionResult& a, DiffusionResult& b) { a.Swap(&b); }
-  inline void Swap(DiffusionResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(DiffusionResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] DiffusionResult* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<DiffusionResult>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const DiffusionResult& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const DiffusionResult& from) { DiffusionResult::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(DiffusionResult* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DiffusionResult"; }
-
-  explicit DiffusionResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  DiffusionResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DiffusionResult& from);
-  DiffusionResult(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DiffusionResult&& from) noexcept
-      : DiffusionResult(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kBatchImagesFieldNumber = 11,
-    kImageDataFieldNumber = 1,
-    kErrorMessageFieldNumber = 8,
-    kImageMediaTypeFieldNumber = 10,
-    kWidthFieldNumber = 2,
-    kHeightFieldNumber = 3,
-    kSeedUsedFieldNumber = 4,
-    kTotalTimeMsFieldNumber = 5,
-    kSafetyFlagFieldNumber = 6,
-    kUsedSchedulerFieldNumber = 7,
-    kErrorCodeFieldNumber = 9,
-    kImagesGeneratedFieldNumber = 12,
-  };
-  // repeated bytes batch_images = 11;
-  [[nodiscard]] int batch_images_size()
-      const;
-  private:
-  int _internal_batch_images_size() const;
-
-  public:
-  void clear_batch_images() ;
-  [[nodiscard]] const ::std::string& batch_images(int index) const;
-  ::std::string* PROTOBUF_NONNULL mutable_batch_images(int index);
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_batch_images(int index, Arg_&& value, Args_... args);
-  ::std::string* PROTOBUF_NONNULL add_batch_images();
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void add_batch_images(Arg_&& value, Args_... args);
-  [[nodiscard]] const
-      ::google::protobuf::RepeatedPtrField<::std::string>&
-      batch_images() const;
-  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>*
-      PROTOBUF_NONNULL
-      mutable_batch_images();
-
-  private:
-  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_batch_images() const;
-  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_batch_images();
-
-  public:
-  // bytes image_data = 1;
-  void clear_image_data() ;
-  [[nodiscard]] const ::std::string& image_data() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_image_data(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_image_data();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_image_data();
-  void set_allocated_image_data(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_image_data() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_image_data(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_image_data();
-
-  public:
-  // optional string error_message = 8;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
-  // optional string image_media_type = 10;
-  [[nodiscard]] bool has_image_media_type()
-      const;
-  void clear_image_media_type() ;
-  [[nodiscard]] const ::std::string& image_media_type() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_image_media_type(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_image_media_type();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_image_media_type();
-  void set_allocated_image_media_type(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_image_media_type() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_image_media_type(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_image_media_type();
-
-  public:
-  // int32 width = 2;
-  void clear_width() ;
-  [[nodiscard]] ::int32_t width() const;
-  void set_width(::int32_t value);
-
-  private:
-  ::int32_t _internal_width() const;
-  void _internal_set_width(::int32_t value);
-
-  public:
-  // int32 height = 3;
-  void clear_height() ;
-  [[nodiscard]] ::int32_t height() const;
-  void set_height(::int32_t value);
-
-  private:
-  ::int32_t _internal_height() const;
-  void _internal_set_height(::int32_t value);
-
-  public:
-  // int64 seed_used = 4;
-  void clear_seed_used() ;
-  [[nodiscard]] ::int64_t seed_used() const;
-  void set_seed_used(::int64_t value);
-
-  private:
-  ::int64_t _internal_seed_used() const;
-  void _internal_set_seed_used(::int64_t value);
-
-  public:
-  // int64 total_time_ms = 5;
-  void clear_total_time_ms() ;
-  [[nodiscard]] ::int64_t total_time_ms() const;
-  void set_total_time_ms(::int64_t value);
-
-  private:
-  ::int64_t _internal_total_time_ms() const;
-  void _internal_set_total_time_ms(::int64_t value);
-
-  public:
-  // bool safety_flag = 6;
-  void clear_safety_flag() ;
-  [[nodiscard]] bool safety_flag() const;
-  void set_safety_flag(bool value);
-
-  private:
-  bool _internal_safety_flag() const;
-  void _internal_set_safety_flag(bool value);
-
-  public:
-  // .runanywhere.v1.DiffusionScheduler used_scheduler = 7;
-  void clear_used_scheduler() ;
-  [[nodiscard]] ::runanywhere::v1::DiffusionScheduler used_scheduler() const;
-  void set_used_scheduler(::runanywhere::v1::DiffusionScheduler value);
-
-  private:
-  ::runanywhere::v1::DiffusionScheduler _internal_used_scheduler() const;
-  void _internal_set_used_scheduler(::runanywhere::v1::DiffusionScheduler value);
-
-  public:
-  // int32 error_code = 9;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
-  // int32 images_generated = 12;
-  void clear_images_generated() ;
-  [[nodiscard]] ::int32_t images_generated() const;
-  void set_images_generated(::int32_t value);
-
-  private:
-  ::int32_t _internal_images_generated() const;
-  void _internal_set_images_generated(::int32_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.DiffusionResult)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 12,
-                          0, 76,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const DiffusionResult& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::RepeatedPtrField<::std::string> batch_images_;
-    ::google::protobuf::internal::ArenaStringPtr image_data_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
-    ::google::protobuf::internal::ArenaStringPtr image_media_type_;
-    ::int32_t width_;
-    ::int32_t height_;
-    ::int64_t seed_used_;
-    ::int64_t total_time_ms_;
-    bool safety_flag_;
-    int used_scheduler_;
-    ::int32_t error_code_;
-    ::int32_t images_generated_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1836,315 +1468,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionGenerationOptions final : 
 };
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionStreamEvent final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.DiffusionStreamEvent) */ {
- public:
-  inline DiffusionStreamEvent() : DiffusionStreamEvent(nullptr) {}
-  ~DiffusionStreamEvent() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(DiffusionStreamEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(DiffusionStreamEvent));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr DiffusionStreamEvent(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline DiffusionStreamEvent(const DiffusionStreamEvent& from) : DiffusionStreamEvent(nullptr, from) {}
-  inline DiffusionStreamEvent(DiffusionStreamEvent&& from) noexcept : DiffusionStreamEvent(nullptr, ::std::move(from)) {}
-  inline DiffusionStreamEvent& operator=(const DiffusionStreamEvent& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline DiffusionStreamEvent& operator=(DiffusionStreamEvent&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const DiffusionStreamEvent& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<DiffusionStreamEvent>(&DiffusionStreamEvent_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 7;
-  friend void swap(DiffusionStreamEvent& a, DiffusionStreamEvent& b) { a.Swap(&b); }
-  inline void Swap(DiffusionStreamEvent* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(DiffusionStreamEvent* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] DiffusionStreamEvent* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<DiffusionStreamEvent>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const DiffusionStreamEvent& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const DiffusionStreamEvent& from) { DiffusionStreamEvent::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(DiffusionStreamEvent* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DiffusionStreamEvent"; }
-
-  explicit DiffusionStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  DiffusionStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DiffusionStreamEvent& from);
-  DiffusionStreamEvent(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DiffusionStreamEvent&& from) noexcept
-      : DiffusionStreamEvent(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kRequestIdFieldNumber = 3,
-    kErrorMessageFieldNumber = 7,
-    kProgressFieldNumber = 5,
-    kResultFieldNumber = 6,
-    kSeqFieldNumber = 1,
-    kTimestampUsFieldNumber = 2,
-    kKindFieldNumber = 4,
-    kErrorCodeFieldNumber = 8,
-  };
-  // string request_id = 3;
-  void clear_request_id() ;
-  [[nodiscard]] const ::std::string& request_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_request_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_request_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
-  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_request_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
-
-  public:
-  // optional string error_message = 7;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
-  // optional .runanywhere.v1.DiffusionProgress progress = 5;
-  [[nodiscard]] bool has_progress()
-      const;
-  void clear_progress() ;
-  [[nodiscard]] const ::runanywhere::v1::DiffusionProgress& progress() const;
-  [[nodiscard]] ::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE release_progress();
-  ::runanywhere::v1::DiffusionProgress* PROTOBUF_NONNULL mutable_progress();
-  void set_allocated_progress(::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_progress(::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE unsafe_arena_release_progress();
-
-  private:
-  const ::runanywhere::v1::DiffusionProgress& _internal_progress() const;
-  ::runanywhere::v1::DiffusionProgress* PROTOBUF_NONNULL _internal_mutable_progress();
-
-  public:
-  // optional .runanywhere.v1.DiffusionResult result = 6;
-  [[nodiscard]] bool has_result()
-      const;
-  void clear_result() ;
-  [[nodiscard]] const ::runanywhere::v1::DiffusionResult& result() const;
-  [[nodiscard]] ::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE release_result();
-  ::runanywhere::v1::DiffusionResult* PROTOBUF_NONNULL mutable_result();
-  void set_allocated_result(::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE value);
-  void unsafe_arena_set_allocated_result(::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE value);
-  ::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE unsafe_arena_release_result();
-
-  private:
-  const ::runanywhere::v1::DiffusionResult& _internal_result() const;
-  ::runanywhere::v1::DiffusionResult* PROTOBUF_NONNULL _internal_mutable_result();
-
-  public:
-  // uint64 seq = 1;
-  void clear_seq() ;
-  [[nodiscard]] ::uint64_t seq() const;
-  void set_seq(::uint64_t value);
-
-  private:
-  ::uint64_t _internal_seq() const;
-  void _internal_set_seq(::uint64_t value);
-
-  public:
-  // int64 timestamp_us = 2;
-  void clear_timestamp_us() ;
-  [[nodiscard]] ::int64_t timestamp_us() const;
-  void set_timestamp_us(::int64_t value);
-
-  private:
-  ::int64_t _internal_timestamp_us() const;
-  void _internal_set_timestamp_us(::int64_t value);
-
-  public:
-  // .runanywhere.v1.DiffusionStreamEventKind kind = 4;
-  void clear_kind() ;
-  [[nodiscard]] ::runanywhere::v1::DiffusionStreamEventKind kind() const;
-  void set_kind(::runanywhere::v1::DiffusionStreamEventKind value);
-
-  private:
-  ::runanywhere::v1::DiffusionStreamEventKind _internal_kind() const;
-  void _internal_set_kind(::runanywhere::v1::DiffusionStreamEventKind value);
-
-  public:
-  // int32 error_code = 8;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.DiffusionStreamEvent)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 8,
-                          2, 75,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const DiffusionStreamEvent& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr request_id_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
-    ::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE progress_;
-    ::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE result_;
-    ::uint64_t seq_;
-    ::int64_t timestamp_us_;
-    int kind_;
-    ::int32_t error_code_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_diffusion_5foptions_2eproto;
-};
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionGenerationRequest final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.DiffusionGenerationRequest) */ {
  public:
@@ -2675,6 +1998,646 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionConfiguration final : publ
     bool enable_safety_checker_;
     ::int32_t max_memory_mb_;
     int preferred_framework_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_diffusion_5foptions_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DiffusionResult) */ {
+ public:
+  inline DiffusionResult() : DiffusionResult(nullptr) {}
+  ~DiffusionResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DiffusionResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DiffusionResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DiffusionResult(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline DiffusionResult(const DiffusionResult& from) : DiffusionResult(nullptr, from) {}
+  inline DiffusionResult(DiffusionResult&& from) noexcept : DiffusionResult(nullptr, ::std::move(from)) {}
+  inline DiffusionResult& operator=(const DiffusionResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DiffusionResult& operator=(DiffusionResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DiffusionResult& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<DiffusionResult>(&DiffusionResult_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 6;
+  friend void swap(DiffusionResult& a, DiffusionResult& b) { a.Swap(&b); }
+  inline void Swap(DiffusionResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DiffusionResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DiffusionResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DiffusionResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DiffusionResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DiffusionResult& from) { DiffusionResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DiffusionResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DiffusionResult"; }
+
+  explicit DiffusionResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DiffusionResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DiffusionResult& from);
+  DiffusionResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DiffusionResult&& from) noexcept
+      : DiffusionResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kBatchImagesFieldNumber = 11,
+    kImageDataFieldNumber = 1,
+    kImageMediaTypeFieldNumber = 10,
+    kErrorFieldNumber = 13,
+    kWidthFieldNumber = 2,
+    kHeightFieldNumber = 3,
+    kSeedUsedFieldNumber = 4,
+    kTotalTimeMsFieldNumber = 5,
+    kSafetyFlagFieldNumber = 6,
+    kUsedSchedulerFieldNumber = 7,
+    kImagesGeneratedFieldNumber = 12,
+  };
+  // repeated bytes batch_images = 11;
+  [[nodiscard]] int batch_images_size()
+      const;
+  private:
+  int _internal_batch_images_size() const;
+
+  public:
+  void clear_batch_images() ;
+  [[nodiscard]] const ::std::string& batch_images(int index) const;
+  ::std::string* PROTOBUF_NONNULL mutable_batch_images(int index);
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_batch_images(int index, Arg_&& value, Args_... args);
+  ::std::string* PROTOBUF_NONNULL add_batch_images();
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void add_batch_images(Arg_&& value, Args_... args);
+  [[nodiscard]] const
+      ::google::protobuf::RepeatedPtrField<::std::string>&
+      batch_images() const;
+  [[nodiscard]] ::google::protobuf::RepeatedPtrField<::std::string>*
+      PROTOBUF_NONNULL
+      mutable_batch_images();
+
+  private:
+  const ::google::protobuf::RepeatedPtrField<::std::string>& _internal_batch_images() const;
+  ::google::protobuf::RepeatedPtrField<::std::string>* PROTOBUF_NONNULL _internal_mutable_batch_images();
+
+  public:
+  // bytes image_data = 1;
+  void clear_image_data() ;
+  [[nodiscard]] const ::std::string& image_data() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_image_data(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_image_data();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_image_data();
+  void set_allocated_image_data(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_image_data() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_image_data(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_image_data();
+
+  public:
+  // optional string image_media_type = 10;
+  [[nodiscard]] bool has_image_media_type()
+      const;
+  void clear_image_media_type() ;
+  [[nodiscard]] const ::std::string& image_media_type() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_image_media_type(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_image_media_type();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_image_media_type();
+  void set_allocated_image_media_type(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_image_media_type() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_image_media_type(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_image_media_type();
+
+  public:
+  // optional .runanywhere.v1.SDKError error = 13;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
+
+  private:
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
+
+  public:
+  // int32 width = 2;
+  void clear_width() ;
+  [[nodiscard]] ::int32_t width() const;
+  void set_width(::int32_t value);
+
+  private:
+  ::int32_t _internal_width() const;
+  void _internal_set_width(::int32_t value);
+
+  public:
+  // int32 height = 3;
+  void clear_height() ;
+  [[nodiscard]] ::int32_t height() const;
+  void set_height(::int32_t value);
+
+  private:
+  ::int32_t _internal_height() const;
+  void _internal_set_height(::int32_t value);
+
+  public:
+  // int64 seed_used = 4;
+  void clear_seed_used() ;
+  [[nodiscard]] ::int64_t seed_used() const;
+  void set_seed_used(::int64_t value);
+
+  private:
+  ::int64_t _internal_seed_used() const;
+  void _internal_set_seed_used(::int64_t value);
+
+  public:
+  // int64 total_time_ms = 5;
+  void clear_total_time_ms() ;
+  [[nodiscard]] ::int64_t total_time_ms() const;
+  void set_total_time_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_total_time_ms() const;
+  void _internal_set_total_time_ms(::int64_t value);
+
+  public:
+  // bool safety_flag = 6;
+  void clear_safety_flag() ;
+  [[nodiscard]] bool safety_flag() const;
+  void set_safety_flag(bool value);
+
+  private:
+  bool _internal_safety_flag() const;
+  void _internal_set_safety_flag(bool value);
+
+  public:
+  // .runanywhere.v1.DiffusionScheduler used_scheduler = 7;
+  void clear_used_scheduler() ;
+  [[nodiscard]] ::runanywhere::v1::DiffusionScheduler used_scheduler() const;
+  void set_used_scheduler(::runanywhere::v1::DiffusionScheduler value);
+
+  private:
+  ::runanywhere::v1::DiffusionScheduler _internal_used_scheduler() const;
+  void _internal_set_used_scheduler(::runanywhere::v1::DiffusionScheduler value);
+
+  public:
+  // int32 images_generated = 12;
+  void clear_images_generated() ;
+  [[nodiscard]] ::int32_t images_generated() const;
+  void set_images_generated(::int32_t value);
+
+  private:
+  ::int32_t _internal_images_generated() const;
+  void _internal_set_images_generated(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DiffusionResult)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<4, 11,
+                          1, 63,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DiffusionResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::RepeatedPtrField<::std::string> batch_images_;
+    ::google::protobuf::internal::ArenaStringPtr image_data_;
+    ::google::protobuf::internal::ArenaStringPtr image_media_type_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
+    ::int32_t width_;
+    ::int32_t height_;
+    ::int64_t seed_used_;
+    ::int64_t total_time_ms_;
+    bool safety_flag_;
+    int used_scheduler_;
+    ::int32_t images_generated_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_diffusion_5foptions_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiffusionStreamEvent final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.DiffusionStreamEvent) */ {
+ public:
+  inline DiffusionStreamEvent() : DiffusionStreamEvent(nullptr) {}
+  ~DiffusionStreamEvent() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(DiffusionStreamEvent* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(DiffusionStreamEvent));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr DiffusionStreamEvent(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline DiffusionStreamEvent(const DiffusionStreamEvent& from) : DiffusionStreamEvent(nullptr, from) {}
+  inline DiffusionStreamEvent(DiffusionStreamEvent&& from) noexcept : DiffusionStreamEvent(nullptr, ::std::move(from)) {}
+  inline DiffusionStreamEvent& operator=(const DiffusionStreamEvent& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline DiffusionStreamEvent& operator=(DiffusionStreamEvent&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const DiffusionStreamEvent& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<DiffusionStreamEvent>(&DiffusionStreamEvent_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 7;
+  friend void swap(DiffusionStreamEvent& a, DiffusionStreamEvent& b) { a.Swap(&b); }
+  inline void Swap(DiffusionStreamEvent* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(DiffusionStreamEvent* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] DiffusionStreamEvent* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<DiffusionStreamEvent>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const DiffusionStreamEvent& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const DiffusionStreamEvent& from) { DiffusionStreamEvent::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(DiffusionStreamEvent* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.DiffusionStreamEvent"; }
+
+  explicit DiffusionStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  DiffusionStreamEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const DiffusionStreamEvent& from);
+  DiffusionStreamEvent(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, DiffusionStreamEvent&& from) noexcept
+      : DiffusionStreamEvent(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kRequestIdFieldNumber = 3,
+    kProgressFieldNumber = 5,
+    kResultFieldNumber = 6,
+    kErrorFieldNumber = 9,
+    kTimestampUsFieldNumber = 2,
+    kKindFieldNumber = 4,
+  };
+  // string request_id = 3;
+  void clear_request_id() ;
+  [[nodiscard]] const ::std::string& request_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_request_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_request_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
+  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_request_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
+
+  public:
+  // optional .runanywhere.v1.DiffusionProgress progress = 5;
+  [[nodiscard]] bool has_progress()
+      const;
+  void clear_progress() ;
+  [[nodiscard]] const ::runanywhere::v1::DiffusionProgress& progress() const;
+  [[nodiscard]] ::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE release_progress();
+  ::runanywhere::v1::DiffusionProgress* PROTOBUF_NONNULL mutable_progress();
+  void set_allocated_progress(::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_progress(::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE unsafe_arena_release_progress();
+
+  private:
+  const ::runanywhere::v1::DiffusionProgress& _internal_progress() const;
+  ::runanywhere::v1::DiffusionProgress* PROTOBUF_NONNULL _internal_mutable_progress();
+
+  public:
+  // optional .runanywhere.v1.DiffusionResult result = 6;
+  [[nodiscard]] bool has_result()
+      const;
+  void clear_result() ;
+  [[nodiscard]] const ::runanywhere::v1::DiffusionResult& result() const;
+  [[nodiscard]] ::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE release_result();
+  ::runanywhere::v1::DiffusionResult* PROTOBUF_NONNULL mutable_result();
+  void set_allocated_result(::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_result(::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE unsafe_arena_release_result();
+
+  private:
+  const ::runanywhere::v1::DiffusionResult& _internal_result() const;
+  ::runanywhere::v1::DiffusionResult* PROTOBUF_NONNULL _internal_mutable_result();
+
+  public:
+  // optional .runanywhere.v1.SDKError error = 9;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
+
+  private:
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
+
+  public:
+  // int64 timestamp_us = 2;
+  void clear_timestamp_us() ;
+  [[nodiscard]] ::int64_t timestamp_us() const;
+  void set_timestamp_us(::int64_t value);
+
+  private:
+  ::int64_t _internal_timestamp_us() const;
+  void _internal_set_timestamp_us(::int64_t value);
+
+  public:
+  // .runanywhere.v1.DiffusionStreamEventKind kind = 4;
+  void clear_kind() ;
+  [[nodiscard]] ::runanywhere::v1::DiffusionStreamEventKind kind() const;
+  void set_kind(::runanywhere::v1::DiffusionStreamEventKind value);
+
+  private:
+  ::runanywhere::v1::DiffusionStreamEventKind _internal_kind() const;
+  void _internal_set_kind(::runanywhere::v1::DiffusionStreamEventKind value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.DiffusionStreamEvent)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<3, 6,
+                          3, 54,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const DiffusionStreamEvent& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr request_id_;
+    ::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE progress_;
+    ::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE result_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
+    ::int64_t timestamp_us_;
+    int kind_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -4674,107 +4637,15 @@ inline void DiffusionResult::_internal_set_used_scheduler(::runanywhere::v1::Dif
   _impl_.used_scheduler_ = value;
 }
 
-// optional string error_message = 8;
-inline bool DiffusionResult::has_error_message() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
-  return value;
-}
-inline void DiffusionResult::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline const ::std::string& DiffusionResult::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionResult.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void DiffusionResult::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionResult.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL DiffusionResult::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DiffusionResult.error_message)
-  return _s;
-}
-inline const ::std::string& DiffusionResult::_internal_error_message() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
-}
-inline void DiffusionResult::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL DiffusionResult::_internal_mutable_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE DiffusionResult::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.DiffusionResult.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  return released;
-}
-inline void DiffusionResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DiffusionResult.error_message)
-}
-
-// int32 error_code = 9;
-inline void DiffusionResult::clear_error_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
-}
-inline ::int32_t DiffusionResult::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionResult.error_code)
-  return _internal_error_code();
-}
-inline void DiffusionResult::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionResult.error_code)
-}
-inline ::int32_t DiffusionResult::_internal_error_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
-}
-inline void DiffusionResult::_internal_set_error_code(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
-}
-
 // optional string image_media_type = 10;
 inline bool DiffusionResult::has_image_media_type() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   return value;
 }
 inline void DiffusionResult::clear_image_media_type() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.image_media_type_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline const ::std::string& DiffusionResult::image_media_type() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -4784,13 +4655,13 @@ inline const ::std::string& DiffusionResult::image_media_type() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void DiffusionResult::set_image_media_type(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   _impl_.image_media_type_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionResult.image_media_type)
 }
 inline ::std::string* PROTOBUF_NONNULL DiffusionResult::mutable_image_media_type()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::std::string* _s = _internal_mutable_image_media_type();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.DiffusionResult.image_media_type)
   return _s;
@@ -4810,10 +4681,10 @@ inline ::std::string* PROTOBUF_NONNULL DiffusionResult::_internal_mutable_image_
 inline ::std::string* PROTOBUF_NULLABLE DiffusionResult::release_image_media_type() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.DiffusionResult.image_media_type)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   auto* released = _impl_.image_media_type_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.image_media_type_.Set("", GetArena());
@@ -4823,9 +4694,9 @@ inline ::std::string* PROTOBUF_NULLABLE DiffusionResult::release_image_media_typ
 inline void DiffusionResult::set_allocated_image_media_type(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   _impl_.image_media_type_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.image_media_type_.IsDefault()) {
@@ -4910,7 +4781,7 @@ DiffusionResult::_internal_mutable_batch_images() {
 inline void DiffusionResult::clear_images_generated() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.images_generated_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
 }
 inline ::int32_t DiffusionResult::images_generated() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionResult.images_generated)
@@ -4918,7 +4789,7 @@ inline ::int32_t DiffusionResult::images_generated() const {
 }
 inline void DiffusionResult::set_images_generated(::int32_t value) {
   _internal_set_images_generated(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionResult.images_generated)
 }
 inline ::int32_t DiffusionResult::_internal_images_generated() const {
@@ -4930,39 +4801,108 @@ inline void DiffusionResult::_internal_set_images_generated(::int32_t value) {
   _impl_.images_generated_ = value;
 }
 
+// optional .runanywhere.v1.SDKError error = 13;
+inline bool DiffusionResult::has_error() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::SDKError& DiffusionResult::_internal_error() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
+}
+inline const ::runanywhere::v1::SDKError& DiffusionResult::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionResult.error)
+  return _internal_error();
+}
+inline void DiffusionResult::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.DiffusionResult.error)
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE DiffusionResult::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE DiffusionResult::unsafe_arena_release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DiffusionResult.error)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL DiffusionResult::_internal_mutable_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL DiffusionResult::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DiffusionResult.error)
+  return _msg;
+}
+inline void DiffusionResult::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DiffusionResult.error)
+}
+
 // -------------------------------------------------------------------
 
 // DiffusionStreamEvent
-
-// uint64 seq = 1;
-inline void DiffusionStreamEvent::clear_seq() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.seq_ = ::uint64_t{0u};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
-}
-inline ::uint64_t DiffusionStreamEvent::seq() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionStreamEvent.seq)
-  return _internal_seq();
-}
-inline void DiffusionStreamEvent::set_seq(::uint64_t value) {
-  _internal_set_seq(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionStreamEvent.seq)
-}
-inline ::uint64_t DiffusionStreamEvent::_internal_seq() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.seq_;
-}
-inline void DiffusionStreamEvent::_internal_set_seq(::uint64_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.seq_ = value;
-}
 
 // int64 timestamp_us = 2;
 inline void DiffusionStreamEvent::clear_timestamp_us() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_us_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::int64_t DiffusionStreamEvent::timestamp_us() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionStreamEvent.timestamp_us)
@@ -4970,7 +4910,7 @@ inline ::int64_t DiffusionStreamEvent::timestamp_us() const {
 }
 inline void DiffusionStreamEvent::set_timestamp_us(::int64_t value) {
   _internal_set_timestamp_us(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionStreamEvent.timestamp_us)
 }
 inline ::int64_t DiffusionStreamEvent::_internal_timestamp_us() const {
@@ -5050,7 +4990,7 @@ inline void DiffusionStreamEvent::set_allocated_request_id(::std::string* PROTOB
 inline void DiffusionStreamEvent::clear_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.kind_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::runanywhere::v1::DiffusionStreamEventKind DiffusionStreamEvent::kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionStreamEvent.kind)
@@ -5058,7 +4998,7 @@ inline ::runanywhere::v1::DiffusionStreamEventKind DiffusionStreamEvent::kind() 
 }
 inline void DiffusionStreamEvent::set_kind(::runanywhere::v1::DiffusionStreamEventKind value) {
   _internal_set_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionStreamEvent.kind)
 }
 inline ::runanywhere::v1::DiffusionStreamEventKind DiffusionStreamEvent::_internal_kind() const {
@@ -5072,14 +5012,14 @@ inline void DiffusionStreamEvent::_internal_set_kind(::runanywhere::v1::Diffusio
 
 // optional .runanywhere.v1.DiffusionProgress progress = 5;
 inline bool DiffusionStreamEvent::has_progress() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   PROTOBUF_ASSUME(!value || _impl_.progress_ != nullptr);
   return value;
 }
 inline void DiffusionStreamEvent::clear_progress() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.progress_ != nullptr) _impl_.progress_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline const ::runanywhere::v1::DiffusionProgress& DiffusionStreamEvent::_internal_progress() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -5098,16 +5038,16 @@ inline void DiffusionStreamEvent::unsafe_arena_set_allocated_progress(
   }
   _impl_.progress_ = reinterpret_cast<::runanywhere::v1::DiffusionProgress*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.DiffusionStreamEvent.progress)
 }
 inline ::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE DiffusionStreamEvent::release_progress() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::DiffusionProgress* released = _impl_.progress_;
   _impl_.progress_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -5127,7 +5067,7 @@ inline ::runanywhere::v1::DiffusionProgress* PROTOBUF_NULLABLE DiffusionStreamEv
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.DiffusionStreamEvent.progress)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::DiffusionProgress* temp = _impl_.progress_;
   _impl_.progress_ = nullptr;
   return temp;
@@ -5142,7 +5082,7 @@ inline ::runanywhere::v1::DiffusionProgress* PROTOBUF_NONNULL DiffusionStreamEve
 }
 inline ::runanywhere::v1::DiffusionProgress* PROTOBUF_NONNULL DiffusionStreamEvent::mutable_progress()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::runanywhere::v1::DiffusionProgress* _msg = _internal_mutable_progress();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.DiffusionStreamEvent.progress)
   return _msg;
@@ -5159,9 +5099,9 @@ inline void DiffusionStreamEvent::set_allocated_progress(::runanywhere::v1::Diff
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
 
   _impl_.progress_ = reinterpret_cast<::runanywhere::v1::DiffusionProgress*>(value);
@@ -5170,14 +5110,14 @@ inline void DiffusionStreamEvent::set_allocated_progress(::runanywhere::v1::Diff
 
 // optional .runanywhere.v1.DiffusionResult result = 6;
 inline bool DiffusionStreamEvent::has_result() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
   PROTOBUF_ASSUME(!value || _impl_.result_ != nullptr);
   return value;
 }
 inline void DiffusionStreamEvent::clear_result() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.result_ != nullptr) _impl_.result_->Clear();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline const ::runanywhere::v1::DiffusionResult& DiffusionStreamEvent::_internal_result() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -5196,16 +5136,16 @@ inline void DiffusionStreamEvent::unsafe_arena_set_allocated_result(
   }
   _impl_.result_ = reinterpret_cast<::runanywhere::v1::DiffusionResult*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.DiffusionStreamEvent.result)
 }
 inline ::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE DiffusionStreamEvent::release_result() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::DiffusionResult* released = _impl_.result_;
   _impl_.result_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -5225,7 +5165,7 @@ inline ::runanywhere::v1::DiffusionResult* PROTOBUF_NULLABLE DiffusionStreamEven
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.DiffusionStreamEvent.result)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::DiffusionResult* temp = _impl_.result_;
   _impl_.result_ = nullptr;
   return temp;
@@ -5240,7 +5180,7 @@ inline ::runanywhere::v1::DiffusionResult* PROTOBUF_NONNULL DiffusionStreamEvent
 }
 inline ::runanywhere::v1::DiffusionResult* PROTOBUF_NONNULL DiffusionStreamEvent::mutable_result()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::runanywhere::v1::DiffusionResult* _msg = _internal_mutable_result();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.DiffusionStreamEvent.result)
   return _msg;
@@ -5257,105 +5197,106 @@ inline void DiffusionStreamEvent::set_allocated_result(::runanywhere::v1::Diffus
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
 
   _impl_.result_ = reinterpret_cast<::runanywhere::v1::DiffusionResult*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DiffusionStreamEvent.result)
 }
 
-// optional string error_message = 7;
-inline bool DiffusionStreamEvent::has_error_message() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+// optional .runanywhere.v1.SDKError error = 9;
+inline bool DiffusionStreamEvent::has_error() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
   return value;
 }
-inline void DiffusionStreamEvent::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& DiffusionStreamEvent::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionStreamEvent.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void DiffusionStreamEvent::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionStreamEvent.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL DiffusionStreamEvent::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DiffusionStreamEvent.error_message)
-  return _s;
-}
-inline const ::std::string& DiffusionStreamEvent::_internal_error_message() const {
+inline const ::runanywhere::v1::SDKError& DiffusionStreamEvent::_internal_error() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
 }
-inline void DiffusionStreamEvent::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
+inline const ::runanywhere::v1::SDKError& DiffusionStreamEvent::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionStreamEvent.error)
+  return _internal_error();
 }
-inline ::std::string* PROTOBUF_NONNULL DiffusionStreamEvent::_internal_mutable_error_message() {
+inline void DiffusionStreamEvent::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE DiffusionStreamEvent::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.DiffusionStreamEvent.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.DiffusionStreamEvent.error)
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE DiffusionStreamEvent::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
   }
   return released;
 }
-inline void DiffusionStreamEvent::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE DiffusionStreamEvent::unsafe_arena_release_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DiffusionStreamEvent.error_message)
-}
+  // @@protoc_insertion_point(field_release:runanywhere.v1.DiffusionStreamEvent.error)
 
-// int32 error_code = 8;
-inline void DiffusionStreamEvent::clear_error_code() {
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL DiffusionStreamEvent::_internal_mutable_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
 }
-inline ::int32_t DiffusionStreamEvent::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.DiffusionStreamEvent.error_code)
-  return _internal_error_code();
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL DiffusionStreamEvent::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.DiffusionStreamEvent.error)
+  return _msg;
 }
-inline void DiffusionStreamEvent::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.DiffusionStreamEvent.error_code)
-}
-inline ::int32_t DiffusionStreamEvent::_internal_error_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
-}
-inline void DiffusionStreamEvent::_internal_set_error_code(::int32_t value) {
+inline void DiffusionStreamEvent::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.DiffusionStreamEvent.error)
 }
 
 #ifdef __GNUC__

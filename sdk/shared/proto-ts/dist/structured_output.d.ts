@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum JSONSchemaType {
     JSON_SCHEMA_TYPE_UNSPECIFIED = 0,
@@ -100,18 +101,17 @@ export interface StructuredOutputOptions {
 export interface StructuredOutputValidation {
     isValid: boolean;
     containsJson: boolean;
-    errorMessage?: string | undefined;
     rawOutput?: string | undefined;
     extractedJson?: string | undefined;
     validationErrors: string[];
     validationTimeMs: number;
+    error?: SDKError | undefined;
 }
 export interface StructuredOutputResult {
     parsedJson: Uint8Array;
     validation?: StructuredOutputValidation | undefined;
     rawText?: string | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export interface StructuredOutputParseRequest {
     requestId: string;
@@ -135,8 +135,7 @@ export interface StructuredOutputPromptResult {
     jsonSchema?: string | undefined;
     regexPattern?: string | undefined;
     grammar?: string | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export interface StructuredOutputRequest {
     requestId: string;
@@ -151,7 +150,6 @@ export interface StructuredOutputRequest_MetadataEntry {
     value: string;
 }
 export interface StructuredOutputStreamEvent {
-    seq: number;
     timestampUs: number;
     requestId: string;
     kind: StructuredOutputStreamEventKind;
@@ -159,8 +157,7 @@ export interface StructuredOutputStreamEvent {
     partialJson?: string | undefined;
     validation?: StructuredOutputValidation | undefined;
     result?: StructuredOutputResult | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 /** Character offsets into the source text. */
 export interface NamedEntity {

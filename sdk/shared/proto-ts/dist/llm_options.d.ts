@@ -1,7 +1,9 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { InferenceFramework } from "./model_types";
 import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
 import { ReasoningOptions } from "./thinking_tag_pattern";
+import { TokenUsage } from "./token_usage";
 import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum ExecutionTarget {
@@ -42,12 +44,9 @@ export interface LLMGenerationOptions {
 export interface LLMGenerationResult {
     text: string;
     thinkingContent?: string | undefined;
-    inputTokens: number;
-    outputTokens: number;
     modelUsed: string;
     generationTimeMs: number;
     ttftMs?: number | undefined;
-    tokensPerSecond: number;
     framework?: string | undefined;
     finishReason: string;
     thinkingTokens: number;
@@ -57,15 +56,13 @@ export interface LLMGenerationResult {
     performance?: PerformanceMetrics | undefined;
     executedOn?: ExecutionTarget | undefined;
     structuredOutputValidation?: StructuredOutputValidation | undefined;
-    /** input_tokens + output_tokens. */
-    totalTokens: number;
-    errorMessage?: string | undefined;
-    errorCode: number;
     cachedPromptTokens: number;
     promptEvalTimeMs: number;
     decodeTimeMs: number;
     toolCalls: ToolCall[];
     toolResults: ToolResult[];
+    usage?: TokenUsage | undefined;
+    error?: SDKError | undefined;
 }
 export interface LLMConfiguration {
     contextLength: number;
@@ -83,9 +80,7 @@ export interface StreamToken {
 export interface PerformanceMetrics {
     latencyMs: number;
     memoryBytes: number;
-    throughputTokensPerSec: number;
-    inputTokens: number;
-    outputTokens: number;
+    usage?: TokenUsage | undefined;
 }
 export declare const LLMGenerationOptions: MessageFns<LLMGenerationOptions>;
 export declare const LLMGenerationResult: MessageFns<LLMGenerationResult>;

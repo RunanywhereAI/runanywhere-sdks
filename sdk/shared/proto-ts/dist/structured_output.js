@@ -14,6 +14,7 @@ exports.structuredOutputStreamEventKindFromJSON = structuredOutputStreamEventKin
 exports.structuredOutputStreamEventKindToJSON = structuredOutputStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const errors_1 = require("./errors");
 exports.protobufPackage = "runanywhere.v1";
 var JSONSchemaType;
 (function (JSONSchemaType) {
@@ -1227,11 +1228,11 @@ function createBaseStructuredOutputValidation() {
     return {
         isValid: false,
         containsJson: false,
-        errorMessage: undefined,
         rawOutput: undefined,
         extractedJson: undefined,
         validationErrors: [],
         validationTimeMs: 0,
+        error: undefined,
     };
 }
 exports.StructuredOutputValidation = {
@@ -1241,9 +1242,6 @@ exports.StructuredOutputValidation = {
         }
         if (message.containsJson !== false) {
             writer.uint32(16).bool(message.containsJson);
-        }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(26).string(message.errorMessage);
         }
         if (message.rawOutput !== undefined) {
             writer.uint32(34).string(message.rawOutput);
@@ -1256,6 +1254,9 @@ exports.StructuredOutputValidation = {
         }
         if (message.validationTimeMs !== 0) {
             writer.uint32(56).int64(message.validationTimeMs);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(66).fork()).join();
         }
         return writer;
     },
@@ -1278,13 +1279,6 @@ exports.StructuredOutputValidation = {
                         break;
                     }
                     message.containsJson = reader.bool();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
                     continue;
                 }
                 case 4: {
@@ -1315,6 +1309,13 @@ exports.StructuredOutputValidation = {
                     message.validationTimeMs = longToNumber(reader.int64());
                     continue;
                 }
+                case 8: {
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1335,11 +1336,6 @@ exports.StructuredOutputValidation = {
                 : isSet(object.contains_json)
                     ? globalThis.Boolean(object.contains_json)
                     : false,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
             rawOutput: isSet(object.rawOutput)
                 ? globalThis.String(object.rawOutput)
                 : isSet(object.raw_output)
@@ -1360,6 +1356,7 @@ exports.StructuredOutputValidation = {
                 : isSet(object.validation_time_ms)
                     ? globalThis.Number(object.validation_time_ms)
                     : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1369,9 +1366,6 @@ exports.StructuredOutputValidation = {
         }
         if (message.containsJson !== false) {
             obj.containsJson = message.containsJson;
-        }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
         }
         if (message.rawOutput !== undefined) {
             obj.rawOutput = message.rawOutput;
@@ -1385,6 +1379,9 @@ exports.StructuredOutputValidation = {
         if (message.validationTimeMs !== 0) {
             obj.validationTimeMs = Math.round(message.validationTimeMs);
         }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
+        }
         return obj;
     },
     create(base) {
@@ -1394,22 +1391,18 @@ exports.StructuredOutputValidation = {
         const message = createBaseStructuredOutputValidation();
         message.isValid = object.isValid ?? false;
         message.containsJson = object.containsJson ?? false;
-        message.errorMessage = object.errorMessage ?? undefined;
         message.rawOutput = object.rawOutput ?? undefined;
         message.extractedJson = object.extractedJson ?? undefined;
         message.validationErrors = object.validationErrors?.map((e) => e) || [];
         message.validationTimeMs = object.validationTimeMs ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
 function createBaseStructuredOutputResult() {
-    return {
-        parsedJson: new Uint8Array(0),
-        validation: undefined,
-        rawText: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
-    };
+    return { parsedJson: new Uint8Array(0), validation: undefined, rawText: undefined, error: undefined };
 }
 exports.StructuredOutputResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1422,11 +1415,8 @@ exports.StructuredOutputResult = {
         if (message.rawText !== undefined) {
             writer.uint32(26).string(message.rawText);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(34).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(40).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
         }
         return writer;
     },
@@ -1458,18 +1448,11 @@ exports.StructuredOutputResult = {
                     message.rawText = reader.string();
                     continue;
                 }
-                case 4: {
-                    if (tag !== 34) {
+                case 6: {
+                    if (tag !== 50) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1493,16 +1476,7 @@ exports.StructuredOutputResult = {
                 : isSet(object.raw_text)
                     ? globalThis.String(object.raw_text)
                     : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1516,11 +1490,8 @@ exports.StructuredOutputResult = {
         if (message.rawText !== undefined) {
             obj.rawText = message.rawText;
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1534,8 +1505,9 @@ exports.StructuredOutputResult = {
             ? exports.StructuredOutputValidation.fromPartial(object.validation)
             : undefined;
         message.rawText = object.rawText ?? undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1807,8 +1779,7 @@ function createBaseStructuredOutputPromptResult() {
         jsonSchema: undefined,
         regexPattern: undefined,
         grammar: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
+        error: undefined,
     };
 }
 exports.StructuredOutputPromptResult = {
@@ -1828,11 +1799,8 @@ exports.StructuredOutputPromptResult = {
         if (message.grammar !== undefined) {
             writer.uint32(42).string(message.grammar);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(50).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(56).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(66).fork()).join();
         }
         return writer;
     },
@@ -1878,18 +1846,11 @@ exports.StructuredOutputPromptResult = {
                     message.grammar = reader.string();
                     continue;
                 }
-                case 6: {
-                    if (tag !== 50) {
+                case 8: {
+                    if (tag !== 66) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 7: {
-                    if (tag !== 56) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1923,16 +1884,7 @@ exports.StructuredOutputPromptResult = {
                     ? globalThis.String(object.regex_pattern)
                     : undefined,
             grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1952,11 +1904,8 @@ exports.StructuredOutputPromptResult = {
         if (message.grammar !== undefined) {
             obj.grammar = message.grammar;
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1970,8 +1919,9 @@ exports.StructuredOutputPromptResult = {
         message.jsonSchema = object.jsonSchema ?? undefined;
         message.regexPattern = object.regexPattern ?? undefined;
         message.grammar = object.grammar ?? undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -2168,7 +2118,6 @@ exports.StructuredOutputRequest_MetadataEntry = {
 };
 function createBaseStructuredOutputStreamEvent() {
     return {
-        seq: 0,
         timestampUs: 0,
         requestId: "",
         kind: 0,
@@ -2176,15 +2125,11 @@ function createBaseStructuredOutputStreamEvent() {
         partialJson: undefined,
         validation: undefined,
         result: undefined,
-        errorMessage: undefined,
-        errorCode: 0,
+        error: undefined,
     };
 }
 exports.StructuredOutputStreamEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.seq !== 0) {
-            writer.uint32(8).uint64(message.seq);
-        }
         if (message.timestampUs !== 0) {
             writer.uint32(16).int64(message.timestampUs);
         }
@@ -2206,11 +2151,8 @@ exports.StructuredOutputStreamEvent = {
         if (message.result !== undefined) {
             exports.StructuredOutputResult.encode(message.result, writer.uint32(66).fork()).join();
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(74).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(80).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(90).fork()).join();
         }
         return writer;
     },
@@ -2221,13 +2163,6 @@ exports.StructuredOutputStreamEvent = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.seq = longToNumber(reader.uint64());
-                    continue;
-                }
                 case 2: {
                     if (tag !== 16) {
                         break;
@@ -2277,18 +2212,11 @@ exports.StructuredOutputStreamEvent = {
                     message.result = exports.StructuredOutputResult.decode(reader, reader.uint32());
                     continue;
                 }
-                case 9: {
-                    if (tag !== 74) {
+                case 11: {
+                    if (tag !== 90) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 10: {
-                    if (tag !== 80) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -2301,7 +2229,6 @@ exports.StructuredOutputStreamEvent = {
     },
     fromJSON(object) {
         return {
-            seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
             timestampUs: isSet(object.timestampUs)
                 ? globalThis.Number(object.timestampUs)
                 : isSet(object.timestamp_us)
@@ -2321,23 +2248,11 @@ exports.StructuredOutputStreamEvent = {
                     : undefined,
             validation: isSet(object.validation) ? exports.StructuredOutputValidation.fromJSON(object.validation) : undefined,
             result: isSet(object.result) ? exports.StructuredOutputResult.fromJSON(object.result) : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.seq !== 0) {
-            obj.seq = Math.round(message.seq);
-        }
         if (message.timestampUs !== 0) {
             obj.timestampUs = Math.round(message.timestampUs);
         }
@@ -2359,11 +2274,8 @@ exports.StructuredOutputStreamEvent = {
         if (message.result !== undefined) {
             obj.result = exports.StructuredOutputResult.toJSON(message.result);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -2372,7 +2284,6 @@ exports.StructuredOutputStreamEvent = {
     },
     fromPartial(object) {
         const message = createBaseStructuredOutputStreamEvent();
-        message.seq = object.seq ?? 0;
         message.timestampUs = object.timestampUs ?? 0;
         message.requestId = object.requestId ?? "";
         message.kind = object.kind ?? 0;
@@ -2384,8 +2295,9 @@ exports.StructuredOutputStreamEvent = {
         message.result = (object.result !== undefined && object.result !== null)
             ? exports.StructuredOutputResult.fromPartial(object.result)
             : undefined;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };

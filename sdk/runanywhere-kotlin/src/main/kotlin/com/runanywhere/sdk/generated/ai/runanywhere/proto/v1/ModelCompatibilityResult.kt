@@ -106,26 +106,12 @@ public class ModelCompatibilityResult(
     schemaIndex = 9,
   )
   public val model_id: String = "",
-  /**
-   * Negative on failure; mirrors rac_result_t. Empty error_message on
-   * success.
-   */
   @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
+    tag = 13,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 10,
   )
-  public val error_code: Int = 0,
-  @field:WireField(
-    tag = 12,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 11,
-  )
-  public val error_message: String = "",
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelCompatibilityResult, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -175,8 +161,7 @@ public class ModelCompatibilityResult(
     if (reasons != other.reasons) return false
     if (suggested_alternatives != other.suggested_alternatives) return false
     if (model_id != other.model_id) return false
-    if (error_code != other.error_code) return false
-    if (error_message != other.error_message) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -194,8 +179,7 @@ public class ModelCompatibilityResult(
       result = result * 37 + reasons.hashCode()
       result = result * 37 + suggested_alternatives.hashCode()
       result = result * 37 + model_id.hashCode()
-      result = result * 37 + error_code.hashCode()
-      result = result * 37 + error_message.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -213,8 +197,7 @@ public class ModelCompatibilityResult(
     if (reasons.isNotEmpty()) result += """reasons=${sanitize(reasons)}"""
     if (suggested_alternatives.isNotEmpty()) result += """suggested_alternatives=${sanitize(suggested_alternatives)}"""
     result += """model_id=${sanitize(model_id)}"""
-    result += """error_code=$error_code"""
-    result += """error_message=${sanitize(error_message)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ModelCompatibilityResult{", separator = ", ", postfix = "}")
   }
 
@@ -229,10 +212,9 @@ public class ModelCompatibilityResult(
     reasons: List<String> = this.reasons,
     suggested_alternatives: List<String> = this.suggested_alternatives,
     model_id: String = this.model_id,
-    error_code: Int = this.error_code,
-    error_message: String = this.error_message,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelCompatibilityResult = ModelCompatibilityResult(is_compatible, can_run, can_fit, required_memory_bytes, available_memory_bytes, required_storage_bytes, available_storage_bytes, reasons, suggested_alternatives, model_id, error_code, error_message, unknownFields)
+  ): ModelCompatibilityResult = ModelCompatibilityResult(is_compatible, can_run, can_fit, required_memory_bytes, available_memory_bytes, required_storage_bytes, available_storage_bytes, reasons, suggested_alternatives, model_id, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -273,12 +255,7 @@ public class ModelCompatibilityResult(
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.model_id)
         }
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(11, value.error_code)
-        }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.error_message)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(13, value.error)
         return size
       }
 
@@ -309,23 +286,13 @@ public class ModelCompatibilityResult(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 10, value.model_id)
         }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.error_message)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 13, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelCompatibilityResult) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 12, value.error_message)
-        }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 13, value.error)
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 10, value.model_id)
         }
@@ -365,8 +332,7 @@ public class ModelCompatibilityResult(
         val reasons = mutableListOf<String>()
         val suggested_alternatives = mutableListOf<String>()
         var model_id: String = ""
-        var error_code: Int = 0
-        var error_message: String = ""
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_compatible = ProtoAdapter.BOOL.decode(reader)
@@ -379,8 +345,7 @@ public class ModelCompatibilityResult(
             8 -> reasons.add(ProtoAdapter.STRING.decode(reader))
             9 -> suggested_alternatives.add(ProtoAdapter.STRING.decode(reader))
             10 -> model_id = ProtoAdapter.STRING.decode(reader)
-            11 -> error_code = ProtoAdapter.INT32.decode(reader)
-            12 -> error_message = ProtoAdapter.STRING.decode(reader)
+            13 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -395,13 +360,13 @@ public class ModelCompatibilityResult(
           reasons = reasons,
           suggested_alternatives = suggested_alternatives,
           model_id = model_id,
-          error_code = error_code,
-          error_message = error_message,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelCompatibilityResult): ModelCompatibilityResult = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

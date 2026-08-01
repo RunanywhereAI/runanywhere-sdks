@@ -12,20 +12,10 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 
 export const protobufPackage = "runanywhere.v1";
 
-/**
- * ---------------------------------------------------------------------------
- * JSON Schema primitive type — union across SDKs.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:12     ('string'|'number'|'integer'|
- *                                        'boolean'|'object'|'array'|'null')
- *   Web (delegates to llamacpp pkg; no own enum)
- *   Swift / Kotlin / Dart represent schema as a serialized JSON string today,
- *     so this enum canonicalizes the RN-defined union.
- * ---------------------------------------------------------------------------
- */
 export enum JSONSchemaType {
   JSON_SCHEMA_TYPE_UNSPECIFIED = 0,
   JSON_SCHEMA_TYPE_OBJECT = 1,
@@ -90,66 +80,6 @@ export function jSONSchemaTypeToJSON(object: JSONSchemaType): string {
     case JSONSchemaType.JSON_SCHEMA_TYPE_NULL:
       return "JSON_SCHEMA_TYPE_NULL";
     case JSONSchemaType.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Sentiment label — union across SDKs.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:131    ('positive'|'negative'|'neutral')
- *   (Other SDKs do not yet define a Sentiment type; MIXED is added for
- *    completeness — common in industry sentiment APIs.)
- * ---------------------------------------------------------------------------
- */
-export enum Sentiment {
-  SENTIMENT_UNSPECIFIED = 0,
-  SENTIMENT_POSITIVE = 1,
-  SENTIMENT_NEGATIVE = 2,
-  SENTIMENT_NEUTRAL = 3,
-  SENTIMENT_MIXED = 4,
-  UNRECOGNIZED = -1,
-}
-
-export function sentimentFromJSON(object: any): Sentiment {
-  switch (object) {
-    case 0:
-    case "SENTIMENT_UNSPECIFIED":
-      return Sentiment.SENTIMENT_UNSPECIFIED;
-    case 1:
-    case "SENTIMENT_POSITIVE":
-      return Sentiment.SENTIMENT_POSITIVE;
-    case 2:
-    case "SENTIMENT_NEGATIVE":
-      return Sentiment.SENTIMENT_NEGATIVE;
-    case 3:
-    case "SENTIMENT_NEUTRAL":
-      return Sentiment.SENTIMENT_NEUTRAL;
-    case 4:
-    case "SENTIMENT_MIXED":
-      return Sentiment.SENTIMENT_MIXED;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return Sentiment.UNRECOGNIZED;
-  }
-}
-
-export function sentimentToJSON(object: Sentiment): string {
-  switch (object) {
-    case Sentiment.SENTIMENT_UNSPECIFIED:
-      return "SENTIMENT_UNSPECIFIED";
-    case Sentiment.SENTIMENT_POSITIVE:
-      return "SENTIMENT_POSITIVE";
-    case Sentiment.SENTIMENT_NEGATIVE:
-      return "SENTIMENT_NEGATIVE";
-    case Sentiment.SENTIMENT_NEUTRAL:
-      return "SENTIMENT_NEUTRAL";
-    case Sentiment.SENTIMENT_MIXED:
-      return "SENTIMENT_MIXED";
-    case Sentiment.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -263,51 +193,16 @@ export function structuredOutputStreamEventKindToJSON(object: StructuredOutputSt
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * JSON Schema property — describes a single property within a schema.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:24     JSONSchemaProperty (type, description,
- *                                       enum, format, items, properties, …)
- *
- * proto3 does not allow direct self-referential message fields without
- * `optional` / explicit handle. Recursion is expressed via:
- *   - `items_schema`     — for array element types       (handle to JSONSchema)
- *   - `object_schema`    — for nested object types       (handle to JSONSchema)
- * Deeper recursion (a property whose items are themselves objects with
- * further nested properties) is represented by repeating the same indirection
- * inside the referenced JSONSchema. Very deep schemas are uncommon and
- * supported by chaining these handles.
- * ---------------------------------------------------------------------------
- */
 export interface JSONSchemaProperty {
-  /** Primitive / composite type for this property. */
   type: JSONSchemaType;
-  /** Human-readable description (`description` in JSON Schema). */
-  description?:
-    | string
-    | undefined;
-  /**
-   * Allowed enum values (`enum` in JSON Schema). Strings only; numeric and
-   * boolean enums are rare and serialized as strings here.
-   */
+  description?: string | undefined;
   enumValues: string[];
-  /**
-   * String format hint (`format` in JSON Schema): "email", "uri",
-   * "date-time", etc.
-   */
   format?:
     | string
     | undefined;
-  /** Element schema when `type == JSON_SCHEMA_TYPE_ARRAY`. */
-  itemsSchema?:
-    | JSONSchema
-    | undefined;
-  /** Nested object schema when `type == JSON_SCHEMA_TYPE_OBJECT`. */
-  objectSchema?:
-    | JSONSchema
-    | undefined;
-  /** Common validation constraints carried by RN/Web schema builders. */
+  /** items_schema for arrays, object_schema for nested objects. */
+  itemsSchema?: JSONSchema | undefined;
+  objectSchema?: JSONSchema | undefined;
   minimum?: number | undefined;
   maximum?: number | undefined;
   minLength?: number | undefined;
@@ -318,34 +213,12 @@ export interface JSONSchemaProperty {
   defaultJson?: string | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * JSON Schema definition — top-level schema for structured output.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:59     JSONSchema (extends JSONSchemaProperty
- *                                       with $schema, $id, title, definitions,
- *                                       $ref, allOf/anyOf/oneOf/not)
- * ---------------------------------------------------------------------------
- */
 export interface JSONSchema {
-  /** Root type for this schema (commonly OBJECT or ARRAY). */
   type: JSONSchemaType;
-  /** Map of property name -> property definition. */
   properties: { [key: string]: JSONSchemaProperty };
-  /** Names of required properties (`required` in JSON Schema). */
   required: string[];
-  /** Element schema when the root `type == JSON_SCHEMA_TYPE_ARRAY`. */
-  items?:
-    | JSONSchemaProperty
-    | undefined;
-  /** Whether properties not declared in `properties` are allowed. */
-  additionalProperties?:
-    | boolean
-    | undefined;
-  /**
-   * JSON Schema document metadata / composition fields. Field names avoid
-   * `$` in generated APIs while preserving JSON names for serializers.
-   */
+  items?: JSONSchemaProperty | undefined;
+  additionalProperties?: boolean | undefined;
   schemaUri?: string | undefined;
   idUri?: string | undefined;
   title?: string | undefined;
@@ -355,7 +228,10 @@ export interface JSONSchema {
   allOf: JSONSchema[];
   anyOf: JSONSchema[];
   oneOf: JSONSchema[];
-  notSchema?: JSONSchema | undefined;
+  notSchema?:
+    | JSONSchema
+    | undefined;
+  /** Escape hatch for schemas the typed shape above cannot express. */
   rawJson?: string | undefined;
 }
 
@@ -369,93 +245,41 @@ export interface JSONSchema_DefinitionsEntry {
   value?: JSONSchema | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Structured output options — request-side configuration for a structured
- * generation call. Wraps a JSONSchema plus generation flags.
- * Sources pre-IDL:
- *   Swift  LLMTypes.swift:533           StructuredOutputConfig
- *   Kotlin LLMTypes.kt:242              StructuredOutputConfig
- *   Dart   structured_output_types.dart StructuredOutputConfig (incl. strict)
- *   RN     StructuredOutputTypes.ts:76  StructuredOutputOptions
- * ---------------------------------------------------------------------------
- * The ONE output-constraint surface. The retired loose fields on
- * LLMGenerationOptions (json_schema, grammar, response_format) all fold in
- * here: schema-shaped output via `schema_source`, low-level constrained
- * decoding via `grammar`/`regex_pattern`.
- */
 export interface StructuredOutputOptions {
-  /** Whether to embed the schema text in the LLM prompt. */
   includeSchemaInPrompt: boolean;
-  /** Strict schema adherence — rejects outputs that don't fully validate. */
+  /** Not read by commons. */
   strictMode?: boolean | undefined;
   schema?: JSONSchema | undefined;
   jsonSchema?:
     | string
     | undefined;
-  /** Name for the schema/output type (OpenAI json_schema.name). */
+  /** Matches OpenAI's json_schema.name. */
   name?: string | undefined;
   mode: StructuredOutputMode;
   regexPattern?: string | undefined;
-  grammar?: string | undefined;
+  grammar?:
+    | string
+    | undefined;
+  /** Attempt to repair malformed JSON before failing. */
   repairJson: boolean;
   maxRetries: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Structured output validation result — populated after the model returns.
- * Sources pre-IDL:
- *   Swift  LLMTypes.swift:585           StructuredOutputValidation
- *   Kotlin LLMTypes.kt:278              StructuredOutputValidation
- *   Dart   structured_output_types.dart StructuredOutputValidation
- * ---------------------------------------------------------------------------
- */
 export interface StructuredOutputValidation {
-  /** Whether the parsed output validates against the requested schema. */
   isValid: boolean;
-  /** Whether the raw text contained any parseable JSON object. */
   containsJson: boolean;
-  /** Validation / parse error message when `is_valid == false`. */
-  errorMessage?:
-    | string
-    | undefined;
-  /** Original raw model output (for debugging / fallback parsing). */
-  rawOutput?:
-    | string
-    | undefined;
-  /**
-   * JSON substring extracted from raw_output before validation, when the
-   * extractor found one.
-   */
+  rawOutput?: string | undefined;
   extractedJson?: string | undefined;
   validationErrors: string[];
   validationTimeMs: number;
+  error?: SDKError | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Structured output result — generic envelope returned by structured calls.
- * `parsed_json` is a UTF-8 JSON-encoded byte payload to keep the result
- * language-agnostic; SDKs deserialize into their concrete typed value.
- * Sources pre-IDL:
- *   RN     StructuredOutputTypes.ts:93  StructuredOutputResult<T> (data, raw,
- *                                       success, error)
- *   Dart   structured_output_types.dart StructuredOutputResult<T> (result,
- *                                       rawText, metrics)
- * ---------------------------------------------------------------------------
- */
 export interface StructuredOutputResult {
-  /** JSON-encoded parsed value (UTF-8 bytes). */
   parsedJson: Uint8Array;
-  /** Validation / parse outcome. */
-  validation?:
-    | StructuredOutputValidation
-    | undefined;
-  /** Raw model text prior to parsing (optional, useful for retries). */
+  validation?: StructuredOutputValidation | undefined;
   rawText?: string | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 export interface StructuredOutputParseRequest {
@@ -481,8 +305,7 @@ export interface StructuredOutputPromptResult {
   jsonSchema?: string | undefined;
   regexPattern?: string | undefined;
   grammar?: string | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 export interface StructuredOutputRequest {
@@ -498,7 +321,6 @@ export interface StructuredOutputRequest_MetadataEntry {
 }
 
 export interface StructuredOutputStreamEvent {
-  seq: number;
   timestampUs: number;
   requestId: string;
   kind: StructuredOutputStreamEventKind;
@@ -506,103 +328,16 @@ export interface StructuredOutputStreamEvent {
   partialJson?: string | undefined;
   validation?: StructuredOutputValidation | undefined;
   result?: StructuredOutputResult | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Named entity — single span identified within input text.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:143    NamedEntity (text, type, startOffset,
- *                                       endOffset, confidence)
- * ---------------------------------------------------------------------------
- */
+/** Character offsets into the source text. */
 export interface NamedEntity {
-  /** Surface form of the entity exactly as it appeared in input. */
   text: string;
-  /** Entity class label, e.g. "PERSON", "ORG", "LOCATION". */
   entityType: string;
-  /** UTF-16 / character start offset (inclusive) within input text. */
   startOffset: number;
-  /** UTF-16 / character end offset (exclusive) within input text. */
   endOffset: number;
-  /** Model confidence in [0.0, 1.0]. */
   confidence: number;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Entity extraction result — list of entities pulled from a document.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:110    EntityExtractionResult<T>
- *                                       (entities, confidence)
- * Note: RN's per-result `confidence` is dropped in favor of per-entity
- * confidence on `NamedEntity`, which is the more granular and useful form.
- * ---------------------------------------------------------------------------
- */
-export interface EntityExtractionResult {
-  entities: NamedEntity[];
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Classification candidate — alternative label considered.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:118    ClassificationResult.alternatives item
- * ---------------------------------------------------------------------------
- */
-export interface ClassificationCandidate {
-  label: string;
-  confidence: number;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Classification result — top label plus optional alternatives.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:118    ClassificationResult (category,
- *                                       confidence, alternatives)
- * Note: RN names the field `category`; canonicalized here to `label`, which
- * matches industry classifier APIs (HuggingFace, OpenAI, etc.).
- * ---------------------------------------------------------------------------
- */
-export interface ClassificationResult {
-  label: string;
-  confidence: number;
-  alternatives: ClassificationCandidate[];
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Sentiment analysis result — overall sentiment plus per-class scores.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:130    SentimentResult (sentiment, score,
- *                                       aspects)
- * ---------------------------------------------------------------------------
- */
-export interface SentimentResult {
-  sentiment: Sentiment;
-  /** Aggregate confidence in the chosen sentiment label, [0.0, 1.0]. */
-  confidence: number;
-  /** Per-class soft scores (optional). Absent fields are unscored. */
-  positiveScore?: number | undefined;
-  negativeScore?: number | undefined;
-  neutralScore?: number | undefined;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Named entity recognition result — alias-style wrapper carrying entities.
- * Equivalent in shape to `EntityExtractionResult`; both are kept so SDKs that
- * distinguish "extraction" (instruction-driven) from "NER" (model-native)
- * can route to the appropriate type without ambiguity.
- * Sources pre-IDL:
- *   RN  StructuredOutputTypes.ts:154    NERResult (entities)
- * ---------------------------------------------------------------------------
- */
-export interface NERResult {
-  entities: NamedEntity[];
 }
 
 function createBaseJSONSchemaProperty(): JSONSchemaProperty {
@@ -1732,11 +1467,11 @@ function createBaseStructuredOutputValidation(): StructuredOutputValidation {
   return {
     isValid: false,
     containsJson: false,
-    errorMessage: undefined,
     rawOutput: undefined,
     extractedJson: undefined,
     validationErrors: [],
     validationTimeMs: 0,
+    error: undefined,
   };
 }
 
@@ -1747,9 +1482,6 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
     }
     if (message.containsJson !== false) {
       writer.uint32(16).bool(message.containsJson);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(26).string(message.errorMessage);
     }
     if (message.rawOutput !== undefined) {
       writer.uint32(34).string(message.rawOutput);
@@ -1762,6 +1494,9 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
     }
     if (message.validationTimeMs !== 0) {
       writer.uint32(56).int64(message.validationTimeMs);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(66).fork()).join();
     }
     return writer;
   },
@@ -1787,14 +1522,6 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
           }
 
           message.containsJson = reader.bool();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
           continue;
         }
         case 4: {
@@ -1829,6 +1556,14 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
           message.validationTimeMs = longToNumber(reader.int64());
           continue;
         }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1850,11 +1585,6 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
         : isSet(object.contains_json)
         ? globalThis.Boolean(object.contains_json)
         : false,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
       rawOutput: isSet(object.rawOutput)
         ? globalThis.String(object.rawOutput)
         : isSet(object.raw_output)
@@ -1875,6 +1605,7 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
         : isSet(object.validation_time_ms)
         ? globalThis.Number(object.validation_time_ms)
         : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1885,9 +1616,6 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
     }
     if (message.containsJson !== false) {
       obj.containsJson = message.containsJson;
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
     }
     if (message.rawOutput !== undefined) {
       obj.rawOutput = message.rawOutput;
@@ -1901,6 +1629,9 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
     if (message.validationTimeMs !== 0) {
       obj.validationTimeMs = Math.round(message.validationTimeMs);
     }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
     return obj;
   },
 
@@ -1911,23 +1642,19 @@ export const StructuredOutputValidation: MessageFns<StructuredOutputValidation> 
     const message = createBaseStructuredOutputValidation();
     message.isValid = object.isValid ?? false;
     message.containsJson = object.containsJson ?? false;
-    message.errorMessage = object.errorMessage ?? undefined;
     message.rawOutput = object.rawOutput ?? undefined;
     message.extractedJson = object.extractedJson ?? undefined;
     message.validationErrors = object.validationErrors?.map((e) => e) || [];
     message.validationTimeMs = object.validationTimeMs ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
 
 function createBaseStructuredOutputResult(): StructuredOutputResult {
-  return {
-    parsedJson: new Uint8Array(0),
-    validation: undefined,
-    rawText: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
-  };
+  return { parsedJson: new Uint8Array(0), validation: undefined, rawText: undefined, error: undefined };
 }
 
 export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
@@ -1941,11 +1668,8 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
     if (message.rawText !== undefined) {
       writer.uint32(26).string(message.rawText);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(34).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(40).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -1981,20 +1705,12 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
           message.rawText = reader.string();
           continue;
         }
-        case 4: {
-          if (tag !== 34) {
+        case 6: {
+          if (tag !== 50) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2019,16 +1735,7 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
         : isSet(object.raw_text)
         ? globalThis.String(object.raw_text)
         : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2043,11 +1750,8 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
     if (message.rawText !== undefined) {
       obj.rawText = message.rawText;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2062,8 +1766,9 @@ export const StructuredOutputResult: MessageFns<StructuredOutputResult> = {
       ? StructuredOutputValidation.fromPartial(object.validation)
       : undefined;
     message.rawText = object.rawText ?? undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -2376,8 +2081,7 @@ function createBaseStructuredOutputPromptResult(): StructuredOutputPromptResult 
     jsonSchema: undefined,
     regexPattern: undefined,
     grammar: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
@@ -2398,11 +2102,8 @@ export const StructuredOutputPromptResult: MessageFns<StructuredOutputPromptResu
     if (message.grammar !== undefined) {
       writer.uint32(42).string(message.grammar);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(50).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(56).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(66).fork()).join();
     }
     return writer;
   },
@@ -2454,20 +2155,12 @@ export const StructuredOutputPromptResult: MessageFns<StructuredOutputPromptResu
           message.grammar = reader.string();
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
+        case 8: {
+          if (tag !== 66) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 7: {
-          if (tag !== 56) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2502,16 +2195,7 @@ export const StructuredOutputPromptResult: MessageFns<StructuredOutputPromptResu
         ? globalThis.String(object.regex_pattern)
         : undefined,
       grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2532,11 +2216,8 @@ export const StructuredOutputPromptResult: MessageFns<StructuredOutputPromptResu
     if (message.grammar !== undefined) {
       obj.grammar = message.grammar;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2551,8 +2232,9 @@ export const StructuredOutputPromptResult: MessageFns<StructuredOutputPromptResu
     message.jsonSchema = object.jsonSchema ?? undefined;
     message.regexPattern = object.regexPattern ?? undefined;
     message.grammar = object.grammar ?? undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -2778,7 +2460,6 @@ export const StructuredOutputRequest_MetadataEntry: MessageFns<StructuredOutputR
 
 function createBaseStructuredOutputStreamEvent(): StructuredOutputStreamEvent {
   return {
-    seq: 0,
     timestampUs: 0,
     requestId: "",
     kind: 0,
@@ -2786,16 +2467,12 @@ function createBaseStructuredOutputStreamEvent(): StructuredOutputStreamEvent {
     partialJson: undefined,
     validation: undefined,
     result: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
 export const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent> = {
   encode(message: StructuredOutputStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.seq !== 0) {
-      writer.uint32(8).uint64(message.seq);
-    }
     if (message.timestampUs !== 0) {
       writer.uint32(16).int64(message.timestampUs);
     }
@@ -2817,11 +2494,8 @@ export const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent
     if (message.result !== undefined) {
       StructuredOutputResult.encode(message.result, writer.uint32(66).fork()).join();
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(74).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(80).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -2833,14 +2507,6 @@ export const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.seq = longToNumber(reader.uint64());
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -2897,20 +2563,12 @@ export const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent
           message.result = StructuredOutputResult.decode(reader, reader.uint32());
           continue;
         }
-        case 9: {
-          if (tag !== 74) {
+        case 11: {
+          if (tag !== 90) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2924,7 +2582,6 @@ export const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent
 
   fromJSON(object: any): StructuredOutputStreamEvent {
     return {
-      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -2944,24 +2601,12 @@ export const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent
         : undefined,
       validation: isSet(object.validation) ? StructuredOutputValidation.fromJSON(object.validation) : undefined,
       result: isSet(object.result) ? StructuredOutputResult.fromJSON(object.result) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: StructuredOutputStreamEvent): unknown {
     const obj: any = {};
-    if (message.seq !== 0) {
-      obj.seq = Math.round(message.seq);
-    }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
     }
@@ -2983,11 +2628,8 @@ export const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent
     if (message.result !== undefined) {
       obj.result = StructuredOutputResult.toJSON(message.result);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2997,7 +2639,6 @@ export const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent
   },
   fromPartial<I extends Exact<DeepPartial<StructuredOutputStreamEvent>, I>>(object: I): StructuredOutputStreamEvent {
     const message = createBaseStructuredOutputStreamEvent();
-    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.requestId = object.requestId ?? "";
     message.kind = object.kind ?? 0;
@@ -3009,8 +2650,9 @@ export const StructuredOutputStreamEvent: MessageFns<StructuredOutputStreamEvent
     message.result = (object.result !== undefined && object.result !== null)
       ? StructuredOutputResult.fromPartial(object.result)
       : undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -3147,436 +2789,6 @@ export const NamedEntity: MessageFns<NamedEntity> = {
     message.startOffset = object.startOffset ?? 0;
     message.endOffset = object.endOffset ?? 0;
     message.confidence = object.confidence ?? 0;
-    return message;
-  },
-};
-
-function createBaseEntityExtractionResult(): EntityExtractionResult {
-  return { entities: [] };
-}
-
-export const EntityExtractionResult: MessageFns<EntityExtractionResult> = {
-  encode(message: EntityExtractionResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.entities) {
-      NamedEntity.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): EntityExtractionResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseEntityExtractionResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.entities.push(NamedEntity.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): EntityExtractionResult {
-    return {
-      entities: globalThis.Array.isArray(object?.entities)
-        ? object.entities.map((e: any) => NamedEntity.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: EntityExtractionResult): unknown {
-    const obj: any = {};
-    if (message.entities?.length) {
-      obj.entities = message.entities.map((e) => NamedEntity.toJSON(e));
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<EntityExtractionResult>, I>>(base?: I): EntityExtractionResult {
-    return EntityExtractionResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<EntityExtractionResult>, I>>(object: I): EntityExtractionResult {
-    const message = createBaseEntityExtractionResult();
-    message.entities = object.entities?.map((e) => NamedEntity.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseClassificationCandidate(): ClassificationCandidate {
-  return { label: "", confidence: 0 };
-}
-
-export const ClassificationCandidate: MessageFns<ClassificationCandidate> = {
-  encode(message: ClassificationCandidate, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.label !== "") {
-      writer.uint32(10).string(message.label);
-    }
-    if (message.confidence !== 0) {
-      writer.uint32(21).float(message.confidence);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ClassificationCandidate {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseClassificationCandidate();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.label = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 21) {
-            break;
-          }
-
-          message.confidence = reader.float();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ClassificationCandidate {
-    return {
-      label: isSet(object.label) ? globalThis.String(object.label) : "",
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-    };
-  },
-
-  toJSON(message: ClassificationCandidate): unknown {
-    const obj: any = {};
-    if (message.label !== "") {
-      obj.label = message.label;
-    }
-    if (message.confidence !== 0) {
-      obj.confidence = message.confidence;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ClassificationCandidate>, I>>(base?: I): ClassificationCandidate {
-    return ClassificationCandidate.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ClassificationCandidate>, I>>(object: I): ClassificationCandidate {
-    const message = createBaseClassificationCandidate();
-    message.label = object.label ?? "";
-    message.confidence = object.confidence ?? 0;
-    return message;
-  },
-};
-
-function createBaseClassificationResult(): ClassificationResult {
-  return { label: "", confidence: 0, alternatives: [] };
-}
-
-export const ClassificationResult: MessageFns<ClassificationResult> = {
-  encode(message: ClassificationResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.label !== "") {
-      writer.uint32(10).string(message.label);
-    }
-    if (message.confidence !== 0) {
-      writer.uint32(21).float(message.confidence);
-    }
-    for (const v of message.alternatives) {
-      ClassificationCandidate.encode(v!, writer.uint32(26).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ClassificationResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseClassificationResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.label = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 21) {
-            break;
-          }
-
-          message.confidence = reader.float();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.alternatives.push(ClassificationCandidate.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ClassificationResult {
-    return {
-      label: isSet(object.label) ? globalThis.String(object.label) : "",
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-      alternatives: globalThis.Array.isArray(object?.alternatives)
-        ? object.alternatives.map((e: any) => ClassificationCandidate.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: ClassificationResult): unknown {
-    const obj: any = {};
-    if (message.label !== "") {
-      obj.label = message.label;
-    }
-    if (message.confidence !== 0) {
-      obj.confidence = message.confidence;
-    }
-    if (message.alternatives?.length) {
-      obj.alternatives = message.alternatives.map((e) => ClassificationCandidate.toJSON(e));
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ClassificationResult>, I>>(base?: I): ClassificationResult {
-    return ClassificationResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ClassificationResult>, I>>(object: I): ClassificationResult {
-    const message = createBaseClassificationResult();
-    message.label = object.label ?? "";
-    message.confidence = object.confidence ?? 0;
-    message.alternatives = object.alternatives?.map((e) => ClassificationCandidate.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseSentimentResult(): SentimentResult {
-  return { sentiment: 0, confidence: 0, positiveScore: undefined, negativeScore: undefined, neutralScore: undefined };
-}
-
-export const SentimentResult: MessageFns<SentimentResult> = {
-  encode(message: SentimentResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sentiment !== 0) {
-      writer.uint32(8).int32(message.sentiment);
-    }
-    if (message.confidence !== 0) {
-      writer.uint32(21).float(message.confidence);
-    }
-    if (message.positiveScore !== undefined) {
-      writer.uint32(29).float(message.positiveScore);
-    }
-    if (message.negativeScore !== undefined) {
-      writer.uint32(37).float(message.negativeScore);
-    }
-    if (message.neutralScore !== undefined) {
-      writer.uint32(45).float(message.neutralScore);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SentimentResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSentimentResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.sentiment = reader.int32() as any;
-          continue;
-        }
-        case 2: {
-          if (tag !== 21) {
-            break;
-          }
-
-          message.confidence = reader.float();
-          continue;
-        }
-        case 3: {
-          if (tag !== 29) {
-            break;
-          }
-
-          message.positiveScore = reader.float();
-          continue;
-        }
-        case 4: {
-          if (tag !== 37) {
-            break;
-          }
-
-          message.negativeScore = reader.float();
-          continue;
-        }
-        case 5: {
-          if (tag !== 45) {
-            break;
-          }
-
-          message.neutralScore = reader.float();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SentimentResult {
-    return {
-      sentiment: isSet(object.sentiment) ? sentimentFromJSON(object.sentiment) : 0,
-      confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
-      positiveScore: isSet(object.positiveScore)
-        ? globalThis.Number(object.positiveScore)
-        : isSet(object.positive_score)
-        ? globalThis.Number(object.positive_score)
-        : undefined,
-      negativeScore: isSet(object.negativeScore)
-        ? globalThis.Number(object.negativeScore)
-        : isSet(object.negative_score)
-        ? globalThis.Number(object.negative_score)
-        : undefined,
-      neutralScore: isSet(object.neutralScore)
-        ? globalThis.Number(object.neutralScore)
-        : isSet(object.neutral_score)
-        ? globalThis.Number(object.neutral_score)
-        : undefined,
-    };
-  },
-
-  toJSON(message: SentimentResult): unknown {
-    const obj: any = {};
-    if (message.sentiment !== 0) {
-      obj.sentiment = sentimentToJSON(message.sentiment);
-    }
-    if (message.confidence !== 0) {
-      obj.confidence = message.confidence;
-    }
-    if (message.positiveScore !== undefined) {
-      obj.positiveScore = message.positiveScore;
-    }
-    if (message.negativeScore !== undefined) {
-      obj.negativeScore = message.negativeScore;
-    }
-    if (message.neutralScore !== undefined) {
-      obj.neutralScore = message.neutralScore;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<SentimentResult>, I>>(base?: I): SentimentResult {
-    return SentimentResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<SentimentResult>, I>>(object: I): SentimentResult {
-    const message = createBaseSentimentResult();
-    message.sentiment = object.sentiment ?? 0;
-    message.confidence = object.confidence ?? 0;
-    message.positiveScore = object.positiveScore ?? undefined;
-    message.negativeScore = object.negativeScore ?? undefined;
-    message.neutralScore = object.neutralScore ?? undefined;
-    return message;
-  },
-};
-
-function createBaseNERResult(): NERResult {
-  return { entities: [] };
-}
-
-export const NERResult: MessageFns<NERResult> = {
-  encode(message: NERResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.entities) {
-      NamedEntity.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): NERResult {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseNERResult();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.entities.push(NamedEntity.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): NERResult {
-    return {
-      entities: globalThis.Array.isArray(object?.entities)
-        ? object.entities.map((e: any) => NamedEntity.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: NERResult): unknown {
-    const obj: any = {};
-    if (message.entities?.length) {
-      obj.entities = message.entities.map((e) => NamedEntity.toJSON(e));
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<NERResult>, I>>(base?: I): NERResult {
-    return NERResult.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<NERResult>, I>>(object: I): NERResult {
-    const message = createBaseNERResult();
-    message.entities = object.entities?.map((e) => NamedEntity.fromPartial(e)) || [];
     return message;
   },
 };

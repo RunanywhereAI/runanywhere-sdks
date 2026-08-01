@@ -23,10 +23,11 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from runanywhere._proto import errors_pb2 as errors__pb2
 from runanywhere._proto import rac_options_pb2 as rac__options__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12tool_calling.proto\x12\x0erunanywhere.v1\x1a\x11rac_options.proto\"\xdf\x01\n\tToolValue\x12\x16\n\x0cstring_value\x18\x01 \x01(\tH\x00\x12\x16\n\x0cnumber_value\x18\x02 \x01(\x01H\x00\x12\x14\n\nbool_value\x18\x03 \x01(\x08H\x00\x12\x35\n\x0b\x61rray_value\x18\x04 \x01(\x0b\x32\x1e.runanywhere.v1.ToolValueArrayH\x00\x12\x37\n\x0cobject_value\x18\x05 \x01(\x0b\x32\x1f.runanywhere.v1.ToolValueObjectH\x00\x12\x14\n\nnull_value\x18\x06 \x01(\x08H\x00\x42\x06\n\x04kind\";\n\x0eToolValueArray\x12)\n\x06values\x18\x01 \x03(\x0b\x32\x19.runanywhere.v1.ToolValue\"\x98\x01\n\x0fToolValueObject\x12;\n\x06\x66ields\x18\x01 \x03(\x0b\x32+.runanywhere.v1.ToolValueObject.FieldsEntry\x1aH\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12(\n\x05value\x18\x02 \x01(\x0b\x32\x19.runanywhere.v1.ToolValue:\x02\x38\x01\"\x1d\n\rToolValueJSON\x12\x0c\n\x04json\x18\x01 \x01(\t\"\xfd\x01\n\rToolParameter\x12\x0c\n\x04name\x18\x01 \x01(\t\x12/\n\x04type\x18\x02 \x01(\x0e\x32!.runanywhere.v1.ToolParameterType\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x10\n\x08required\x18\x04 \x01(\x08\x12\x13\n\x0b\x65num_values\x18\x05 \x03(\t\x12\x18\n\x0bjson_schema\x18\x06 \x01(\tH\x00\x88\x01\x01\x12\x35\n\rdefault_value\x18\x07 \x01(\x0b\x32\x19.runanywhere.v1.ToolValueH\x01\x88\x01\x01\x42\x0e\n\x0c_json_schemaB\x10\n\x0e_default_value\"\xa5\x02\n\x0eToolDefinition\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x31\n\nparameters\x18\x03 \x03(\x0b\x32\x1d.runanywhere.v1.ToolParameter\x12\x18\n\x0bjson_schema\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x15\n\x08\x63\x61tegory\x18\x04 \x01(\tH\x01\x88\x01\x01\x12>\n\x08metadata\x18\x06 \x03(\x0b\x32,.runanywhere.v1.ToolDefinition.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x0e\n\x0c_json_schemaB\x0b\n\t_category\"\x85\x01\n\x08ToolCall\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x16\n\x0e\x61rguments_json\x18\x03 \x01(\t\x12\x0c\n\x04type\x18\x04 \x01(\t\x12\x15\n\rcreated_at_ms\x18\x07 \x01(\x03\x12\x15\n\x08raw_text\x18\x08 \x01(\tH\x00\x88\x01\x01\x42\x0b\n\t_raw_text\"\xa4\x01\n\nToolResult\x12\x14\n\x0ctool_call_id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0bresult_json\x18\x03 \x01(\t\x12\x12\n\x05\x65rror\x18\x04 \x01(\tH\x00\x88\x01\x01\x12\x0f\n\x07success\x18\x05 \x01(\x08\x12\x15\n\rstarted_at_ms\x18\x08 \x01(\x03\x12\x17\n\x0f\x63ompleted_at_ms\x18\t \x01(\x03\x42\x08\n\x06_error\"\xbe\x03\n\x12ToolCallingOptions\x12-\n\x05tools\x18\x01 \x03(\x0b\x32\x1e.runanywhere.v1.ToolDefinition\x12#\n\x0c\x61uto_execute\x18\x03 \x01(\x08\x42\x08\x8a\xb5\x18\x04trueH\x00\x88\x01\x01\x12\x1d\n\x15replace_system_prompt\x18\x07 \x01(\x08\x12\x1c\n\x14keep_tools_available\x18\x08 \x01(\x08\x12\x37\n\x06\x66ormat\x18\n \x01(\x0e\x32\".runanywhere.v1.ToolCallFormatNameH\x01\x88\x01\x01\x12&\n\x0emax_tool_calls\x18\x0c \x01(\x05\x42\t\x8a\xb5\x18\x01\x35\xa0\xb5\x18\x01H\x02\x88\x01\x01\x12\x33\n\x0btool_choice\x18\r \x01(\x0e\x32\x1e.runanywhere.v1.ToolChoiceMode\x12\x1d\n\x10\x66orced_tool_name\x18\x0e \x01(\tH\x03\x88\x01\x01\x12\x1e\n\x16require_json_arguments\x18\x10 \x01(\x08\x42\x0f\n\r_auto_executeB\t\n\x07_formatB\x11\n\x0f_max_tool_callsB\x13\n\x11_forced_tool_name\"\xe9\x02\n\x11ToolCallingResult\x12\x0c\n\x04text\x18\x01 \x01(\t\x12,\n\ntool_calls\x18\x02 \x03(\x0b\x32\x18.runanywhere.v1.ToolCall\x12\x30\n\x0ctool_results\x18\x03 \x03(\x0b\x32\x1a.runanywhere.v1.ToolResult\x12\x13\n\x0bis_complete\x18\x04 \x01(\x08\x12\x1c\n\x0f\x63onversation_id\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x17\n\x0fiterations_used\x18\x06 \x01(\x05\x12\x1a\n\rerror_message\x18\x07 \x01(\tH\x01\x88\x01\x01\x12\x12\n\nerror_code\x18\x08 \x01(\x05\x12\x10\n\x08raw_text\x18\t \x01(\t\x12\x1d\n\x10thinking_content\x18\n \x01(\tH\x02\x88\x01\x01\x42\x12\n\x10_conversation_idB\x10\n\x0e_error_messageB\x13\n\x11_thinking_content\"f\n\x10ToolParseRequest\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x38\n\x07options\x18\x02 \x01(\x0b\x32\".runanywhere.v1.ToolCallingOptionsH\x00\x88\x01\x01\x42\n\n\x08_options\"\xb0\x01\n\x0fToolParseResult\x12\x15\n\rhas_tool_call\x18\x01 \x01(\x08\x12,\n\ntool_calls\x18\x02 \x03(\x0b\x32\x18.runanywhere.v1.ToolCall\x12\x16\n\x0eremaining_text\x18\x03 \x01(\t\x12\x1a\n\rerror_message\x18\x04 \x01(\tH\x00\x88\x01\x01\x12\x12\n\nerror_code\x18\x05 \x01(\x05\x42\x10\n\x0e_error_message\"\xd6\x01\n\x17ToolPromptFormatRequest\x12\x13\n\x0buser_prompt\x18\x01 \x01(\t\x12\x38\n\x07options\x18\x02 \x01(\x0b\x32\".runanywhere.v1.ToolCallingOptionsH\x00\x88\x01\x01\x12\x30\n\x0ctool_results\x18\x03 \x03(\x0b\x32\x1a.runanywhere.v1.ToolResult\x12\x1b\n\x0e\x61ssistant_text\x18\x04 \x01(\tH\x01\x88\x01\x01\x42\n\n\x08_optionsB\x11\n\x0f_assistant_text\"\xa8\x01\n\x16ToolPromptFormatResult\x12\x18\n\x10\x66ormatted_prompt\x18\x01 \x01(\t\x12\x32\n\x06\x66ormat\x18\x02 \x01(\x0e\x32\".runanywhere.v1.ToolCallFormatName\x12\x1a\n\rerror_message\x18\x04 \x01(\tH\x00\x88\x01\x01\x12\x12\n\nerror_code\x18\x05 \x01(\x05\x42\x10\n\x0e_error_message\"\x8e\x01\n\x19ToolCallValidationRequest\x12+\n\ttool_call\x18\x01 \x01(\x0b\x32\x18.runanywhere.v1.ToolCall\x12\x38\n\x07options\x18\x02 \x01(\x0b\x32\".runanywhere.v1.ToolCallingOptionsH\x00\x88\x01\x01\x42\n\n\x08_options\"\xf8\x01\n\x18ToolCallValidationResult\x12\x10\n\x08is_valid\x18\x01 \x01(\x08\x12\x19\n\x11validation_errors\x18\x02 \x03(\t\x12\x39\n\x0cmatched_tool\x18\x03 \x01(\x0b\x32\x1e.runanywhere.v1.ToolDefinitionH\x00\x88\x01\x01\x12!\n\x19normalized_arguments_json\x18\x04 \x01(\t\x12\x1a\n\rerror_message\x18\x05 \x01(\tH\x01\x88\x01\x01\x12\x12\n\nerror_code\x18\x06 \x01(\x05\x42\x0f\n\r_matched_toolB\x10\n\x0e_error_message*\xd8\x01\n\x11ToolParameterType\x12#\n\x1fTOOL_PARAMETER_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n\x1aTOOL_PARAMETER_TYPE_STRING\x10\x01\x12\x1e\n\x1aTOOL_PARAMETER_TYPE_NUMBER\x10\x02\x12\x1f\n\x1bTOOL_PARAMETER_TYPE_BOOLEAN\x10\x03\x12\x1e\n\x1aTOOL_PARAMETER_TYPE_OBJECT\x10\x04\x12\x1d\n\x19TOOL_PARAMETER_TYPE_ARRAY\x10\x05*{\n\x12ToolCallFormatName\x12%\n!TOOL_CALL_FORMAT_NAME_UNSPECIFIED\x10\x00\x12\x1e\n\x1aTOOL_CALL_FORMAT_NAME_JSON\x10\x01\x12\x1e\n\x1aTOOL_CALL_FORMAT_NAME_LFM2\x10\x07*\xa6\x01\n\x0eToolChoiceMode\x12 \n\x1cTOOL_CHOICE_MODE_UNSPECIFIED\x10\x00\x12\x19\n\x15TOOL_CHOICE_MODE_AUTO\x10\x01\x12\x19\n\x15TOOL_CHOICE_MODE_NONE\x10\x02\x12\x1d\n\x19TOOL_CHOICE_MODE_REQUIRED\x10\x03\x12\x1d\n\x19TOOL_CHOICE_MODE_SPECIFIC\x10\x04\x42\x8b\x01\n\x17\x61i.runanywhere.proto.v1B\x10ToolCallingProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12tool_calling.proto\x12\x0erunanywhere.v1\x1a\x0c\x65rrors.proto\x1a\x11rac_options.proto\"\xdf\x01\n\tToolValue\x12\x16\n\x0cstring_value\x18\x01 \x01(\tH\x00\x12\x16\n\x0cnumber_value\x18\x02 \x01(\x01H\x00\x12\x14\n\nbool_value\x18\x03 \x01(\x08H\x00\x12\x35\n\x0b\x61rray_value\x18\x04 \x01(\x0b\x32\x1e.runanywhere.v1.ToolValueArrayH\x00\x12\x37\n\x0cobject_value\x18\x05 \x01(\x0b\x32\x1f.runanywhere.v1.ToolValueObjectH\x00\x12\x14\n\nnull_value\x18\x06 \x01(\x08H\x00\x42\x06\n\x04kind\";\n\x0eToolValueArray\x12)\n\x06values\x18\x01 \x03(\x0b\x32\x19.runanywhere.v1.ToolValue\"\x98\x01\n\x0fToolValueObject\x12;\n\x06\x66ields\x18\x01 \x03(\x0b\x32+.runanywhere.v1.ToolValueObject.FieldsEntry\x1aH\n\x0b\x46ieldsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12(\n\x05value\x18\x02 \x01(\x0b\x32\x19.runanywhere.v1.ToolValue:\x02\x38\x01\"\x1d\n\rToolValueJSON\x12\x0c\n\x04json\x18\x01 \x01(\t\"\xfd\x01\n\rToolParameter\x12\x0c\n\x04name\x18\x01 \x01(\t\x12/\n\x04type\x18\x02 \x01(\x0e\x32!.runanywhere.v1.ToolParameterType\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x10\n\x08required\x18\x04 \x01(\x08\x12\x13\n\x0b\x65num_values\x18\x05 \x03(\t\x12\x18\n\x0bjson_schema\x18\x06 \x01(\tH\x00\x88\x01\x01\x12\x35\n\rdefault_value\x18\x07 \x01(\x0b\x32\x19.runanywhere.v1.ToolValueH\x01\x88\x01\x01\x42\x0e\n\x0c_json_schemaB\x10\n\x0e_default_value\"\xa5\x02\n\x0eToolDefinition\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x31\n\nparameters\x18\x03 \x03(\x0b\x32\x1d.runanywhere.v1.ToolParameter\x12\x18\n\x0bjson_schema\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x15\n\x08\x63\x61tegory\x18\x04 \x01(\tH\x01\x88\x01\x01\x12>\n\x08metadata\x18\x06 \x03(\x0b\x32,.runanywhere.v1.ToolDefinition.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x0e\n\x0c_json_schemaB\x0b\n\t_category\"\x85\x01\n\x08ToolCall\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x16\n\x0e\x61rguments_json\x18\x03 \x01(\t\x12\x0c\n\x04type\x18\x04 \x01(\t\x12\x15\n\rcreated_at_ms\x18\x07 \x01(\x03\x12\x15\n\x08raw_text\x18\x08 \x01(\tH\x00\x88\x01\x01\x42\x0b\n\t_raw_text\"\xad\x01\n\nToolResult\x12\x14\n\x0ctool_call_id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0bresult_json\x18\x03 \x01(\t\x12\x15\n\rstarted_at_ms\x18\x08 \x01(\x03\x12\x17\n\x0f\x63ompleted_at_ms\x18\t \x01(\x03\x12,\n\x05\x65rror\x18\n \x01(\x0b\x32\x18.runanywhere.v1.SDKErrorH\x00\x88\x01\x01\x42\x08\n\x06_error\"\xbe\x03\n\x12ToolCallingOptions\x12-\n\x05tools\x18\x01 \x03(\x0b\x32\x1e.runanywhere.v1.ToolDefinition\x12#\n\x0c\x61uto_execute\x18\x03 \x01(\x08\x42\x08\x8a\xb5\x18\x04trueH\x00\x88\x01\x01\x12\x1d\n\x15replace_system_prompt\x18\x07 \x01(\x08\x12\x1c\n\x14keep_tools_available\x18\x08 \x01(\x08\x12\x37\n\x06\x66ormat\x18\n \x01(\x0e\x32\".runanywhere.v1.ToolCallFormatNameH\x01\x88\x01\x01\x12&\n\x0emax_tool_calls\x18\x0c \x01(\x05\x42\t\x8a\xb5\x18\x01\x35\xa0\xb5\x18\x01H\x02\x88\x01\x01\x12\x33\n\x0btool_choice\x18\r \x01(\x0e\x32\x1e.runanywhere.v1.ToolChoiceMode\x12\x1d\n\x10\x66orced_tool_name\x18\x0e \x01(\tH\x03\x88\x01\x01\x12\x1e\n\x16require_json_arguments\x18\x10 \x01(\x08\x42\x0f\n\r_auto_executeB\t\n\x07_formatB\x11\n\x0f_max_tool_callsB\x13\n\x11_forced_tool_name\"\xdf\x02\n\x11ToolCallingResult\x12\x0c\n\x04text\x18\x01 \x01(\t\x12,\n\ntool_calls\x18\x02 \x03(\x0b\x32\x18.runanywhere.v1.ToolCall\x12\x30\n\x0ctool_results\x18\x03 \x03(\x0b\x32\x1a.runanywhere.v1.ToolResult\x12\x13\n\x0bis_complete\x18\x04 \x01(\x08\x12\x1c\n\x0f\x63onversation_id\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x17\n\x0fiterations_used\x18\x06 \x01(\x05\x12\x10\n\x08raw_text\x18\t \x01(\t\x12\x1d\n\x10thinking_content\x18\n \x01(\tH\x01\x88\x01\x01\x12,\n\x05\x65rror\x18\x0b \x01(\x0b\x32\x18.runanywhere.v1.SDKErrorH\x02\x88\x01\x01\x42\x12\n\x10_conversation_idB\x13\n\x11_thinking_contentB\x08\n\x06_error\"f\n\x10ToolParseRequest\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x38\n\x07options\x18\x02 \x01(\x0b\x32\".runanywhere.v1.ToolCallingOptionsH\x00\x88\x01\x01\x42\n\n\x08_options\"\xa6\x01\n\x0fToolParseResult\x12\x15\n\rhas_tool_call\x18\x01 \x01(\x08\x12,\n\ntool_calls\x18\x02 \x03(\x0b\x32\x18.runanywhere.v1.ToolCall\x12\x16\n\x0eremaining_text\x18\x03 \x01(\t\x12,\n\x05\x65rror\x18\x06 \x01(\x0b\x32\x18.runanywhere.v1.SDKErrorH\x00\x88\x01\x01\x42\x08\n\x06_error\"\xd6\x01\n\x17ToolPromptFormatRequest\x12\x13\n\x0buser_prompt\x18\x01 \x01(\t\x12\x38\n\x07options\x18\x02 \x01(\x0b\x32\".runanywhere.v1.ToolCallingOptionsH\x00\x88\x01\x01\x12\x30\n\x0ctool_results\x18\x03 \x03(\x0b\x32\x1a.runanywhere.v1.ToolResult\x12\x1b\n\x0e\x61ssistant_text\x18\x04 \x01(\tH\x01\x88\x01\x01\x42\n\n\x08_optionsB\x11\n\x0f_assistant_text\"\x9e\x01\n\x16ToolPromptFormatResult\x12\x18\n\x10\x66ormatted_prompt\x18\x01 \x01(\t\x12\x32\n\x06\x66ormat\x18\x02 \x01(\x0e\x32\".runanywhere.v1.ToolCallFormatName\x12,\n\x05\x65rror\x18\x06 \x01(\x0b\x32\x18.runanywhere.v1.SDKErrorH\x00\x88\x01\x01\x42\x08\n\x06_error\"\x8e\x01\n\x19ToolCallValidationRequest\x12+\n\ttool_call\x18\x01 \x01(\x0b\x32\x18.runanywhere.v1.ToolCall\x12\x38\n\x07options\x18\x02 \x01(\x0b\x32\".runanywhere.v1.ToolCallingOptionsH\x00\x88\x01\x01\x42\n\n\x08_options\"\xee\x01\n\x18ToolCallValidationResult\x12\x10\n\x08is_valid\x18\x01 \x01(\x08\x12\x19\n\x11validation_errors\x18\x02 \x03(\t\x12\x39\n\x0cmatched_tool\x18\x03 \x01(\x0b\x32\x1e.runanywhere.v1.ToolDefinitionH\x00\x88\x01\x01\x12!\n\x19normalized_arguments_json\x18\x04 \x01(\t\x12,\n\x05\x65rror\x18\x07 \x01(\x0b\x32\x18.runanywhere.v1.SDKErrorH\x01\x88\x01\x01\x42\x0f\n\r_matched_toolB\x08\n\x06_error*\xd8\x01\n\x11ToolParameterType\x12#\n\x1fTOOL_PARAMETER_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n\x1aTOOL_PARAMETER_TYPE_STRING\x10\x01\x12\x1e\n\x1aTOOL_PARAMETER_TYPE_NUMBER\x10\x02\x12\x1f\n\x1bTOOL_PARAMETER_TYPE_BOOLEAN\x10\x03\x12\x1e\n\x1aTOOL_PARAMETER_TYPE_OBJECT\x10\x04\x12\x1d\n\x19TOOL_PARAMETER_TYPE_ARRAY\x10\x05*{\n\x12ToolCallFormatName\x12%\n!TOOL_CALL_FORMAT_NAME_UNSPECIFIED\x10\x00\x12\x1e\n\x1aTOOL_CALL_FORMAT_NAME_JSON\x10\x01\x12\x1e\n\x1aTOOL_CALL_FORMAT_NAME_LFM2\x10\x07*\xa6\x01\n\x0eToolChoiceMode\x12 \n\x1cTOOL_CHOICE_MODE_UNSPECIFIED\x10\x00\x12\x19\n\x15TOOL_CHOICE_MODE_AUTO\x10\x01\x12\x19\n\x15TOOL_CHOICE_MODE_NONE\x10\x02\x12\x1d\n\x19TOOL_CHOICE_MODE_REQUIRED\x10\x03\x12\x1d\n\x19TOOL_CHOICE_MODE_SPECIFIC\x10\x04\x42\x8b\x01\n\x17\x61i.runanywhere.proto.v1B\x10ToolCallingProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -42,46 +43,46 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_TOOLCALLINGOPTIONS'].fields_by_name['auto_execute']._serialized_options = b'\212\265\030\004true'
   _globals['_TOOLCALLINGOPTIONS'].fields_by_name['max_tool_calls']._loaded_options = None
   _globals['_TOOLCALLINGOPTIONS'].fields_by_name['max_tool_calls']._serialized_options = b'\212\265\030\0015\240\265\030\001'
-  _globals['_TOOLPARAMETERTYPE']._serialized_start=3266
-  _globals['_TOOLPARAMETERTYPE']._serialized_end=3482
-  _globals['_TOOLCALLFORMATNAME']._serialized_start=3484
-  _globals['_TOOLCALLFORMATNAME']._serialized_end=3607
-  _globals['_TOOLCHOICEMODE']._serialized_start=3610
-  _globals['_TOOLCHOICEMODE']._serialized_end=3776
-  _globals['_TOOLVALUE']._serialized_start=58
-  _globals['_TOOLVALUE']._serialized_end=281
-  _globals['_TOOLVALUEARRAY']._serialized_start=283
-  _globals['_TOOLVALUEARRAY']._serialized_end=342
-  _globals['_TOOLVALUEOBJECT']._serialized_start=345
-  _globals['_TOOLVALUEOBJECT']._serialized_end=497
-  _globals['_TOOLVALUEOBJECT_FIELDSENTRY']._serialized_start=425
-  _globals['_TOOLVALUEOBJECT_FIELDSENTRY']._serialized_end=497
-  _globals['_TOOLVALUEJSON']._serialized_start=499
-  _globals['_TOOLVALUEJSON']._serialized_end=528
-  _globals['_TOOLPARAMETER']._serialized_start=531
-  _globals['_TOOLPARAMETER']._serialized_end=784
-  _globals['_TOOLDEFINITION']._serialized_start=787
-  _globals['_TOOLDEFINITION']._serialized_end=1080
-  _globals['_TOOLDEFINITION_METADATAENTRY']._serialized_start=1004
-  _globals['_TOOLDEFINITION_METADATAENTRY']._serialized_end=1051
-  _globals['_TOOLCALL']._serialized_start=1083
-  _globals['_TOOLCALL']._serialized_end=1216
-  _globals['_TOOLRESULT']._serialized_start=1219
-  _globals['_TOOLRESULT']._serialized_end=1383
-  _globals['_TOOLCALLINGOPTIONS']._serialized_start=1386
-  _globals['_TOOLCALLINGOPTIONS']._serialized_end=1832
-  _globals['_TOOLCALLINGRESULT']._serialized_start=1835
-  _globals['_TOOLCALLINGRESULT']._serialized_end=2196
-  _globals['_TOOLPARSEREQUEST']._serialized_start=2198
-  _globals['_TOOLPARSEREQUEST']._serialized_end=2300
-  _globals['_TOOLPARSERESULT']._serialized_start=2303
-  _globals['_TOOLPARSERESULT']._serialized_end=2479
-  _globals['_TOOLPROMPTFORMATREQUEST']._serialized_start=2482
-  _globals['_TOOLPROMPTFORMATREQUEST']._serialized_end=2696
-  _globals['_TOOLPROMPTFORMATRESULT']._serialized_start=2699
-  _globals['_TOOLPROMPTFORMATRESULT']._serialized_end=2867
-  _globals['_TOOLCALLVALIDATIONREQUEST']._serialized_start=2870
-  _globals['_TOOLCALLVALIDATIONREQUEST']._serialized_end=3012
-  _globals['_TOOLCALLVALIDATIONRESULT']._serialized_start=3015
-  _globals['_TOOLCALLVALIDATIONRESULT']._serialized_end=3263
+  _globals['_TOOLPARAMETERTYPE']._serialized_start=3249
+  _globals['_TOOLPARAMETERTYPE']._serialized_end=3465
+  _globals['_TOOLCALLFORMATNAME']._serialized_start=3467
+  _globals['_TOOLCALLFORMATNAME']._serialized_end=3590
+  _globals['_TOOLCHOICEMODE']._serialized_start=3593
+  _globals['_TOOLCHOICEMODE']._serialized_end=3759
+  _globals['_TOOLVALUE']._serialized_start=72
+  _globals['_TOOLVALUE']._serialized_end=295
+  _globals['_TOOLVALUEARRAY']._serialized_start=297
+  _globals['_TOOLVALUEARRAY']._serialized_end=356
+  _globals['_TOOLVALUEOBJECT']._serialized_start=359
+  _globals['_TOOLVALUEOBJECT']._serialized_end=511
+  _globals['_TOOLVALUEOBJECT_FIELDSENTRY']._serialized_start=439
+  _globals['_TOOLVALUEOBJECT_FIELDSENTRY']._serialized_end=511
+  _globals['_TOOLVALUEJSON']._serialized_start=513
+  _globals['_TOOLVALUEJSON']._serialized_end=542
+  _globals['_TOOLPARAMETER']._serialized_start=545
+  _globals['_TOOLPARAMETER']._serialized_end=798
+  _globals['_TOOLDEFINITION']._serialized_start=801
+  _globals['_TOOLDEFINITION']._serialized_end=1094
+  _globals['_TOOLDEFINITION_METADATAENTRY']._serialized_start=1018
+  _globals['_TOOLDEFINITION_METADATAENTRY']._serialized_end=1065
+  _globals['_TOOLCALL']._serialized_start=1097
+  _globals['_TOOLCALL']._serialized_end=1230
+  _globals['_TOOLRESULT']._serialized_start=1233
+  _globals['_TOOLRESULT']._serialized_end=1406
+  _globals['_TOOLCALLINGOPTIONS']._serialized_start=1409
+  _globals['_TOOLCALLINGOPTIONS']._serialized_end=1855
+  _globals['_TOOLCALLINGRESULT']._serialized_start=1858
+  _globals['_TOOLCALLINGRESULT']._serialized_end=2209
+  _globals['_TOOLPARSEREQUEST']._serialized_start=2211
+  _globals['_TOOLPARSEREQUEST']._serialized_end=2313
+  _globals['_TOOLPARSERESULT']._serialized_start=2316
+  _globals['_TOOLPARSERESULT']._serialized_end=2482
+  _globals['_TOOLPROMPTFORMATREQUEST']._serialized_start=2485
+  _globals['_TOOLPROMPTFORMATREQUEST']._serialized_end=2699
+  _globals['_TOOLPROMPTFORMATRESULT']._serialized_start=2702
+  _globals['_TOOLPROMPTFORMATRESULT']._serialized_end=2860
+  _globals['_TOOLCALLVALIDATIONREQUEST']._serialized_start=2863
+  _globals['_TOOLCALLVALIDATIONREQUEST']._serialized_end=3005
+  _globals['_TOOLCALLVALIDATIONRESULT']._serialized_start=3008
+  _globals['_TOOLCALLVALIDATIONRESULT']._serialized_end=3246
 # @@protoc_insertion_point(module_scope)

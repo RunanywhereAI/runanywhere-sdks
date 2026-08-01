@@ -8,12 +8,7 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// RunAnywhere IDL — LLM token streaming service.
-//
-// Server-streaming rpc returning per-token deltas during
-// LLM generation. Replaces the 5 hand-written token-stream implementations
-// (Swift AsyncThrowingStream, Kotlin callbackFlow, Dart StreamController,
-// RN Nitro callback, Web tokenQueue) with one schema + 5 thin adapters.
+// RunAnywhere IDL — LLM request envelopes and streaming events.
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -90,8 +85,7 @@ public nonisolated enum RALLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
 
 }
 
-/// Generation settings live exclusively in `options`. Reserved field numbers
-/// prevent unsafe wire reuse.
+/// The single request envelope for both unary and streaming generation.
 public nonisolated struct RALLMGenerateRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -107,8 +101,6 @@ public nonisolated struct RALLMGenerateRequest: Sendable {
 
   public var metadata: Dictionary<String,String> = [:]
 
-  /// Canonical generation settings. When absent, commons applies its SDK
-  /// defaults; callers that need explicit controls populate this message.
   public var options: RALLMGenerationOptions {
     get {_options ?? RALLMGenerationOptions()}
     set {_options = newValue}
@@ -118,12 +110,8 @@ public nonisolated struct RALLMGenerateRequest: Sendable {
   /// Clears the value of `options`. Subsequent reads from it will return its default value.
   public mutating func clearOptions() {self._options = nil}
 
-  /// Prior conversation turns (excludes the current `prompt`, which
-  /// stays the live user turn, and `options.system_prompt`, which stays
-  /// separate).
-  /// Alternating user/assistant ChatMessages in chronological order. An engine
-  /// that owns its chat template renders {system_prompt, history, prompt} from
-  /// its model's markers; engines that don't simply ignore this field.
+  /// Prior turns, excluding `prompt` (the live user turn) and
+  /// options.system_prompt.
   public var history: [RAChatMessage] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -133,135 +121,126 @@ public nonisolated struct RALLMGenerateRequest: Sendable {
   fileprivate var _options: RALLMGenerationOptions? = nil
 }
 
-/// Aggregate terminal payload emitted by LLMStreamEvent. It intentionally keeps
-/// stream-native token, timing, and error fields distinct from the unary
-/// LLMGenerationResult shape.
-public nonisolated struct RALLMStreamFinalResult: Sendable {
+public nonisolated struct RALLMStreamFinalResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var text: String = String()
+  public var text: String {
+    get {_storage._text}
+    set {_uniqueStorage()._text = newValue}
+  }
 
   public var thinkingContent: String {
-    get {_thinkingContent ?? String()}
-    set {_thinkingContent = newValue}
+    get {_storage._thinkingContent ?? String()}
+    set {_uniqueStorage()._thinkingContent = newValue}
   }
   /// Returns true if `thinkingContent` has been explicitly set.
-  public var hasThinkingContent: Bool {self._thinkingContent != nil}
+  public var hasThinkingContent: Bool {_storage._thinkingContent != nil}
   /// Clears the value of `thinkingContent`. Subsequent reads from it will return its default value.
-  public mutating func clearThinkingContent() {self._thinkingContent = nil}
+  public mutating func clearThinkingContent() {_uniqueStorage()._thinkingContent = nil}
 
-  public var inputTokens: Int32 = 0
-
-  public var outputTokens: Int32 = 0
-
-  public var totalTokens: Int32 = 0
-
-  public var totalTimeMs: Int64 = 0
-
-  public var timeToFirstTokenMs: Int64 = 0
-
-  public var tokensPerSecond: Float = 0
-
-  public var finishReason: String = String()
-
-  public var errorCode: Int32 = 0
-
-  public var errorMessage: String = String()
-
-  public var promptEvalTimeMs: Int64 = 0
-
-  public var decodeTimeMs: Int64 = 0
-
-  /// Tool calls actually executed during the streaming session (mirrors
-  /// LLMGenerationResult.tool_calls / .tool_results in llm_options.proto).
-  /// Populated only on terminal events when the backend completed at least
-  /// one tool call.
-  public var toolCalls: [RAToolCall] = []
-
-  public var toolResults: [RAToolResult] = []
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _thinkingContent: String? = nil
-}
-
-/// Unified per-token streaming event. Replaces
-/// LLMToken (deleted) and the per-SDK hand-rolled AsyncThrowingStream /
-/// callbackFlow / StreamController / tokenQueue. One serialized event
-/// per generated token. Mirrors VoiceEvent's seq + timestamp_us pattern
-/// from voice_events.proto so frontends can reuse gap-detection logic.
-public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Monotonic per-process sequence number. Useful for frontends that
-  /// need to detect gaps or out-of-order delivery.
-  public var seq: UInt64 {
-    get {_storage._seq}
-    set {_uniqueStorage()._seq = newValue}
+  public var totalTimeMs: Int64 {
+    get {_storage._totalTimeMs}
+    set {_uniqueStorage()._totalTimeMs = newValue}
   }
 
-  /// Wall-clock timestamp captured at the C++ edge, in microseconds
-  /// since Unix epoch. Frontends may re-timestamp for UI display.
-  public var timestampUs: Int64 {
-    get {_storage._timestampUs}
-    set {_uniqueStorage()._timestampUs = newValue}
+  public var timeToFirstTokenMs: Int64 {
+    get {_storage._timeToFirstTokenMs}
+    set {_uniqueStorage()._timeToFirstTokenMs = newValue}
   }
 
-  /// Generated token text. Empty on terminal events where only
-  /// finish_reason or error_message is populated.
-  public var token: String {
-    get {_storage._token}
-    set {_uniqueStorage()._token = newValue}
-  }
-
-  /// True on the last event of a generation.
-  public var isFinal: Bool {
-    get {_storage._isFinal}
-    set {_uniqueStorage()._isFinal = newValue}
-  }
-
-  /// Token semantic category (answer / thought / tool-call).
-  /// Canonical TokenKind from voice_events.proto.
-  public var kind: RATokenKind {
-    get {_storage._kind}
-    set {_uniqueStorage()._kind = newValue}
-  }
-
-  /// Backend-provided token id when the engine exposes it; 0 = unset
-  /// (proto3 scalar default).
-  public var tokenID: UInt32 {
-    get {_storage._tokenID}
-    set {_uniqueStorage()._tokenID = newValue}
-  }
-
-  /// Per-token log-probability when supported; 0.0 = unset.
-  public var logprob: Float {
-    get {_storage._logprob}
-    set {_uniqueStorage()._logprob = newValue}
-  }
-
-  /// Reason the stream stopped: "stop", "length", "cancelled", "error",
-  /// "" = unset (proto3 scalar default). Only populated when is_final.
   public var finishReason: String {
     get {_storage._finishReason}
     set {_uniqueStorage()._finishReason = newValue}
   }
 
-  /// Error message on failure events (kind may be unset, is_final true).
-  /// Empty on success.
-  public var errorMessage: String {
-    get {_storage._errorMessage}
-    set {_uniqueStorage()._errorMessage = newValue}
+  public var promptEvalTimeMs: Int64 {
+    get {_storage._promptEvalTimeMs}
+    set {_uniqueStorage()._promptEvalTimeMs = newValue}
   }
 
-  /// Final aggregate result. Only populated on terminal events
-  /// (is_final=true) when the backend can report result metrics.
+  public var decodeTimeMs: Int64 {
+    get {_storage._decodeTimeMs}
+    set {_uniqueStorage()._decodeTimeMs = newValue}
+  }
+
+  public var toolCalls: [RAToolCall] {
+    get {_storage._toolCalls}
+    set {_uniqueStorage()._toolCalls = newValue}
+  }
+
+  public var toolResults: [RAToolResult] {
+    get {_storage._toolResults}
+    set {_uniqueStorage()._toolResults = newValue}
+  }
+
+  public var usage: RATokenUsage {
+    get {_storage._usage ?? RATokenUsage()}
+    set {_uniqueStorage()._usage = newValue}
+  }
+  /// Returns true if `usage` has been explicitly set.
+  public var hasUsage: Bool {_storage._usage != nil}
+  /// Clears the value of `usage`. Subsequent reads from it will return its default value.
+  public mutating func clearUsage() {_uniqueStorage()._usage = nil}
+
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+/// `result` is populated only on the terminal event.
+public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var timestampUs: Int64 {
+    get {_storage._timestampUs}
+    set {_uniqueStorage()._timestampUs = newValue}
+  }
+
+  public var token: String {
+    get {_storage._token}
+    set {_uniqueStorage()._token = newValue}
+  }
+
+  public var isFinal: Bool {
+    get {_storage._isFinal}
+    set {_uniqueStorage()._isFinal = newValue}
+  }
+
+  public var kind: RATokenKind {
+    get {_storage._kind}
+    set {_uniqueStorage()._kind = newValue}
+  }
+
+  public var tokenID: UInt32 {
+    get {_storage._tokenID}
+    set {_uniqueStorage()._tokenID = newValue}
+  }
+
+  public var logprob: Float {
+    get {_storage._logprob}
+    set {_uniqueStorage()._logprob = newValue}
+  }
+
+  public var finishReason: String {
+    get {_storage._finishReason}
+    set {_uniqueStorage()._finishReason = newValue}
+  }
+
   public var result: RALLMStreamFinalResult {
     get {_storage._result ?? RALLMStreamFinalResult()}
     set {_uniqueStorage()._result = newValue}
@@ -271,20 +250,11 @@ public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
   /// Clears the value of `result`. Subsequent reads from it will return its default value.
   public mutating func clearResult() {_uniqueStorage()._result = nil}
 
-  /// Numeric backend status code when the terminal event represents a
-  /// failure. 0 = unset/success.
-  public var errorCode: Int32 {
-    get {_storage._errorCode}
-    set {_uniqueStorage()._errorCode = newValue}
-  }
-
-  /// Event classification distinct from token semantic kind.
   public var eventKind: RALLMStreamEventKind {
     get {_storage._eventKind}
     set {_uniqueStorage()._eventKind = newValue}
   }
 
-  /// Request/session correlation fields.
   public var requestID: String {
     get {_storage._requestID}
     set {_uniqueStorage()._requestID = newValue}
@@ -295,7 +265,6 @@ public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
     set {_uniqueStorage()._conversationID = newValue}
   }
 
-  /// Running counters for progress UIs.
   public var promptTokensProcessed: Int32 {
     get {_storage._promptTokensProcessed}
     set {_uniqueStorage()._promptTokensProcessed = newValue}
@@ -311,8 +280,6 @@ public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
     set {_uniqueStorage()._elapsedMs = newValue}
   }
 
-  /// Structured tool-call payload emitted when event_kind is
-  /// LLM_STREAM_EVENT_KIND_TOOL_CALL.
   public var toolCall: RAToolCall {
     get {_storage._toolCall ?? RAToolCall()}
     set {_uniqueStorage()._toolCall = newValue}
@@ -322,6 +289,15 @@ public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
   /// Clears the value of `toolCall`. Subsequent reads from it will return its default value.
   public mutating func clearToolCall() {_uniqueStorage()._toolCall = nil}
 
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -329,24 +305,14 @@ public nonisolated struct RALLMStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-/// ---------------------------------------------------------------------------
-/// Tool-calling session / run-loop envelopes. They live here (not in
-/// tool_calling.proto) because they carry an LLMGenerationOptions and
-/// llm_options.proto already imports tool_calling.proto — the reverse import
-/// would be a cycle. Moving them ended the inline re-declaration of sampling
-/// knobs the old ToolCallingSessionCreateRequest carried.
-/// ---------------------------------------------------------------------------
+/// Tool-driven streaming uses this session path, not LLMGenerateRequest.
 public nonisolated struct RAToolCallingSessionCreateRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// The live user turn.
   public var prompt: String = String()
 
-  /// Sampling, reasoning, system prompt — the same canonical knobs as any
-  /// other generation. tools/tool_choice policy travels in
-  /// generation.tool_calling.
   public var generation: RALLMGenerationOptions {
     get {_generation ?? RALLMGenerationOptions()}
     set {_generation = newValue}
@@ -356,10 +322,7 @@ public nonisolated struct RAToolCallingSessionCreateRequest: Sendable {
   /// Clears the value of `generation`. Subsequent reads from it will return its default value.
   public mutating func clearGeneration() {self._generation = nil}
 
-  /// proto3 `optional` enables presence detection. When unset, commons
-  /// defaults to validate_calls=true so unknown tool calls short-circuit
-  /// before host execution. Callers that delegate validation to their
-  /// executor must explicitly set false.
+  /// Unset preserves commons' secure default of validate=true.
   public var validateCalls: Bool {
     get {_validateCalls ?? false}
     set {_validateCalls = newValue}
@@ -369,8 +332,6 @@ public nonisolated struct RAToolCallingSessionCreateRequest: Sendable {
   /// Clears the value of `validateCalls`. Subsequent reads from it will return its default value.
   public mutating func clearValidateCalls() {self._validateCalls = nil}
 
-  /// Prior conversation turns (excluding `prompt`), same contract as
-  /// LLMGenerateRequest.history.
   public var history: [RAChatMessage] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -381,18 +342,6 @@ public nonisolated struct RAToolCallingSessionCreateRequest: Sendable {
   fileprivate var _validateCalls: Bool? = nil
 }
 
-public nonisolated struct RAToolCallingSessionCreateResult: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var sessionHandle: UInt64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
 public nonisolated struct RAToolCallingSessionEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -400,7 +349,7 @@ public nonisolated struct RAToolCallingSessionEvent: Sendable {
 
   public var kind: RAToolCallingSessionEvent.OneOf_Kind? = nil
 
-  /// serialized LLMStreamEvent proto
+  /// serialized LLMStreamEvent
   public var llmStreamEventBytes: Data {
     get {
       if case .llmStreamEventBytes(let v)? = kind {return v}
@@ -425,7 +374,7 @@ public nonisolated struct RAToolCallingSessionEvent: Sendable {
     set {kind = .finalResult(newValue)}
   }
 
-  /// serialized SDKError proto
+  /// serialized SDKError
   public var errorBytes: Data {
     get {
       if case .errorBytes(let v)? = kind {return v}
@@ -439,11 +388,11 @@ public nonisolated struct RAToolCallingSessionEvent: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_Kind: Equatable, Sendable {
-    /// serialized LLMStreamEvent proto
+    /// serialized LLMStreamEvent
     case llmStreamEventBytes(Data)
     case toolCall(RAToolCall)
     case finalResult(RAToolCallingResult)
-    /// serialized SDKError proto
+    /// serialized SDKError
     case errorBytes(Data)
 
   }
@@ -451,6 +400,7 @@ public nonisolated struct RAToolCallingSessionEvent: Sendable {
   public init() {}
 }
 
+/// Hands a caller-executed tool result back into a running session.
 public nonisolated struct RAToolCallingSessionStepWithResultRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -478,18 +428,6 @@ public nonisolated struct RAToolCallingSessionStepWithResultRequest: Sendable {
   fileprivate var _error: String? = nil
 }
 
-public nonisolated struct RAToolCallingSessionDestroyRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var sessionHandle: UInt64 = 0
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
@@ -500,7 +438,7 @@ nonisolated extension RALLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {
 
 nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{4}\u{d}request_id\0\u{3}model_id\0\u{3}conversation_id\0\u{2}\u{9}metadata\0\u{1}options\0\u{1}history\0\u{c}\u{2}\u{c}\u{c}\u{11}\u{8}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{4}\u{d}request_id\0\u{3}model_id\0\u{3}conversation_id\0\u{2}\u{9}metadata\0\u{1}options\0\u{1}history\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -564,131 +502,20 @@ nonisolated extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf
 
 nonisolated extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMStreamFinalResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{3}input_tokens\0\u{3}output_tokens\0\u{3}total_tokens\0\u{3}total_time_ms\0\u{3}time_to_first_token_ms\0\u{3}tokens_per_second\0\u{3}finish_reason\0\u{3}error_code\0\u{3}error_message\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._thinkingContent) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.inputTokens) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.outputTokens) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.totalTokens) }()
-      case 6: try { try decoder.decodeSingularInt64Field(value: &self.totalTimeMs) }()
-      case 7: try { try decoder.decodeSingularInt64Field(value: &self.timeToFirstTokenMs) }()
-      case 8: try { try decoder.decodeSingularFloatField(value: &self.tokensPerSecond) }()
-      case 9: try { try decoder.decodeSingularStringField(value: &self.finishReason) }()
-      case 10: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
-      case 12: try { try decoder.decodeSingularInt64Field(value: &self.promptEvalTimeMs) }()
-      case 13: try { try decoder.decodeSingularInt64Field(value: &self.decodeTimeMs) }()
-      case 14: try { try decoder.decodeRepeatedMessageField(value: &self.toolCalls) }()
-      case 15: try { try decoder.decodeRepeatedMessageField(value: &self.toolResults) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.text.isEmpty {
-      try visitor.visitSingularStringField(value: self.text, fieldNumber: 1)
-    }
-    try { if let v = self._thinkingContent {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    if self.inputTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.inputTokens, fieldNumber: 3)
-    }
-    if self.outputTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.outputTokens, fieldNumber: 4)
-    }
-    if self.totalTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.totalTokens, fieldNumber: 5)
-    }
-    if self.totalTimeMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.totalTimeMs, fieldNumber: 6)
-    }
-    if self.timeToFirstTokenMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.timeToFirstTokenMs, fieldNumber: 7)
-    }
-    if self.tokensPerSecond.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.tokensPerSecond, fieldNumber: 8)
-    }
-    if !self.finishReason.isEmpty {
-      try visitor.visitSingularStringField(value: self.finishReason, fieldNumber: 9)
-    }
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 10)
-    }
-    if !self.errorMessage.isEmpty {
-      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 11)
-    }
-    if self.promptEvalTimeMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.promptEvalTimeMs, fieldNumber: 12)
-    }
-    if self.decodeTimeMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.decodeTimeMs, fieldNumber: 13)
-    }
-    if !self.toolCalls.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.toolCalls, fieldNumber: 14)
-    }
-    if !self.toolResults.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.toolResults, fieldNumber: 15)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RALLMStreamFinalResult, rhs: RALLMStreamFinalResult) -> Bool {
-    if lhs.text != rhs.text {return false}
-    if lhs._thinkingContent != rhs._thinkingContent {return false}
-    if lhs.inputTokens != rhs.inputTokens {return false}
-    if lhs.outputTokens != rhs.outputTokens {return false}
-    if lhs.totalTokens != rhs.totalTokens {return false}
-    if lhs.totalTimeMs != rhs.totalTimeMs {return false}
-    if lhs.timeToFirstTokenMs != rhs.timeToFirstTokenMs {return false}
-    if lhs.tokensPerSecond != rhs.tokensPerSecond {return false}
-    if lhs.finishReason != rhs.finishReason {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
-    if lhs.errorMessage != rhs.errorMessage {return false}
-    if lhs.promptEvalTimeMs != rhs.promptEvalTimeMs {return false}
-    if lhs.decodeTimeMs != rhs.decodeTimeMs {return false}
-    if lhs.toolCalls != rhs.toolCalls {return false}
-    if lhs.toolResults != rhs.toolResults {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".LLMStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{1}token\0\u{3}is_final\0\u{1}kind\0\u{3}token_id\0\u{1}logprob\0\u{3}finish_reason\0\u{3}error_message\0\u{1}result\0\u{3}error_code\0\u{3}event_kind\0\u{3}request_id\0\u{3}conversation_id\0\u{3}prompt_tokens_processed\0\u{3}completion_tokens_generated\0\u{3}elapsed_ms\0\u{3}tool_call\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{4}\u{4}total_time_ms\0\u{3}time_to_first_token_ms\0\u{4}\u{2}finish_reason\0\u{4}\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0\u{1}usage\0\u{1}error\0")
 
   fileprivate class _StorageClass {
-    var _seq: UInt64 = 0
-    var _timestampUs: Int64 = 0
-    var _token: String = String()
-    var _isFinal: Bool = false
-    var _kind: RATokenKind = .unspecified
-    var _tokenID: UInt32 = 0
-    var _logprob: Float = 0
+    var _text: String = String()
+    var _thinkingContent: String? = nil
+    var _totalTimeMs: Int64 = 0
+    var _timeToFirstTokenMs: Int64 = 0
     var _finishReason: String = String()
-    var _errorMessage: String = String()
-    var _result: RALLMStreamFinalResult? = nil
-    var _errorCode: Int32 = 0
-    var _eventKind: RALLMStreamEventKind = .unspecified
-    var _requestID: String = String()
-    var _conversationID: String = String()
-    var _promptTokensProcessed: Int32 = 0
-    var _completionTokensGenerated: Int32 = 0
-    var _elapsedMs: Int64 = 0
-    var _toolCall: RAToolCall? = nil
+    var _promptEvalTimeMs: Int64 = 0
+    var _decodeTimeMs: Int64 = 0
+    var _toolCalls: [RAToolCall] = []
+    var _toolResults: [RAToolResult] = []
+    var _usage: RATokenUsage? = nil
+    var _error: RASDKError? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -699,24 +526,17 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
     private init() {}
 
     init(copying source: _StorageClass) {
-      _seq = source._seq
-      _timestampUs = source._timestampUs
-      _token = source._token
-      _isFinal = source._isFinal
-      _kind = source._kind
-      _tokenID = source._tokenID
-      _logprob = source._logprob
+      _text = source._text
+      _thinkingContent = source._thinkingContent
+      _totalTimeMs = source._totalTimeMs
+      _timeToFirstTokenMs = source._timeToFirstTokenMs
       _finishReason = source._finishReason
-      _errorMessage = source._errorMessage
-      _result = source._result
-      _errorCode = source._errorCode
-      _eventKind = source._eventKind
-      _requestID = source._requestID
-      _conversationID = source._conversationID
-      _promptTokensProcessed = source._promptTokensProcessed
-      _completionTokensGenerated = source._completionTokensGenerated
-      _elapsedMs = source._elapsedMs
-      _toolCall = source._toolCall
+      _promptEvalTimeMs = source._promptEvalTimeMs
+      _decodeTimeMs = source._decodeTimeMs
+      _toolCalls = source._toolCalls
+      _toolResults = source._toolResults
+      _usage = source._usage
+      _error = source._error
     }
   }
 
@@ -735,24 +555,17 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
         // allocates stack space for every case branch when no optimizations are
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
-        case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._seq) }()
-        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
-        case 3: try { try decoder.decodeSingularStringField(value: &_storage._token) }()
-        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._isFinal) }()
-        case 5: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
-        case 6: try { try decoder.decodeSingularUInt32Field(value: &_storage._tokenID) }()
-        case 7: try { try decoder.decodeSingularFloatField(value: &_storage._logprob) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._finishReason) }()
-        case 9: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
-        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
-        case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
-        case 12: try { try decoder.decodeSingularEnumField(value: &_storage._eventKind) }()
-        case 13: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
-        case 14: try { try decoder.decodeSingularStringField(value: &_storage._conversationID) }()
-        case 15: try { try decoder.decodeSingularInt32Field(value: &_storage._promptTokensProcessed) }()
-        case 16: try { try decoder.decodeSingularInt32Field(value: &_storage._completionTokensGenerated) }()
-        case 17: try { try decoder.decodeSingularInt64Field(value: &_storage._elapsedMs) }()
-        case 18: try { try decoder.decodeSingularMessageField(value: &_storage._toolCall) }()
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._text) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._thinkingContent) }()
+        case 6: try { try decoder.decodeSingularInt64Field(value: &_storage._totalTimeMs) }()
+        case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._timeToFirstTokenMs) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._finishReason) }()
+        case 12: try { try decoder.decodeSingularInt64Field(value: &_storage._promptEvalTimeMs) }()
+        case 13: try { try decoder.decodeSingularInt64Field(value: &_storage._decodeTimeMs) }()
+        case 14: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolCalls) }()
+        case 15: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolResults) }()
+        case 16: try { try decoder.decodeSingularMessageField(value: &_storage._usage) }()
+        case 17: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
         }
       }
@@ -765,9 +578,161 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       // allocates stack space for every if/case branch local when no optimizations
       // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
       // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._seq != 0 {
-        try visitor.visitSingularUInt64Field(value: _storage._seq, fieldNumber: 1)
+      if !_storage._text.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._text, fieldNumber: 1)
       }
+      try { if let v = _storage._thinkingContent {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+      } }()
+      if _storage._totalTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._totalTimeMs, fieldNumber: 6)
+      }
+      if _storage._timeToFirstTokenMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._timeToFirstTokenMs, fieldNumber: 7)
+      }
+      if !_storage._finishReason.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._finishReason, fieldNumber: 9)
+      }
+      if _storage._promptEvalTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._promptEvalTimeMs, fieldNumber: 12)
+      }
+      if _storage._decodeTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._decodeTimeMs, fieldNumber: 13)
+      }
+      if !_storage._toolCalls.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._toolCalls, fieldNumber: 14)
+      }
+      if !_storage._toolResults.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._toolResults, fieldNumber: 15)
+      }
+      try { if let v = _storage._usage {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 17)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RALLMStreamFinalResult, rhs: RALLMStreamFinalResult) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._text != rhs_storage._text {return false}
+        if _storage._thinkingContent != rhs_storage._thinkingContent {return false}
+        if _storage._totalTimeMs != rhs_storage._totalTimeMs {return false}
+        if _storage._timeToFirstTokenMs != rhs_storage._timeToFirstTokenMs {return false}
+        if _storage._finishReason != rhs_storage._finishReason {return false}
+        if _storage._promptEvalTimeMs != rhs_storage._promptEvalTimeMs {return false}
+        if _storage._decodeTimeMs != rhs_storage._decodeTimeMs {return false}
+        if _storage._toolCalls != rhs_storage._toolCalls {return false}
+        if _storage._toolResults != rhs_storage._toolResults {return false}
+        if _storage._usage != rhs_storage._usage {return false}
+        if _storage._error != rhs_storage._error {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LLMStreamEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}timestamp_us\0\u{1}token\0\u{3}is_final\0\u{1}kind\0\u{3}token_id\0\u{1}logprob\0\u{3}finish_reason\0\u{2}\u{2}result\0\u{4}\u{2}event_kind\0\u{3}request_id\0\u{3}conversation_id\0\u{3}prompt_tokens_processed\0\u{3}completion_tokens_generated\0\u{3}elapsed_ms\0\u{3}tool_call\0\u{1}error\0")
+
+  fileprivate class _StorageClass {
+    var _timestampUs: Int64 = 0
+    var _token: String = String()
+    var _isFinal: Bool = false
+    var _kind: RATokenKind = .unspecified
+    var _tokenID: UInt32 = 0
+    var _logprob: Float = 0
+    var _finishReason: String = String()
+    var _result: RALLMStreamFinalResult? = nil
+    var _eventKind: RALLMStreamEventKind = .unspecified
+    var _requestID: String = String()
+    var _conversationID: String = String()
+    var _promptTokensProcessed: Int32 = 0
+    var _completionTokensGenerated: Int32 = 0
+    var _elapsedMs: Int64 = 0
+    var _toolCall: RAToolCall? = nil
+    var _error: RASDKError? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _timestampUs = source._timestampUs
+      _token = source._token
+      _isFinal = source._isFinal
+      _kind = source._kind
+      _tokenID = source._tokenID
+      _logprob = source._logprob
+      _finishReason = source._finishReason
+      _result = source._result
+      _eventKind = source._eventKind
+      _requestID = source._requestID
+      _conversationID = source._conversationID
+      _promptTokensProcessed = source._promptTokensProcessed
+      _completionTokensGenerated = source._completionTokensGenerated
+      _elapsedMs = source._elapsedMs
+      _toolCall = source._toolCall
+      _error = source._error
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._token) }()
+        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._isFinal) }()
+        case 5: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
+        case 6: try { try decoder.decodeSingularUInt32Field(value: &_storage._tokenID) }()
+        case 7: try { try decoder.decodeSingularFloatField(value: &_storage._logprob) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._finishReason) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
+        case 12: try { try decoder.decodeSingularEnumField(value: &_storage._eventKind) }()
+        case 13: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 14: try { try decoder.decodeSingularStringField(value: &_storage._conversationID) }()
+        case 15: try { try decoder.decodeSingularInt32Field(value: &_storage._promptTokensProcessed) }()
+        case 16: try { try decoder.decodeSingularInt32Field(value: &_storage._completionTokensGenerated) }()
+        case 17: try { try decoder.decodeSingularInt64Field(value: &_storage._elapsedMs) }()
+        case 18: try { try decoder.decodeSingularMessageField(value: &_storage._toolCall) }()
+        case 19: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
       if _storage._timestampUs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
       }
@@ -789,15 +754,9 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       if !_storage._finishReason.isEmpty {
         try visitor.visitSingularStringField(value: _storage._finishReason, fieldNumber: 8)
       }
-      if !_storage._errorMessage.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._errorMessage, fieldNumber: 9)
-      }
       try { if let v = _storage._result {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
       } }()
-      if _storage._errorCode != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 11)
-      }
       if _storage._eventKind != .unspecified {
         try visitor.visitSingularEnumField(value: _storage._eventKind, fieldNumber: 12)
       }
@@ -819,6 +778,9 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       try { if let v = _storage._toolCall {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
       } }()
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 19)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -828,7 +790,6 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
         let _storage = _args.0
         let rhs_storage = _args.1
-        if _storage._seq != rhs_storage._seq {return false}
         if _storage._timestampUs != rhs_storage._timestampUs {return false}
         if _storage._token != rhs_storage._token {return false}
         if _storage._isFinal != rhs_storage._isFinal {return false}
@@ -836,9 +797,7 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
         if _storage._tokenID != rhs_storage._tokenID {return false}
         if _storage._logprob != rhs_storage._logprob {return false}
         if _storage._finishReason != rhs_storage._finishReason {return false}
-        if _storage._errorMessage != rhs_storage._errorMessage {return false}
         if _storage._result != rhs_storage._result {return false}
-        if _storage._errorCode != rhs_storage._errorCode {return false}
         if _storage._eventKind != rhs_storage._eventKind {return false}
         if _storage._requestID != rhs_storage._requestID {return false}
         if _storage._conversationID != rhs_storage._conversationID {return false}
@@ -846,6 +805,7 @@ nonisolated extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
         if _storage._completionTokensGenerated != rhs_storage._completionTokensGenerated {return false}
         if _storage._elapsedMs != rhs_storage._elapsedMs {return false}
         if _storage._toolCall != rhs_storage._toolCall {return false}
+        if _storage._error != rhs_storage._error {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -899,36 +859,6 @@ nonisolated extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, 
     if lhs._generation != rhs._generation {return false}
     if lhs._validateCalls != rhs._validateCalls {return false}
     if lhs.history != rhs.history {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAToolCallingSessionCreateResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionCreateResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_handle\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.sessionHandle) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.sessionHandle != 0 {
-      try visitor.visitSingularUInt64Field(value: self.sessionHandle, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAToolCallingSessionCreateResult, rhs: RAToolCallingSessionCreateResult) -> Bool {
-    if lhs.sessionHandle != rhs.sessionHandle {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1074,36 +1004,6 @@ nonisolated extension RAToolCallingSessionStepWithResultRequest: SwiftProtobuf.M
     if lhs.toolCallID != rhs.toolCallID {return false}
     if lhs.resultJson != rhs.resultJson {return false}
     if lhs._error != rhs._error {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension RAToolCallingSessionDestroyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionDestroyRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_handle\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.sessionHandle) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.sessionHandle != 0 {
-      try visitor.visitSingularUInt64Field(value: self.sessionHandle, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAToolCallingSessionDestroyRequest, rhs: RAToolCallingSessionDestroyRequest) -> Bool {
-    if lhs.sessionHandle != rhs.sessionHandle {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

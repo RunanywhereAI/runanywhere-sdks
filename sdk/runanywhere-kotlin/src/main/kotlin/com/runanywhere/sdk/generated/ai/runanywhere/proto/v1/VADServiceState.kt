@@ -79,20 +79,11 @@ public class VADServiceState(
   )
   public val current_model: String? = null,
   @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 6,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 7,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADServiceState, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -111,8 +102,7 @@ public class VADServiceState(
     if (sample_rate != other.sample_rate) return false
     if (frame_length_ms != other.frame_length_ms) return false
     if (current_model != other.current_model) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -126,8 +116,7 @@ public class VADServiceState(
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + frame_length_ms.hashCode()
       result = result * 37 + (current_model?.hashCode() ?: 0)
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -141,8 +130,7 @@ public class VADServiceState(
     result += """sample_rate=$sample_rate"""
     result += """frame_length_ms=$frame_length_ms"""
     if (current_model != null) result += """current_model=${sanitize(current_model)}"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "VADServiceState{", separator = ", ", postfix = "}")
   }
 
@@ -153,10 +141,9 @@ public class VADServiceState(
     sample_rate: Int = this.sample_rate,
     frame_length_ms: Int = this.frame_length_ms,
     current_model: String? = this.current_model,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VADServiceState = VADServiceState(is_ready, is_speech_active, energy_threshold, sample_rate, frame_length_ms, current_model, error_message, error_code, unknownFields)
+  ): VADServiceState = VADServiceState(is_ready, is_speech_active, energy_threshold, sample_rate, frame_length_ms, current_model, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -186,10 +173,7 @@ public class VADServiceState(
           size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.frame_length_ms)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.current_model)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
 
@@ -210,19 +194,13 @@ public class VADServiceState(
           ProtoAdapter.INT32.encodeWithTag(writer, 5, value.frame_length_ms)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.current_model)
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADServiceState) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.current_model)
         if (value.frame_length_ms != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 5, value.frame_length_ms)
@@ -248,8 +226,7 @@ public class VADServiceState(
         var sample_rate: Int = 0
         var frame_length_ms: Int = 0
         var current_model: String? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_ready = ProtoAdapter.BOOL.decode(reader)
@@ -258,8 +235,7 @@ public class VADServiceState(
             4 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             5 -> frame_length_ms = ProtoAdapter.INT32.decode(reader)
             6 -> current_model = ProtoAdapter.STRING.decode(reader)
-            7 -> error_message = ProtoAdapter.STRING.decode(reader)
-            8 -> error_code = ProtoAdapter.INT32.decode(reader)
+            9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -270,13 +246,13 @@ public class VADServiceState(
           sample_rate = sample_rate,
           frame_length_ms = frame_length_ms,
           current_model = current_model,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: VADServiceState): VADServiceState = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

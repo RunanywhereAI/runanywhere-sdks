@@ -31,18 +31,11 @@ import okio.ByteString
 
 public class VADStreamEvent(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val seq: Long = 0L,
-  @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
@@ -50,49 +43,40 @@ public class VADStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val request_id: String = "",
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.VADStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val kind: VADStreamEventKind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.VADResult#ADAPTER",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val result: VADResult? = null,
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.SpeechActivityEvent#ADAPTER",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val activity: SpeechActivityEvent? = null,
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.VADStatistics#ADAPTER",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val statistics: VADStatistics? = null,
   @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 7,
+    tag = 10,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 6,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 8,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADStreamEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -105,15 +89,13 @@ public class VADStreamEvent(
     if (other === this) return true
     if (other !is VADStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
-    if (seq != other.seq) return false
     if (timestamp_us != other.timestamp_us) return false
     if (request_id != other.request_id) return false
     if (kind != other.kind) return false
     if (result != other.result) return false
     if (activity != other.activity) return false
     if (statistics != other.statistics) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -121,15 +103,13 @@ public class VADStreamEvent(
     var result_ = super.hashCode
     if (result_ == 0) {
       result_ = unknownFields.hashCode()
-      result_ = result_ * 37 + seq.hashCode()
       result_ = result_ * 37 + timestamp_us.hashCode()
       result_ = result_ * 37 + request_id.hashCode()
       result_ = result_ * 37 + kind.hashCode()
       result_ = result_ * 37 + (result?.hashCode() ?: 0)
       result_ = result_ * 37 + (activity?.hashCode() ?: 0)
       result_ = result_ * 37 + (statistics?.hashCode() ?: 0)
-      result_ = result_ * 37 + (error_message?.hashCode() ?: 0)
-      result_ = result_ * 37 + error_code.hashCode()
+      result_ = result_ * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result_
     }
     return result_
@@ -137,30 +117,26 @@ public class VADStreamEvent(
 
   override fun toString(): String {
     val result_ = mutableListOf<String>()
-    result_ += """seq=$seq"""
     result_ += """timestamp_us=$timestamp_us"""
     result_ += """request_id=${sanitize(request_id)}"""
     result_ += """kind=$kind"""
     if (result != null) result_ += """result=$result"""
     if (activity != null) result_ += """activity=$activity"""
     if (statistics != null) result_ += """statistics=$statistics"""
-    if (error_message != null) result_ += """error_message=${sanitize(error_message)}"""
-    result_ += """error_code=$error_code"""
+    if (error != null) result_ += """error=$error"""
     return result_.joinToString(prefix = "VADStreamEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
     request_id: String = this.request_id,
     kind: VADStreamEventKind = this.kind,
     result: VADResult? = this.result,
     activity: SpeechActivityEvent? = this.activity,
     statistics: VADStatistics? = this.statistics,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VADStreamEvent = VADStreamEvent(seq, timestamp_us, request_id, kind, result, activity, statistics, error_message, error_code, unknownFields)
+  ): VADStreamEvent = VADStreamEvent(timestamp_us, request_id, kind, result, activity, statistics, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -174,9 +150,6 @@ public class VADStreamEvent(
     ) {
       override fun encodedSize(`value`: VADStreamEvent): Int {
         var size = value.unknownFields.size
-        if (value.seq != 0L) {
-          size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
         }
@@ -189,17 +162,11 @@ public class VADStreamEvent(
         size += VADResult.ADAPTER.encodedSizeWithTag(5, value.result)
         size += SpeechActivityEvent.ADAPTER.encodedSizeWithTag(6, value.activity)
         size += VADStatistics.ADAPTER.encodedSizeWithTag(7, value.statistics)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(10, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: VADStreamEvent) {
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
@@ -212,19 +179,13 @@ public class VADStreamEvent(
         VADResult.ADAPTER.encodeWithTag(writer, 5, value.result)
         SpeechActivityEvent.ADAPTER.encodeWithTag(writer, 6, value.activity)
         VADStatistics.ADAPTER.encodeWithTag(writer, 7, value.statistics)
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADStreamEvent) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
         VADStatistics.ADAPTER.encodeWithTag(writer, 7, value.statistics)
         SpeechActivityEvent.ADAPTER.encodeWithTag(writer, 6, value.activity)
         VADResult.ADAPTER.encodeWithTag(writer, 5, value.result)
@@ -237,24 +198,18 @@ public class VADStreamEvent(
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
-        }
       }
 
       override fun decode(reader: ProtoReader): VADStreamEvent {
-        var seq: Long = 0L
         var timestamp_us: Long = 0L
         var request_id: String = ""
         var kind: VADStreamEventKind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED
         var result: VADResult? = null
         var activity: SpeechActivityEvent? = null
         var statistics: VADStatistics? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> seq = ProtoAdapter.UINT64.decode(reader)
             2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             3 -> request_id = ProtoAdapter.STRING.decode(reader)
             4 -> try {
@@ -265,21 +220,18 @@ public class VADStreamEvent(
             5 -> result = VADResult.ADAPTER.decode(reader)
             6 -> activity = SpeechActivityEvent.ADAPTER.decode(reader)
             7 -> statistics = VADStatistics.ADAPTER.decode(reader)
-            8 -> error_message = ProtoAdapter.STRING.decode(reader)
-            9 -> error_code = ProtoAdapter.INT32.decode(reader)
+            10 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VADStreamEvent(
-          seq = seq,
           timestamp_us = timestamp_us,
           request_id = request_id,
           kind = kind,
           result = result,
           activity = activity,
           statistics = statistics,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -288,6 +240,7 @@ public class VADStreamEvent(
         result = value.result?.let(VADResult.ADAPTER::redact),
         activity = value.activity?.let(SpeechActivityEvent.ADAPTER::redact),
         statistics = value.statistics?.let(VADStatistics.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

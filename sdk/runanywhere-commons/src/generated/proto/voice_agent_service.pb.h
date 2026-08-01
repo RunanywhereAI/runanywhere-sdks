@@ -2266,8 +2266,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
     kSynthesizedAudioFieldNumber = 5,
     kSessionIdFieldNumber = 10,
     kTurnIdFieldNumber = 11,
-    kErrorMessageFieldNumber = 16,
     kFinalStateFieldNumber = 6,
+    kErrorFieldNumber = 18,
     kSpeechDetectedFieldNumber = 1,
     kSynthesizedAudioSampleRateHzFieldNumber = 7,
     kSynthesizedAudioChannelsFieldNumber = 8,
@@ -2276,7 +2276,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
     kLlmTimeMsFieldNumber = 13,
     kTtsTimeMsFieldNumber = 14,
     kTotalTimeMsFieldNumber = 15,
-    kErrorCodeFieldNumber = 17,
   };
   // optional string transcription = 2;
   [[nodiscard]] bool has_transcription()
@@ -2376,23 +2375,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_turn_id();
 
   public:
-  // optional string error_message = 16;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
   // optional .runanywhere.v1.VoiceAgentComponentStates final_state = 6;
   [[nodiscard]] bool has_final_state()
       const;
@@ -2407,6 +2389,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
   private:
   const ::runanywhere::v1::VoiceAgentComponentStates& _internal_final_state() const;
   ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NONNULL _internal_mutable_final_state();
+
+  public:
+  // optional .runanywhere.v1.SDKError error = 18;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
+
+  private:
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
 
   public:
   // bool speech_detected = 1;
@@ -2489,22 +2487,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
   void _internal_set_total_time_ms(::int64_t value);
 
   public:
-  // int32 error_code = 17;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VoiceAgentResult)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<5, 17,
-                          1, 133,
+      ::google::protobuf::internal::TcParseTable<5, 16,
+                          2, 120,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2538,8 +2526,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
     ::google::protobuf::internal::ArenaStringPtr synthesized_audio_;
     ::google::protobuf::internal::ArenaStringPtr session_id_;
     ::google::protobuf::internal::ArenaStringPtr turn_id_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
     ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NULLABLE final_state_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     bool speech_detected_;
     ::int32_t synthesized_audio_sample_rate_hz_;
     ::int32_t synthesized_audio_channels_;
@@ -2548,7 +2536,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
     ::int64_t llm_time_ms_;
     ::int64_t tts_time_ms_;
     ::int64_t total_time_ms_;
-    ::int32_t error_code_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -3594,7 +3581,7 @@ inline void VoiceAgentResult::set_allocated_synthesized_audio(::std::string* PRO
 
 // optional .runanywhere.v1.VoiceAgentComponentStates final_state = 6;
 inline bool VoiceAgentResult::has_final_state() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
   PROTOBUF_ASSUME(!value || _impl_.final_state_ != nullptr);
   return value;
 }
@@ -3615,16 +3602,16 @@ inline void VoiceAgentResult::unsafe_arena_set_allocated_final_state(
   }
   _impl_.final_state_ = reinterpret_cast<::runanywhere::v1::VoiceAgentComponentStates*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VoiceAgentResult.final_state)
 }
 inline ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NULLABLE VoiceAgentResult::release_final_state() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
   ::runanywhere::v1::VoiceAgentComponentStates* released = _impl_.final_state_;
   _impl_.final_state_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -3644,7 +3631,7 @@ inline ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NULLABLE VoiceAgen
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentResult.final_state)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
   ::runanywhere::v1::VoiceAgentComponentStates* temp = _impl_.final_state_;
   _impl_.final_state_ = nullptr;
   return temp;
@@ -3659,7 +3646,7 @@ inline ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NONNULL VoiceAgent
 }
 inline ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NONNULL VoiceAgentResult::mutable_final_state()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   ::runanywhere::v1::VoiceAgentComponentStates* _msg = _internal_mutable_final_state();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentResult.final_state)
   return _msg;
@@ -3676,9 +3663,9 @@ inline void VoiceAgentResult::set_allocated_final_state(::runanywhere::v1::Voice
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
   }
 
   _impl_.final_state_ = reinterpret_cast<::runanywhere::v1::VoiceAgentComponentStates*>(value);
@@ -3981,96 +3968,97 @@ inline void VoiceAgentResult::_internal_set_total_time_ms(::int64_t value) {
   _impl_.total_time_ms_ = value;
 }
 
-// optional string error_message = 16;
-inline bool VoiceAgentResult::has_error_message() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+// optional .runanywhere.v1.SDKError error = 18;
+inline bool VoiceAgentResult::has_error() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
   return value;
 }
-inline void VoiceAgentResult::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
-}
-inline const ::std::string& VoiceAgentResult::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void VoiceAgentResult::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL VoiceAgentResult::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentResult.error_message)
-  return _s;
-}
-inline const ::std::string& VoiceAgentResult::_internal_error_message() const {
+inline const ::runanywhere::v1::SDKError& VoiceAgentResult::_internal_error() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
 }
-inline void VoiceAgentResult::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
+inline const ::runanywhere::v1::SDKError& VoiceAgentResult::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.error)
+  return _internal_error();
 }
-inline ::std::string* PROTOBUF_NONNULL VoiceAgentResult::_internal_mutable_error_message() {
+inline void VoiceAgentResult::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE VoiceAgentResult::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentResult.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000040U)) {
-    return nullptr;
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VoiceAgentResult.error)
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE VoiceAgentResult::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
   }
   return released;
 }
-inline void VoiceAgentResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE VoiceAgentResult::unsafe_arena_release_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
-  }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentResult.error_message)
-}
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentResult.error)
 
-// int32 error_code = 17;
-inline void VoiceAgentResult::clear_error_code() {
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL VoiceAgentResult::_internal_mutable_error() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00010000U);
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
 }
-inline ::int32_t VoiceAgentResult::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.error_code)
-  return _internal_error_code();
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL VoiceAgentResult::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentResult.error)
+  return _msg;
 }
-inline void VoiceAgentResult::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.error_code)
-}
-inline ::int32_t VoiceAgentResult::_internal_error_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
-}
-inline void VoiceAgentResult::_internal_set_error_code(::int32_t value) {
+inline void VoiceAgentResult::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentResult.error)
 }
 
 // -------------------------------------------------------------------

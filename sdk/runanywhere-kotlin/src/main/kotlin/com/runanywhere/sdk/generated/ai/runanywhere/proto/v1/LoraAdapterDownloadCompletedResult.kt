@@ -16,7 +16,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -31,34 +30,25 @@ import okio.ByteString
 
 public class LoraAdapterDownloadCompletedResult(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.LoraAdapterCatalogEntry#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val entry: LoraAdapterCatalogEntry? = null,
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 2,
-  )
-  public val error_message: String = "",
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
+    schemaIndex = 1,
   )
   public val persisted: Boolean = false,
+  @field:WireField(
+    tag = 5,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 2,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoraAdapterDownloadCompletedResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -71,10 +61,9 @@ public class LoraAdapterDownloadCompletedResult(
     if (other === this) return true
     if (other !is LoraAdapterDownloadCompletedResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (entry != other.entry) return false
-    if (error_message != other.error_message) return false
     if (persisted != other.persisted) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -82,10 +71,9 @@ public class LoraAdapterDownloadCompletedResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + (entry?.hashCode() ?: 0)
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + persisted.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -93,20 +81,18 @@ public class LoraAdapterDownloadCompletedResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     if (entry != null) result += """entry=$entry"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """persisted=$persisted"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "LoraAdapterDownloadCompletedResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     entry: LoraAdapterCatalogEntry? = this.entry,
-    error_message: String = this.error_message,
     persisted: Boolean = this.persisted,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LoraAdapterDownloadCompletedResult = LoraAdapterDownloadCompletedResult(success, entry, error_message, persisted, unknownFields)
+  ): LoraAdapterDownloadCompletedResult = LoraAdapterDownloadCompletedResult(entry, persisted, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -121,78 +107,61 @@ public class LoraAdapterDownloadCompletedResult(
     ) {
       override fun encodedSize(`value`: LoraAdapterDownloadCompletedResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         if (value.entry != null) {
           size += LoraAdapterCatalogEntry.ADAPTER.encodedSizeWithTag(2, value.entry)
-        }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.error_message)
         }
         if (value.persisted != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.persisted)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(5, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: LoraAdapterDownloadCompletedResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         if (value.entry != null) {
           LoraAdapterCatalogEntry.ADAPTER.encodeWithTag(writer, 2, value.entry)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
         }
         if (value.persisted != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.persisted)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 5, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoraAdapterDownloadCompletedResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 5, value.error)
         if (value.persisted != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.persisted)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
         }
         if (value.entry != null) {
           LoraAdapterCatalogEntry.ADAPTER.encodeWithTag(writer, 2, value.entry)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): LoraAdapterDownloadCompletedResult {
-        var success: Boolean = false
         var entry: LoraAdapterCatalogEntry? = null
-        var error_message: String = ""
         var persisted: Boolean = false
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> entry = LoraAdapterCatalogEntry.ADAPTER.decode(reader)
-            3 -> error_message = ProtoAdapter.STRING.decode(reader)
             4 -> persisted = ProtoAdapter.BOOL.decode(reader)
+            5 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LoraAdapterDownloadCompletedResult(
-          success = success,
           entry = entry,
-          error_message = error_message,
           persisted = persisted,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LoraAdapterDownloadCompletedResult): LoraAdapterDownloadCompletedResult = value.copy(
         entry = value.entry?.let(LoraAdapterCatalogEntry.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

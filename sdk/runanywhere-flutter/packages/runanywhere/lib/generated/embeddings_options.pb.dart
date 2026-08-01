@@ -16,7 +16,8 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'embeddings_options.pbenum.dart';
-import 'model_types.pbenum.dart' as $0;
+import 'errors.pb.dart' as $0;
+import 'model_types.pbenum.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -28,8 +29,8 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
     $core.String? modelId,
     $core.int? embeddingDimension,
     $core.int? maxSequenceLength,
-    $0.InferenceFramework? preferredFramework,
-    EmbeddingsNormalizeMode? normalizeMode,
+    $1.InferenceFramework? preferredFramework,
+    $core.bool? normalize,
     EmbeddingsPoolingStrategy? pooling,
     $core.String? configJson,
   }) {
@@ -40,7 +41,7 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
     if (maxSequenceLength != null) result.maxSequenceLength = maxSequenceLength;
     if (preferredFramework != null)
       result.preferredFramework = preferredFramework;
-    if (normalizeMode != null) result.normalizeMode = normalizeMode;
+    if (normalize != null) result.normalize = normalize;
     if (pooling != null) result.pooling = pooling;
     if (configJson != null) result.configJson = configJson;
     return result;
@@ -62,10 +63,9 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
     ..aI(2, _omitFieldNames ? '' : 'embeddingDimension')
     ..aI(3, _omitFieldNames ? '' : 'maxSequenceLength')
-    ..aE<$0.InferenceFramework>(5, _omitFieldNames ? '' : 'preferredFramework',
-        enumValues: $0.InferenceFramework.values)
-    ..aE<EmbeddingsNormalizeMode>(7, _omitFieldNames ? '' : 'normalizeMode',
-        enumValues: EmbeddingsNormalizeMode.values)
+    ..aE<$1.InferenceFramework>(5, _omitFieldNames ? '' : 'preferredFramework',
+        enumValues: $1.InferenceFramework.values)
+    ..aOB(7, _omitFieldNames ? '' : 'normalize')
     ..aE<EmbeddingsPoolingStrategy>(8, _omitFieldNames ? '' : 'pooling',
         enumValues: EmbeddingsPoolingStrategy.values)
     ..aOS(9, _omitFieldNames ? '' : 'configJson')
@@ -123,22 +123,22 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
   void clearMaxSequenceLength() => $_clearField(3);
 
   @$pb.TagNumber(5)
-  $0.InferenceFramework get preferredFramework => $_getN(3);
+  $1.InferenceFramework get preferredFramework => $_getN(3);
   @$pb.TagNumber(5)
-  set preferredFramework($0.InferenceFramework value) => $_setField(5, value);
+  set preferredFramework($1.InferenceFramework value) => $_setField(5, value);
   @$pb.TagNumber(5)
   $core.bool hasPreferredFramework() => $_has(3);
   @$pb.TagNumber(5)
   void clearPreferredFramework() => $_clearField(5);
 
   @$pb.TagNumber(7)
-  EmbeddingsNormalizeMode get normalizeMode => $_getN(4);
+  $core.bool get normalize => $_getBF(4);
   @$pb.TagNumber(7)
-  set normalizeMode(EmbeddingsNormalizeMode value) => $_setField(7, value);
+  set normalize($core.bool value) => $_setBool(4, value);
   @$pb.TagNumber(7)
-  $core.bool hasNormalizeMode() => $_has(4);
+  $core.bool hasNormalize() => $_has(4);
   @$pb.TagNumber(7)
-  void clearNormalizeMode() => $_clearField(7);
+  void clearNormalize() => $_clearField(7);
 
   @$pb.TagNumber(8)
   EmbeddingsPoolingStrategy get pooling => $_getN(5);
@@ -165,14 +165,14 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
   factory EmbeddingsOptions({
     $core.bool? truncate,
     $core.int? batchSize,
-    EmbeddingsNormalizeMode? normalizeMode,
+    $core.bool? normalize,
     EmbeddingsPoolingStrategy? pooling,
     $core.int? nThreads,
   }) {
     final result = create();
     if (truncate != null) result.truncate = truncate;
     if (batchSize != null) result.batchSize = batchSize;
-    if (normalizeMode != null) result.normalizeMode = normalizeMode;
+    if (normalize != null) result.normalize = normalize;
     if (pooling != null) result.pooling = pooling;
     if (nThreads != null) result.nThreads = nThreads;
     return result;
@@ -193,8 +193,7 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOB(2, _omitFieldNames ? '' : 'truncate')
     ..aI(3, _omitFieldNames ? '' : 'batchSize')
-    ..aE<EmbeddingsNormalizeMode>(4, _omitFieldNames ? '' : 'normalizeMode',
-        enumValues: EmbeddingsNormalizeMode.values)
+    ..aOB(4, _omitFieldNames ? '' : 'normalize')
     ..aE<EmbeddingsPoolingStrategy>(5, _omitFieldNames ? '' : 'pooling',
         enumValues: EmbeddingsPoolingStrategy.values)
     ..aI(6, _omitFieldNames ? '' : 'nThreads')
@@ -240,15 +239,14 @@ class EmbeddingsOptions extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearBatchSize() => $_clearField(3);
 
-  /// UNSPECIFIED = use the component config.
   @$pb.TagNumber(4)
-  EmbeddingsNormalizeMode get normalizeMode => $_getN(2);
+  $core.bool get normalize => $_getBF(2);
   @$pb.TagNumber(4)
-  set normalizeMode(EmbeddingsNormalizeMode value) => $_setField(4, value);
+  set normalize($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasNormalizeMode() => $_has(2);
+  $core.bool hasNormalize() => $_has(2);
   @$pb.TagNumber(4)
-  void clearNormalizeMode() => $_clearField(4);
+  void clearNormalize() => $_clearField(4);
 
   @$pb.TagNumber(5)
   EmbeddingsPoolingStrategy get pooling => $_getN(3);
@@ -484,9 +482,8 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
     $fixnum.Int64? processingTimeMs,
     $core.int? tokensUsed,
     $core.String? modelId,
-    $core.String? errorMessage,
-    $core.int? errorCode,
     $core.String? requestId,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (vectors != null) result.vectors.addAll(vectors);
@@ -494,9 +491,8 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
     if (processingTimeMs != null) result.processingTimeMs = processingTimeMs;
     if (tokensUsed != null) result.tokensUsed = tokensUsed;
     if (modelId != null) result.modelId = modelId;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
     if (requestId != null) result.requestId = requestId;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -519,9 +515,9 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
     ..aInt64(3, _omitFieldNames ? '' : 'processingTimeMs')
     ..aI(4, _omitFieldNames ? '' : 'tokensUsed')
     ..aOS(5, _omitFieldNames ? '' : 'modelId')
-    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(7, _omitFieldNames ? '' : 'errorCode')
     ..aOS(8, _omitFieldNames ? '' : 'requestId')
+    ..aOM<$0.SDKError>(9, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -585,32 +581,25 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearModelId() => $_clearField(5);
 
-  @$pb.TagNumber(6)
-  $core.String get errorMessage => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set errorMessage($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasErrorMessage() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearErrorMessage() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.int get errorCode => $_getIZ(6);
-  @$pb.TagNumber(7)
-  set errorCode($core.int value) => $_setSignedInt32(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasErrorCode() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearErrorCode() => $_clearField(7);
-
   @$pb.TagNumber(8)
-  $core.String get requestId => $_getSZ(7);
+  $core.String get requestId => $_getSZ(5);
   @$pb.TagNumber(8)
-  set requestId($core.String value) => $_setString(7, value);
+  set requestId($core.String value) => $_setString(5, value);
   @$pb.TagNumber(8)
-  $core.bool hasRequestId() => $_has(7);
+  $core.bool hasRequestId() => $_has(5);
   @$pb.TagNumber(8)
   void clearRequestId() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $0.SDKError get error => $_getN(6);
+  @$pb.TagNumber(9)
+  set error($0.SDKError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $0.SDKError ensureError() => $_ensure(6);
 }
 
 class EmbeddingsCreateRequest extends $pb.GeneratedMessage {
@@ -704,16 +693,14 @@ class EmbeddingsCreateResult extends $pb.GeneratedMessage {
     $core.String? modelId,
     $core.int? dimension,
     $core.int? maxTokens,
-    $core.int? errorCode,
-    $core.String? errorMessage,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (handle != null) result.handle = handle;
     if (modelId != null) result.modelId = modelId;
     if (dimension != null) result.dimension = dimension;
     if (maxTokens != null) result.maxTokens = maxTokens;
-    if (errorCode != null) result.errorCode = errorCode;
-    if (errorMessage != null) result.errorMessage = errorMessage;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -735,8 +722,8 @@ class EmbeddingsCreateResult extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'modelId')
     ..aI(3, _omitFieldNames ? '' : 'dimension')
     ..aI(4, _omitFieldNames ? '' : 'maxTokens')
-    ..aI(5, _omitFieldNames ? '' : 'errorCode')
-    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..aOM<$0.SDKError>(7, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -798,24 +785,16 @@ class EmbeddingsCreateResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearMaxTokens() => $_clearField(4);
 
-  /// Mirrors rac_result_t; negative on failure.
-  @$pb.TagNumber(5)
-  $core.int get errorCode => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set errorCode($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorCode() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearErrorCode() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.String get errorMessage => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set errorMessage($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasErrorMessage() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearErrorMessage() => $_clearField(6);
+  @$pb.TagNumber(7)
+  $0.SDKError get error => $_getN(4);
+  @$pb.TagNumber(7)
+  set error($0.SDKError value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasError() => $_has(4);
+  @$pb.TagNumber(7)
+  void clearError() => $_clearField(7);
+  @$pb.TagNumber(7)
+  $0.SDKError ensureError() => $_ensure(4);
 }
 
 const $core.bool _omitFieldNames =

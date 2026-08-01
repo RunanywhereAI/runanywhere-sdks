@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import {
   AudioEncoding,
   audioEncodingFromJSON,
@@ -217,8 +218,7 @@ export interface VADResult {
   startTimeMs: number;
   endTimeMs: number;
   statistics?: VADStatistics | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 /** Exposed for debugging and waveform UIs. */
@@ -256,15 +256,13 @@ export interface SpeechActivityEvent {
 }
 
 export interface VADStreamEvent {
-  seq: number;
   timestampUs: number;
   requestId: string;
   kind: VADStreamEventKind;
   result?: VADResult | undefined;
   activity?: SpeechActivityEvent | undefined;
   statistics?: VADStatistics | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 export interface VADServiceState {
@@ -274,8 +272,7 @@ export interface VADServiceState {
   sampleRate: number;
   frameLengthMs: number;
   currentModel?: string | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 function createBaseVADConfiguration(): VADConfiguration {
@@ -1089,8 +1086,7 @@ function createBaseVADResult(): VADResult {
     startTimeMs: 0,
     endTimeMs: 0,
     statistics: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
@@ -1120,11 +1116,8 @@ export const VADResult: MessageFns<VADResult> = {
     if (message.statistics !== undefined) {
       VADStatistics.encode(message.statistics, writer.uint32(66).fork()).join();
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(74).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(80).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -1200,20 +1193,12 @@ export const VADResult: MessageFns<VADResult> = {
           message.statistics = VADStatistics.decode(reader, reader.uint32());
           continue;
         }
-        case 9: {
-          if (tag !== 74) {
+        case 11: {
+          if (tag !== 90) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 10: {
-          if (tag !== 80) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1255,16 +1240,7 @@ export const VADResult: MessageFns<VADResult> = {
         ? globalThis.Number(object.end_time_ms)
         : 0,
       statistics: isSet(object.statistics) ? VADStatistics.fromJSON(object.statistics) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1294,11 +1270,8 @@ export const VADResult: MessageFns<VADResult> = {
     if (message.statistics !== undefined) {
       obj.statistics = VADStatistics.toJSON(message.statistics);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1318,8 +1291,9 @@ export const VADResult: MessageFns<VADResult> = {
     message.statistics = (object.statistics !== undefined && object.statistics !== null)
       ? VADStatistics.fromPartial(object.statistics)
       : undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1718,23 +1692,18 @@ export const SpeechActivityEvent: MessageFns<SpeechActivityEvent> = {
 
 function createBaseVADStreamEvent(): VADStreamEvent {
   return {
-    seq: 0,
     timestampUs: 0,
     requestId: "",
     kind: 0,
     result: undefined,
     activity: undefined,
     statistics: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
 export const VADStreamEvent: MessageFns<VADStreamEvent> = {
   encode(message: VADStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.seq !== 0) {
-      writer.uint32(8).uint64(message.seq);
-    }
     if (message.timestampUs !== 0) {
       writer.uint32(16).int64(message.timestampUs);
     }
@@ -1753,11 +1722,8 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
     if (message.statistics !== undefined) {
       VADStatistics.encode(message.statistics, writer.uint32(58).fork()).join();
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(66).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(72).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(82).fork()).join();
     }
     return writer;
   },
@@ -1769,14 +1735,6 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.seq = longToNumber(reader.uint64());
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -1825,20 +1783,12 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
           message.statistics = VADStatistics.decode(reader, reader.uint32());
           continue;
         }
-        case 8: {
-          if (tag !== 66) {
+        case 10: {
+          if (tag !== 82) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1852,7 +1802,6 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
 
   fromJSON(object: any): VADStreamEvent {
     return {
-      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -1867,24 +1816,12 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
       result: isSet(object.result) ? VADResult.fromJSON(object.result) : undefined,
       activity: isSet(object.activity) ? SpeechActivityEvent.fromJSON(object.activity) : undefined,
       statistics: isSet(object.statistics) ? VADStatistics.fromJSON(object.statistics) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: VADStreamEvent): unknown {
     const obj: any = {};
-    if (message.seq !== 0) {
-      obj.seq = Math.round(message.seq);
-    }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
     }
@@ -1903,11 +1840,8 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
     if (message.statistics !== undefined) {
       obj.statistics = VADStatistics.toJSON(message.statistics);
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1917,7 +1851,6 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
   },
   fromPartial<I extends Exact<DeepPartial<VADStreamEvent>, I>>(object: I): VADStreamEvent {
     const message = createBaseVADStreamEvent();
-    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.requestId = object.requestId ?? "";
     message.kind = object.kind ?? 0;
@@ -1930,8 +1863,9 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
     message.statistics = (object.statistics !== undefined && object.statistics !== null)
       ? VADStatistics.fromPartial(object.statistics)
       : undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1944,8 +1878,7 @@ function createBaseVADServiceState(): VADServiceState {
     sampleRate: 0,
     frameLengthMs: 0,
     currentModel: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
+    error: undefined,
   };
 }
 
@@ -1969,11 +1902,8 @@ export const VADServiceState: MessageFns<VADServiceState> = {
     if (message.currentModel !== undefined) {
       writer.uint32(50).string(message.currentModel);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(58).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(64).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(74).fork()).join();
     }
     return writer;
   },
@@ -2033,20 +1963,12 @@ export const VADServiceState: MessageFns<VADServiceState> = {
           message.currentModel = reader.string();
           continue;
         }
-        case 7: {
-          if (tag !== 58) {
+        case 9: {
+          if (tag !== 74) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 64) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2090,16 +2012,7 @@ export const VADServiceState: MessageFns<VADServiceState> = {
         : isSet(object.current_model)
         ? globalThis.String(object.current_model)
         : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2123,11 +2036,8 @@ export const VADServiceState: MessageFns<VADServiceState> = {
     if (message.currentModel !== undefined) {
       obj.currentModel = message.currentModel;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2143,8 +2053,9 @@ export const VADServiceState: MessageFns<VADServiceState> = {
     message.sampleRate = object.sampleRate ?? 0;
     message.frameLengthMs = object.frameLengthMs ?? 0;
     message.currentModel = object.currentModel ?? undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

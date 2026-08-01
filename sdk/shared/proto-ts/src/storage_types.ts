@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -131,10 +132,9 @@ export interface StorageInfoRequest {
 }
 
 export interface StorageInfoResult {
-  success: boolean;
   info?: StorageInfo | undefined;
-  errorMessage: string;
   warnings: string[];
+  error?: SDKError | undefined;
 }
 
 export interface StorageAvailabilityRequest {
@@ -149,11 +149,10 @@ export interface StorageAvailabilityRequest {
 }
 
 export interface StorageAvailabilityResult {
-  success: boolean;
   availability?: StorageAvailability | undefined;
   warnings: string[];
-  errorMessage: string;
   deletePlan?: StorageDeletePlan | undefined;
+  error?: SDKError | undefined;
 }
 
 export interface StorageDeletePlanRequest {
@@ -185,10 +184,10 @@ export interface StorageDeletePlan {
   reclaimableBytes: number;
   candidates: StorageDeleteCandidate[];
   warnings: string[];
-  errorMessage: string;
   requiresUnload: boolean;
   requiresPlatformDelete: boolean;
   candidateCount: number;
+  error?: SDKError | undefined;
 }
 
 export interface StorageDeleteRequest {
@@ -204,16 +203,15 @@ export interface StorageDeleteRequest {
 }
 
 export interface StorageDeleteResult {
-  success: boolean;
   deletedBytes: number;
   deletedModelIds: string[];
   failedModelIds: string[];
   warnings: string[];
-  errorMessage: string;
   skippedModelIds: string[];
   dryRun: boolean;
   registryUpdated: boolean;
   filesDeleted: boolean;
+  error?: SDKError | undefined;
 }
 
 function createBaseDeviceStorageInfo(): DeviceStorageInfo {
@@ -1019,22 +1017,19 @@ export const StorageInfoRequest: MessageFns<StorageInfoRequest> = {
 };
 
 function createBaseStorageInfoResult(): StorageInfoResult {
-  return { success: false, info: undefined, errorMessage: "", warnings: [] };
+  return { info: undefined, warnings: [], error: undefined };
 }
 
 export const StorageInfoResult: MessageFns<StorageInfoResult> = {
   encode(message: StorageInfoResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     if (message.info !== undefined) {
       StorageInfo.encode(message.info, writer.uint32(18).fork()).join();
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(26).string(message.errorMessage);
-    }
     for (const v of message.warnings) {
       writer.uint32(34).string(v!);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -1046,14 +1041,6 @@ export const StorageInfoResult: MessageFns<StorageInfoResult> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
@@ -1062,20 +1049,20 @@ export const StorageInfoResult: MessageFns<StorageInfoResult> = {
           message.info = StorageInfo.decode(reader, reader.uint32());
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 4: {
           if (tag !== 34) {
             break;
           }
 
           message.warnings.push(reader.string());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1089,30 +1076,22 @@ export const StorageInfoResult: MessageFns<StorageInfoResult> = {
 
   fromJSON(object: any): StorageInfoResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       info: isSet(object.info) ? StorageInfo.fromJSON(object.info) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: StorageInfoResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.info !== undefined) {
       obj.info = StorageInfo.toJSON(message.info);
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.warnings?.length) {
       obj.warnings = message.warnings;
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1122,12 +1101,13 @@ export const StorageInfoResult: MessageFns<StorageInfoResult> = {
   },
   fromPartial<I extends Exact<DeepPartial<StorageInfoResult>, I>>(object: I): StorageInfoResult {
     const message = createBaseStorageInfoResult();
-    message.success = object.success ?? false;
     message.info = (object.info !== undefined && object.info !== null)
       ? StorageInfo.fromPartial(object.info)
       : undefined;
-    message.errorMessage = object.errorMessage ?? "";
     message.warnings = object.warnings?.map((e) => e) || [];
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1304,25 +1284,22 @@ export const StorageAvailabilityRequest: MessageFns<StorageAvailabilityRequest> 
 };
 
 function createBaseStorageAvailabilityResult(): StorageAvailabilityResult {
-  return { success: false, availability: undefined, warnings: [], errorMessage: "", deletePlan: undefined };
+  return { availability: undefined, warnings: [], deletePlan: undefined, error: undefined };
 }
 
 export const StorageAvailabilityResult: MessageFns<StorageAvailabilityResult> = {
   encode(message: StorageAvailabilityResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     if (message.availability !== undefined) {
       StorageAvailability.encode(message.availability, writer.uint32(18).fork()).join();
     }
     for (const v of message.warnings) {
       writer.uint32(26).string(v!);
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(34).string(message.errorMessage);
-    }
     if (message.deletePlan !== undefined) {
       StorageDeletePlan.encode(message.deletePlan, writer.uint32(42).fork()).join();
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -1334,14 +1311,6 @@ export const StorageAvailabilityResult: MessageFns<StorageAvailabilityResult> = 
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
@@ -1358,20 +1327,20 @@ export const StorageAvailabilityResult: MessageFns<StorageAvailabilityResult> = 
           message.warnings.push(reader.string());
           continue;
         }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 5: {
           if (tag !== 42) {
             break;
           }
 
           message.deletePlan = StorageDeletePlan.decode(reader, reader.uint32());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1385,38 +1354,30 @@ export const StorageAvailabilityResult: MessageFns<StorageAvailabilityResult> = 
 
   fromJSON(object: any): StorageAvailabilityResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       availability: isSet(object.availability) ? StorageAvailability.fromJSON(object.availability) : undefined,
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       deletePlan: isSet(object.deletePlan)
         ? StorageDeletePlan.fromJSON(object.deletePlan)
         : isSet(object.delete_plan)
         ? StorageDeletePlan.fromJSON(object.delete_plan)
         : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: StorageAvailabilityResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.availability !== undefined) {
       obj.availability = StorageAvailability.toJSON(message.availability);
     }
     if (message.warnings?.length) {
       obj.warnings = message.warnings;
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.deletePlan !== undefined) {
       obj.deletePlan = StorageDeletePlan.toJSON(message.deletePlan);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1426,14 +1387,15 @@ export const StorageAvailabilityResult: MessageFns<StorageAvailabilityResult> = 
   },
   fromPartial<I extends Exact<DeepPartial<StorageAvailabilityResult>, I>>(object: I): StorageAvailabilityResult {
     const message = createBaseStorageAvailabilityResult();
-    message.success = object.success ?? false;
     message.availability = (object.availability !== undefined && object.availability !== null)
       ? StorageAvailability.fromPartial(object.availability)
       : undefined;
     message.warnings = object.warnings?.map((e) => e) || [];
-    message.errorMessage = object.errorMessage ?? "";
     message.deletePlan = (object.deletePlan !== undefined && object.deletePlan !== null)
       ? StorageDeletePlan.fromPartial(object.deletePlan)
+      : undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
       : undefined;
     return message;
   },
@@ -1830,10 +1792,10 @@ function createBaseStorageDeletePlan(): StorageDeletePlan {
     reclaimableBytes: 0,
     candidates: [],
     warnings: [],
-    errorMessage: "",
     requiresUnload: false,
     requiresPlatformDelete: false,
     candidateCount: 0,
+    error: undefined,
   };
 }
 
@@ -1854,9 +1816,6 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
     for (const v of message.warnings) {
       writer.uint32(42).string(v!);
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(50).string(message.errorMessage);
-    }
     if (message.requiresUnload !== false) {
       writer.uint32(56).bool(message.requiresUnload);
     }
@@ -1865,6 +1824,9 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
     }
     if (message.candidateCount !== 0) {
       writer.uint32(72).int32(message.candidateCount);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(82).fork()).join();
     }
     return writer;
   },
@@ -1916,14 +1878,6 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
           message.warnings.push(reader.string());
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 7: {
           if (tag !== 56) {
             break;
@@ -1946,6 +1900,14 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
           }
 
           message.candidateCount = reader.int32();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1980,11 +1942,6 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
       warnings: globalThis.Array.isArray(object?.warnings)
         ? object.warnings.map((e: any) => globalThis.String(e))
         : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       requiresUnload: isSet(object.requiresUnload)
         ? globalThis.Boolean(object.requiresUnload)
         : isSet(object.requires_unload)
@@ -2000,6 +1957,7 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
         : isSet(object.candidate_count)
         ? globalThis.Number(object.candidate_count)
         : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2020,9 +1978,6 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
     if (message.warnings?.length) {
       obj.warnings = message.warnings;
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.requiresUnload !== false) {
       obj.requiresUnload = message.requiresUnload;
     }
@@ -2031,6 +1986,9 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
     }
     if (message.candidateCount !== 0) {
       obj.candidateCount = Math.round(message.candidateCount);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2045,10 +2003,12 @@ export const StorageDeletePlan: MessageFns<StorageDeletePlan> = {
     message.reclaimableBytes = object.reclaimableBytes ?? 0;
     message.candidates = object.candidates?.map((e) => StorageDeleteCandidate.fromPartial(e)) || [];
     message.warnings = object.warnings?.map((e) => e) || [];
-    message.errorMessage = object.errorMessage ?? "";
     message.requiresUnload = object.requiresUnload ?? false;
     message.requiresPlatformDelete = object.requiresPlatformDelete ?? false;
     message.candidateCount = object.candidateCount ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -2266,24 +2226,20 @@ export const StorageDeleteRequest: MessageFns<StorageDeleteRequest> = {
 
 function createBaseStorageDeleteResult(): StorageDeleteResult {
   return {
-    success: false,
     deletedBytes: 0,
     deletedModelIds: [],
     failedModelIds: [],
     warnings: [],
-    errorMessage: "",
     skippedModelIds: [],
     dryRun: false,
     registryUpdated: false,
     filesDeleted: false,
+    error: undefined,
   };
 }
 
 export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
   encode(message: StorageDeleteResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     if (message.deletedBytes !== 0) {
       writer.uint32(16).int64(message.deletedBytes);
     }
@@ -2295,9 +2251,6 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
     }
     for (const v of message.warnings) {
       writer.uint32(42).string(v!);
-    }
-    if (message.errorMessage !== "") {
-      writer.uint32(50).string(message.errorMessage);
     }
     for (const v of message.skippedModelIds) {
       writer.uint32(58).string(v!);
@@ -2311,6 +2264,9 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
     if (message.filesDeleted !== false) {
       writer.uint32(80).bool(message.filesDeleted);
     }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(90).fork()).join();
+    }
     return writer;
   },
 
@@ -2321,14 +2277,6 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -2359,14 +2307,6 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
           }
 
           message.warnings.push(reader.string());
-          continue;
-        }
-        case 6: {
-          if (tag !== 50) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
           continue;
         }
         case 7: {
@@ -2401,6 +2341,14 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
           message.filesDeleted = reader.bool();
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2412,7 +2360,6 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
 
   fromJSON(object: any): StorageDeleteResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       deletedBytes: isSet(object.deletedBytes)
         ? globalThis.Number(object.deletedBytes)
         : isSet(object.deleted_bytes)
@@ -2429,11 +2376,6 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
         ? object.failed_model_ids.map((e: any) => globalThis.String(e))
         : [],
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       skippedModelIds: globalThis.Array.isArray(object?.skippedModelIds)
         ? object.skippedModelIds.map((e: any) => globalThis.String(e))
         : globalThis.Array.isArray(object?.skipped_model_ids)
@@ -2454,14 +2396,12 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
         : isSet(object.files_deleted)
         ? globalThis.Boolean(object.files_deleted)
         : false,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: StorageDeleteResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.deletedBytes !== 0) {
       obj.deletedBytes = Math.round(message.deletedBytes);
     }
@@ -2473,9 +2413,6 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
     }
     if (message.warnings?.length) {
       obj.warnings = message.warnings;
-    }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
     }
     if (message.skippedModelIds?.length) {
       obj.skippedModelIds = message.skippedModelIds;
@@ -2489,6 +2426,9 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
     if (message.filesDeleted !== false) {
       obj.filesDeleted = message.filesDeleted;
     }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
     return obj;
   },
 
@@ -2497,16 +2437,17 @@ export const StorageDeleteResult: MessageFns<StorageDeleteResult> = {
   },
   fromPartial<I extends Exact<DeepPartial<StorageDeleteResult>, I>>(object: I): StorageDeleteResult {
     const message = createBaseStorageDeleteResult();
-    message.success = object.success ?? false;
     message.deletedBytes = object.deletedBytes ?? 0;
     message.deletedModelIds = object.deletedModelIds?.map((e) => e) || [];
     message.failedModelIds = object.failedModelIds?.map((e) => e) || [];
     message.warnings = object.warnings?.map((e) => e) || [];
-    message.errorMessage = object.errorMessage ?? "";
     message.skippedModelIds = object.skippedModelIds?.map((e) => e) || [];
     message.dryRun = object.dryRun ?? false;
     message.registryUpdated = object.registryUpdated ?? false;
     message.filesDeleted = object.filesDeleted ?? false;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

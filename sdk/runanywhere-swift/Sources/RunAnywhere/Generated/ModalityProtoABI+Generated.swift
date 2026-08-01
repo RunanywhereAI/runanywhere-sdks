@@ -314,12 +314,12 @@ extension CppBridge.LLM {
             request: request,
             category: "CppBridge.LLM.ProtoStream",
             onError: { rc in
-                let mapped = RASDKError.from(rcResult: rc)
                 var event = RALLMStreamEvent()
                 event.isFinal = true
                 event.finishReason = "error"
-                event.errorCode = rc
-                event.errorMessage = mapped?.message ?? "LLM stream failed: \(rc)"
+                if let mapped = RASDKError.from(rcResult: rc) {
+                    event.error = mapped
+                }
                 return event
             },
             onCancel: {
@@ -364,7 +364,9 @@ extension CppBridge.StructuredOutput {
             onError: { rc in
                 var event = RAStructuredOutputStreamEvent()
                 event.kind = .error
-                event.errorMessage = "Structured output stream failed: \(rc)"
+                if let mapped = RASDKError.from(rcResult: rc) {
+                    event.error = mapped
+                }
                 return event
             },
             onCancel: {
@@ -638,7 +640,7 @@ extension CppBridge.EmbeddingsProto {
 // MARK: - RAG
 
 extension CppBridge.RAG {
-    public func createPipeline(_ request: RARAGConfiguration) throws -> rac_handle_t {
+    public nonisolated func createPipeline(_ request: RARAGConfiguration) throws -> rac_handle_t {
         let symbol = try NativeProtoABI.require(
             RAGGeneratedProtoABI.createPipeline,
             named: RAGGeneratedProtoABI.createPipelineName
@@ -653,7 +655,7 @@ extension CppBridge.RAG {
         return newHandle
     }
 
-    public func ingest(handle: rac_handle_t, _ request: RARAGDocument) throws -> RARAGStatistics {
+    public nonisolated func ingest(handle: rac_handle_t, _ request: RARAGDocument) throws -> RARAGStatistics {
         return try NativeProtoABI.invoke(
             request,
             on: handle,
@@ -663,7 +665,7 @@ extension CppBridge.RAG {
         )
     }
 
-    public func query(handle: rac_handle_t, _ request: RARAGQueryOptions) throws -> RARAGResult {
+    public nonisolated func query(handle: rac_handle_t, _ request: RARAGQueryOptions) throws -> RARAGResult {
         return try NativeProtoABI.invoke(
             request,
             on: handle,
@@ -673,7 +675,7 @@ extension CppBridge.RAG {
         )
     }
 
-    public func clearProto(handle: rac_handle_t) throws -> RARAGStatistics {
+    public nonisolated func clearProto(handle: rac_handle_t) throws -> RARAGStatistics {
         let symbol = try NativeProtoABI.require(
             RAGGeneratedProtoABI.clearProto,
             named: RAGGeneratedProtoABI.clearProtoName
@@ -689,7 +691,7 @@ extension CppBridge.RAG {
         return try NativeProtoABI.decode(RARAGStatistics.self, from: outBuffer)
     }
 
-    public func statsProto(handle: rac_handle_t) throws -> RARAGStatistics {
+    public nonisolated func statsProto(handle: rac_handle_t) throws -> RARAGStatistics {
         let symbol = try NativeProtoABI.require(
             RAGGeneratedProtoABI.statsProto,
             named: RAGGeneratedProtoABI.statsProtoName

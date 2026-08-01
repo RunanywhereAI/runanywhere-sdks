@@ -15,8 +15,10 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'model_types.pbenum.dart' as $1;
+import 'errors.pb.dart' as $2;
+import 'model_types.pbenum.dart' as $3;
 import 'thinking_tag_pattern.pb.dart' as $0;
+import 'token_usage.pb.dart' as $1;
 import 'vlm_options.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -306,7 +308,7 @@ class VLMConfiguration extends $pb.GeneratedMessage {
     $core.double? temperature,
     $core.String? systemPrompt,
     $core.bool? streamingEnabled,
-    $1.InferenceFramework? preferredFramework,
+    $3.InferenceFramework? preferredFramework,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
@@ -341,8 +343,8 @@ class VLMConfiguration extends $pb.GeneratedMessage {
     ..aD(5, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
     ..aOS(6, _omitFieldNames ? '' : 'systemPrompt')
     ..aOB(7, _omitFieldNames ? '' : 'streamingEnabled')
-    ..aE<$1.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework',
-        enumValues: $1.InferenceFramework.values)
+    ..aE<$3.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework',
+        enumValues: $3.InferenceFramework.values)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -428,9 +430,9 @@ class VLMConfiguration extends $pb.GeneratedMessage {
   void clearStreamingEnabled() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $1.InferenceFramework get preferredFramework => $_getN(7);
+  $3.InferenceFramework get preferredFramework => $_getN(7);
   @$pb.TagNumber(8)
-  set preferredFramework($1.InferenceFramework value) => $_setField(8, value);
+  set preferredFramework($3.InferenceFramework value) => $_setField(8, value);
   @$pb.TagNumber(8)
   $core.bool hasPreferredFramework() => $_has(7);
   @$pb.TagNumber(8)
@@ -803,36 +805,28 @@ class VLMGenerationRequest extends $pb.GeneratedMessage {
 class VLMResult extends $pb.GeneratedMessage {
   factory VLMResult({
     $core.String? text,
-    $core.int? inputTokens,
-    $core.int? outputTokens,
-    $fixnum.Int64? totalTokens,
     $fixnum.Int64? processingTimeMs,
-    $core.double? tokensPerSecond,
     $core.int? imageTokens,
     $fixnum.Int64? timeToFirstTokenMs,
     $fixnum.Int64? imageEncodeTimeMs,
     $core.String? hardwareUsed,
-    $core.String? errorMessage,
-    $core.int? errorCode,
     $core.String? finishReason,
     $core.int? imagesProcessed,
+    $1.TokenUsage? usage,
+    $2.SDKError? error,
   }) {
     final result = create();
     if (text != null) result.text = text;
-    if (inputTokens != null) result.inputTokens = inputTokens;
-    if (outputTokens != null) result.outputTokens = outputTokens;
-    if (totalTokens != null) result.totalTokens = totalTokens;
     if (processingTimeMs != null) result.processingTimeMs = processingTimeMs;
-    if (tokensPerSecond != null) result.tokensPerSecond = tokensPerSecond;
     if (imageTokens != null) result.imageTokens = imageTokens;
     if (timeToFirstTokenMs != null)
       result.timeToFirstTokenMs = timeToFirstTokenMs;
     if (imageEncodeTimeMs != null) result.imageEncodeTimeMs = imageEncodeTimeMs;
     if (hardwareUsed != null) result.hardwareUsed = hardwareUsed;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
     if (finishReason != null) result.finishReason = finishReason;
     if (imagesProcessed != null) result.imagesProcessed = imagesProcessed;
+    if (usage != null) result.usage = usage;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -850,20 +844,17 @@ class VLMResult extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'text')
-    ..aI(2, _omitFieldNames ? '' : 'inputTokens')
-    ..aI(3, _omitFieldNames ? '' : 'outputTokens')
-    ..aInt64(4, _omitFieldNames ? '' : 'totalTokens')
     ..aInt64(5, _omitFieldNames ? '' : 'processingTimeMs')
-    ..aD(6, _omitFieldNames ? '' : 'tokensPerSecond',
-        fieldType: $pb.PbFieldType.OF)
     ..aI(7, _omitFieldNames ? '' : 'imageTokens')
     ..aInt64(8, _omitFieldNames ? '' : 'timeToFirstTokenMs')
     ..aInt64(9, _omitFieldNames ? '' : 'imageEncodeTimeMs')
     ..aOS(10, _omitFieldNames ? '' : 'hardwareUsed')
-    ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(12, _omitFieldNames ? '' : 'errorCode')
     ..aOS(13, _omitFieldNames ? '' : 'finishReason')
     ..aI(14, _omitFieldNames ? '' : 'imagesProcessed')
+    ..aOM<$1.TokenUsage>(15, _omitFieldNames ? '' : 'usage',
+        subBuilder: $1.TokenUsage.create)
+    ..aOM<$2.SDKError>(16, _omitFieldNames ? '' : 'error',
+        subBuilder: $2.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -893,127 +884,94 @@ class VLMResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearText() => $_clearField(1);
 
-  @$pb.TagNumber(2)
-  $core.int get inputTokens => $_getIZ(1);
-  @$pb.TagNumber(2)
-  set inputTokens($core.int value) => $_setSignedInt32(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasInputTokens() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearInputTokens() => $_clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.int get outputTokens => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set outputTokens($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasOutputTokens() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearOutputTokens() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $fixnum.Int64 get totalTokens => $_getI64(3);
-  @$pb.TagNumber(4)
-  set totalTokens($fixnum.Int64 value) => $_setInt64(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasTotalTokens() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearTotalTokens() => $_clearField(4);
-
   @$pb.TagNumber(5)
-  $fixnum.Int64 get processingTimeMs => $_getI64(4);
+  $fixnum.Int64 get processingTimeMs => $_getI64(1);
   @$pb.TagNumber(5)
-  set processingTimeMs($fixnum.Int64 value) => $_setInt64(4, value);
+  set processingTimeMs($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(5)
-  $core.bool hasProcessingTimeMs() => $_has(4);
+  $core.bool hasProcessingTimeMs() => $_has(1);
   @$pb.TagNumber(5)
   void clearProcessingTimeMs() => $_clearField(5);
 
-  @$pb.TagNumber(6)
-  $core.double get tokensPerSecond => $_getN(5);
-  @$pb.TagNumber(6)
-  set tokensPerSecond($core.double value) => $_setFloat(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasTokensPerSecond() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearTokensPerSecond() => $_clearField(6);
-
   @$pb.TagNumber(7)
-  $core.int get imageTokens => $_getIZ(6);
+  $core.int get imageTokens => $_getIZ(2);
   @$pb.TagNumber(7)
-  set imageTokens($core.int value) => $_setSignedInt32(6, value);
+  set imageTokens($core.int value) => $_setSignedInt32(2, value);
   @$pb.TagNumber(7)
-  $core.bool hasImageTokens() => $_has(6);
+  $core.bool hasImageTokens() => $_has(2);
   @$pb.TagNumber(7)
   void clearImageTokens() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $fixnum.Int64 get timeToFirstTokenMs => $_getI64(7);
+  $fixnum.Int64 get timeToFirstTokenMs => $_getI64(3);
   @$pb.TagNumber(8)
-  set timeToFirstTokenMs($fixnum.Int64 value) => $_setInt64(7, value);
+  set timeToFirstTokenMs($fixnum.Int64 value) => $_setInt64(3, value);
   @$pb.TagNumber(8)
-  $core.bool hasTimeToFirstTokenMs() => $_has(7);
+  $core.bool hasTimeToFirstTokenMs() => $_has(3);
   @$pb.TagNumber(8)
   void clearTimeToFirstTokenMs() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $fixnum.Int64 get imageEncodeTimeMs => $_getI64(8);
+  $fixnum.Int64 get imageEncodeTimeMs => $_getI64(4);
   @$pb.TagNumber(9)
-  set imageEncodeTimeMs($fixnum.Int64 value) => $_setInt64(8, value);
+  set imageEncodeTimeMs($fixnum.Int64 value) => $_setInt64(4, value);
   @$pb.TagNumber(9)
-  $core.bool hasImageEncodeTimeMs() => $_has(8);
+  $core.bool hasImageEncodeTimeMs() => $_has(4);
   @$pb.TagNumber(9)
   void clearImageEncodeTimeMs() => $_clearField(9);
 
   @$pb.TagNumber(10)
-  $core.String get hardwareUsed => $_getSZ(9);
+  $core.String get hardwareUsed => $_getSZ(5);
   @$pb.TagNumber(10)
-  set hardwareUsed($core.String value) => $_setString(9, value);
+  set hardwareUsed($core.String value) => $_setString(5, value);
   @$pb.TagNumber(10)
-  $core.bool hasHardwareUsed() => $_has(9);
+  $core.bool hasHardwareUsed() => $_has(5);
   @$pb.TagNumber(10)
   void clearHardwareUsed() => $_clearField(10);
 
-  @$pb.TagNumber(11)
-  $core.String get errorMessage => $_getSZ(10);
-  @$pb.TagNumber(11)
-  set errorMessage($core.String value) => $_setString(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasErrorMessage() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearErrorMessage() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.int get errorCode => $_getIZ(11);
-  @$pb.TagNumber(12)
-  set errorCode($core.int value) => $_setSignedInt32(11, value);
-  @$pb.TagNumber(12)
-  $core.bool hasErrorCode() => $_has(11);
-  @$pb.TagNumber(12)
-  void clearErrorCode() => $_clearField(12);
-
   @$pb.TagNumber(13)
-  $core.String get finishReason => $_getSZ(12);
+  $core.String get finishReason => $_getSZ(6);
   @$pb.TagNumber(13)
-  set finishReason($core.String value) => $_setString(12, value);
+  set finishReason($core.String value) => $_setString(6, value);
   @$pb.TagNumber(13)
-  $core.bool hasFinishReason() => $_has(12);
+  $core.bool hasFinishReason() => $_has(6);
   @$pb.TagNumber(13)
   void clearFinishReason() => $_clearField(13);
 
   @$pb.TagNumber(14)
-  $core.int get imagesProcessed => $_getIZ(13);
+  $core.int get imagesProcessed => $_getIZ(7);
   @$pb.TagNumber(14)
-  set imagesProcessed($core.int value) => $_setSignedInt32(13, value);
+  set imagesProcessed($core.int value) => $_setSignedInt32(7, value);
   @$pb.TagNumber(14)
-  $core.bool hasImagesProcessed() => $_has(13);
+  $core.bool hasImagesProcessed() => $_has(7);
   @$pb.TagNumber(14)
   void clearImagesProcessed() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $1.TokenUsage get usage => $_getN(8);
+  @$pb.TagNumber(15)
+  set usage($1.TokenUsage value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasUsage() => $_has(8);
+  @$pb.TagNumber(15)
+  void clearUsage() => $_clearField(15);
+  @$pb.TagNumber(15)
+  $1.TokenUsage ensureUsage() => $_ensure(8);
+
+  @$pb.TagNumber(16)
+  $2.SDKError get error => $_getN(9);
+  @$pb.TagNumber(16)
+  set error($2.SDKError value) => $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasError() => $_has(9);
+  @$pb.TagNumber(16)
+  void clearError() => $_clearField(16);
+  @$pb.TagNumber(16)
+  $2.SDKError ensureError() => $_ensure(9);
 }
 
 class VLMStreamEvent extends $pb.GeneratedMessage {
   factory VLMStreamEvent({
-    $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
     $core.String? requestId,
     VLMStreamEventKind? kind,
@@ -1022,11 +980,9 @@ class VLMStreamEvent extends $pb.GeneratedMessage {
     $core.bool? isFinal,
     $core.double? tokensPerSecond,
     VLMResult? result,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $2.SDKError? error,
   }) {
     final result$ = create();
-    if (seq != null) result$.seq = seq;
     if (timestampUs != null) result$.timestampUs = timestampUs;
     if (requestId != null) result$.requestId = requestId;
     if (kind != null) result$.kind = kind;
@@ -1035,8 +991,7 @@ class VLMStreamEvent extends $pb.GeneratedMessage {
     if (isFinal != null) result$.isFinal = isFinal;
     if (tokensPerSecond != null) result$.tokensPerSecond = tokensPerSecond;
     if (result != null) result$.result = result;
-    if (errorMessage != null) result$.errorMessage = errorMessage;
-    if (errorCode != null) result$.errorCode = errorCode;
+    if (error != null) result$.error = error;
     return result$;
   }
 
@@ -1053,8 +1008,6 @@ class VLMStreamEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'VLMStreamEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6,
-        defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(3, _omitFieldNames ? '' : 'requestId')
     ..aE<VLMStreamEventKind>(4, _omitFieldNames ? '' : 'kind',
@@ -1066,8 +1019,8 @@ class VLMStreamEvent extends $pb.GeneratedMessage {
         fieldType: $pb.PbFieldType.OF)
     ..aOM<VLMResult>(9, _omitFieldNames ? '' : 'result',
         subBuilder: VLMResult.create)
-    ..aOS(10, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(11, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$2.SDKError>(12, _omitFieldNames ? '' : 'error',
+        subBuilder: $2.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1089,106 +1042,90 @@ class VLMStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<VLMStreamEvent>(create);
   static VLMStreamEvent? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $fixnum.Int64 get seq => $_getI64(0);
-  @$pb.TagNumber(1)
-  set seq($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSeq() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSeq() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $fixnum.Int64 get timestampUs => $_getI64(1);
+  $fixnum.Int64 get timestampUs => $_getI64(0);
   @$pb.TagNumber(2)
-  set timestampUs($fixnum.Int64 value) => $_setInt64(1, value);
+  set timestampUs($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasTimestampUs() => $_has(1);
+  $core.bool hasTimestampUs() => $_has(0);
   @$pb.TagNumber(2)
   void clearTimestampUs() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get requestId => $_getSZ(2);
+  $core.String get requestId => $_getSZ(1);
   @$pb.TagNumber(3)
-  set requestId($core.String value) => $_setString(2, value);
+  set requestId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasRequestId() => $_has(2);
+  $core.bool hasRequestId() => $_has(1);
   @$pb.TagNumber(3)
   void clearRequestId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  VLMStreamEventKind get kind => $_getN(3);
+  VLMStreamEventKind get kind => $_getN(2);
   @$pb.TagNumber(4)
   set kind(VLMStreamEventKind value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasKind() => $_has(3);
+  $core.bool hasKind() => $_has(2);
   @$pb.TagNumber(4)
   void clearKind() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.String get token => $_getSZ(4);
+  $core.String get token => $_getSZ(3);
   @$pb.TagNumber(5)
-  set token($core.String value) => $_setString(4, value);
+  set token($core.String value) => $_setString(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasToken() => $_has(4);
+  $core.bool hasToken() => $_has(3);
   @$pb.TagNumber(5)
   void clearToken() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get tokenIndex => $_getIZ(5);
+  $core.int get tokenIndex => $_getIZ(4);
   @$pb.TagNumber(6)
-  set tokenIndex($core.int value) => $_setSignedInt32(5, value);
+  set tokenIndex($core.int value) => $_setSignedInt32(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasTokenIndex() => $_has(5);
+  $core.bool hasTokenIndex() => $_has(4);
   @$pb.TagNumber(6)
   void clearTokenIndex() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.bool get isFinal => $_getBF(6);
+  $core.bool get isFinal => $_getBF(5);
   @$pb.TagNumber(7)
-  set isFinal($core.bool value) => $_setBool(6, value);
+  set isFinal($core.bool value) => $_setBool(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasIsFinal() => $_has(6);
+  $core.bool hasIsFinal() => $_has(5);
   @$pb.TagNumber(7)
   void clearIsFinal() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.double get tokensPerSecond => $_getN(7);
+  $core.double get tokensPerSecond => $_getN(6);
   @$pb.TagNumber(8)
-  set tokensPerSecond($core.double value) => $_setFloat(7, value);
+  set tokensPerSecond($core.double value) => $_setFloat(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasTokensPerSecond() => $_has(7);
+  $core.bool hasTokensPerSecond() => $_has(6);
   @$pb.TagNumber(8)
   void clearTokensPerSecond() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  VLMResult get result => $_getN(8);
+  VLMResult get result => $_getN(7);
   @$pb.TagNumber(9)
   set result(VLMResult value) => $_setField(9, value);
   @$pb.TagNumber(9)
-  $core.bool hasResult() => $_has(8);
+  $core.bool hasResult() => $_has(7);
   @$pb.TagNumber(9)
   void clearResult() => $_clearField(9);
   @$pb.TagNumber(9)
-  VLMResult ensureResult() => $_ensure(8);
+  VLMResult ensureResult() => $_ensure(7);
 
-  @$pb.TagNumber(10)
-  $core.String get errorMessage => $_getSZ(9);
-  @$pb.TagNumber(10)
-  set errorMessage($core.String value) => $_setString(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasErrorMessage() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearErrorMessage() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.int get errorCode => $_getIZ(10);
-  @$pb.TagNumber(11)
-  set errorCode($core.int value) => $_setSignedInt32(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasErrorCode() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearErrorCode() => $_clearField(11);
+  @$pb.TagNumber(12)
+  $2.SDKError get error => $_getN(8);
+  @$pb.TagNumber(12)
+  set error($2.SDKError value) => $_setField(12, value);
+  @$pb.TagNumber(12)
+  $core.bool hasError() => $_has(8);
+  @$pb.TagNumber(12)
+  void clearError() => $_clearField(12);
+  @$pb.TagNumber(12)
+  $2.SDKError ensureError() => $_ensure(8);
 }
 
 class VLMServiceState extends $pb.GeneratedMessage {
@@ -1199,8 +1136,7 @@ class VLMServiceState extends $pb.GeneratedMessage {
     $core.bool? supportsStreaming,
     $core.bool? supportsMultipleImages,
     $core.String? visionEncoderType,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $2.SDKError? error,
   }) {
     final result = create();
     if (isReady != null) result.isReady = isReady;
@@ -1210,8 +1146,7 @@ class VLMServiceState extends $pb.GeneratedMessage {
     if (supportsMultipleImages != null)
       result.supportsMultipleImages = supportsMultipleImages;
     if (visionEncoderType != null) result.visionEncoderType = visionEncoderType;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1234,8 +1169,8 @@ class VLMServiceState extends $pb.GeneratedMessage {
     ..aOB(4, _omitFieldNames ? '' : 'supportsStreaming')
     ..aOB(5, _omitFieldNames ? '' : 'supportsMultipleImages')
     ..aOS(6, _omitFieldNames ? '' : 'visionEncoderType')
-    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(8, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$2.SDKError>(9, _omitFieldNames ? '' : 'error',
+        subBuilder: $2.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1311,23 +1246,16 @@ class VLMServiceState extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearVisionEncoderType() => $_clearField(6);
 
-  @$pb.TagNumber(7)
-  $core.String get errorMessage => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set errorMessage($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasErrorMessage() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearErrorMessage() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.int get errorCode => $_getIZ(7);
-  @$pb.TagNumber(8)
-  set errorCode($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasErrorCode() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearErrorCode() => $_clearField(8);
+  @$pb.TagNumber(9)
+  $2.SDKError get error => $_getN(6);
+  @$pb.TagNumber(9)
+  set error($2.SDKError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $2.SDKError ensureError() => $_ensure(6);
 }
 
 const $core.bool _omitFieldNames =

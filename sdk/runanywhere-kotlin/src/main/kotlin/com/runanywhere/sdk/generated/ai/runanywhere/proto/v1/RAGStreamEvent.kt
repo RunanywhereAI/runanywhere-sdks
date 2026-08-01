@@ -31,18 +31,11 @@ import okio.ByteString
 
 public class RAGStreamEvent(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val seq: Long = 0L,
-  @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
@@ -50,50 +43,41 @@ public class RAGStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val request_id: String = "",
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.RAGStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val kind: RAGStreamEventKind = RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.RAGSearchResult#ADAPTER",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val chunk: RAGSearchResult? = null,
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val token: String = "",
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.RAGResult#ADAPTER",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val result: RAGResult? = null,
   @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 7,
+    tag = 10,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 6,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 9,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 8,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGStreamEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -106,15 +90,13 @@ public class RAGStreamEvent(
     if (other === this) return true
     if (other !is RAGStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
-    if (seq != other.seq) return false
     if (timestamp_us != other.timestamp_us) return false
     if (request_id != other.request_id) return false
     if (kind != other.kind) return false
     if (chunk != other.chunk) return false
     if (token != other.token) return false
     if (result != other.result) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -122,15 +104,13 @@ public class RAGStreamEvent(
     var result_ = super.hashCode
     if (result_ == 0) {
       result_ = unknownFields.hashCode()
-      result_ = result_ * 37 + seq.hashCode()
       result_ = result_ * 37 + timestamp_us.hashCode()
       result_ = result_ * 37 + request_id.hashCode()
       result_ = result_ * 37 + kind.hashCode()
       result_ = result_ * 37 + (chunk?.hashCode() ?: 0)
       result_ = result_ * 37 + token.hashCode()
       result_ = result_ * 37 + (result?.hashCode() ?: 0)
-      result_ = result_ * 37 + (error_message?.hashCode() ?: 0)
-      result_ = result_ * 37 + error_code.hashCode()
+      result_ = result_ * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result_
     }
     return result_
@@ -138,30 +118,26 @@ public class RAGStreamEvent(
 
   override fun toString(): String {
     val result_ = mutableListOf<String>()
-    result_ += """seq=$seq"""
     result_ += """timestamp_us=$timestamp_us"""
     result_ += """request_id=${sanitize(request_id)}"""
     result_ += """kind=$kind"""
     if (chunk != null) result_ += """chunk=$chunk"""
     result_ += """token=${sanitize(token)}"""
     if (result != null) result_ += """result=$result"""
-    if (error_message != null) result_ += """error_message=${sanitize(error_message)}"""
-    result_ += """error_code=$error_code"""
+    if (error != null) result_ += """error=$error"""
     return result_.joinToString(prefix = "RAGStreamEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
     request_id: String = this.request_id,
     kind: RAGStreamEventKind = this.kind,
     chunk: RAGSearchResult? = this.chunk,
     token: String = this.token,
     result: RAGResult? = this.result,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGStreamEvent = RAGStreamEvent(seq, timestamp_us, request_id, kind, chunk, token, result, error_message, error_code, unknownFields)
+  ): RAGStreamEvent = RAGStreamEvent(timestamp_us, request_id, kind, chunk, token, result, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -175,9 +151,6 @@ public class RAGStreamEvent(
     ) {
       override fun encodedSize(`value`: RAGStreamEvent): Int {
         var size = value.unknownFields.size
-        if (value.seq != 0L) {
-          size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
         }
@@ -192,17 +165,11 @@ public class RAGStreamEvent(
           size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.token)
         }
         size += RAGResult.ADAPTER.encodedSizeWithTag(7, value.result)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(10, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: RAGStreamEvent) {
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
@@ -217,19 +184,13 @@ public class RAGStreamEvent(
           ProtoAdapter.STRING.encodeWithTag(writer, 6, value.token)
         }
         RAGResult.ADAPTER.encodeWithTag(writer, 7, value.result)
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGStreamEvent) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 9, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
         RAGResult.ADAPTER.encodeWithTag(writer, 7, value.result)
         if (value.token != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 6, value.token)
@@ -244,24 +205,18 @@ public class RAGStreamEvent(
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
-        }
       }
 
       override fun decode(reader: ProtoReader): RAGStreamEvent {
-        var seq: Long = 0L
         var timestamp_us: Long = 0L
         var request_id: String = ""
         var kind: RAGStreamEventKind = RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED
         var chunk: RAGSearchResult? = null
         var token: String = ""
         var result: RAGResult? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> seq = ProtoAdapter.UINT64.decode(reader)
             2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             3 -> request_id = ProtoAdapter.STRING.decode(reader)
             4 -> try {
@@ -272,21 +227,18 @@ public class RAGStreamEvent(
             5 -> chunk = RAGSearchResult.ADAPTER.decode(reader)
             6 -> token = ProtoAdapter.STRING.decode(reader)
             7 -> result = RAGResult.ADAPTER.decode(reader)
-            8 -> error_message = ProtoAdapter.STRING.decode(reader)
-            9 -> error_code = ProtoAdapter.INT32.decode(reader)
+            10 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return RAGStreamEvent(
-          seq = seq,
           timestamp_us = timestamp_us,
           request_id = request_id,
           kind = kind,
           chunk = chunk,
           token = token,
           result = result,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -294,6 +246,7 @@ public class RAGStreamEvent(
       override fun redact(`value`: RAGStreamEvent): RAGStreamEvent = value.copy(
         chunk = value.chunk?.let(RAGSearchResult.ADAPTER::redact),
         result = value.result?.let(RAGResult.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

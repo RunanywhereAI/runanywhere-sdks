@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -32,10 +33,9 @@ export interface LoRAAdapterInfo {
   scale: number;
   /** Whether it is currently applied to the context. */
   applied: boolean;
-  /** Populated when applied is false. */
-  errorMessage?: string | undefined;
-  errorCode: number;
   loadedAtMs: number;
+  /** Populated when applied is false. */
+  error?: SDKError | undefined;
 }
 
 export interface LoraAdapterCatalogEntry {
@@ -83,13 +83,12 @@ export interface LoraAdapterCatalogListRequest {
 }
 
 export interface LoraAdapterCatalogListResult {
-  success: boolean;
   entries: LoraAdapterCatalogEntry[];
-  errorMessage: string;
   /** total_count is unfiltered; filtered_count reflects the query. */
   totalCount: number;
   filteredCount: number;
   downloadedCount: number;
+  error?: SDKError | undefined;
 }
 
 export interface LoraAdapterCatalogGetRequest {
@@ -99,7 +98,7 @@ export interface LoraAdapterCatalogGetRequest {
 export interface LoraAdapterCatalogGetResult {
   found: boolean;
   entry?: LoraAdapterCatalogEntry | undefined;
-  errorMessage: string;
+  error?: SDKError | undefined;
 }
 
 export interface LoraAdapterDownloadCompletedRequest {
@@ -113,10 +112,9 @@ export interface LoraAdapterDownloadCompletedRequest {
 }
 
 export interface LoraAdapterDownloadCompletedResult {
-  success: boolean;
   entry?: LoraAdapterCatalogEntry | undefined;
-  errorMessage: string;
   persisted: boolean;
+  error?: SDKError | undefined;
 }
 
 export interface LoraAdapterImportRequest {
@@ -127,22 +125,20 @@ export interface LoraAdapterImportRequest {
 }
 
 export interface LoraAdapterImportResult {
-  success: boolean;
-  errorMessage: string;
   /** Stable SDK-owned path of the imported file. */
   localPath: string;
   /** Whether a catalog entry matched and was completed. */
   matched: boolean;
   entry?: LoraAdapterCatalogEntry | undefined;
+  error?: SDKError | undefined;
 }
 
 export interface LoraCompatibilityResult {
   isCompatible: boolean;
-  /** Populated when is_compatible is false. */
-  errorMessage?: string | undefined;
   baseModelRequired?: string | undefined;
   warnings: string[];
-  errorCode: number;
+  /** Populated when is_compatible is false. */
+  error?: SDKError | undefined;
 }
 
 export interface LoRAApplyRequest {
@@ -155,9 +151,7 @@ export interface LoRAApplyRequest {
 export interface LoRAApplyResult {
   requestId: string;
   adapters: LoRAAdapterInfo[];
-  success: boolean;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 export interface LoRARemoveRequest {
@@ -176,8 +170,7 @@ export interface LoRAState {
   loadedAdapters: LoRAAdapterInfo[];
   hasActiveAdapters: boolean;
   baseModelId?: string | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  error?: SDKError | undefined;
 }
 
 function createBaseLoRAAdapterConfig(): LoRAAdapterConfig {
@@ -420,15 +413,7 @@ export const LoRAAdapterConfig_MetadataEntry: MessageFns<LoRAAdapterConfig_Metad
 };
 
 function createBaseLoRAAdapterInfo(): LoRAAdapterInfo {
-  return {
-    adapterId: "",
-    adapterPath: "",
-    scale: 0,
-    applied: false,
-    errorMessage: undefined,
-    errorCode: 0,
-    loadedAtMs: 0,
-  };
+  return { adapterId: "", adapterPath: "", scale: 0, applied: false, loadedAtMs: 0, error: undefined };
 }
 
 export const LoRAAdapterInfo: MessageFns<LoRAAdapterInfo> = {
@@ -445,14 +430,11 @@ export const LoRAAdapterInfo: MessageFns<LoRAAdapterInfo> = {
     if (message.applied !== false) {
       writer.uint32(32).bool(message.applied);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(42).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(48).int32(message.errorCode);
-    }
     if (message.loadedAtMs !== 0) {
       writer.uint32(56).int64(message.loadedAtMs);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(66).fork()).join();
     }
     return writer;
   },
@@ -496,28 +478,20 @@ export const LoRAAdapterInfo: MessageFns<LoRAAdapterInfo> = {
           message.applied = reader.bool();
           continue;
         }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
         case 7: {
           if (tag !== 56) {
             break;
           }
 
           message.loadedAtMs = longToNumber(reader.int64());
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -543,21 +517,12 @@ export const LoRAAdapterInfo: MessageFns<LoRAAdapterInfo> = {
         : "",
       scale: isSet(object.scale) ? globalThis.Number(object.scale) : 0,
       applied: isSet(object.applied) ? globalThis.Boolean(object.applied) : false,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
       loadedAtMs: isSet(object.loadedAtMs)
         ? globalThis.Number(object.loadedAtMs)
         : isSet(object.loaded_at_ms)
         ? globalThis.Number(object.loaded_at_ms)
         : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -575,14 +540,11 @@ export const LoRAAdapterInfo: MessageFns<LoRAAdapterInfo> = {
     if (message.applied !== false) {
       obj.applied = message.applied;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
     if (message.loadedAtMs !== 0) {
       obj.loadedAtMs = Math.round(message.loadedAtMs);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -596,9 +558,10 @@ export const LoRAAdapterInfo: MessageFns<LoRAAdapterInfo> = {
     message.adapterPath = object.adapterPath ?? "";
     message.scale = object.scale ?? 0;
     message.applied = object.applied ?? false;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     message.loadedAtMs = object.loadedAtMs ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1324,19 +1287,13 @@ export const LoraAdapterCatalogListRequest: MessageFns<LoraAdapterCatalogListReq
 };
 
 function createBaseLoraAdapterCatalogListResult(): LoraAdapterCatalogListResult {
-  return { success: false, entries: [], errorMessage: "", totalCount: 0, filteredCount: 0, downloadedCount: 0 };
+  return { entries: [], totalCount: 0, filteredCount: 0, downloadedCount: 0, error: undefined };
 }
 
 export const LoraAdapterCatalogListResult: MessageFns<LoraAdapterCatalogListResult> = {
   encode(message: LoraAdapterCatalogListResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     for (const v of message.entries) {
       LoraAdapterCatalogEntry.encode(v!, writer.uint32(18).fork()).join();
-    }
-    if (message.errorMessage !== "") {
-      writer.uint32(26).string(message.errorMessage);
     }
     if (message.totalCount !== 0) {
       writer.uint32(32).int32(message.totalCount);
@@ -1346,6 +1303,9 @@ export const LoraAdapterCatalogListResult: MessageFns<LoraAdapterCatalogListResu
     }
     if (message.downloadedCount !== 0) {
       writer.uint32(48).int32(message.downloadedCount);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -1357,28 +1317,12 @@ export const LoraAdapterCatalogListResult: MessageFns<LoraAdapterCatalogListResu
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
           }
 
           message.entries.push(LoraAdapterCatalogEntry.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
           continue;
         }
         case 4: {
@@ -1405,6 +1349,14 @@ export const LoraAdapterCatalogListResult: MessageFns<LoraAdapterCatalogListResu
           message.downloadedCount = reader.int32();
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1416,15 +1368,9 @@ export const LoraAdapterCatalogListResult: MessageFns<LoraAdapterCatalogListResu
 
   fromJSON(object: any): LoraAdapterCatalogListResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       entries: globalThis.Array.isArray(object?.entries)
         ? object.entries.map((e: any) => LoraAdapterCatalogEntry.fromJSON(e))
         : [],
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       totalCount: isSet(object.totalCount)
         ? globalThis.Number(object.totalCount)
         : isSet(object.total_count)
@@ -1440,19 +1386,14 @@ export const LoraAdapterCatalogListResult: MessageFns<LoraAdapterCatalogListResu
         : isSet(object.downloaded_count)
         ? globalThis.Number(object.downloaded_count)
         : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: LoraAdapterCatalogListResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.entries?.length) {
       obj.entries = message.entries.map((e) => LoraAdapterCatalogEntry.toJSON(e));
-    }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
     }
     if (message.totalCount !== 0) {
       obj.totalCount = Math.round(message.totalCount);
@@ -1463,6 +1404,9 @@ export const LoraAdapterCatalogListResult: MessageFns<LoraAdapterCatalogListResu
     if (message.downloadedCount !== 0) {
       obj.downloadedCount = Math.round(message.downloadedCount);
     }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
     return obj;
   },
 
@@ -1471,12 +1415,13 @@ export const LoraAdapterCatalogListResult: MessageFns<LoraAdapterCatalogListResu
   },
   fromPartial<I extends Exact<DeepPartial<LoraAdapterCatalogListResult>, I>>(object: I): LoraAdapterCatalogListResult {
     const message = createBaseLoraAdapterCatalogListResult();
-    message.success = object.success ?? false;
     message.entries = object.entries?.map((e) => LoraAdapterCatalogEntry.fromPartial(e)) || [];
-    message.errorMessage = object.errorMessage ?? "";
     message.totalCount = object.totalCount ?? 0;
     message.filteredCount = object.filteredCount ?? 0;
     message.downloadedCount = object.downloadedCount ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1546,7 +1491,7 @@ export const LoraAdapterCatalogGetRequest: MessageFns<LoraAdapterCatalogGetReque
 };
 
 function createBaseLoraAdapterCatalogGetResult(): LoraAdapterCatalogGetResult {
-  return { found: false, entry: undefined, errorMessage: "" };
+  return { found: false, entry: undefined, error: undefined };
 }
 
 export const LoraAdapterCatalogGetResult: MessageFns<LoraAdapterCatalogGetResult> = {
@@ -1557,8 +1502,8 @@ export const LoraAdapterCatalogGetResult: MessageFns<LoraAdapterCatalogGetResult
     if (message.entry !== undefined) {
       LoraAdapterCatalogEntry.encode(message.entry, writer.uint32(18).fork()).join();
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(26).string(message.errorMessage);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(34).fork()).join();
     }
     return writer;
   },
@@ -1586,12 +1531,12 @@ export const LoraAdapterCatalogGetResult: MessageFns<LoraAdapterCatalogGetResult
           message.entry = LoraAdapterCatalogEntry.decode(reader, reader.uint32());
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
+        case 4: {
+          if (tag !== 34) {
             break;
           }
 
-          message.errorMessage = reader.string();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1607,11 +1552,7 @@ export const LoraAdapterCatalogGetResult: MessageFns<LoraAdapterCatalogGetResult
     return {
       found: isSet(object.found) ? globalThis.Boolean(object.found) : false,
       entry: isSet(object.entry) ? LoraAdapterCatalogEntry.fromJSON(object.entry) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1623,8 +1564,8 @@ export const LoraAdapterCatalogGetResult: MessageFns<LoraAdapterCatalogGetResult
     if (message.entry !== undefined) {
       obj.entry = LoraAdapterCatalogEntry.toJSON(message.entry);
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1638,7 +1579,9 @@ export const LoraAdapterCatalogGetResult: MessageFns<LoraAdapterCatalogGetResult
     message.entry = (object.entry !== undefined && object.entry !== null)
       ? LoraAdapterCatalogEntry.fromPartial(object.entry)
       : undefined;
-    message.errorMessage = object.errorMessage ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1836,22 +1779,19 @@ export const LoraAdapterDownloadCompletedRequest: MessageFns<LoraAdapterDownload
 };
 
 function createBaseLoraAdapterDownloadCompletedResult(): LoraAdapterDownloadCompletedResult {
-  return { success: false, entry: undefined, errorMessage: "", persisted: false };
+  return { entry: undefined, persisted: false, error: undefined };
 }
 
 export const LoraAdapterDownloadCompletedResult: MessageFns<LoraAdapterDownloadCompletedResult> = {
   encode(message: LoraAdapterDownloadCompletedResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
     if (message.entry !== undefined) {
       LoraAdapterCatalogEntry.encode(message.entry, writer.uint32(18).fork()).join();
     }
-    if (message.errorMessage !== "") {
-      writer.uint32(26).string(message.errorMessage);
-    }
     if (message.persisted !== false) {
       writer.uint32(32).bool(message.persisted);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -1863,14 +1803,6 @@ export const LoraAdapterDownloadCompletedResult: MessageFns<LoraAdapterDownloadC
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
         case 2: {
           if (tag !== 18) {
             break;
@@ -1879,20 +1811,20 @@ export const LoraAdapterDownloadCompletedResult: MessageFns<LoraAdapterDownloadC
           message.entry = LoraAdapterCatalogEntry.decode(reader, reader.uint32());
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 4: {
           if (tag !== 32) {
             break;
           }
 
           message.persisted = reader.bool();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1906,30 +1838,22 @@ export const LoraAdapterDownloadCompletedResult: MessageFns<LoraAdapterDownloadC
 
   fromJSON(object: any): LoraAdapterDownloadCompletedResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       entry: isSet(object.entry) ? LoraAdapterCatalogEntry.fromJSON(object.entry) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       persisted: isSet(object.persisted) ? globalThis.Boolean(object.persisted) : false,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: LoraAdapterDownloadCompletedResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
     if (message.entry !== undefined) {
       obj.entry = LoraAdapterCatalogEntry.toJSON(message.entry);
     }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.persisted !== false) {
       obj.persisted = message.persisted;
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1943,12 +1867,13 @@ export const LoraAdapterDownloadCompletedResult: MessageFns<LoraAdapterDownloadC
     object: I,
   ): LoraAdapterDownloadCompletedResult {
     const message = createBaseLoraAdapterDownloadCompletedResult();
-    message.success = object.success ?? false;
     message.entry = (object.entry !== undefined && object.entry !== null)
       ? LoraAdapterCatalogEntry.fromPartial(object.entry)
       : undefined;
-    message.errorMessage = object.errorMessage ?? "";
     message.persisted = object.persisted ?? false;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -2034,17 +1959,11 @@ export const LoraAdapterImportRequest: MessageFns<LoraAdapterImportRequest> = {
 };
 
 function createBaseLoraAdapterImportResult(): LoraAdapterImportResult {
-  return { success: false, errorMessage: "", localPath: "", matched: false, entry: undefined };
+  return { localPath: "", matched: false, entry: undefined, error: undefined };
 }
 
 export const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult> = {
   encode(message: LoraAdapterImportResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.success !== false) {
-      writer.uint32(8).bool(message.success);
-    }
-    if (message.errorMessage !== "") {
-      writer.uint32(18).string(message.errorMessage);
-    }
     if (message.localPath !== "") {
       writer.uint32(26).string(message.localPath);
     }
@@ -2053,6 +1972,9 @@ export const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult> = {
     }
     if (message.entry !== undefined) {
       LoraAdapterCatalogEntry.encode(message.entry, writer.uint32(42).fork()).join();
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -2064,22 +1986,6 @@ export const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.success = reader.bool();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 3: {
           if (tag !== 26) {
             break;
@@ -2104,6 +2010,14 @@ export const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult> = {
           message.entry = LoraAdapterCatalogEntry.decode(reader, reader.uint32());
           continue;
         }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2115,12 +2029,6 @@ export const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult> = {
 
   fromJSON(object: any): LoraAdapterImportResult {
     return {
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : "",
       localPath: isSet(object.localPath)
         ? globalThis.String(object.localPath)
         : isSet(object.local_path)
@@ -2128,17 +2036,12 @@ export const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult> = {
         : "",
       matched: isSet(object.matched) ? globalThis.Boolean(object.matched) : false,
       entry: isSet(object.entry) ? LoraAdapterCatalogEntry.fromJSON(object.entry) : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
   toJSON(message: LoraAdapterImportResult): unknown {
     const obj: any = {};
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
-    if (message.errorMessage !== "") {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.localPath !== "") {
       obj.localPath = message.localPath;
     }
@@ -2148,6 +2051,9 @@ export const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult> = {
     if (message.entry !== undefined) {
       obj.entry = LoraAdapterCatalogEntry.toJSON(message.entry);
     }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
     return obj;
   },
 
@@ -2156,19 +2062,20 @@ export const LoraAdapterImportResult: MessageFns<LoraAdapterImportResult> = {
   },
   fromPartial<I extends Exact<DeepPartial<LoraAdapterImportResult>, I>>(object: I): LoraAdapterImportResult {
     const message = createBaseLoraAdapterImportResult();
-    message.success = object.success ?? false;
-    message.errorMessage = object.errorMessage ?? "";
     message.localPath = object.localPath ?? "";
     message.matched = object.matched ?? false;
     message.entry = (object.entry !== undefined && object.entry !== null)
       ? LoraAdapterCatalogEntry.fromPartial(object.entry)
+      : undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
       : undefined;
     return message;
   },
 };
 
 function createBaseLoraCompatibilityResult(): LoraCompatibilityResult {
-  return { isCompatible: false, errorMessage: undefined, baseModelRequired: undefined, warnings: [], errorCode: 0 };
+  return { isCompatible: false, baseModelRequired: undefined, warnings: [], error: undefined };
 }
 
 export const LoraCompatibilityResult: MessageFns<LoraCompatibilityResult> = {
@@ -2176,17 +2083,14 @@ export const LoraCompatibilityResult: MessageFns<LoraCompatibilityResult> = {
     if (message.isCompatible !== false) {
       writer.uint32(8).bool(message.isCompatible);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(18).string(message.errorMessage);
-    }
     if (message.baseModelRequired !== undefined) {
       writer.uint32(26).string(message.baseModelRequired);
     }
     for (const v of message.warnings) {
       writer.uint32(34).string(v!);
     }
-    if (message.errorCode !== 0) {
-      writer.uint32(40).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -2206,14 +2110,6 @@ export const LoraCompatibilityResult: MessageFns<LoraCompatibilityResult> = {
           message.isCompatible = reader.bool();
           continue;
         }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
         case 3: {
           if (tag !== 26) {
             break;
@@ -2230,12 +2126,12 @@ export const LoraCompatibilityResult: MessageFns<LoraCompatibilityResult> = {
           message.warnings.push(reader.string());
           continue;
         }
-        case 5: {
-          if (tag !== 40) {
+        case 6: {
+          if (tag !== 50) {
             break;
           }
 
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2254,22 +2150,13 @@ export const LoraCompatibilityResult: MessageFns<LoraCompatibilityResult> = {
         : isSet(object.is_compatible)
         ? globalThis.Boolean(object.is_compatible)
         : false,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
       baseModelRequired: isSet(object.baseModelRequired)
         ? globalThis.String(object.baseModelRequired)
         : isSet(object.base_model_required)
         ? globalThis.String(object.base_model_required)
         : undefined,
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2278,17 +2165,14 @@ export const LoraCompatibilityResult: MessageFns<LoraCompatibilityResult> = {
     if (message.isCompatible !== false) {
       obj.isCompatible = message.isCompatible;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
     if (message.baseModelRequired !== undefined) {
       obj.baseModelRequired = message.baseModelRequired;
     }
     if (message.warnings?.length) {
       obj.warnings = message.warnings;
     }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2299,10 +2183,11 @@ export const LoraCompatibilityResult: MessageFns<LoraCompatibilityResult> = {
   fromPartial<I extends Exact<DeepPartial<LoraCompatibilityResult>, I>>(object: I): LoraCompatibilityResult {
     const message = createBaseLoraCompatibilityResult();
     message.isCompatible = object.isCompatible ?? false;
-    message.errorMessage = object.errorMessage ?? undefined;
     message.baseModelRequired = object.baseModelRequired ?? undefined;
     message.warnings = object.warnings?.map((e) => e) || [];
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -2410,7 +2295,7 @@ export const LoRAApplyRequest: MessageFns<LoRAApplyRequest> = {
 };
 
 function createBaseLoRAApplyResult(): LoRAApplyResult {
-  return { requestId: "", adapters: [], success: false, errorMessage: undefined, errorCode: 0 };
+  return { requestId: "", adapters: [], error: undefined };
 }
 
 export const LoRAApplyResult: MessageFns<LoRAApplyResult> = {
@@ -2421,14 +2306,8 @@ export const LoRAApplyResult: MessageFns<LoRAApplyResult> = {
     for (const v of message.adapters) {
       LoRAAdapterInfo.encode(v!, writer.uint32(18).fork()).join();
     }
-    if (message.success !== false) {
-      writer.uint32(24).bool(message.success);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(34).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(40).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -2456,28 +2335,12 @@ export const LoRAApplyResult: MessageFns<LoRAApplyResult> = {
           message.adapters.push(LoRAAdapterInfo.decode(reader, reader.uint32()));
           continue;
         }
-        case 3: {
-          if (tag !== 24) {
+        case 6: {
+          if (tag !== 50) {
             break;
           }
 
-          message.success = reader.bool();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2499,17 +2362,7 @@ export const LoRAApplyResult: MessageFns<LoRAApplyResult> = {
       adapters: globalThis.Array.isArray(object?.adapters)
         ? object.adapters.map((e: any) => LoRAAdapterInfo.fromJSON(e))
         : [],
-      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2521,14 +2374,8 @@ export const LoRAApplyResult: MessageFns<LoRAApplyResult> = {
     if (message.adapters?.length) {
       obj.adapters = message.adapters.map((e) => LoRAAdapterInfo.toJSON(e));
     }
-    if (message.success !== false) {
-      obj.success = message.success;
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2540,9 +2387,9 @@ export const LoRAApplyResult: MessageFns<LoRAApplyResult> = {
     const message = createBaseLoRAApplyResult();
     message.requestId = object.requestId ?? "";
     message.adapters = object.adapters?.map((e) => LoRAAdapterInfo.fromPartial(e)) || [];
-    message.success = object.success ?? false;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -2672,13 +2519,7 @@ export const LoRARemoveRequest: MessageFns<LoRARemoveRequest> = {
 };
 
 function createBaseLoRAState(): LoRAState {
-  return {
-    loadedAdapters: [],
-    hasActiveAdapters: false,
-    baseModelId: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
-  };
+  return { loadedAdapters: [], hasActiveAdapters: false, baseModelId: undefined, error: undefined };
 }
 
 export const LoRAState: MessageFns<LoRAState> = {
@@ -2692,11 +2533,8 @@ export const LoRAState: MessageFns<LoRAState> = {
     if (message.baseModelId !== undefined) {
       writer.uint32(26).string(message.baseModelId);
     }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(34).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(40).int32(message.errorCode);
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -2732,20 +2570,12 @@ export const LoRAState: MessageFns<LoRAState> = {
           message.baseModelId = reader.string();
           continue;
         }
-        case 4: {
-          if (tag !== 34) {
+        case 6: {
+          if (tag !== 50) {
             break;
           }
 
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
+          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -2774,16 +2604,7 @@ export const LoRAState: MessageFns<LoRAState> = {
         : isSet(object.base_model_id)
         ? globalThis.String(object.base_model_id)
         : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -2798,11 +2619,8 @@ export const LoRAState: MessageFns<LoRAState> = {
     if (message.baseModelId !== undefined) {
       obj.baseModelId = message.baseModelId;
     }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -2815,8 +2633,9 @@ export const LoRAState: MessageFns<LoRAState> = {
     message.loadedAdapters = object.loadedAdapters?.map((e) => LoRAAdapterInfo.fromPartial(e)) || [];
     message.hasActiveAdapters = object.hasActiveAdapters ?? false;
     message.baseModelId = object.baseModelId ?? undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

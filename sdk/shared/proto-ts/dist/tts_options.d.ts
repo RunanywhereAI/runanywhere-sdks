@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { AudioFormat, InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum TTSVoiceGender {
@@ -82,8 +83,6 @@ export interface TTSSynthesisMetadata {
     processingTimeMs: number;
     characterCount: number;
     audioDurationMs: number;
-    /** character_count / processing_time_ms, set by the producer. */
-    charactersPerSecond: number;
 }
 export interface TTSOutput {
     /** Encoded per audio_format. */
@@ -104,8 +103,7 @@ export interface TTSOutput {
     chunkIndex: number;
     isFinal: boolean;
     audioSizeBytes: number;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 /**
  * Metadata-only view for callers that let the SDK play the audio and never
@@ -120,8 +118,7 @@ export interface TTSSpeakResult {
     metadata?: TTSSynthesisMetadata | undefined;
     /** Milliseconds since epoch, when speech completed. */
     timestampMs: number;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export interface TTSVoiceInfo {
     /** Passed back as TTSOptions.voice. */
@@ -142,29 +139,26 @@ export interface TTSVoiceList {
     voices: TTSVoiceInfo[];
 }
 export interface TTSStreamEvent {
-    seq: number;
     timestampUs: number;
     requestId: string;
     kind: TTSStreamEventKind;
     output?: TTSOutput | undefined;
     phoneme?: TTSPhonemeTimestamp | undefined;
     speakResult?: TTSSpeakResult | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
     /** progress is 0.0-1.0 when known; total_chunks 0 = unknown. */
     progress: number;
     chunkIndex: number;
     totalChunks: number;
     elapsedMs: number;
     statusMessage: string;
+    error?: SDKError | undefined;
 }
 export interface TTSServiceState {
     isReady: boolean;
     currentVoice?: string | undefined;
     voices: TTSVoiceInfo[];
     supportedLanguageCodes: string[];
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export declare const TTSConfiguration: MessageFns<TTSConfiguration>;
 export declare const TTSOptions: MessageFns<TTSOptions>;

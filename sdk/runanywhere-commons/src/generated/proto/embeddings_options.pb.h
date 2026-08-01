@@ -35,6 +35,7 @@
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "errors.pb.h"
 #include "model_types.pb.h"
 #include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
@@ -62,8 +63,6 @@ extern const ::google::protobuf::internal::DescriptorTable descriptor_table_embe
 }  // extern "C"
 namespace runanywhere {
 namespace v1 {
-enum EmbeddingsNormalizeMode : int;
-extern const uint32_t EmbeddingsNormalizeMode_internal_data_[];
 enum EmbeddingsPoolingStrategy : int;
 extern const uint32_t EmbeddingsPoolingStrategy_internal_data_[];
 class EmbeddingVector;
@@ -143,9 +142,6 @@ extern const EmbeddingsResultGlobalsTypeInternal EmbeddingsResult_globals_;
 namespace google {
 namespace protobuf {
 template <>
-internal::EnumTraitsT<::runanywhere::v1::EmbeddingsNormalizeMode_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::EmbeddingsNormalizeMode>;
-template <>
 internal::EnumTraitsT<::runanywhere::v1::EmbeddingsPoolingStrategy_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::EmbeddingsPoolingStrategy>;
 }  // namespace protobuf
@@ -153,47 +149,6 @@ internal::EnumTraitsT<::runanywhere::v1::EmbeddingsPoolingStrategy_internal_data
 
 namespace runanywhere {
 namespace v1 {
-enum EmbeddingsNormalizeMode : int {
-  EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED = 0,
-  EMBEDDINGS_NORMALIZE_MODE_NONE = 1,
-  EMBEDDINGS_NORMALIZE_MODE_L2 = 2,
-  EmbeddingsNormalizeMode_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  EmbeddingsNormalizeMode_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t EmbeddingsNormalizeMode_internal_data_[];
-inline constexpr EmbeddingsNormalizeMode EmbeddingsNormalizeMode_MIN =
-    static_cast<EmbeddingsNormalizeMode>(0);
-inline constexpr EmbeddingsNormalizeMode EmbeddingsNormalizeMode_MAX =
-    static_cast<EmbeddingsNormalizeMode>(2);
-[[nodiscard]] inline bool EmbeddingsNormalizeMode_IsValid(int value) {
-  return 0 <= value && value <= 2;
-}
-inline constexpr int EmbeddingsNormalizeMode_ARRAYSIZE = 2 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-EmbeddingsNormalizeMode_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(EmbeddingsNormalizeMode) {
-  return EmbeddingsNormalizeMode_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& EmbeddingsNormalizeMode_Name(T value) {
-  static_assert(::std::is_same<T, EmbeddingsNormalizeMode>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to EmbeddingsNormalizeMode_Name().");
-  return EmbeddingsNormalizeMode_Name(static_cast<EmbeddingsNormalizeMode>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& EmbeddingsNormalizeMode_Name(EmbeddingsNormalizeMode value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<EmbeddingsNormalizeMode_descriptor, 0, 2>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool EmbeddingsNormalizeMode_Parse(
-    ::absl::string_view name, EmbeddingsNormalizeMode* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<EmbeddingsNormalizeMode>(EmbeddingsNormalizeMode_descriptor(), name,
-                                           value);
-}
 enum EmbeddingsPoolingStrategy : int {
   EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0,
   EMBEDDINGS_POOLING_STRATEGY_MEAN = 1,
@@ -441,24 +396,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
 
   // accessors -------------------------------------------------------
   enum : int {
-    kTruncateFieldNumber = 2,
     kBatchSizeFieldNumber = 3,
-    kNormalizeModeFieldNumber = 4,
+    kTruncateFieldNumber = 2,
+    kNormalizeFieldNumber = 4,
     kPoolingFieldNumber = 5,
     kNThreadsFieldNumber = 6,
   };
-  // optional bool truncate = 2;
-  [[nodiscard]] bool has_truncate()
-      const;
-  void clear_truncate() ;
-  [[nodiscard]] bool truncate() const;
-  void set_truncate(bool value);
-
-  private:
-  bool _internal_truncate() const;
-  void _internal_set_truncate(bool value);
-
-  public:
   // optional int32 batch_size = 3 [(.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8192];
   [[nodiscard]] bool has_batch_size()
       const;
@@ -471,14 +414,26 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
   void _internal_set_batch_size(::int32_t value);
 
   public:
-  // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"];
-  void clear_normalize_mode() ;
-  [[nodiscard]] ::runanywhere::v1::EmbeddingsNormalizeMode normalize_mode() const;
-  void set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value);
+  // optional bool truncate = 2;
+  [[nodiscard]] bool has_truncate()
+      const;
+  void clear_truncate() ;
+  [[nodiscard]] bool truncate() const;
+  void set_truncate(bool value);
 
   private:
-  ::runanywhere::v1::EmbeddingsNormalizeMode _internal_normalize_mode() const;
-  void _internal_set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value);
+  bool _internal_truncate() const;
+  void _internal_set_truncate(bool value);
+
+  public:
+  // bool normalize = 4;
+  void clear_normalize() ;
+  [[nodiscard]] bool normalize() const;
+  void set_normalize(bool value);
+
+  private:
+  bool _internal_normalize() const;
+  void _internal_set_normalize(bool value);
 
   public:
   // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 5;
@@ -534,282 +489,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
         const EmbeddingsOptions& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    bool truncate_;
     ::int32_t batch_size_;
-    int normalize_mode_;
+    bool truncate_;
+    bool normalize_;
     int pooling_;
     ::int32_t n_threads_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_embeddings_5foptions_2eproto;
-};
-// -------------------------------------------------------------------
-
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsCreateResult final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.EmbeddingsCreateResult) */ {
- public:
-  inline EmbeddingsCreateResult() : EmbeddingsCreateResult(nullptr) {}
-  ~EmbeddingsCreateResult() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(EmbeddingsCreateResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(EmbeddingsCreateResult));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr EmbeddingsCreateResult(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline EmbeddingsCreateResult(const EmbeddingsCreateResult& from) : EmbeddingsCreateResult(nullptr, from) {}
-  inline EmbeddingsCreateResult(EmbeddingsCreateResult&& from) noexcept : EmbeddingsCreateResult(nullptr, ::std::move(from)) {}
-  inline EmbeddingsCreateResult& operator=(const EmbeddingsCreateResult& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline EmbeddingsCreateResult& operator=(EmbeddingsCreateResult&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const EmbeddingsCreateResult& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingsCreateResult>(&EmbeddingsCreateResult_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 8;
-  friend void swap(EmbeddingsCreateResult& a, EmbeddingsCreateResult& b) { a.Swap(&b); }
-  inline void Swap(EmbeddingsCreateResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(EmbeddingsCreateResult* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] EmbeddingsCreateResult* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<EmbeddingsCreateResult>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const EmbeddingsCreateResult& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const EmbeddingsCreateResult& from) { EmbeddingsCreateResult::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(EmbeddingsCreateResult* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.EmbeddingsCreateResult"; }
-
-  explicit EmbeddingsCreateResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  EmbeddingsCreateResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const EmbeddingsCreateResult& from);
-  EmbeddingsCreateResult(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, EmbeddingsCreateResult&& from) noexcept
-      : EmbeddingsCreateResult(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kModelIdFieldNumber = 2,
-    kErrorMessageFieldNumber = 6,
-    kHandleFieldNumber = 1,
-    kDimensionFieldNumber = 3,
-    kMaxTokensFieldNumber = 4,
-    kErrorCodeFieldNumber = 5,
-  };
-  // string model_id = 2;
-  void clear_model_id() ;
-  [[nodiscard]] const ::std::string& model_id() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_model_id(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_model_id();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
-  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_model_id() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
-
-  public:
-  // string error_message = 6;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
-  // uint64 handle = 1;
-  void clear_handle() ;
-  [[nodiscard]] ::uint64_t handle() const;
-  void set_handle(::uint64_t value);
-
-  private:
-  ::uint64_t _internal_handle() const;
-  void _internal_set_handle(::uint64_t value);
-
-  public:
-  // int32 dimension = 3;
-  void clear_dimension() ;
-  [[nodiscard]] ::int32_t dimension() const;
-  void set_dimension(::int32_t value);
-
-  private:
-  ::int32_t _internal_dimension() const;
-  void _internal_set_dimension(::int32_t value);
-
-  public:
-  // int32 max_tokens = 4;
-  void clear_max_tokens() ;
-  [[nodiscard]] ::int32_t max_tokens() const;
-  void set_max_tokens(::int32_t value);
-
-  private:
-  ::int32_t _internal_max_tokens() const;
-  void _internal_set_max_tokens(::int32_t value);
-
-  public:
-  // int32 error_code = 5;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingsCreateResult)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
-                          0, 67,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const EmbeddingsCreateResult& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr model_id_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
-    ::uint64_t handle_;
-    ::int32_t dimension_;
-    ::int32_t max_tokens_;
-    ::int32_t error_code_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -970,7 +654,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
     kEmbeddingDimensionFieldNumber = 2,
     kMaxSequenceLengthFieldNumber = 3,
     kPreferredFrameworkFieldNumber = 5,
-    kNormalizeModeFieldNumber = 7,
+    kNormalizeFieldNumber = 7,
     kPoolingFieldNumber = 8,
   };
   // string model_id = 1 [(.runanywhere.v1.rac_required) = true];
@@ -1037,14 +721,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   void _internal_set_preferred_framework(::runanywhere::v1::InferenceFramework value);
 
   public:
-  // .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_L2"];
-  void clear_normalize_mode() ;
-  [[nodiscard]] ::runanywhere::v1::EmbeddingsNormalizeMode normalize_mode() const;
-  void set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value);
+  // bool normalize = 7 [(.runanywhere.v1.rac_default) = "true"];
+  void clear_normalize() ;
+  [[nodiscard]] bool normalize() const;
+  void set_normalize(bool value);
 
   private:
-  ::runanywhere::v1::EmbeddingsNormalizeMode _internal_normalize_mode() const;
-  void _internal_set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value);
+  bool _internal_normalize() const;
+  void _internal_set_normalize(bool value);
 
   public:
   // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
@@ -1095,7 +779,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
     ::int32_t embedding_dimension_;
     ::int32_t max_sequence_length_;
     int preferred_framework_;
-    int normalize_mode_;
+    bool normalize_;
     int pooling_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
@@ -2122,12 +1806,11 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsResult final : public ::g
   enum : int {
     kVectorsFieldNumber = 1,
     kModelIdFieldNumber = 5,
-    kErrorMessageFieldNumber = 6,
     kRequestIdFieldNumber = 8,
+    kErrorFieldNumber = 9,
     kProcessingTimeMsFieldNumber = 3,
     kDimensionFieldNumber = 2,
     kTokensUsedFieldNumber = 4,
-    kErrorCodeFieldNumber = 7,
   };
   // repeated .runanywhere.v1.EmbeddingVector vectors = 1;
   [[nodiscard]] int vectors_size()
@@ -2167,23 +1850,6 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsResult final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
 
   public:
-  // optional string error_message = 6;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
   // string request_id = 8;
   void clear_request_id() ;
   [[nodiscard]] const ::std::string& request_id() const;
@@ -2197,6 +1863,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsResult final : public ::g
   const ::std::string& _internal_request_id() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
+
+  public:
+  // optional .runanywhere.v1.SDKError error = 9;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
+
+  private:
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
 
   public:
   // int64 processing_time_ms = 3;
@@ -2229,22 +1911,12 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsResult final : public ::g
   void _internal_set_tokens_used(::int32_t value);
 
   public:
-  // int32 error_code = 7;
-  void clear_error_code() ;
-  [[nodiscard]] ::int32_t error_code() const;
-  void set_error_code(::int32_t value);
-
-  private:
-  ::int32_t _internal_error_code() const;
-  void _internal_set_error_code(::int32_t value);
-
-  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingsResult)
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 8,
-                          1, 79,
+      ::google::protobuf::internal::TcParseTable<3, 7,
+                          2, 58,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2274,12 +1946,271 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsResult final : public ::g
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::RepeatedPtrField< ::runanywhere::v1::EmbeddingVector > vectors_;
     ::google::protobuf::internal::ArenaStringPtr model_id_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
     ::google::protobuf::internal::ArenaStringPtr request_id_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     ::int64_t processing_time_ms_;
     ::int32_t dimension_;
     ::int32_t tokens_used_;
-    ::int32_t error_code_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_embeddings_5foptions_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsCreateResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.EmbeddingsCreateResult) */ {
+ public:
+  inline EmbeddingsCreateResult() : EmbeddingsCreateResult(nullptr) {}
+  ~EmbeddingsCreateResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(EmbeddingsCreateResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(EmbeddingsCreateResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr EmbeddingsCreateResult(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline EmbeddingsCreateResult(const EmbeddingsCreateResult& from) : EmbeddingsCreateResult(nullptr, from) {}
+  inline EmbeddingsCreateResult(EmbeddingsCreateResult&& from) noexcept : EmbeddingsCreateResult(nullptr, ::std::move(from)) {}
+  inline EmbeddingsCreateResult& operator=(const EmbeddingsCreateResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline EmbeddingsCreateResult& operator=(EmbeddingsCreateResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const EmbeddingsCreateResult& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<EmbeddingsCreateResult>(&EmbeddingsCreateResult_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 8;
+  friend void swap(EmbeddingsCreateResult& a, EmbeddingsCreateResult& b) { a.Swap(&b); }
+  inline void Swap(EmbeddingsCreateResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(EmbeddingsCreateResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] EmbeddingsCreateResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<EmbeddingsCreateResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const EmbeddingsCreateResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const EmbeddingsCreateResult& from) { EmbeddingsCreateResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(EmbeddingsCreateResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.EmbeddingsCreateResult"; }
+
+  explicit EmbeddingsCreateResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  EmbeddingsCreateResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const EmbeddingsCreateResult& from);
+  EmbeddingsCreateResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, EmbeddingsCreateResult&& from) noexcept
+      : EmbeddingsCreateResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kModelIdFieldNumber = 2,
+    kErrorFieldNumber = 7,
+    kHandleFieldNumber = 1,
+    kDimensionFieldNumber = 3,
+    kMaxTokensFieldNumber = 4,
+  };
+  // string model_id = 2;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // optional .runanywhere.v1.SDKError error = 7;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
+
+  private:
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
+
+  public:
+  // uint64 handle = 1;
+  void clear_handle() ;
+  [[nodiscard]] ::uint64_t handle() const;
+  void set_handle(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_handle() const;
+  void _internal_set_handle(::uint64_t value);
+
+  public:
+  // int32 dimension = 3;
+  void clear_dimension() ;
+  [[nodiscard]] ::int32_t dimension() const;
+  void set_dimension(::int32_t value);
+
+  private:
+  ::int32_t _internal_dimension() const;
+  void _internal_set_dimension(::int32_t value);
+
+  public:
+  // int32 max_tokens = 4;
+  void clear_max_tokens() ;
+  [[nodiscard]] ::int32_t max_tokens() const;
+  void set_max_tokens(::int32_t value);
+
+  private:
+  ::int32_t _internal_max_tokens() const;
+  void _internal_set_max_tokens(::int32_t value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.EmbeddingsCreateResult)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<3, 5,
+                          1, 54,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const EmbeddingsCreateResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
+    ::uint64_t handle_;
+    ::int32_t dimension_;
+    ::int32_t max_tokens_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -2442,28 +2373,28 @@ inline void EmbeddingsConfiguration::_internal_set_preferred_framework(::runanyw
   _impl_.preferred_framework_ = value;
 }
 
-// .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 7 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_L2"];
-inline void EmbeddingsConfiguration::clear_normalize_mode() {
+// bool normalize = 7 [(.runanywhere.v1.rac_default) = "true"];
+inline void EmbeddingsConfiguration::clear_normalize() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.normalize_mode_ = 0;
+  _impl_.normalize_ = false;
   ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
-inline ::runanywhere::v1::EmbeddingsNormalizeMode EmbeddingsConfiguration::normalize_mode() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.normalize_mode)
-  return _internal_normalize_mode();
+inline bool EmbeddingsConfiguration::normalize() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsConfiguration.normalize)
+  return _internal_normalize();
 }
-inline void EmbeddingsConfiguration::set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value) {
-  _internal_set_normalize_mode(value);
+inline void EmbeddingsConfiguration::set_normalize(bool value) {
+  _internal_set_normalize(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.normalize_mode)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsConfiguration.normalize)
 }
-inline ::runanywhere::v1::EmbeddingsNormalizeMode EmbeddingsConfiguration::_internal_normalize_mode() const {
+inline bool EmbeddingsConfiguration::_internal_normalize() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::EmbeddingsNormalizeMode>(_impl_.normalize_mode_);
+  return _impl_.normalize_;
 }
-inline void EmbeddingsConfiguration::_internal_set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value) {
+inline void EmbeddingsConfiguration::_internal_set_normalize(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.normalize_mode_ = value;
+  _impl_.normalize_ = value;
 }
 
 // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 8 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
@@ -2564,13 +2495,13 @@ inline void EmbeddingsConfiguration::set_allocated_config_json(::std::string* PR
 
 // optional bool truncate = 2;
 inline bool EmbeddingsOptions::has_truncate() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
   return value;
 }
 inline void EmbeddingsOptions::clear_truncate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.truncate_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
 }
 inline bool EmbeddingsOptions::truncate() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.truncate)
@@ -2578,7 +2509,7 @@ inline bool EmbeddingsOptions::truncate() const {
 }
 inline void EmbeddingsOptions::set_truncate(bool value) {
   _internal_set_truncate(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.truncate)
 }
 inline bool EmbeddingsOptions::_internal_truncate() const {
@@ -2592,13 +2523,13 @@ inline void EmbeddingsOptions::_internal_set_truncate(bool value) {
 
 // optional int32 batch_size = 3 [(.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 8192];
 inline bool EmbeddingsOptions::has_batch_size() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
   return value;
 }
 inline void EmbeddingsOptions::clear_batch_size() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.batch_size_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
 }
 inline ::int32_t EmbeddingsOptions::batch_size() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.batch_size)
@@ -2606,7 +2537,7 @@ inline ::int32_t EmbeddingsOptions::batch_size() const {
 }
 inline void EmbeddingsOptions::set_batch_size(::int32_t value) {
   _internal_set_batch_size(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.batch_size)
 }
 inline ::int32_t EmbeddingsOptions::_internal_batch_size() const {
@@ -2618,28 +2549,28 @@ inline void EmbeddingsOptions::_internal_set_batch_size(::int32_t value) {
   _impl_.batch_size_ = value;
 }
 
-// .runanywhere.v1.EmbeddingsNormalizeMode normalize_mode = 4 [(.runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"];
-inline void EmbeddingsOptions::clear_normalize_mode() {
+// bool normalize = 4;
+inline void EmbeddingsOptions::clear_normalize() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.normalize_mode_ = 0;
+  _impl_.normalize_ = false;
   ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
-inline ::runanywhere::v1::EmbeddingsNormalizeMode EmbeddingsOptions::normalize_mode() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.normalize_mode)
-  return _internal_normalize_mode();
+inline bool EmbeddingsOptions::normalize() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsOptions.normalize)
+  return _internal_normalize();
 }
-inline void EmbeddingsOptions::set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value) {
-  _internal_set_normalize_mode(value);
+inline void EmbeddingsOptions::set_normalize(bool value) {
+  _internal_set_normalize(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.normalize_mode)
+  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsOptions.normalize)
 }
-inline ::runanywhere::v1::EmbeddingsNormalizeMode EmbeddingsOptions::_internal_normalize_mode() const {
+inline bool EmbeddingsOptions::_internal_normalize() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::EmbeddingsNormalizeMode>(_impl_.normalize_mode_);
+  return _impl_.normalize_;
 }
-inline void EmbeddingsOptions::_internal_set_normalize_mode(::runanywhere::v1::EmbeddingsNormalizeMode value) {
+inline void EmbeddingsOptions::_internal_set_normalize(bool value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.normalize_mode_ = value;
+  _impl_.normalize_ = value;
 }
 
 // .runanywhere.v1.EmbeddingsPoolingStrategy pooling = 5;
@@ -3460,103 +3391,11 @@ inline void EmbeddingsResult::set_allocated_model_id(::std::string* PROTOBUF_NUL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsResult.model_id)
 }
 
-// optional string error_message = 6;
-inline bool EmbeddingsResult::has_error_message() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000004U);
-  return value;
-}
-inline void EmbeddingsResult::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-}
-inline const ::std::string& EmbeddingsResult::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsResult.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void EmbeddingsResult::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsResult.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL EmbeddingsResult::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.EmbeddingsResult.error_message)
-  return _s;
-}
-inline const ::std::string& EmbeddingsResult::_internal_error_message() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
-}
-inline void EmbeddingsResult::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL EmbeddingsResult::_internal_mutable_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE EmbeddingsResult::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.EmbeddingsResult.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
-    return nullptr;
-  }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  return released;
-}
-inline void EmbeddingsResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
-  } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
-  }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsResult.error_message)
-}
-
-// int32 error_code = 7;
-inline void EmbeddingsResult::clear_error_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
-}
-inline ::int32_t EmbeddingsResult::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsResult.error_code)
-  return _internal_error_code();
-}
-inline void EmbeddingsResult::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsResult.error_code)
-}
-inline ::int32_t EmbeddingsResult::_internal_error_code() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
-}
-inline void EmbeddingsResult::_internal_set_error_code(::int32_t value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
-}
-
 // string request_id = 8;
 inline void EmbeddingsResult::clear_request_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.request_id_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
 }
 inline const ::std::string& EmbeddingsResult::request_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -3566,13 +3405,13 @@ inline const ::std::string& EmbeddingsResult::request_id() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void EmbeddingsResult::set_request_id(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   _impl_.request_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsResult.request_id)
 }
 inline ::std::string* PROTOBUF_NONNULL EmbeddingsResult::mutable_request_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   ::std::string* _s = _internal_mutable_request_id();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.EmbeddingsResult.request_id)
   return _s;
@@ -3592,10 +3431,10 @@ inline ::std::string* PROTOBUF_NONNULL EmbeddingsResult::_internal_mutable_reque
 inline ::std::string* PROTOBUF_NULLABLE EmbeddingsResult::release_request_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.EmbeddingsResult.request_id)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   auto* released = _impl_.request_id_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.request_id_.Set("", GetArena());
@@ -3605,15 +3444,108 @@ inline ::std::string* PROTOBUF_NULLABLE EmbeddingsResult::release_request_id() {
 inline void EmbeddingsResult::set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
   }
   _impl_.request_id_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.request_id_.IsDefault()) {
     _impl_.request_id_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsResult.request_id)
+}
+
+// optional .runanywhere.v1.SDKError error = 9;
+inline bool EmbeddingsResult::has_error() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::SDKError& EmbeddingsResult::_internal_error() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
+}
+inline const ::runanywhere::v1::SDKError& EmbeddingsResult::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsResult.error)
+  return _internal_error();
+}
+inline void EmbeddingsResult::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.EmbeddingsResult.error)
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE EmbeddingsResult::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE EmbeddingsResult::unsafe_arena_release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.EmbeddingsResult.error)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL EmbeddingsResult::_internal_mutable_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL EmbeddingsResult::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.EmbeddingsResult.error)
+  return _msg;
+}
+inline void EmbeddingsResult::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsResult.error)
 }
 
 // -------------------------------------------------------------------
@@ -3990,92 +3922,97 @@ inline void EmbeddingsCreateResult::_internal_set_max_tokens(::int32_t value) {
   _impl_.max_tokens_ = value;
 }
 
-// int32 error_code = 5;
-inline void EmbeddingsCreateResult::clear_error_code() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+// optional .runanywhere.v1.SDKError error = 7;
+inline bool EmbeddingsCreateResult::has_error() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
+  return value;
 }
-inline ::int32_t EmbeddingsCreateResult::error_code() const {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsCreateResult.error_code)
-  return _internal_error_code();
-}
-inline void EmbeddingsCreateResult::set_error_code(::int32_t value) {
-  _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsCreateResult.error_code)
-}
-inline ::int32_t EmbeddingsCreateResult::_internal_error_code() const {
+inline const ::runanywhere::v1::SDKError& EmbeddingsCreateResult::_internal_error() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_code_;
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
 }
-inline void EmbeddingsCreateResult::_internal_set_error_code(::int32_t value) {
+inline const ::runanywhere::v1::SDKError& EmbeddingsCreateResult::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsCreateResult.error)
+  return _internal_error();
+}
+inline void EmbeddingsCreateResult::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_code_ = value;
-}
-
-// string error_message = 6;
-inline void EmbeddingsCreateResult::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-}
-inline const ::std::string& EmbeddingsCreateResult::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.EmbeddingsCreateResult.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void EmbeddingsCreateResult::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.EmbeddingsCreateResult.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL EmbeddingsCreateResult::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.EmbeddingsCreateResult.error_message)
-  return _s;
-}
-inline const ::std::string& EmbeddingsCreateResult::_internal_error_message() const {
-  ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
-}
-inline void EmbeddingsCreateResult::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
-}
-inline ::std::string* PROTOBUF_NONNULL EmbeddingsCreateResult::_internal_mutable_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE EmbeddingsCreateResult::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.EmbeddingsCreateResult.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
-    return nullptr;
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  return released;
-}
-inline void EmbeddingsCreateResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.EmbeddingsCreateResult.error)
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE EmbeddingsCreateResult::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
   }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsCreateResult.error_message)
+  return released;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE EmbeddingsCreateResult::unsafe_arena_release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.EmbeddingsCreateResult.error)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL EmbeddingsCreateResult::_internal_mutable_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL EmbeddingsCreateResult::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.EmbeddingsCreateResult.error)
+  return _msg;
+}
+inline void EmbeddingsCreateResult::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsCreateResult.error)
 }
 
 #ifdef __GNUC__
@@ -4090,12 +4027,6 @@ inline void EmbeddingsCreateResult::set_allocated_error_message(::std::string* P
 namespace google {
 namespace protobuf {
 
-template <>
-struct is_proto_enum<::runanywhere::v1::EmbeddingsNormalizeMode> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::EmbeddingsNormalizeMode>() {
-  return ::runanywhere::v1::EmbeddingsNormalizeMode_descriptor();
-}
 template <>
 struct is_proto_enum<::runanywhere::v1::EmbeddingsPoolingStrategy> : std::true_type {};
 template <>

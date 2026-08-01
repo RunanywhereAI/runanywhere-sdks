@@ -33,17 +33,10 @@ import okio.ByteString
 
 public class ModelImportResult(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.ModelInfo#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val model: ModelInfo? = null,
   @field:WireField(
@@ -51,7 +44,7 @@ public class ModelImportResult(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "localPath",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val local_path: String = "",
   @field:WireField(
@@ -59,23 +52,15 @@ public class ModelImportResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "importedBytes",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val imported_bytes: Long = 0L,
   warnings: List<String> = emptyList(),
   @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 5,
-  )
-  public val error_message: String = "",
-  @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 6,
+    schemaIndex = 4,
   )
   public val registered: Boolean = false,
   @field:WireField(
@@ -83,16 +68,22 @@ public class ModelImportResult(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "copiedIntoManagedStorage",
-    schemaIndex = 7,
+    schemaIndex = 5,
   )
   public val copied_into_managed_storage: Boolean = false,
+  @field:WireField(
+    tag = 9,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 6,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelImportResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val warnings: List<String> = immutableCopyOf("warnings", warnings)
 
@@ -106,14 +97,13 @@ public class ModelImportResult(
     if (other === this) return true
     if (other !is ModelImportResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (model != other.model) return false
     if (local_path != other.local_path) return false
     if (imported_bytes != other.imported_bytes) return false
     if (warnings != other.warnings) return false
-    if (error_message != other.error_message) return false
     if (registered != other.registered) return false
     if (copied_into_managed_storage != other.copied_into_managed_storage) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -121,14 +111,13 @@ public class ModelImportResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + (model?.hashCode() ?: 0)
       result = result * 37 + local_path.hashCode()
       result = result * 37 + imported_bytes.hashCode()
       result = result * 37 + warnings.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + registered.hashCode()
       result = result * 37 + copied_into_managed_storage.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -136,28 +125,26 @@ public class ModelImportResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     if (model != null) result += """model=$model"""
     result += """local_path=${sanitize(local_path)}"""
     result += """imported_bytes=$imported_bytes"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """registered=$registered"""
     result += """copied_into_managed_storage=$copied_into_managed_storage"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ModelImportResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     model: ModelInfo? = this.model,
     local_path: String = this.local_path,
     imported_bytes: Long = this.imported_bytes,
     warnings: List<String> = this.warnings,
-    error_message: String = this.error_message,
     registered: Boolean = this.registered,
     copied_into_managed_storage: Boolean = this.copied_into_managed_storage,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelImportResult = ModelImportResult(success, model, local_path, imported_bytes, warnings, error_message, registered, copied_into_managed_storage, unknownFields)
+  ): ModelImportResult = ModelImportResult(model, local_path, imported_bytes, warnings, registered, copied_into_managed_storage, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -171,9 +158,6 @@ public class ModelImportResult(
     ) {
       override fun encodedSize(`value`: ModelImportResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         if (value.model != null) {
           size += ModelInfo.ADAPTER.encodedSizeWithTag(2, value.model)
         }
@@ -184,22 +168,17 @@ public class ModelImportResult(
           size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.imported_bytes)
         }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.warnings)
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.error_message)
-        }
         if (value.registered != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.registered)
         }
         if (value.copied_into_managed_storage != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.copied_into_managed_storage)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(9, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ModelImportResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         if (value.model != null) {
           ModelInfo.ADAPTER.encodeWithTag(writer, 2, value.model)
         }
@@ -210,28 +189,24 @@ public class ModelImportResult(
           ProtoAdapter.INT64.encodeWithTag(writer, 4, value.imported_bytes)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
-        }
         if (value.registered != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.registered)
         }
         if (value.copied_into_managed_storage != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.copied_into_managed_storage)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelImportResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 9, value.error)
         if (value.copied_into_managed_storage != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.copied_into_managed_storage)
         }
         if (value.registered != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.registered)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
         if (value.imported_bytes != 0L) {
@@ -243,48 +218,43 @@ public class ModelImportResult(
         if (value.model != null) {
           ModelInfo.ADAPTER.encodeWithTag(writer, 2, value.model)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): ModelImportResult {
-        var success: Boolean = false
         var model: ModelInfo? = null
         var local_path: String = ""
         var imported_bytes: Long = 0L
         val warnings = mutableListOf<String>()
-        var error_message: String = ""
         var registered: Boolean = false
         var copied_into_managed_storage: Boolean = false
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> model = ModelInfo.ADAPTER.decode(reader)
             3 -> local_path = ProtoAdapter.STRING.decode(reader)
             4 -> imported_bytes = ProtoAdapter.INT64.decode(reader)
             5 -> warnings.add(ProtoAdapter.STRING.decode(reader))
-            6 -> error_message = ProtoAdapter.STRING.decode(reader)
             7 -> registered = ProtoAdapter.BOOL.decode(reader)
             8 -> copied_into_managed_storage = ProtoAdapter.BOOL.decode(reader)
+            9 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ModelImportResult(
-          success = success,
           model = model,
           local_path = local_path,
           imported_bytes = imported_bytes,
           warnings = warnings,
-          error_message = error_message,
           registered = registered,
           copied_into_managed_storage = copied_into_managed_storage,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelImportResult): ModelImportResult = value.copy(
         model = value.model?.let(ModelInfo.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

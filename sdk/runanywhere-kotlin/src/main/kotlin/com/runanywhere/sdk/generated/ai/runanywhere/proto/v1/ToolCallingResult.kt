@@ -69,35 +69,26 @@ public class ToolCallingResult(
   )
   public val iterations_used: Int = 0,
   @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 6,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 8,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 7,
-  )
-  public val error_code: Int = 0,
-  @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "rawText",
-    schemaIndex = 8,
+    schemaIndex = 6,
   )
   public val raw_text: String = "",
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "thinkingContent",
-    schemaIndex = 9,
+    schemaIndex = 7,
   )
   public val thinking_content: String? = null,
+  @field:WireField(
+    tag = 11,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 8,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallingResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -134,10 +125,9 @@ public class ToolCallingResult(
     if (is_complete != other.is_complete) return false
     if (conversation_id != other.conversation_id) return false
     if (iterations_used != other.iterations_used) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
     if (raw_text != other.raw_text) return false
     if (thinking_content != other.thinking_content) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -151,10 +141,9 @@ public class ToolCallingResult(
       result = result * 37 + is_complete.hashCode()
       result = result * 37 + (conversation_id?.hashCode() ?: 0)
       result = result * 37 + iterations_used.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
       result = result * 37 + raw_text.hashCode()
       result = result * 37 + (thinking_content?.hashCode() ?: 0)
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -168,10 +157,9 @@ public class ToolCallingResult(
     result += """is_complete=$is_complete"""
     if (conversation_id != null) result += """conversation_id=${sanitize(conversation_id)}"""
     result += """iterations_used=$iterations_used"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
     result += """raw_text=${sanitize(raw_text)}"""
     if (thinking_content != null) result += """thinking_content=${sanitize(thinking_content)}"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ToolCallingResult{", separator = ", ", postfix = "}")
   }
 
@@ -182,12 +170,11 @@ public class ToolCallingResult(
     is_complete: Boolean = this.is_complete,
     conversation_id: String? = this.conversation_id,
     iterations_used: Int = this.iterations_used,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
     raw_text: String = this.raw_text,
     thinking_content: String? = this.thinking_content,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallingResult = ToolCallingResult(text, tool_calls, tool_results, is_complete, conversation_id, iterations_used, error_message, error_code, raw_text, thinking_content, unknownFields)
+  ): ToolCallingResult = ToolCallingResult(text, tool_calls, tool_results, is_complete, conversation_id, iterations_used, raw_text, thinking_content, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -213,14 +200,11 @@ public class ToolCallingResult(
         if (value.iterations_used != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.iterations_used)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(8, value.error_code)
-        }
         if (value.raw_text != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.raw_text)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.thinking_content)
+        size += SDKError.ADAPTER.encodedSizeWithTag(11, value.error)
         return size
       }
 
@@ -237,27 +221,21 @@ public class ToolCallingResult(
         if (value.iterations_used != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 6, value.iterations_used)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
-        }
         if (value.raw_text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.raw_text)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.thinking_content)
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallingResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.thinking_content)
         if (value.raw_text != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 9, value.raw_text)
         }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
         if (value.iterations_used != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 6, value.iterations_used)
         }
@@ -279,10 +257,9 @@ public class ToolCallingResult(
         var is_complete: Boolean = false
         var conversation_id: String? = null
         var iterations_used: Int = 0
-        var error_message: String? = null
-        var error_code: Int = 0
         var raw_text: String = ""
         var thinking_content: String? = null
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -291,10 +268,9 @@ public class ToolCallingResult(
             4 -> is_complete = ProtoAdapter.BOOL.decode(reader)
             5 -> conversation_id = ProtoAdapter.STRING.decode(reader)
             6 -> iterations_used = ProtoAdapter.INT32.decode(reader)
-            7 -> error_message = ProtoAdapter.STRING.decode(reader)
-            8 -> error_code = ProtoAdapter.INT32.decode(reader)
             9 -> raw_text = ProtoAdapter.STRING.decode(reader)
             10 -> thinking_content = ProtoAdapter.STRING.decode(reader)
+            11 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -305,10 +281,9 @@ public class ToolCallingResult(
           is_complete = is_complete,
           conversation_id = conversation_id,
           iterations_used = iterations_used,
-          error_message = error_message,
-          error_code = error_code,
           raw_text = raw_text,
           thinking_content = thinking_content,
+          error = error,
           unknownFields = unknownFields
         )
       }
@@ -316,6 +291,7 @@ public class ToolCallingResult(
       override fun redact(`value`: ToolCallingResult): ToolCallingResult = value.copy(
         tool_calls = value.tool_calls.redactElements(ToolCall.ADAPTER),
         tool_results = value.tool_results.redactElements(ToolResult.ADAPTER),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

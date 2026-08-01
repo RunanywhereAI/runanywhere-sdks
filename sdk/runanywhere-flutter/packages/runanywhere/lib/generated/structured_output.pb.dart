@@ -15,6 +15,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'errors.pb.dart' as $0;
 import 'structured_output.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -648,21 +649,21 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
   factory StructuredOutputValidation({
     $core.bool? isValid,
     $core.bool? containsJson,
-    $core.String? errorMessage,
     $core.String? rawOutput,
     $core.String? extractedJson,
     $core.Iterable<$core.String>? validationErrors,
     $fixnum.Int64? validationTimeMs,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (isValid != null) result.isValid = isValid;
     if (containsJson != null) result.containsJson = containsJson;
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (rawOutput != null) result.rawOutput = rawOutput;
     if (extractedJson != null) result.extractedJson = extractedJson;
     if (validationErrors != null)
       result.validationErrors.addAll(validationErrors);
     if (validationTimeMs != null) result.validationTimeMs = validationTimeMs;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -681,11 +682,12 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'isValid')
     ..aOB(2, _omitFieldNames ? '' : 'containsJson')
-    ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
     ..aOS(4, _omitFieldNames ? '' : 'rawOutput')
     ..aOS(5, _omitFieldNames ? '' : 'extractedJson')
     ..pPS(6, _omitFieldNames ? '' : 'validationErrors')
     ..aInt64(7, _omitFieldNames ? '' : 'validationTimeMs')
+    ..aOM<$0.SDKError>(8, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -727,44 +729,46 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearContainsJson() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  $core.String get errorMessage => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set errorMessage($core.String value) => $_setString(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasErrorMessage() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearErrorMessage() => $_clearField(3);
-
   @$pb.TagNumber(4)
-  $core.String get rawOutput => $_getSZ(3);
+  $core.String get rawOutput => $_getSZ(2);
   @$pb.TagNumber(4)
-  set rawOutput($core.String value) => $_setString(3, value);
+  set rawOutput($core.String value) => $_setString(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasRawOutput() => $_has(3);
+  $core.bool hasRawOutput() => $_has(2);
   @$pb.TagNumber(4)
   void clearRawOutput() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.String get extractedJson => $_getSZ(4);
+  $core.String get extractedJson => $_getSZ(3);
   @$pb.TagNumber(5)
-  set extractedJson($core.String value) => $_setString(4, value);
+  set extractedJson($core.String value) => $_setString(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasExtractedJson() => $_has(4);
+  $core.bool hasExtractedJson() => $_has(3);
   @$pb.TagNumber(5)
   void clearExtractedJson() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $pb.PbList<$core.String> get validationErrors => $_getList(5);
+  $pb.PbList<$core.String> get validationErrors => $_getList(4);
 
   @$pb.TagNumber(7)
-  $fixnum.Int64 get validationTimeMs => $_getI64(6);
+  $fixnum.Int64 get validationTimeMs => $_getI64(5);
   @$pb.TagNumber(7)
-  set validationTimeMs($fixnum.Int64 value) => $_setInt64(6, value);
+  set validationTimeMs($fixnum.Int64 value) => $_setInt64(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasValidationTimeMs() => $_has(6);
+  $core.bool hasValidationTimeMs() => $_has(5);
   @$pb.TagNumber(7)
   void clearValidationTimeMs() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $0.SDKError get error => $_getN(6);
+  @$pb.TagNumber(8)
+  set error($0.SDKError value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasError() => $_has(6);
+  @$pb.TagNumber(8)
+  void clearError() => $_clearField(8);
+  @$pb.TagNumber(8)
+  $0.SDKError ensureError() => $_ensure(6);
 }
 
 class StructuredOutputResult extends $pb.GeneratedMessage {
@@ -772,15 +776,13 @@ class StructuredOutputResult extends $pb.GeneratedMessage {
     $core.List<$core.int>? parsedJson,
     StructuredOutputValidation? validation,
     $core.String? rawText,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (parsedJson != null) result.parsedJson = parsedJson;
     if (validation != null) result.validation = validation;
     if (rawText != null) result.rawText = rawText;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -802,8 +804,8 @@ class StructuredOutputResult extends $pb.GeneratedMessage {
     ..aOM<StructuredOutputValidation>(2, _omitFieldNames ? '' : 'validation',
         subBuilder: StructuredOutputValidation.create)
     ..aOS(3, _omitFieldNames ? '' : 'rawText')
-    ..aOS(4, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(5, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(6, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -855,23 +857,16 @@ class StructuredOutputResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   void clearRawText() => $_clearField(3);
 
-  @$pb.TagNumber(4)
-  $core.String get errorMessage => $_getSZ(3);
-  @$pb.TagNumber(4)
-  set errorMessage($core.String value) => $_setString(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasErrorMessage() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearErrorMessage() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get errorCode => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set errorCode($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorCode() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearErrorCode() => $_clearField(5);
+  @$pb.TagNumber(6)
+  $0.SDKError get error => $_getN(3);
+  @$pb.TagNumber(6)
+  set error($0.SDKError value) => $_setField(6, value);
+  @$pb.TagNumber(6)
+  $core.bool hasError() => $_has(3);
+  @$pb.TagNumber(6)
+  void clearError() => $_clearField(6);
+  @$pb.TagNumber(6)
+  $0.SDKError ensureError() => $_ensure(3);
 }
 
 class StructuredOutputParseRequest extends $pb.GeneratedMessage {
@@ -1049,8 +1044,7 @@ class StructuredOutputPromptResult extends $pb.GeneratedMessage {
     $core.String? jsonSchema,
     $core.String? regexPattern,
     $core.String? grammar,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (preparedPrompt != null) result.preparedPrompt = preparedPrompt;
@@ -1058,8 +1052,7 @@ class StructuredOutputPromptResult extends $pb.GeneratedMessage {
     if (jsonSchema != null) result.jsonSchema = jsonSchema;
     if (regexPattern != null) result.regexPattern = regexPattern;
     if (grammar != null) result.grammar = grammar;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1081,8 +1074,8 @@ class StructuredOutputPromptResult extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'jsonSchema')
     ..aOS(4, _omitFieldNames ? '' : 'regexPattern')
     ..aOS(5, _omitFieldNames ? '' : 'grammar')
-    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(7, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(8, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1152,23 +1145,16 @@ class StructuredOutputPromptResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearGrammar() => $_clearField(5);
 
-  @$pb.TagNumber(6)
-  $core.String get errorMessage => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set errorMessage($core.String value) => $_setString(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasErrorMessage() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearErrorMessage() => $_clearField(6);
-
-  @$pb.TagNumber(7)
-  $core.int get errorCode => $_getIZ(6);
-  @$pb.TagNumber(7)
-  set errorCode($core.int value) => $_setSignedInt32(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasErrorCode() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearErrorCode() => $_clearField(7);
+  @$pb.TagNumber(8)
+  $0.SDKError get error => $_getN(5);
+  @$pb.TagNumber(8)
+  set error($0.SDKError value) => $_setField(8, value);
+  @$pb.TagNumber(8)
+  $core.bool hasError() => $_has(5);
+  @$pb.TagNumber(8)
+  void clearError() => $_clearField(8);
+  @$pb.TagNumber(8)
+  $0.SDKError ensureError() => $_ensure(5);
 }
 
 class StructuredOutputRequest extends $pb.GeneratedMessage {
@@ -1265,7 +1251,6 @@ class StructuredOutputRequest extends $pb.GeneratedMessage {
 
 class StructuredOutputStreamEvent extends $pb.GeneratedMessage {
   factory StructuredOutputStreamEvent({
-    $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
     $core.String? requestId,
     StructuredOutputStreamEventKind? kind,
@@ -1273,11 +1258,9 @@ class StructuredOutputStreamEvent extends $pb.GeneratedMessage {
     $core.String? partialJson,
     StructuredOutputValidation? validation,
     StructuredOutputResult? result,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result$ = create();
-    if (seq != null) result$.seq = seq;
     if (timestampUs != null) result$.timestampUs = timestampUs;
     if (requestId != null) result$.requestId = requestId;
     if (kind != null) result$.kind = kind;
@@ -1285,8 +1268,7 @@ class StructuredOutputStreamEvent extends $pb.GeneratedMessage {
     if (partialJson != null) result$.partialJson = partialJson;
     if (validation != null) result$.validation = validation;
     if (result != null) result$.result = result;
-    if (errorMessage != null) result$.errorMessage = errorMessage;
-    if (errorCode != null) result$.errorCode = errorCode;
+    if (error != null) result$.error = error;
     return result$;
   }
 
@@ -1303,8 +1285,6 @@ class StructuredOutputStreamEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'StructuredOutputStreamEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6,
-        defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(3, _omitFieldNames ? '' : 'requestId')
     ..aE<StructuredOutputStreamEventKind>(4, _omitFieldNames ? '' : 'kind',
@@ -1315,8 +1295,8 @@ class StructuredOutputStreamEvent extends $pb.GeneratedMessage {
         subBuilder: StructuredOutputValidation.create)
     ..aOM<StructuredOutputResult>(8, _omitFieldNames ? '' : 'result',
         subBuilder: StructuredOutputResult.create)
-    ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(10, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(11, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1341,99 +1321,83 @@ class StructuredOutputStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<StructuredOutputStreamEvent>(create);
   static StructuredOutputStreamEvent? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $fixnum.Int64 get seq => $_getI64(0);
-  @$pb.TagNumber(1)
-  set seq($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSeq() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSeq() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $fixnum.Int64 get timestampUs => $_getI64(1);
+  $fixnum.Int64 get timestampUs => $_getI64(0);
   @$pb.TagNumber(2)
-  set timestampUs($fixnum.Int64 value) => $_setInt64(1, value);
+  set timestampUs($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasTimestampUs() => $_has(1);
+  $core.bool hasTimestampUs() => $_has(0);
   @$pb.TagNumber(2)
   void clearTimestampUs() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get requestId => $_getSZ(2);
+  $core.String get requestId => $_getSZ(1);
   @$pb.TagNumber(3)
-  set requestId($core.String value) => $_setString(2, value);
+  set requestId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasRequestId() => $_has(2);
+  $core.bool hasRequestId() => $_has(1);
   @$pb.TagNumber(3)
   void clearRequestId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  StructuredOutputStreamEventKind get kind => $_getN(3);
+  StructuredOutputStreamEventKind get kind => $_getN(2);
   @$pb.TagNumber(4)
   set kind(StructuredOutputStreamEventKind value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasKind() => $_has(3);
+  $core.bool hasKind() => $_has(2);
   @$pb.TagNumber(4)
   void clearKind() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.String get token => $_getSZ(4);
+  $core.String get token => $_getSZ(3);
   @$pb.TagNumber(5)
-  set token($core.String value) => $_setString(4, value);
+  set token($core.String value) => $_setString(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasToken() => $_has(4);
+  $core.bool hasToken() => $_has(3);
   @$pb.TagNumber(5)
   void clearToken() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.String get partialJson => $_getSZ(5);
+  $core.String get partialJson => $_getSZ(4);
   @$pb.TagNumber(6)
-  set partialJson($core.String value) => $_setString(5, value);
+  set partialJson($core.String value) => $_setString(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasPartialJson() => $_has(5);
+  $core.bool hasPartialJson() => $_has(4);
   @$pb.TagNumber(6)
   void clearPartialJson() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  StructuredOutputValidation get validation => $_getN(6);
+  StructuredOutputValidation get validation => $_getN(5);
   @$pb.TagNumber(7)
   set validation(StructuredOutputValidation value) => $_setField(7, value);
   @$pb.TagNumber(7)
-  $core.bool hasValidation() => $_has(6);
+  $core.bool hasValidation() => $_has(5);
   @$pb.TagNumber(7)
   void clearValidation() => $_clearField(7);
   @$pb.TagNumber(7)
-  StructuredOutputValidation ensureValidation() => $_ensure(6);
+  StructuredOutputValidation ensureValidation() => $_ensure(5);
 
   @$pb.TagNumber(8)
-  StructuredOutputResult get result => $_getN(7);
+  StructuredOutputResult get result => $_getN(6);
   @$pb.TagNumber(8)
   set result(StructuredOutputResult value) => $_setField(8, value);
   @$pb.TagNumber(8)
-  $core.bool hasResult() => $_has(7);
+  $core.bool hasResult() => $_has(6);
   @$pb.TagNumber(8)
   void clearResult() => $_clearField(8);
   @$pb.TagNumber(8)
-  StructuredOutputResult ensureResult() => $_ensure(7);
+  StructuredOutputResult ensureResult() => $_ensure(6);
 
-  @$pb.TagNumber(9)
-  $core.String get errorMessage => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set errorMessage($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasErrorMessage() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearErrorMessage() => $_clearField(9);
-
-  @$pb.TagNumber(10)
-  $core.int get errorCode => $_getIZ(9);
-  @$pb.TagNumber(10)
-  set errorCode($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasErrorCode() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearErrorCode() => $_clearField(10);
+  @$pb.TagNumber(11)
+  $0.SDKError get error => $_getN(7);
+  @$pb.TagNumber(11)
+  set error($0.SDKError value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasError() => $_has(7);
+  @$pb.TagNumber(11)
+  void clearError() => $_clearField(11);
+  @$pb.TagNumber(11)
+  $0.SDKError ensureError() => $_ensure(7);
 }
 
 /// Character offsets into the source text.

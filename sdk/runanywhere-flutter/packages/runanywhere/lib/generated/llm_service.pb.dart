@@ -16,10 +16,12 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'chat.pb.dart' as $1;
+import 'errors.pb.dart' as $4;
 import 'llm_options.pb.dart' as $0;
 import 'llm_service.pbenum.dart';
+import 'token_usage.pb.dart' as $3;
 import 'tool_calling.pb.dart' as $2;
-import 'voice_events.pbenum.dart' as $3;
+import 'voice_events.pbenum.dart' as $5;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
@@ -154,37 +156,29 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   factory LLMStreamFinalResult({
     $core.String? text,
     $core.String? thinkingContent,
-    $core.int? inputTokens,
-    $core.int? outputTokens,
-    $core.int? totalTokens,
     $fixnum.Int64? totalTimeMs,
     $fixnum.Int64? timeToFirstTokenMs,
-    $core.double? tokensPerSecond,
     $core.String? finishReason,
-    $core.int? errorCode,
-    $core.String? errorMessage,
     $fixnum.Int64? promptEvalTimeMs,
     $fixnum.Int64? decodeTimeMs,
     $core.Iterable<$2.ToolCall>? toolCalls,
     $core.Iterable<$2.ToolResult>? toolResults,
+    $3.TokenUsage? usage,
+    $4.SDKError? error,
   }) {
     final result = create();
     if (text != null) result.text = text;
     if (thinkingContent != null) result.thinkingContent = thinkingContent;
-    if (inputTokens != null) result.inputTokens = inputTokens;
-    if (outputTokens != null) result.outputTokens = outputTokens;
-    if (totalTokens != null) result.totalTokens = totalTokens;
     if (totalTimeMs != null) result.totalTimeMs = totalTimeMs;
     if (timeToFirstTokenMs != null)
       result.timeToFirstTokenMs = timeToFirstTokenMs;
-    if (tokensPerSecond != null) result.tokensPerSecond = tokensPerSecond;
     if (finishReason != null) result.finishReason = finishReason;
-    if (errorCode != null) result.errorCode = errorCode;
-    if (errorMessage != null) result.errorMessage = errorMessage;
     if (promptEvalTimeMs != null) result.promptEvalTimeMs = promptEvalTimeMs;
     if (decodeTimeMs != null) result.decodeTimeMs = decodeTimeMs;
     if (toolCalls != null) result.toolCalls.addAll(toolCalls);
     if (toolResults != null) result.toolResults.addAll(toolResults);
+    if (usage != null) result.usage = usage;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -203,22 +197,19 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'text')
     ..aOS(2, _omitFieldNames ? '' : 'thinkingContent')
-    ..aI(3, _omitFieldNames ? '' : 'inputTokens')
-    ..aI(4, _omitFieldNames ? '' : 'outputTokens')
-    ..aI(5, _omitFieldNames ? '' : 'totalTokens')
     ..aInt64(6, _omitFieldNames ? '' : 'totalTimeMs')
     ..aInt64(7, _omitFieldNames ? '' : 'timeToFirstTokenMs')
-    ..aD(8, _omitFieldNames ? '' : 'tokensPerSecond',
-        fieldType: $pb.PbFieldType.OF)
     ..aOS(9, _omitFieldNames ? '' : 'finishReason')
-    ..aI(10, _omitFieldNames ? '' : 'errorCode')
-    ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
     ..aInt64(12, _omitFieldNames ? '' : 'promptEvalTimeMs')
     ..aInt64(13, _omitFieldNames ? '' : 'decodeTimeMs')
     ..pPM<$2.ToolCall>(14, _omitFieldNames ? '' : 'toolCalls',
         subBuilder: $2.ToolCall.create)
     ..pPM<$2.ToolResult>(15, _omitFieldNames ? '' : 'toolResults',
         subBuilder: $2.ToolResult.create)
+    ..aOM<$3.TokenUsage>(16, _omitFieldNames ? '' : 'usage',
+        subBuilder: $3.TokenUsage.create)
+    ..aOM<$4.SDKError>(17, _omitFieldNames ? '' : 'error',
+        subBuilder: $4.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -258,126 +249,91 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearThinkingContent() => $_clearField(2);
 
-  @$pb.TagNumber(3)
-  $core.int get inputTokens => $_getIZ(2);
-  @$pb.TagNumber(3)
-  set inputTokens($core.int value) => $_setSignedInt32(2, value);
-  @$pb.TagNumber(3)
-  $core.bool hasInputTokens() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearInputTokens() => $_clearField(3);
-
-  @$pb.TagNumber(4)
-  $core.int get outputTokens => $_getIZ(3);
-  @$pb.TagNumber(4)
-  set outputTokens($core.int value) => $_setSignedInt32(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasOutputTokens() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearOutputTokens() => $_clearField(4);
-
-  @$pb.TagNumber(5)
-  $core.int get totalTokens => $_getIZ(4);
-  @$pb.TagNumber(5)
-  set totalTokens($core.int value) => $_setSignedInt32(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasTotalTokens() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearTotalTokens() => $_clearField(5);
-
   @$pb.TagNumber(6)
-  $fixnum.Int64 get totalTimeMs => $_getI64(5);
+  $fixnum.Int64 get totalTimeMs => $_getI64(2);
   @$pb.TagNumber(6)
-  set totalTimeMs($fixnum.Int64 value) => $_setInt64(5, value);
+  set totalTimeMs($fixnum.Int64 value) => $_setInt64(2, value);
   @$pb.TagNumber(6)
-  $core.bool hasTotalTimeMs() => $_has(5);
+  $core.bool hasTotalTimeMs() => $_has(2);
   @$pb.TagNumber(6)
   void clearTotalTimeMs() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $fixnum.Int64 get timeToFirstTokenMs => $_getI64(6);
+  $fixnum.Int64 get timeToFirstTokenMs => $_getI64(3);
   @$pb.TagNumber(7)
-  set timeToFirstTokenMs($fixnum.Int64 value) => $_setInt64(6, value);
+  set timeToFirstTokenMs($fixnum.Int64 value) => $_setInt64(3, value);
   @$pb.TagNumber(7)
-  $core.bool hasTimeToFirstTokenMs() => $_has(6);
+  $core.bool hasTimeToFirstTokenMs() => $_has(3);
   @$pb.TagNumber(7)
   void clearTimeToFirstTokenMs() => $_clearField(7);
 
-  @$pb.TagNumber(8)
-  $core.double get tokensPerSecond => $_getN(7);
-  @$pb.TagNumber(8)
-  set tokensPerSecond($core.double value) => $_setFloat(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasTokensPerSecond() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearTokensPerSecond() => $_clearField(8);
-
   @$pb.TagNumber(9)
-  $core.String get finishReason => $_getSZ(8);
+  $core.String get finishReason => $_getSZ(4);
   @$pb.TagNumber(9)
-  set finishReason($core.String value) => $_setString(8, value);
+  set finishReason($core.String value) => $_setString(4, value);
   @$pb.TagNumber(9)
-  $core.bool hasFinishReason() => $_has(8);
+  $core.bool hasFinishReason() => $_has(4);
   @$pb.TagNumber(9)
   void clearFinishReason() => $_clearField(9);
 
-  @$pb.TagNumber(10)
-  $core.int get errorCode => $_getIZ(9);
-  @$pb.TagNumber(10)
-  set errorCode($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(10)
-  $core.bool hasErrorCode() => $_has(9);
-  @$pb.TagNumber(10)
-  void clearErrorCode() => $_clearField(10);
-
-  @$pb.TagNumber(11)
-  $core.String get errorMessage => $_getSZ(10);
-  @$pb.TagNumber(11)
-  set errorMessage($core.String value) => $_setString(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasErrorMessage() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearErrorMessage() => $_clearField(11);
-
   @$pb.TagNumber(12)
-  $fixnum.Int64 get promptEvalTimeMs => $_getI64(11);
+  $fixnum.Int64 get promptEvalTimeMs => $_getI64(5);
   @$pb.TagNumber(12)
-  set promptEvalTimeMs($fixnum.Int64 value) => $_setInt64(11, value);
+  set promptEvalTimeMs($fixnum.Int64 value) => $_setInt64(5, value);
   @$pb.TagNumber(12)
-  $core.bool hasPromptEvalTimeMs() => $_has(11);
+  $core.bool hasPromptEvalTimeMs() => $_has(5);
   @$pb.TagNumber(12)
   void clearPromptEvalTimeMs() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $fixnum.Int64 get decodeTimeMs => $_getI64(12);
+  $fixnum.Int64 get decodeTimeMs => $_getI64(6);
   @$pb.TagNumber(13)
-  set decodeTimeMs($fixnum.Int64 value) => $_setInt64(12, value);
+  set decodeTimeMs($fixnum.Int64 value) => $_setInt64(6, value);
   @$pb.TagNumber(13)
-  $core.bool hasDecodeTimeMs() => $_has(12);
+  $core.bool hasDecodeTimeMs() => $_has(6);
   @$pb.TagNumber(13)
   void clearDecodeTimeMs() => $_clearField(13);
 
   @$pb.TagNumber(14)
-  $pb.PbList<$2.ToolCall> get toolCalls => $_getList(13);
+  $pb.PbList<$2.ToolCall> get toolCalls => $_getList(7);
 
   @$pb.TagNumber(15)
-  $pb.PbList<$2.ToolResult> get toolResults => $_getList(14);
+  $pb.PbList<$2.ToolResult> get toolResults => $_getList(8);
+
+  @$pb.TagNumber(16)
+  $3.TokenUsage get usage => $_getN(9);
+  @$pb.TagNumber(16)
+  set usage($3.TokenUsage value) => $_setField(16, value);
+  @$pb.TagNumber(16)
+  $core.bool hasUsage() => $_has(9);
+  @$pb.TagNumber(16)
+  void clearUsage() => $_clearField(16);
+  @$pb.TagNumber(16)
+  $3.TokenUsage ensureUsage() => $_ensure(9);
+
+  @$pb.TagNumber(17)
+  $4.SDKError get error => $_getN(10);
+  @$pb.TagNumber(17)
+  set error($4.SDKError value) => $_setField(17, value);
+  @$pb.TagNumber(17)
+  $core.bool hasError() => $_has(10);
+  @$pb.TagNumber(17)
+  void clearError() => $_clearField(17);
+  @$pb.TagNumber(17)
+  $4.SDKError ensureError() => $_ensure(10);
 }
 
 /// `result` is populated only on the terminal event.
 class LLMStreamEvent extends $pb.GeneratedMessage {
   factory LLMStreamEvent({
-    $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
     $core.String? token,
     $core.bool? isFinal,
-    $3.TokenKind? kind,
+    $5.TokenKind? kind,
     $core.int? tokenId,
     $core.double? logprob,
     $core.String? finishReason,
-    $core.String? errorMessage,
     LLMStreamFinalResult? result,
-    $core.int? errorCode,
     LLMStreamEventKind? eventKind,
     $core.String? requestId,
     $core.String? conversationId,
@@ -385,9 +341,9 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     $core.int? completionTokensGenerated,
     $fixnum.Int64? elapsedMs,
     $2.ToolCall? toolCall,
+    $4.SDKError? error,
   }) {
     final result$ = create();
-    if (seq != null) result$.seq = seq;
     if (timestampUs != null) result$.timestampUs = timestampUs;
     if (token != null) result$.token = token;
     if (isFinal != null) result$.isFinal = isFinal;
@@ -395,9 +351,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     if (tokenId != null) result$.tokenId = tokenId;
     if (logprob != null) result$.logprob = logprob;
     if (finishReason != null) result$.finishReason = finishReason;
-    if (errorMessage != null) result$.errorMessage = errorMessage;
     if (result != null) result$.result = result;
-    if (errorCode != null) result$.errorCode = errorCode;
     if (eventKind != null) result$.eventKind = eventKind;
     if (requestId != null) result$.requestId = requestId;
     if (conversationId != null) result$.conversationId = conversationId;
@@ -407,6 +361,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
       result$.completionTokensGenerated = completionTokensGenerated;
     if (elapsedMs != null) result$.elapsedMs = elapsedMs;
     if (toolCall != null) result$.toolCall = toolCall;
+    if (error != null) result$.error = error;
     return result$;
   }
 
@@ -423,20 +378,16 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'LLMStreamEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6,
-        defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(3, _omitFieldNames ? '' : 'token')
     ..aOB(4, _omitFieldNames ? '' : 'isFinal')
-    ..aE<$3.TokenKind>(5, _omitFieldNames ? '' : 'kind',
-        enumValues: $3.TokenKind.values)
+    ..aE<$5.TokenKind>(5, _omitFieldNames ? '' : 'kind',
+        enumValues: $5.TokenKind.values)
     ..aI(6, _omitFieldNames ? '' : 'tokenId', fieldType: $pb.PbFieldType.OU3)
     ..aD(7, _omitFieldNames ? '' : 'logprob', fieldType: $pb.PbFieldType.OF)
     ..aOS(8, _omitFieldNames ? '' : 'finishReason')
-    ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
     ..aOM<LLMStreamFinalResult>(10, _omitFieldNames ? '' : 'result',
         subBuilder: LLMStreamFinalResult.create)
-    ..aI(11, _omitFieldNames ? '' : 'errorCode')
     ..aE<LLMStreamEventKind>(12, _omitFieldNames ? '' : 'eventKind',
         enumValues: LLMStreamEventKind.values)
     ..aOS(13, _omitFieldNames ? '' : 'requestId')
@@ -446,6 +397,8 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     ..aInt64(17, _omitFieldNames ? '' : 'elapsedMs')
     ..aOM<$2.ToolCall>(18, _omitFieldNames ? '' : 'toolCall',
         subBuilder: $2.ToolCall.create)
+    ..aOM<$4.SDKError>(19, _omitFieldNames ? '' : 'error',
+        subBuilder: $4.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -467,171 +420,155 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LLMStreamEvent>(create);
   static LLMStreamEvent? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $fixnum.Int64 get seq => $_getI64(0);
-  @$pb.TagNumber(1)
-  set seq($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSeq() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSeq() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $fixnum.Int64 get timestampUs => $_getI64(1);
+  $fixnum.Int64 get timestampUs => $_getI64(0);
   @$pb.TagNumber(2)
-  set timestampUs($fixnum.Int64 value) => $_setInt64(1, value);
+  set timestampUs($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasTimestampUs() => $_has(1);
+  $core.bool hasTimestampUs() => $_has(0);
   @$pb.TagNumber(2)
   void clearTimestampUs() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get token => $_getSZ(2);
+  $core.String get token => $_getSZ(1);
   @$pb.TagNumber(3)
-  set token($core.String value) => $_setString(2, value);
+  set token($core.String value) => $_setString(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasToken() => $_has(2);
+  $core.bool hasToken() => $_has(1);
   @$pb.TagNumber(3)
   void clearToken() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.bool get isFinal => $_getBF(3);
+  $core.bool get isFinal => $_getBF(2);
   @$pb.TagNumber(4)
-  set isFinal($core.bool value) => $_setBool(3, value);
+  set isFinal($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasIsFinal() => $_has(3);
+  $core.bool hasIsFinal() => $_has(2);
   @$pb.TagNumber(4)
   void clearIsFinal() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $3.TokenKind get kind => $_getN(4);
+  $5.TokenKind get kind => $_getN(3);
   @$pb.TagNumber(5)
-  set kind($3.TokenKind value) => $_setField(5, value);
+  set kind($5.TokenKind value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasKind() => $_has(4);
+  $core.bool hasKind() => $_has(3);
   @$pb.TagNumber(5)
   void clearKind() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get tokenId => $_getIZ(5);
+  $core.int get tokenId => $_getIZ(4);
   @$pb.TagNumber(6)
-  set tokenId($core.int value) => $_setUnsignedInt32(5, value);
+  set tokenId($core.int value) => $_setUnsignedInt32(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasTokenId() => $_has(5);
+  $core.bool hasTokenId() => $_has(4);
   @$pb.TagNumber(6)
   void clearTokenId() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.double get logprob => $_getN(6);
+  $core.double get logprob => $_getN(5);
   @$pb.TagNumber(7)
-  set logprob($core.double value) => $_setFloat(6, value);
+  set logprob($core.double value) => $_setFloat(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasLogprob() => $_has(6);
+  $core.bool hasLogprob() => $_has(5);
   @$pb.TagNumber(7)
   void clearLogprob() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.String get finishReason => $_getSZ(7);
+  $core.String get finishReason => $_getSZ(6);
   @$pb.TagNumber(8)
-  set finishReason($core.String value) => $_setString(7, value);
+  set finishReason($core.String value) => $_setString(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasFinishReason() => $_has(7);
+  $core.bool hasFinishReason() => $_has(6);
   @$pb.TagNumber(8)
   void clearFinishReason() => $_clearField(8);
 
-  @$pb.TagNumber(9)
-  $core.String get errorMessage => $_getSZ(8);
-  @$pb.TagNumber(9)
-  set errorMessage($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(9)
-  $core.bool hasErrorMessage() => $_has(8);
-  @$pb.TagNumber(9)
-  void clearErrorMessage() => $_clearField(9);
-
   @$pb.TagNumber(10)
-  LLMStreamFinalResult get result => $_getN(9);
+  LLMStreamFinalResult get result => $_getN(7);
   @$pb.TagNumber(10)
   set result(LLMStreamFinalResult value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasResult() => $_has(9);
+  $core.bool hasResult() => $_has(7);
   @$pb.TagNumber(10)
   void clearResult() => $_clearField(10);
   @$pb.TagNumber(10)
-  LLMStreamFinalResult ensureResult() => $_ensure(9);
-
-  @$pb.TagNumber(11)
-  $core.int get errorCode => $_getIZ(10);
-  @$pb.TagNumber(11)
-  set errorCode($core.int value) => $_setSignedInt32(10, value);
-  @$pb.TagNumber(11)
-  $core.bool hasErrorCode() => $_has(10);
-  @$pb.TagNumber(11)
-  void clearErrorCode() => $_clearField(11);
+  LLMStreamFinalResult ensureResult() => $_ensure(7);
 
   @$pb.TagNumber(12)
-  LLMStreamEventKind get eventKind => $_getN(11);
+  LLMStreamEventKind get eventKind => $_getN(8);
   @$pb.TagNumber(12)
   set eventKind(LLMStreamEventKind value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasEventKind() => $_has(11);
+  $core.bool hasEventKind() => $_has(8);
   @$pb.TagNumber(12)
   void clearEventKind() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $core.String get requestId => $_getSZ(12);
+  $core.String get requestId => $_getSZ(9);
   @$pb.TagNumber(13)
-  set requestId($core.String value) => $_setString(12, value);
+  set requestId($core.String value) => $_setString(9, value);
   @$pb.TagNumber(13)
-  $core.bool hasRequestId() => $_has(12);
+  $core.bool hasRequestId() => $_has(9);
   @$pb.TagNumber(13)
   void clearRequestId() => $_clearField(13);
 
   @$pb.TagNumber(14)
-  $core.String get conversationId => $_getSZ(13);
+  $core.String get conversationId => $_getSZ(10);
   @$pb.TagNumber(14)
-  set conversationId($core.String value) => $_setString(13, value);
+  set conversationId($core.String value) => $_setString(10, value);
   @$pb.TagNumber(14)
-  $core.bool hasConversationId() => $_has(13);
+  $core.bool hasConversationId() => $_has(10);
   @$pb.TagNumber(14)
   void clearConversationId() => $_clearField(14);
 
   @$pb.TagNumber(15)
-  $core.int get promptTokensProcessed => $_getIZ(14);
+  $core.int get promptTokensProcessed => $_getIZ(11);
   @$pb.TagNumber(15)
-  set promptTokensProcessed($core.int value) => $_setSignedInt32(14, value);
+  set promptTokensProcessed($core.int value) => $_setSignedInt32(11, value);
   @$pb.TagNumber(15)
-  $core.bool hasPromptTokensProcessed() => $_has(14);
+  $core.bool hasPromptTokensProcessed() => $_has(11);
   @$pb.TagNumber(15)
   void clearPromptTokensProcessed() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $core.int get completionTokensGenerated => $_getIZ(15);
+  $core.int get completionTokensGenerated => $_getIZ(12);
   @$pb.TagNumber(16)
-  set completionTokensGenerated($core.int value) => $_setSignedInt32(15, value);
+  set completionTokensGenerated($core.int value) => $_setSignedInt32(12, value);
   @$pb.TagNumber(16)
-  $core.bool hasCompletionTokensGenerated() => $_has(15);
+  $core.bool hasCompletionTokensGenerated() => $_has(12);
   @$pb.TagNumber(16)
   void clearCompletionTokensGenerated() => $_clearField(16);
 
   @$pb.TagNumber(17)
-  $fixnum.Int64 get elapsedMs => $_getI64(16);
+  $fixnum.Int64 get elapsedMs => $_getI64(13);
   @$pb.TagNumber(17)
-  set elapsedMs($fixnum.Int64 value) => $_setInt64(16, value);
+  set elapsedMs($fixnum.Int64 value) => $_setInt64(13, value);
   @$pb.TagNumber(17)
-  $core.bool hasElapsedMs() => $_has(16);
+  $core.bool hasElapsedMs() => $_has(13);
   @$pb.TagNumber(17)
   void clearElapsedMs() => $_clearField(17);
 
   @$pb.TagNumber(18)
-  $2.ToolCall get toolCall => $_getN(17);
+  $2.ToolCall get toolCall => $_getN(14);
   @$pb.TagNumber(18)
   set toolCall($2.ToolCall value) => $_setField(18, value);
   @$pb.TagNumber(18)
-  $core.bool hasToolCall() => $_has(17);
+  $core.bool hasToolCall() => $_has(14);
   @$pb.TagNumber(18)
   void clearToolCall() => $_clearField(18);
   @$pb.TagNumber(18)
-  $2.ToolCall ensureToolCall() => $_ensure(17);
+  $2.ToolCall ensureToolCall() => $_ensure(14);
+
+  @$pb.TagNumber(19)
+  $4.SDKError get error => $_getN(15);
+  @$pb.TagNumber(19)
+  set error($4.SDKError value) => $_setField(19, value);
+  @$pb.TagNumber(19)
+  $core.bool hasError() => $_has(15);
+  @$pb.TagNumber(19)
+  void clearError() => $_clearField(19);
+  @$pb.TagNumber(19)
+  $4.SDKError ensureError() => $_ensure(15);
 }
 
 /// Tool-driven streaming uses this session path, not LLMGenerateRequest.

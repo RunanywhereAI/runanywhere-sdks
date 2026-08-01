@@ -101,20 +101,11 @@ public class RAGStatistics(
   )
   public val last_query_ms: Long = 0L,
   @field:WireField(
-    tag = 10,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    tag = 12,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 9,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 11,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 10,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGStatistics, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -136,8 +127,7 @@ public class RAGStatistics(
     if (vector_store_size_bytes != other.vector_store_size_bytes) return false
     if (is_persistent != other.is_persistent) return false
     if (last_query_ms != other.last_query_ms) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -154,8 +144,7 @@ public class RAGStatistics(
       result = result * 37 + vector_store_size_bytes.hashCode()
       result = result * 37 + is_persistent.hashCode()
       result = result * 37 + last_query_ms.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -172,8 +161,7 @@ public class RAGStatistics(
     result += """vector_store_size_bytes=$vector_store_size_bytes"""
     result += """is_persistent=$is_persistent"""
     result += """last_query_ms=$last_query_ms"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "RAGStatistics{", separator = ", ", postfix = "}")
   }
 
@@ -187,10 +175,9 @@ public class RAGStatistics(
     vector_store_size_bytes: Long = this.vector_store_size_bytes,
     is_persistent: Boolean = this.is_persistent,
     last_query_ms: Long = this.last_query_ms,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGStatistics = RAGStatistics(indexed_documents, indexed_chunks, total_tokens_indexed, last_updated_ms, index_path, stats_json, vector_store_size_bytes, is_persistent, last_query_ms, error_message, error_code, unknownFields)
+  ): RAGStatistics = RAGStatistics(indexed_documents, indexed_chunks, total_tokens_indexed, last_updated_ms, index_path, stats_json, vector_store_size_bytes, is_persistent, last_query_ms, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -227,10 +214,7 @@ public class RAGStatistics(
         if (value.last_query_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.last_query_ms)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(11, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(12, value.error)
         return size
       }
 
@@ -258,19 +242,13 @@ public class RAGStatistics(
         if (value.last_query_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.last_query_ms)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 12, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGStatistics) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 12, value.error)
         if (value.last_query_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.last_query_ms)
         }
@@ -306,8 +284,7 @@ public class RAGStatistics(
         var vector_store_size_bytes: Long = 0L
         var is_persistent: Boolean = false
         var last_query_ms: Long = 0L
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> indexed_documents = ProtoAdapter.INT64.decode(reader)
@@ -319,8 +296,7 @@ public class RAGStatistics(
             7 -> vector_store_size_bytes = ProtoAdapter.INT64.decode(reader)
             8 -> is_persistent = ProtoAdapter.BOOL.decode(reader)
             9 -> last_query_ms = ProtoAdapter.INT64.decode(reader)
-            10 -> error_message = ProtoAdapter.STRING.decode(reader)
-            11 -> error_code = ProtoAdapter.INT32.decode(reader)
+            12 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -334,13 +310,13 @@ public class RAGStatistics(
           vector_store_size_bytes = vector_store_size_bytes,
           is_persistent = is_persistent,
           last_query_ms = last_query_ms,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: RAGStatistics): RAGStatistics = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

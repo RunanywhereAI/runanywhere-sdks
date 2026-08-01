@@ -22,7 +22,6 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
-import kotlin.Double
 import kotlin.Float
 import kotlin.Int
 import kotlin.Long
@@ -233,21 +232,10 @@ public class VoiceLifecycleEvent(
    * STT
    */
   @field:WireField(
-    tag = 18,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "realTimeFactor",
-    schemaIndex = 17,
-  )
-  public val real_time_factor: Double = 0.0,
-  /**
-   * STT
-   */
-  @field:WireField(
     tag = 19,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 18,
+    schemaIndex = 17,
   )
   public val language: String = "",
   /**
@@ -258,7 +246,7 @@ public class VoiceLifecycleEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "sampleRate",
-    schemaIndex = 19,
+    schemaIndex = 18,
   )
   public val sample_rate: Int = 0,
   /**
@@ -269,7 +257,7 @@ public class VoiceLifecycleEvent(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "isStreaming",
-    schemaIndex = 20,
+    schemaIndex = 19,
   )
   public val is_streaming: Boolean = false,
   /**
@@ -279,7 +267,7 @@ public class VoiceLifecycleEvent(
     tag = 22,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 21,
+    schemaIndex = 20,
   )
   public val framework: Int = 0,
   /**
@@ -290,7 +278,7 @@ public class VoiceLifecycleEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "characterCount",
-    schemaIndex = 22,
+    schemaIndex = 21,
   )
   public val character_count: Int = 0,
   /**
@@ -301,7 +289,7 @@ public class VoiceLifecycleEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "audioDurationMs",
-    schemaIndex = 23,
+    schemaIndex = 22,
   )
   public val audio_duration_ms: Long = 0L,
   @field:WireField(
@@ -309,7 +297,7 @@ public class VoiceLifecycleEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "audioSizeBytesTts",
-    schemaIndex = 24,
+    schemaIndex = 23,
   )
   public val audio_size_bytes_tts: Int = 0,
   /**
@@ -320,17 +308,9 @@ public class VoiceLifecycleEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "processingDurationMs",
-    schemaIndex = 25,
+    schemaIndex = 24,
   )
   public val processing_duration_ms: Long = 0L,
-  @field:WireField(
-    tag = 27,
-    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "charactersPerSecond",
-    schemaIndex = 26,
-  )
-  public val characters_per_second: Double = 0.0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceLifecycleEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -360,7 +340,6 @@ public class VoiceLifecycleEvent(
     if (audio_length_ms != other.audio_length_ms) return false
     if (audio_size_bytes != other.audio_size_bytes) return false
     if (word_count != other.word_count) return false
-    if (real_time_factor != other.real_time_factor) return false
     if (language != other.language) return false
     if (sample_rate != other.sample_rate) return false
     if (is_streaming != other.is_streaming) return false
@@ -369,7 +348,6 @@ public class VoiceLifecycleEvent(
     if (audio_duration_ms != other.audio_duration_ms) return false
     if (audio_size_bytes_tts != other.audio_size_bytes_tts) return false
     if (processing_duration_ms != other.processing_duration_ms) return false
-    if (characters_per_second != other.characters_per_second) return false
     return true
   }
 
@@ -394,7 +372,6 @@ public class VoiceLifecycleEvent(
       result = result * 37 + audio_length_ms.hashCode()
       result = result * 37 + audio_size_bytes.hashCode()
       result = result * 37 + word_count.hashCode()
-      result = result * 37 + real_time_factor.hashCode()
       result = result * 37 + language.hashCode()
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + is_streaming.hashCode()
@@ -403,7 +380,6 @@ public class VoiceLifecycleEvent(
       result = result * 37 + audio_duration_ms.hashCode()
       result = result * 37 + audio_size_bytes_tts.hashCode()
       result = result * 37 + processing_duration_ms.hashCode()
-      result = result * 37 + characters_per_second.hashCode()
       super.hashCode = result
     }
     return result
@@ -428,7 +404,6 @@ public class VoiceLifecycleEvent(
     result += """audio_length_ms=$audio_length_ms"""
     result += """audio_size_bytes=$audio_size_bytes"""
     result += """word_count=$word_count"""
-    result += """real_time_factor=$real_time_factor"""
     result += """language=${sanitize(language)}"""
     result += """sample_rate=$sample_rate"""
     result += """is_streaming=$is_streaming"""
@@ -437,7 +412,6 @@ public class VoiceLifecycleEvent(
     result += """audio_duration_ms=$audio_duration_ms"""
     result += """audio_size_bytes_tts=$audio_size_bytes_tts"""
     result += """processing_duration_ms=$processing_duration_ms"""
-    result += """characters_per_second=$characters_per_second"""
     return result.joinToString(prefix = "VoiceLifecycleEvent{", separator = ", ", postfix = "}")
   }
 
@@ -459,7 +433,6 @@ public class VoiceLifecycleEvent(
     audio_length_ms: Long = this.audio_length_ms,
     audio_size_bytes: Int = this.audio_size_bytes,
     word_count: Int = this.word_count,
-    real_time_factor: Double = this.real_time_factor,
     language: String = this.language,
     sample_rate: Int = this.sample_rate,
     is_streaming: Boolean = this.is_streaming,
@@ -468,9 +441,8 @@ public class VoiceLifecycleEvent(
     audio_duration_ms: Long = this.audio_duration_ms,
     audio_size_bytes_tts: Int = this.audio_size_bytes_tts,
     processing_duration_ms: Long = this.processing_duration_ms,
-    characters_per_second: Double = this.characters_per_second,
     unknownFields: ByteString = this.unknownFields,
-  ): VoiceLifecycleEvent = VoiceLifecycleEvent(kind, session_id, text, confidence, response_text, audio_base64, duration_ms, audio_level, transcription, turn_response, turn_audio_base64, error, model_id, model_name, audio_length_ms, audio_size_bytes, word_count, real_time_factor, language, sample_rate, is_streaming, framework, character_count, audio_duration_ms, audio_size_bytes_tts, processing_duration_ms, characters_per_second, unknownFields)
+  ): VoiceLifecycleEvent = VoiceLifecycleEvent(kind, session_id, text, confidence, response_text, audio_base64, duration_ms, audio_level, transcription, turn_response, turn_audio_base64, error, model_id, model_name, audio_length_ms, audio_size_bytes, word_count, language, sample_rate, is_streaming, framework, character_count, audio_duration_ms, audio_size_bytes_tts, processing_duration_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -536,9 +508,6 @@ public class VoiceLifecycleEvent(
         if (value.word_count != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(17, value.word_count)
         }
-        if (!value.real_time_factor.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(18, value.real_time_factor)
-        }
         if (value.language != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(19, value.language)
         }
@@ -562,9 +531,6 @@ public class VoiceLifecycleEvent(
         }
         if (value.processing_duration_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(26, value.processing_duration_ms)
-        }
-        if (!value.characters_per_second.equals(0.0)) {
-          size += ProtoAdapter.DOUBLE.encodedSizeWithTag(27, value.characters_per_second)
         }
         return size
       }
@@ -621,9 +587,6 @@ public class VoiceLifecycleEvent(
         if (value.word_count != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 17, value.word_count)
         }
-        if (!value.real_time_factor.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 18, value.real_time_factor)
-        }
         if (value.language != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 19, value.language)
         }
@@ -647,18 +610,12 @@ public class VoiceLifecycleEvent(
         }
         if (value.processing_duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 26, value.processing_duration_ms)
-        }
-        if (!value.characters_per_second.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 27, value.characters_per_second)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceLifecycleEvent) {
         writer.writeBytes(value.unknownFields)
-        if (!value.characters_per_second.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 27, value.characters_per_second)
-        }
         if (value.processing_duration_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 26, value.processing_duration_ms)
         }
@@ -682,9 +639,6 @@ public class VoiceLifecycleEvent(
         }
         if (value.language != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 19, value.language)
-        }
-        if (!value.real_time_factor.equals(0.0)) {
-          ProtoAdapter.DOUBLE.encodeWithTag(writer, 18, value.real_time_factor)
         }
         if (value.word_count != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 17, value.word_count)
@@ -757,7 +711,6 @@ public class VoiceLifecycleEvent(
         var audio_length_ms: Long = 0L
         var audio_size_bytes: Int = 0
         var word_count: Int = 0
-        var real_time_factor: Double = 0.0
         var language: String = ""
         var sample_rate: Int = 0
         var is_streaming: Boolean = false
@@ -766,7 +719,6 @@ public class VoiceLifecycleEvent(
         var audio_duration_ms: Long = 0L
         var audio_size_bytes_tts: Int = 0
         var processing_duration_ms: Long = 0L
-        var characters_per_second: Double = 0.0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -790,7 +742,6 @@ public class VoiceLifecycleEvent(
             15 -> audio_length_ms = ProtoAdapter.INT64.decode(reader)
             16 -> audio_size_bytes = ProtoAdapter.INT32.decode(reader)
             17 -> word_count = ProtoAdapter.INT32.decode(reader)
-            18 -> real_time_factor = ProtoAdapter.DOUBLE.decode(reader)
             19 -> language = ProtoAdapter.STRING.decode(reader)
             20 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             21 -> is_streaming = ProtoAdapter.BOOL.decode(reader)
@@ -799,7 +750,6 @@ public class VoiceLifecycleEvent(
             24 -> audio_duration_ms = ProtoAdapter.INT64.decode(reader)
             25 -> audio_size_bytes_tts = ProtoAdapter.INT32.decode(reader)
             26 -> processing_duration_ms = ProtoAdapter.INT64.decode(reader)
-            27 -> characters_per_second = ProtoAdapter.DOUBLE.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -821,7 +771,6 @@ public class VoiceLifecycleEvent(
           audio_length_ms = audio_length_ms,
           audio_size_bytes = audio_size_bytes,
           word_count = word_count,
-          real_time_factor = real_time_factor,
           language = language,
           sample_rate = sample_rate,
           is_streaming = is_streaming,
@@ -830,7 +779,6 @@ public class VoiceLifecycleEvent(
           audio_duration_ms = audio_duration_ms,
           audio_size_bytes_tts = audio_size_bytes_tts,
           processing_duration_ms = processing_duration_ms,
-          characters_per_second = characters_per_second,
           unknownFields = unknownFields
         )
       }

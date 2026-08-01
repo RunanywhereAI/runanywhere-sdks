@@ -1134,298 +1134,6 @@ class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceEvent_MetadataEntry_DoNotUse fi
 };
 // -------------------------------------------------------------------
 
-class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComponentStates final : public ::google::protobuf::Message
-/* @@protoc_insertion_point(class_definition:runanywhere.v1.VoiceAgentComponentStates) */ {
- public:
-  inline VoiceAgentComponentStates() : VoiceAgentComponentStates(nullptr) {}
-  ~VoiceAgentComponentStates() PROTOBUF_FINAL;
-
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-  void operator delete(VoiceAgentComponentStates* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
-    SharedDtor(*msg);
-    ::google::protobuf::internal::SizedDelete(msg, sizeof(VoiceAgentComponentStates));
-  }
-#endif
-
-  template <typename = void>
-  explicit constexpr VoiceAgentComponentStates(::google::protobuf::internal::ConstantInitialized,
-                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
-                               class_data);
-
-  inline VoiceAgentComponentStates(const VoiceAgentComponentStates& from) : VoiceAgentComponentStates(nullptr, from) {}
-  inline VoiceAgentComponentStates(VoiceAgentComponentStates&& from) noexcept : VoiceAgentComponentStates(nullptr, ::std::move(from)) {}
-  inline VoiceAgentComponentStates& operator=(const VoiceAgentComponentStates& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline VoiceAgentComponentStates& operator=(VoiceAgentComponentStates&& from) noexcept {
-    if (this == &from) return *this;
-    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
-      ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
-  }
-  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
-  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
-    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
-  }
-
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
-    return GetDescriptor();
-  }
-  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
-  GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  [[nodiscard]] static const VoiceAgentComponentStates& default_instance() {
-    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<VoiceAgentComponentStates>(&VoiceAgentComponentStates_globals_);
-  }
-  static constexpr int kIndexInFileMessages = 12;
-  friend void swap(VoiceAgentComponentStates& a, VoiceAgentComponentStates& b) { a.Swap(&b); }
-  inline void Swap(VoiceAgentComponentStates* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
-      InternalSwap(other);
-    } else {
-      ::google::protobuf::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(VoiceAgentComponentStates* PROTOBUF_NONNULL other) {
-    if (other == this) return;
-    ABSL_DCHECK(GetArena() == other->GetArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  [[nodiscard]] VoiceAgentComponentStates* PROTOBUF_NONNULL
-  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
-    return ::google::protobuf::Message::DefaultConstruct<VoiceAgentComponentStates>(arena);
-  }
-  using ::google::protobuf::Message::CopyFrom;
-  void CopyFrom(const VoiceAgentComponentStates& from);
-  using ::google::protobuf::Message::MergeFrom;
-  void MergeFrom(const VoiceAgentComponentStates& from) { VoiceAgentComponentStates::MergeImpl(*this, from); }
-
-  private:
-  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
-                        const ::google::protobuf::MessageLite& from_msg);
-
-  public:
-  [[nodiscard]] bool IsInitialized() const {
-    return true;
-  }
-  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
-  #if defined(PROTOBUF_CUSTOM_VTABLE)
-  private:
-  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
-  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
-
-  public:
-  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
-    return _InternalSerialize(*this, target, stream);
-  }
-  #else   // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] ::size_t ByteSizeLong() const final;
-  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
-      ::uint8_t* PROTOBUF_NONNULL target,
-      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
-  #endif  // PROTOBUF_CUSTOM_VTABLE
-  [[nodiscard]] int GetCachedSize() const {
-    return _impl_._cached_size_.Get();
-  }
-
-  private:
-  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static void SharedDtor(MessageLite& self);
-  void InternalSwap(VoiceAgentComponentStates* PROTOBUF_NONNULL other);
- private:
-  template <typename T>
-  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
-  static ::absl::string_view FullMessageName() { return "runanywhere.v1.VoiceAgentComponentStates"; }
-
-  explicit VoiceAgentComponentStates(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  VoiceAgentComponentStates(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const VoiceAgentComponentStates& from);
-  VoiceAgentComponentStates(
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, VoiceAgentComponentStates&& from) noexcept
-      : VoiceAgentComponentStates(arena) {
-    *this = ::std::move(from);
-  }
-  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
-  static void* PROTOBUF_NONNULL PlacementNew_(
-      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
-      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-  static constexpr auto InternalNewImpl_();
-
- public:
-  static constexpr auto InternalGenerateClassData_(
-      const MessageLite& prototype,
-      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
-
-  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-  enum : int {
-    kErrorMessageFieldNumber = 8,
-    kSttStateFieldNumber = 1,
-    kLlmStateFieldNumber = 2,
-    kTtsStateFieldNumber = 3,
-    kVadStateFieldNumber = 4,
-    kReadyFieldNumber = 5,
-    kAnyLoadingFieldNumber = 6,
-    kWakewordStateFieldNumber = 7,
-  };
-  // optional string error_message = 8;
-  [[nodiscard]] bool has_error_message()
-      const;
-  void clear_error_message() ;
-  [[nodiscard]] const ::std::string& error_message() const;
-  template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_error_message(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_error_message();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
-  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
-
-  private:
-  const ::std::string& _internal_error_message() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
-
-  public:
-  // .runanywhere.v1.ComponentLifecycleState stt_state = 1;
-  void clear_stt_state() ;
-  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState stt_state() const;
-  void set_stt_state(::runanywhere::v1::ComponentLifecycleState value);
-
-  private:
-  ::runanywhere::v1::ComponentLifecycleState _internal_stt_state() const;
-  void _internal_set_stt_state(::runanywhere::v1::ComponentLifecycleState value);
-
-  public:
-  // .runanywhere.v1.ComponentLifecycleState llm_state = 2;
-  void clear_llm_state() ;
-  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState llm_state() const;
-  void set_llm_state(::runanywhere::v1::ComponentLifecycleState value);
-
-  private:
-  ::runanywhere::v1::ComponentLifecycleState _internal_llm_state() const;
-  void _internal_set_llm_state(::runanywhere::v1::ComponentLifecycleState value);
-
-  public:
-  // .runanywhere.v1.ComponentLifecycleState tts_state = 3;
-  void clear_tts_state() ;
-  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState tts_state() const;
-  void set_tts_state(::runanywhere::v1::ComponentLifecycleState value);
-
-  private:
-  ::runanywhere::v1::ComponentLifecycleState _internal_tts_state() const;
-  void _internal_set_tts_state(::runanywhere::v1::ComponentLifecycleState value);
-
-  public:
-  // .runanywhere.v1.ComponentLifecycleState vad_state = 4;
-  void clear_vad_state() ;
-  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState vad_state() const;
-  void set_vad_state(::runanywhere::v1::ComponentLifecycleState value);
-
-  private:
-  ::runanywhere::v1::ComponentLifecycleState _internal_vad_state() const;
-  void _internal_set_vad_state(::runanywhere::v1::ComponentLifecycleState value);
-
-  public:
-  // bool ready = 5;
-  void clear_ready() ;
-  [[nodiscard]] bool ready() const;
-  void set_ready(bool value);
-
-  private:
-  bool _internal_ready() const;
-  void _internal_set_ready(bool value);
-
-  public:
-  // bool any_loading = 6;
-  void clear_any_loading() ;
-  [[nodiscard]] bool any_loading() const;
-  void set_any_loading(bool value);
-
-  private:
-  bool _internal_any_loading() const;
-  void _internal_set_any_loading(bool value);
-
-  public:
-  // .runanywhere.v1.ComponentLifecycleState wakeword_state = 7;
-  void clear_wakeword_state() ;
-  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState wakeword_state() const;
-  void set_wakeword_state(::runanywhere::v1::ComponentLifecycleState value);
-
-  private:
-  ::runanywhere::v1::ComponentLifecycleState _internal_wakeword_state() const;
-  void _internal_set_wakeword_state(::runanywhere::v1::ComponentLifecycleState value);
-
-  public:
-  // @@protoc_insertion_point(class_scope:runanywhere.v1.VoiceAgentComponentStates)
- private:
-  class _Internal;
-  using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 8,
-                          0, 70,
-                          2>;
-  static constexpr ParseTableT_ InternalGenerateParseTable_(
-      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
-  friend class ::google::protobuf::internal::TcParser;
-  #ifndef PROTOBUF_MESSAGE_GLOBALS
-  static const ParseTableT_ _table_;
-  #endif
-
-  friend class ::google::protobuf::MessageLite;
-  friend class ::google::protobuf::Arena;
-  friend ::google::protobuf::internal::PrivateAccess;
-  template <typename T>
-  friend class ::google::protobuf::Arena::InternalHelper;
-  using InternalArenaConstructable_ = void;
-  using DestructorSkippable_ = void;
-  struct Impl_ {
-    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
-                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
-    inline explicit Impl_(
-        ::google::protobuf::internal::InternalVisibility visibility,
-        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
-        const VoiceAgentComponentStates& from_msg);
-    ::google::protobuf::internal::HasBits<1> _has_bits_;
-    ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr error_message_;
-    int stt_state_;
-    int llm_state_;
-    int tts_state_;
-    int vad_state_;
-    bool ready_;
-    bool any_loading_;
-    int wakeword_state_;
-    PROTOBUF_TSAN_DECLARE_MEMBER
-  };
-  union { Impl_ _impl_; };
-  friend struct ::TableStruct_voice_5fevents_2eproto;
-};
-// -------------------------------------------------------------------
-
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADEvent final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.VADEvent) */ {
  public:
@@ -5494,6 +5202,297 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AgentResponseCompletedEvent final :
     ::google::protobuf::internal::CachedSize _cached_size_;
     ::google::protobuf::internal::ArenaStringPtr turn_id_;
     ::int64_t response_duration_ms_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_voice_5fevents_2eproto;
+};
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComponentStates final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.VoiceAgentComponentStates) */ {
+ public:
+  inline VoiceAgentComponentStates() : VoiceAgentComponentStates(nullptr) {}
+  ~VoiceAgentComponentStates() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(VoiceAgentComponentStates* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(VoiceAgentComponentStates));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr VoiceAgentComponentStates(::google::protobuf::internal::ConstantInitialized,
+                           const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+                               class_data);
+
+  inline VoiceAgentComponentStates(const VoiceAgentComponentStates& from) : VoiceAgentComponentStates(nullptr, from) {}
+  inline VoiceAgentComponentStates(VoiceAgentComponentStates&& from) noexcept : VoiceAgentComponentStates(nullptr, ::std::move(from)) {}
+  inline VoiceAgentComponentStates& operator=(const VoiceAgentComponentStates& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline VoiceAgentComponentStates& operator=(VoiceAgentComponentStates&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const VoiceAgentComponentStates& default_instance() {
+    return *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<VoiceAgentComponentStates>(&VoiceAgentComponentStates_globals_);
+  }
+  static constexpr int kIndexInFileMessages = 12;
+  friend void swap(VoiceAgentComponentStates& a, VoiceAgentComponentStates& b) { a.Swap(&b); }
+  inline void Swap(VoiceAgentComponentStates* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(VoiceAgentComponentStates* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] VoiceAgentComponentStates* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<VoiceAgentComponentStates>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const VoiceAgentComponentStates& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const VoiceAgentComponentStates& from) { VoiceAgentComponentStates::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(VoiceAgentComponentStates* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.VoiceAgentComponentStates"; }
+
+  explicit VoiceAgentComponentStates(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  VoiceAgentComponentStates(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const VoiceAgentComponentStates& from);
+  VoiceAgentComponentStates(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, VoiceAgentComponentStates&& from) noexcept
+      : VoiceAgentComponentStates(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_(
+      const MessageLite& prototype,
+      const ::google::protobuf::internal::TcParseTableBase* PROTOBUF_NULLABLE tc_table = nullptr);
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kErrorFieldNumber = 9,
+    kSttStateFieldNumber = 1,
+    kLlmStateFieldNumber = 2,
+    kTtsStateFieldNumber = 3,
+    kVadStateFieldNumber = 4,
+    kReadyFieldNumber = 5,
+    kAnyLoadingFieldNumber = 6,
+    kWakewordStateFieldNumber = 7,
+  };
+  // optional .runanywhere.v1.SDKError error = 9;
+  [[nodiscard]] bool has_error()
+      const;
+  void clear_error() ;
+  [[nodiscard]] const ::runanywhere::v1::SDKError& error() const;
+  [[nodiscard]] ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE release_error();
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL mutable_error();
+  void set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE unsafe_arena_release_error();
+
+  private:
+  const ::runanywhere::v1::SDKError& _internal_error() const;
+  ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
+
+  public:
+  // .runanywhere.v1.ComponentLifecycleState stt_state = 1;
+  void clear_stt_state() ;
+  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState stt_state() const;
+  void set_stt_state(::runanywhere::v1::ComponentLifecycleState value);
+
+  private:
+  ::runanywhere::v1::ComponentLifecycleState _internal_stt_state() const;
+  void _internal_set_stt_state(::runanywhere::v1::ComponentLifecycleState value);
+
+  public:
+  // .runanywhere.v1.ComponentLifecycleState llm_state = 2;
+  void clear_llm_state() ;
+  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState llm_state() const;
+  void set_llm_state(::runanywhere::v1::ComponentLifecycleState value);
+
+  private:
+  ::runanywhere::v1::ComponentLifecycleState _internal_llm_state() const;
+  void _internal_set_llm_state(::runanywhere::v1::ComponentLifecycleState value);
+
+  public:
+  // .runanywhere.v1.ComponentLifecycleState tts_state = 3;
+  void clear_tts_state() ;
+  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState tts_state() const;
+  void set_tts_state(::runanywhere::v1::ComponentLifecycleState value);
+
+  private:
+  ::runanywhere::v1::ComponentLifecycleState _internal_tts_state() const;
+  void _internal_set_tts_state(::runanywhere::v1::ComponentLifecycleState value);
+
+  public:
+  // .runanywhere.v1.ComponentLifecycleState vad_state = 4;
+  void clear_vad_state() ;
+  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState vad_state() const;
+  void set_vad_state(::runanywhere::v1::ComponentLifecycleState value);
+
+  private:
+  ::runanywhere::v1::ComponentLifecycleState _internal_vad_state() const;
+  void _internal_set_vad_state(::runanywhere::v1::ComponentLifecycleState value);
+
+  public:
+  // bool ready = 5;
+  void clear_ready() ;
+  [[nodiscard]] bool ready() const;
+  void set_ready(bool value);
+
+  private:
+  bool _internal_ready() const;
+  void _internal_set_ready(bool value);
+
+  public:
+  // bool any_loading = 6;
+  void clear_any_loading() ;
+  [[nodiscard]] bool any_loading() const;
+  void set_any_loading(bool value);
+
+  private:
+  bool _internal_any_loading() const;
+  void _internal_set_any_loading(bool value);
+
+  public:
+  // .runanywhere.v1.ComponentLifecycleState wakeword_state = 7;
+  void clear_wakeword_state() ;
+  [[nodiscard]] ::runanywhere::v1::ComponentLifecycleState wakeword_state() const;
+  void set_wakeword_state(::runanywhere::v1::ComponentLifecycleState value);
+
+  private:
+  ::runanywhere::v1::ComponentLifecycleState _internal_wakeword_state() const;
+  void _internal_set_wakeword_state(::runanywhere::v1::ComponentLifecycleState value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.VoiceAgentComponentStates)
+ private:
+  class _Internal;
+  using ParseTableT_ =
+      ::google::protobuf::internal::TcParseTable<4, 8,
+                          1, 0,
+                          2>;
+  static constexpr ParseTableT_ InternalGenerateParseTable_(
+      const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
+  friend class ::google::protobuf::internal::TcParser;
+  #ifndef PROTOBUF_MESSAGE_GLOBALS
+  static const ParseTableT_ _table_;
+  #endif
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const VoiceAgentComponentStates& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
+    int stt_state_;
+    int llm_state_;
+    int tts_state_;
+    int vad_state_;
+    bool ready_;
+    bool any_loading_;
+    int wakeword_state_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -10274,72 +10273,97 @@ inline void VoiceAgentComponentStates::_internal_set_wakeword_state(::runanywher
   _impl_.wakeword_state_ = value;
 }
 
-// optional string error_message = 8;
-inline bool VoiceAgentComponentStates::has_error_message() const {
+// optional .runanywhere.v1.SDKError error = 9;
+inline bool VoiceAgentComponentStates::has_error() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
+  PROTOBUF_ASSUME(!value || _impl_.error_ != nullptr);
   return value;
 }
-inline void VoiceAgentComponentStates::clear_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.ClearToEmpty();
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-}
-inline const ::std::string& VoiceAgentComponentStates::error_message() const
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComponentStates.error_message)
-  return _internal_error_message();
-}
-template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void VoiceAgentComponentStates::set_error_message(Arg_&& arg, Args_... args) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComponentStates.error_message)
-}
-inline ::std::string* PROTOBUF_NONNULL VoiceAgentComponentStates::mutable_error_message()
-    ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_error_message();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentComponentStates.error_message)
-  return _s;
-}
-inline const ::std::string& VoiceAgentComponentStates::_internal_error_message() const {
+inline const ::runanywhere::v1::SDKError& VoiceAgentComponentStates::_internal_error() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.error_message_.Get();
+  const ::runanywhere::v1::SDKError* p = _impl_.error_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::SDKError>(&::runanywhere::v1::SDKError_globals_);
 }
-inline void VoiceAgentComponentStates::_internal_set_error_message(const ::std::string& value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.error_message_.Set(value, GetArena());
+inline const ::runanywhere::v1::SDKError& VoiceAgentComponentStates::error() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComponentStates.error)
+  return _internal_error();
 }
-inline ::std::string* PROTOBUF_NONNULL VoiceAgentComponentStates::_internal_mutable_error_message() {
+inline void VoiceAgentComponentStates::unsafe_arena_set_allocated_error(
+    ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.error_message_.Mutable( GetArena());
-}
-inline ::std::string* PROTOBUF_NULLABLE VoiceAgentComponentStates::release_error_message() {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentComponentStates.error_message)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
-    return nullptr;
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.error_message_.Release();
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.error_message_.Set("", GetArena());
-  }
-  return released;
-}
-inline void VoiceAgentComponentStates::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
-  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   }
-  _impl_.error_message_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
-    _impl_.error_message_.Set("", GetArena());
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VoiceAgentComponentStates.error)
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE VoiceAgentComponentStates::release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::runanywhere::v1::SDKError* released = _impl_.error_;
+  _impl_.error_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
   }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentComponentStates.error_message)
+  return released;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE VoiceAgentComponentStates::unsafe_arena_release_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentComponentStates.error)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::runanywhere::v1::SDKError* temp = _impl_.error_;
+  _impl_.error_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL VoiceAgentComponentStates::_internal_mutable_error() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.error_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::SDKError>(GetArena());
+    _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(p);
+  }
+  return _impl_.error_;
+}
+inline ::runanywhere::v1::SDKError* PROTOBUF_NONNULL VoiceAgentComponentStates::mutable_error()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::runanywhere::v1::SDKError* _msg = _internal_mutable_error();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentComponentStates.error)
+  return _msg;
+}
+inline void VoiceAgentComponentStates::set_allocated_error(::runanywhere::v1::SDKError* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.error_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+
+  _impl_.error_ = reinterpret_cast<::runanywhere::v1::SDKError*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentComponentStates.error)
 }
 
 // -------------------------------------------------------------------

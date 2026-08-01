@@ -14,32 +14,6 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-class EmbeddingsNormalizeMode extends $pb.ProtobufEnum {
-  static const EmbeddingsNormalizeMode EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED =
-      EmbeddingsNormalizeMode._(
-          0, _omitEnumNames ? '' : 'EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED');
-  static const EmbeddingsNormalizeMode EMBEDDINGS_NORMALIZE_MODE_NONE =
-      EmbeddingsNormalizeMode._(
-          1, _omitEnumNames ? '' : 'EMBEDDINGS_NORMALIZE_MODE_NONE');
-  static const EmbeddingsNormalizeMode EMBEDDINGS_NORMALIZE_MODE_L2 =
-      EmbeddingsNormalizeMode._(
-          2, _omitEnumNames ? '' : 'EMBEDDINGS_NORMALIZE_MODE_L2');
-
-  static const $core.List<EmbeddingsNormalizeMode> values =
-      <EmbeddingsNormalizeMode>[
-    EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED,
-    EMBEDDINGS_NORMALIZE_MODE_NONE,
-    EMBEDDINGS_NORMALIZE_MODE_L2,
-  ];
-
-  static final $core.List<EmbeddingsNormalizeMode?> _byValue =
-      $pb.ProtobufEnum.$_initByValueList(values, 2);
-  static EmbeddingsNormalizeMode? valueOf($core.int value) =>
-      value < 0 || value >= _byValue.length ? null : _byValue[value];
-
-  const EmbeddingsNormalizeMode._(super.value, super.name);
-}
-
 class EmbeddingsPoolingStrategy extends $pb.ProtobufEnum {
   static const EmbeddingsPoolingStrategy
       EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = EmbeddingsPoolingStrategy._(

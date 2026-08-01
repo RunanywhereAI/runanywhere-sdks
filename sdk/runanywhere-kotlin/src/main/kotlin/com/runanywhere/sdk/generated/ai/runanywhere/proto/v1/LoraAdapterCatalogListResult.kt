@@ -18,7 +18,6 @@ import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.redactElements
-import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -33,22 +32,7 @@ import kotlin.collections.List
 import okio.ByteString
 
 public class LoraAdapterCatalogListResult(
-  @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
   entries: List<LoraAdapterCatalogEntry> = emptyList(),
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 2,
-  )
-  public val error_message: String = "",
   /**
    * total_count is unfiltered; filtered_count reflects the query.
    */
@@ -57,7 +41,7 @@ public class LoraAdapterCatalogListResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "totalCount",
-    schemaIndex = 3,
+    schemaIndex = 1,
   )
   public val total_count: Int = 0,
   @field:WireField(
@@ -65,7 +49,7 @@ public class LoraAdapterCatalogListResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "filteredCount",
-    schemaIndex = 4,
+    schemaIndex = 2,
   )
   public val filtered_count: Int = 0,
   @field:WireField(
@@ -73,16 +57,22 @@ public class LoraAdapterCatalogListResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "downloadedCount",
-    schemaIndex = 5,
+    schemaIndex = 3,
   )
   public val downloaded_count: Int = 0,
+  @field:WireField(
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 4,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoraAdapterCatalogListResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.LoraAdapterCatalogEntry#ADAPTER",
     label = WireField.Label.REPEATED,
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val entries: List<LoraAdapterCatalogEntry> = immutableCopyOf("entries", entries)
 
@@ -96,12 +86,11 @@ public class LoraAdapterCatalogListResult(
     if (other === this) return true
     if (other !is LoraAdapterCatalogListResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (entries != other.entries) return false
-    if (error_message != other.error_message) return false
     if (total_count != other.total_count) return false
     if (filtered_count != other.filtered_count) return false
     if (downloaded_count != other.downloaded_count) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -109,12 +98,11 @@ public class LoraAdapterCatalogListResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + entries.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + total_count.hashCode()
       result = result * 37 + filtered_count.hashCode()
       result = result * 37 + downloaded_count.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -122,24 +110,22 @@ public class LoraAdapterCatalogListResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     if (entries.isNotEmpty()) result += """entries=$entries"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """total_count=$total_count"""
     result += """filtered_count=$filtered_count"""
     result += """downloaded_count=$downloaded_count"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "LoraAdapterCatalogListResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     entries: List<LoraAdapterCatalogEntry> = this.entries,
-    error_message: String = this.error_message,
     total_count: Int = this.total_count,
     filtered_count: Int = this.filtered_count,
     downloaded_count: Int = this.downloaded_count,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LoraAdapterCatalogListResult = LoraAdapterCatalogListResult(success, entries, error_message, total_count, filtered_count, downloaded_count, unknownFields)
+  ): LoraAdapterCatalogListResult = LoraAdapterCatalogListResult(entries, total_count, filtered_count, downloaded_count, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -154,13 +140,7 @@ public class LoraAdapterCatalogListResult(
     ) {
       override fun encodedSize(`value`: LoraAdapterCatalogListResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         size += LoraAdapterCatalogEntry.ADAPTER.asRepeated().encodedSizeWithTag(2, value.entries)
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.error_message)
-        }
         if (value.total_count != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.total_count)
         }
@@ -170,17 +150,12 @@ public class LoraAdapterCatalogListResult(
         if (value.downloaded_count != 0) {
           size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.downloaded_count)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(7, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: LoraAdapterCatalogListResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         LoraAdapterCatalogEntry.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.entries)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
-        }
         if (value.total_count != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 4, value.total_count)
         }
@@ -190,11 +165,13 @@ public class LoraAdapterCatalogListResult(
         if (value.downloaded_count != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 6, value.downloaded_count)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoraAdapterCatalogListResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         if (value.downloaded_count != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 6, value.downloaded_count)
         }
@@ -204,46 +181,38 @@ public class LoraAdapterCatalogListResult(
         if (value.total_count != 0) {
           ProtoAdapter.INT32.encodeWithTag(writer, 4, value.total_count)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
-        }
         LoraAdapterCatalogEntry.ADAPTER.asRepeated().encodeWithTag(writer, 2, value.entries)
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): LoraAdapterCatalogListResult {
-        var success: Boolean = false
         val entries = mutableListOf<LoraAdapterCatalogEntry>()
-        var error_message: String = ""
         var total_count: Int = 0
         var filtered_count: Int = 0
         var downloaded_count: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> entries.add(LoraAdapterCatalogEntry.ADAPTER.decode(reader))
-            3 -> error_message = ProtoAdapter.STRING.decode(reader)
             4 -> total_count = ProtoAdapter.INT32.decode(reader)
             5 -> filtered_count = ProtoAdapter.INT32.decode(reader)
             6 -> downloaded_count = ProtoAdapter.INT32.decode(reader)
+            7 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LoraAdapterCatalogListResult(
-          success = success,
           entries = entries,
-          error_message = error_message,
           total_count = total_count,
           filtered_count = filtered_count,
           downloaded_count = downloaded_count,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LoraAdapterCatalogListResult): LoraAdapterCatalogListResult = value.copy(
         entries = value.entries.redactElements(LoraAdapterCatalogEntry.ADAPTER),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

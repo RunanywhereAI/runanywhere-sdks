@@ -2771,17 +2771,16 @@ function createBaseComponentInitializationEvent() {
         modelId: "",
         sizeBytes: 0,
         progress: 0,
-        error: "",
         oldState: "",
         newState: "",
         components: [],
         readyComponents: [],
         pendingComponents: [],
-        initSuccess: false,
         readyCount: 0,
         failedCount: 0,
         previousLifecycleState: 0,
         currentLifecycleState: 0,
+        error: undefined,
     };
 }
 exports.ComponentInitializationEvent = {
@@ -2800,9 +2799,6 @@ exports.ComponentInitializationEvent = {
         }
         if (message.progress !== 0) {
             writer.uint32(45).float(message.progress);
-        }
-        if (message.error !== "") {
-            writer.uint32(50).string(message.error);
         }
         if (message.oldState !== "") {
             writer.uint32(58).string(message.oldState);
@@ -2825,9 +2821,6 @@ exports.ComponentInitializationEvent = {
             writer.int32(v);
         }
         writer.join();
-        if (message.initSuccess !== false) {
-            writer.uint32(96).bool(message.initSuccess);
-        }
         if (message.readyCount !== 0) {
             writer.uint32(104).int32(message.readyCount);
         }
@@ -2839,6 +2832,9 @@ exports.ComponentInitializationEvent = {
         }
         if (message.currentLifecycleState !== 0) {
             writer.uint32(128).int32(message.currentLifecycleState);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(138).fork()).join();
         }
         return writer;
     },
@@ -2882,13 +2878,6 @@ exports.ComponentInitializationEvent = {
                         break;
                     }
                     message.progress = reader.float();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.error = reader.string();
                     continue;
                 }
                 case 7: {
@@ -2947,13 +2936,6 @@ exports.ComponentInitializationEvent = {
                     }
                     break;
                 }
-                case 12: {
-                    if (tag !== 96) {
-                        break;
-                    }
-                    message.initSuccess = reader.bool();
-                    continue;
-                }
                 case 13: {
                     if (tag !== 104) {
                         break;
@@ -2982,6 +2964,13 @@ exports.ComponentInitializationEvent = {
                     message.currentLifecycleState = reader.int32();
                     continue;
                 }
+                case 17: {
+                    if (tag !== 138) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3005,7 +2994,6 @@ exports.ComponentInitializationEvent = {
                     ? globalThis.Number(object.size_bytes)
                     : 0,
             progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
-            error: isSet(object.error) ? globalThis.String(object.error) : "",
             oldState: isSet(object.oldState)
                 ? globalThis.String(object.oldState)
                 : isSet(object.old_state)
@@ -3029,11 +3017,6 @@ exports.ComponentInitializationEvent = {
                 : globalThis.Array.isArray(object?.pending_components)
                     ? object.pending_components.map((e) => sDKComponentFromJSON(e))
                     : [],
-            initSuccess: isSet(object.initSuccess)
-                ? globalThis.Boolean(object.initSuccess)
-                : isSet(object.init_success)
-                    ? globalThis.Boolean(object.init_success)
-                    : false,
             readyCount: isSet(object.readyCount)
                 ? globalThis.Number(object.readyCount)
                 : isSet(object.ready_count)
@@ -3054,6 +3037,7 @@ exports.ComponentInitializationEvent = {
                 : isSet(object.current_lifecycle_state)
                     ? (0, component_types_1.componentLifecycleStateFromJSON)(object.current_lifecycle_state)
                     : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -3073,9 +3057,6 @@ exports.ComponentInitializationEvent = {
         if (message.progress !== 0) {
             obj.progress = message.progress;
         }
-        if (message.error !== "") {
-            obj.error = message.error;
-        }
         if (message.oldState !== "") {
             obj.oldState = message.oldState;
         }
@@ -3091,9 +3072,6 @@ exports.ComponentInitializationEvent = {
         if (message.pendingComponents?.length) {
             obj.pendingComponents = message.pendingComponents.map((e) => sDKComponentToJSON(e));
         }
-        if (message.initSuccess !== false) {
-            obj.initSuccess = message.initSuccess;
-        }
         if (message.readyCount !== 0) {
             obj.readyCount = Math.round(message.readyCount);
         }
@@ -3105,6 +3083,9 @@ exports.ComponentInitializationEvent = {
         }
         if (message.currentLifecycleState !== 0) {
             obj.currentLifecycleState = (0, component_types_1.componentLifecycleStateToJSON)(message.currentLifecycleState);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -3118,17 +3099,18 @@ exports.ComponentInitializationEvent = {
         message.modelId = object.modelId ?? "";
         message.sizeBytes = object.sizeBytes ?? 0;
         message.progress = object.progress ?? 0;
-        message.error = object.error ?? "";
         message.oldState = object.oldState ?? "";
         message.newState = object.newState ?? "";
         message.components = object.components?.map((e) => e) || [];
         message.readyComponents = object.readyComponents?.map((e) => e) || [];
         message.pendingComponents = object.pendingComponents?.map((e) => e) || [];
-        message.initSuccess = object.initSuccess ?? false;
         message.readyCount = object.readyCount ?? 0;
         message.failedCount = object.failedCount ?? 0;
         message.previousLifecycleState = object.previousLifecycleState ?? 0;
         message.currentLifecycleState = object.currentLifecycleState ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -3138,12 +3120,12 @@ function createBaseComponentLifecycleSnapshot() {
         state: 0,
         modelId: "",
         updatedAtMs: 0,
-        errorMessage: "",
         category: 0,
         framework: 0,
         resolvedPath: "",
         loadedAtUnixMs: 0,
         model: undefined,
+        error: undefined,
     };
 }
 exports.ComponentLifecycleSnapshot = {
@@ -3160,9 +3142,6 @@ exports.ComponentLifecycleSnapshot = {
         if (message.updatedAtMs !== 0) {
             writer.uint32(32).int64(message.updatedAtMs);
         }
-        if (message.errorMessage !== "") {
-            writer.uint32(42).string(message.errorMessage);
-        }
         if (message.category !== 0) {
             writer.uint32(48).int32(message.category);
         }
@@ -3177,6 +3156,9 @@ exports.ComponentLifecycleSnapshot = {
         }
         if (message.model !== undefined) {
             model_types_1.ModelInfo.encode(message.model, writer.uint32(82).fork()).join();
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(90).fork()).join();
         }
         return writer;
     },
@@ -3215,13 +3197,6 @@ exports.ComponentLifecycleSnapshot = {
                     message.updatedAtMs = longToNumber(reader.int64());
                     continue;
                 }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
                 case 6: {
                     if (tag !== 48) {
                         break;
@@ -3257,6 +3232,13 @@ exports.ComponentLifecycleSnapshot = {
                     message.model = model_types_1.ModelInfo.decode(reader, reader.uint32());
                     continue;
                 }
+                case 11: {
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3279,11 +3261,6 @@ exports.ComponentLifecycleSnapshot = {
                 : isSet(object.updated_at_ms)
                     ? globalThis.Number(object.updated_at_ms)
                     : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
             category: isSet(object.category) ? (0, model_types_1.modelCategoryFromJSON)(object.category) : 0,
             framework: isSet(object.framework) ? (0, model_types_1.inferenceFrameworkFromJSON)(object.framework) : 0,
             resolvedPath: isSet(object.resolvedPath)
@@ -3297,6 +3274,7 @@ exports.ComponentLifecycleSnapshot = {
                     ? globalThis.Number(object.loaded_at_unix_ms)
                     : 0,
             model: isSet(object.model) ? model_types_1.ModelInfo.fromJSON(object.model) : undefined,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -3313,9 +3291,6 @@ exports.ComponentLifecycleSnapshot = {
         if (message.updatedAtMs !== 0) {
             obj.updatedAtMs = Math.round(message.updatedAtMs);
         }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
-        }
         if (message.category !== 0) {
             obj.category = (0, model_types_1.modelCategoryToJSON)(message.category);
         }
@@ -3331,6 +3306,9 @@ exports.ComponentLifecycleSnapshot = {
         if (message.model !== undefined) {
             obj.model = model_types_1.ModelInfo.toJSON(message.model);
         }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
+        }
         return obj;
     },
     create(base) {
@@ -3342,7 +3320,6 @@ exports.ComponentLifecycleSnapshot = {
         message.state = object.state ?? 0;
         message.modelId = object.modelId ?? "";
         message.updatedAtMs = object.updatedAtMs ?? 0;
-        message.errorMessage = object.errorMessage ?? "";
         message.category = object.category ?? 0;
         message.framework = object.framework ?? 0;
         message.resolvedPath = object.resolvedPath ?? "";
@@ -3350,22 +3327,22 @@ exports.ComponentLifecycleSnapshot = {
         message.model = (object.model !== undefined && object.model !== null)
             ? model_types_1.ModelInfo.fromPartial(object.model)
             : undefined;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
 function createBaseComponentLifecycleSnapshotResult() {
-    return { success: false, snapshots: [], errorMessage: "" };
+    return { snapshots: [], error: undefined };
 }
 exports.ComponentLifecycleSnapshotResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.success !== false) {
-            writer.uint32(8).bool(message.success);
-        }
         for (const v of message.snapshots) {
             exports.ComponentLifecycleSnapshot.encode(v, writer.uint32(18).fork()).join();
         }
-        if (message.errorMessage !== "") {
-            writer.uint32(26).string(message.errorMessage);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(34).fork()).join();
         }
         return writer;
     },
@@ -3376,13 +3353,6 @@ exports.ComponentLifecycleSnapshotResult = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.success = reader.bool();
-                    continue;
-                }
                 case 2: {
                     if (tag !== 18) {
                         break;
@@ -3390,11 +3360,11 @@ exports.ComponentLifecycleSnapshotResult = {
                     message.snapshots.push(exports.ComponentLifecycleSnapshot.decode(reader, reader.uint32()));
                     continue;
                 }
-                case 3: {
-                    if (tag !== 26) {
+                case 4: {
+                    if (tag !== 34) {
                         break;
                     }
-                    message.errorMessage = reader.string();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -3407,27 +3377,19 @@ exports.ComponentLifecycleSnapshotResult = {
     },
     fromJSON(object) {
         return {
-            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
             snapshots: globalThis.Array.isArray(object?.snapshots)
                 ? object.snapshots.map((e) => exports.ComponentLifecycleSnapshot.fromJSON(e))
                 : [],
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.success !== false) {
-            obj.success = message.success;
-        }
         if (message.snapshots?.length) {
             obj.snapshots = message.snapshots.map((e) => exports.ComponentLifecycleSnapshot.toJSON(e));
         }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -3436,9 +3398,10 @@ exports.ComponentLifecycleSnapshotResult = {
     },
     fromPartial(object) {
         const message = createBaseComponentLifecycleSnapshotResult();
-        message.success = object.success ?? false;
         message.snapshots = object.snapshots?.map((e) => exports.ComponentLifecycleSnapshot.fromPartial(e)) || [];
-        message.errorMessage = object.errorMessage ?? "";
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -4640,7 +4603,6 @@ function createBaseVoiceLifecycleEvent() {
         audioLengthMs: 0,
         audioSizeBytes: 0,
         wordCount: 0,
-        realTimeFactor: 0,
         language: "",
         sampleRate: 0,
         isStreaming: false,
@@ -4649,7 +4611,6 @@ function createBaseVoiceLifecycleEvent() {
         audioDurationMs: 0,
         audioSizeBytesTts: 0,
         processingDurationMs: 0,
-        charactersPerSecond: 0,
     };
 }
 exports.VoiceLifecycleEvent = {
@@ -4705,9 +4666,6 @@ exports.VoiceLifecycleEvent = {
         if (message.wordCount !== 0) {
             writer.uint32(136).int32(message.wordCount);
         }
-        if (message.realTimeFactor !== 0) {
-            writer.uint32(145).double(message.realTimeFactor);
-        }
         if (message.language !== "") {
             writer.uint32(154).string(message.language);
         }
@@ -4731,9 +4689,6 @@ exports.VoiceLifecycleEvent = {
         }
         if (message.processingDurationMs !== 0) {
             writer.uint32(208).int64(message.processingDurationMs);
-        }
-        if (message.charactersPerSecond !== 0) {
-            writer.uint32(217).double(message.charactersPerSecond);
         }
         return writer;
     },
@@ -4863,13 +4818,6 @@ exports.VoiceLifecycleEvent = {
                     message.wordCount = reader.int32();
                     continue;
                 }
-                case 18: {
-                    if (tag !== 145) {
-                        break;
-                    }
-                    message.realTimeFactor = reader.double();
-                    continue;
-                }
                 case 19: {
                     if (tag !== 154) {
                         break;
@@ -4924,13 +4872,6 @@ exports.VoiceLifecycleEvent = {
                         break;
                     }
                     message.processingDurationMs = longToNumber(reader.int64());
-                    continue;
-                }
-                case 27: {
-                    if (tag !== 217) {
-                        break;
-                    }
-                    message.charactersPerSecond = reader.double();
                     continue;
                 }
             }
@@ -5008,11 +4949,6 @@ exports.VoiceLifecycleEvent = {
                 : isSet(object.word_count)
                     ? globalThis.Number(object.word_count)
                     : 0,
-            realTimeFactor: isSet(object.realTimeFactor)
-                ? globalThis.Number(object.realTimeFactor)
-                : isSet(object.real_time_factor)
-                    ? globalThis.Number(object.real_time_factor)
-                    : 0,
             language: isSet(object.language) ? globalThis.String(object.language) : "",
             sampleRate: isSet(object.sampleRate)
                 ? globalThis.Number(object.sampleRate)
@@ -5044,11 +4980,6 @@ exports.VoiceLifecycleEvent = {
                 ? globalThis.Number(object.processingDurationMs)
                 : isSet(object.processing_duration_ms)
                     ? globalThis.Number(object.processing_duration_ms)
-                    : 0,
-            charactersPerSecond: isSet(object.charactersPerSecond)
-                ? globalThis.Number(object.charactersPerSecond)
-                : isSet(object.characters_per_second)
-                    ? globalThis.Number(object.characters_per_second)
                     : 0,
         };
     },
@@ -5105,9 +5036,6 @@ exports.VoiceLifecycleEvent = {
         if (message.wordCount !== 0) {
             obj.wordCount = Math.round(message.wordCount);
         }
-        if (message.realTimeFactor !== 0) {
-            obj.realTimeFactor = message.realTimeFactor;
-        }
         if (message.language !== "") {
             obj.language = message.language;
         }
@@ -5131,9 +5059,6 @@ exports.VoiceLifecycleEvent = {
         }
         if (message.processingDurationMs !== 0) {
             obj.processingDurationMs = Math.round(message.processingDurationMs);
-        }
-        if (message.charactersPerSecond !== 0) {
-            obj.charactersPerSecond = message.charactersPerSecond;
         }
         return obj;
     },
@@ -5159,7 +5084,6 @@ exports.VoiceLifecycleEvent = {
         message.audioLengthMs = object.audioLengthMs ?? 0;
         message.audioSizeBytes = object.audioSizeBytes ?? 0;
         message.wordCount = object.wordCount ?? 0;
-        message.realTimeFactor = object.realTimeFactor ?? 0;
         message.language = object.language ?? "";
         message.sampleRate = object.sampleRate ?? 0;
         message.isStreaming = object.isStreaming ?? false;
@@ -5168,7 +5092,6 @@ exports.VoiceLifecycleEvent = {
         message.audioDurationMs = object.audioDurationMs ?? 0;
         message.audioSizeBytesTts = object.audioSizeBytesTts ?? 0;
         message.processingDurationMs = object.processingDurationMs ?? 0;
-        message.charactersPerSecond = object.charactersPerSecond ?? 0;
         return message;
     },
 };

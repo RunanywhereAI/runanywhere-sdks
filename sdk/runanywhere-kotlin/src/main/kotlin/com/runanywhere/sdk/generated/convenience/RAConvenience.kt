@@ -22,7 +22,6 @@ import ai.runanywhere.proto.v1.AudioFormat
 import ai.runanywhere.proto.v1.DiarizationOptions
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.EmbeddingsConfiguration
-import ai.runanywhere.proto.v1.EmbeddingsNormalizeMode
 import ai.runanywhere.proto.v1.EmbeddingsOptions
 import ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy
 import ai.runanywhere.proto.v1.LLMConfiguration
@@ -354,7 +353,7 @@ public fun EmbeddingsConfiguration.Companion.defaults(): EmbeddingsConfiguration
     EmbeddingsConfiguration(
         embedding_dimension = 384,
         max_sequence_length = 512,
-        normalize_mode = EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2,
+        normalize = true,
         pooling = EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN,
     )
 
@@ -383,7 +382,6 @@ public fun EmbeddingsConfiguration.validate() {
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
 public fun EmbeddingsOptions.Companion.defaults(): EmbeddingsOptions =
     EmbeddingsOptions(
-        normalize_mode = EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED,
         n_threads = 0,
     )
 

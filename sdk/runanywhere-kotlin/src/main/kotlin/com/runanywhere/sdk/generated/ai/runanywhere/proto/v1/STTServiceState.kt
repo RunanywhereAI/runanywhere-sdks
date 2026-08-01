@@ -57,20 +57,11 @@ public class STTServiceState(
   public val supports_streaming: Boolean = false,
   supported_language_codes: List<String> = emptyList(),
   @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 4,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 5,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTServiceState, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -97,8 +88,7 @@ public class STTServiceState(
     if (current_model != other.current_model) return false
     if (supports_streaming != other.supports_streaming) return false
     if (supported_language_codes != other.supported_language_codes) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -110,8 +100,7 @@ public class STTServiceState(
       result = result * 37 + (current_model?.hashCode() ?: 0)
       result = result * 37 + supports_streaming.hashCode()
       result = result * 37 + supported_language_codes.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -123,8 +112,7 @@ public class STTServiceState(
     if (current_model != null) result += """current_model=${sanitize(current_model)}"""
     result += """supports_streaming=$supports_streaming"""
     if (supported_language_codes.isNotEmpty()) result += """supported_language_codes=${sanitize(supported_language_codes)}"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "STTServiceState{", separator = ", ", postfix = "}")
   }
 
@@ -133,10 +121,9 @@ public class STTServiceState(
     current_model: String? = this.current_model,
     supports_streaming: Boolean = this.supports_streaming,
     supported_language_codes: List<String> = this.supported_language_codes,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): STTServiceState = STTServiceState(is_ready, current_model, supports_streaming, supported_language_codes, error_message, error_code, unknownFields)
+  ): STTServiceState = STTServiceState(is_ready, current_model, supports_streaming, supported_language_codes, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -158,10 +145,7 @@ public class STTServiceState(
           size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.supports_streaming)
         }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(4, value.supported_language_codes)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(7, value.error)
         return size
       }
 
@@ -174,19 +158,13 @@ public class STTServiceState(
           ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.supports_streaming)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.supported_language_codes)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTServiceState) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.supported_language_codes)
         if (value.supports_streaming != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.supports_streaming)
@@ -202,16 +180,14 @@ public class STTServiceState(
         var current_model: String? = null
         var supports_streaming: Boolean = false
         val supported_language_codes = mutableListOf<String>()
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_ready = ProtoAdapter.BOOL.decode(reader)
             2 -> current_model = ProtoAdapter.STRING.decode(reader)
             3 -> supports_streaming = ProtoAdapter.BOOL.decode(reader)
             4 -> supported_language_codes.add(ProtoAdapter.STRING.decode(reader))
-            5 -> error_message = ProtoAdapter.STRING.decode(reader)
-            6 -> error_code = ProtoAdapter.INT32.decode(reader)
+            7 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -220,13 +196,13 @@ public class STTServiceState(
           current_model = current_model,
           supports_streaming = supports_streaming,
           supported_language_codes = supported_language_codes,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: STTServiceState): STTServiceState = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

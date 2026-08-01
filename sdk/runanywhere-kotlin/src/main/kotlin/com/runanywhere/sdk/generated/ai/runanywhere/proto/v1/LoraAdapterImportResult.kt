@@ -30,21 +30,6 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class LoraAdapterImportResult(
-  @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 1,
-  )
-  public val error_message: String = "",
   /**
    * Stable SDK-owned path of the imported file.
    */
@@ -53,7 +38,7 @@ public class LoraAdapterImportResult(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "localPath",
-    schemaIndex = 2,
+    schemaIndex = 0,
   )
   public val local_path: String = "",
   /**
@@ -63,16 +48,22 @@ public class LoraAdapterImportResult(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
+    schemaIndex = 1,
   )
   public val matched: Boolean = false,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.LoraAdapterCatalogEntry#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
+    schemaIndex = 2,
   )
   public val entry: LoraAdapterCatalogEntry? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 3,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoraAdapterImportResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -85,11 +76,10 @@ public class LoraAdapterImportResult(
     if (other === this) return true
     if (other !is LoraAdapterImportResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
-    if (error_message != other.error_message) return false
     if (local_path != other.local_path) return false
     if (matched != other.matched) return false
     if (entry != other.entry) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -97,11 +87,10 @@ public class LoraAdapterImportResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + local_path.hashCode()
       result = result * 37 + matched.hashCode()
       result = result * 37 + (entry?.hashCode() ?: 0)
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -109,22 +98,20 @@ public class LoraAdapterImportResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
-    result += """error_message=${sanitize(error_message)}"""
     result += """local_path=${sanitize(local_path)}"""
     result += """matched=$matched"""
     if (entry != null) result += """entry=$entry"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "LoraAdapterImportResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
-    error_message: String = this.error_message,
     local_path: String = this.local_path,
     matched: Boolean = this.matched,
     entry: LoraAdapterCatalogEntry? = this.entry,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LoraAdapterImportResult = LoraAdapterImportResult(success, error_message, local_path, matched, entry, unknownFields)
+  ): LoraAdapterImportResult = LoraAdapterImportResult(local_path, matched, entry, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -139,12 +126,6 @@ public class LoraAdapterImportResult(
     ) {
       override fun encodedSize(`value`: LoraAdapterImportResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.error_message)
-        }
         if (value.local_path != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.local_path)
         }
@@ -154,16 +135,11 @@ public class LoraAdapterImportResult(
         if (value.entry != null) {
           size += LoraAdapterCatalogEntry.ADAPTER.encodedSizeWithTag(5, value.entry)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: LoraAdapterImportResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 2, value.error_message)
-        }
         if (value.local_path != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.local_path)
         }
@@ -173,11 +149,13 @@ public class LoraAdapterImportResult(
         if (value.entry != null) {
           LoraAdapterCatalogEntry.ADAPTER.encodeWithTag(writer, 5, value.entry)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoraAdapterImportResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         if (value.entry != null) {
           LoraAdapterCatalogEntry.ADAPTER.encodeWithTag(writer, 5, value.entry)
         }
@@ -187,42 +165,34 @@ public class LoraAdapterImportResult(
         if (value.local_path != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.local_path)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 2, value.error_message)
-        }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): LoraAdapterImportResult {
-        var success: Boolean = false
-        var error_message: String = ""
         var local_path: String = ""
         var matched: Boolean = false
         var entry: LoraAdapterCatalogEntry? = null
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
-            2 -> error_message = ProtoAdapter.STRING.decode(reader)
             3 -> local_path = ProtoAdapter.STRING.decode(reader)
             4 -> matched = ProtoAdapter.BOOL.decode(reader)
             5 -> entry = LoraAdapterCatalogEntry.ADAPTER.decode(reader)
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return LoraAdapterImportResult(
-          success = success,
-          error_message = error_message,
           local_path = local_path,
           matched = matched,
           entry = entry,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LoraAdapterImportResult): LoraAdapterImportResult = value.copy(
         entry = value.entry?.let(LoraAdapterCatalogEntry.ADAPTER::redact),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

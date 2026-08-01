@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum NPUChip {
     NPU_CHIP_UNSPECIFIED = 0,
@@ -60,10 +61,9 @@ export interface StorageInfoRequest {
     includeCache: boolean;
 }
 export interface StorageInfoResult {
-    success: boolean;
     info?: StorageInfo | undefined;
-    errorMessage: string;
     warnings: string[];
+    error?: SDKError | undefined;
 }
 export interface StorageAvailabilityRequest {
     modelId: string;
@@ -76,11 +76,10 @@ export interface StorageAvailabilityRequest {
     allowCacheReclamation: boolean;
 }
 export interface StorageAvailabilityResult {
-    success: boolean;
     availability?: StorageAvailability | undefined;
     warnings: string[];
-    errorMessage: string;
     deletePlan?: StorageDeletePlan | undefined;
+    error?: SDKError | undefined;
 }
 export interface StorageDeletePlanRequest {
     modelIds: string[];
@@ -109,10 +108,10 @@ export interface StorageDeletePlan {
     reclaimableBytes: number;
     candidates: StorageDeleteCandidate[];
     warnings: string[];
-    errorMessage: string;
     requiresUnload: boolean;
     requiresPlatformDelete: boolean;
     candidateCount: number;
+    error?: SDKError | undefined;
 }
 export interface StorageDeleteRequest {
     modelIds: string[];
@@ -126,16 +125,15 @@ export interface StorageDeleteRequest {
     allowPlatformDelete: boolean;
 }
 export interface StorageDeleteResult {
-    success: boolean;
     deletedBytes: number;
     deletedModelIds: string[];
     failedModelIds: string[];
     warnings: string[];
-    errorMessage: string;
     skippedModelIds: string[];
     dryRun: boolean;
     registryUpdated: boolean;
     filesDeleted: boolean;
+    error?: SDKError | undefined;
 }
 export declare const DeviceStorageInfo: MessageFns<DeviceStorageInfo>;
 export declare const AppStorageInfo: MessageFns<AppStorageInfo>;

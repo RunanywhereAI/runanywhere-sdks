@@ -1,6 +1,8 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ChatMessage } from "./chat";
+import { SDKError } from "./errors";
 import { LLMGenerationOptions } from "./llm_options";
+import { TokenUsage } from "./token_usage";
 import { ToolCall, ToolCallingResult, ToolResult } from "./tool_calling";
 import { TokenKind } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
@@ -40,23 +42,18 @@ export interface LLMGenerateRequest_MetadataEntry {
 export interface LLMStreamFinalResult {
     text: string;
     thinkingContent?: string | undefined;
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
     totalTimeMs: number;
     timeToFirstTokenMs: number;
-    tokensPerSecond: number;
     finishReason: string;
-    errorCode: number;
-    errorMessage: string;
     promptEvalTimeMs: number;
     decodeTimeMs: number;
     toolCalls: ToolCall[];
     toolResults: ToolResult[];
+    usage?: TokenUsage | undefined;
+    error?: SDKError | undefined;
 }
 /** `result` is populated only on the terminal event. */
 export interface LLMStreamEvent {
-    seq: number;
     timestampUs: number;
     token: string;
     isFinal: boolean;
@@ -64,9 +61,7 @@ export interface LLMStreamEvent {
     tokenId: number;
     logprob: number;
     finishReason: string;
-    errorMessage: string;
     result?: LLMStreamFinalResult | undefined;
-    errorCode: number;
     eventKind: LLMStreamEventKind;
     requestId: string;
     conversationId: string;
@@ -74,6 +69,7 @@ export interface LLMStreamEvent {
     completionTokensGenerated: number;
     elapsedMs: number;
     toolCall?: ToolCall | undefined;
+    error?: SDKError | undefined;
 }
 /** Tool-driven streaming uses this session path, not LLMGenerateRequest. */
 export interface ToolCallingSessionCreateRequest {

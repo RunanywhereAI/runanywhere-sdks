@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { AudioEncoding, AudioFormat, InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum STTStreamEventKind {
@@ -87,8 +88,6 @@ export interface TranscriptionMetadata {
     modelId: string;
     processingTimeMs: number;
     audioLengthMs: number;
-    /** processing_time_ms / audio_length_ms, set by the producer. */
-    realTimeFactor: number;
 }
 export interface STTOutput {
     text: string;
@@ -103,10 +102,9 @@ export interface STTOutput {
     /** Often duplicates metadata.audio_length_ms. */
     durationMs: number;
     speakerIds: string[];
-    errorMessage?: string | undefined;
-    errorCode: number;
     /** For long-running or streaming transcription. */
     segmentIndex: number;
+    error?: SDKError | undefined;
 }
 export interface STTPartialResult {
     text: string;
@@ -124,22 +122,19 @@ export interface STTPartialResult {
     finalOutput?: STTOutput | undefined;
 }
 export interface STTStreamEvent {
-    seq: number;
     timestampUs: number;
     requestId: string;
     kind: STTStreamEventKind;
     partial?: STTPartialResult | undefined;
     finalOutput?: STTOutput | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export interface STTServiceState {
     isReady: boolean;
     currentModel?: string | undefined;
     supportsStreaming: boolean;
     supportedLanguageCodes: string[];
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export declare const STTConfiguration: MessageFns<STTConfiguration>;
 export declare const STTOptions: MessageFns<STTOptions>;

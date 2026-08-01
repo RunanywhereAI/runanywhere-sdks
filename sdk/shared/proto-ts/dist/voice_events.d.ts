@@ -1,6 +1,6 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { ComponentLifecycleState, EventCategory } from "./component_types";
-import { ErrorCode, ErrorSeverity } from "./errors";
+import { ErrorCode, ErrorSeverity, SDKError } from "./errors";
 import { AudioEncoding } from "./model_types";
 import { VADStreamEventKind } from "./vad_options";
 export declare const protobufPackage = "runanywhere.v1";
@@ -292,7 +292,7 @@ export interface VoiceAgentComponentStates {
      */
     anyLoading: boolean;
     wakewordState: ComponentLifecycleState;
-    errorMessage?: string | undefined;
+    error?: SDKError | undefined;
 }
 export interface VoiceSessionError {
     code: ErrorCode;

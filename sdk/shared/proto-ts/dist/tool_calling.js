@@ -14,6 +14,7 @@ exports.toolChoiceModeFromJSON = toolChoiceModeFromJSON;
 exports.toolChoiceModeToJSON = toolChoiceModeToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const errors_1 = require("./errors");
 exports.protobufPackage = "runanywhere.v1";
 var ToolParameterType;
 (function (ToolParameterType) {
@@ -1093,15 +1094,7 @@ exports.ToolCall = {
     },
 };
 function createBaseToolResult() {
-    return {
-        toolCallId: "",
-        name: "",
-        resultJson: "",
-        error: undefined,
-        success: false,
-        startedAtMs: 0,
-        completedAtMs: 0,
-    };
+    return { toolCallId: "", name: "", resultJson: "", startedAtMs: 0, completedAtMs: 0, error: undefined };
 }
 exports.ToolResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1114,17 +1107,14 @@ exports.ToolResult = {
         if (message.resultJson !== "") {
             writer.uint32(26).string(message.resultJson);
         }
-        if (message.error !== undefined) {
-            writer.uint32(34).string(message.error);
-        }
-        if (message.success !== false) {
-            writer.uint32(40).bool(message.success);
-        }
         if (message.startedAtMs !== 0) {
             writer.uint32(64).int64(message.startedAtMs);
         }
         if (message.completedAtMs !== 0) {
             writer.uint32(72).int64(message.completedAtMs);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(82).fork()).join();
         }
         return writer;
     },
@@ -1156,20 +1146,6 @@ exports.ToolResult = {
                     message.resultJson = reader.string();
                     continue;
                 }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.success = reader.bool();
-                    continue;
-                }
                 case 8: {
                     if (tag !== 64) {
                         break;
@@ -1182,6 +1158,13 @@ exports.ToolResult = {
                         break;
                     }
                     message.completedAtMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 10: {
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1205,8 +1188,6 @@ exports.ToolResult = {
                 : isSet(object.result_json)
                     ? globalThis.String(object.result_json)
                     : "",
-            error: isSet(object.error) ? globalThis.String(object.error) : undefined,
-            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
             startedAtMs: isSet(object.startedAtMs)
                 ? globalThis.Number(object.startedAtMs)
                 : isSet(object.started_at_ms)
@@ -1217,6 +1198,7 @@ exports.ToolResult = {
                 : isSet(object.completed_at_ms)
                     ? globalThis.Number(object.completed_at_ms)
                     : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1230,17 +1212,14 @@ exports.ToolResult = {
         if (message.resultJson !== "") {
             obj.resultJson = message.resultJson;
         }
-        if (message.error !== undefined) {
-            obj.error = message.error;
-        }
-        if (message.success !== false) {
-            obj.success = message.success;
-        }
         if (message.startedAtMs !== 0) {
             obj.startedAtMs = Math.round(message.startedAtMs);
         }
         if (message.completedAtMs !== 0) {
             obj.completedAtMs = Math.round(message.completedAtMs);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1252,10 +1231,11 @@ exports.ToolResult = {
         message.toolCallId = object.toolCallId ?? "";
         message.name = object.name ?? "";
         message.resultJson = object.resultJson ?? "";
-        message.error = object.error ?? undefined;
-        message.success = object.success ?? false;
         message.startedAtMs = object.startedAtMs ?? 0;
         message.completedAtMs = object.completedAtMs ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1478,10 +1458,9 @@ function createBaseToolCallingResult() {
         isComplete: false,
         conversationId: undefined,
         iterationsUsed: 0,
-        errorMessage: undefined,
-        errorCode: 0,
         rawText: "",
         thinkingContent: undefined,
+        error: undefined,
     };
 }
 exports.ToolCallingResult = {
@@ -1504,17 +1483,14 @@ exports.ToolCallingResult = {
         if (message.iterationsUsed !== 0) {
             writer.uint32(48).int32(message.iterationsUsed);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(58).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(64).int32(message.errorCode);
-        }
         if (message.rawText !== "") {
             writer.uint32(74).string(message.rawText);
         }
         if (message.thinkingContent !== undefined) {
             writer.uint32(82).string(message.thinkingContent);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(90).fork()).join();
         }
         return writer;
     },
@@ -1567,20 +1543,6 @@ exports.ToolCallingResult = {
                     message.iterationsUsed = reader.int32();
                     continue;
                 }
-                case 7: {
-                    if (tag !== 58) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 8: {
-                    if (tag !== 64) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
-                    continue;
-                }
                 case 9: {
                     if (tag !== 74) {
                         break;
@@ -1593,6 +1555,13 @@ exports.ToolCallingResult = {
                         break;
                     }
                     message.thinkingContent = reader.string();
+                    continue;
+                }
+                case 11: {
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1631,16 +1600,6 @@ exports.ToolCallingResult = {
                 : isSet(object.iterations_used)
                     ? globalThis.Number(object.iterations_used)
                     : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
             rawText: isSet(object.rawText)
                 ? globalThis.String(object.rawText)
                 : isSet(object.raw_text)
@@ -1651,6 +1610,7 @@ exports.ToolCallingResult = {
                 : isSet(object.thinking_content)
                     ? globalThis.String(object.thinking_content)
                     : undefined,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1673,17 +1633,14 @@ exports.ToolCallingResult = {
         if (message.iterationsUsed !== 0) {
             obj.iterationsUsed = Math.round(message.iterationsUsed);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
-        }
         if (message.rawText !== "") {
             obj.rawText = message.rawText;
         }
         if (message.thinkingContent !== undefined) {
             obj.thinkingContent = message.thinkingContent;
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1698,10 +1655,11 @@ exports.ToolCallingResult = {
         message.isComplete = object.isComplete ?? false;
         message.conversationId = object.conversationId ?? undefined;
         message.iterationsUsed = object.iterationsUsed ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
         message.rawText = object.rawText ?? "";
         message.thinkingContent = object.thinkingContent ?? undefined;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1776,7 +1734,7 @@ exports.ToolParseRequest = {
     },
 };
 function createBaseToolParseResult() {
-    return { hasToolCall: false, toolCalls: [], remainingText: "", errorMessage: undefined, errorCode: 0 };
+    return { hasToolCall: false, toolCalls: [], remainingText: "", error: undefined };
 }
 exports.ToolParseResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -1789,11 +1747,8 @@ exports.ToolParseResult = {
         if (message.remainingText !== "") {
             writer.uint32(26).string(message.remainingText);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(34).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(40).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
         }
         return writer;
     },
@@ -1825,18 +1780,11 @@ exports.ToolParseResult = {
                     message.remainingText = reader.string();
                     continue;
                 }
-                case 4: {
-                    if (tag !== 34) {
+                case 6: {
+                    if (tag !== 50) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1864,16 +1812,7 @@ exports.ToolParseResult = {
                 : isSet(object.remaining_text)
                     ? globalThis.String(object.remaining_text)
                     : "",
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1887,11 +1826,8 @@ exports.ToolParseResult = {
         if (message.remainingText !== "") {
             obj.remainingText = message.remainingText;
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1903,8 +1839,9 @@ exports.ToolParseResult = {
         message.hasToolCall = object.hasToolCall ?? false;
         message.toolCalls = object.toolCalls?.map((e) => exports.ToolCall.fromPartial(e)) || [];
         message.remainingText = object.remainingText ?? "";
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -2021,7 +1958,7 @@ exports.ToolPromptFormatRequest = {
     },
 };
 function createBaseToolPromptFormatResult() {
-    return { formattedPrompt: "", format: 0, errorMessage: undefined, errorCode: 0 };
+    return { formattedPrompt: "", format: 0, error: undefined };
 }
 exports.ToolPromptFormatResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -2031,11 +1968,8 @@ exports.ToolPromptFormatResult = {
         if (message.format !== 0) {
             writer.uint32(16).int32(message.format);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(34).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(40).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(50).fork()).join();
         }
         return writer;
     },
@@ -2060,18 +1994,11 @@ exports.ToolPromptFormatResult = {
                     message.format = reader.int32();
                     continue;
                 }
-                case 4: {
-                    if (tag !== 34) {
+                case 6: {
+                    if (tag !== 50) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -2090,16 +2017,7 @@ exports.ToolPromptFormatResult = {
                     ? globalThis.String(object.formatted_prompt)
                     : "",
             format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -2110,11 +2028,8 @@ exports.ToolPromptFormatResult = {
         if (message.format !== 0) {
             obj.format = toolCallFormatNameToJSON(message.format);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -2125,8 +2040,9 @@ exports.ToolPromptFormatResult = {
         const message = createBaseToolPromptFormatResult();
         message.formattedPrompt = object.formattedPrompt ?? "";
         message.format = object.format ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -2212,8 +2128,7 @@ function createBaseToolCallValidationResult() {
         validationErrors: [],
         matchedTool: undefined,
         normalizedArgumentsJson: "",
-        errorMessage: undefined,
-        errorCode: 0,
+        error: undefined,
     };
 }
 exports.ToolCallValidationResult = {
@@ -2230,11 +2145,8 @@ exports.ToolCallValidationResult = {
         if (message.normalizedArgumentsJson !== "") {
             writer.uint32(34).string(message.normalizedArgumentsJson);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(42).string(message.errorMessage);
-        }
-        if (message.errorCode !== 0) {
-            writer.uint32(48).int32(message.errorCode);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(58).fork()).join();
         }
         return writer;
     },
@@ -2273,18 +2185,11 @@ exports.ToolCallValidationResult = {
                     message.normalizedArgumentsJson = reader.string();
                     continue;
                 }
-                case 5: {
-                    if (tag !== 42) {
+                case 7: {
+                    if (tag !== 58) {
                         break;
                     }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
-                case 6: {
-                    if (tag !== 48) {
-                        break;
-                    }
-                    message.errorCode = reader.int32();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -2317,16 +2222,7 @@ exports.ToolCallValidationResult = {
                 : isSet(object.normalized_arguments_json)
                     ? globalThis.String(object.normalized_arguments_json)
                     : "",
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
-            errorCode: isSet(object.errorCode)
-                ? globalThis.Number(object.errorCode)
-                : isSet(object.error_code)
-                    ? globalThis.Number(object.error_code)
-                    : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -2343,11 +2239,8 @@ exports.ToolCallValidationResult = {
         if (message.normalizedArgumentsJson !== "") {
             obj.normalizedArgumentsJson = message.normalizedArgumentsJson;
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
-        }
-        if (message.errorCode !== 0) {
-            obj.errorCode = Math.round(message.errorCode);
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -2362,8 +2255,9 @@ exports.ToolCallValidationResult = {
             ? exports.ToolDefinition.fromPartial(object.matchedTool)
             : undefined;
         message.normalizedArgumentsJson = object.normalizedArgumentsJson ?? "";
-        message.errorMessage = object.errorMessage ?? undefined;
-        message.errorCode = object.errorCode ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };

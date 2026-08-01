@@ -79,16 +79,14 @@ public class EmbeddingsConfiguration(
     schemaIndex = 3,
   )
   public val preferred_framework: InferenceFramework? = null,
-  @RacDefaultOption("EMBEDDINGS_NORMALIZE_MODE_L2")
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 7,
-    adapter = "ai.runanywhere.proto.v1.EmbeddingsNormalizeMode#ADAPTER",
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "normalizeMode",
     schemaIndex = 4,
   )
-  public val normalize_mode:
-      EmbeddingsNormalizeMode = EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED,
+  public val normalize: Boolean = false,
   @RacDefaultOption("EMBEDDINGS_POOLING_STRATEGY_MEAN")
   @field:WireField(
     tag = 8,
@@ -124,7 +122,7 @@ public class EmbeddingsConfiguration(
     if (embedding_dimension != other.embedding_dimension) return false
     if (max_sequence_length != other.max_sequence_length) return false
     if (preferred_framework != other.preferred_framework) return false
-    if (normalize_mode != other.normalize_mode) return false
+    if (normalize != other.normalize) return false
     if (pooling != other.pooling) return false
     if (config_json != other.config_json) return false
     return true
@@ -138,7 +136,7 @@ public class EmbeddingsConfiguration(
       result = result * 37 + embedding_dimension.hashCode()
       result = result * 37 + max_sequence_length.hashCode()
       result = result * 37 + (preferred_framework?.hashCode() ?: 0)
-      result = result * 37 + normalize_mode.hashCode()
+      result = result * 37 + normalize.hashCode()
       result = result * 37 + pooling.hashCode()
       result = result * 37 + (config_json?.hashCode() ?: 0)
       super.hashCode = result
@@ -152,7 +150,7 @@ public class EmbeddingsConfiguration(
     result += """embedding_dimension=$embedding_dimension"""
     result += """max_sequence_length=$max_sequence_length"""
     if (preferred_framework != null) result += """preferred_framework=$preferred_framework"""
-    result += """normalize_mode=$normalize_mode"""
+    result += """normalize=$normalize"""
     result += """pooling=$pooling"""
     if (config_json != null) result += """config_json=${sanitize(config_json)}"""
     return result.joinToString(prefix = "EmbeddingsConfiguration{", separator = ", ", postfix = "}")
@@ -163,11 +161,11 @@ public class EmbeddingsConfiguration(
     embedding_dimension: Int = this.embedding_dimension,
     max_sequence_length: Int = this.max_sequence_length,
     preferred_framework: InferenceFramework? = this.preferred_framework,
-    normalize_mode: EmbeddingsNormalizeMode = this.normalize_mode,
+    normalize: Boolean = this.normalize,
     pooling: EmbeddingsPoolingStrategy = this.pooling,
     config_json: String? = this.config_json,
     unknownFields: ByteString = this.unknownFields,
-  ): EmbeddingsConfiguration = EmbeddingsConfiguration(model_id, embedding_dimension, max_sequence_length, preferred_framework, normalize_mode, pooling, config_json, unknownFields)
+  ): EmbeddingsConfiguration = EmbeddingsConfiguration(model_id, embedding_dimension, max_sequence_length, preferred_framework, normalize, pooling, config_json, unknownFields)
 
   public companion object {
     @JvmField
@@ -192,8 +190,8 @@ public class EmbeddingsConfiguration(
           size += ProtoAdapter.INT32.encodedSizeWithTag(3, value.max_sequence_length)
         }
         size += InferenceFramework.ADAPTER.encodedSizeWithTag(5, value.preferred_framework)
-        if (value.normalize_mode != ai.runanywhere.proto.v1.EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED) {
-          size += EmbeddingsNormalizeMode.ADAPTER.encodedSizeWithTag(7, value.normalize_mode)
+        if (value.normalize != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(7, value.normalize)
         }
         if (value.pooling != ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED) {
           size += EmbeddingsPoolingStrategy.ADAPTER.encodedSizeWithTag(8, value.pooling)
@@ -213,8 +211,8 @@ public class EmbeddingsConfiguration(
           ProtoAdapter.INT32.encodeWithTag(writer, 3, value.max_sequence_length)
         }
         InferenceFramework.ADAPTER.encodeWithTag(writer, 5, value.preferred_framework)
-        if (value.normalize_mode != ai.runanywhere.proto.v1.EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED) {
-          EmbeddingsNormalizeMode.ADAPTER.encodeWithTag(writer, 7, value.normalize_mode)
+        if (value.normalize != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.normalize)
         }
         if (value.pooling != ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED) {
           EmbeddingsPoolingStrategy.ADAPTER.encodeWithTag(writer, 8, value.pooling)
@@ -229,8 +227,8 @@ public class EmbeddingsConfiguration(
         if (value.pooling != ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED) {
           EmbeddingsPoolingStrategy.ADAPTER.encodeWithTag(writer, 8, value.pooling)
         }
-        if (value.normalize_mode != ai.runanywhere.proto.v1.EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED) {
-          EmbeddingsNormalizeMode.ADAPTER.encodeWithTag(writer, 7, value.normalize_mode)
+        if (value.normalize != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.normalize)
         }
         InferenceFramework.ADAPTER.encodeWithTag(writer, 5, value.preferred_framework)
         if (value.max_sequence_length != 0) {
@@ -249,7 +247,7 @@ public class EmbeddingsConfiguration(
         var embedding_dimension: Int = 0
         var max_sequence_length: Int = 0
         var preferred_framework: InferenceFramework? = null
-        var normalize_mode: EmbeddingsNormalizeMode = EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED
+        var normalize: Boolean = false
         var pooling: EmbeddingsPoolingStrategy = EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED
         var config_json: String? = null
         val unknownFields = reader.forEachTag { tag ->
@@ -262,11 +260,7 @@ public class EmbeddingsConfiguration(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            7 -> try {
-              normalize_mode = EmbeddingsNormalizeMode.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
+            7 -> normalize = ProtoAdapter.BOOL.decode(reader)
             8 -> try {
               pooling = EmbeddingsPoolingStrategy.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
@@ -281,7 +275,7 @@ public class EmbeddingsConfiguration(
           embedding_dimension = embedding_dimension,
           max_sequence_length = max_sequence_length,
           preferred_framework = preferred_framework,
-          normalize_mode = normalize_mode,
+          normalize = normalize,
           pooling = pooling,
           config_json = config_json,
           unknownFields = unknownFields

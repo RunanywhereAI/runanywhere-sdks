@@ -10,27 +10,10 @@
 
 // RunAnywhere IDL — two-phase SDK initialization.
 //
-// Collapses the duplicated Phase 1 / Phase 2 / retryHTTPSetup step
-// list that lives in every SDK (RunAnywhere.swift, Kotlin RunAnywhere object,
-// Flutter RunAnywhereSDK, RN RunAnywhere, Web RunAnywhere) into a single C
-// ABI surface owned by commons. Platform SDKs still spawn their own
-// concurrency primitive (Task.detached / suspendCancellableCoroutine /
-// Future / Promise) and handle MainActor-style platform-plugin
-// registration; everything that is a deterministic, linear C call moves
-// into commons.
-//
-// Pre-IDL drift summary (steps consolidated here):
-//   Swift  RunAnywhere.swift:198-555      initialize()/completeServicesInitialization()/setupHTTP/retryHTTPSetup
-//   Kotlin RunAnywhere.kt                 initialize() + completeServicesInitialization()
-//   Flutter RunAnywhereSDK.dart           initialize() + completeServicesInitialization()
-//   RN     RunAnywhere.ts                 initialize() + completeServicesInitialization()
-//   Web    RunAnywhere.ts                 initialize() + completeServicesInitialization()
-//
-// All five SDKs duplicate the same step list (validate args → store creds →
-// init state → authenticate → register device → fetch model assignments →
-// flush telemetry → discover models). This proto carries the inputs each SDK
-// needs to push into commons (Phase 1) and the structured result every SDK
-// reports back (Phase 1 / Phase 2 / retryHTTP).
+// The deterministic, linear step list (validate args, store creds, init state,
+// authenticate, register device, fetch model assignments, flush telemetry,
+// discover models) lives in commons. Platform SDKs still own their own
+// concurrency primitive and any main-thread plugin registration.
 
 import SwiftProtobuf
 
@@ -44,22 +27,17 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// Phase identifiers — used by SdkInitResult.phase to indicate which phase the
-/// result describes. Mirrors the SDK_INIT_* analytics events (started /
-/// completed / failed) that exist in sdk_events.proto.
-/// ---------------------------------------------------------------------------
 public nonisolated enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
 
-  /// Synchronous core init (~1-5ms, no network)
+  /// Synchronous core init, no network
   case one // = 1
 
-  /// Async services init (~100-500ms, network)
+  /// Async services init, network
   case two // = 2
 
-  /// HTTP/auth retry after offline init
+  /// HTTP/auth retry after an offline init
   case retryHTTP // = 3
   case UNRECOGNIZED(Int)
 
@@ -97,13 +75,8 @@ public nonisolated enum RASdkInitPhase: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-/// ---------------------------------------------------------------------------
-/// Environment values — must match RAC_ENV_* in
-/// sdk/runanywhere-commons/include/rac/infrastructure/network/rac_environment.h
-/// (development=0, production=2). Numeric values are part of the wire format;
-/// do not reorder. Number 1 was formerly SDK_INIT_ENVIRONMENT_STAGING and is
-/// reserved so PRODUCTION stays at 2 (shipped commons / xcframework layout).
-/// ---------------------------------------------------------------------------
+/// PRODUCTION is 2 because 1 was a staging value in shipped commons and
+/// xcframework builds. Do not renumber.
 public nonisolated enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case development // = 0
@@ -138,15 +111,9 @@ public nonisolated enum RASdkInitEnvironment: SwiftProtobuf.Enum, Swift.CaseIter
 
 }
 
-/// ---------------------------------------------------------------------------
-/// Phase 1 input — synchronous core initialization. Carries the only
-/// platform-supplied values commons cannot derive on its own: API credentials
-/// + environment + device id (resolved by platform Keychain/Keystore lookup).
-///
-/// Platform adapter callbacks (file I/O, secure storage, HTTP transport, log,
-/// memory) are registered separately via rac_platform_adapter_t prior to
-/// calling this entry point. This message is purely the data envelope.
-/// ---------------------------------------------------------------------------
+/// The only platform-supplied values commons cannot derive itself. Platform
+/// adapter callbacks are registered separately through rac_platform_adapter_t
+/// before this call; this message is purely the data envelope.
 public nonisolated struct RASdkInitPhase1Request: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -160,13 +127,11 @@ public nonisolated struct RASdkInitPhase1Request: Sendable {
   /// May be empty in development mode.
   public var baseURL: String = String()
 
-  /// Resolved by platform (Keychain UUID, etc.).
+  /// Platform-resolved, e.g. a Keychain UUID.
   public var deviceID: String = String()
 
-  /// SDK/platform identity used in auth/device metadata.
   public var platform: String = String()
 
-  /// SDK version reported to backend services.
   public var sdkVersion: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -174,30 +139,23 @@ public nonisolated struct RASdkInitPhase1Request: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Phase 2 input — async services initialization. Most state is already
-/// resident in commons after Phase 1; this envelope carries the few per-call
-/// hints that remain SDK-owned while the deterministic orchestration lives in
-/// commons.
-/// ---------------------------------------------------------------------------
+/// Most state is already resident in commons after Phase 1; these are the
+/// per-call hints that stay SDK-owned.
 public nonisolated struct RASdkInitPhase2Request: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Optional dev-mode device registration token.
+  /// Dev-mode device registration token.
   public var buildToken: String = String()
 
-  /// Bypass cached model assignments.
   public var forceRefreshAssignments: Bool = false
 
-  /// Flush the registered telemetry sink.
   public var flushTelemetry: Bool = false
 
   /// Reconcile registry rows with local files.
   public var discoverDownloadedModels: Bool = false
 
-  /// Ask discovery/refresh to rescan model dirs.
   public var rescanLocalModels: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -205,35 +163,22 @@ public nonisolated struct RASdkInitPhase2Request: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Result envelope returned by Phase 1 / Phase 2 / retryHTTP. Mirrors the
-/// Swift RunAnywhere.swift Phase 2 logging shape (phase + duration + outcome
-/// counts) so each SDK reports the same structured result to its consumer.
+/// Returned by Phase 1, Phase 2, and retryHTTP.
 ///
-/// success = true when the phase reached its terminal step. Even successful
-/// Phase 2 results may carry warnings: HTTP/auth setup is allowed to fail in
-/// offline mode; the SDK continues with cached/local models. In that case
-/// success=true, http_configured=false, and warning carries the offline-mode
-/// notice.
-/// ---------------------------------------------------------------------------
+/// A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
+/// to fail in offline mode, in which case error is unset, http_configured=false,
+/// and warning holds the offline notice while the SDK continues on cached
+/// models.
 public nonisolated struct RASdkInitResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Which phase produced this result.
   public var phase: RASdkInitPhase {
     get {_storage._phase}
     set {_uniqueStorage()._phase = newValue}
   }
 
-  /// True when the phase reached its terminal step.
-  public var success: Bool {
-    get {_storage._success}
-    set {_uniqueStorage()._success = newValue}
-  }
-
-  /// Set when success=false (validation/init failure).
   public var error: RASDKError {
     get {_storage._error ?? RASDKError()}
     set {_uniqueStorage()._error = newValue}
@@ -243,63 +188,50 @@ public nonisolated struct RASdkInitResult: @unchecked Sendable {
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
   public mutating func clearError() {_uniqueStorage()._error = nil}
 
-  /// Phase 2 / retryHTTP: HTTP transport wired up.
+  /// HTTP transport wired at this call site.
   public var httpConfigured: Bool {
     get {_storage._httpConfigured}
     set {_uniqueStorage()._httpConfigured = newValue}
   }
 
-  /// Phase 2: device registration callback returned RAC_SUCCESS.
   public var deviceRegistered: Bool {
     get {_storage._deviceRegistered}
     set {_uniqueStorage()._deviceRegistered = newValue}
   }
 
-  /// Phase 2: count of registry rows that linked to local files.
+  /// Registry rows that linked to local files.
   public var linkedModelsCount: UInt32 {
     get {_storage._linkedModelsCount}
     set {_uniqueStorage()._linkedModelsCount = newValue}
   }
 
-  /// Phase 2: count of on-disk folders without registry rows.
+  /// On-disk folders with no registry row.
   public var discoveredOrphans: UInt32 {
     get {_storage._discoveredOrphans}
     set {_uniqueStorage()._discoveredOrphans = newValue}
   }
 
-  /// Optional non-fatal note (e.g. "offline mode", "auth deferred").
   public var warning: String {
     get {_storage._warning}
     set {_uniqueStorage()._warning = newValue}
   }
 
-  /// Wall-clock duration for this phase.
   public var durationMs: Int64 {
     get {_storage._durationMs}
     set {_uniqueStorage()._durationMs = newValue}
   }
 
-  /// Explicit two-phase HTTP-setup completion flag,
-  /// decoupled from services-init completion so SDKs that initialize
-  /// offline (no connectivity) can still report success=true with
-  /// has_completed_http_setup=false and retry HTTP later via the
-  /// SDK_INIT_PHASE_RETRY_HTTP path. Mirrors RunAnywhere.swift:37
-  /// (`internal static var hasCompletedHTTPSetup`) and is the canonical
-  /// signal Flutter / Web / RN consume to decide whether the next
-  /// download/authenticated call can proceed without a retryHTTP step.
-  ///
-  /// Distinct from `http_configured` (field 4) which historically meant
-  /// "HTTP transport wired up at this phase's call site"; this field is
-  /// the cross-phase latched bit that survives between phase calls.
+  /// The cross-phase latched bit that survives between calls, as opposed to
+  /// http_configured, which describes only the calling phase. SDKs read this
+  /// to decide whether an authenticated call can proceed without a retryHTTP.
   public var hasCompletedHTTPSetup_p: Bool {
     get {_storage._hasCompletedHTTPSetup_p}
     set {_uniqueStorage()._hasCompletedHTTPSetup_p = newValue}
   }
 
-  /// True when this SDK configuration has a usable network credential/url
-  /// pair and therefore HTTP/auth setup can eventually succeed. Local-only
-  /// development builds without baked-in Supabase config set this false so
-  /// platform SDKs do not retry HTTP on every guarded API call.
+  /// Whether this configuration has a usable credential and URL pair at all.
+  /// Local-only development builds set it false so platform SDKs stop
+  /// retrying HTTP on every guarded call.
   public var httpApplicable: Bool {
     get {_storage._httpApplicable}
     set {_uniqueStorage()._httpApplicable = newValue}
@@ -431,11 +363,10 @@ nonisolated extension RASdkInitPhase2Request: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SdkInitResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{1}success\0\u{1}error\0\u{3}http_configured\0\u{3}device_registered\0\u{3}linked_models_count\0\u{3}discovered_orphans\0\u{1}warning\0\u{3}duration_ms\0\u{3}has_completed_http_setup\0\u{3}http_applicable\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}phase\0\u{2}\u{2}error\0\u{3}http_configured\0\u{3}device_registered\0\u{3}linked_models_count\0\u{3}discovered_orphans\0\u{1}warning\0\u{3}duration_ms\0\u{3}has_completed_http_setup\0\u{3}http_applicable\0")
 
   fileprivate class _StorageClass {
     var _phase: RASdkInitPhase = .unspecified
-    var _success: Bool = false
     var _error: RASDKError? = nil
     var _httpConfigured: Bool = false
     var _deviceRegistered: Bool = false
@@ -456,7 +387,6 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
 
     init(copying source: _StorageClass) {
       _phase = source._phase
-      _success = source._success
       _error = source._error
       _httpConfigured = source._httpConfigured
       _deviceRegistered = source._deviceRegistered
@@ -485,7 +415,6 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularEnumField(value: &_storage._phase) }()
-        case 2: try { try decoder.decodeSingularBoolField(value: &_storage._success) }()
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         case 4: try { try decoder.decodeSingularBoolField(value: &_storage._httpConfigured) }()
         case 5: try { try decoder.decodeSingularBoolField(value: &_storage._deviceRegistered) }()
@@ -509,9 +438,6 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
       // https://github.com/apple/swift-protobuf/issues/1182
       if _storage._phase != .unspecified {
         try visitor.visitSingularEnumField(value: _storage._phase, fieldNumber: 1)
-      }
-      if _storage._success != false {
-        try visitor.visitSingularBoolField(value: _storage._success, fieldNumber: 2)
       }
       try { if let v = _storage._error {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
@@ -550,7 +476,6 @@ nonisolated extension RASdkInitResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
         let _storage = _args.0
         let rhs_storage = _args.1
         if _storage._phase != rhs_storage._phase {return false}
-        if _storage._success != rhs_storage._success {return false}
         if _storage._error != rhs_storage._error {return false}
         if _storage._httpConfigured != rhs_storage._httpConfigured {return false}
         if _storage._deviceRegistered != rhs_storage._deviceRegistered {return false}

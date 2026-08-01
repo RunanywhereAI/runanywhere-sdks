@@ -16,6 +16,7 @@ exports.httpDownloadStatusFromJSON = httpDownloadStatusFromJSON;
 exports.httpDownloadStatusToJSON = httpDownloadStatusToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const errors_1 = require("./errors");
 const model_types_1 = require("./model_types");
 exports.protobufPackage = "runanywhere.v1";
 var DownloadStage;
@@ -405,7 +406,6 @@ function createBaseDownloadProgress() {
         etaSeconds: 0,
         state: 0,
         retryAttempt: 0,
-        errorMessage: "",
         taskId: "",
         currentFileIndex: 0,
         totalFiles: 0,
@@ -416,6 +416,7 @@ function createBaseDownloadProgress() {
         updatedAtUnixMs: 0,
         currentFileName: "",
         resumeToken: "",
+        error: undefined,
     };
 }
 exports.DownloadProgress = {
@@ -447,9 +448,6 @@ exports.DownloadProgress = {
         if (message.retryAttempt !== 0) {
             writer.uint32(72).int32(message.retryAttempt);
         }
-        if (message.errorMessage !== "") {
-            writer.uint32(82).string(message.errorMessage);
-        }
         if (message.taskId !== "") {
             writer.uint32(90).string(message.taskId);
         }
@@ -479,6 +477,9 @@ exports.DownloadProgress = {
         }
         if (message.resumeToken !== "") {
             writer.uint32(162).string(message.resumeToken);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(170).fork()).join();
         }
         return writer;
     },
@@ -552,13 +553,6 @@ exports.DownloadProgress = {
                     message.retryAttempt = reader.int32();
                     continue;
                 }
-                case 10: {
-                    if (tag !== 82) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
                 case 11: {
                     if (tag !== 90) {
                         break;
@@ -629,6 +623,13 @@ exports.DownloadProgress = {
                     message.resumeToken = reader.string();
                     continue;
                 }
+                case 21: {
+                    if (tag !== 170) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -676,11 +677,6 @@ exports.DownloadProgress = {
                 : isSet(object.retry_attempt)
                     ? globalThis.Number(object.retry_attempt)
                     : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
             taskId: isSet(object.taskId)
                 ? globalThis.String(object.taskId)
                 : isSet(object.task_id)
@@ -731,6 +727,7 @@ exports.DownloadProgress = {
                 : isSet(object.resume_token)
                     ? globalThis.String(object.resume_token)
                     : "",
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -762,9 +759,6 @@ exports.DownloadProgress = {
         if (message.retryAttempt !== 0) {
             obj.retryAttempt = Math.round(message.retryAttempt);
         }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
-        }
         if (message.taskId !== "") {
             obj.taskId = message.taskId;
         }
@@ -795,6 +789,9 @@ exports.DownloadProgress = {
         if (message.resumeToken !== "") {
             obj.resumeToken = message.resumeToken;
         }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
+        }
         return obj;
     },
     create(base) {
@@ -811,7 +808,6 @@ exports.DownloadProgress = {
         message.etaSeconds = object.etaSeconds ?? 0;
         message.state = object.state ?? 0;
         message.retryAttempt = object.retryAttempt ?? 0;
-        message.errorMessage = object.errorMessage ?? "";
         message.taskId = object.taskId ?? "";
         message.currentFileIndex = object.currentFileIndex ?? 0;
         message.totalFiles = object.totalFiles ?? 0;
@@ -822,6 +818,9 @@ exports.DownloadProgress = {
         message.updatedAtUnixMs = object.updatedAtUnixMs ?? 0;
         message.currentFileName = object.currentFileName ?? "";
         message.resumeToken = object.resumeToken ?? "";
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1229,11 +1228,11 @@ function createBaseDownloadPlanResult() {
         canResume: false,
         resumeFromBytes: 0,
         warnings: [],
-        errorMessage: "",
         storageNamespace: "",
         resumeToken: "",
         requiredFreeBytesAfterDownload: 0,
         failureReason: 0,
+        error: undefined,
     };
 }
 exports.DownloadPlanResult = {
@@ -1262,9 +1261,6 @@ exports.DownloadPlanResult = {
         for (const v of message.warnings) {
             writer.uint32(66).string(v);
         }
-        if (message.errorMessage !== "") {
-            writer.uint32(74).string(message.errorMessage);
-        }
         if (message.storageNamespace !== "") {
             writer.uint32(82).string(message.storageNamespace);
         }
@@ -1276,6 +1272,9 @@ exports.DownloadPlanResult = {
         }
         if (message.failureReason !== 0) {
             writer.uint32(104).int32(message.failureReason);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(114).fork()).join();
         }
         return writer;
     },
@@ -1342,13 +1341,6 @@ exports.DownloadPlanResult = {
                     message.warnings.push(reader.string());
                     continue;
                 }
-                case 9: {
-                    if (tag !== 74) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
                 case 10: {
                     if (tag !== 82) {
                         break;
@@ -1375,6 +1367,13 @@ exports.DownloadPlanResult = {
                         break;
                     }
                     message.failureReason = reader.int32();
+                    continue;
+                }
+                case 14: {
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1421,11 +1420,6 @@ exports.DownloadPlanResult = {
             warnings: globalThis.Array.isArray(object?.warnings)
                 ? object.warnings.map((e) => globalThis.String(e))
                 : [],
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
             storageNamespace: isSet(object.storageNamespace)
                 ? globalThis.String(object.storageNamespace)
                 : isSet(object.storage_namespace)
@@ -1446,6 +1440,7 @@ exports.DownloadPlanResult = {
                 : isSet(object.failure_reason)
                     ? downloadFailureReasonFromJSON(object.failure_reason)
                     : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1474,9 +1469,6 @@ exports.DownloadPlanResult = {
         if (message.warnings?.length) {
             obj.warnings = message.warnings;
         }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
-        }
         if (message.storageNamespace !== "") {
             obj.storageNamespace = message.storageNamespace;
         }
@@ -1488,6 +1480,9 @@ exports.DownloadPlanResult = {
         }
         if (message.failureReason !== 0) {
             obj.failureReason = downloadFailureReasonToJSON(message.failureReason);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1504,11 +1499,13 @@ exports.DownloadPlanResult = {
         message.canResume = object.canResume ?? false;
         message.resumeFromBytes = object.resumeFromBytes ?? 0;
         message.warnings = object.warnings?.map((e) => e) || [];
-        message.errorMessage = object.errorMessage ?? "";
         message.storageNamespace = object.storageNamespace ?? "";
         message.resumeToken = object.resumeToken ?? "";
         message.requiredFreeBytesAfterDownload = object.requiredFreeBytesAfterDownload ?? 0;
         message.failureReason = object.failureReason ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1645,9 +1642,9 @@ function createBaseDownloadStartResult() {
         taskId: "",
         modelId: "",
         initialProgress: undefined,
-        errorMessage: "",
         resumeToken: "",
         failureReason: 0,
+        error: undefined,
     };
 }
 exports.DownloadStartResult = {
@@ -1664,14 +1661,14 @@ exports.DownloadStartResult = {
         if (message.initialProgress !== undefined) {
             exports.DownloadProgress.encode(message.initialProgress, writer.uint32(34).fork()).join();
         }
-        if (message.errorMessage !== "") {
-            writer.uint32(42).string(message.errorMessage);
-        }
         if (message.resumeToken !== "") {
             writer.uint32(50).string(message.resumeToken);
         }
         if (message.failureReason !== 0) {
             writer.uint32(56).int32(message.failureReason);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(66).fork()).join();
         }
         return writer;
     },
@@ -1710,13 +1707,6 @@ exports.DownloadStartResult = {
                     message.initialProgress = exports.DownloadProgress.decode(reader, reader.uint32());
                     continue;
                 }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
                 case 6: {
                     if (tag !== 50) {
                         break;
@@ -1729,6 +1719,13 @@ exports.DownloadStartResult = {
                         break;
                     }
                     message.failureReason = reader.int32();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -1757,11 +1754,6 @@ exports.DownloadStartResult = {
                 : isSet(object.initial_progress)
                     ? exports.DownloadProgress.fromJSON(object.initial_progress)
                     : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
             resumeToken: isSet(object.resumeToken)
                 ? globalThis.String(object.resumeToken)
                 : isSet(object.resume_token)
@@ -1772,6 +1764,7 @@ exports.DownloadStartResult = {
                 : isSet(object.failure_reason)
                     ? downloadFailureReasonFromJSON(object.failure_reason)
                     : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -1788,14 +1781,14 @@ exports.DownloadStartResult = {
         if (message.initialProgress !== undefined) {
             obj.initialProgress = exports.DownloadProgress.toJSON(message.initialProgress);
         }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
-        }
         if (message.resumeToken !== "") {
             obj.resumeToken = message.resumeToken;
         }
         if (message.failureReason !== 0) {
             obj.failureReason = downloadFailureReasonToJSON(message.failureReason);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -1810,9 +1803,11 @@ exports.DownloadStartResult = {
         message.initialProgress = (object.initialProgress !== undefined && object.initialProgress !== null)
             ? exports.DownloadProgress.fromPartial(object.initialProgress)
             : undefined;
-        message.errorMessage = object.errorMessage ?? "";
         message.resumeToken = object.resumeToken ?? "";
         message.failureReason = object.failureReason ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -1913,21 +1908,17 @@ exports.DownloadCancelRequest = {
 };
 function createBaseDownloadCancelResult() {
     return {
-        success: false,
         taskId: "",
         modelId: "",
         partialBytesDeleted: 0,
-        errorMessage: "",
         wasRunning: false,
         partialBytesPreserved: false,
         resumeToken: "",
+        error: undefined,
     };
 }
 exports.DownloadCancelResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.success !== false) {
-            writer.uint32(8).bool(message.success);
-        }
         if (message.taskId !== "") {
             writer.uint32(18).string(message.taskId);
         }
@@ -1936,9 +1927,6 @@ exports.DownloadCancelResult = {
         }
         if (message.partialBytesDeleted !== 0) {
             writer.uint32(32).int64(message.partialBytesDeleted);
-        }
-        if (message.errorMessage !== "") {
-            writer.uint32(42).string(message.errorMessage);
         }
         if (message.wasRunning !== false) {
             writer.uint32(48).bool(message.wasRunning);
@@ -1949,6 +1937,9 @@ exports.DownloadCancelResult = {
         if (message.resumeToken !== "") {
             writer.uint32(66).string(message.resumeToken);
         }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(74).fork()).join();
+        }
         return writer;
     },
     decode(input, length) {
@@ -1958,13 +1949,6 @@ exports.DownloadCancelResult = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.success = reader.bool();
-                    continue;
-                }
                 case 2: {
                     if (tag !== 18) {
                         break;
@@ -1984,13 +1968,6 @@ exports.DownloadCancelResult = {
                         break;
                     }
                     message.partialBytesDeleted = longToNumber(reader.int64());
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
                     continue;
                 }
                 case 6: {
@@ -2014,6 +1991,13 @@ exports.DownloadCancelResult = {
                     message.resumeToken = reader.string();
                     continue;
                 }
+                case 9: {
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2024,7 +2008,6 @@ exports.DownloadCancelResult = {
     },
     fromJSON(object) {
         return {
-            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
             taskId: isSet(object.taskId)
                 ? globalThis.String(object.taskId)
                 : isSet(object.task_id)
@@ -2040,11 +2023,6 @@ exports.DownloadCancelResult = {
                 : isSet(object.partial_bytes_deleted)
                     ? globalThis.Number(object.partial_bytes_deleted)
                     : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
             wasRunning: isSet(object.wasRunning)
                 ? globalThis.Boolean(object.wasRunning)
                 : isSet(object.was_running)
@@ -2060,13 +2038,11 @@ exports.DownloadCancelResult = {
                 : isSet(object.resume_token)
                     ? globalThis.String(object.resume_token)
                     : "",
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.success !== false) {
-            obj.success = message.success;
-        }
         if (message.taskId !== "") {
             obj.taskId = message.taskId;
         }
@@ -2075,9 +2051,6 @@ exports.DownloadCancelResult = {
         }
         if (message.partialBytesDeleted !== 0) {
             obj.partialBytesDeleted = Math.round(message.partialBytesDeleted);
-        }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
         }
         if (message.wasRunning !== false) {
             obj.wasRunning = message.wasRunning;
@@ -2088,6 +2061,9 @@ exports.DownloadCancelResult = {
         if (message.resumeToken !== "") {
             obj.resumeToken = message.resumeToken;
         }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
+        }
         return obj;
     },
     create(base) {
@@ -2095,14 +2071,15 @@ exports.DownloadCancelResult = {
     },
     fromPartial(object) {
         const message = createBaseDownloadCancelResult();
-        message.success = object.success ?? false;
         message.taskId = object.taskId ?? "";
         message.modelId = object.modelId ?? "";
         message.partialBytesDeleted = object.partialBytesDeleted ?? 0;
-        message.errorMessage = object.errorMessage ?? "";
         message.wasRunning = object.wasRunning ?? false;
         message.partialBytesPreserved = object.partialBytesPreserved ?? false;
         message.resumeToken = object.resumeToken ?? "";
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };
@@ -2245,9 +2222,9 @@ function createBaseDownloadResumeResult() {
         taskId: "",
         modelId: "",
         initialProgress: undefined,
-        errorMessage: "",
         resumeToken: "",
         failureReason: 0,
+        error: undefined,
     };
 }
 exports.DownloadResumeResult = {
@@ -2264,14 +2241,14 @@ exports.DownloadResumeResult = {
         if (message.initialProgress !== undefined) {
             exports.DownloadProgress.encode(message.initialProgress, writer.uint32(34).fork()).join();
         }
-        if (message.errorMessage !== "") {
-            writer.uint32(42).string(message.errorMessage);
-        }
         if (message.resumeToken !== "") {
             writer.uint32(50).string(message.resumeToken);
         }
         if (message.failureReason !== 0) {
             writer.uint32(56).int32(message.failureReason);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(66).fork()).join();
         }
         return writer;
     },
@@ -2310,13 +2287,6 @@ exports.DownloadResumeResult = {
                     message.initialProgress = exports.DownloadProgress.decode(reader, reader.uint32());
                     continue;
                 }
-                case 5: {
-                    if (tag !== 42) {
-                        break;
-                    }
-                    message.errorMessage = reader.string();
-                    continue;
-                }
                 case 6: {
                     if (tag !== 50) {
                         break;
@@ -2329,6 +2299,13 @@ exports.DownloadResumeResult = {
                         break;
                     }
                     message.failureReason = reader.int32();
+                    continue;
+                }
+                case 8: {
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -2357,11 +2334,6 @@ exports.DownloadResumeResult = {
                 : isSet(object.initial_progress)
                     ? exports.DownloadProgress.fromJSON(object.initial_progress)
                     : undefined,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : "",
             resumeToken: isSet(object.resumeToken)
                 ? globalThis.String(object.resumeToken)
                 : isSet(object.resume_token)
@@ -2372,6 +2344,7 @@ exports.DownloadResumeResult = {
                 : isSet(object.failure_reason)
                     ? downloadFailureReasonFromJSON(object.failure_reason)
                     : 0,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -2388,14 +2361,14 @@ exports.DownloadResumeResult = {
         if (message.initialProgress !== undefined) {
             obj.initialProgress = exports.DownloadProgress.toJSON(message.initialProgress);
         }
-        if (message.errorMessage !== "") {
-            obj.errorMessage = message.errorMessage;
-        }
         if (message.resumeToken !== "") {
             obj.resumeToken = message.resumeToken;
         }
         if (message.failureReason !== 0) {
             obj.failureReason = downloadFailureReasonToJSON(message.failureReason);
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -2410,9 +2383,11 @@ exports.DownloadResumeResult = {
         message.initialProgress = (object.initialProgress !== undefined && object.initialProgress !== null)
             ? exports.DownloadProgress.fromPartial(object.initialProgress)
             : undefined;
-        message.errorMessage = object.errorMessage ?? "";
         message.resumeToken = object.resumeToken ?? "";
         message.failureReason = object.failureReason ?? 0;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };

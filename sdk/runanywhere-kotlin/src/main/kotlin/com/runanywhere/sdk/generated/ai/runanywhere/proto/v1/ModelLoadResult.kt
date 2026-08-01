@@ -34,32 +34,25 @@ import okio.ByteString
 
 public class ModelLoadResult(
   @field:WireField(
-    tag = 1,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 0,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "modelId",
-    schemaIndex = 1,
+    schemaIndex = 0,
   )
   public val model_id: String = "",
   @field:WireField(
     tag = 3,
     adapter = "ai.runanywhere.proto.v1.ModelCategory#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val category: ModelCategory = ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
   @field:WireField(
@@ -67,7 +60,7 @@ public class ModelLoadResult(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "resolvedPath",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val resolved_path: String = "",
   @field:WireField(
@@ -75,34 +68,32 @@ public class ModelLoadResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "loadedAtUnixMs",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val loaded_at_unix_ms: Long = 0L,
-  @field:WireField(
-    tag = 7,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorMessage",
-    schemaIndex = 6,
-  )
-  public val error_message: String = "",
   warnings: List<String> = emptyList(),
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "alreadyLoaded",
-    schemaIndex = 8,
+    schemaIndex = 6,
   )
   public val already_loaded: Boolean = false,
   resolved_artifacts: List<ModelFileDescriptor> = emptyList(),
+  @field:WireField(
+    tag = 11,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 8,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelLoadResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.REPEATED,
-    schemaIndex = 7,
+    schemaIndex = 5,
   )
   public val warnings: List<String> = immutableCopyOf("warnings", warnings)
 
@@ -116,7 +107,7 @@ public class ModelLoadResult(
     adapter = "ai.runanywhere.proto.v1.ModelFileDescriptor#ADAPTER",
     label = WireField.Label.REPEATED,
     jsonName = "resolvedArtifacts",
-    schemaIndex = 9,
+    schemaIndex = 7,
   )
   public val resolved_artifacts: List<ModelFileDescriptor> =
       immutableCopyOf("resolved_artifacts", resolved_artifacts)
@@ -131,16 +122,15 @@ public class ModelLoadResult(
     if (other === this) return true
     if (other !is ModelLoadResult) return false
     if (unknownFields != other.unknownFields) return false
-    if (success != other.success) return false
     if (model_id != other.model_id) return false
     if (category != other.category) return false
     if (framework != other.framework) return false
     if (resolved_path != other.resolved_path) return false
     if (loaded_at_unix_ms != other.loaded_at_unix_ms) return false
-    if (error_message != other.error_message) return false
     if (warnings != other.warnings) return false
     if (already_loaded != other.already_loaded) return false
     if (resolved_artifacts != other.resolved_artifacts) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -148,16 +138,15 @@ public class ModelLoadResult(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + category.hashCode()
       result = result * 37 + framework.hashCode()
       result = result * 37 + resolved_path.hashCode()
       result = result * 37 + loaded_at_unix_ms.hashCode()
-      result = result * 37 + error_message.hashCode()
       result = result * 37 + warnings.hashCode()
       result = result * 37 + already_loaded.hashCode()
       result = result * 37 + resolved_artifacts.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -165,32 +154,30 @@ public class ModelLoadResult(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """success=$success"""
     result += """model_id=${sanitize(model_id)}"""
     result += """category=$category"""
     result += """framework=$framework"""
     result += """resolved_path=${sanitize(resolved_path)}"""
     result += """loaded_at_unix_ms=$loaded_at_unix_ms"""
-    result += """error_message=${sanitize(error_message)}"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     result += """already_loaded=$already_loaded"""
     if (resolved_artifacts.isNotEmpty()) result += """resolved_artifacts=$resolved_artifacts"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ModelLoadResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    success: Boolean = this.success,
     model_id: String = this.model_id,
     category: ModelCategory = this.category,
     framework: InferenceFramework = this.framework,
     resolved_path: String = this.resolved_path,
     loaded_at_unix_ms: Long = this.loaded_at_unix_ms,
-    error_message: String = this.error_message,
     warnings: List<String> = this.warnings,
     already_loaded: Boolean = this.already_loaded,
     resolved_artifacts: List<ModelFileDescriptor> = this.resolved_artifacts,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelLoadResult = ModelLoadResult(success, model_id, category, framework, resolved_path, loaded_at_unix_ms, error_message, warnings, already_loaded, resolved_artifacts, unknownFields)
+  ): ModelLoadResult = ModelLoadResult(model_id, category, framework, resolved_path, loaded_at_unix_ms, warnings, already_loaded, resolved_artifacts, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -204,9 +191,6 @@ public class ModelLoadResult(
     ) {
       override fun encodedSize(`value`: ModelLoadResult): Int {
         var size = value.unknownFields.size
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(1, value.success)
-        }
         if (value.model_id != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.model_id)
         }
@@ -222,21 +206,16 @@ public class ModelLoadResult(
         if (value.loaded_at_unix_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(6, value.loaded_at_unix_ms)
         }
-        if (value.error_message != "") {
-          size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.error_message)
-        }
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(8, value.warnings)
         if (value.already_loaded != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.already_loaded)
         }
         size += ModelFileDescriptor.ADAPTER.asRepeated().encodedSizeWithTag(10, value.resolved_artifacts)
+        size += SDKError.ADAPTER.encodedSizeWithTag(11, value.error)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ModelLoadResult) {
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.model_id)
         }
@@ -252,27 +231,23 @@ public class ModelLoadResult(
         if (value.loaded_at_unix_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 6, value.loaded_at_unix_ms)
         }
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
-        }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
         if (value.already_loaded != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.already_loaded)
         }
         ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 10, value.resolved_artifacts)
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelLoadResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 10, value.resolved_artifacts)
         if (value.already_loaded != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.already_loaded)
         }
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
-        if (value.error_message != "") {
-          ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
-        }
         if (value.loaded_at_unix_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 6, value.loaded_at_unix_ms)
         }
@@ -288,25 +263,20 @@ public class ModelLoadResult(
         if (value.model_id != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 2, value.model_id)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 1, value.success)
-        }
       }
 
       override fun decode(reader: ProtoReader): ModelLoadResult {
-        var success: Boolean = false
         var model_id: String = ""
         var category: ModelCategory = ModelCategory.MODEL_CATEGORY_UNSPECIFIED
         var framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
         var resolved_path: String = ""
         var loaded_at_unix_ms: Long = 0L
-        var error_message: String = ""
         val warnings = mutableListOf<String>()
         var already_loaded: Boolean = false
         val resolved_artifacts = mutableListOf<ModelFileDescriptor>()
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> model_id = ProtoAdapter.STRING.decode(reader)
             3 -> try {
               category = ModelCategory.ADAPTER.decode(reader)
@@ -320,30 +290,30 @@ public class ModelLoadResult(
             }
             5 -> resolved_path = ProtoAdapter.STRING.decode(reader)
             6 -> loaded_at_unix_ms = ProtoAdapter.INT64.decode(reader)
-            7 -> error_message = ProtoAdapter.STRING.decode(reader)
             8 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             9 -> already_loaded = ProtoAdapter.BOOL.decode(reader)
             10 -> resolved_artifacts.add(ModelFileDescriptor.ADAPTER.decode(reader))
+            11 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ModelLoadResult(
-          success = success,
           model_id = model_id,
           category = category,
           framework = framework,
           resolved_path = resolved_path,
           loaded_at_unix_ms = loaded_at_unix_ms,
-          error_message = error_message,
           warnings = warnings,
           already_loaded = already_loaded,
           resolved_artifacts = resolved_artifacts,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelLoadResult): ModelLoadResult = value.copy(
         resolved_artifacts = value.resolved_artifacts.redactElements(ModelFileDescriptor.ADAPTER),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

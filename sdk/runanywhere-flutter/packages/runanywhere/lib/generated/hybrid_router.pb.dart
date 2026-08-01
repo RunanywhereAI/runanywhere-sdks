@@ -389,12 +389,12 @@ class HybridRoutingPolicy extends $pb.GeneratedMessage {
   factory HybridRoutingPolicy({
     $core.Iterable<HybridFilter>? hardFilters,
     HybridCascade? cascade,
-    HybridRank? rank,
+    $core.bool? preferLocal,
   }) {
     final result = create();
     if (hardFilters != null) result.hardFilters.addAll(hardFilters);
     if (cascade != null) result.cascade = cascade;
-    if (rank != null) result.rank = rank;
+    if (preferLocal != null) result.preferLocal = preferLocal;
     return result;
   }
 
@@ -415,8 +415,7 @@ class HybridRoutingPolicy extends $pb.GeneratedMessage {
         subBuilder: HybridFilter.create)
     ..aOM<HybridCascade>(2, _omitFieldNames ? '' : 'cascade',
         subBuilder: HybridCascade.create)
-    ..aE<HybridRank>(3, _omitFieldNames ? '' : 'rank',
-        enumValues: HybridRank.values)
+    ..aOB(3, _omitFieldNames ? '' : 'preferLocal')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -453,25 +452,25 @@ class HybridRoutingPolicy extends $pb.GeneratedMessage {
   HybridCascade ensureCascade() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  HybridRank get rank => $_getN(2);
+  $core.bool get preferLocal => $_getBF(2);
   @$pb.TagNumber(3)
-  set rank(HybridRank value) => $_setField(3, value);
+  set preferLocal($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasRank() => $_has(2);
+  $core.bool hasPreferLocal() => $_has(2);
   @$pb.TagNumber(3)
-  void clearRank() => $_clearField(3);
+  void clearPreferLocal() => $_clearField(3);
 }
 
 class HybridModelDescriptor extends $pb.GeneratedMessage {
   factory HybridModelDescriptor({
     $core.String? modelId,
-    HybridModelType? modelType,
+    $core.bool? isLocal,
     HybridBackendKind? backend,
     $core.String? provider,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
-    if (modelType != null) result.modelType = modelType;
+    if (isLocal != null) result.isLocal = isLocal;
     if (backend != null) result.backend = backend;
     if (provider != null) result.provider = provider;
     return result;
@@ -491,8 +490,7 @@ class HybridModelDescriptor extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aE<HybridModelType>(2, _omitFieldNames ? '' : 'modelType',
-        enumValues: HybridModelType.values)
+    ..aOB(2, _omitFieldNames ? '' : 'isLocal')
     ..aE<HybridBackendKind>(3, _omitFieldNames ? '' : 'backend',
         enumValues: HybridBackendKind.values)
     ..aOS(4, _omitFieldNames ? '' : 'provider')
@@ -528,13 +526,13 @@ class HybridModelDescriptor extends $pb.GeneratedMessage {
   void clearModelId() => $_clearField(1);
 
   @$pb.TagNumber(2)
-  HybridModelType get modelType => $_getN(1);
+  $core.bool get isLocal => $_getBF(1);
   @$pb.TagNumber(2)
-  set modelType(HybridModelType value) => $_setField(2, value);
+  set isLocal($core.bool value) => $_setBool(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasModelType() => $_has(1);
+  $core.bool hasIsLocal() => $_has(1);
   @$pb.TagNumber(2)
-  void clearModelType() => $_clearField(2);
+  void clearIsLocal() => $_clearField(2);
 
   @$pb.TagNumber(3)
   HybridBackendKind get backend => $_getN(2);

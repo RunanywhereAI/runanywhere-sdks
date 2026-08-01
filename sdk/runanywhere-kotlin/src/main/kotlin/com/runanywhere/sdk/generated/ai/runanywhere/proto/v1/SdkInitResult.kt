@@ -33,7 +33,7 @@ import okio.ByteString
  * Returned by Phase 1, Phase 2, and retryHTTP.
  *
  * A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
- * to fail in offline mode, in which case success=true, http_configured=false,
+ * to fail in offline mode, in which case error is unset, http_configured=false,
  * and warning holds the offline notice while the SDK continues on cached
  * models.
  */
@@ -45,21 +45,11 @@ public class SdkInitResult(
     schemaIndex = 0,
   )
   public val phase: SdkInitPhase = SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED,
-  /**
-   * The phase reached its terminal step.
-   */
-  @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
-  )
-  public val success: Boolean = false,
   @field:WireField(
     tag = 3,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val error: SDKError? = null,
   /**
@@ -70,7 +60,7 @@ public class SdkInitResult(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "httpConfigured",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val http_configured: Boolean = false,
   @field:WireField(
@@ -78,7 +68,7 @@ public class SdkInitResult(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "deviceRegistered",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val device_registered: Boolean = false,
   /**
@@ -89,7 +79,7 @@ public class SdkInitResult(
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "linkedModelsCount",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val linked_models_count: Int = 0,
   /**
@@ -100,14 +90,14 @@ public class SdkInitResult(
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "discoveredOrphans",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val discovered_orphans: Int = 0,
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val warning: String = "",
   @field:WireField(
@@ -115,7 +105,7 @@ public class SdkInitResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "durationMs",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val duration_ms: Long = 0L,
   /**
@@ -128,7 +118,7 @@ public class SdkInitResult(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "hasCompletedHttpSetup",
-    schemaIndex = 9,
+    schemaIndex = 8,
   )
   public val has_completed_http_setup: Boolean = false,
   /**
@@ -141,7 +131,7 @@ public class SdkInitResult(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "httpApplicable",
-    schemaIndex = 10,
+    schemaIndex = 9,
   )
   public val http_applicable: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -157,7 +147,6 @@ public class SdkInitResult(
     if (other !is SdkInitResult) return false
     if (unknownFields != other.unknownFields) return false
     if (phase != other.phase) return false
-    if (success != other.success) return false
     if (error != other.error) return false
     if (http_configured != other.http_configured) return false
     if (device_registered != other.device_registered) return false
@@ -175,7 +164,6 @@ public class SdkInitResult(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + phase.hashCode()
-      result = result * 37 + success.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
       result = result * 37 + http_configured.hashCode()
       result = result * 37 + device_registered.hashCode()
@@ -193,7 +181,6 @@ public class SdkInitResult(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """phase=$phase"""
-    result += """success=$success"""
     if (error != null) result += """error=$error"""
     result += """http_configured=$http_configured"""
     result += """device_registered=$device_registered"""
@@ -208,7 +195,6 @@ public class SdkInitResult(
 
   public fun copy(
     phase: SdkInitPhase = this.phase,
-    success: Boolean = this.success,
     error: SDKError? = this.error,
     http_configured: Boolean = this.http_configured,
     device_registered: Boolean = this.device_registered,
@@ -219,7 +205,7 @@ public class SdkInitResult(
     has_completed_http_setup: Boolean = this.has_completed_http_setup,
     http_applicable: Boolean = this.http_applicable,
     unknownFields: ByteString = this.unknownFields,
-  ): SdkInitResult = SdkInitResult(phase, success, error, http_configured, device_registered, linked_models_count, discovered_orphans, warning, duration_ms, has_completed_http_setup, http_applicable, unknownFields)
+  ): SdkInitResult = SdkInitResult(phase, error, http_configured, device_registered, linked_models_count, discovered_orphans, warning, duration_ms, has_completed_http_setup, http_applicable, unknownFields)
 
   public companion object {
     @JvmField
@@ -235,9 +221,6 @@ public class SdkInitResult(
         var size = value.unknownFields.size
         if (value.phase != ai.runanywhere.proto.v1.SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED) {
           size += SdkInitPhase.ADAPTER.encodedSizeWithTag(1, value.phase)
-        }
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.success)
         }
         if (value.error != null) {
           size += SDKError.ADAPTER.encodedSizeWithTag(3, value.error)
@@ -272,9 +255,6 @@ public class SdkInitResult(
       override fun encode(writer: ProtoWriter, `value`: SdkInitResult) {
         if (value.phase != ai.runanywhere.proto.v1.SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED) {
           SdkInitPhase.ADAPTER.encodeWithTag(writer, 1, value.phase)
-        }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.success)
         }
         if (value.error != null) {
           SDKError.ADAPTER.encodeWithTag(writer, 3, value.error)
@@ -335,9 +315,6 @@ public class SdkInitResult(
         if (value.error != null) {
           SDKError.ADAPTER.encodeWithTag(writer, 3, value.error)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.success)
-        }
         if (value.phase != ai.runanywhere.proto.v1.SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED) {
           SdkInitPhase.ADAPTER.encodeWithTag(writer, 1, value.phase)
         }
@@ -345,7 +322,6 @@ public class SdkInitResult(
 
       override fun decode(reader: ProtoReader): SdkInitResult {
         var phase: SdkInitPhase = SdkInitPhase.SDK_INIT_PHASE_UNSPECIFIED
-        var success: Boolean = false
         var error: SDKError? = null
         var http_configured: Boolean = false
         var device_registered: Boolean = false
@@ -362,7 +338,6 @@ public class SdkInitResult(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
-            2 -> success = ProtoAdapter.BOOL.decode(reader)
             3 -> error = SDKError.ADAPTER.decode(reader)
             4 -> http_configured = ProtoAdapter.BOOL.decode(reader)
             5 -> device_registered = ProtoAdapter.BOOL.decode(reader)
@@ -377,7 +352,6 @@ public class SdkInitResult(
         }
         return SdkInitResult(
           phase = phase,
-          success = success,
           error = error,
           http_configured = http_configured,
           device_registered = device_registered,

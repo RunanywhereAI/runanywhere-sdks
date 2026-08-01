@@ -571,10 +571,10 @@ constexpr HybridModelDescriptor::ParseTableT_ HybridModelDescriptor::InternalGen
       {::_pbi::TcParser::FastUS1,
        {10, 0, 0,
         PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_id_)}},
-      // .runanywhere.v1.HybridModelType model_type = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridModelDescriptor, _impl_.model_type_), 2>(),
+      // bool is_local = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(HybridModelDescriptor, _impl_.is_local_), 2>(),
        {16, 2, 0,
-        PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_type_)}},
+        PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.is_local_)}},
       // .runanywhere.v1.HybridBackendKind backend = 3;
       {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridModelDescriptor, _impl_.backend_), 3>(),
        {24, 3, 0,
@@ -584,8 +584,8 @@ constexpr HybridModelDescriptor::ParseTableT_ HybridModelDescriptor::InternalGen
     }}, {{
       // string model_id = 1;
       {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-      // .runanywhere.v1.HybridModelType model_type = 2;
-      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_type_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // bool is_local = 2;
+      {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.is_local_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // .runanywhere.v1.HybridBackendKind backend = 3;
       {PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.backend_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // string provider = 4;
@@ -612,7 +612,7 @@ inline constexpr HybridModelDescriptor::Impl_::Impl_(
         provider_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        model_type_{static_cast< ::runanywhere::v1::HybridModelType >(0)},
+        is_local_{false},
         backend_{static_cast< ::runanywhere::v1::HybridBackendKind >(0)} {}
 
 template <typename>
@@ -2034,10 +2034,10 @@ constexpr HybridRoutingPolicy::ParseTableT_ HybridRoutingPolicy::InternalGenerat
       {::_pbi::TcParser::FastMtS1,
        {18, 1, 1,
         PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.cascade_)}},
-      // .runanywhere.v1.HybridRank rank = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HybridRoutingPolicy, _impl_.rank_), 2>(),
+      // bool prefer_local = 3;
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(HybridRoutingPolicy, _impl_.prefer_local_), 2>(),
        {24, 2, 0,
-        PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.rank_)}},
+        PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.prefer_local_)}},
     }}, {{
       65535, 65535
     }}, {{
@@ -2045,8 +2045,8 @@ constexpr HybridRoutingPolicy::ParseTableT_ HybridRoutingPolicy::InternalGenerat
       {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.hard_filters_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
       // .runanywhere.v1.HybridCascade cascade = 2;
       {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.cascade_), _Internal::kHasBitsOffset + 1, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
-      // .runanywhere.v1.HybridRank rank = 3;
-      {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.rank_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      // bool prefer_local = 3;
+      {PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.prefer_local_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     }},
     {{
         #ifndef PROTOBUF_MESSAGE_GLOBALS
@@ -2076,7 +2076,7 @@ inline constexpr HybridRoutingPolicy::Impl_::Impl_(
          }
         ,
         cascade_{nullptr},
-        rank_{static_cast< ::runanywhere::v1::HybridRank >(0)} {}
+        prefer_local_{false} {}
 
 template <typename>
 constexpr HybridRoutingPolicy::HybridRoutingPolicy(::_pbi::ConstantInitialized,
@@ -2173,7 +2173,7 @@ const ::_pbi::ClassData* HybridRoutingPolicy_get_class_data() {
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_hybrid_5frouter_2eproto[3];
+    file_level_enum_descriptors_hybrid_5frouter_2eproto[1];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_hybrid_5frouter_2eproto = nullptr;
 const ::uint32_t
@@ -2212,7 +2212,7 @@ const ::uint32_t
         6, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.hard_filters_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.cascade_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.rank_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridRoutingPolicy, _impl_.prefer_local_),
         0,
         1,
         2,
@@ -2220,7 +2220,7 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_._has_bits_),
         7, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.model_id_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.model_type_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.is_local_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.backend_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HybridModelDescriptor, _impl_.provider_),
         0,
@@ -2337,55 +2337,47 @@ const char descriptor_table_protodef_hybrid_5frouter_2eproto[] ABSL_ATTRIBUTE_SE
     "\023\n\013description\030\002 \001(\t\"P\n\rHybridCascade\0227\n"
     "\nconfidence\030\001 \001(\0132!.runanywhere.v1.Confi"
     "denceCascadeH\000B\006\n\004kind\"&\n\021ConfidenceCasc"
-    "ade\022\021\n\tthreshold\030\001 \001(\002\"\243\001\n\023HybridRouting"
+    "ade\022\021\n\tthreshold\030\001 \001(\002\"\217\001\n\023HybridRouting"
     "Policy\0222\n\014hard_filters\030\001 \003(\0132\034.runanywhe"
     "re.v1.HybridFilter\022.\n\007cascade\030\002 \001(\0132\035.ru"
-    "nanywhere.v1.HybridCascade\022(\n\004rank\030\003 \001(\016"
-    "2\032.runanywhere.v1.HybridRank\"\244\001\n\025HybridM"
-    "odelDescriptor\022\020\n\010model_id\030\001 \001(\t\0223\n\nmode"
-    "l_type\030\002 \001(\0162\037.runanywhere.v1.HybridMode"
-    "lType\0222\n\007backend\030\003 \001(\0162!.runanywhere.v1."
-    "HybridBackendKind\022\020\n\010provider\030\004 \001(\t\"\307\001\n\024"
-    "HybridRoutedMetadata\022\027\n\017chosen_model_id\030"
-    "\001 \001(\t\022\024\n\014was_fallback\030\002 \001(\010\022\025\n\rattempt_c"
-    "ount\030\003 \001(\005\022\032\n\022primary_error_code\030\004 \001(\005\022\035"
-    "\n\025primary_error_message\030\005 \001(\t\022\022\n\nconfide"
-    "nce\030\006 \001(\002\022\032\n\022primary_confidence\030\007 \001(\002\"\026\n"
-    "\024HybridRoutingContext\"\206\001\n\025CloudSttBacken"
-    "dConfig\022\020\n\010provider\030\001 \001(\t\022\r\n\005model\030\002 \001(\t"
-    "\022\017\n\007api_key\030\003 \001(\t\022\025\n\rlanguage_code\030\004 \001(\t"
-    "\022\020\n\010base_url\030\005 \001(\t\022\022\n\ntimeout_ms\030\006 \001(\005\"Y"
-    "\n\032HybridSttTranscribeOptions\022\020\n\010language"
-    "\030\001 \001(\t\022\023\n\013sample_rate\030\002 \001(\005\022\024\n\014audio_for"
-    "mat\030\003 \001(\005\"\245\001\n\032HybridSttTranscribeRequest"
-    "\022\023\n\013audio_bytes\030\001 \001(\014\0225\n\007context\030\002 \001(\0132$"
-    ".runanywhere.v1.HybridRoutingContext\022;\n\007"
-    "options\030\003 \001(\0132*.runanywhere.v1.HybridStt"
-    "TranscribeOptions\"\234\001\n\033HybridSttTranscrib"
-    "eResponse\022\n\n\002rc\030\001 \001(\005\022\014\n\004text\030\002 \001(\t\022\031\n\021d"
-    "etected_language\030\003 \001(\t\0225\n\007routing\030\004 \001(\0132"
-    "$.runanywhere.v1.HybridRoutedMetadata\022\021\n"
-    "\terror_msg\030\005 \001(\t*\244\001\n\021HybridBackendKind\022\036"
-    "\n\032HYBRID_BACKEND_UNSPECIFIED\020\000\022\033\n\027HYBRID"
-    "_BACKEND_LLAMACPP\020\001\022\035\n\031HYBRID_BACKEND_OP"
-    "ENROUTER\020\002\022\031\n\025HYBRID_BACKEND_SHERPA\020\003\022\030\n"
-    "\024HYBRID_BACKEND_CLOUD\020\004*q\n\017HybridModelTy"
-    "pe\022!\n\035HYBRID_MODEL_TYPE_UNSPECIFIED\020\000\022\035\n"
-    "\031HYBRID_MODEL_TYPE_OFFLINE\020\001\022\034\n\030HYBRID_M"
-    "ODEL_TYPE_ONLINE\020\002*r\n\nHybridRank\022\033\n\027HYBR"
-    "ID_RANK_UNSPECIFIED\020\000\022\"\n\036HYBRID_RANK_PRE"
-    "FER_LOCAL_FIRST\020\001\022#\n\037HYBRID_RANK_PREFER_"
-    "ONLINE_FIRST\020\002B\214\001\n\027ai.runanywhere.proto."
-    "v1B\021HybridRouterProtoP\001Z<github.com/runa"
-    "nywhere/runanywhere-sdks/idl/v1;runanywh"
-    "erev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006p"
-    "roto3"
+    "nanywhere.v1.HybridCascade\022\024\n\014prefer_loc"
+    "al\030\003 \001(\010\"\201\001\n\025HybridModelDescriptor\022\020\n\010mo"
+    "del_id\030\001 \001(\t\022\020\n\010is_local\030\002 \001(\010\0222\n\007backen"
+    "d\030\003 \001(\0162!.runanywhere.v1.HybridBackendKi"
+    "nd\022\020\n\010provider\030\004 \001(\t\"\307\001\n\024HybridRoutedMet"
+    "adata\022\027\n\017chosen_model_id\030\001 \001(\t\022\024\n\014was_fa"
+    "llback\030\002 \001(\010\022\025\n\rattempt_count\030\003 \001(\005\022\032\n\022p"
+    "rimary_error_code\030\004 \001(\005\022\035\n\025primary_error"
+    "_message\030\005 \001(\t\022\022\n\nconfidence\030\006 \001(\002\022\032\n\022pr"
+    "imary_confidence\030\007 \001(\002\"\026\n\024HybridRoutingC"
+    "ontext\"\206\001\n\025CloudSttBackendConfig\022\020\n\010prov"
+    "ider\030\001 \001(\t\022\r\n\005model\030\002 \001(\t\022\017\n\007api_key\030\003 \001"
+    "(\t\022\025\n\rlanguage_code\030\004 \001(\t\022\020\n\010base_url\030\005 "
+    "\001(\t\022\022\n\ntimeout_ms\030\006 \001(\005\"Y\n\032HybridSttTran"
+    "scribeOptions\022\020\n\010language\030\001 \001(\t\022\023\n\013sampl"
+    "e_rate\030\002 \001(\005\022\024\n\014audio_format\030\003 \001(\005\"\245\001\n\032H"
+    "ybridSttTranscribeRequest\022\023\n\013audio_bytes"
+    "\030\001 \001(\014\0225\n\007context\030\002 \001(\0132$.runanywhere.v1"
+    ".HybridRoutingContext\022;\n\007options\030\003 \001(\0132*"
+    ".runanywhere.v1.HybridSttTranscribeOptio"
+    "ns\"\234\001\n\033HybridSttTranscribeResponse\022\n\n\002rc"
+    "\030\001 \001(\005\022\014\n\004text\030\002 \001(\t\022\031\n\021detected_languag"
+    "e\030\003 \001(\t\0225\n\007routing\030\004 \001(\0132$.runanywhere.v"
+    "1.HybridRoutedMetadata\022\021\n\terror_msg\030\005 \001("
+    "\t*\244\001\n\021HybridBackendKind\022\036\n\032HYBRID_BACKEN"
+    "D_UNSPECIFIED\020\000\022\033\n\027HYBRID_BACKEND_LLAMAC"
+    "PP\020\001\022\035\n\031HYBRID_BACKEND_OPENROUTER\020\002\022\031\n\025H"
+    "YBRID_BACKEND_SHERPA\020\003\022\030\n\024HYBRID_BACKEND"
+    "_CLOUD\020\004B\214\001\n\027ai.runanywhere.proto.v1B\021Hy"
+    "bridRouterProtoP\001Z<github.com/runanywher"
+    "e/runanywhere-sdks/idl/v1;runanywherev1\370"
+    "\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_hybrid_5frouter_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hybrid_5frouter_2eproto = {
     false,
     false,
-    2085,
+    1799,
     descriptor_table_protodef_hybrid_5frouter_2eproto,
     "hybrid_router.proto",
     &descriptor_table_hybrid_5frouter_2eproto_once,
@@ -2407,20 +2399,6 @@ HybridBackendKind_descriptor() {
 }
 PROTOBUF_CONSTINIT const uint32_t HybridBackendKind_internal_data_[] = {
     327680u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridModelType_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hybrid_5frouter_2eproto);
-  return file_level_enum_descriptors_hybrid_5frouter_2eproto[1];
-}
-PROTOBUF_CONSTINIT const uint32_t HybridModelType_internal_data_[] = {
-    196608u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-HybridRank_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_hybrid_5frouter_2eproto);
-  return file_level_enum_descriptors_hybrid_5frouter_2eproto[2];
-}
-PROTOBUF_CONSTINIT const uint32_t HybridRank_internal_data_[] = {
-    196608u, 0u, };
 // ===================================================================
 
 void HybridFilter::set_allocated_battery(::runanywhere::v1::BatteryFilter* PROTOBUF_NULLABLE battery) {
@@ -3709,7 +3687,7 @@ HybridRoutingPolicy::HybridRoutingPolicy(
   _impl_.cascade_ = (CheckHasBit(cached_has_bits, 0x00000002U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.cascade_)
                 : nullptr;
-  _impl_.rank_ = from._impl_.rank_;
+  _impl_.prefer_local_ = from._impl_.prefer_local_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.HybridRoutingPolicy)
 }
@@ -3728,9 +3706,9 @@ inline void HybridRoutingPolicy::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE aren
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, cascade_),
            0,
-           offsetof(Impl_, rank_) -
+           offsetof(Impl_, prefer_local_) -
                offsetof(Impl_, cascade_) +
-               sizeof(Impl_::rank_));
+               sizeof(Impl_::prefer_local_));
 }
 HybridRoutingPolicy::~HybridRoutingPolicy() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.HybridRoutingPolicy)
@@ -3790,7 +3768,7 @@ PROTOBUF_NOINLINE void HybridRoutingPolicy::Clear() {
       _impl_.cascade_->Clear();
     }
   }
-  _impl_.rank_ = 0;
+  _impl_.prefer_local_ = false;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -3834,12 +3812,12 @@ PROTOBUF_NOINLINE void HybridRoutingPolicy::Clear() {
         stream);
   }
 
-  // .runanywhere.v1.HybridRank rank = 3;
+  // bool prefer_local = 3;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_rank() != 0) {
+    if (this_._internal_prefer_local() != 0) {
       target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          3, this_._internal_rank(), target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          3, this_._internal_prefer_local(), target);
     }
   }
 
@@ -3881,11 +3859,10 @@ PROTOBUF_NOINLINE void HybridRoutingPolicy::Clear() {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.cascade_);
     }
-    // .runanywhere.v1.HybridRank rank = 3;
+    // bool prefer_local = 3;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_rank() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_rank());
+      if (this_._internal_prefer_local() != 0) {
+        total_size += 2;
       }
     }
   }
@@ -3922,8 +3899,8 @@ void HybridRoutingPolicy::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_rank() != 0) {
-        _this->_impl_.rank_ = from._impl_.rank_;
+      if (from._internal_prefer_local() != 0) {
+        _this->_impl_.prefer_local_ = from._impl_.prefer_local_;
       }
     }
   }
@@ -3946,8 +3923,8 @@ void HybridRoutingPolicy::InternalSwap(HybridRoutingPolicy* PROTOBUF_RESTRICT PR
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   _impl_.hard_filters_.InternalSwap(&other->_impl_.hard_filters_);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.rank_)
-      + sizeof(HybridRoutingPolicy::_impl_.rank_)
+      PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.prefer_local_)
+      + sizeof(HybridRoutingPolicy::_impl_.prefer_local_)
       - PROTOBUF_FIELD_OFFSET(HybridRoutingPolicy, _impl_.cascade_)>(
           reinterpret_cast<char*>(&_impl_.cascade_),
           reinterpret_cast<char*>(&other->_impl_.cascade_));
@@ -3991,11 +3968,11 @@ HybridModelDescriptor::HybridModelDescriptor(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, model_type_),
+               offsetof(Impl_, is_local_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, model_type_),
+               offsetof(Impl_, is_local_),
            offsetof(Impl_, backend_) -
-               offsetof(Impl_, model_type_) +
+               offsetof(Impl_, is_local_) +
                sizeof(Impl_::backend_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.HybridModelDescriptor)
@@ -4010,10 +3987,10 @@ PROTOBUF_NDEBUG_INLINE HybridModelDescriptor::Impl_::Impl_(
 inline void HybridModelDescriptor::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, model_type_),
+               offsetof(Impl_, is_local_),
            0,
            offsetof(Impl_, backend_) -
-               offsetof(Impl_, model_type_) +
+               offsetof(Impl_, is_local_) +
                sizeof(Impl_::backend_));
 }
 HybridModelDescriptor::~HybridModelDescriptor() {
@@ -4075,9 +4052,9 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000000cU)) {
-    ::memset(&_impl_.model_type_, 0, static_cast<::size_t>(
+    ::memset(&_impl_.is_local_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.backend_) -
-        reinterpret_cast<char*>(&_impl_.model_type_)) + sizeof(_impl_.backend_));
+        reinterpret_cast<char*>(&_impl_.is_local_)) + sizeof(_impl_.backend_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -4112,12 +4089,12 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
     }
   }
 
-  // .runanywhere.v1.HybridModelType model_type = 2;
+  // bool is_local = 2;
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-    if (this_._internal_model_type() != 0) {
+    if (this_._internal_is_local() != 0) {
       target = stream->EnsureSpace(target);
-      target = ::_pbi::WireFormatLite::WriteEnumToArray(
-          2, this_._internal_model_type(), target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          2, this_._internal_is_local(), target);
     }
   }
 
@@ -4180,11 +4157,10 @@ PROTOBUF_NOINLINE void HybridModelDescriptor::Clear() {
                                         this_._internal_provider());
       }
     }
-    // .runanywhere.v1.HybridModelType model_type = 2;
+    // bool is_local = 2;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (this_._internal_model_type() != 0) {
-        total_size += 1 +
-                      ::_pbi::WireFormatLite::EnumSize(this_._internal_model_type());
+      if (this_._internal_is_local() != 0) {
+        total_size += 2;
       }
     }
     // .runanywhere.v1.HybridBackendKind backend = 3;
@@ -4232,8 +4208,8 @@ void HybridModelDescriptor::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
-      if (from._internal_model_type() != 0) {
-        _this->_impl_.model_type_ = from._impl_.model_type_;
+      if (from._internal_is_local() != 0) {
+        _this->_impl_.is_local_ = from._impl_.is_local_;
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
@@ -4266,9 +4242,9 @@ void HybridModelDescriptor::InternalSwap(HybridModelDescriptor* PROTOBUF_RESTRIC
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.backend_)
       + sizeof(HybridModelDescriptor::_impl_.backend_)
-      - PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.model_type_)>(
-          reinterpret_cast<char*>(&_impl_.model_type_),
-          reinterpret_cast<char*>(&other->_impl_.model_type_));
+      - PROTOBUF_FIELD_OFFSET(HybridModelDescriptor, _impl_.is_local_)>(
+          reinterpret_cast<char*>(&_impl_.is_local_),
+          reinterpret_cast<char*>(&other->_impl_.is_local_));
 }
 
 ::google::protobuf::Metadata HybridModelDescriptor::GetMetadata() const {

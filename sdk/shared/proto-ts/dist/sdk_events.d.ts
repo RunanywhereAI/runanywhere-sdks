@@ -559,8 +559,6 @@ export interface ComponentInitializationEvent {
     sizeBytes: number;
     /** For COMPONENT_DOWNLOAD_PROGRESS — 0.0..1.0. */
     progress: number;
-    /** For COMPONENT_FAILED / *_FAILED. */
-    error: string;
     /** For COMPONENT_STATE_CHANGED — RN events.ts:274-278. */
     oldState: string;
     newState: string;
@@ -572,10 +570,9 @@ export interface ComponentInitializationEvent {
     readyComponents: SDKComponent[];
     pendingComponents: SDKComponent[];
     /**
-     * For INITIALIZATION_COMPLETED — InitializationResult summary
-     * (success bool + count). Full result travels via dedicated RPC.
+     * For INITIALIZATION_COMPLETED — InitializationResult summary count.
+     * Full result travels via dedicated RPC.
      */
-    initSuccess: boolean;
     readyCount: number;
     failedCount: number;
     /**
@@ -584,6 +581,8 @@ export interface ComponentInitializationEvent {
      */
     previousLifecycleState: ComponentLifecycleState;
     currentLifecycleState: ComponentLifecycleState;
+    /** Set on COMPONENT_FAILED / *_FAILED and failed completions. */
+    error?: SDKError | undefined;
 }
 /** Snapshot of a component's current model-backed lifecycle state. */
 export interface ComponentLifecycleSnapshot {
@@ -591,17 +590,16 @@ export interface ComponentLifecycleSnapshot {
     state: ComponentLifecycleState;
     modelId: string;
     updatedAtMs: number;
-    errorMessage: string;
     category: ModelCategory;
     framework: InferenceFramework;
     resolvedPath: string;
     loadedAtUnixMs: number;
     model?: ModelInfo | undefined;
+    error?: SDKError | undefined;
 }
 export interface ComponentLifecycleSnapshotResult {
-    success: boolean;
     snapshots: ComponentLifecycleSnapshot[];
-    errorMessage: string;
+    error?: SDKError | undefined;
 }
 /**
  * Operation-aware lifecycle event. The oneof arms intentionally reference the
@@ -764,8 +762,6 @@ export interface VoiceLifecycleEvent {
     /** STT */
     wordCount: number;
     /** STT */
-    realTimeFactor: number;
-    /** STT */
     language: string;
     /** STT + TTS */
     sampleRate: number;
@@ -780,7 +776,6 @@ export interface VoiceLifecycleEvent {
     audioSizeBytesTts: number;
     /** telemetry processing_time_ms */
     processingDurationMs: number;
-    charactersPerSecond: number;
 }
 /**
  * ===========================================================================

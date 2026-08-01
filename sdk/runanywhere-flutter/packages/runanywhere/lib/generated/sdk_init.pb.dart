@@ -249,13 +249,12 @@ class SdkInitPhase2Request extends $pb.GeneratedMessage {
 /// Returned by Phase 1, Phase 2, and retryHTTP.
 ///
 /// A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
-/// to fail in offline mode, in which case success=true, http_configured=false,
+/// to fail in offline mode, in which case error is unset, http_configured=false,
 /// and warning holds the offline notice while the SDK continues on cached
 /// models.
 class SdkInitResult extends $pb.GeneratedMessage {
   factory SdkInitResult({
     SdkInitPhase? phase,
-    $core.bool? success,
     $0.SDKError? error,
     $core.bool? httpConfigured,
     $core.bool? deviceRegistered,
@@ -268,7 +267,6 @@ class SdkInitResult extends $pb.GeneratedMessage {
   }) {
     final result = create();
     if (phase != null) result.phase = phase;
-    if (success != null) result.success = success;
     if (error != null) result.error = error;
     if (httpConfigured != null) result.httpConfigured = httpConfigured;
     if (deviceRegistered != null) result.deviceRegistered = deviceRegistered;
@@ -297,7 +295,6 @@ class SdkInitResult extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aE<SdkInitPhase>(1, _omitFieldNames ? '' : 'phase',
         enumValues: SdkInitPhase.values)
-    ..aOB(2, _omitFieldNames ? '' : 'success')
     ..aOM<$0.SDKError>(3, _omitFieldNames ? '' : 'error',
         subBuilder: $0.SDKError.create)
     ..aOB(4, _omitFieldNames ? '' : 'httpConfigured')
@@ -340,77 +337,68 @@ class SdkInitResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearPhase() => $_clearField(1);
 
-  @$pb.TagNumber(2)
-  $core.bool get success => $_getBF(1);
-  @$pb.TagNumber(2)
-  set success($core.bool value) => $_setBool(1, value);
-  @$pb.TagNumber(2)
-  $core.bool hasSuccess() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearSuccess() => $_clearField(2);
-
   @$pb.TagNumber(3)
-  $0.SDKError get error => $_getN(2);
+  $0.SDKError get error => $_getN(1);
   @$pb.TagNumber(3)
   set error($0.SDKError value) => $_setField(3, value);
   @$pb.TagNumber(3)
-  $core.bool hasError() => $_has(2);
+  $core.bool hasError() => $_has(1);
   @$pb.TagNumber(3)
   void clearError() => $_clearField(3);
   @$pb.TagNumber(3)
-  $0.SDKError ensureError() => $_ensure(2);
+  $0.SDKError ensureError() => $_ensure(1);
 
   @$pb.TagNumber(4)
-  $core.bool get httpConfigured => $_getBF(3);
+  $core.bool get httpConfigured => $_getBF(2);
   @$pb.TagNumber(4)
-  set httpConfigured($core.bool value) => $_setBool(3, value);
+  set httpConfigured($core.bool value) => $_setBool(2, value);
   @$pb.TagNumber(4)
-  $core.bool hasHttpConfigured() => $_has(3);
+  $core.bool hasHttpConfigured() => $_has(2);
   @$pb.TagNumber(4)
   void clearHttpConfigured() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $core.bool get deviceRegistered => $_getBF(4);
+  $core.bool get deviceRegistered => $_getBF(3);
   @$pb.TagNumber(5)
-  set deviceRegistered($core.bool value) => $_setBool(4, value);
+  set deviceRegistered($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(5)
-  $core.bool hasDeviceRegistered() => $_has(4);
+  $core.bool hasDeviceRegistered() => $_has(3);
   @$pb.TagNumber(5)
   void clearDeviceRegistered() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get linkedModelsCount => $_getIZ(5);
+  $core.int get linkedModelsCount => $_getIZ(4);
   @$pb.TagNumber(6)
-  set linkedModelsCount($core.int value) => $_setUnsignedInt32(5, value);
+  set linkedModelsCount($core.int value) => $_setUnsignedInt32(4, value);
   @$pb.TagNumber(6)
-  $core.bool hasLinkedModelsCount() => $_has(5);
+  $core.bool hasLinkedModelsCount() => $_has(4);
   @$pb.TagNumber(6)
   void clearLinkedModelsCount() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.int get discoveredOrphans => $_getIZ(6);
+  $core.int get discoveredOrphans => $_getIZ(5);
   @$pb.TagNumber(7)
-  set discoveredOrphans($core.int value) => $_setUnsignedInt32(6, value);
+  set discoveredOrphans($core.int value) => $_setUnsignedInt32(5, value);
   @$pb.TagNumber(7)
-  $core.bool hasDiscoveredOrphans() => $_has(6);
+  $core.bool hasDiscoveredOrphans() => $_has(5);
   @$pb.TagNumber(7)
   void clearDiscoveredOrphans() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.String get warning => $_getSZ(7);
+  $core.String get warning => $_getSZ(6);
   @$pb.TagNumber(8)
-  set warning($core.String value) => $_setString(7, value);
+  set warning($core.String value) => $_setString(6, value);
   @$pb.TagNumber(8)
-  $core.bool hasWarning() => $_has(7);
+  $core.bool hasWarning() => $_has(6);
   @$pb.TagNumber(8)
   void clearWarning() => $_clearField(8);
 
   @$pb.TagNumber(9)
-  $fixnum.Int64 get durationMs => $_getI64(8);
+  $fixnum.Int64 get durationMs => $_getI64(7);
   @$pb.TagNumber(9)
-  set durationMs($fixnum.Int64 value) => $_setInt64(8, value);
+  set durationMs($fixnum.Int64 value) => $_setInt64(7, value);
   @$pb.TagNumber(9)
-  $core.bool hasDurationMs() => $_has(8);
+  $core.bool hasDurationMs() => $_has(7);
   @$pb.TagNumber(9)
   void clearDurationMs() => $_clearField(9);
 
@@ -418,11 +406,11 @@ class SdkInitResult extends $pb.GeneratedMessage {
   /// http_configured, which describes only the calling phase. SDKs read this
   /// to decide whether an authenticated call can proceed without a retryHTTP.
   @$pb.TagNumber(10)
-  $core.bool get hasCompletedHttpSetup => $_getBF(9);
+  $core.bool get hasCompletedHttpSetup => $_getBF(8);
   @$pb.TagNumber(10)
-  set hasCompletedHttpSetup($core.bool value) => $_setBool(9, value);
+  set hasCompletedHttpSetup($core.bool value) => $_setBool(8, value);
   @$pb.TagNumber(10)
-  $core.bool hasHasCompletedHttpSetup() => $_has(9);
+  $core.bool hasHasCompletedHttpSetup() => $_has(8);
   @$pb.TagNumber(10)
   void clearHasCompletedHttpSetup() => $_clearField(10);
 
@@ -430,11 +418,11 @@ class SdkInitResult extends $pb.GeneratedMessage {
   /// Local-only development builds set it false so platform SDKs stop
   /// retrying HTTP on every guarded call.
   @$pb.TagNumber(11)
-  $core.bool get httpApplicable => $_getBF(10);
+  $core.bool get httpApplicable => $_getBF(9);
   @$pb.TagNumber(11)
-  set httpApplicable($core.bool value) => $_setBool(10, value);
+  set httpApplicable($core.bool value) => $_setBool(9, value);
   @$pb.TagNumber(11)
-  $core.bool hasHttpApplicable() => $_has(10);
+  $core.bool hasHttpApplicable() => $_has(9);
   @$pb.TagNumber(11)
   void clearHttpApplicable() => $_clearField(11);
 }

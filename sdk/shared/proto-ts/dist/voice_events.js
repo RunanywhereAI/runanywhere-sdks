@@ -2503,7 +2503,7 @@ function createBaseVoiceAgentComponentStates() {
         ready: false,
         anyLoading: false,
         wakewordState: 0,
-        errorMessage: undefined,
+        error: undefined,
     };
 }
 exports.VoiceAgentComponentStates = {
@@ -2529,8 +2529,8 @@ exports.VoiceAgentComponentStates = {
         if (message.wakewordState !== 0) {
             writer.uint32(56).int32(message.wakewordState);
         }
-        if (message.errorMessage !== undefined) {
-            writer.uint32(66).string(message.errorMessage);
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(74).fork()).join();
         }
         return writer;
     },
@@ -2590,11 +2590,11 @@ exports.VoiceAgentComponentStates = {
                     message.wakewordState = reader.int32();
                     continue;
                 }
-                case 8: {
-                    if (tag !== 66) {
+                case 9: {
+                    if (tag !== 74) {
                         break;
                     }
-                    message.errorMessage = reader.string();
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
                     continue;
                 }
             }
@@ -2638,11 +2638,7 @@ exports.VoiceAgentComponentStates = {
                 : isSet(object.wakeword_state)
                     ? (0, component_types_1.componentLifecycleStateFromJSON)(object.wakeword_state)
                     : 0,
-            errorMessage: isSet(object.errorMessage)
-                ? globalThis.String(object.errorMessage)
-                : isSet(object.error_message)
-                    ? globalThis.String(object.error_message)
-                    : undefined,
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
         };
     },
     toJSON(message) {
@@ -2668,8 +2664,8 @@ exports.VoiceAgentComponentStates = {
         if (message.wakewordState !== 0) {
             obj.wakewordState = (0, component_types_1.componentLifecycleStateToJSON)(message.wakewordState);
         }
-        if (message.errorMessage !== undefined) {
-            obj.errorMessage = message.errorMessage;
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
         }
         return obj;
     },
@@ -2685,7 +2681,9 @@ exports.VoiceAgentComponentStates = {
         message.ready = object.ready ?? false;
         message.anyLoading = object.anyLoading ?? false;
         message.wakewordState = object.wakewordState ?? 0;
-        message.errorMessage = object.errorMessage ?? undefined;
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };

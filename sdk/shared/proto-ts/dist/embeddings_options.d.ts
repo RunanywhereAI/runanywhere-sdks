@@ -1,14 +1,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
-export declare enum EmbeddingsNormalizeMode {
-    EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED = 0,
-    EMBEDDINGS_NORMALIZE_MODE_NONE = 1,
-    EMBEDDINGS_NORMALIZE_MODE_L2 = 2,
-    UNRECOGNIZED = -1
-}
-export declare function embeddingsNormalizeModeFromJSON(object: any): EmbeddingsNormalizeMode;
-export declare function embeddingsNormalizeModeToJSON(object: EmbeddingsNormalizeMode): string;
 export declare enum EmbeddingsPoolingStrategy {
     EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0,
     EMBEDDINGS_POOLING_STRATEGY_MEAN = 1,
@@ -30,7 +23,7 @@ export interface EmbeddingsConfiguration {
     /** Truncation or sliding window past this length is backend-decided. */
     maxSequenceLength: number;
     preferredFramework?: InferenceFramework | undefined;
-    normalizeMode: EmbeddingsNormalizeMode;
+    normalize: boolean;
     pooling: EmbeddingsPoolingStrategy;
     /** Backend-specific config such as tokenizer or vocab companion paths. */
     configJson?: string | undefined;
@@ -44,8 +37,7 @@ export interface EmbeddingsOptions {
     truncate?: boolean | undefined;
     /** Unset = backend chooses (512, capped at 8192). */
     batchSize?: number | undefined;
-    /** UNSPECIFIED = use the component config. */
-    normalizeMode: EmbeddingsNormalizeMode;
+    normalize: boolean;
     pooling: EmbeddingsPoolingStrategy;
     /** 0 = auto */
     nThreads: number;
@@ -93,9 +85,8 @@ export interface EmbeddingsResult {
     /** Across all inputs, post-truncation. */
     tokensUsed: number;
     modelId?: string | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
     requestId: string;
+    error?: SDKError | undefined;
 }
 export interface EmbeddingsCreateRequest {
     /** Registry id or absolute model path. */
@@ -113,9 +104,7 @@ export interface EmbeddingsCreateResult {
     /** Backend-resolved after load. 0 = unknown until the first embed call. */
     dimension: number;
     maxTokens: number;
-    /** Mirrors rac_result_t; negative on failure. */
-    errorCode: number;
-    errorMessage: string;
+    error?: SDKError | undefined;
 }
 export declare const EmbeddingsConfiguration: MessageFns<EmbeddingsConfiguration>;
 export declare const EmbeddingsOptions: MessageFns<EmbeddingsOptions>;

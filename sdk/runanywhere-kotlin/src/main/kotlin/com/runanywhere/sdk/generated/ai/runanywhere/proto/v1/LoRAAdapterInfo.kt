@@ -67,32 +67,23 @@ public class LoRAAdapterInfo(
     schemaIndex = 3,
   )
   public val applied: Boolean = false,
-  /**
-   * Populated when applied is false.
-   */
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
-    schemaIndex = 4,
-  )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 5,
-  )
-  public val error_code: Int = 0,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "loadedAtMs",
-    schemaIndex = 6,
+    schemaIndex = 4,
   )
   public val loaded_at_ms: Long = 0L,
+  /**
+   * Populated when applied is false.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 5,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoRAAdapterInfo, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -109,9 +100,8 @@ public class LoRAAdapterInfo(
     if (adapter_path != other.adapter_path) return false
     if (scale != other.scale) return false
     if (applied != other.applied) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
     if (loaded_at_ms != other.loaded_at_ms) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -123,9 +113,8 @@ public class LoRAAdapterInfo(
       result = result * 37 + adapter_path.hashCode()
       result = result * 37 + scale.hashCode()
       result = result * 37 + applied.hashCode()
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
       result = result * 37 + loaded_at_ms.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -137,9 +126,8 @@ public class LoRAAdapterInfo(
     result += """adapter_path=${sanitize(adapter_path)}"""
     result += """scale=$scale"""
     result += """applied=$applied"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
     result += """loaded_at_ms=$loaded_at_ms"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "LoRAAdapterInfo{", separator = ", ", postfix = "}")
   }
 
@@ -148,11 +136,10 @@ public class LoRAAdapterInfo(
     adapter_path: String = this.adapter_path,
     scale: Float = this.scale,
     applied: Boolean = this.applied,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
     loaded_at_ms: Long = this.loaded_at_ms,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LoRAAdapterInfo = LoRAAdapterInfo(adapter_id, adapter_path, scale, applied, error_message, error_code, loaded_at_ms, unknownFields)
+  ): LoRAAdapterInfo = LoRAAdapterInfo(adapter_id, adapter_path, scale, applied, loaded_at_ms, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -178,13 +165,10 @@ public class LoRAAdapterInfo(
         if (value.applied != false) {
           size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.applied)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.error_code)
-        }
         if (value.loaded_at_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(7, value.loaded_at_ms)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(8, value.error)
         return size
       }
 
@@ -201,25 +185,19 @@ public class LoRAAdapterInfo(
         if (value.applied != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.applied)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.error_code)
-        }
         if (value.loaded_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.loaded_at_ms)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 8, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoRAAdapterInfo) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 8, value.error)
         if (value.loaded_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 7, value.loaded_at_ms)
         }
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
         if (value.applied != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.applied)
         }
@@ -239,18 +217,16 @@ public class LoRAAdapterInfo(
         var adapter_path: String = ""
         var scale: Float = 0f
         var applied: Boolean = false
-        var error_message: String? = null
-        var error_code: Int = 0
         var loaded_at_ms: Long = 0L
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> adapter_id = ProtoAdapter.STRING.decode(reader)
             2 -> adapter_path = ProtoAdapter.STRING.decode(reader)
             3 -> scale = ProtoAdapter.FLOAT.decode(reader)
             4 -> applied = ProtoAdapter.BOOL.decode(reader)
-            5 -> error_message = ProtoAdapter.STRING.decode(reader)
-            6 -> error_code = ProtoAdapter.INT32.decode(reader)
             7 -> loaded_at_ms = ProtoAdapter.INT64.decode(reader)
+            8 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -259,14 +235,14 @@ public class LoRAAdapterInfo(
           adapter_path = adapter_path,
           scale = scale,
           applied = applied,
-          error_message = error_message,
-          error_code = error_code,
           loaded_at_ms = loaded_at_ms,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LoRAAdapterInfo): LoRAAdapterInfo = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

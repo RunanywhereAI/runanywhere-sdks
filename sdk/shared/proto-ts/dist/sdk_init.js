@@ -381,7 +381,6 @@ exports.SdkInitPhase2Request = {
 function createBaseSdkInitResult() {
     return {
         phase: 0,
-        success: false,
         error: undefined,
         httpConfigured: false,
         deviceRegistered: false,
@@ -397,9 +396,6 @@ exports.SdkInitResult = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.phase !== 0) {
             writer.uint32(8).int32(message.phase);
-        }
-        if (message.success !== false) {
-            writer.uint32(16).bool(message.success);
         }
         if (message.error !== undefined) {
             errors_1.SDKError.encode(message.error, writer.uint32(26).fork()).join();
@@ -442,13 +438,6 @@ exports.SdkInitResult = {
                         break;
                     }
                     message.phase = reader.int32();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 16) {
-                        break;
-                    }
-                    message.success = reader.bool();
                     continue;
                 }
                 case 3: {
@@ -525,7 +514,6 @@ exports.SdkInitResult = {
     fromJSON(object) {
         return {
             phase: isSet(object.phase) ? sdkInitPhaseFromJSON(object.phase) : 0,
-            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
             error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
             httpConfigured: isSet(object.httpConfigured)
                 ? globalThis.Boolean(object.httpConfigured)
@@ -570,9 +558,6 @@ exports.SdkInitResult = {
         if (message.phase !== 0) {
             obj.phase = sdkInitPhaseToJSON(message.phase);
         }
-        if (message.success !== false) {
-            obj.success = message.success;
-        }
         if (message.error !== undefined) {
             obj.error = errors_1.SDKError.toJSON(message.error);
         }
@@ -608,7 +593,6 @@ exports.SdkInitResult = {
     fromPartial(object) {
         const message = createBaseSdkInitResult();
         message.phase = object.phase ?? 0;
-        message.success = object.success ?? false;
         message.error = (object.error !== undefined && object.error !== null)
             ? errors_1.SDKError.fromPartial(object.error)
             : undefined;

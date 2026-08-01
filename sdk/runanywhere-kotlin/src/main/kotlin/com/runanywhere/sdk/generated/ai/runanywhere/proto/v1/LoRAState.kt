@@ -54,20 +54,11 @@ public class LoRAState(
   )
   public val base_model_id: String? = null,
   @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "errorMessage",
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
     schemaIndex = 3,
   )
-  public val error_message: String? = null,
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#INT32",
-    label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "errorCode",
-    schemaIndex = 4,
-  )
-  public val error_code: Int = 0,
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoRAState, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -93,8 +84,7 @@ public class LoRAState(
     if (loaded_adapters != other.loaded_adapters) return false
     if (has_active_adapters != other.has_active_adapters) return false
     if (base_model_id != other.base_model_id) return false
-    if (error_message != other.error_message) return false
-    if (error_code != other.error_code) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -105,8 +95,7 @@ public class LoRAState(
       result = result * 37 + loaded_adapters.hashCode()
       result = result * 37 + has_active_adapters.hashCode()
       result = result * 37 + (base_model_id?.hashCode() ?: 0)
-      result = result * 37 + (error_message?.hashCode() ?: 0)
-      result = result * 37 + error_code.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -117,8 +106,7 @@ public class LoRAState(
     if (loaded_adapters.isNotEmpty()) result += """loaded_adapters=$loaded_adapters"""
     result += """has_active_adapters=$has_active_adapters"""
     if (base_model_id != null) result += """base_model_id=${sanitize(base_model_id)}"""
-    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
-    result += """error_code=$error_code"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "LoRAState{", separator = ", ", postfix = "}")
   }
 
@@ -126,10 +114,9 @@ public class LoRAState(
     loaded_adapters: List<LoRAAdapterInfo> = this.loaded_adapters,
     has_active_adapters: Boolean = this.has_active_adapters,
     base_model_id: String? = this.base_model_id,
-    error_message: String? = this.error_message,
-    error_code: Int = this.error_code,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LoRAState = LoRAState(loaded_adapters, has_active_adapters, base_model_id, error_message, error_code, unknownFields)
+  ): LoRAState = LoRAState(loaded_adapters, has_active_adapters, base_model_id, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -148,10 +135,7 @@ public class LoRAState(
           size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.has_active_adapters)
         }
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.base_model_id)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.error_message)
-        if (value.error_code != 0) {
-          size += ProtoAdapter.INT32.encodedSizeWithTag(5, value.error_code)
-        }
+        size += SDKError.ADAPTER.encodedSizeWithTag(6, value.error)
         return size
       }
 
@@ -161,19 +145,13 @@ public class LoRAState(
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.has_active_adapters)
         }
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.base_model_id)
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error_message)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
-        }
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoRAState) {
         writer.writeBytes(value.unknownFields)
-        if (value.error_code != 0) {
-          ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error_message)
+        SDKError.ADAPTER.encodeWithTag(writer, 6, value.error)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.base_model_id)
         if (value.has_active_adapters != false) {
           ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.has_active_adapters)
@@ -185,15 +163,13 @@ public class LoRAState(
         val loaded_adapters = mutableListOf<LoRAAdapterInfo>()
         var has_active_adapters: Boolean = false
         var base_model_id: String? = null
-        var error_message: String? = null
-        var error_code: Int = 0
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> loaded_adapters.add(LoRAAdapterInfo.ADAPTER.decode(reader))
             2 -> has_active_adapters = ProtoAdapter.BOOL.decode(reader)
             3 -> base_model_id = ProtoAdapter.STRING.decode(reader)
-            4 -> error_message = ProtoAdapter.STRING.decode(reader)
-            5 -> error_code = ProtoAdapter.INT32.decode(reader)
+            6 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -201,14 +177,14 @@ public class LoRAState(
           loaded_adapters = loaded_adapters,
           has_active_adapters = has_active_adapters,
           base_model_id = base_model_id,
-          error_message = error_message,
-          error_code = error_code,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: LoRAState): LoRAState = value.copy(
         loaded_adapters = value.loaded_adapters.redactElements(LoRAAdapterInfo.ADAPTER),
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

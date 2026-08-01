@@ -42,11 +42,12 @@ public class HybridRoutingPolicy(
   public val cascade: HybridCascade? = null,
   @field:WireField(
     tag = 3,
-    adapter = "ai.runanywhere.proto.v1.HybridRank#ADAPTER",
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "preferLocal",
     schemaIndex = 2,
   )
-  public val rank: HybridRank = HybridRank.HYBRID_RANK_UNSPECIFIED,
+  public val prefer_local: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HybridRoutingPolicy, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -70,7 +71,7 @@ public class HybridRoutingPolicy(
     if (unknownFields != other.unknownFields) return false
     if (hard_filters != other.hard_filters) return false
     if (cascade != other.cascade) return false
-    if (rank != other.rank) return false
+    if (prefer_local != other.prefer_local) return false
     return true
   }
 
@@ -80,7 +81,7 @@ public class HybridRoutingPolicy(
       result = unknownFields.hashCode()
       result = result * 37 + hard_filters.hashCode()
       result = result * 37 + (cascade?.hashCode() ?: 0)
-      result = result * 37 + rank.hashCode()
+      result = result * 37 + prefer_local.hashCode()
       super.hashCode = result
     }
     return result
@@ -90,16 +91,16 @@ public class HybridRoutingPolicy(
     val result = mutableListOf<String>()
     if (hard_filters.isNotEmpty()) result += """hard_filters=$hard_filters"""
     if (cascade != null) result += """cascade=$cascade"""
-    result += """rank=$rank"""
+    result += """prefer_local=$prefer_local"""
     return result.joinToString(prefix = "HybridRoutingPolicy{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     hard_filters: List<HybridFilter> = this.hard_filters,
     cascade: HybridCascade? = this.cascade,
-    rank: HybridRank = this.rank,
+    prefer_local: Boolean = this.prefer_local,
     unknownFields: ByteString = this.unknownFields,
-  ): HybridRoutingPolicy = HybridRoutingPolicy(hard_filters, cascade, rank, unknownFields)
+  ): HybridRoutingPolicy = HybridRoutingPolicy(hard_filters, cascade, prefer_local, unknownFields)
 
   public companion object {
     @JvmField
@@ -118,8 +119,8 @@ public class HybridRoutingPolicy(
         if (value.cascade != null) {
           size += HybridCascade.ADAPTER.encodedSizeWithTag(2, value.cascade)
         }
-        if (value.rank != ai.runanywhere.proto.v1.HybridRank.HYBRID_RANK_UNSPECIFIED) {
-          size += HybridRank.ADAPTER.encodedSizeWithTag(3, value.rank)
+        if (value.prefer_local != false) {
+          size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.prefer_local)
         }
         return size
       }
@@ -129,16 +130,16 @@ public class HybridRoutingPolicy(
         if (value.cascade != null) {
           HybridCascade.ADAPTER.encodeWithTag(writer, 2, value.cascade)
         }
-        if (value.rank != ai.runanywhere.proto.v1.HybridRank.HYBRID_RANK_UNSPECIFIED) {
-          HybridRank.ADAPTER.encodeWithTag(writer, 3, value.rank)
+        if (value.prefer_local != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.prefer_local)
         }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: HybridRoutingPolicy) {
         writer.writeBytes(value.unknownFields)
-        if (value.rank != ai.runanywhere.proto.v1.HybridRank.HYBRID_RANK_UNSPECIFIED) {
-          HybridRank.ADAPTER.encodeWithTag(writer, 3, value.rank)
+        if (value.prefer_local != false) {
+          ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.prefer_local)
         }
         if (value.cascade != null) {
           HybridCascade.ADAPTER.encodeWithTag(writer, 2, value.cascade)
@@ -149,23 +150,19 @@ public class HybridRoutingPolicy(
       override fun decode(reader: ProtoReader): HybridRoutingPolicy {
         val hard_filters = mutableListOf<HybridFilter>()
         var cascade: HybridCascade? = null
-        var rank: HybridRank = HybridRank.HYBRID_RANK_UNSPECIFIED
+        var prefer_local: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> hard_filters.add(HybridFilter.ADAPTER.decode(reader))
             2 -> cascade = HybridCascade.ADAPTER.decode(reader)
-            3 -> try {
-              rank = HybridRank.ADAPTER.decode(reader)
-            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
-              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
-            }
+            3 -> prefer_local = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return HybridRoutingPolicy(
           hard_filters = hard_filters,
           cascade = cascade,
-          rank = rank,
+          prefer_local = prefer_local,
           unknownFields = unknownFields
         )
       }

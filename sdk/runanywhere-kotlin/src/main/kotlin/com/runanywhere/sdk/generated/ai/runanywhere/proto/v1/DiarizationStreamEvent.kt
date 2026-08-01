@@ -43,38 +43,31 @@ public class DiarizationStreamEvent(
   )
   public val session_id: Long = 0L,
   @field:WireField(
-    tag = 2,
-    adapter = "com.squareup.wire.ProtoAdapter#UINT64",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
-  )
-  public val seq: Long = 0L,
-  @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
-    schemaIndex = 2,
+    schemaIndex = 1,
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.DiarizationStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val kind:
       DiarizationStreamEventKind = DiarizationStreamEventKind.DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.DiarizationResult#ADAPTER",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val result: DiarizationResult? = null,
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -90,7 +83,6 @@ public class DiarizationStreamEvent(
     if (other !is DiarizationStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
     if (session_id != other.session_id) return false
-    if (seq != other.seq) return false
     if (timestamp_us != other.timestamp_us) return false
     if (kind != other.kind) return false
     if (result != other.result) return false
@@ -103,7 +95,6 @@ public class DiarizationStreamEvent(
     if (result_ == 0) {
       result_ = unknownFields.hashCode()
       result_ = result_ * 37 + session_id.hashCode()
-      result_ = result_ * 37 + seq.hashCode()
       result_ = result_ * 37 + timestamp_us.hashCode()
       result_ = result_ * 37 + kind.hashCode()
       result_ = result_ * 37 + (result?.hashCode() ?: 0)
@@ -116,7 +107,6 @@ public class DiarizationStreamEvent(
   override fun toString(): String {
     val result_ = mutableListOf<String>()
     result_ += """session_id=$session_id"""
-    result_ += """seq=$seq"""
     result_ += """timestamp_us=$timestamp_us"""
     result_ += """kind=$kind"""
     if (result != null) result_ += """result=$result"""
@@ -126,13 +116,12 @@ public class DiarizationStreamEvent(
 
   public fun copy(
     session_id: Long = this.session_id,
-    seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
     kind: DiarizationStreamEventKind = this.kind,
     result: DiarizationResult? = this.result,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): DiarizationStreamEvent = DiarizationStreamEvent(session_id, seq, timestamp_us, kind, result, error, unknownFields)
+  ): DiarizationStreamEvent = DiarizationStreamEvent(session_id, timestamp_us, kind, result, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -150,9 +139,6 @@ public class DiarizationStreamEvent(
         if (value.session_id != 0L) {
           size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.session_id)
         }
-        if (value.seq != 0L) {
-          size += ProtoAdapter.UINT64.encodedSizeWithTag(2, value.seq)
-        }
         if (value.timestamp_us != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.timestamp_us)
         }
@@ -167,9 +153,6 @@ public class DiarizationStreamEvent(
       override fun encode(writer: ProtoWriter, `value`: DiarizationStreamEvent) {
         if (value.session_id != 0L) {
           ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.session_id)
-        }
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 2, value.seq)
         }
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.timestamp_us)
@@ -192,9 +175,6 @@ public class DiarizationStreamEvent(
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 3, value.timestamp_us)
         }
-        if (value.seq != 0L) {
-          ProtoAdapter.UINT64.encodeWithTag(writer, 2, value.seq)
-        }
         if (value.session_id != 0L) {
           ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.session_id)
         }
@@ -202,7 +182,6 @@ public class DiarizationStreamEvent(
 
       override fun decode(reader: ProtoReader): DiarizationStreamEvent {
         var session_id: Long = 0L
-        var seq: Long = 0L
         var timestamp_us: Long = 0L
         var kind: DiarizationStreamEventKind = DiarizationStreamEventKind.DIARIZATION_STREAM_EVENT_KIND_UNSPECIFIED
         var result: DiarizationResult? = null
@@ -210,7 +189,6 @@ public class DiarizationStreamEvent(
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> session_id = ProtoAdapter.UINT64.decode(reader)
-            2 -> seq = ProtoAdapter.UINT64.decode(reader)
             3 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             4 -> try {
               kind = DiarizationStreamEventKind.ADAPTER.decode(reader)
@@ -224,7 +202,6 @@ public class DiarizationStreamEvent(
         }
         return DiarizationStreamEvent(
           session_id = session_id,
-          seq = seq,
           timestamp_us = timestamp_us,
           kind = kind,
           result = result,

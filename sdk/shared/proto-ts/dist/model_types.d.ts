@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { AccelerationPreference, HardwareProfile } from "./hardware_profile";
 import { ThinkingTagPattern } from "./thinking_tag_pattern";
 export declare const protobufPackage = "runanywhere.v1";
@@ -224,14 +225,6 @@ export declare enum ModelQuerySortField {
 }
 export declare function modelQuerySortFieldFromJSON(object: any): ModelQuerySortField;
 export declare function modelQuerySortFieldToJSON(object: ModelQuerySortField): string;
-export declare enum ModelQuerySortOrder {
-    MODEL_QUERY_SORT_ORDER_UNSPECIFIED = 0,
-    MODEL_QUERY_SORT_ORDER_ASCENDING = 1,
-    MODEL_QUERY_SORT_ORDER_DESCENDING = 2,
-    UNRECOGNIZED = -1
-}
-export declare function modelQuerySortOrderFromJSON(object: any): ModelQuerySortOrder;
-export declare function modelQuerySortOrderToJSON(object: ModelQuerySortOrder): string;
 /**
  * Role of a file inside a single/multi-file artifact. The generic COMPANION
  * role covers arbitrary sidecars; specific roles document common public
@@ -447,7 +440,7 @@ export interface ModelQuery {
     searchQuery: string;
     source?: ModelSource | undefined;
     sortField?: ModelQuerySortField | undefined;
-    sortOrder?: ModelQuerySortOrder | undefined;
+    descending?: boolean | undefined;
     registryStatus?: ModelRegistryStatus | undefined;
 }
 export interface ModelRegistryRefreshRequest {
@@ -470,7 +463,6 @@ export interface ModelRegistryRefreshRequest {
     includeDownloadedState: boolean;
 }
 export interface ModelRegistryRefreshResult {
-    success: boolean;
     models?: ModelInfoList | undefined;
     registeredCount: number;
     updatedCount: number;
@@ -478,10 +470,10 @@ export interface ModelRegistryRefreshResult {
     prunedCount: number;
     refreshedAtUnixMs: number;
     warnings: string[];
-    errorMessage: string;
     downloadedCount: number;
     availableCount: number;
     errorCount: number;
+    error?: SDKError | undefined;
 }
 export interface ModelListRequest {
     /** Set query.downloaded_only for downloaded-only lists. */
@@ -490,13 +482,12 @@ export interface ModelListRequest {
     includeCounts: boolean;
 }
 export interface ModelListResult {
-    success: boolean;
     models?: ModelInfoList | undefined;
-    errorMessage: string;
     totalCount: number;
     downloadedCount: number;
     availableCount: number;
     filteredCount: number;
+    error?: SDKError | undefined;
 }
 export interface ModelGetRequest {
     modelId: string;
@@ -504,7 +495,7 @@ export interface ModelGetRequest {
 export interface ModelGetResult {
     found: boolean;
     model?: ModelInfo | undefined;
-    errorMessage: string;
+    error?: SDKError | undefined;
 }
 export interface ModelImportRequest {
     /**
@@ -525,14 +516,13 @@ export interface ModelImportRequest {
     validateBeforeRegister: boolean;
 }
 export interface ModelImportResult {
-    success: boolean;
     model?: ModelInfo | undefined;
     localPath: string;
     importedBytes: number;
     warnings: string[];
-    errorMessage: string;
     registered: boolean;
     copiedIntoManagedStorage: boolean;
+    error?: SDKError | undefined;
 }
 export interface ModelDiscoveryRequest {
     /**
@@ -556,14 +546,13 @@ export interface DiscoveredModel {
     warnings: string[];
 }
 export interface ModelDiscoveryResult {
-    success: boolean;
     discoveredModels: DiscoveredModel[];
     linkedCount: number;
     purgedCount: number;
     warnings: string[];
-    errorMessage: string;
     scannedCount: number;
     importedCount: number;
+    error?: SDKError | undefined;
 }
 export interface ModelLoadRequest {
     modelId: string;
@@ -573,13 +562,11 @@ export interface ModelLoadRequest {
     validateAvailability: boolean;
 }
 export interface ModelLoadResult {
-    success: boolean;
     modelId: string;
     category: ModelCategory;
     framework: InferenceFramework;
     resolvedPath: string;
     loadedAtUnixMs: number;
-    errorMessage: string;
     warnings: string[];
     alreadyLoaded: boolean;
     /**
@@ -588,6 +575,7 @@ export interface ModelLoadResult {
      * ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
      */
     resolvedArtifacts: ModelFileDescriptor[];
+    error?: SDKError | undefined;
 }
 export interface ModelUnloadRequest {
     modelId: string;
@@ -596,11 +584,10 @@ export interface ModelUnloadRequest {
     framework?: InferenceFramework | undefined;
 }
 export interface ModelUnloadResult {
-    success: boolean;
     unloadedModelIds: string[];
-    errorMessage: string;
     unloadedAtUnixMs: number;
     warnings: string[];
+    error?: SDKError | undefined;
 }
 export interface CurrentModelRequest {
     category?: ModelCategory | undefined;
@@ -612,21 +599,20 @@ export interface CurrentModelResult {
     model?: ModelInfo | undefined;
     loadedAtUnixMs: number;
     found: boolean;
-    errorMessage: string;
     category: ModelCategory;
     framework: InferenceFramework;
     resolvedPath: string;
     resolvedArtifacts: ModelFileDescriptor[];
+    error?: SDKError | undefined;
 }
 export interface ModelDeleteResult {
-    success: boolean;
     modelId: string;
     deletedBytes: number;
     filesDeleted: boolean;
     registryUpdated: boolean;
     wasLoaded: boolean;
-    errorMessage: string;
     warnings: string[];
+    error?: SDKError | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -689,12 +675,7 @@ export interface ModelCompatibilityResult {
      * checks with their request id.
      */
     modelId: string;
-    /**
-     * Negative on failure; mirrors rac_result_t. Empty error_message on
-     * success.
-     */
-    errorCode: number;
-    errorMessage: string;
+    error?: SDKError | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -793,12 +774,10 @@ export interface ModelRegistryFetchAssignmentsRequest {
     forceRefresh: boolean;
 }
 export interface ModelRegistryFetchAssignmentsResult {
-    success: boolean;
     models?: ModelInfoList | undefined;
     modelCount: number;
     fetchedAtUnixMs: number;
-    errorCode: number;
-    errorMessage: string;
+    error?: SDKError | undefined;
 }
 /**
  * ---------------------------------------------------------------------------

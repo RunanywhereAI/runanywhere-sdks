@@ -15,7 +15,8 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'model_types.pbenum.dart' as $0;
+import 'errors.pb.dart' as $0;
+import 'model_types.pbenum.dart' as $1;
 import 'stt_options.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -29,13 +30,13 @@ class STTConfiguration extends $pb.GeneratedMessage {
     $core.String? modelId,
     $core.int? sampleRate,
     $core.bool? enableVad,
-    $0.AudioFormat? audioFormat,
+    $1.AudioFormat? audioFormat,
     $core.bool? enablePunctuation,
     $core.bool? enableDiarization,
     $core.Iterable<$core.String>? vocabularyList,
     $core.int? maxAlternatives,
     $core.bool? enableWordTimestamps,
-    $0.InferenceFramework? preferredFramework,
+    $1.InferenceFramework? preferredFramework,
     $core.String? language,
   }) {
     final result = create();
@@ -71,15 +72,15 @@ class STTConfiguration extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
     ..aI(3, _omitFieldNames ? '' : 'sampleRate')
     ..aOB(4, _omitFieldNames ? '' : 'enableVad')
-    ..aE<$0.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat',
-        enumValues: $0.AudioFormat.values)
+    ..aE<$1.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat',
+        enumValues: $1.AudioFormat.values)
     ..aOB(6, _omitFieldNames ? '' : 'enablePunctuation')
     ..aOB(7, _omitFieldNames ? '' : 'enableDiarization')
     ..pPS(8, _omitFieldNames ? '' : 'vocabularyList')
     ..aI(9, _omitFieldNames ? '' : 'maxAlternatives')
     ..aOB(10, _omitFieldNames ? '' : 'enableWordTimestamps')
-    ..aE<$0.InferenceFramework>(11, _omitFieldNames ? '' : 'preferredFramework',
-        enumValues: $0.InferenceFramework.values)
+    ..aE<$1.InferenceFramework>(11, _omitFieldNames ? '' : 'preferredFramework',
+        enumValues: $1.InferenceFramework.values)
     ..aOS(13, _omitFieldNames ? '' : 'language')
     ..hasRequiredFields = false;
 
@@ -130,9 +131,9 @@ class STTConfiguration extends $pb.GeneratedMessage {
   void clearEnableVad() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $0.AudioFormat get audioFormat => $_getN(3);
+  $1.AudioFormat get audioFormat => $_getN(3);
   @$pb.TagNumber(5)
-  set audioFormat($0.AudioFormat value) => $_setField(5, value);
+  set audioFormat($1.AudioFormat value) => $_setField(5, value);
   @$pb.TagNumber(5)
   $core.bool hasAudioFormat() => $_has(3);
   @$pb.TagNumber(5)
@@ -178,9 +179,9 @@ class STTConfiguration extends $pb.GeneratedMessage {
   void clearEnableWordTimestamps() => $_clearField(10);
 
   @$pb.TagNumber(11)
-  $0.InferenceFramework get preferredFramework => $_getN(9);
+  $1.InferenceFramework get preferredFramework => $_getN(9);
   @$pb.TagNumber(11)
-  set preferredFramework($0.InferenceFramework value) => $_setField(11, value);
+  set preferredFramework($1.InferenceFramework value) => $_setField(11, value);
   @$pb.TagNumber(11)
   $core.bool hasPreferredFramework() => $_has(9);
   @$pb.TagNumber(11)
@@ -386,8 +387,8 @@ class STTAudioSource extends $pb.GeneratedMessage {
     $core.List<$core.int>? audioData,
     $core.String? fileUri,
     $core.String? adapterHandle,
-    $0.AudioEncoding? encoding,
-    $0.AudioFormat? audioFormat,
+    $1.AudioEncoding? encoding,
+    $1.AudioFormat? audioFormat,
     $core.int? sampleRate,
     $core.int? channels,
     $core.int? bitsPerSample,
@@ -431,10 +432,10 @@ class STTAudioSource extends $pb.GeneratedMessage {
         1, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
     ..aOS(2, _omitFieldNames ? '' : 'fileUri')
     ..aOS(3, _omitFieldNames ? '' : 'adapterHandle')
-    ..aE<$0.AudioEncoding>(4, _omitFieldNames ? '' : 'encoding',
-        enumValues: $0.AudioEncoding.values)
-    ..aE<$0.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat',
-        enumValues: $0.AudioFormat.values)
+    ..aE<$1.AudioEncoding>(4, _omitFieldNames ? '' : 'encoding',
+        enumValues: $1.AudioEncoding.values)
+    ..aE<$1.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat',
+        enumValues: $1.AudioFormat.values)
     ..aI(6, _omitFieldNames ? '' : 'sampleRate')
     ..aI(7, _omitFieldNames ? '' : 'channels')
     ..aI(8, _omitFieldNames ? '' : 'bitsPerSample')
@@ -498,18 +499,18 @@ class STTAudioSource extends $pb.GeneratedMessage {
   void clearAdapterHandle() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $0.AudioEncoding get encoding => $_getN(3);
+  $1.AudioEncoding get encoding => $_getN(3);
   @$pb.TagNumber(4)
-  set encoding($0.AudioEncoding value) => $_setField(4, value);
+  set encoding($1.AudioEncoding value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasEncoding() => $_has(3);
   @$pb.TagNumber(4)
   void clearEncoding() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $0.AudioFormat get audioFormat => $_getN(4);
+  $1.AudioFormat get audioFormat => $_getN(4);
   @$pb.TagNumber(5)
-  set audioFormat($0.AudioFormat value) => $_setField(5, value);
+  set audioFormat($1.AudioFormat value) => $_setField(5, value);
   @$pb.TagNumber(5)
   $core.bool hasAudioFormat() => $_has(4);
   @$pb.TagNumber(5)
@@ -829,13 +830,11 @@ class TranscriptionMetadata extends $pb.GeneratedMessage {
     $core.String? modelId,
     $fixnum.Int64? processingTimeMs,
     $fixnum.Int64? audioLengthMs,
-    $core.double? realTimeFactor,
   }) {
     final result = create();
     if (modelId != null) result.modelId = modelId;
     if (processingTimeMs != null) result.processingTimeMs = processingTimeMs;
     if (audioLengthMs != null) result.audioLengthMs = audioLengthMs;
-    if (realTimeFactor != null) result.realTimeFactor = realTimeFactor;
     return result;
   }
 
@@ -855,8 +854,6 @@ class TranscriptionMetadata extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
     ..aInt64(2, _omitFieldNames ? '' : 'processingTimeMs')
     ..aInt64(3, _omitFieldNames ? '' : 'audioLengthMs')
-    ..aD(4, _omitFieldNames ? '' : 'realTimeFactor',
-        fieldType: $pb.PbFieldType.OF)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -905,16 +902,6 @@ class TranscriptionMetadata extends $pb.GeneratedMessage {
   $core.bool hasAudioLengthMs() => $_has(2);
   @$pb.TagNumber(3)
   void clearAudioLengthMs() => $_clearField(3);
-
-  /// processing_time_ms / audio_length_ms, set by the producer.
-  @$pb.TagNumber(4)
-  $core.double get realTimeFactor => $_getN(3);
-  @$pb.TagNumber(4)
-  set realTimeFactor($core.double value) => $_setFloat(3, value);
-  @$pb.TagNumber(4)
-  $core.bool hasRealTimeFactor() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearRealTimeFactor() => $_clearField(4);
 }
 
 class STTOutput extends $pb.GeneratedMessage {
@@ -927,10 +914,9 @@ class STTOutput extends $pb.GeneratedMessage {
     $fixnum.Int64? timestampMs,
     $fixnum.Int64? durationMs,
     $core.Iterable<$core.String>? speakerIds,
-    $core.String? errorMessage,
-    $core.int? errorCode,
     $core.int? segmentIndex,
     $core.String? language,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (text != null) result.text = text;
@@ -941,10 +927,9 @@ class STTOutput extends $pb.GeneratedMessage {
     if (timestampMs != null) result.timestampMs = timestampMs;
     if (durationMs != null) result.durationMs = durationMs;
     if (speakerIds != null) result.speakerIds.addAll(speakerIds);
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
     if (segmentIndex != null) result.segmentIndex = segmentIndex;
     if (language != null) result.language = language;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -972,10 +957,10 @@ class STTOutput extends $pb.GeneratedMessage {
     ..aInt64(8, _omitFieldNames ? '' : 'timestampMs')
     ..aInt64(9, _omitFieldNames ? '' : 'durationMs')
     ..pPS(10, _omitFieldNames ? '' : 'speakerIds')
-    ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(12, _omitFieldNames ? '' : 'errorCode')
     ..aI(13, _omitFieldNames ? '' : 'segmentIndex')
     ..aOS(14, _omitFieldNames ? '' : 'language')
+    ..aOM<$0.SDKError>(15, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1054,43 +1039,36 @@ class STTOutput extends $pb.GeneratedMessage {
   @$pb.TagNumber(10)
   $pb.PbList<$core.String> get speakerIds => $_getList(7);
 
-  @$pb.TagNumber(11)
-  $core.String get errorMessage => $_getSZ(8);
-  @$pb.TagNumber(11)
-  set errorMessage($core.String value) => $_setString(8, value);
-  @$pb.TagNumber(11)
-  $core.bool hasErrorMessage() => $_has(8);
-  @$pb.TagNumber(11)
-  void clearErrorMessage() => $_clearField(11);
-
-  @$pb.TagNumber(12)
-  $core.int get errorCode => $_getIZ(9);
-  @$pb.TagNumber(12)
-  set errorCode($core.int value) => $_setSignedInt32(9, value);
-  @$pb.TagNumber(12)
-  $core.bool hasErrorCode() => $_has(9);
-  @$pb.TagNumber(12)
-  void clearErrorCode() => $_clearField(12);
-
   /// For long-running or streaming transcription.
   @$pb.TagNumber(13)
-  $core.int get segmentIndex => $_getIZ(10);
+  $core.int get segmentIndex => $_getIZ(8);
   @$pb.TagNumber(13)
-  set segmentIndex($core.int value) => $_setSignedInt32(10, value);
+  set segmentIndex($core.int value) => $_setSignedInt32(8, value);
   @$pb.TagNumber(13)
-  $core.bool hasSegmentIndex() => $_has(10);
+  $core.bool hasSegmentIndex() => $_has(8);
   @$pb.TagNumber(13)
   void clearSegmentIndex() => $_clearField(13);
 
   /// Detected language, BCP-47. Empty = unknown.
   @$pb.TagNumber(14)
-  $core.String get language => $_getSZ(11);
+  $core.String get language => $_getSZ(9);
   @$pb.TagNumber(14)
-  set language($core.String value) => $_setString(11, value);
+  set language($core.String value) => $_setString(9, value);
   @$pb.TagNumber(14)
-  $core.bool hasLanguage() => $_has(11);
+  $core.bool hasLanguage() => $_has(9);
   @$pb.TagNumber(14)
   void clearLanguage() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $0.SDKError get error => $_getN(10);
+  @$pb.TagNumber(15)
+  set error($0.SDKError value) => $_setField(15, value);
+  @$pb.TagNumber(15)
+  $core.bool hasError() => $_has(10);
+  @$pb.TagNumber(15)
+  void clearError() => $_clearField(15);
+  @$pb.TagNumber(15)
+  $0.SDKError ensureError() => $_ensure(10);
 }
 
 class STTPartialResult extends $pb.GeneratedMessage {
@@ -1280,24 +1258,20 @@ class STTPartialResult extends $pb.GeneratedMessage {
 
 class STTStreamEvent extends $pb.GeneratedMessage {
   factory STTStreamEvent({
-    $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
     $core.String? requestId,
     STTStreamEventKind? kind,
     STTPartialResult? partial,
     STTOutput? finalOutput,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result = create();
-    if (seq != null) result.seq = seq;
     if (timestampUs != null) result.timestampUs = timestampUs;
     if (requestId != null) result.requestId = requestId;
     if (kind != null) result.kind = kind;
     if (partial != null) result.partial = partial;
     if (finalOutput != null) result.finalOutput = finalOutput;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1314,8 +1288,6 @@ class STTStreamEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'STTStreamEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
-    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6,
-        defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(3, _omitFieldNames ? '' : 'requestId')
     ..aE<STTStreamEventKind>(4, _omitFieldNames ? '' : 'kind',
@@ -1324,8 +1296,8 @@ class STTStreamEvent extends $pb.GeneratedMessage {
         subBuilder: STTPartialResult.create)
     ..aOM<STTOutput>(6, _omitFieldNames ? '' : 'finalOutput',
         subBuilder: STTOutput.create)
-    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(8, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(9, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1347,81 +1319,65 @@ class STTStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<STTStreamEvent>(create);
   static STTStreamEvent? _defaultInstance;
 
-  @$pb.TagNumber(1)
-  $fixnum.Int64 get seq => $_getI64(0);
-  @$pb.TagNumber(1)
-  set seq($fixnum.Int64 value) => $_setInt64(0, value);
-  @$pb.TagNumber(1)
-  $core.bool hasSeq() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearSeq() => $_clearField(1);
-
   @$pb.TagNumber(2)
-  $fixnum.Int64 get timestampUs => $_getI64(1);
+  $fixnum.Int64 get timestampUs => $_getI64(0);
   @$pb.TagNumber(2)
-  set timestampUs($fixnum.Int64 value) => $_setInt64(1, value);
+  set timestampUs($fixnum.Int64 value) => $_setInt64(0, value);
   @$pb.TagNumber(2)
-  $core.bool hasTimestampUs() => $_has(1);
+  $core.bool hasTimestampUs() => $_has(0);
   @$pb.TagNumber(2)
   void clearTimestampUs() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get requestId => $_getSZ(2);
+  $core.String get requestId => $_getSZ(1);
   @$pb.TagNumber(3)
-  set requestId($core.String value) => $_setString(2, value);
+  set requestId($core.String value) => $_setString(1, value);
   @$pb.TagNumber(3)
-  $core.bool hasRequestId() => $_has(2);
+  $core.bool hasRequestId() => $_has(1);
   @$pb.TagNumber(3)
   void clearRequestId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  STTStreamEventKind get kind => $_getN(3);
+  STTStreamEventKind get kind => $_getN(2);
   @$pb.TagNumber(4)
   set kind(STTStreamEventKind value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasKind() => $_has(3);
+  $core.bool hasKind() => $_has(2);
   @$pb.TagNumber(4)
   void clearKind() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  STTPartialResult get partial => $_getN(4);
+  STTPartialResult get partial => $_getN(3);
   @$pb.TagNumber(5)
   set partial(STTPartialResult value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasPartial() => $_has(4);
+  $core.bool hasPartial() => $_has(3);
   @$pb.TagNumber(5)
   void clearPartial() => $_clearField(5);
   @$pb.TagNumber(5)
-  STTPartialResult ensurePartial() => $_ensure(4);
+  STTPartialResult ensurePartial() => $_ensure(3);
 
   @$pb.TagNumber(6)
-  STTOutput get finalOutput => $_getN(5);
+  STTOutput get finalOutput => $_getN(4);
   @$pb.TagNumber(6)
   set finalOutput(STTOutput value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasFinalOutput() => $_has(5);
+  $core.bool hasFinalOutput() => $_has(4);
   @$pb.TagNumber(6)
   void clearFinalOutput() => $_clearField(6);
   @$pb.TagNumber(6)
-  STTOutput ensureFinalOutput() => $_ensure(5);
+  STTOutput ensureFinalOutput() => $_ensure(4);
 
-  @$pb.TagNumber(7)
-  $core.String get errorMessage => $_getSZ(6);
-  @$pb.TagNumber(7)
-  set errorMessage($core.String value) => $_setString(6, value);
-  @$pb.TagNumber(7)
-  $core.bool hasErrorMessage() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearErrorMessage() => $_clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.int get errorCode => $_getIZ(7);
-  @$pb.TagNumber(8)
-  set errorCode($core.int value) => $_setSignedInt32(7, value);
-  @$pb.TagNumber(8)
-  $core.bool hasErrorCode() => $_has(7);
-  @$pb.TagNumber(8)
-  void clearErrorCode() => $_clearField(8);
+  @$pb.TagNumber(9)
+  $0.SDKError get error => $_getN(5);
+  @$pb.TagNumber(9)
+  set error($0.SDKError value) => $_setField(9, value);
+  @$pb.TagNumber(9)
+  $core.bool hasError() => $_has(5);
+  @$pb.TagNumber(9)
+  void clearError() => $_clearField(9);
+  @$pb.TagNumber(9)
+  $0.SDKError ensureError() => $_ensure(5);
 }
 
 class STTServiceState extends $pb.GeneratedMessage {
@@ -1430,8 +1386,7 @@ class STTServiceState extends $pb.GeneratedMessage {
     $core.String? currentModel,
     $core.bool? supportsStreaming,
     $core.Iterable<$core.String>? supportedLanguageCodes,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $0.SDKError? error,
   }) {
     final result = create();
     if (isReady != null) result.isReady = isReady;
@@ -1439,8 +1394,7 @@ class STTServiceState extends $pb.GeneratedMessage {
     if (supportsStreaming != null) result.supportsStreaming = supportsStreaming;
     if (supportedLanguageCodes != null)
       result.supportedLanguageCodes.addAll(supportedLanguageCodes);
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -1461,8 +1415,8 @@ class STTServiceState extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'currentModel')
     ..aOB(3, _omitFieldNames ? '' : 'supportsStreaming')
     ..pPS(4, _omitFieldNames ? '' : 'supportedLanguageCodes')
-    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(6, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$0.SDKError>(7, _omitFieldNames ? '' : 'error',
+        subBuilder: $0.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1514,23 +1468,16 @@ class STTServiceState extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   $pb.PbList<$core.String> get supportedLanguageCodes => $_getList(3);
 
-  @$pb.TagNumber(5)
-  $core.String get errorMessage => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set errorMessage($core.String value) => $_setString(4, value);
-  @$pb.TagNumber(5)
-  $core.bool hasErrorMessage() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearErrorMessage() => $_clearField(5);
-
-  @$pb.TagNumber(6)
-  $core.int get errorCode => $_getIZ(5);
-  @$pb.TagNumber(6)
-  set errorCode($core.int value) => $_setSignedInt32(5, value);
-  @$pb.TagNumber(6)
-  $core.bool hasErrorCode() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearErrorCode() => $_clearField(6);
+  @$pb.TagNumber(7)
+  $0.SDKError get error => $_getN(4);
+  @$pb.TagNumber(7)
+  set error($0.SDKError value) => $_setField(7, value);
+  @$pb.TagNumber(7)
+  $core.bool hasError() => $_has(4);
+  @$pb.TagNumber(7)
+  void clearError() => $_clearField(7);
+  @$pb.TagNumber(7)
+  $0.SDKError ensureError() => $_ensure(4);
 }
 
 const $core.bool _omitFieldNames =

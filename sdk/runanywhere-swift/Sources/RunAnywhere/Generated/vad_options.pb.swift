@@ -10,16 +10,8 @@
 
 // RunAnywhere IDL — Voice Activity Detection (VAD) options & messages.
 //
-// Every message below is the *union* of fields currently declared by hand
-// across Swift, Kotlin, Dart, React Native, Web, and the C ABI. The pre-IDL
-// drift table is
-// what motivated this schema. Every SDK consumes generated output; nothing
-// is hand-written.
-//
-// Note: this file does NOT redefine VADEvent — that lives in
-// voice_events.proto and is imported here when needed. VADStreamEventKind
-// below is the canonical VAD event enum (it absorbed the deleted
-// VADEventType from voice_events.proto).
+// VADEvent is not defined here; it lives in voice_events.proto.
+// VADStreamEventKind below is the canonical VAD event enum.
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -38,21 +30,8 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
-/// ---------------------------------------------------------------------------
-/// Speech-activity lifecycle kind.
-/// Sources pre-IDL:
-///   Swift  VADTypes.swift:235               (started, ended)
-///   Kotlin VADTypes.kt:171                  (STARTED, ENDED)
-///   Dart   runanywhere_vad.dart:28          (started, ended)
-///   RN     VADTypes.ts:43                   ('started' | 'ended')
-///   Web    VADTypes.ts:8                    (Started, Ended, Ongoing)   ← only SDK with ONGOING
-///   C ABI  rac_vad_types.h:107              (RAC_SPEECH_STARTED, RAC_SPEECH_ENDED, RAC_SPEECH_ONGOING)
-/// Canonical union: STARTED, ENDED, ONGOING.
-/// ---------------------------------------------------------------------------
 public nonisolated enum RASpeechActivityKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
-
-  /// Reserved (proto3 default)
   case unspecified // = 0
   case speechStarted // = 1
   case speechEnded // = 2
@@ -93,44 +72,6 @@ public nonisolated enum RASpeechActivityKind: SwiftProtobuf.Enum, Swift.CaseIter
 
 }
 
-public nonisolated enum RAVADAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case pcmF32Le // = 1
-  case pcmS16Le // = 2
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .pcmF32Le
-    case 2: self = .pcmS16Le
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .pcmF32Le: return 1
-    case .pcmS16Le: return 2
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAVADAudioEncoding] = [
-    .unspecified,
-    .pcmF32Le,
-    .pcmS16Le,
-  ]
-
-}
-
 public nonisolated enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -141,10 +82,8 @@ public nonisolated enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
   case stopped // = 5
   case error // = 6
 
-  /// Pipeline-level barge-in signal previously carried by the
-  /// deleted VADEventType enum. Emitted when the VAD detects speech that
-  /// interrupts active assistant playback; downstream pipeline typically
-  /// routes this through InterruptedEvent/InterruptReason as well.
+  /// Speech that interrupts active assistant playback. Downstream pipeline
+  /// also routes this through InterruptedEvent/InterruptReason.
   case bargeIn // = 7
   case UNRECOGNIZED(Int)
 
@@ -194,55 +133,31 @@ public nonisolated enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIter
 
 }
 
-/// ---------------------------------------------------------------------------
-/// Compile-time / load-time configuration for a VAD instance.
-/// Sources pre-IDL:
-///   Swift  VADTypes.swift:15                (energyThreshold, sampleRate, frameLength,
-///                                            enableAutoCalibration, calibrationMultiplier)
-///   Kotlin VADTypes.kt:26                   (same five fields, defaults match Swift)
-///   Dart   vad_configuration.dart:5         (same five fields)
-///   RN     VADTypes.ts:12                   (sampleRate, frameLength, energyThreshold;
-///                                            no calibration fields)
-///   Web    VADTypes.ts —                    (no VADConfiguration; per-backend in WebSDK)
-///   C ABI  rac_vad_types.h:63 (rac_vad_config_t)
-///                                           (model_id, preferred_framework, energy_threshold,
-///                                            sample_rate, frame_length, enable_auto_calibration,
-///                                            calibration_multiplier)
-///
-/// `frame_length_ms` is the canonical wire field — Swift/Kotlin/Dart/C use
-/// seconds (float), but ms is more interoperable across protobuf consumers.
-/// Generators must convert when binding to per-platform types.
-/// ---------------------------------------------------------------------------
+/// Load-time configuration for a VAD instance.
 public nonisolated struct RAVADConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Optional model id; empty when using the built-in energy VAD.
-  /// C ABI: model_id (rac_vad_config_t::model_id, may be NULL).
+  /// Empty when using the built-in energy VAD.
   public var modelID: String = String()
 
-  /// PCM sample rate in Hz. Default 16000 (RAC_VAD_DEFAULT_SAMPLE_RATE).
   public var sampleRate: Int32 = 0
 
-  /// Frame length in milliseconds. Default 100 (Swift/Kotlin/Dart store
-  /// 0.1 seconds; we canonicalize to ms on the wire).
+  /// Milliseconds on the wire; Swift/Kotlin/Dart/C hold seconds, so generated
+  /// bindings divide by 1000 when they bind to those types.
   public var frameLengthMs: Int32 = 0
 
-  /// Activation (energy) threshold in [0.0, 1.0] for voice detection.
-  /// Recommended range 0.01–0.05.
+  /// Commons rejects values outside [0, 1] and warns below 0.002 or above 0.1.
   public var activationThreshold: Float = 0
 
-  /// When true, the VAD performs ambient-noise calibration and uses the
-  /// result as a multiplier on the threshold (see calibration_multiplier
-  /// in the C ABI). Defaults to false.
+  /// Calibrate against ambient noise and scale the threshold by
+  /// calibration_multiplier.
   public var enableAutoCalibration: Bool = false
 
-  /// Calibration multiplier (threshold = ambient noise * multiplier).
-  /// Present in Swift/Kotlin/Dart configs and rac_vad_config_t.
+  /// threshold = ambient noise * multiplier
   public var calibrationMultiplier: Float = 0
 
-  /// Preferred framework for VAD. Absent = auto.
   public var preferredFramework: RAInferenceFramework {
     get {_preferredFramework ?? .unspecified}
     set {_preferredFramework = newValue}
@@ -252,7 +167,7 @@ public nonisolated struct RAVADConfiguration: Sendable {
   /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
   public mutating func clearPreferredFramework() {self._preferredFramework = nil}
 
-  /// Optional model path for backend-specific VADs (e.g. Silero ONNX).
+  /// For backend-specific VADs such as Silero ONNX.
   public var modelPath: String {
     get {_modelPath ?? String()}
     set {_modelPath = newValue}
@@ -262,12 +177,9 @@ public nonisolated struct RAVADConfiguration: Sendable {
   /// Clears the value of `modelPath`. Subsequent reads from it will return its default value.
   public mutating func clearModelPath() {self._modelPath = nil}
 
-  /// Window size in samples for frame-based neural VAD backends. 0 =
-  /// backend/default.
+  /// 0 = backend default, for both of these.
   public var windowSizeSamples: Int32 = 0
 
-  /// Maximum continuous speech segment duration in milliseconds. 0 =
-  /// backend/default.
   public var maxSpeechDurationMs: Int32 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -278,50 +190,26 @@ public nonisolated struct RAVADConfiguration: Sendable {
   fileprivate var _modelPath: String? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// Runtime / per-call options applied to a VAD pass.
-/// Sources pre-IDL:
-///   Swift  none — Swift uses raw arguments to detectSpeech().
-///   Kotlin none — same as Swift.
-///   Dart   runanywhere_vad.dart:99          (`detectSpeech` takes raw Float32List)
-///   RN     VADTypes.ts —                    (no per-call options struct)
-///   Web    VADTypes.ts —                    (no per-call options struct)
-///   C ABI  rac_vad_types.h:123 (rac_vad_input_t)
-///                                           (audio_samples, num_samples,
-///                                            energy_threshold_override)
-///
-/// We canonicalize on the energy_threshold_override + the speech-duration
-/// gates that already appear as constants in rac_vad_types.h:50-51:
-///   RAC_VAD_MIN_SPEECH_DURATION_MS  = 100
-///   RAC_VAD_MIN_SILENCE_DURATION_MS = 300
-/// Surfacing them as fields lets callers tune debouncing without a rebuild.
-/// ---------------------------------------------------------------------------
-/// Field vocabulary follows the industry VAD naming (LiveKit/Silero):
-/// activation_threshold + min/max duration knobs + prefix padding.
+/// Per-call options. Field vocabulary follows LiveKit/Silero naming.
 public nonisolated struct RAVADOptions: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Per-call activation threshold override in [0.0, 1.0]. Unset/0 = keep
-  /// the configured threshold.
+  /// 0 = keep the configured threshold.
   public var activationThreshold: Float = 0
 
-  /// Minimum continuous speech duration (ms) before SPEECH_STARTED fires.
   public var minSpeechDurationMs: Int32 = 0
 
-  /// Minimum continuous silence duration (ms) before SPEECH_ENDED fires.
   public var minSilenceDurationMs: Int32 = 0
 
-  /// Maximum continuous speech duration (ms) before forcing a segment split.
-  /// 0 = backend/default.
+  /// 0 = backend default, for both of these.
   public var maxSpeechDurationMs: Int32 = 0
 
   /// Audio retained before SPEECH_STARTED so segments don't clip the first
-  /// syllable. 0 = backend/default.
+  /// syllable.
   public var prefixPaddingMs: Int32 = 0
 
-  /// Whether to include VADStatistics in stream events when available.
   public var includeStatistics: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -352,7 +240,7 @@ public nonisolated struct RAVADAudioSource: Sendable {
     set {source = .adapterHandle(newValue)}
   }
 
-  public var encoding: RAVADAudioEncoding = .unspecified
+  public var encoding: RAAudioEncoding = .unspecified
 
   public var sampleRate: Int32 = 0
 
@@ -406,63 +294,41 @@ public nonisolated struct RAVADProcessRequest: Sendable {
   fileprivate var _options: RAVADOptions? = nil
 }
 
-/// ---------------------------------------------------------------------------
-/// Result of a single VAD pass over a chunk of PCM audio.
-/// Sources pre-IDL:
-///   Swift  VADTypes.swift —                 (no struct; bool returned from detectSpeech())
-///   Kotlin VADTypes.kt:152                  (isSpeech, confidence, energyLevel,
-///                                            statistics, timestamp)
-///   Dart   dart_bridge_vad.dart:290         (isSpeech, energy, speechProbability)
-///   RN     VADTypes.ts:26                   (isSpeech, probability, startTime, endTime)
-///   Web    VADTypes.ts —                    (no VADResult; only SpeechSegment)
-///   C ABI  rac_vad_types.h:151 (rac_vad_output_t)
-///                                           (is_speech_detected, energy_level, timestamp_ms)
-///
-/// Drift notes:
-///   - Kotlin's `confidence` and Dart's `speechProbability` and RN's
-///     `probability` collapse onto the canonical `confidence` field.
-///   - Kotlin/RN/C all carry timing — we encode duration_ms (length of the
-///     analyzed frame). Wall-clock timestamps belong on the carrying envelope
-///     (e.g. VoiceEvent.timestamp_us in voice_events.proto).
-/// ---------------------------------------------------------------------------
 public nonisolated struct RAVADResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Whether speech was detected in this frame.
-  /// Mirrors rac_vad_output_t::is_speech_detected.
   public var isSpeech: Bool {
     get {_storage._isSpeech}
     set {_uniqueStorage()._isSpeech = newValue}
   }
 
-  /// Confidence / probability in [0.0, 1.0]. Backend-dependent.
+  /// [0.0, 1.0], backend-dependent.
   public var confidence: Float {
     get {_storage._confidence}
     set {_uniqueStorage()._confidence = newValue}
   }
 
-  /// RMS energy level of the analyzed frame.
-  /// Mirrors rac_vad_output_t::energy_level.
+  /// RMS energy of the analyzed frame.
   public var energy: Float {
     get {_storage._energy}
     set {_uniqueStorage()._energy = newValue}
   }
 
-  /// Length of the analyzed frame in milliseconds.
+  /// Length of the analyzed frame.
   public var durationMs: Int32 {
     get {_storage._durationMs}
     set {_uniqueStorage()._durationMs = newValue}
   }
 
-  /// Wall-clock timestamp for this frame/result, in milliseconds since epoch.
+  /// Milliseconds since epoch.
   public var timestampMs: Int64 {
     get {_storage._timestampMs}
     set {_uniqueStorage()._timestampMs = newValue}
   }
 
-  /// Optional detected segment start/end times, in milliseconds. 0 = unset.
+  /// 0 = unset.
   public var startTimeMs: Int64 {
     get {_storage._startTimeMs}
     set {_uniqueStorage()._startTimeMs = newValue}
@@ -473,7 +339,6 @@ public nonisolated struct RAVADResult: @unchecked Sendable {
     set {_uniqueStorage()._endTimeMs = newValue}
   }
 
-  /// Optional statistics snapshot and result-envelope error details.
   public var statistics: RAVADStatistics {
     get {_storage._statistics ?? RAVADStatistics()}
     set {_uniqueStorage()._statistics = newValue}
@@ -483,19 +348,14 @@ public nonisolated struct RAVADResult: @unchecked Sendable {
   /// Clears the value of `statistics`. Subsequent reads from it will return its default value.
   public mutating func clearStatistics() {_uniqueStorage()._statistics = nil}
 
-  public var errorMessage: String {
-    get {_storage._errorMessage ?? String()}
-    set {_uniqueStorage()._errorMessage = newValue}
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
-
-  public var errorCode: Int32 {
-    get {_storage._errorCode}
-    set {_uniqueStorage()._errorCode = newValue}
-  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -504,48 +364,25 @@ public nonisolated struct RAVADResult: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-/// ---------------------------------------------------------------------------
-/// Internal VAD statistics, exposed for debugging / waveform UIs.
-/// Sources pre-IDL:
-///   Swift  VADTypes.swift:174               (current, threshold, ambient,
-///                                            recentAvg, recentMax)
-///   Kotlin VADTypes.kt:123                  (same five fields)
-///   Dart   none — Dart bridge does not surface statistics yet.
-///   RN     VADTypes.ts —                    (none)
-///   Web    VADTypes.ts —                    (none)
-///   C ABI  rac_vad_types.h:194 (rac_vad_statistics_t)
-///                                           (current_threshold, ambient_noise_level,
-///                                            total_speech_segments, total_speech_duration_ms,
-///                                            average_energy, peak_energy)
-///
-/// We canonicalize on the Swift/Kotlin shape because it is the most widely
-/// used. The richer C ABI fields (segment counts, totals) belong on a future
-/// VADAnalytics message and are intentionally NOT included here.
-/// ---------------------------------------------------------------------------
+/// Exposed for debugging and waveform UIs.
 public nonisolated struct RAVADStatistics: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Current instantaneous energy level. (Swift/Kotlin: `current`)
   public var currentEnergy: Float = 0
 
-  /// Energy threshold currently in use. (Swift/Kotlin: `threshold`;
-  /// C ABI: rac_vad_statistics_t::current_threshold)
   public var currentThreshold: Float = 0
 
-  /// Ambient noise level captured by calibration. (Swift/Kotlin: `ambient`;
-  /// C ABI: rac_vad_statistics_t::ambient_noise_level)
+  /// Ambient noise level captured by calibration.
   public var ambientLevel: Float = 0
 
-  /// Recent moving-window average energy. (Swift/Kotlin: `recentAvg`)
+  /// Moving-window average and peak.
   public var recentAvg: Float = 0
 
-  /// Recent moving-window peak energy. (Swift/Kotlin: `recentMax`)
   public var recentMax: Float = 0
 
-  /// Richer service-level counters from rac_vad_statistics_t. Zero = unset
-  /// for energy-only implementations.
+  /// Zero = unset for energy-only implementations.
   public var totalSpeechSegments: Int32 = 0
 
   public var totalSpeechDurationMs: Int64 = 0
@@ -559,37 +396,20 @@ public nonisolated struct RAVADStatistics: Sendable {
   public init() {}
 }
 
-/// ---------------------------------------------------------------------------
-/// Activity transition emitted by the VAD as it watches a stream.
-/// Sources pre-IDL:
-///   Swift  VADTypes.swift:235               (SpeechActivityEvent enum: started/ended)
-///   Kotlin VADTypes.kt:171                  (SpeechActivityEvent enum: STARTED/ENDED)
-///   Dart   runanywhere_vad.dart:28          (SpeechActivityEvent enum: started/ended)
-///   RN     VADTypes.ts:43                   ('started' | 'ended' string union)
-///   Web    VADTypes.ts:8                    (SpeechActivity enum: Started/Ended/Ongoing)
-///   C ABI  rac_vad_types.h:107 (rac_speech_activity_t)
-///                                           (RAC_SPEECH_STARTED/ENDED/ONGOING)
-///
-/// Distinct from voice_events.proto's `VADEvent`, which carries the broader
-/// pipeline-level taxonomy (BARGE_IN, END_OF_UTTERANCE, etc) via
-/// `VADStreamEventKind`. `SpeechActivityEvent` here is the narrow
-/// component-level transition.
-/// ---------------------------------------------------------------------------
+/// Narrow component-level transition. voice_events.proto's VADEvent carries the
+/// broader pipeline taxonomy (BARGE_IN, END_OF_UTTERANCE) via VADStreamEventKind.
 public nonisolated struct RASpeechActivityEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Which transition happened.
   public var eventType: RASpeechActivityKind = .unspecified
 
-  /// Wall-clock time of the transition, in milliseconds since epoch.
-  /// Aligns with rac_vad_output_t::timestamp_ms.
+  /// Milliseconds since epoch.
   public var timestampMs: Int64 = 0
 
-  /// Optional duration of the speech / silence that triggered this event,
-  /// in milliseconds. Set on SPEECH_ENDED to communicate the just-finished
-  /// utterance length; left zero on SPEECH_STARTED.
+  /// Length of the just-finished utterance on SPEECH_ENDED; zero on
+  /// SPEECH_STARTED.
   public var durationMs: Int32 = 0
 
   public var confidence: Float = 0
@@ -624,11 +444,6 @@ public nonisolated struct RAVADStreamEvent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
-
-  public var seq: UInt64 {
-    get {_storage._seq}
-    set {_uniqueStorage()._seq = newValue}
-  }
 
   public var timestampUs: Int64 {
     get {_storage._timestampUs}
@@ -672,19 +487,14 @@ public nonisolated struct RAVADStreamEvent: @unchecked Sendable {
   /// Clears the value of `statistics`. Subsequent reads from it will return its default value.
   public mutating func clearStatistics() {_uniqueStorage()._statistics = nil}
 
-  public var errorMessage: String {
-    get {_storage._errorMessage ?? String()}
-    set {_uniqueStorage()._errorMessage = newValue}
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
-
-  public var errorCode: Int32 {
-    get {_storage._errorCode}
-    set {_uniqueStorage()._errorCode = newValue}
-  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -693,47 +503,59 @@ public nonisolated struct RAVADStreamEvent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public nonisolated struct RAVADServiceState: Sendable {
+public nonisolated struct RAVADServiceState: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var isReady: Bool = false
+  public var isReady: Bool {
+    get {_storage._isReady}
+    set {_uniqueStorage()._isReady = newValue}
+  }
 
-  public var isSpeechActive: Bool = false
+  public var isSpeechActive: Bool {
+    get {_storage._isSpeechActive}
+    set {_uniqueStorage()._isSpeechActive = newValue}
+  }
 
-  public var energyThreshold: Float = 0
+  public var energyThreshold: Float {
+    get {_storage._energyThreshold}
+    set {_uniqueStorage()._energyThreshold = newValue}
+  }
 
-  public var sampleRate: Int32 = 0
+  public var sampleRate: Int32 {
+    get {_storage._sampleRate}
+    set {_uniqueStorage()._sampleRate = newValue}
+  }
 
-  public var frameLengthMs: Int32 = 0
+  public var frameLengthMs: Int32 {
+    get {_storage._frameLengthMs}
+    set {_uniqueStorage()._frameLengthMs = newValue}
+  }
 
   public var currentModel: String {
-    get {_currentModel ?? String()}
-    set {_currentModel = newValue}
+    get {_storage._currentModel ?? String()}
+    set {_uniqueStorage()._currentModel = newValue}
   }
   /// Returns true if `currentModel` has been explicitly set.
-  public var hasCurrentModel: Bool {self._currentModel != nil}
+  public var hasCurrentModel: Bool {_storage._currentModel != nil}
   /// Clears the value of `currentModel`. Subsequent reads from it will return its default value.
-  public mutating func clearCurrentModel() {self._currentModel = nil}
+  public mutating func clearCurrentModel() {_uniqueStorage()._currentModel = nil}
 
-  public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
+  public var error: RASDKError {
+    get {_storage._error ?? RASDKError()}
+    set {_uniqueStorage()._error = newValue}
   }
-  /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
-  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
-
-  public var errorCode: Int32 = 0
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {_storage._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {_uniqueStorage()._error = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _currentModel: String? = nil
-  fileprivate var _errorMessage: String? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -742,10 +564,6 @@ fileprivate nonisolated let _protobuf_package = "runanywhere.v1"
 
 nonisolated extension RASpeechActivityKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SPEECH_ACTIVITY_KIND_UNSPECIFIED\0\u{1}SPEECH_ACTIVITY_KIND_SPEECH_STARTED\0\u{1}SPEECH_ACTIVITY_KIND_SPEECH_ENDED\0\u{1}SPEECH_ACTIVITY_KIND_ONGOING\0")
-}
-
-nonisolated extension RAVADAudioEncoding: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VAD_AUDIO_ENCODING_UNSPECIFIED\0\u{1}VAD_AUDIO_ENCODING_PCM_F32_LE\0\u{1}VAD_AUDIO_ENCODING_PCM_S16_LE\0")
 }
 
 nonisolated extension RAVADStreamEventKind: SwiftProtobuf._ProtoNameProviding {
@@ -833,7 +651,7 @@ nonisolated extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}min_speech_duration_ms\0\u{3}min_silence_duration_ms\0\u{3}max_speech_duration_ms\0\u{3}include_statistics\0\u{3}activation_threshold\0\u{3}prefix_padding_ms\0\u{c}\u{1}\u{1}")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}min_speech_duration_ms\0\u{3}min_silence_duration_ms\0\u{3}max_speech_duration_ms\0\u{3}include_statistics\0\u{3}activation_threshold\0\u{3}prefix_padding_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1014,7 +832,7 @@ nonisolated extension RAVADProcessRequest: SwiftProtobuf.Message, SwiftProtobuf.
 
 nonisolated extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_speech\0\u{1}confidence\0\u{1}energy\0\u{3}duration_ms\0\u{3}timestamp_ms\0\u{3}start_time_ms\0\u{3}end_time_ms\0\u{1}statistics\0\u{3}error_message\0\u{3}error_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_speech\0\u{1}confidence\0\u{1}energy\0\u{3}duration_ms\0\u{3}timestamp_ms\0\u{3}start_time_ms\0\u{3}end_time_ms\0\u{1}statistics\0\u{2}\u{3}error\0")
 
   fileprivate class _StorageClass {
     var _isSpeech: Bool = false
@@ -1025,8 +843,7 @@ nonisolated extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._Message
     var _startTimeMs: Int64 = 0
     var _endTimeMs: Int64 = 0
     var _statistics: RAVADStatistics? = nil
-    var _errorMessage: String? = nil
-    var _errorCode: Int32 = 0
+    var _error: RASDKError? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1045,8 +862,7 @@ nonisolated extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._Message
       _startTimeMs = source._startTimeMs
       _endTimeMs = source._endTimeMs
       _statistics = source._statistics
-      _errorMessage = source._errorMessage
-      _errorCode = source._errorCode
+      _error = source._error
     }
   }
 
@@ -1073,8 +889,7 @@ nonisolated extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._Message
         case 6: try { try decoder.decodeSingularInt64Field(value: &_storage._startTimeMs) }()
         case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._endTimeMs) }()
         case 8: try { try decoder.decodeSingularMessageField(value: &_storage._statistics) }()
-        case 9: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
-        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
         }
       }
@@ -1111,12 +926,9 @@ nonisolated extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._Message
       try { if let v = _storage._statistics {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
       } }()
-      try { if let v = _storage._errorMessage {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
       } }()
-      if _storage._errorCode != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 10)
-      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1134,8 +946,7 @@ nonisolated extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._Message
         if _storage._startTimeMs != rhs_storage._startTimeMs {return false}
         if _storage._endTimeMs != rhs_storage._endTimeMs {return false}
         if _storage._statistics != rhs_storage._statistics {return false}
-        if _storage._errorMessage != rhs_storage._errorMessage {return false}
-        if _storage._errorCode != rhs_storage._errorCode {return false}
+        if _storage._error != rhs_storage._error {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1276,18 +1087,16 @@ nonisolated extension RASpeechActivityEvent: SwiftProtobuf.Message, SwiftProtobu
 
 nonisolated extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}result\0\u{1}activity\0\u{1}statistics\0\u{3}error_message\0\u{3}error_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}result\0\u{1}activity\0\u{1}statistics\0\u{2}\u{3}error\0")
 
   fileprivate class _StorageClass {
-    var _seq: UInt64 = 0
     var _timestampUs: Int64 = 0
     var _requestID: String = String()
     var _kind: RAVADStreamEventKind = .unspecified
     var _result: RAVADResult? = nil
     var _activity: RASpeechActivityEvent? = nil
     var _statistics: RAVADStatistics? = nil
-    var _errorMessage: String? = nil
-    var _errorCode: Int32 = 0
+    var _error: RASDKError? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1298,15 +1107,13 @@ nonisolated extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
     private init() {}
 
     init(copying source: _StorageClass) {
-      _seq = source._seq
       _timestampUs = source._timestampUs
       _requestID = source._requestID
       _kind = source._kind
       _result = source._result
       _activity = source._activity
       _statistics = source._statistics
-      _errorMessage = source._errorMessage
-      _errorCode = source._errorCode
+      _error = source._error
     }
   }
 
@@ -1325,15 +1132,13 @@ nonisolated extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
         // allocates stack space for every case branch when no optimizations are
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
-        case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._seq) }()
         case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
         case 3: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
         case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
         case 6: try { try decoder.decodeSingularMessageField(value: &_storage._activity) }()
         case 7: try { try decoder.decodeSingularMessageField(value: &_storage._statistics) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
-        case 9: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
         default: break
         }
       }
@@ -1346,9 +1151,6 @@ nonisolated extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       // allocates stack space for every if/case branch local when no optimizations
       // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
       // https://github.com/apple/swift-protobuf/issues/1182
-      if _storage._seq != 0 {
-        try visitor.visitSingularUInt64Field(value: _storage._seq, fieldNumber: 1)
-      }
       if _storage._timestampUs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
       }
@@ -1367,12 +1169,9 @@ nonisolated extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       try { if let v = _storage._statistics {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
       } }()
-      try { if let v = _storage._errorMessage {
-        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
       } }()
-      if _storage._errorCode != 0 {
-        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 9)
-      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1382,15 +1181,13 @@ nonisolated extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
         let _storage = _args.0
         let rhs_storage = _args.1
-        if _storage._seq != rhs_storage._seq {return false}
         if _storage._timestampUs != rhs_storage._timestampUs {return false}
         if _storage._requestID != rhs_storage._requestID {return false}
         if _storage._kind != rhs_storage._kind {return false}
         if _storage._result != rhs_storage._result {return false}
         if _storage._activity != rhs_storage._activity {return false}
         if _storage._statistics != rhs_storage._statistics {return false}
-        if _storage._errorMessage != rhs_storage._errorMessage {return false}
-        if _storage._errorCode != rhs_storage._errorCode {return false}
+        if _storage._error != rhs_storage._error {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1402,68 +1199,111 @@ nonisolated extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 nonisolated extension RAVADServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADServiceState"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}is_speech_active\0\u{3}energy_threshold\0\u{3}sample_rate\0\u{3}frame_length_ms\0\u{3}current_model\0\u{3}error_message\0\u{3}error_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}is_speech_active\0\u{3}energy_threshold\0\u{3}sample_rate\0\u{3}frame_length_ms\0\u{3}current_model\0\u{2}\u{3}error\0")
+
+  fileprivate class _StorageClass {
+    var _isReady: Bool = false
+    var _isSpeechActive: Bool = false
+    var _energyThreshold: Float = 0
+    var _sampleRate: Int32 = 0
+    var _frameLengthMs: Int32 = 0
+    var _currentModel: String? = nil
+    var _error: RASDKError? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _isReady = source._isReady
+      _isSpeechActive = source._isSpeechActive
+      _energyThreshold = source._energyThreshold
+      _sampleRate = source._sampleRate
+      _frameLengthMs = source._frameLengthMs
+      _currentModel = source._currentModel
+      _error = source._error
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.isReady) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.isSpeechActive) }()
-      case 3: try { try decoder.decodeSingularFloatField(value: &self.energyThreshold) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.frameLengthMs) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._currentModel) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 8: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._isReady) }()
+        case 2: try { try decoder.decodeSingularBoolField(value: &_storage._isSpeechActive) }()
+        case 3: try { try decoder.decodeSingularFloatField(value: &_storage._energyThreshold) }()
+        case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._sampleRate) }()
+        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._frameLengthMs) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._currentModel) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.isReady != false {
-      try visitor.visitSingularBoolField(value: self.isReady, fieldNumber: 1)
-    }
-    if self.isSpeechActive != false {
-      try visitor.visitSingularBoolField(value: self.isSpeechActive, fieldNumber: 2)
-    }
-    if self.energyThreshold.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.energyThreshold, fieldNumber: 3)
-    }
-    if self.sampleRate != 0 {
-      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 4)
-    }
-    if self.frameLengthMs != 0 {
-      try visitor.visitSingularInt32Field(value: self.frameLengthMs, fieldNumber: 5)
-    }
-    try { if let v = self._currentModel {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-    } }()
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-    } }()
-    if self.errorCode != 0 {
-      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 8)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._isReady != false {
+        try visitor.visitSingularBoolField(value: _storage._isReady, fieldNumber: 1)
+      }
+      if _storage._isSpeechActive != false {
+        try visitor.visitSingularBoolField(value: _storage._isSpeechActive, fieldNumber: 2)
+      }
+      if _storage._energyThreshold.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._energyThreshold, fieldNumber: 3)
+      }
+      if _storage._sampleRate != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._sampleRate, fieldNumber: 4)
+      }
+      if _storage._frameLengthMs != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._frameLengthMs, fieldNumber: 5)
+      }
+      try { if let v = _storage._currentModel {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._error {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAVADServiceState, rhs: RAVADServiceState) -> Bool {
-    if lhs.isReady != rhs.isReady {return false}
-    if lhs.isSpeechActive != rhs.isSpeechActive {return false}
-    if lhs.energyThreshold != rhs.energyThreshold {return false}
-    if lhs.sampleRate != rhs.sampleRate {return false}
-    if lhs.frameLengthMs != rhs.frameLengthMs {return false}
-    if lhs._currentModel != rhs._currentModel {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._isReady != rhs_storage._isReady {return false}
+        if _storage._isSpeechActive != rhs_storage._isSpeechActive {return false}
+        if _storage._energyThreshold != rhs_storage._energyThreshold {return false}
+        if _storage._sampleRate != rhs_storage._sampleRate {return false}
+        if _storage._frameLengthMs != rhs_storage._frameLengthMs {return false}
+        if _storage._currentModel != rhs_storage._currentModel {return false}
+        if _storage._error != rhs_storage._error {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

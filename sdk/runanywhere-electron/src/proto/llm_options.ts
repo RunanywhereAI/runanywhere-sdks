@@ -12,93 +12,19 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
 import { ReasoningOptions } from "./thinking_tag_pattern";
+import { TokenUsage } from "./token_usage";
 import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 
 export const protobufPackage = "runanywhere.v1";
 
-export enum LLMGenerationState {
-  LLM_GENERATION_STATE_UNSPECIFIED = 0,
-  LLM_GENERATION_STATE_QUEUED = 1,
-  LLM_GENERATION_STATE_PREFILLING = 2,
-  LLM_GENERATION_STATE_DECODING = 3,
-  LLM_GENERATION_STATE_TOOL_CALLING = 4,
-  LLM_GENERATION_STATE_COMPLETED = 5,
-  LLM_GENERATION_STATE_CANCELLED = 6,
-  LLM_GENERATION_STATE_FAILED = 7,
-  UNRECOGNIZED = -1,
-}
-
-export function lLMGenerationStateFromJSON(object: any): LLMGenerationState {
-  switch (object) {
-    case 0:
-    case "LLM_GENERATION_STATE_UNSPECIFIED":
-      return LLMGenerationState.LLM_GENERATION_STATE_UNSPECIFIED;
-    case 1:
-    case "LLM_GENERATION_STATE_QUEUED":
-      return LLMGenerationState.LLM_GENERATION_STATE_QUEUED;
-    case 2:
-    case "LLM_GENERATION_STATE_PREFILLING":
-      return LLMGenerationState.LLM_GENERATION_STATE_PREFILLING;
-    case 3:
-    case "LLM_GENERATION_STATE_DECODING":
-      return LLMGenerationState.LLM_GENERATION_STATE_DECODING;
-    case 4:
-    case "LLM_GENERATION_STATE_TOOL_CALLING":
-      return LLMGenerationState.LLM_GENERATION_STATE_TOOL_CALLING;
-    case 5:
-    case "LLM_GENERATION_STATE_COMPLETED":
-      return LLMGenerationState.LLM_GENERATION_STATE_COMPLETED;
-    case 6:
-    case "LLM_GENERATION_STATE_CANCELLED":
-      return LLMGenerationState.LLM_GENERATION_STATE_CANCELLED;
-    case 7:
-    case "LLM_GENERATION_STATE_FAILED":
-      return LLMGenerationState.LLM_GENERATION_STATE_FAILED;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return LLMGenerationState.UNRECOGNIZED;
-  }
-}
-
-export function lLMGenerationStateToJSON(object: LLMGenerationState): string {
-  switch (object) {
-    case LLMGenerationState.LLM_GENERATION_STATE_UNSPECIFIED:
-      return "LLM_GENERATION_STATE_UNSPECIFIED";
-    case LLMGenerationState.LLM_GENERATION_STATE_QUEUED:
-      return "LLM_GENERATION_STATE_QUEUED";
-    case LLMGenerationState.LLM_GENERATION_STATE_PREFILLING:
-      return "LLM_GENERATION_STATE_PREFILLING";
-    case LLMGenerationState.LLM_GENERATION_STATE_DECODING:
-      return "LLM_GENERATION_STATE_DECODING";
-    case LLMGenerationState.LLM_GENERATION_STATE_TOOL_CALLING:
-      return "LLM_GENERATION_STATE_TOOL_CALLING";
-    case LLMGenerationState.LLM_GENERATION_STATE_COMPLETED:
-      return "LLM_GENERATION_STATE_COMPLETED";
-    case LLMGenerationState.LLM_GENERATION_STATE_CANCELLED:
-      return "LLM_GENERATION_STATE_CANCELLED";
-    case LLMGenerationState.LLM_GENERATION_STATE_FAILED:
-      return "LLM_GENERATION_STATE_FAILED";
-    case LLMGenerationState.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Routing destination for a generation (Web SDK ExecutionTarget in
- * types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
- * ---------------------------------------------------------------------------
- */
 export enum ExecutionTarget {
   EXECUTION_TARGET_UNSPECIFIED = 0,
   EXECUTION_TARGET_ON_DEVICE = 1,
   EXECUTION_TARGET_CLOUD = 2,
-  /** EXECUTION_TARGET_AUTO - Let the SDK decide based on policy (cost, latency, privacy, etc.). */
   EXECUTION_TARGET_AUTO = 3,
   UNRECOGNIZED = -1,
 }
@@ -140,253 +66,82 @@ export function executionTargetToJSON(object: ExecutionTarget): string {
   }
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Options for a single text generation invocation.
- *
- * Field names match Swift LLMGenerationOptions exactly; consumers may treat
- * proto3 scalar defaults as "unset" (Swift handled this via Optionals — proto
- * represents optional reference fields explicitly via `optional` keyword).
- * ---------------------------------------------------------------------------
- */
 export interface LLMGenerationOptions {
-  /**
-   * Maximum number of tokens to generate. 0 (default) = unset → engine
-   * default (typically 100).
-   */
+  /** 0 = unset, so the annotated default applies. */
   maxOutputTokens: number;
-  /** Sampling temperature (0.0 - 2.0). 0.0 = greedy decoding. */
+  /** 0.0 = greedy decoding. */
   temperature: number;
-  /** Nucleus sampling (top-p). 1.0 = no nucleus truncation. */
   topP: number;
-  /** Top-K sampling (Kotlin/Dart/RN field). 0 = disabled. */
+  /** Commons treats 0 as unset for every sampling knob below. */
   topK: number;
-  /** Repetition penalty (Kotlin/Dart/RN field). 1.0 = no penalty. */
   repetitionPenalty: number;
-  /**
-   * Stop sequences. Generation halts when any of these strings appears in
-   * the output stream.
-   */
   stopSequences: string[];
-  /** Preferred inference framework. UNSPECIFIED = pick automatically. */
   preferredFramework: InferenceFramework;
-  /** System prompt to define AI behavior and formatting rules. */
-  systemPrompt?:
-    | string
-    | undefined;
-  /**
-   * Reasoning/thinking control (mode, emission, tag pattern). Unset =
-   * model default with thinking stripped from output.
-   */
+  systemPrompt?: string | undefined;
   reasoning?:
     | ReasoningOptions
     | undefined;
-  /**
-   * Routing hint: where this generation should run (on-device, cloud, or
-   * SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
-   */
-  executionTarget?:
-    | ExecutionTarget
-    | undefined;
-  /**
-   * The ONE output-constraint surface (typed or raw JSON schema, grammar,
-   * regex — see structured_output.proto).
-   */
-  structuredOutput?:
-    | StructuredOutputOptions
-    | undefined;
-  /** Deterministic sampling seed. 0 = backend/default random seed. */
+  /** No consumer reads this today. */
+  executionTarget?: ExecutionTarget | undefined;
+  structuredOutput?: StructuredOutputOptions | undefined;
   seed: number;
-  /** OpenAI-compatible sampling penalties. 0.0 = disabled. */
   frequencyPenalty: number;
   presencePenalty: number;
-  /** Repeat-penalty lookback window. 0 = backend default. */
+  /** No engine reads repeat_last_n or echo_prompt. */
   repeatLastN: number;
-  /** Minimum probability sampling. 0.0 = disabled. */
   minP: number;
-  /** Include prompt text in the result/stream when the backend supports echo. */
   echoPrompt: boolean;
-  /** Per-request backend thread hint. 0 = backend/runtime default. */
   nThreads: number;
-  /**
-   * Tool-calling contract for this generation: pure tool configuration
-   * (definitions, choice policy, loop limits). Sampling and reasoning come
-   * from THIS message — ToolCallingOptions carries none of its own.
-   */
   toolCalling?: ToolCallingOptions | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Result of a single text generation shared by every SDK.
- * ---------------------------------------------------------------------------
- */
 export interface LLMGenerationResult {
-  /** Generated text (with thinking content removed if extracted). */
   text: string;
-  /** Optional thinking/reasoning content extracted from the response. */
-  thinkingContent?:
-    | string
-    | undefined;
-  /** Number of input/prompt tokens (from tokenizer). */
-  inputTokens: number;
-  /** Number of output/completion tokens. */
-  outputTokens: number;
-  /** Model used for generation. */
+  thinkingContent?: string | undefined;
   modelUsed: string;
-  /** Total wall-clock generation time in milliseconds. */
   generationTimeMs: number;
-  /** Time-to-first-token in milliseconds (only set in streaming mode). */
-  ttftMs?:
-    | number
-    | undefined;
-  /** Tokens-per-second throughput. */
-  tokensPerSecond: number;
-  /**
-   * Framework that actually performed the generation. Optional because
-   * some C ABI paths don't surface it.
-   */
-  framework?:
-    | string
-    | undefined;
-  /**
-   * Reason the generation stopped: "stop", "length", "cancelled", "error".
-   * Empty = unset.
-   */
+  ttftMs?: number | undefined;
+  framework?: string | undefined;
   finishReason: string;
-  /** Number of tokens used for thinking/reasoning. 0 = not applicable. */
   thinkingTokens: number;
-  /** Number of tokens in the actual response content (vs thinking). */
   responseTokens: number;
-  /**
-   * Optional JSON output (when structured-output mode was requested).
-   * Empty = no structured output.
-   */
   jsonOutput?:
     | string
     | undefined;
-  /**
-   * Optional aggregated performance metrics. Web SDK surfaces this as a
-   * separate object alongside the result; consumers may ignore it if they
-   * already use the per-field timings above.
-   */
-  performance?:
-    | PerformanceMetrics
-    | undefined;
-  /**
-   * Where the generation actually ran (on-device, cloud, etc.). Useful
-   * when execution_target was AUTO and the SDK picked the route.
-   */
-  executedOn?:
-    | ExecutionTarget
-    | undefined;
-  /**
-   * Structured-output validation details, when a structured-output request
-   * was used. Mirrors the Swift/RN validation payload.
-   */
-  structuredOutputValidation?:
-    | StructuredOutputValidation
-    | undefined;
-  /**
-   * Total tokens consumed (prompt + completion). Some C ABI paths expose
-   * this directly; consumers may also compute it from the per-field counts.
-   */
-  totalTokens: number;
-  /**
-   * Backend error text for result-producing APIs that return a terminal
-   * result envelope instead of throwing through the host language.
-   */
-  errorMessage?:
-    | string
-    | undefined;
-  /** Numeric backend status code when a result envelope carries an error. */
-  errorCode: number;
-  /** Prompt/cache accounting surfaced by llama.cpp/CoreML-style backends. */
+  /** Nothing reads performance or executed_on. */
+  performance?: PerformanceMetrics | undefined;
+  executedOn?: ExecutionTarget | undefined;
+  structuredOutputValidation?: StructuredOutputValidation | undefined;
   cachedPromptTokens: number;
   promptEvalTimeMs: number;
   decodeTimeMs: number;
-  /** Tool calls parsed from the final assistant response, if any. */
   toolCalls: ToolCall[];
-  /** Tool results incorporated during auto-execute loops. */
   toolResults: ToolResult[];
+  usage?: TokenUsage | undefined;
+  error?: SDKError | undefined;
 }
 
-export interface LLMGenerationStatus {
-  requestId: string;
-  state: LLMGenerationState;
-  promptTokensProcessed: number;
-  completionTokensGenerated: number;
-  progress: number;
-  elapsedMs: number;
-  message?: string | undefined;
-  errorMessage?: string | undefined;
-  errorCode: number;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Lightweight LLM configuration used at component-init time (Swift
- * LLMConfiguration in LLMTypes.swift:15). Distinct from LLMGenerationOptions
- * — this is the "load the model" knob set, not the per-call sampling knobs.
- * ---------------------------------------------------------------------------
- */
 export interface LLMConfiguration {
-  /** Model context window length in tokens. 0 = use model default. */
   contextLength: number;
-  /**
-   * Model identifier/path resolved by the component loader. Present in the
-   * C ABI rac_llm_config_t and needed for generated-proto service handles.
-   */
-  modelId?:
-    | string
-    | undefined;
-  /**
-   * Preferred inference framework for this component. UNSPECIFIED / absent
-   * means "auto".
-   */
+  modelId?: string | undefined;
   preferredFramework?:
     | InferenceFramework
     | undefined;
-  /**
-   * Component-level defaults applied when a per-call options message is
-   * absent or leaves a field unset.
-   */
+  /** Applied when a per-call LLMGenerationOptions leaves a field unset. */
   defaultOptions?: LLMGenerationOptions | undefined;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
- * once per token in streaming mode.
- * ---------------------------------------------------------------------------
- */
 export interface StreamToken {
-  /** Decoded text fragment for this token. */
   text: string;
-  /** Wall-clock timestamp (ms since Unix epoch) the token was produced. */
   timestampMs: number;
-  /** Sequence index within the current generation (0-based). */
   index: number;
 }
 
-/**
- * ---------------------------------------------------------------------------
- * Aggregated performance metrics for a generation (Web SDK
- * PerformanceMetrics in types/models.ts:57). Higher-level summary that
- * rolls up the timing fields scattered across LLMGenerationResult.
- * ---------------------------------------------------------------------------
- */
+/** Referenced only by LLMGenerationResult.performance, which no SDK reads. */
 export interface PerformanceMetrics {
-  /** Total latency from request to last token, in milliseconds. */
   latencyMs: number;
-  /** Peak memory used by the inference engine, in bytes. */
   memoryBytes: number;
-  /** Decode throughput in tokens/second. */
-  throughputTokensPerSec: number;
-  /** Input (prompt) token count. */
-  inputTokens: number;
-  /** Output (completion) token count. */
-  outputTokens: number;
+  usage?: TokenUsage | undefined;
 }
 
 function createBaseLLMGenerationOptions(): LLMGenerationOptions {
@@ -831,12 +586,9 @@ function createBaseLLMGenerationResult(): LLMGenerationResult {
   return {
     text: "",
     thinkingContent: undefined,
-    inputTokens: 0,
-    outputTokens: 0,
     modelUsed: "",
     generationTimeMs: 0,
     ttftMs: undefined,
-    tokensPerSecond: 0,
     framework: undefined,
     finishReason: "",
     thinkingTokens: 0,
@@ -845,14 +597,13 @@ function createBaseLLMGenerationResult(): LLMGenerationResult {
     performance: undefined,
     executedOn: undefined,
     structuredOutputValidation: undefined,
-    totalTokens: 0,
-    errorMessage: undefined,
-    errorCode: 0,
     cachedPromptTokens: 0,
     promptEvalTimeMs: 0,
     decodeTimeMs: 0,
     toolCalls: [],
     toolResults: [],
+    usage: undefined,
+    error: undefined,
   };
 }
 
@@ -864,12 +615,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     if (message.thinkingContent !== undefined) {
       writer.uint32(18).string(message.thinkingContent);
     }
-    if (message.inputTokens !== 0) {
-      writer.uint32(24).int32(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      writer.uint32(32).int32(message.outputTokens);
-    }
     if (message.modelUsed !== "") {
       writer.uint32(42).string(message.modelUsed);
     }
@@ -878,9 +623,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     }
     if (message.ttftMs !== undefined) {
       writer.uint32(57).double(message.ttftMs);
-    }
-    if (message.tokensPerSecond !== 0) {
-      writer.uint32(65).double(message.tokensPerSecond);
     }
     if (message.framework !== undefined) {
       writer.uint32(74).string(message.framework);
@@ -906,15 +648,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     if (message.structuredOutputValidation !== undefined) {
       StructuredOutputValidation.encode(message.structuredOutputValidation, writer.uint32(130).fork()).join();
     }
-    if (message.totalTokens !== 0) {
-      writer.uint32(136).int32(message.totalTokens);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(146).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(152).int32(message.errorCode);
-    }
     if (message.cachedPromptTokens !== 0) {
       writer.uint32(160).int32(message.cachedPromptTokens);
     }
@@ -929,6 +662,12 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     }
     for (const v of message.toolResults) {
       ToolResult.encode(v!, writer.uint32(194).fork()).join();
+    }
+    if (message.usage !== undefined) {
+      TokenUsage.encode(message.usage, writer.uint32(202).fork()).join();
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(210).fork()).join();
     }
     return writer;
   },
@@ -956,22 +695,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
           message.thinkingContent = reader.string();
           continue;
         }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.inputTokens = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.outputTokens = reader.int32();
-          continue;
-        }
         case 5: {
           if (tag !== 42) {
             break;
@@ -994,14 +717,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
           }
 
           message.ttftMs = reader.double();
-          continue;
-        }
-        case 8: {
-          if (tag !== 65) {
-            break;
-          }
-
-          message.tokensPerSecond = reader.double();
           continue;
         }
         case 9: {
@@ -1068,30 +783,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
           message.structuredOutputValidation = StructuredOutputValidation.decode(reader, reader.uint32());
           continue;
         }
-        case 17: {
-          if (tag !== 136) {
-            break;
-          }
-
-          message.totalTokens = reader.int32();
-          continue;
-        }
-        case 18: {
-          if (tag !== 146) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 19: {
-          if (tag !== 152) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
         case 20: {
           if (tag !== 160) {
             break;
@@ -1132,6 +823,22 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
           message.toolResults.push(ToolResult.decode(reader, reader.uint32()));
           continue;
         }
+        case 25: {
+          if (tag !== 202) {
+            break;
+          }
+
+          message.usage = TokenUsage.decode(reader, reader.uint32());
+          continue;
+        }
+        case 26: {
+          if (tag !== 210) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1149,16 +856,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
         : isSet(object.thinking_content)
         ? globalThis.String(object.thinking_content)
         : undefined,
-      inputTokens: isSet(object.inputTokens)
-        ? globalThis.Number(object.inputTokens)
-        : isSet(object.input_tokens)
-        ? globalThis.Number(object.input_tokens)
-        : 0,
-      outputTokens: isSet(object.outputTokens)
-        ? globalThis.Number(object.outputTokens)
-        : isSet(object.output_tokens)
-        ? globalThis.Number(object.output_tokens)
-        : 0,
       modelUsed: isSet(object.modelUsed)
         ? globalThis.String(object.modelUsed)
         : isSet(object.model_used)
@@ -1174,11 +871,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
         : isSet(object.ttft_ms)
         ? globalThis.Number(object.ttft_ms)
         : undefined,
-      tokensPerSecond: isSet(object.tokensPerSecond)
-        ? globalThis.Number(object.tokensPerSecond)
-        : isSet(object.tokens_per_second)
-        ? globalThis.Number(object.tokens_per_second)
-        : 0,
       framework: isSet(object.framework) ? globalThis.String(object.framework) : undefined,
       finishReason: isSet(object.finishReason)
         ? globalThis.String(object.finishReason)
@@ -1211,21 +903,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
         : isSet(object.structured_output_validation)
         ? StructuredOutputValidation.fromJSON(object.structured_output_validation)
         : undefined,
-      totalTokens: isSet(object.totalTokens)
-        ? globalThis.Number(object.totalTokens)
-        : isSet(object.total_tokens)
-        ? globalThis.Number(object.total_tokens)
-        : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
       cachedPromptTokens: isSet(object.cachedPromptTokens)
         ? globalThis.Number(object.cachedPromptTokens)
         : isSet(object.cached_prompt_tokens)
@@ -1251,6 +928,8 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
         : globalThis.Array.isArray(object?.tool_results)
         ? object.tool_results.map((e: any) => ToolResult.fromJSON(e))
         : [],
+      usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1262,12 +941,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     if (message.thinkingContent !== undefined) {
       obj.thinkingContent = message.thinkingContent;
     }
-    if (message.inputTokens !== 0) {
-      obj.inputTokens = Math.round(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      obj.outputTokens = Math.round(message.outputTokens);
-    }
     if (message.modelUsed !== "") {
       obj.modelUsed = message.modelUsed;
     }
@@ -1276,9 +949,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     }
     if (message.ttftMs !== undefined) {
       obj.ttftMs = message.ttftMs;
-    }
-    if (message.tokensPerSecond !== 0) {
-      obj.tokensPerSecond = message.tokensPerSecond;
     }
     if (message.framework !== undefined) {
       obj.framework = message.framework;
@@ -1304,15 +974,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     if (message.structuredOutputValidation !== undefined) {
       obj.structuredOutputValidation = StructuredOutputValidation.toJSON(message.structuredOutputValidation);
     }
-    if (message.totalTokens !== 0) {
-      obj.totalTokens = Math.round(message.totalTokens);
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
     if (message.cachedPromptTokens !== 0) {
       obj.cachedPromptTokens = Math.round(message.cachedPromptTokens);
     }
@@ -1328,6 +989,12 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     if (message.toolResults?.length) {
       obj.toolResults = message.toolResults.map((e) => ToolResult.toJSON(e));
     }
+    if (message.usage !== undefined) {
+      obj.usage = TokenUsage.toJSON(message.usage);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
     return obj;
   },
 
@@ -1338,12 +1005,9 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     const message = createBaseLLMGenerationResult();
     message.text = object.text ?? "";
     message.thinkingContent = object.thinkingContent ?? undefined;
-    message.inputTokens = object.inputTokens ?? 0;
-    message.outputTokens = object.outputTokens ?? 0;
     message.modelUsed = object.modelUsed ?? "";
     message.generationTimeMs = object.generationTimeMs ?? 0;
     message.ttftMs = object.ttftMs ?? undefined;
-    message.tokensPerSecond = object.tokensPerSecond ?? 0;
     message.framework = object.framework ?? undefined;
     message.finishReason = object.finishReason ?? "";
     message.thinkingTokens = object.thinkingTokens ?? 0;
@@ -1357,236 +1021,17 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
       (object.structuredOutputValidation !== undefined && object.structuredOutputValidation !== null)
         ? StructuredOutputValidation.fromPartial(object.structuredOutputValidation)
         : undefined;
-    message.totalTokens = object.totalTokens ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     message.cachedPromptTokens = object.cachedPromptTokens ?? 0;
     message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
     message.decodeTimeMs = object.decodeTimeMs ?? 0;
     message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
     message.toolResults = object.toolResults?.map((e) => ToolResult.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseLLMGenerationStatus(): LLMGenerationStatus {
-  return {
-    requestId: "",
-    state: 0,
-    promptTokensProcessed: 0,
-    completionTokensGenerated: 0,
-    progress: 0,
-    elapsedMs: 0,
-    message: undefined,
-    errorMessage: undefined,
-    errorCode: 0,
-  };
-}
-
-export const LLMGenerationStatus: MessageFns<LLMGenerationStatus> = {
-  encode(message: LLMGenerationStatus, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.requestId !== "") {
-      writer.uint32(10).string(message.requestId);
-    }
-    if (message.state !== 0) {
-      writer.uint32(16).int32(message.state);
-    }
-    if (message.promptTokensProcessed !== 0) {
-      writer.uint32(24).int32(message.promptTokensProcessed);
-    }
-    if (message.completionTokensGenerated !== 0) {
-      writer.uint32(32).int32(message.completionTokensGenerated);
-    }
-    if (message.progress !== 0) {
-      writer.uint32(45).float(message.progress);
-    }
-    if (message.elapsedMs !== 0) {
-      writer.uint32(48).int64(message.elapsedMs);
-    }
-    if (message.message !== undefined) {
-      writer.uint32(58).string(message.message);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(66).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(72).int32(message.errorCode);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): LLMGenerationStatus {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseLLMGenerationStatus();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.requestId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.state = reader.int32() as any;
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.promptTokensProcessed = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.completionTokensGenerated = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 45) {
-            break;
-          }
-
-          message.progress = reader.float();
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.elapsedMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.message = reader.string();
-          continue;
-        }
-        case 8: {
-          if (tag !== 66) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 9: {
-          if (tag !== 72) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): LLMGenerationStatus {
-    return {
-      requestId: isSet(object.requestId)
-        ? globalThis.String(object.requestId)
-        : isSet(object.request_id)
-        ? globalThis.String(object.request_id)
-        : "",
-      state: isSet(object.state) ? lLMGenerationStateFromJSON(object.state) : 0,
-      promptTokensProcessed: isSet(object.promptTokensProcessed)
-        ? globalThis.Number(object.promptTokensProcessed)
-        : isSet(object.prompt_tokens_processed)
-        ? globalThis.Number(object.prompt_tokens_processed)
-        : 0,
-      completionTokensGenerated: isSet(object.completionTokensGenerated)
-        ? globalThis.Number(object.completionTokensGenerated)
-        : isSet(object.completion_tokens_generated)
-        ? globalThis.Number(object.completion_tokens_generated)
-        : 0,
-      progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
-      elapsedMs: isSet(object.elapsedMs)
-        ? globalThis.Number(object.elapsedMs)
-        : isSet(object.elapsed_ms)
-        ? globalThis.Number(object.elapsed_ms)
-        : 0,
-      message: isSet(object.message) ? globalThis.String(object.message) : undefined,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
-    };
-  },
-
-  toJSON(message: LLMGenerationStatus): unknown {
-    const obj: any = {};
-    if (message.requestId !== "") {
-      obj.requestId = message.requestId;
-    }
-    if (message.state !== 0) {
-      obj.state = lLMGenerationStateToJSON(message.state);
-    }
-    if (message.promptTokensProcessed !== 0) {
-      obj.promptTokensProcessed = Math.round(message.promptTokensProcessed);
-    }
-    if (message.completionTokensGenerated !== 0) {
-      obj.completionTokensGenerated = Math.round(message.completionTokensGenerated);
-    }
-    if (message.progress !== 0) {
-      obj.progress = message.progress;
-    }
-    if (message.elapsedMs !== 0) {
-      obj.elapsedMs = Math.round(message.elapsedMs);
-    }
-    if (message.message !== undefined) {
-      obj.message = message.message;
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<LLMGenerationStatus>, I>>(base?: I): LLMGenerationStatus {
-    return LLMGenerationStatus.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<LLMGenerationStatus>, I>>(object: I): LLMGenerationStatus {
-    const message = createBaseLLMGenerationStatus();
-    message.requestId = object.requestId ?? "";
-    message.state = object.state ?? 0;
-    message.promptTokensProcessed = object.promptTokensProcessed ?? 0;
-    message.completionTokensGenerated = object.completionTokensGenerated ?? 0;
-    message.progress = object.progress ?? 0;
-    message.elapsedMs = object.elapsedMs ?? 0;
-    message.message = object.message ?? undefined;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? TokenUsage.fromPartial(object.usage)
+      : undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1814,7 +1259,7 @@ export const StreamToken: MessageFns<StreamToken> = {
 };
 
 function createBasePerformanceMetrics(): PerformanceMetrics {
-  return { latencyMs: 0, memoryBytes: 0, throughputTokensPerSec: 0, inputTokens: 0, outputTokens: 0 };
+  return { latencyMs: 0, memoryBytes: 0, usage: undefined };
 }
 
 export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
@@ -1825,14 +1270,8 @@ export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
     if (message.memoryBytes !== 0) {
       writer.uint32(16).int64(message.memoryBytes);
     }
-    if (message.throughputTokensPerSec !== 0) {
-      writer.uint32(29).float(message.throughputTokensPerSec);
-    }
-    if (message.inputTokens !== 0) {
-      writer.uint32(32).int32(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      writer.uint32(40).int32(message.outputTokens);
+    if (message.usage !== undefined) {
+      TokenUsage.encode(message.usage, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -1860,28 +1299,12 @@ export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
           message.memoryBytes = longToNumber(reader.int64());
           continue;
         }
-        case 3: {
-          if (tag !== 29) {
+        case 6: {
+          if (tag !== 50) {
             break;
           }
 
-          message.throughputTokensPerSec = reader.float();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.inputTokens = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.outputTokens = reader.int32();
+          message.usage = TokenUsage.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1905,21 +1328,7 @@ export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
         : isSet(object.memory_bytes)
         ? globalThis.Number(object.memory_bytes)
         : 0,
-      throughputTokensPerSec: isSet(object.throughputTokensPerSec)
-        ? globalThis.Number(object.throughputTokensPerSec)
-        : isSet(object.throughput_tokens_per_sec)
-        ? globalThis.Number(object.throughput_tokens_per_sec)
-        : 0,
-      inputTokens: isSet(object.inputTokens)
-        ? globalThis.Number(object.inputTokens)
-        : isSet(object.input_tokens)
-        ? globalThis.Number(object.input_tokens)
-        : 0,
-      outputTokens: isSet(object.outputTokens)
-        ? globalThis.Number(object.outputTokens)
-        : isSet(object.output_tokens)
-        ? globalThis.Number(object.output_tokens)
-        : 0,
+      usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
     };
   },
 
@@ -1931,14 +1340,8 @@ export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
     if (message.memoryBytes !== 0) {
       obj.memoryBytes = Math.round(message.memoryBytes);
     }
-    if (message.throughputTokensPerSec !== 0) {
-      obj.throughputTokensPerSec = message.throughputTokensPerSec;
-    }
-    if (message.inputTokens !== 0) {
-      obj.inputTokens = Math.round(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      obj.outputTokens = Math.round(message.outputTokens);
+    if (message.usage !== undefined) {
+      obj.usage = TokenUsage.toJSON(message.usage);
     }
     return obj;
   },
@@ -1950,9 +1353,9 @@ export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
     const message = createBasePerformanceMetrics();
     message.latencyMs = object.latencyMs ?? 0;
     message.memoryBytes = object.memoryBytes ?? 0;
-    message.throughputTokensPerSec = object.throughputTokensPerSec ?? 0;
-    message.inputTokens = object.inputTokens ?? 0;
-    message.outputTokens = object.outputTokens ?? 0;
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? TokenUsage.fromPartial(object.usage)
+      : undefined;
     return message;
   },
 };

@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { AudioEncoding, InferenceFramework } from "./model_types";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum SpeechActivityKind {
@@ -102,8 +103,7 @@ export interface VADResult {
     startTimeMs: number;
     endTimeMs: number;
     statistics?: VADStatistics | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 /** Exposed for debugging and waveform UIs. */
 export interface VADStatistics {
@@ -138,15 +138,13 @@ export interface SpeechActivityEvent {
     segmentId?: string | undefined;
 }
 export interface VADStreamEvent {
-    seq: number;
     timestampUs: number;
     requestId: string;
     kind: VADStreamEventKind;
     result?: VADResult | undefined;
     activity?: SpeechActivityEvent | undefined;
     statistics?: VADStatistics | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export interface VADServiceState {
     isReady: boolean;
@@ -155,8 +153,7 @@ export interface VADServiceState {
     sampleRate: number;
     frameLengthMs: number;
     currentModel?: string | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export declare const VADConfiguration: MessageFns<VADConfiguration>;
 export declare const VADOptions: MessageFns<VADOptions>;

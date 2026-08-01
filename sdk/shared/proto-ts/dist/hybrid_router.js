@@ -5,13 +5,9 @@
 //   protoc               v7.35.1
 // source: hybrid_router.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HybridSttTranscribeResponse = exports.HybridSttTranscribeRequest = exports.HybridSttTranscribeOptions = exports.CloudSttBackendConfig = exports.HybridRoutingContext = exports.HybridRoutedMetadata = exports.HybridModelDescriptor = exports.HybridRoutingPolicy = exports.ConfidenceCascade = exports.HybridCascade = exports.CustomFilter = exports.BatteryFilter = exports.HybridFilter = exports.HybridRank = exports.HybridModelType = exports.HybridBackendKind = exports.protobufPackage = void 0;
+exports.HybridSttTranscribeResponse = exports.HybridSttTranscribeRequest = exports.HybridSttTranscribeOptions = exports.CloudSttBackendConfig = exports.HybridRoutingContext = exports.HybridRoutedMetadata = exports.HybridModelDescriptor = exports.HybridRoutingPolicy = exports.ConfidenceCascade = exports.HybridCascade = exports.CustomFilter = exports.BatteryFilter = exports.HybridFilter = exports.HybridBackendKind = exports.protobufPackage = void 0;
 exports.hybridBackendKindFromJSON = hybridBackendKindFromJSON;
 exports.hybridBackendKindToJSON = hybridBackendKindToJSON;
-exports.hybridModelTypeFromJSON = hybridModelTypeFromJSON;
-exports.hybridModelTypeToJSON = hybridModelTypeToJSON;
-exports.hybridRankFromJSON = hybridRankFromJSON;
-exports.hybridRankToJSON = hybridRankToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
 exports.protobufPackage = "runanywhere.v1";
@@ -60,80 +56,6 @@ function hybridBackendKindToJSON(object) {
         case HybridBackendKind.HYBRID_BACKEND_CLOUD:
             return "HYBRID_BACKEND_CLOUD";
         case HybridBackendKind.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var HybridModelType;
-(function (HybridModelType) {
-    HybridModelType[HybridModelType["HYBRID_MODEL_TYPE_UNSPECIFIED"] = 0] = "HYBRID_MODEL_TYPE_UNSPECIFIED";
-    HybridModelType[HybridModelType["HYBRID_MODEL_TYPE_OFFLINE"] = 1] = "HYBRID_MODEL_TYPE_OFFLINE";
-    HybridModelType[HybridModelType["HYBRID_MODEL_TYPE_ONLINE"] = 2] = "HYBRID_MODEL_TYPE_ONLINE";
-    HybridModelType[HybridModelType["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(HybridModelType || (exports.HybridModelType = HybridModelType = {}));
-function hybridModelTypeFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "HYBRID_MODEL_TYPE_UNSPECIFIED":
-            return HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED;
-        case 1:
-        case "HYBRID_MODEL_TYPE_OFFLINE":
-            return HybridModelType.HYBRID_MODEL_TYPE_OFFLINE;
-        case 2:
-        case "HYBRID_MODEL_TYPE_ONLINE":
-            return HybridModelType.HYBRID_MODEL_TYPE_ONLINE;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return HybridModelType.UNRECOGNIZED;
-    }
-}
-function hybridModelTypeToJSON(object) {
-    switch (object) {
-        case HybridModelType.HYBRID_MODEL_TYPE_UNSPECIFIED:
-            return "HYBRID_MODEL_TYPE_UNSPECIFIED";
-        case HybridModelType.HYBRID_MODEL_TYPE_OFFLINE:
-            return "HYBRID_MODEL_TYPE_OFFLINE";
-        case HybridModelType.HYBRID_MODEL_TYPE_ONLINE:
-            return "HYBRID_MODEL_TYPE_ONLINE";
-        case HybridModelType.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-var HybridRank;
-(function (HybridRank) {
-    HybridRank[HybridRank["HYBRID_RANK_UNSPECIFIED"] = 0] = "HYBRID_RANK_UNSPECIFIED";
-    HybridRank[HybridRank["HYBRID_RANK_PREFER_LOCAL_FIRST"] = 1] = "HYBRID_RANK_PREFER_LOCAL_FIRST";
-    HybridRank[HybridRank["HYBRID_RANK_PREFER_ONLINE_FIRST"] = 2] = "HYBRID_RANK_PREFER_ONLINE_FIRST";
-    HybridRank[HybridRank["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(HybridRank || (exports.HybridRank = HybridRank = {}));
-function hybridRankFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "HYBRID_RANK_UNSPECIFIED":
-            return HybridRank.HYBRID_RANK_UNSPECIFIED;
-        case 1:
-        case "HYBRID_RANK_PREFER_LOCAL_FIRST":
-            return HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST;
-        case 2:
-        case "HYBRID_RANK_PREFER_ONLINE_FIRST":
-            return HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return HybridRank.UNRECOGNIZED;
-    }
-}
-function hybridRankToJSON(object) {
-    switch (object) {
-        case HybridRank.HYBRID_RANK_UNSPECIFIED:
-            return "HYBRID_RANK_UNSPECIFIED";
-        case HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST:
-            return "HYBRID_RANK_PREFER_LOCAL_FIRST";
-        case HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST:
-            return "HYBRID_RANK_PREFER_ONLINE_FIRST";
-        case HybridRank.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -474,7 +396,7 @@ exports.ConfidenceCascade = {
     },
 };
 function createBaseHybridRoutingPolicy() {
-    return { hardFilters: [], cascade: undefined, rank: 0 };
+    return { hardFilters: [], cascade: undefined, preferLocal: false };
 }
 exports.HybridRoutingPolicy = {
     encode(message, writer = new wire_1.BinaryWriter()) {
@@ -484,8 +406,8 @@ exports.HybridRoutingPolicy = {
         if (message.cascade !== undefined) {
             exports.HybridCascade.encode(message.cascade, writer.uint32(18).fork()).join();
         }
-        if (message.rank !== 0) {
-            writer.uint32(24).int32(message.rank);
+        if (message.preferLocal !== false) {
+            writer.uint32(24).bool(message.preferLocal);
         }
         return writer;
     },
@@ -514,7 +436,7 @@ exports.HybridRoutingPolicy = {
                     if (tag !== 24) {
                         break;
                     }
-                    message.rank = reader.int32();
+                    message.preferLocal = reader.bool();
                     continue;
                 }
             }
@@ -533,7 +455,11 @@ exports.HybridRoutingPolicy = {
                     ? object.hard_filters.map((e) => exports.HybridFilter.fromJSON(e))
                     : [],
             cascade: isSet(object.cascade) ? exports.HybridCascade.fromJSON(object.cascade) : undefined,
-            rank: isSet(object.rank) ? hybridRankFromJSON(object.rank) : 0,
+            preferLocal: isSet(object.preferLocal)
+                ? globalThis.Boolean(object.preferLocal)
+                : isSet(object.prefer_local)
+                    ? globalThis.Boolean(object.prefer_local)
+                    : false,
         };
     },
     toJSON(message) {
@@ -544,8 +470,8 @@ exports.HybridRoutingPolicy = {
         if (message.cascade !== undefined) {
             obj.cascade = exports.HybridCascade.toJSON(message.cascade);
         }
-        if (message.rank !== 0) {
-            obj.rank = hybridRankToJSON(message.rank);
+        if (message.preferLocal !== false) {
+            obj.preferLocal = message.preferLocal;
         }
         return obj;
     },
@@ -558,20 +484,20 @@ exports.HybridRoutingPolicy = {
         message.cascade = (object.cascade !== undefined && object.cascade !== null)
             ? exports.HybridCascade.fromPartial(object.cascade)
             : undefined;
-        message.rank = object.rank ?? 0;
+        message.preferLocal = object.preferLocal ?? false;
         return message;
     },
 };
 function createBaseHybridModelDescriptor() {
-    return { modelId: "", modelType: 0, backend: 0, provider: "" };
+    return { modelId: "", isLocal: false, backend: 0, provider: "" };
 }
 exports.HybridModelDescriptor = {
     encode(message, writer = new wire_1.BinaryWriter()) {
         if (message.modelId !== "") {
             writer.uint32(10).string(message.modelId);
         }
-        if (message.modelType !== 0) {
-            writer.uint32(16).int32(message.modelType);
+        if (message.isLocal !== false) {
+            writer.uint32(16).bool(message.isLocal);
         }
         if (message.backend !== 0) {
             writer.uint32(24).int32(message.backend);
@@ -599,7 +525,7 @@ exports.HybridModelDescriptor = {
                     if (tag !== 16) {
                         break;
                     }
-                    message.modelType = reader.int32();
+                    message.isLocal = reader.bool();
                     continue;
                 }
                 case 3: {
@@ -631,11 +557,11 @@ exports.HybridModelDescriptor = {
                 : isSet(object.model_id)
                     ? globalThis.String(object.model_id)
                     : "",
-            modelType: isSet(object.modelType)
-                ? hybridModelTypeFromJSON(object.modelType)
-                : isSet(object.model_type)
-                    ? hybridModelTypeFromJSON(object.model_type)
-                    : 0,
+            isLocal: isSet(object.isLocal)
+                ? globalThis.Boolean(object.isLocal)
+                : isSet(object.is_local)
+                    ? globalThis.Boolean(object.is_local)
+                    : false,
             backend: isSet(object.backend) ? hybridBackendKindFromJSON(object.backend) : 0,
             provider: isSet(object.provider) ? globalThis.String(object.provider) : "",
         };
@@ -645,8 +571,8 @@ exports.HybridModelDescriptor = {
         if (message.modelId !== "") {
             obj.modelId = message.modelId;
         }
-        if (message.modelType !== 0) {
-            obj.modelType = hybridModelTypeToJSON(message.modelType);
+        if (message.isLocal !== false) {
+            obj.isLocal = message.isLocal;
         }
         if (message.backend !== 0) {
             obj.backend = hybridBackendKindToJSON(message.backend);
@@ -662,7 +588,7 @@ exports.HybridModelDescriptor = {
     fromPartial(object) {
         const message = createBaseHybridModelDescriptor();
         message.modelId = object.modelId ?? "";
-        message.modelType = object.modelType ?? 0;
+        message.isLocal = object.isLocal ?? false;
         message.backend = object.backend ?? 0;
         message.provider = object.provider ?? "";
         return message;

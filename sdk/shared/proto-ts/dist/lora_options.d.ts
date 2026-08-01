@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 export declare const protobufPackage = "runanywhere.v1";
 export interface LoRAAdapterConfig {
     /** On-disk path to the GGUF file. */
@@ -23,10 +24,9 @@ export interface LoRAAdapterInfo {
     scale: number;
     /** Whether it is currently applied to the context. */
     applied: boolean;
-    /** Populated when applied is false. */
-    errorMessage?: string | undefined;
-    errorCode: number;
     loadedAtMs: number;
+    /** Populated when applied is false. */
+    error?: SDKError | undefined;
 }
 export interface LoraAdapterCatalogEntry {
     id: string;
@@ -71,13 +71,12 @@ export interface LoraAdapterCatalogListRequest {
     includeCounts: boolean;
 }
 export interface LoraAdapterCatalogListResult {
-    success: boolean;
     entries: LoraAdapterCatalogEntry[];
-    errorMessage: string;
     /** total_count is unfiltered; filtered_count reflects the query. */
     totalCount: number;
     filteredCount: number;
     downloadedCount: number;
+    error?: SDKError | undefined;
 }
 export interface LoraAdapterCatalogGetRequest {
     adapterId: string;
@@ -85,7 +84,7 @@ export interface LoraAdapterCatalogGetRequest {
 export interface LoraAdapterCatalogGetResult {
     found: boolean;
     entry?: LoraAdapterCatalogEntry | undefined;
-    errorMessage: string;
+    error?: SDKError | undefined;
 }
 export interface LoraAdapterDownloadCompletedRequest {
     adapterId: string;
@@ -97,10 +96,9 @@ export interface LoraAdapterDownloadCompletedRequest {
     statusMessage: string;
 }
 export interface LoraAdapterDownloadCompletedResult {
-    success: boolean;
     entry?: LoraAdapterCatalogEntry | undefined;
-    errorMessage: string;
     persisted: boolean;
+    error?: SDKError | undefined;
 }
 export interface LoraAdapterImportRequest {
     /** Platform-readable path of the picked file. */
@@ -109,21 +107,19 @@ export interface LoraAdapterImportRequest {
     filename?: string | undefined;
 }
 export interface LoraAdapterImportResult {
-    success: boolean;
-    errorMessage: string;
     /** Stable SDK-owned path of the imported file. */
     localPath: string;
     /** Whether a catalog entry matched and was completed. */
     matched: boolean;
     entry?: LoraAdapterCatalogEntry | undefined;
+    error?: SDKError | undefined;
 }
 export interface LoraCompatibilityResult {
     isCompatible: boolean;
-    /** Populated when is_compatible is false. */
-    errorMessage?: string | undefined;
     baseModelRequired?: string | undefined;
     warnings: string[];
-    errorCode: number;
+    /** Populated when is_compatible is false. */
+    error?: SDKError | undefined;
 }
 export interface LoRAApplyRequest {
     requestId: string;
@@ -134,9 +130,7 @@ export interface LoRAApplyRequest {
 export interface LoRAApplyResult {
     requestId: string;
     adapters: LoRAAdapterInfo[];
-    success: boolean;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export interface LoRARemoveRequest {
     requestId: string;
@@ -153,8 +147,7 @@ export interface LoRAState {
     loadedAdapters: LoRAAdapterInfo[];
     hasActiveAdapters: boolean;
     baseModelId?: string | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export declare const LoRAAdapterConfig: MessageFns<LoRAAdapterConfig>;
 export declare const LoRAAdapterConfig_MetadataEntry: MessageFns<LoRAAdapterConfig_MetadataEntry>;

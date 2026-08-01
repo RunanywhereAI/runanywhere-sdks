@@ -6,9 +6,11 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
 import { ReasoningOptions } from "./thinking_tag_pattern";
+import { TokenUsage } from "./token_usage";
 import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 
 export const protobufPackage = "runanywhere.v1";
@@ -90,12 +92,9 @@ export interface LLMGenerationOptions {
 export interface LLMGenerationResult {
   text: string;
   thinkingContent?: string | undefined;
-  inputTokens: number;
-  outputTokens: number;
   modelUsed: string;
   generationTimeMs: number;
   ttftMs?: number | undefined;
-  tokensPerSecond: number;
   framework?: string | undefined;
   finishReason: string;
   thinkingTokens: number;
@@ -106,18 +105,14 @@ export interface LLMGenerationResult {
   /** Nothing reads performance or executed_on. */
   performance?: PerformanceMetrics | undefined;
   executedOn?: ExecutionTarget | undefined;
-  structuredOutputValidation?:
-    | StructuredOutputValidation
-    | undefined;
-  /** input_tokens + output_tokens. */
-  totalTokens: number;
-  errorMessage?: string | undefined;
-  errorCode: number;
+  structuredOutputValidation?: StructuredOutputValidation | undefined;
   cachedPromptTokens: number;
   promptEvalTimeMs: number;
   decodeTimeMs: number;
   toolCalls: ToolCall[];
   toolResults: ToolResult[];
+  usage?: TokenUsage | undefined;
+  error?: SDKError | undefined;
 }
 
 export interface LLMConfiguration {
@@ -140,9 +135,7 @@ export interface StreamToken {
 export interface PerformanceMetrics {
   latencyMs: number;
   memoryBytes: number;
-  throughputTokensPerSec: number;
-  inputTokens: number;
-  outputTokens: number;
+  usage?: TokenUsage | undefined;
 }
 
 function createBaseLLMGenerationOptions(): LLMGenerationOptions {
@@ -587,12 +580,9 @@ function createBaseLLMGenerationResult(): LLMGenerationResult {
   return {
     text: "",
     thinkingContent: undefined,
-    inputTokens: 0,
-    outputTokens: 0,
     modelUsed: "",
     generationTimeMs: 0,
     ttftMs: undefined,
-    tokensPerSecond: 0,
     framework: undefined,
     finishReason: "",
     thinkingTokens: 0,
@@ -601,14 +591,13 @@ function createBaseLLMGenerationResult(): LLMGenerationResult {
     performance: undefined,
     executedOn: undefined,
     structuredOutputValidation: undefined,
-    totalTokens: 0,
-    errorMessage: undefined,
-    errorCode: 0,
     cachedPromptTokens: 0,
     promptEvalTimeMs: 0,
     decodeTimeMs: 0,
     toolCalls: [],
     toolResults: [],
+    usage: undefined,
+    error: undefined,
   };
 }
 
@@ -620,12 +609,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     if (message.thinkingContent !== undefined) {
       writer.uint32(18).string(message.thinkingContent);
     }
-    if (message.inputTokens !== 0) {
-      writer.uint32(24).int32(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      writer.uint32(32).int32(message.outputTokens);
-    }
     if (message.modelUsed !== "") {
       writer.uint32(42).string(message.modelUsed);
     }
@@ -634,9 +617,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     }
     if (message.ttftMs !== undefined) {
       writer.uint32(57).double(message.ttftMs);
-    }
-    if (message.tokensPerSecond !== 0) {
-      writer.uint32(65).double(message.tokensPerSecond);
     }
     if (message.framework !== undefined) {
       writer.uint32(74).string(message.framework);
@@ -662,15 +642,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     if (message.structuredOutputValidation !== undefined) {
       StructuredOutputValidation.encode(message.structuredOutputValidation, writer.uint32(130).fork()).join();
     }
-    if (message.totalTokens !== 0) {
-      writer.uint32(136).int32(message.totalTokens);
-    }
-    if (message.errorMessage !== undefined) {
-      writer.uint32(146).string(message.errorMessage);
-    }
-    if (message.errorCode !== 0) {
-      writer.uint32(152).int32(message.errorCode);
-    }
     if (message.cachedPromptTokens !== 0) {
       writer.uint32(160).int32(message.cachedPromptTokens);
     }
@@ -685,6 +656,12 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     }
     for (const v of message.toolResults) {
       ToolResult.encode(v!, writer.uint32(194).fork()).join();
+    }
+    if (message.usage !== undefined) {
+      TokenUsage.encode(message.usage, writer.uint32(202).fork()).join();
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(210).fork()).join();
     }
     return writer;
   },
@@ -712,22 +689,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
           message.thinkingContent = reader.string();
           continue;
         }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.inputTokens = reader.int32();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.outputTokens = reader.int32();
-          continue;
-        }
         case 5: {
           if (tag !== 42) {
             break;
@@ -750,14 +711,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
           }
 
           message.ttftMs = reader.double();
-          continue;
-        }
-        case 8: {
-          if (tag !== 65) {
-            break;
-          }
-
-          message.tokensPerSecond = reader.double();
           continue;
         }
         case 9: {
@@ -824,30 +777,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
           message.structuredOutputValidation = StructuredOutputValidation.decode(reader, reader.uint32());
           continue;
         }
-        case 17: {
-          if (tag !== 136) {
-            break;
-          }
-
-          message.totalTokens = reader.int32();
-          continue;
-        }
-        case 18: {
-          if (tag !== 146) {
-            break;
-          }
-
-          message.errorMessage = reader.string();
-          continue;
-        }
-        case 19: {
-          if (tag !== 152) {
-            break;
-          }
-
-          message.errorCode = reader.int32();
-          continue;
-        }
         case 20: {
           if (tag !== 160) {
             break;
@@ -888,6 +817,22 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
           message.toolResults.push(ToolResult.decode(reader, reader.uint32()));
           continue;
         }
+        case 25: {
+          if (tag !== 202) {
+            break;
+          }
+
+          message.usage = TokenUsage.decode(reader, reader.uint32());
+          continue;
+        }
+        case 26: {
+          if (tag !== 210) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -905,16 +850,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
         : isSet(object.thinking_content)
         ? globalThis.String(object.thinking_content)
         : undefined,
-      inputTokens: isSet(object.inputTokens)
-        ? globalThis.Number(object.inputTokens)
-        : isSet(object.input_tokens)
-        ? globalThis.Number(object.input_tokens)
-        : 0,
-      outputTokens: isSet(object.outputTokens)
-        ? globalThis.Number(object.outputTokens)
-        : isSet(object.output_tokens)
-        ? globalThis.Number(object.output_tokens)
-        : 0,
       modelUsed: isSet(object.modelUsed)
         ? globalThis.String(object.modelUsed)
         : isSet(object.model_used)
@@ -930,11 +865,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
         : isSet(object.ttft_ms)
         ? globalThis.Number(object.ttft_ms)
         : undefined,
-      tokensPerSecond: isSet(object.tokensPerSecond)
-        ? globalThis.Number(object.tokensPerSecond)
-        : isSet(object.tokens_per_second)
-        ? globalThis.Number(object.tokens_per_second)
-        : 0,
       framework: isSet(object.framework) ? globalThis.String(object.framework) : undefined,
       finishReason: isSet(object.finishReason)
         ? globalThis.String(object.finishReason)
@@ -967,21 +897,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
         : isSet(object.structured_output_validation)
         ? StructuredOutputValidation.fromJSON(object.structured_output_validation)
         : undefined,
-      totalTokens: isSet(object.totalTokens)
-        ? globalThis.Number(object.totalTokens)
-        : isSet(object.total_tokens)
-        ? globalThis.Number(object.total_tokens)
-        : 0,
-      errorMessage: isSet(object.errorMessage)
-        ? globalThis.String(object.errorMessage)
-        : isSet(object.error_message)
-        ? globalThis.String(object.error_message)
-        : undefined,
-      errorCode: isSet(object.errorCode)
-        ? globalThis.Number(object.errorCode)
-        : isSet(object.error_code)
-        ? globalThis.Number(object.error_code)
-        : 0,
       cachedPromptTokens: isSet(object.cachedPromptTokens)
         ? globalThis.Number(object.cachedPromptTokens)
         : isSet(object.cached_prompt_tokens)
@@ -1007,6 +922,8 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
         : globalThis.Array.isArray(object?.tool_results)
         ? object.tool_results.map((e: any) => ToolResult.fromJSON(e))
         : [],
+      usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1018,12 +935,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     if (message.thinkingContent !== undefined) {
       obj.thinkingContent = message.thinkingContent;
     }
-    if (message.inputTokens !== 0) {
-      obj.inputTokens = Math.round(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      obj.outputTokens = Math.round(message.outputTokens);
-    }
     if (message.modelUsed !== "") {
       obj.modelUsed = message.modelUsed;
     }
@@ -1032,9 +943,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     }
     if (message.ttftMs !== undefined) {
       obj.ttftMs = message.ttftMs;
-    }
-    if (message.tokensPerSecond !== 0) {
-      obj.tokensPerSecond = message.tokensPerSecond;
     }
     if (message.framework !== undefined) {
       obj.framework = message.framework;
@@ -1060,15 +968,6 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     if (message.structuredOutputValidation !== undefined) {
       obj.structuredOutputValidation = StructuredOutputValidation.toJSON(message.structuredOutputValidation);
     }
-    if (message.totalTokens !== 0) {
-      obj.totalTokens = Math.round(message.totalTokens);
-    }
-    if (message.errorMessage !== undefined) {
-      obj.errorMessage = message.errorMessage;
-    }
-    if (message.errorCode !== 0) {
-      obj.errorCode = Math.round(message.errorCode);
-    }
     if (message.cachedPromptTokens !== 0) {
       obj.cachedPromptTokens = Math.round(message.cachedPromptTokens);
     }
@@ -1084,6 +983,12 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     if (message.toolResults?.length) {
       obj.toolResults = message.toolResults.map((e) => ToolResult.toJSON(e));
     }
+    if (message.usage !== undefined) {
+      obj.usage = TokenUsage.toJSON(message.usage);
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
     return obj;
   },
 
@@ -1094,12 +999,9 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
     const message = createBaseLLMGenerationResult();
     message.text = object.text ?? "";
     message.thinkingContent = object.thinkingContent ?? undefined;
-    message.inputTokens = object.inputTokens ?? 0;
-    message.outputTokens = object.outputTokens ?? 0;
     message.modelUsed = object.modelUsed ?? "";
     message.generationTimeMs = object.generationTimeMs ?? 0;
     message.ttftMs = object.ttftMs ?? undefined;
-    message.tokensPerSecond = object.tokensPerSecond ?? 0;
     message.framework = object.framework ?? undefined;
     message.finishReason = object.finishReason ?? "";
     message.thinkingTokens = object.thinkingTokens ?? 0;
@@ -1113,14 +1015,17 @@ export const LLMGenerationResult: MessageFns<LLMGenerationResult> = {
       (object.structuredOutputValidation !== undefined && object.structuredOutputValidation !== null)
         ? StructuredOutputValidation.fromPartial(object.structuredOutputValidation)
         : undefined;
-    message.totalTokens = object.totalTokens ?? 0;
-    message.errorMessage = object.errorMessage ?? undefined;
-    message.errorCode = object.errorCode ?? 0;
     message.cachedPromptTokens = object.cachedPromptTokens ?? 0;
     message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
     message.decodeTimeMs = object.decodeTimeMs ?? 0;
     message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
     message.toolResults = object.toolResults?.map((e) => ToolResult.fromPartial(e)) || [];
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? TokenUsage.fromPartial(object.usage)
+      : undefined;
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };
@@ -1348,7 +1253,7 @@ export const StreamToken: MessageFns<StreamToken> = {
 };
 
 function createBasePerformanceMetrics(): PerformanceMetrics {
-  return { latencyMs: 0, memoryBytes: 0, throughputTokensPerSec: 0, inputTokens: 0, outputTokens: 0 };
+  return { latencyMs: 0, memoryBytes: 0, usage: undefined };
 }
 
 export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
@@ -1359,14 +1264,8 @@ export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
     if (message.memoryBytes !== 0) {
       writer.uint32(16).int64(message.memoryBytes);
     }
-    if (message.throughputTokensPerSec !== 0) {
-      writer.uint32(29).float(message.throughputTokensPerSec);
-    }
-    if (message.inputTokens !== 0) {
-      writer.uint32(32).int32(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      writer.uint32(40).int32(message.outputTokens);
+    if (message.usage !== undefined) {
+      TokenUsage.encode(message.usage, writer.uint32(50).fork()).join();
     }
     return writer;
   },
@@ -1394,28 +1293,12 @@ export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
           message.memoryBytes = longToNumber(reader.int64());
           continue;
         }
-        case 3: {
-          if (tag !== 29) {
+        case 6: {
+          if (tag !== 50) {
             break;
           }
 
-          message.throughputTokensPerSec = reader.float();
-          continue;
-        }
-        case 4: {
-          if (tag !== 32) {
-            break;
-          }
-
-          message.inputTokens = reader.int32();
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.outputTokens = reader.int32();
+          message.usage = TokenUsage.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1439,21 +1322,7 @@ export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
         : isSet(object.memory_bytes)
         ? globalThis.Number(object.memory_bytes)
         : 0,
-      throughputTokensPerSec: isSet(object.throughputTokensPerSec)
-        ? globalThis.Number(object.throughputTokensPerSec)
-        : isSet(object.throughput_tokens_per_sec)
-        ? globalThis.Number(object.throughput_tokens_per_sec)
-        : 0,
-      inputTokens: isSet(object.inputTokens)
-        ? globalThis.Number(object.inputTokens)
-        : isSet(object.input_tokens)
-        ? globalThis.Number(object.input_tokens)
-        : 0,
-      outputTokens: isSet(object.outputTokens)
-        ? globalThis.Number(object.outputTokens)
-        : isSet(object.output_tokens)
-        ? globalThis.Number(object.output_tokens)
-        : 0,
+      usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
     };
   },
 
@@ -1465,14 +1334,8 @@ export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
     if (message.memoryBytes !== 0) {
       obj.memoryBytes = Math.round(message.memoryBytes);
     }
-    if (message.throughputTokensPerSec !== 0) {
-      obj.throughputTokensPerSec = message.throughputTokensPerSec;
-    }
-    if (message.inputTokens !== 0) {
-      obj.inputTokens = Math.round(message.inputTokens);
-    }
-    if (message.outputTokens !== 0) {
-      obj.outputTokens = Math.round(message.outputTokens);
+    if (message.usage !== undefined) {
+      obj.usage = TokenUsage.toJSON(message.usage);
     }
     return obj;
   },
@@ -1484,9 +1347,9 @@ export const PerformanceMetrics: MessageFns<PerformanceMetrics> = {
     const message = createBasePerformanceMetrics();
     message.latencyMs = object.latencyMs ?? 0;
     message.memoryBytes = object.memoryBytes ?? 0;
-    message.throughputTokensPerSec = object.throughputTokensPerSec ?? 0;
-    message.inputTokens = object.inputTokens ?? 0;
-    message.outputTokens = object.outputTokens ?? 0;
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? TokenUsage.fromPartial(object.usage)
+      : undefined;
     return message;
   },
 };

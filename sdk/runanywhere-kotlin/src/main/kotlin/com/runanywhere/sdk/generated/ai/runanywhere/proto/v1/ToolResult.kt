@@ -54,27 +54,11 @@ public class ToolResult(
   )
   public val result_json: String = "",
   @field:WireField(
-    tag = 4,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 3,
-  )
-  public val error: String? = null,
-  /**
-   * When false and error is empty, fall back to result_json semantics.
-   */
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
-    label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 4,
-  )
-  public val success: Boolean = false,
-  @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "startedAtMs",
-    schemaIndex = 5,
+    schemaIndex = 3,
   )
   public val started_at_ms: Long = 0L,
   @field:WireField(
@@ -82,9 +66,18 @@ public class ToolResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "completedAtMs",
-    schemaIndex = 6,
+    schemaIndex = 4,
   )
   public val completed_at_ms: Long = 0L,
+  /**
+   * Unset means the tool ran successfully; fall back to result_json semantics.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    schemaIndex = 5,
+  )
+  public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -100,10 +93,9 @@ public class ToolResult(
     if (tool_call_id != other.tool_call_id) return false
     if (name != other.name) return false
     if (result_json != other.result_json) return false
-    if (error != other.error) return false
-    if (success != other.success) return false
     if (started_at_ms != other.started_at_ms) return false
     if (completed_at_ms != other.completed_at_ms) return false
+    if (error != other.error) return false
     return true
   }
 
@@ -114,10 +106,9 @@ public class ToolResult(
       result = result * 37 + tool_call_id.hashCode()
       result = result * 37 + name.hashCode()
       result = result * 37 + result_json.hashCode()
-      result = result * 37 + (error?.hashCode() ?: 0)
-      result = result * 37 + success.hashCode()
       result = result * 37 + started_at_ms.hashCode()
       result = result * 37 + completed_at_ms.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -128,10 +119,9 @@ public class ToolResult(
     result += """tool_call_id=${sanitize(tool_call_id)}"""
     result += """name=${sanitize(name)}"""
     result += """result_json=${sanitize(result_json)}"""
-    if (error != null) result += """error=${sanitize(error)}"""
-    result += """success=$success"""
     result += """started_at_ms=$started_at_ms"""
     result += """completed_at_ms=$completed_at_ms"""
+    if (error != null) result += """error=$error"""
     return result.joinToString(prefix = "ToolResult{", separator = ", ", postfix = "}")
   }
 
@@ -139,12 +129,11 @@ public class ToolResult(
     tool_call_id: String = this.tool_call_id,
     name: String = this.name,
     result_json: String = this.result_json,
-    error: String? = this.error,
-    success: Boolean = this.success,
     started_at_ms: Long = this.started_at_ms,
     completed_at_ms: Long = this.completed_at_ms,
+    error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolResult = ToolResult(tool_call_id, name, result_json, error, success, started_at_ms, completed_at_ms, unknownFields)
+  ): ToolResult = ToolResult(tool_call_id, name, result_json, started_at_ms, completed_at_ms, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -167,16 +156,13 @@ public class ToolResult(
         if (value.result_json != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.result_json)
         }
-        size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.error)
-        if (value.success != false) {
-          size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.success)
-        }
         if (value.started_at_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(8, value.started_at_ms)
         }
         if (value.completed_at_ms != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(9, value.completed_at_ms)
         }
+        size += SDKError.ADAPTER.encodedSizeWithTag(10, value.error)
         return size
       }
 
@@ -190,31 +176,25 @@ public class ToolResult(
         if (value.result_json != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.result_json)
         }
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error)
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
-        }
         if (value.started_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 8, value.started_at_ms)
         }
         if (value.completed_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.completed_at_ms)
         }
+        SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolResult) {
         writer.writeBytes(value.unknownFields)
+        SDKError.ADAPTER.encodeWithTag(writer, 10, value.error)
         if (value.completed_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 9, value.completed_at_ms)
         }
         if (value.started_at_ms != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 8, value.started_at_ms)
         }
-        if (value.success != false) {
-          ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
-        }
-        ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error)
         if (value.result_json != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 3, value.result_json)
         }
@@ -230,19 +210,17 @@ public class ToolResult(
         var tool_call_id: String = ""
         var name: String = ""
         var result_json: String = ""
-        var error: String? = null
-        var success: Boolean = false
         var started_at_ms: Long = 0L
         var completed_at_ms: Long = 0L
+        var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> tool_call_id = ProtoAdapter.STRING.decode(reader)
             2 -> name = ProtoAdapter.STRING.decode(reader)
             3 -> result_json = ProtoAdapter.STRING.decode(reader)
-            4 -> error = ProtoAdapter.STRING.decode(reader)
-            5 -> success = ProtoAdapter.BOOL.decode(reader)
             8 -> started_at_ms = ProtoAdapter.INT64.decode(reader)
             9 -> completed_at_ms = ProtoAdapter.INT64.decode(reader)
+            10 -> error = SDKError.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -250,15 +228,15 @@ public class ToolResult(
           tool_call_id = tool_call_id,
           name = name,
           result_json = result_json,
-          error = error,
-          success = success,
           started_at_ms = started_at_ms,
           completed_at_ms = completed_at_ms,
+          error = error,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ToolResult): ToolResult = value.copy(
+        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

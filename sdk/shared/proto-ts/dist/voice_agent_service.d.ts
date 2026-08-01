@@ -1,6 +1,6 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import { EventCategory } from "./component_types";
-import { ErrorSeverity } from "./errors";
+import { ErrorSeverity, SDKError } from "./errors";
 import { LLMGenerationOptions } from "./llm_options";
 import { AudioEncoding } from "./model_types";
 import { TTSOptions } from "./tts_options";
@@ -34,8 +34,7 @@ export interface VoiceAgentResult {
     llmTimeMs: number;
     ttsTimeMs: number;
     totalTimeMs: number;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 /** One-shot turn: audio in, transcription plus response plus audio out. */
 export interface VoiceAgentTurnRequest {

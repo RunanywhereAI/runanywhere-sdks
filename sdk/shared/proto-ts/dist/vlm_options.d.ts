@@ -1,6 +1,8 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { SDKError } from "./errors";
 import { InferenceFramework } from "./model_types";
 import { ReasoningOptions } from "./thinking_tag_pattern";
+import { TokenUsage } from "./token_usage";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * The JPEG/PNG/WEBP and RAW_RGBA values are reserved: no backend detects
@@ -117,22 +119,17 @@ export interface VLMGenerationRequest_MetadataEntry {
 }
 export interface VLMResult {
     text: string;
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
     processingTimeMs: number;
-    tokensPerSecond: number;
     imageTokens: number;
     timeToFirstTokenMs: number;
     imageEncodeTimeMs: number;
     hardwareUsed?: string | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
     finishReason: string;
     imagesProcessed: number;
+    usage?: TokenUsage | undefined;
+    error?: SDKError | undefined;
 }
 export interface VLMStreamEvent {
-    seq: number;
     timestampUs: number;
     requestId: string;
     kind: VLMStreamEventKind;
@@ -141,8 +138,7 @@ export interface VLMStreamEvent {
     isFinal: boolean;
     tokensPerSecond: number;
     result?: VLMResult | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export interface VLMServiceState {
     isReady: boolean;
@@ -151,8 +147,7 @@ export interface VLMServiceState {
     supportsStreaming: boolean;
     supportsMultipleImages: boolean;
     visionEncoderType?: string | undefined;
-    errorMessage?: string | undefined;
-    errorCode: number;
+    error?: SDKError | undefined;
 }
 export declare const VLMChatTemplate: MessageFns<VLMChatTemplate>;
 export declare const VLMImage: MessageFns<VLMImage>;

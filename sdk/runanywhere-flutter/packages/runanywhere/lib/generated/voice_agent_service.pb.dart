@@ -15,12 +15,12 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'component_types.pbenum.dart' as $4;
-import 'errors.pbenum.dart' as $5;
-import 'llm_options.pb.dart' as $2;
+import 'component_types.pbenum.dart' as $5;
+import 'errors.pb.dart' as $1;
+import 'llm_options.pb.dart' as $3;
 import 'model_types.pbenum.dart' as $6;
-import 'tts_options.pb.dart' as $3;
-import 'vad_options.pb.dart' as $1;
+import 'tts_options.pb.dart' as $4;
+import 'vad_options.pb.dart' as $2;
 import 'voice_events.pb.dart' as $0;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -30,8 +30,8 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   factory VoiceAgentRequest({
     $core.String? eventFilter,
     $core.String? sessionId,
-    $core.Iterable<$4.EventCategory>? categories,
-    $5.ErrorSeverity? minSeverity,
+    $core.Iterable<$5.EventCategory>? categories,
+    $1.ErrorSeverity? minSeverity,
     $fixnum.Int64? replayFromSeq,
     $core.bool? includeAudio,
   }) {
@@ -60,13 +60,13 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'eventFilter')
     ..aOS(2, _omitFieldNames ? '' : 'sessionId')
-    ..pc<$4.EventCategory>(
+    ..pc<$5.EventCategory>(
         3, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE,
-        valueOf: $4.EventCategory.valueOf,
-        enumValues: $4.EventCategory.values,
-        defaultEnumValue: $4.EventCategory.EVENT_CATEGORY_UNSPECIFIED)
-    ..aE<$5.ErrorSeverity>(4, _omitFieldNames ? '' : 'minSeverity',
-        enumValues: $5.ErrorSeverity.values)
+        valueOf: $5.EventCategory.valueOf,
+        enumValues: $5.EventCategory.values,
+        defaultEnumValue: $5.EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+    ..aE<$1.ErrorSeverity>(4, _omitFieldNames ? '' : 'minSeverity',
+        enumValues: $1.ErrorSeverity.values)
     ..a<$fixnum.Int64>(
         5, _omitFieldNames ? '' : 'replayFromSeq', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
@@ -111,12 +111,12 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   void clearSessionId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $pb.PbList<$4.EventCategory> get categories => $_getList(2);
+  $pb.PbList<$5.EventCategory> get categories => $_getList(2);
 
   @$pb.TagNumber(4)
-  $5.ErrorSeverity get minSeverity => $_getN(3);
+  $1.ErrorSeverity get minSeverity => $_getN(3);
   @$pb.TagNumber(4)
-  set minSeverity($5.ErrorSeverity value) => $_setField(4, value);
+  set minSeverity($1.ErrorSeverity value) => $_setField(4, value);
   @$pb.TagNumber(4)
   $core.bool hasMinSeverity() => $_has(3);
   @$pb.TagNumber(4)
@@ -158,8 +158,7 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
     $fixnum.Int64? llmTimeMs,
     $fixnum.Int64? ttsTimeMs,
     $fixnum.Int64? totalTimeMs,
-    $core.String? errorMessage,
-    $core.int? errorCode,
+    $1.SDKError? error,
   }) {
     final result = create();
     if (speechDetected != null) result.speechDetected = speechDetected;
@@ -180,8 +179,7 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
     if (llmTimeMs != null) result.llmTimeMs = llmTimeMs;
     if (ttsTimeMs != null) result.ttsTimeMs = ttsTimeMs;
     if (totalTimeMs != null) result.totalTimeMs = totalTimeMs;
-    if (errorMessage != null) result.errorMessage = errorMessage;
-    if (errorCode != null) result.errorCode = errorCode;
+    if (error != null) result.error = error;
     return result;
   }
 
@@ -216,8 +214,8 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
     ..aInt64(13, _omitFieldNames ? '' : 'llmTimeMs')
     ..aInt64(14, _omitFieldNames ? '' : 'ttsTimeMs')
     ..aInt64(15, _omitFieldNames ? '' : 'totalTimeMs')
-    ..aOS(16, _omitFieldNames ? '' : 'errorMessage')
-    ..aI(17, _omitFieldNames ? '' : 'errorCode')
+    ..aOM<$1.SDKError>(18, _omitFieldNames ? '' : 'error',
+        subBuilder: $1.SDKError.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -379,23 +377,16 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(15)
   void clearTotalTimeMs() => $_clearField(15);
 
-  @$pb.TagNumber(16)
-  $core.String get errorMessage => $_getSZ(15);
-  @$pb.TagNumber(16)
-  set errorMessage($core.String value) => $_setString(15, value);
-  @$pb.TagNumber(16)
-  $core.bool hasErrorMessage() => $_has(15);
-  @$pb.TagNumber(16)
-  void clearErrorMessage() => $_clearField(16);
-
-  @$pb.TagNumber(17)
-  $core.int get errorCode => $_getIZ(16);
-  @$pb.TagNumber(17)
-  set errorCode($core.int value) => $_setSignedInt32(16, value);
-  @$pb.TagNumber(17)
-  $core.bool hasErrorCode() => $_has(16);
-  @$pb.TagNumber(17)
-  void clearErrorCode() => $_clearField(17);
+  @$pb.TagNumber(18)
+  $1.SDKError get error => $_getN(15);
+  @$pb.TagNumber(18)
+  set error($1.SDKError value) => $_setField(18, value);
+  @$pb.TagNumber(18)
+  $core.bool hasError() => $_has(15);
+  @$pb.TagNumber(18)
+  void clearError() => $_clearField(18);
+  @$pb.TagNumber(18)
+  $1.SDKError ensureError() => $_ensure(15);
 }
 
 /// One-shot turn: audio in, transcription plus response plus audio out.
@@ -896,8 +887,8 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
     AudioPipelineConfig? audioPipelineConfig,
     $core.String? sessionId,
     $core.String? defaultLanguageCode,
-    $1.VADConfiguration? vadConfig,
-    $2.LLMGenerationOptions? llmGeneration,
+    $2.VADConfiguration? vadConfig,
+    $3.LLMGenerationOptions? llmGeneration,
   }) {
     final result = create();
     if (sttModelPath != null) result.sttModelPath = sttModelPath;
@@ -948,10 +939,10 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
         subBuilder: AudioPipelineConfig.create)
     ..aOS(22, _omitFieldNames ? '' : 'sessionId')
     ..aOS(23, _omitFieldNames ? '' : 'defaultLanguageCode')
-    ..aOM<$1.VADConfiguration>(24, _omitFieldNames ? '' : 'vadConfig',
-        subBuilder: $1.VADConfiguration.create)
-    ..aOM<$2.LLMGenerationOptions>(25, _omitFieldNames ? '' : 'llmGeneration',
-        subBuilder: $2.LLMGenerationOptions.create)
+    ..aOM<$2.VADConfiguration>(24, _omitFieldNames ? '' : 'vadConfig',
+        subBuilder: $2.VADConfiguration.create)
+    ..aOM<$3.LLMGenerationOptions>(25, _omitFieldNames ? '' : 'llmGeneration',
+        subBuilder: $3.LLMGenerationOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1096,26 +1087,26 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   void clearDefaultLanguageCode() => $_clearField(23);
 
   @$pb.TagNumber(24)
-  $1.VADConfiguration get vadConfig => $_getN(13);
+  $2.VADConfiguration get vadConfig => $_getN(13);
   @$pb.TagNumber(24)
-  set vadConfig($1.VADConfiguration value) => $_setField(24, value);
+  set vadConfig($2.VADConfiguration value) => $_setField(24, value);
   @$pb.TagNumber(24)
   $core.bool hasVadConfig() => $_has(13);
   @$pb.TagNumber(24)
   void clearVadConfig() => $_clearField(24);
   @$pb.TagNumber(24)
-  $1.VADConfiguration ensureVadConfig() => $_ensure(13);
+  $2.VADConfiguration ensureVadConfig() => $_ensure(13);
 
   @$pb.TagNumber(25)
-  $2.LLMGenerationOptions get llmGeneration => $_getN(14);
+  $3.LLMGenerationOptions get llmGeneration => $_getN(14);
   @$pb.TagNumber(25)
-  set llmGeneration($2.LLMGenerationOptions value) => $_setField(25, value);
+  set llmGeneration($3.LLMGenerationOptions value) => $_setField(25, value);
   @$pb.TagNumber(25)
   $core.bool hasLlmGeneration() => $_has(14);
   @$pb.TagNumber(25)
   void clearLlmGeneration() => $_clearField(25);
   @$pb.TagNumber(25)
-  $2.LLMGenerationOptions ensureLlmGeneration() => $_ensure(14);
+  $3.LLMGenerationOptions ensureLlmGeneration() => $_ensure(14);
 }
 
 class VoiceAgentTranscribeProtoRequest extends $pb.GeneratedMessage {
@@ -1243,7 +1234,7 @@ class VoiceAgentSynthesizeSpeechProtoRequest extends $pb.GeneratedMessage {
   factory VoiceAgentSynthesizeSpeechProtoRequest({
     $core.String? text,
     $core.String? sessionId,
-    $3.TTSOptions? options,
+    $4.TTSOptions? options,
   }) {
     final result = create();
     if (text != null) result.text = text;
@@ -1268,8 +1259,8 @@ class VoiceAgentSynthesizeSpeechProtoRequest extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'text')
     ..aOS(2, _omitFieldNames ? '' : 'sessionId')
-    ..aOM<$3.TTSOptions>(3, _omitFieldNames ? '' : 'options',
-        subBuilder: $3.TTSOptions.create)
+    ..aOM<$4.TTSOptions>(3, _omitFieldNames ? '' : 'options',
+        subBuilder: $4.TTSOptions.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1314,15 +1305,15 @@ class VoiceAgentSynthesizeSpeechProtoRequest extends $pb.GeneratedMessage {
   void clearSessionId() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $3.TTSOptions get options => $_getN(2);
+  $4.TTSOptions get options => $_getN(2);
   @$pb.TagNumber(3)
-  set options($3.TTSOptions value) => $_setField(3, value);
+  set options($4.TTSOptions value) => $_setField(3, value);
   @$pb.TagNumber(3)
   $core.bool hasOptions() => $_has(2);
   @$pb.TagNumber(3)
   void clearOptions() => $_clearField(3);
   @$pb.TagNumber(3)
-  $3.TTSOptions ensureOptions() => $_ensure(2);
+  $4.TTSOptions ensureOptions() => $_ensure(2);
 }
 
 const $core.bool _omitFieldNames =
