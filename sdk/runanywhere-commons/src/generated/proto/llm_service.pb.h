@@ -742,6 +742,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamEvent final : public ::goo
     kResultFieldNumber = 10,
     kToolCallFieldNumber = 18,
     kErrorFieldNumber = 19,
+    kSeqFieldNumber = 1,
     kTimestampUsFieldNumber = 2,
     kIsFinalFieldNumber = 4,
     kKindFieldNumber = 5,
@@ -860,6 +861,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamEvent final : public ::goo
   ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
 
   public:
+  // uint64 seq = 1;
+  void clear_seq() ;
+  [[nodiscard]] ::uint64_t seq() const;
+  void set_seq(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_seq() const;
+  void _internal_set_seq(::uint64_t value);
+
+  public:
   // int64 timestamp_us = 2;
   void clear_timestamp_us() ;
   [[nodiscard]] ::int64_t timestamp_us() const;
@@ -954,7 +965,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamEvent final : public ::goo
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<5, 16,
+      ::google::protobuf::internal::TcParseTable<5, 17,
                           3, 97,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -990,6 +1001,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamEvent final : public ::goo
     ::runanywhere::v1::LLMStreamFinalResult* PROTOBUF_NULLABLE result_;
     ::runanywhere::v1::ToolCall* PROTOBUF_NULLABLE tool_call_;
     ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
+    ::uint64_t seq_;
     ::int64_t timestamp_us_;
     bool is_final_;
     int kind_;
@@ -2355,11 +2367,35 @@ inline void LLMStreamFinalResult::set_allocated_error(::runanywhere::v1::SDKErro
 
 // LLMStreamEvent
 
+// uint64 seq = 1;
+inline void LLMStreamEvent::clear_seq() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.seq_ = ::uint64_t{0u};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+}
+inline ::uint64_t LLMStreamEvent::seq() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.seq)
+  return _internal_seq();
+}
+inline void LLMStreamEvent::set_seq(::uint64_t value) {
+  _internal_set_seq(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.seq)
+}
+inline ::uint64_t LLMStreamEvent::_internal_seq() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.seq_;
+}
+inline void LLMStreamEvent::_internal_set_seq(::uint64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.seq_ = value;
+}
+
 // int64 timestamp_us = 2;
 inline void LLMStreamEvent::clear_timestamp_us() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_us_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline ::int64_t LLMStreamEvent::timestamp_us() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.timestamp_us)
@@ -2367,7 +2403,7 @@ inline ::int64_t LLMStreamEvent::timestamp_us() const {
 }
 inline void LLMStreamEvent::set_timestamp_us(::int64_t value) {
   _internal_set_timestamp_us(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.timestamp_us)
 }
 inline ::int64_t LLMStreamEvent::_internal_timestamp_us() const {
@@ -2447,7 +2483,7 @@ inline void LLMStreamEvent::set_allocated_token(::std::string* PROTOBUF_NULLABLE
 inline void LLMStreamEvent::clear_is_final() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_final_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
 inline bool LLMStreamEvent::is_final() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.is_final)
@@ -2455,7 +2491,7 @@ inline bool LLMStreamEvent::is_final() const {
 }
 inline void LLMStreamEvent::set_is_final(bool value) {
   _internal_set_is_final(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.is_final)
 }
 inline bool LLMStreamEvent::_internal_is_final() const {
@@ -2471,7 +2507,7 @@ inline void LLMStreamEvent::_internal_set_is_final(bool value) {
 inline void LLMStreamEvent::clear_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.kind_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
 }
 inline ::runanywhere::v1::TokenKind LLMStreamEvent::kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.kind)
@@ -2479,7 +2515,7 @@ inline ::runanywhere::v1::TokenKind LLMStreamEvent::kind() const {
 }
 inline void LLMStreamEvent::set_kind(::runanywhere::v1::TokenKind value) {
   _internal_set_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.kind)
 }
 inline ::runanywhere::v1::TokenKind LLMStreamEvent::_internal_kind() const {
@@ -2495,7 +2531,7 @@ inline void LLMStreamEvent::_internal_set_kind(::runanywhere::v1::TokenKind valu
 inline void LLMStreamEvent::clear_token_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.token_id_ = 0u;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
 }
 inline ::uint32_t LLMStreamEvent::token_id() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.token_id)
@@ -2503,7 +2539,7 @@ inline ::uint32_t LLMStreamEvent::token_id() const {
 }
 inline void LLMStreamEvent::set_token_id(::uint32_t value) {
   _internal_set_token_id(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.token_id)
 }
 inline ::uint32_t LLMStreamEvent::_internal_token_id() const {
@@ -2519,7 +2555,7 @@ inline void LLMStreamEvent::_internal_set_token_id(::uint32_t value) {
 inline void LLMStreamEvent::clear_logprob() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.logprob_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000800U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
 }
 inline float LLMStreamEvent::logprob() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.logprob)
@@ -2527,7 +2563,7 @@ inline float LLMStreamEvent::logprob() const {
 }
 inline void LLMStreamEvent::set_logprob(float value) {
   _internal_set_logprob(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.logprob)
 }
 inline float LLMStreamEvent::_internal_logprob() const {
@@ -2705,7 +2741,7 @@ inline void LLMStreamEvent::set_allocated_result(::runanywhere::v1::LLMStreamFin
 inline void LLMStreamEvent::clear_event_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.event_kind_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00001000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
 }
 inline ::runanywhere::v1::LLMStreamEventKind LLMStreamEvent::event_kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.event_kind)
@@ -2713,7 +2749,7 @@ inline ::runanywhere::v1::LLMStreamEventKind LLMStreamEvent::event_kind() const 
 }
 inline void LLMStreamEvent::set_event_kind(::runanywhere::v1::LLMStreamEventKind value) {
   _internal_set_event_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.event_kind)
 }
 inline ::runanywhere::v1::LLMStreamEventKind LLMStreamEvent::_internal_event_kind() const {
@@ -2857,7 +2893,7 @@ inline void LLMStreamEvent::set_allocated_conversation_id(::std::string* PROTOBU
 inline void LLMStreamEvent::clear_prompt_tokens_processed() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.prompt_tokens_processed_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00002000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
 }
 inline ::int32_t LLMStreamEvent::prompt_tokens_processed() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.prompt_tokens_processed)
@@ -2865,7 +2901,7 @@ inline ::int32_t LLMStreamEvent::prompt_tokens_processed() const {
 }
 inline void LLMStreamEvent::set_prompt_tokens_processed(::int32_t value) {
   _internal_set_prompt_tokens_processed(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.prompt_tokens_processed)
 }
 inline ::int32_t LLMStreamEvent::_internal_prompt_tokens_processed() const {
@@ -2881,7 +2917,7 @@ inline void LLMStreamEvent::_internal_set_prompt_tokens_processed(::int32_t valu
 inline void LLMStreamEvent::clear_completion_tokens_generated() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.completion_tokens_generated_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00010000U);
 }
 inline ::int32_t LLMStreamEvent::completion_tokens_generated() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.completion_tokens_generated)
@@ -2889,7 +2925,7 @@ inline ::int32_t LLMStreamEvent::completion_tokens_generated() const {
 }
 inline void LLMStreamEvent::set_completion_tokens_generated(::int32_t value) {
   _internal_set_completion_tokens_generated(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.completion_tokens_generated)
 }
 inline ::int32_t LLMStreamEvent::_internal_completion_tokens_generated() const {
@@ -2905,7 +2941,7 @@ inline void LLMStreamEvent::_internal_set_completion_tokens_generated(::int32_t 
 inline void LLMStreamEvent::clear_elapsed_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.elapsed_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
 }
 inline ::int64_t LLMStreamEvent::elapsed_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.elapsed_ms)
@@ -2913,7 +2949,7 @@ inline ::int64_t LLMStreamEvent::elapsed_ms() const {
 }
 inline void LLMStreamEvent::set_elapsed_ms(::int64_t value) {
   _internal_set_elapsed_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.elapsed_ms)
 }
 inline ::int64_t LLMStreamEvent::_internal_elapsed_ms() const {

@@ -30,7 +30,6 @@
 
 #include "features/llm/tool_calling_internal.h"
 #include "rac/core/rac_logger.h"
-#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/features/llm/rac_tool_calling.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -1848,6 +1847,15 @@ tool_calling_options_from_proto(const runanywhere::v1::ToolCallingOptions& proto
     if (proto.auto_execute()) {
         converted.options.auto_execute = RAC_TRUE;
     }
+    if (proto.has_temperature()) {
+        converted.options.temperature = proto.temperature();
+    }
+    if (proto.has_max_tokens()) {
+        converted.options.max_tokens = proto.max_tokens();
+    }
+    if (proto.has_system_prompt()) {
+        converted.system_prompt = proto.system_prompt();
+    }
     if (proto.replace_system_prompt()) {
         converted.options.replace_system_prompt = RAC_TRUE;
     }
@@ -1896,10 +1904,10 @@ static rac_result_t set_tool_parse_proto_error(rac_proto_buffer_t* out_result,
     runanywhere::v1::ToolParseResult result;
     result.set_has_tool_call(false);
     result.set_remaining_text(remaining_text);
-    rac::foundation::populate_sdk_error(result.mutable_error(), error_code);
     if (error_message) {
-        result.mutable_error()->set_message(error_message);
+        result.set_error_message(error_message);
     }
+    result.set_error_code(static_cast<int32_t>(error_code));
     return copy_serialized_proto(result, out_result, "ToolParseResult");
 }
 
@@ -1910,10 +1918,10 @@ static rac_result_t set_tool_prompt_format_proto_error(rac_proto_buffer_t* out_r
     runanywhere::v1::ToolPromptFormatResult result;
     result.set_format(
         tool_format_proto_from_rac(rac_tool_call_format_from_name(format_key.c_str())));
-    rac::foundation::populate_sdk_error(result.mutable_error(), error_code);
     if (error_message) {
-        result.mutable_error()->set_message(error_message);
+        result.set_error_message(error_message);
     }
+    result.set_error_code(static_cast<int32_t>(error_code));
     return copy_serialized_proto(result, out_result, "ToolPromptFormatResult");
 }
 
@@ -2028,11 +2036,11 @@ static rac_result_t set_tool_validation_proto_error(rac_proto_buffer_t* out_resu
                                                     rac_result_t error_code) {
     runanywhere::v1::ToolCallValidationResult result;
     result.set_is_valid(false);
-    rac::foundation::populate_sdk_error(result.mutable_error(), error_code);
     if (error_message) {
-        result.mutable_error()->set_message(error_message);
+        result.set_error_message(error_message);
         result.add_validation_errors(error_message);
     }
+    result.set_error_code(static_cast<int32_t>(error_code));
     return copy_serialized_proto(result, out_result, "ToolCallValidationResult");
 }
 #endif
@@ -2154,6 +2162,7 @@ extern "C" rac_result_t rac_tool_call_parse_proto(const uint8_t* request_proto_b
             result.set_remaining_text(remainder);
         }
     }
+    result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
     rac_tool_call_free(&parsed);
     return copy_serialized_proto(result, out_result, "ToolParseResult");
 #endif
@@ -2287,9 +2296,9 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
             if (!value.result_json().empty()) {
                 return value.result_json();
             }
-            if (value.has_error() && !value.error().message().empty()) {
+            if (value.has_error() && !value.error().empty()) {
                 json error = json::object();
-                error["error"] = value.error().message();
+                error["error"] = value.error();
                 return error.dump();
             }
             return std::string("{}");
@@ -2360,6 +2369,7 @@ static rac_result_t format_prompt_proto_impl(const uint8_t* request_proto_bytes,
     runanywhere::v1::ToolPromptFormatResult result;
     result.set_formatted_prompt(prompt ? prompt : "");
     result.set_format(tool_format_proto_from_rac(converted.options.format));
+    result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
     free(prompt);
     return copy_serialized_proto(result, out_result, "ToolPromptFormatResult");
 #endif
@@ -2443,6 +2453,8 @@ extern "C" rac_result_t rac_tool_call_validate_proto(const uint8_t* request_prot
 
     const bool is_valid = validated.is_valid == RAC_TRUE && proto_errors.empty();
     result.set_is_valid(is_valid);
+    result.set_error_code(
+        static_cast<int32_t>(is_valid ? RAC_SUCCESS : RAC_ERROR_VALIDATION_FAILED));
 
     if (matched_tool) {
         result.mutable_matched_tool()->CopyFrom(*matched_tool);
@@ -2451,13 +2463,10 @@ extern "C" rac_result_t rac_tool_call_validate_proto(const uint8_t* request_prot
         result.set_normalized_arguments_json(validated.normalized_arguments_json);
     }
 
-    if (!is_valid) {
-        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_VALIDATION_FAILED);
-        if (validated.error_message && validated.error_message[0] != '\0') {
-            result.mutable_error()->set_message(validated.error_message);
-        } else if (!proto_errors.empty()) {
-            result.mutable_error()->set_message(proto_errors.front());
-        }
+    if (validated.error_message && validated.error_message[0] != '\0') {
+        result.set_error_message(validated.error_message);
+    } else if (!proto_errors.empty()) {
+        result.set_error_message(proto_errors.front());
     }
 
     rac_tool_call_validation_free(&validated);

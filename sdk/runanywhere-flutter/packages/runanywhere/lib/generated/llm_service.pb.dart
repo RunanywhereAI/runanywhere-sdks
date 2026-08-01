@@ -326,6 +326,7 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
 /// `result` is populated only on the terminal event.
 class LLMStreamEvent extends $pb.GeneratedMessage {
   factory LLMStreamEvent({
+    $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
     $core.String? token,
     $core.bool? isFinal,
@@ -344,6 +345,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     $4.SDKError? error,
   }) {
     final result$ = create();
+    if (seq != null) result$.seq = seq;
     if (timestampUs != null) result$.timestampUs = timestampUs;
     if (token != null) result$.token = token;
     if (isFinal != null) result$.isFinal = isFinal;
@@ -378,6 +380,8 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'LLMStreamEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(3, _omitFieldNames ? '' : 'token')
     ..aOB(4, _omitFieldNames ? '' : 'isFinal')
@@ -420,155 +424,165 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<LLMStreamEvent>(create);
   static LLMStreamEvent? _defaultInstance;
 
+  /// Monotonic sequence for tool-calling session streams (#607).
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get seq => $_getI64(0);
+  @$pb.TagNumber(1)
+  set seq($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSeq() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeq() => $_clearField(1);
+
   @$pb.TagNumber(2)
-  $fixnum.Int64 get timestampUs => $_getI64(0);
+  $fixnum.Int64 get timestampUs => $_getI64(1);
   @$pb.TagNumber(2)
-  set timestampUs($fixnum.Int64 value) => $_setInt64(0, value);
+  set timestampUs($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasTimestampUs() => $_has(0);
+  $core.bool hasTimestampUs() => $_has(1);
   @$pb.TagNumber(2)
   void clearTimestampUs() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get token => $_getSZ(1);
+  $core.String get token => $_getSZ(2);
   @$pb.TagNumber(3)
-  set token($core.String value) => $_setString(1, value);
+  set token($core.String value) => $_setString(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasToken() => $_has(1);
+  $core.bool hasToken() => $_has(2);
   @$pb.TagNumber(3)
   void clearToken() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  $core.bool get isFinal => $_getBF(2);
+  $core.bool get isFinal => $_getBF(3);
   @$pb.TagNumber(4)
-  set isFinal($core.bool value) => $_setBool(2, value);
+  set isFinal($core.bool value) => $_setBool(3, value);
   @$pb.TagNumber(4)
-  $core.bool hasIsFinal() => $_has(2);
+  $core.bool hasIsFinal() => $_has(3);
   @$pb.TagNumber(4)
   void clearIsFinal() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  $5.TokenKind get kind => $_getN(3);
+  $5.TokenKind get kind => $_getN(4);
   @$pb.TagNumber(5)
   set kind($5.TokenKind value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasKind() => $_has(3);
+  $core.bool hasKind() => $_has(4);
   @$pb.TagNumber(5)
   void clearKind() => $_clearField(5);
 
   @$pb.TagNumber(6)
-  $core.int get tokenId => $_getIZ(4);
+  $core.int get tokenId => $_getIZ(5);
   @$pb.TagNumber(6)
-  set tokenId($core.int value) => $_setUnsignedInt32(4, value);
+  set tokenId($core.int value) => $_setUnsignedInt32(5, value);
   @$pb.TagNumber(6)
-  $core.bool hasTokenId() => $_has(4);
+  $core.bool hasTokenId() => $_has(5);
   @$pb.TagNumber(6)
   void clearTokenId() => $_clearField(6);
 
   @$pb.TagNumber(7)
-  $core.double get logprob => $_getN(5);
+  $core.double get logprob => $_getN(6);
   @$pb.TagNumber(7)
-  set logprob($core.double value) => $_setFloat(5, value);
+  set logprob($core.double value) => $_setFloat(6, value);
   @$pb.TagNumber(7)
-  $core.bool hasLogprob() => $_has(5);
+  $core.bool hasLogprob() => $_has(6);
   @$pb.TagNumber(7)
   void clearLogprob() => $_clearField(7);
 
   @$pb.TagNumber(8)
-  $core.String get finishReason => $_getSZ(6);
+  $core.String get finishReason => $_getSZ(7);
   @$pb.TagNumber(8)
-  set finishReason($core.String value) => $_setString(6, value);
+  set finishReason($core.String value) => $_setString(7, value);
   @$pb.TagNumber(8)
-  $core.bool hasFinishReason() => $_has(6);
+  $core.bool hasFinishReason() => $_has(7);
   @$pb.TagNumber(8)
   void clearFinishReason() => $_clearField(8);
 
   @$pb.TagNumber(10)
-  LLMStreamFinalResult get result => $_getN(7);
+  LLMStreamFinalResult get result => $_getN(8);
   @$pb.TagNumber(10)
   set result(LLMStreamFinalResult value) => $_setField(10, value);
   @$pb.TagNumber(10)
-  $core.bool hasResult() => $_has(7);
+  $core.bool hasResult() => $_has(8);
   @$pb.TagNumber(10)
   void clearResult() => $_clearField(10);
   @$pb.TagNumber(10)
-  LLMStreamFinalResult ensureResult() => $_ensure(7);
+  LLMStreamFinalResult ensureResult() => $_ensure(8);
 
   @$pb.TagNumber(12)
-  LLMStreamEventKind get eventKind => $_getN(8);
+  LLMStreamEventKind get eventKind => $_getN(9);
   @$pb.TagNumber(12)
   set eventKind(LLMStreamEventKind value) => $_setField(12, value);
   @$pb.TagNumber(12)
-  $core.bool hasEventKind() => $_has(8);
+  $core.bool hasEventKind() => $_has(9);
   @$pb.TagNumber(12)
   void clearEventKind() => $_clearField(12);
 
   @$pb.TagNumber(13)
-  $core.String get requestId => $_getSZ(9);
+  $core.String get requestId => $_getSZ(10);
   @$pb.TagNumber(13)
-  set requestId($core.String value) => $_setString(9, value);
+  set requestId($core.String value) => $_setString(10, value);
   @$pb.TagNumber(13)
-  $core.bool hasRequestId() => $_has(9);
+  $core.bool hasRequestId() => $_has(10);
   @$pb.TagNumber(13)
   void clearRequestId() => $_clearField(13);
 
   @$pb.TagNumber(14)
-  $core.String get conversationId => $_getSZ(10);
+  $core.String get conversationId => $_getSZ(11);
   @$pb.TagNumber(14)
-  set conversationId($core.String value) => $_setString(10, value);
+  set conversationId($core.String value) => $_setString(11, value);
   @$pb.TagNumber(14)
-  $core.bool hasConversationId() => $_has(10);
+  $core.bool hasConversationId() => $_has(11);
   @$pb.TagNumber(14)
   void clearConversationId() => $_clearField(14);
 
   @$pb.TagNumber(15)
-  $core.int get promptTokensProcessed => $_getIZ(11);
+  $core.int get promptTokensProcessed => $_getIZ(12);
   @$pb.TagNumber(15)
-  set promptTokensProcessed($core.int value) => $_setSignedInt32(11, value);
+  set promptTokensProcessed($core.int value) => $_setSignedInt32(12, value);
   @$pb.TagNumber(15)
-  $core.bool hasPromptTokensProcessed() => $_has(11);
+  $core.bool hasPromptTokensProcessed() => $_has(12);
   @$pb.TagNumber(15)
   void clearPromptTokensProcessed() => $_clearField(15);
 
   @$pb.TagNumber(16)
-  $core.int get completionTokensGenerated => $_getIZ(12);
+  $core.int get completionTokensGenerated => $_getIZ(13);
   @$pb.TagNumber(16)
-  set completionTokensGenerated($core.int value) => $_setSignedInt32(12, value);
+  set completionTokensGenerated($core.int value) => $_setSignedInt32(13, value);
   @$pb.TagNumber(16)
-  $core.bool hasCompletionTokensGenerated() => $_has(12);
+  $core.bool hasCompletionTokensGenerated() => $_has(13);
   @$pb.TagNumber(16)
   void clearCompletionTokensGenerated() => $_clearField(16);
 
   @$pb.TagNumber(17)
-  $fixnum.Int64 get elapsedMs => $_getI64(13);
+  $fixnum.Int64 get elapsedMs => $_getI64(14);
   @$pb.TagNumber(17)
-  set elapsedMs($fixnum.Int64 value) => $_setInt64(13, value);
+  set elapsedMs($fixnum.Int64 value) => $_setInt64(14, value);
   @$pb.TagNumber(17)
-  $core.bool hasElapsedMs() => $_has(13);
+  $core.bool hasElapsedMs() => $_has(14);
   @$pb.TagNumber(17)
   void clearElapsedMs() => $_clearField(17);
 
   @$pb.TagNumber(18)
-  $2.ToolCall get toolCall => $_getN(14);
+  $2.ToolCall get toolCall => $_getN(15);
   @$pb.TagNumber(18)
   set toolCall($2.ToolCall value) => $_setField(18, value);
   @$pb.TagNumber(18)
-  $core.bool hasToolCall() => $_has(14);
+  $core.bool hasToolCall() => $_has(15);
   @$pb.TagNumber(18)
   void clearToolCall() => $_clearField(18);
   @$pb.TagNumber(18)
-  $2.ToolCall ensureToolCall() => $_ensure(14);
+  $2.ToolCall ensureToolCall() => $_ensure(15);
 
   @$pb.TagNumber(19)
-  $4.SDKError get error => $_getN(15);
+  $4.SDKError get error => $_getN(16);
   @$pb.TagNumber(19)
   set error($4.SDKError value) => $_setField(19, value);
   @$pb.TagNumber(19)
-  $core.bool hasError() => $_has(15);
+  $core.bool hasError() => $_has(16);
   @$pb.TagNumber(19)
   void clearError() => $_clearField(19);
   @$pb.TagNumber(19)
-  $4.SDKError ensureError() => $_ensure(15);
+  $4.SDKError ensureError() => $_ensure(16);
 }
 
 const $core.bool _omitFieldNames =

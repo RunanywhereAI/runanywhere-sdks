@@ -34,19 +34,29 @@ import okio.ByteString
  * `result` is populated only on the terminal event.
  */
 public class LLMStreamEvent(
+  /**
+   * Monotonic sequence for tool-calling session streams (#607).
+   */
+  @field:WireField(
+    tag = 1,
+    adapter = "com.squareup.wire.ProtoAdapter#UINT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 0,
+  )
+  public val seq: Long = 0L,
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
-    schemaIndex = 0,
+    schemaIndex = 1,
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 1,
+    schemaIndex = 2,
   )
   public val token: String = "",
   @field:WireField(
@@ -54,14 +64,14 @@ public class LLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "isFinal",
-    schemaIndex = 2,
+    schemaIndex = 3,
   )
   public val is_final: Boolean = false,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.TokenKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 3,
+    schemaIndex = 4,
   )
   public val kind: TokenKind = TokenKind.TOKEN_KIND_UNSPECIFIED,
   @field:WireField(
@@ -69,14 +79,14 @@ public class LLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#UINT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "tokenId",
-    schemaIndex = 4,
+    schemaIndex = 5,
   )
   public val token_id: Int = 0,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 5,
+    schemaIndex = 6,
   )
   public val logprob: Float = 0f,
   @field:WireField(
@@ -84,13 +94,13 @@ public class LLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "finishReason",
-    schemaIndex = 6,
+    schemaIndex = 7,
   )
   public val finish_reason: String = "",
   @field:WireField(
     tag = 10,
     adapter = "ai.runanywhere.proto.v1.LLMStreamFinalResult#ADAPTER",
-    schemaIndex = 7,
+    schemaIndex = 8,
   )
   public val result: LLMStreamFinalResult? = null,
   @field:WireField(
@@ -98,7 +108,7 @@ public class LLMStreamEvent(
     adapter = "ai.runanywhere.proto.v1.LLMStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "eventKind",
-    schemaIndex = 8,
+    schemaIndex = 9,
   )
   public val event_kind: LLMStreamEventKind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
@@ -106,7 +116,7 @@ public class LLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 9,
+    schemaIndex = 10,
   )
   public val request_id: String = "",
   @field:WireField(
@@ -114,7 +124,7 @@ public class LLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "conversationId",
-    schemaIndex = 10,
+    schemaIndex = 11,
   )
   public val conversation_id: String = "",
   @field:WireField(
@@ -122,7 +132,7 @@ public class LLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "promptTokensProcessed",
-    schemaIndex = 11,
+    schemaIndex = 12,
   )
   public val prompt_tokens_processed: Int = 0,
   @field:WireField(
@@ -130,7 +140,7 @@ public class LLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "completionTokensGenerated",
-    schemaIndex = 12,
+    schemaIndex = 13,
   )
   public val completion_tokens_generated: Int = 0,
   @field:WireField(
@@ -138,20 +148,20 @@ public class LLMStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "elapsedMs",
-    schemaIndex = 13,
+    schemaIndex = 14,
   )
   public val elapsed_ms: Long = 0L,
   @field:WireField(
     tag = 18,
     adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",
     jsonName = "toolCall",
-    schemaIndex = 14,
+    schemaIndex = 15,
   )
   public val tool_call: ToolCall? = null,
   @field:WireField(
     tag = 19,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 15,
+    schemaIndex = 16,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -166,6 +176,7 @@ public class LLMStreamEvent(
     if (other === this) return true
     if (other !is LLMStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
+    if (seq != other.seq) return false
     if (timestamp_us != other.timestamp_us) return false
     if (token != other.token) return false
     if (is_final != other.is_final) return false
@@ -189,6 +200,7 @@ public class LLMStreamEvent(
     var result_ = super.hashCode
     if (result_ == 0) {
       result_ = unknownFields.hashCode()
+      result_ = result_ * 37 + seq.hashCode()
       result_ = result_ * 37 + timestamp_us.hashCode()
       result_ = result_ * 37 + token.hashCode()
       result_ = result_ * 37 + is_final.hashCode()
@@ -212,6 +224,7 @@ public class LLMStreamEvent(
 
   override fun toString(): String {
     val result_ = mutableListOf<String>()
+    result_ += """seq=$seq"""
     result_ += """timestamp_us=$timestamp_us"""
     result_ += """token=${sanitize(token)}"""
     result_ += """is_final=$is_final"""
@@ -232,6 +245,7 @@ public class LLMStreamEvent(
   }
 
   public fun copy(
+    seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
     token: String = this.token,
     is_final: Boolean = this.is_final,
@@ -249,7 +263,7 @@ public class LLMStreamEvent(
     tool_call: ToolCall? = this.tool_call,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): LLMStreamEvent = LLMStreamEvent(timestamp_us, token, is_final, kind, token_id, logprob, finish_reason, result, event_kind, request_id, conversation_id, prompt_tokens_processed, completion_tokens_generated, elapsed_ms, tool_call, error, unknownFields)
+  ): LLMStreamEvent = LLMStreamEvent(seq, timestamp_us, token, is_final, kind, token_id, logprob, finish_reason, result, event_kind, request_id, conversation_id, prompt_tokens_processed, completion_tokens_generated, elapsed_ms, tool_call, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -263,6 +277,9 @@ public class LLMStreamEvent(
     ) {
       override fun encodedSize(`value`: LLMStreamEvent): Int {
         var size = value.unknownFields.size
+        if (value.seq != 0L) {
+          size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
+        }
         if (value.timestamp_us != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
         }
@@ -309,6 +326,9 @@ public class LLMStreamEvent(
       }
 
       override fun encode(writer: ProtoWriter, `value`: LLMStreamEvent) {
+        if (value.seq != 0L) {
+          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
+        }
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
@@ -398,9 +418,13 @@ public class LLMStreamEvent(
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
+        if (value.seq != 0L) {
+          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
+        }
       }
 
       override fun decode(reader: ProtoReader): LLMStreamEvent {
+        var seq: Long = 0L
         var timestamp_us: Long = 0L
         var token: String = ""
         var is_final: Boolean = false
@@ -419,6 +443,7 @@ public class LLMStreamEvent(
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
+            1 -> seq = ProtoAdapter.UINT64.decode(reader)
             2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             3 -> token = ProtoAdapter.STRING.decode(reader)
             4 -> is_final = ProtoAdapter.BOOL.decode(reader)
@@ -447,6 +472,7 @@ public class LLMStreamEvent(
           }
         }
         return LLMStreamEvent(
+          seq = seq,
           timestamp_us = timestamp_us,
           token = token,
           is_final = is_final,

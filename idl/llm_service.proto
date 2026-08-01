@@ -62,6 +62,8 @@ enum LLMStreamEventKind {
 
 // `result` is populated only on the terminal event.
 message LLMStreamEvent {
+    // Monotonic sequence for tool-calling session streams (#607).
+    uint64 seq             = 1;
     int64  timestamp_us    = 2;
     string token           = 3;
     bool   is_final        = 4;

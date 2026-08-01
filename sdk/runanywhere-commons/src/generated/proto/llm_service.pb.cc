@@ -446,9 +446,9 @@ constexpr LLMStreamEvent::ParseTableT_ LLMStreamEvent::InternalGenerateParseTabl
       0, // no _extensions_
       19, 248,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294444289,  // skipmap
+      4294444288,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      16,  // num_field_entries
+      17,  // num_field_entries
       3,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -459,30 +459,33 @@ constexpr LLMStreamEvent::ParseTableT_ LLMStreamEvent::InternalGenerateParseTabl
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // uint64 seq = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(LLMStreamEvent, _impl_.seq_), 7>(),
+       {8, 7, 0,
+        PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.seq_)}},
       // int64 timestamp_us = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(LLMStreamEvent, _impl_.timestamp_us_), 7>(),
-       {16, 7, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(LLMStreamEvent, _impl_.timestamp_us_), 8>(),
+       {16, 8, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.timestamp_us_)}},
       // string token = 3;
       {::_pbi::TcParser::FastUS1,
        {26, 0, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.token_)}},
       // bool is_final = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(LLMStreamEvent, _impl_.is_final_), 8>(),
-       {32, 8, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(LLMStreamEvent, _impl_.is_final_), 9>(),
+       {32, 9, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.is_final_)}},
       // .runanywhere.v1.TokenKind kind = 5;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMStreamEvent, _impl_.kind_), 9>(),
-       {40, 9, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMStreamEvent, _impl_.kind_), 10>(),
+       {40, 10, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.kind_)}},
       // uint32 token_id = 6;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMStreamEvent, _impl_.token_id_), 10>(),
-       {48, 10, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMStreamEvent, _impl_.token_id_), 11>(),
+       {48, 11, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.token_id_)}},
       // float logprob = 7;
       {::_pbi::TcParser::FastF32S1,
-       {61, 11, 0,
+       {61, 12, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.logprob_)}},
       // string finish_reason = 8;
       {::_pbi::TcParser::FastUS1,
@@ -495,8 +498,8 @@ constexpr LLMStreamEvent::ParseTableT_ LLMStreamEvent::InternalGenerateParseTabl
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.result_)}},
       {::_pbi::TcParser::MiniParse, {}},
       // .runanywhere.v1.LLMStreamEventKind event_kind = 12;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMStreamEvent, _impl_.event_kind_), 12>(),
-       {96, 12, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMStreamEvent, _impl_.event_kind_), 13>(),
+       {96, 13, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.event_kind_)}},
       // string request_id = 13;
       {::_pbi::TcParser::FastUS1,
@@ -507,16 +510,16 @@ constexpr LLMStreamEvent::ParseTableT_ LLMStreamEvent::InternalGenerateParseTabl
        {114, 3, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.conversation_id_)}},
       // int32 prompt_tokens_processed = 15;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMStreamEvent, _impl_.prompt_tokens_processed_), 13>(),
-       {120, 13, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMStreamEvent, _impl_.prompt_tokens_processed_), 14>(),
+       {120, 14, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.prompt_tokens_processed_)}},
       // int32 completion_tokens_generated = 16;
       {::_pbi::TcParser::FastV32S2,
-       {384, 15, 0,
+       {384, 16, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.completion_tokens_generated_)}},
       // int64 elapsed_ms = 17;
       {::_pbi::TcParser::FastV64S2,
-       {392, 14, 0,
+       {392, 15, 0,
         PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.elapsed_ms_)}},
       // optional .runanywhere.v1.ToolCall tool_call = 18;
       {::_pbi::TcParser::FastMtS2,
@@ -541,34 +544,36 @@ constexpr LLMStreamEvent::ParseTableT_ LLMStreamEvent::InternalGenerateParseTabl
     }}, {{
       65535, 65535
     }}, {{
+      // uint64 seq = 1;
+      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.seq_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
       // int64 timestamp_us = 2;
-      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // string token = 3;
       {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.token_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // bool is_final = 4;
-      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.is_final_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.is_final_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
       // .runanywhere.v1.TokenKind kind = 5;
-      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // uint32 token_id = 6;
-      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.token_id_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
+      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.token_id_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
       // float logprob = 7;
-      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.logprob_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.logprob_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
       // string finish_reason = 8;
       {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.finish_reason_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // optional .runanywhere.v1.LLMStreamFinalResult result = 10;
       {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.result_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // .runanywhere.v1.LLMStreamEventKind event_kind = 12;
-      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.event_kind_), _Internal::kHasBitsOffset + 12, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.event_kind_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // string request_id = 13;
       {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.request_id_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // string conversation_id = 14;
       {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.conversation_id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // int32 prompt_tokens_processed = 15;
-      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.prompt_tokens_processed_), _Internal::kHasBitsOffset + 13, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.prompt_tokens_processed_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int32 completion_tokens_generated = 16;
-      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.completion_tokens_generated_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.completion_tokens_generated_), _Internal::kHasBitsOffset + 16, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
       // int64 elapsed_ms = 17;
-      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.elapsed_ms_), _Internal::kHasBitsOffset + 14, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.elapsed_ms_), _Internal::kHasBitsOffset + 15, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // optional .runanywhere.v1.ToolCall tool_call = 18;
       {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.tool_call_), _Internal::kHasBitsOffset + 5, 1, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // optional .runanywhere.v1.SDKError error = 19;
@@ -592,7 +597,7 @@ constexpr LLMStreamEvent::ParseTableT_ LLMStreamEvent::InternalGenerateParseTabl
         #endif
     }},
     {{
-      "\35\0\5\0\0\0\0\15\0\0\12\17\0\0\0\0\0\0\0\0\0\0\0\0"
+      "\35\0\0\5\0\0\0\0\15\0\0\12\17\0\0\0\0\0\0\0\0\0\0\0"
       "runanywhere.v1.LLMStreamEvent"
       "token"
       "finish_reason"
@@ -622,6 +627,7 @@ inline constexpr LLMStreamEvent::Impl_::Impl_(
         result_{nullptr},
         tool_call_{nullptr},
         error_{nullptr},
+        seq_{::uint64_t{0u}},
         timestamp_us_{::int64_t{0}},
         is_final_{false},
         kind_{static_cast< ::runanywhere::v1::TokenKind >(0)},
@@ -1001,7 +1007,8 @@ const ::uint32_t
         6,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMStreamEvent, _impl_._has_bits_),
-        19, // hasbit index offset
+        20, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMStreamEvent, _impl_.seq_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMStreamEvent, _impl_.timestamp_us_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMStreamEvent, _impl_.token_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMStreamEvent, _impl_.is_final_),
@@ -1019,19 +1026,20 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMStreamEvent, _impl_.tool_call_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::LLMStreamEvent, _impl_.error_),
         7,
-        0,
         8,
+        0,
         9,
         10,
         11,
+        12,
         1,
         4,
-        12,
+        13,
         2,
         3,
-        13,
-        15,
         14,
+        16,
+        15,
         5,
         6,
 };
@@ -1074,32 +1082,32 @@ const char descriptor_table_protodef_llm_5fservice_2eproto[] ABSL_ATTRIBUTE_SECT
     "v1.ToolResult\022)\n\005usage\030\020 \001(\0132\032.runanywhe"
     "re.v1.TokenUsage\022,\n\005error\030\021 \001(\0132\030.runany"
     "where.v1.SDKErrorH\001\210\001\001B\023\n\021_thinking_cont"
-    "entB\010\n\006_error\"\247\004\n\016LLMStreamEvent\022\024\n\014time"
-    "stamp_us\030\002 \001(\003\022\r\n\005token\030\003 \001(\t\022\020\n\010is_fina"
-    "l\030\004 \001(\010\022\'\n\004kind\030\005 \001(\0162\031.runanywhere.v1.T"
-    "okenKind\022\020\n\010token_id\030\006 \001(\r\022\017\n\007logprob\030\007 "
-    "\001(\002\022\025\n\rfinish_reason\030\010 \001(\t\0229\n\006result\030\n \001"
-    "(\0132$.runanywhere.v1.LLMStreamFinalResult"
-    "H\000\210\001\001\0226\n\nevent_kind\030\014 \001(\0162\".runanywhere."
-    "v1.LLMStreamEventKind\022\022\n\nrequest_id\030\r \001("
-    "\t\022\027\n\017conversation_id\030\016 \001(\t\022\037\n\027prompt_tok"
-    "ens_processed\030\017 \001(\005\022#\n\033completion_tokens"
-    "_generated\030\020 \001(\005\022\022\n\nelapsed_ms\030\021 \001(\003\0220\n\t"
-    "tool_call\030\022 \001(\0132\030.runanywhere.v1.ToolCal"
-    "lH\001\210\001\001\022,\n\005error\030\023 \001(\0132\030.runanywhere.v1.S"
-    "DKErrorH\002\210\001\001B\t\n\007_resultB\014\n\n_tool_callB\010\n"
-    "\006_error*\262\002\n\022LLMStreamEventKind\022%\n!LLM_ST"
-    "REAM_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035LLM_STR"
-    "EAM_EVENT_KIND_STARTED\020\001\022\037\n\033LLM_STREAM_E"
-    "VENT_KIND_TOKEN\020\002\022\"\n\036LLM_STREAM_EVENT_KI"
-    "ND_THINKING\020\003\022#\n\037LLM_STREAM_EVENT_KIND_T"
-    "OOL_CALL\020\004\022\"\n\036LLM_STREAM_EVENT_KIND_PROG"
-    "RESS\020\005\022#\n\037LLM_STREAM_EVENT_KIND_COMPLETE"
-    "D\020\006\022\037\n\033LLM_STREAM_EVENT_KIND_ERROR\020\007B\212\001\n"
-    "\027ai.runanywhere.proto.v1B\017LLMServiceProt"
-    "oP\001Z<github.com/runanywhere/runanywhere-"
-    "sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Ru"
-    "nanywhere.V1\272\002\002RAb\006proto3"
+    "entB\010\n\006_error\"\264\004\n\016LLMStreamEvent\022\013\n\003seq\030"
+    "\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003\022\r\n\005token\030\003 \001"
+    "(\t\022\020\n\010is_final\030\004 \001(\010\022\'\n\004kind\030\005 \001(\0162\031.run"
+    "anywhere.v1.TokenKind\022\020\n\010token_id\030\006 \001(\r\022"
+    "\017\n\007logprob\030\007 \001(\002\022\025\n\rfinish_reason\030\010 \001(\t\022"
+    "9\n\006result\030\n \001(\0132$.runanywhere.v1.LLMStre"
+    "amFinalResultH\000\210\001\001\0226\n\nevent_kind\030\014 \001(\0162\""
+    ".runanywhere.v1.LLMStreamEventKind\022\022\n\nre"
+    "quest_id\030\r \001(\t\022\027\n\017conversation_id\030\016 \001(\t\022"
+    "\037\n\027prompt_tokens_processed\030\017 \001(\005\022#\n\033comp"
+    "letion_tokens_generated\030\020 \001(\005\022\022\n\nelapsed"
+    "_ms\030\021 \001(\003\0220\n\ttool_call\030\022 \001(\0132\030.runanywhe"
+    "re.v1.ToolCallH\001\210\001\001\022,\n\005error\030\023 \001(\0132\030.run"
+    "anywhere.v1.SDKErrorH\002\210\001\001B\t\n\007_resultB\014\n\n"
+    "_tool_callB\010\n\006_error*\262\002\n\022LLMStreamEventK"
+    "ind\022%\n!LLM_STREAM_EVENT_KIND_UNSPECIFIED"
+    "\020\000\022!\n\035LLM_STREAM_EVENT_KIND_STARTED\020\001\022\037\n"
+    "\033LLM_STREAM_EVENT_KIND_TOKEN\020\002\022\"\n\036LLM_ST"
+    "REAM_EVENT_KIND_THINKING\020\003\022#\n\037LLM_STREAM"
+    "_EVENT_KIND_TOOL_CALL\020\004\022\"\n\036LLM_STREAM_EV"
+    "ENT_KIND_PROGRESS\020\005\022#\n\037LLM_STREAM_EVENT_"
+    "KIND_COMPLETED\020\006\022\037\n\033LLM_STREAM_EVENT_KIN"
+    "D_ERROR\020\007B\212\001\n\027ai.runanywhere.proto.v1B\017L"
+    "LMServiceProtoP\001Z<github.com/runanywhere"
+    "/runanywhere-sdks/idl/v1;runanywherev1\370\001"
+    "\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_llm_5fservice_2eproto_deps[6] = {
@@ -1114,7 +1122,7 @@ static ::absl::once_flag descriptor_table_llm_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_llm_5fservice_2eproto = {
     false,
     false,
-    1905,
+    1918,
     descriptor_table_protodef_llm_5fservice_2eproto,
     "llm_service.proto",
     &descriptor_table_llm_5fservice_2eproto_once,
@@ -2244,11 +2252,11 @@ LLMStreamEvent::LLMStreamEvent(
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, timestamp_us_),
+               offsetof(Impl_, seq_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, timestamp_us_),
+               offsetof(Impl_, seq_),
            offsetof(Impl_, completion_tokens_generated_) -
-               offsetof(Impl_, timestamp_us_) +
+               offsetof(Impl_, seq_) +
                sizeof(Impl_::completion_tokens_generated_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.LLMStreamEvent)
@@ -2352,12 +2360,13 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
       _impl_.error_->Clear();
     }
   }
-  _impl_.timestamp_us_ = ::int64_t{0};
+  _impl_.seq_ = ::uint64_t{0u};
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
-    ::memset(&_impl_.is_final_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.completion_tokens_generated_) -
-        reinterpret_cast<char*>(&_impl_.is_final_)) + sizeof(_impl_.completion_tokens_generated_));
+    ::memset(&_impl_.timestamp_us_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.elapsed_ms_) -
+        reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.elapsed_ms_));
   }
+  _impl_.completion_tokens_generated_ = 0;
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -2381,8 +2390,17 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // int64 timestamp_us = 2;
+  // uint64 seq = 1;
   if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_seq() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteUInt64ToArray(
+          1, this_._internal_seq(), target);
+    }
+  }
+
+  // int64 timestamp_us = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
     if (this_._internal_timestamp_us() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
@@ -2401,7 +2419,7 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
   }
 
   // bool is_final = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (this_._internal_is_final() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -2410,7 +2428,7 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
   }
 
   // .runanywhere.v1.TokenKind kind = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
     if (this_._internal_kind() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -2419,7 +2437,7 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
   }
 
   // uint32 token_id = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     if (this_._internal_token_id() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
@@ -2428,7 +2446,7 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
   }
 
   // float logprob = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_logprob()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -2454,7 +2472,7 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
   }
 
   // .runanywhere.v1.LLMStreamEventKind event_kind = 12;
-  if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
     if (this_._internal_event_kind() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -2483,7 +2501,7 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
   }
 
   // int32 prompt_tokens_processed = 15;
-  if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00004000U)) {
     if (this_._internal_prompt_tokens_processed() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<15>(
@@ -2492,7 +2510,7 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
   }
 
   // int32 completion_tokens_generated = 16;
-  if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00010000U)) {
     if (this_._internal_completion_tokens_generated() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt32ToArray(
@@ -2501,7 +2519,7 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
   }
 
   // int64 elapsed_ms = 17;
-  if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+  if (CheckHasBit(cached_has_bits, 0x00008000U)) {
     if (this_._internal_elapsed_ms() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteInt64ToArray(
@@ -2592,64 +2610,73 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
       total_size += 2 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
-    // int64 timestamp_us = 2;
+    // uint64 seq = 1;
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (this_._internal_seq() != 0) {
+        total_size += ::_pbi::WireFormatLite::UInt64SizePlusOne(
+            this_._internal_seq());
+      }
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
+    // int64 timestamp_us = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
       if (this_._internal_timestamp_us() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_us());
       }
     }
-  }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
     // bool is_final = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (this_._internal_is_final() != 0) {
         total_size += 2;
       }
     }
     // .runanywhere.v1.TokenKind kind = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (this_._internal_kind() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_kind());
       }
     }
     // uint32 token_id = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (this_._internal_token_id() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
             this_._internal_token_id());
       }
     }
     // float logprob = 7;
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_logprob()) != 0) {
         total_size += 5;
       }
     }
     // .runanywhere.v1.LLMStreamEventKind event_kind = 12;
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (this_._internal_event_kind() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_event_kind());
       }
     }
     // int32 prompt_tokens_processed = 15;
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
       if (this_._internal_prompt_tokens_processed() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_prompt_tokens_processed());
       }
     }
     // int64 elapsed_ms = 17;
-    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
       if (this_._internal_elapsed_ms() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int64Size(
                                         this_._internal_elapsed_ms());
       }
     }
+  }
+   {
     // int32 completion_tokens_generated = 16;
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00010000U)) {
       if (this_._internal_completion_tokens_generated() != 0) {
         total_size += 2 + ::_pbi::WireFormatLite::Int32Size(
                                         this_._internal_completion_tokens_generated());
@@ -2736,51 +2763,56 @@ void LLMStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
-      if (from._internal_timestamp_us() != 0) {
-        _this->_impl_.timestamp_us_ = from._impl_.timestamp_us_;
+      if (from._internal_seq() != 0) {
+        _this->_impl_.seq_ = from._impl_.seq_;
       }
     }
   }
   if (BatchCheckHasBit(cached_has_bits, 0x0000ff00U)) {
     if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (from._internal_timestamp_us() != 0) {
+        _this->_impl_.timestamp_us_ = from._impl_.timestamp_us_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (from._internal_is_final() != 0) {
         _this->_impl_.is_final_ = from._impl_.is_final_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
       if (from._internal_kind() != 0) {
         _this->_impl_.kind_ = from._impl_.kind_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (from._internal_token_id() != 0) {
         _this->_impl_.token_id_ = from._impl_.token_id_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
+    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
       if (::absl::bit_cast<::uint32_t>(from._internal_logprob()) != 0) {
         _this->_impl_.logprob_ = from._impl_.logprob_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00001000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
       if (from._internal_event_kind() != 0) {
         _this->_impl_.event_kind_ = from._impl_.event_kind_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00002000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
       if (from._internal_prompt_tokens_processed() != 0) {
         _this->_impl_.prompt_tokens_processed_ = from._impl_.prompt_tokens_processed_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00004000U)) {
+    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
       if (from._internal_elapsed_ms() != 0) {
         _this->_impl_.elapsed_ms_ = from._impl_.elapsed_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00008000U)) {
-      if (from._internal_completion_tokens_generated() != 0) {
-        _this->_impl_.completion_tokens_generated_ = from._impl_.completion_tokens_generated_;
-      }
+  }
+  if (CheckHasBit(cached_has_bits, 0x00010000U)) {
+    if (from._internal_completion_tokens_generated() != 0) {
+      _this->_impl_.completion_tokens_generated_ = from._impl_.completion_tokens_generated_;
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;

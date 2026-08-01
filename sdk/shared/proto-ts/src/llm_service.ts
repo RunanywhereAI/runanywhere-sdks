@@ -122,6 +122,8 @@ export interface LLMStreamFinalResult {
 
 /** `result` is populated only on the terminal event. */
 export interface LLMStreamEvent {
+  /** Monotonic sequence for tool-calling session streams (#607). */
+  seq: number;
   timestampUs: number;
   token: string;
   isFinal: boolean;
@@ -687,6 +689,7 @@ export const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult> = {
 
 function createBaseLLMStreamEvent(): LLMStreamEvent {
   return {
+    seq: 0,
     timestampUs: 0,
     token: "",
     isFinal: false,
@@ -708,6 +711,9 @@ function createBaseLLMStreamEvent(): LLMStreamEvent {
 
 export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
   encode(message: LLMStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.seq !== 0) {
+      writer.uint32(8).uint64(message.seq);
+    }
     if (message.timestampUs !== 0) {
       writer.uint32(16).int64(message.timestampUs);
     }
@@ -766,6 +772,14 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.seq = longToNumber(reader.uint64());
+          continue;
+        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -905,6 +919,7 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
 
   fromJSON(object: any): LLMStreamEvent {
     return {
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -970,6 +985,9 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
 
   toJSON(message: LLMStreamEvent): unknown {
     const obj: any = {};
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
+    }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
     }
@@ -1026,6 +1044,7 @@ export const LLMStreamEvent: MessageFns<LLMStreamEvent> = {
   },
   fromPartial<I extends Exact<DeepPartial<LLMStreamEvent>, I>>(object: I): LLMStreamEvent {
     const message = createBaseLLMStreamEvent();
+    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.token = object.token ?? "";
     message.isFinal = object.isFinal ?? false;

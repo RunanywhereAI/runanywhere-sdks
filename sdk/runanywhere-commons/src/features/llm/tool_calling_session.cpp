@@ -37,11 +37,9 @@
 #include "features/llm/tool_calling_result_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
-#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include "chat.pb.h"
 #include "errors.pb.h"
 #include "llm_service.pb.h"
 #include "tool_calling.pb.h"
@@ -390,6 +388,7 @@ void emit_final_event(ToolCallingSession& session, bool is_complete) {
 void emit_llm_chunk(ToolCallingSession& session, const std::string& text, bool is_final,
                     const std::string& finish_reason) {
     runanywhere::v1::LLMStreamEvent stream;
+    stream.set_seq(session.seq + 1);
     stream.set_timestamp_us(now_us());
     stream.set_token(text);
     stream.set_is_final(is_final);
@@ -419,8 +418,15 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const ToolCallingSess
     options.set_format(session.format);
     options.set_max_tool_calls(static_cast<int32_t>(session.max_tool_calls));
     options.set_keep_tools_available(session.keep_tools_available);
-    // Sampling/system prompt stay on the generation snapshot; ToolCallingOptions
-    // carries tool config only.
+    if (session.generation.max_tokens > 0) {
+        options.set_max_tokens(session.generation.max_tokens);
+    }
+    if (session.generation.temperature > 0.0f) {
+        options.set_temperature(session.generation.temperature);
+    }
+    if (!session.generation.system_prompt.empty()) {
+        options.set_system_prompt(session.generation.system_prompt);
+    }
     // Honor request-level tool_choice / forced_tool_name on the
     // snapshot consumed by the format/validate proto helpers.
     if (session.has_tool_choice) {
@@ -568,8 +574,7 @@ validate_tool_call(const ToolCallingSession& session, const runanywhere::v1::Too
     if (req_size > 0 &&
         !request.SerializeToArray(req_bytes.data(), static_cast<int>(req_bytes.size()))) {
         empty_result.set_is_valid(false);
-        rac::foundation::populate_sdk_error(empty_result.mutable_error(), RAC_ERROR_ENCODING_ERROR);
-        empty_result.mutable_error()->set_message("failed to serialize validation request");
+        empty_result.set_error_message("failed to serialize validation request");
         return empty_result;
     }
 
@@ -583,10 +588,8 @@ validate_tool_call(const ToolCallingSession& session, const runanywhere::v1::Too
         (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     } else {
         result.set_is_valid(false);
-        rac::foundation::populate_sdk_error(
-            result.mutable_error(), rc != RAC_SUCCESS ? rc : RAC_ERROR_INVALID_RESPONSE);
-        result.mutable_error()->set_message(out.error_message ? out.error_message
-                                                              : "validation proto call failed");
+        result.set_error_message(out.error_message ? out.error_message
+                                                   : "validation proto call failed");
     }
     rac_proto_buffer_free(&out);
     return result;
@@ -698,8 +701,8 @@ void run_generate_loop(ToolCallingSession& session) {
         runanywhere::v1::ToolResult failed;
         failed.set_tool_call_id(parsed_call.id());
         failed.set_name(parsed_call.name());
-        rac::foundation::populate_sdk_error(failed.mutable_error(), RAC_ERROR_VALIDATION_FAILED);
-        failed.mutable_error()->set_message(policy_error);
+        failed.set_error(policy_error);
+        failed.set_success(false);
         failed.set_started_at_ms(now_ms());
         failed.set_completed_at_ms(now_ms());
         session.all_tool_calls.push_back(parsed_call);
@@ -722,7 +725,7 @@ void run_generate_loop(ToolCallingSession& session) {
     if (session.validate_calls) {
         auto validation = validate_tool_call(session, parsed_call);
         if (!validation.is_valid()) {
-            std::string msg = validation.error().message();
+            std::string msg = validation.error_message();
             if (msg.empty() && validation.validation_errors_size() > 0) {
                 msg = validation.validation_errors(0);
             }
@@ -733,8 +736,8 @@ void run_generate_loop(ToolCallingSession& session) {
             runanywhere::v1::ToolResult failed;
             failed.set_tool_call_id(parsed_call.id());
             failed.set_name(parsed_call.name());
-            rac::foundation::populate_sdk_error(failed.mutable_error(), RAC_ERROR_VALIDATION_FAILED);
-            failed.mutable_error()->set_message(msg);
+            failed.set_error(msg);
+            failed.set_success(false);
             failed.set_started_at_ms(now_ms());
             failed.set_completed_at_ms(now_ms());
             session.all_tool_calls.push_back(parsed_call);
@@ -815,58 +818,55 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
     session->callback = callback;
     session->user_data = user_data;
 
-    const auto& gen = request.generation();
-    const auto& tool_cfg = gen.tool_calling();
-
     session->user_prompt = request.prompt();
-    session->generation.max_tokens = gen.max_output_tokens();
-    session->generation.temperature = gen.temperature();
-    session->generation.top_p = gen.top_p();
-    session->generation.system_prompt = gen.system_prompt();
-    session->generation.disable_thinking =
-        gen.has_reasoning() && gen.reasoning().mode() == runanywhere::v1::REASONING_MODE_OFF;
-    // Prior conversation turns, EXCLUDING the current turn. The session path
+    session->generation.max_tokens = request.max_tokens();
+    session->generation.temperature = request.temperature();
+    session->generation.top_p = request.top_p();
+    session->generation.system_prompt = request.system_prompt();
+    session->generation.disable_thinking = request.disable_thinking();
+    // Prior conversation turns (tool_calling.proto field 19). The session path
     // shares run_generate_once (via generation_for_tool_step), which flattens
-    // generation.history into options.history for EVERY generate. History is
-    // role-tagged ChatMessages; the internal snapshot stays positional
-    // [user0, asst0, ...], so drop leading assistant turns and a dangling
-    // trailing turn (mirrors tool_calling_run_loop.cpp).
-    for (const auto& msg : request.history()) {
-        if (session->generation.history.empty() &&
-            msg.role() != runanywhere::v1::MessageRole::MESSAGE_ROLE_USER) {
-            continue;
-        }
-        session->generation.history.push_back(msg.content());
-    }
+    // generation.history into options.history for EVERY generate — so setting it
+    // here gives Web/Flutter (session ABI) the same multi-turn context the
+    // run-loop ABI already threads. request.history already EXCLUDES the current
+    // turn and is pre-alternated [user,asst,...]; drop a dangling trailing turn
+    // on an odd count so the positional role assignment stays aligned (mirrors
+    // tool_calling_run_loop.cpp and the standard path's trailing-user pop).
+    session->generation.history.assign(request.history().begin(), request.history().end());
     if (session->generation.history.size() % 2 != 0) {
         session->generation.history.pop_back();
     }
 
-    session->format = tool_cfg.has_format() ? tool_cfg.format()
-                                            : runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON;
+    session->format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
+                          ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON
+                          : request.format();
     // Probe grammar capability once (cheap acquire/release): grammar backends build +
     // parse the tool prompt in the bare-Pythonic format the QHexRT grammar enforces.
     // Non-grammar engines keep the declared format — a strict no-op for them (RUN-80).
     session->grammar_backend = rac::llm::lifecycle_llm_supports_grammar();
     session->max_tool_calls =
-        tool_cfg.max_tool_calls() == 0 ? kDefaultMaxToolCalls : tool_cfg.max_tool_calls();
-    session->auto_execute = tool_cfg.has_auto_execute() ? tool_cfg.auto_execute() : true;
-    session->replace_system_prompt = tool_cfg.replace_system_prompt();
-    session->require_json_arguments = tool_cfg.require_json_arguments();
-    session->keep_tools_available = tool_cfg.keep_tools_available();
-    // validate_calls is `optional bool`: preserve the documented default
-    // (validate=true) when unset; hosts that delegate validation to their
-    // executor opt out explicitly.
+        request.max_tool_calls() == 0 ? kDefaultMaxToolCalls : request.max_tool_calls();
+    session->auto_execute = request.has_auto_execute() ? request.auto_execute() : true;
+    session->replace_system_prompt = request.replace_system_prompt();
+    session->require_json_arguments = request.require_json_arguments();
+    session->keep_tools_available = request.keep_tools_available();
+    // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
+    // The field is `optional bool` so we can preserve the documented default
+    // (validate=true) when the caller did not set it, while still letting hosts
+    // that delegate validation/authorization to their executor opt out by
+    // explicitly setting validate_calls=false.
     session->validate_calls = request.has_validate_calls() ? request.validate_calls() : true;
-    if (tool_cfg.tool_choice() != runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED) {
+    // Pick up the OpenAI-style request-level tool_choice and
+    // forced_tool_name knobs (idl/tool_calling.proto fields 7/8).
+    if (request.has_tool_choice()) {
         session->has_tool_choice = true;
-        session->tool_choice = tool_cfg.tool_choice();
+        session->tool_choice = request.tool_choice();
     }
-    if (tool_cfg.has_forced_tool_name()) {
-        session->forced_tool_name = tool_cfg.forced_tool_name();
+    if (request.has_forced_tool_name()) {
+        session->forced_tool_name = request.forced_tool_name();
     }
 
-    for (const auto& tool : tool_cfg.tools()) {
+    for (const auto& tool : request.tools()) {
         *session->tool_options.add_tools() = tool;
     }
 
@@ -979,11 +979,12 @@ rac_tool_calling_session_step_with_result_proto(const uint8_t* request_proto_byt
         tr.set_name(session->pending_tool_name);
         const bool has_error = request.has_error() && !request.error().empty();
         if (has_error) {
-            rac::foundation::populate_sdk_error(tr.mutable_error(), RAC_ERROR_PROCESSING_FAILED);
-            tr.mutable_error()->set_message(request.error());
+            tr.set_error(request.error());
+            tr.set_success(false);
         } else {
             tr.set_result_json(request.result_json().empty() ? std::string("{}")
                                                              : request.result_json());
+            tr.set_success(true);
         }
         tr.set_started_at_ms(now_ms());
         tr.set_completed_at_ms(now_ms());
