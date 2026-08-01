@@ -359,7 +359,7 @@ class STTViewModel: VoiceComponentViewModelBase {
             policy: HybridRoutingPolicy(
                 hardFilters: filters,
                 cascade: .confidence(threshold: Float(hybridConfidenceThreshold)),
-                rank: hybridPreferOnline ? .preferOnlineFirst : .preferLocalFirst
+                preferLocal: !hybridPreferOnline
             )
         )
         hybridRouter = router

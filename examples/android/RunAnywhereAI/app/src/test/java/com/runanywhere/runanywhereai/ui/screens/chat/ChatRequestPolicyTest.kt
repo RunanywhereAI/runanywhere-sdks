@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
-import com.runanywhere.sdk.public.api.ChatRole
+import ai.runanywhere.proto.v1.MessageRole
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -10,13 +11,16 @@ class ChatRequestPolicyTest {
     @Test
     fun `first turn keeps the current prompt out of history`() {
         val turn = ChatRequestPolicy.snapshot("Current prompt", emptyList())
-
-        assertEquals("Current prompt", turn.prompt)
-        assertTrue(turn.history.isEmpty())
-        assertEquals(
-            listOf(ChatRole.USER to "Current prompt"),
-            ChatRequestPolicy.toMessages(turn).map { it.role to it.content },
+        val request = ChatRequestPolicy.buildRequest(
+            turn = turn,
+            options = RALLMGenerationOptions(max_output_tokens = 96),
+            conversationId = "conversation-1",
+            streaming = false,
         )
+
+        assertEquals("Current prompt", request.prompt)
+        assertEquals("conversation-1", request.conversation_id)
+        assertTrue(request.history.isEmpty())
     }
 
     @Test
@@ -33,8 +37,8 @@ class ChatRequestPolicyTest {
 
         assertEquals(
             listOf(
-                ChatRole.USER to "first question",
-                ChatRole.ASSISTANT to "first answer",
+                MessageRole.MESSAGE_ROLE_USER to "first question",
+                MessageRole.MESSAGE_ROLE_ASSISTANT to "first answer",
             ),
             turn.history.map { it.role to it.content },
         )
@@ -42,16 +46,20 @@ class ChatRequestPolicyTest {
     }
 
     @Test
-    fun `the transcript is prior history followed by the current prompt`() {
+    fun `stream request preserves history budget and canonical streaming flag`() {
         val turn = ChatRequestPolicy.snapshot(
             prompt = "follow up",
             messages = listOf(ChatMessage(text = "prior", isUser = true)),
         )
-        val messages = ChatRequestPolicy.toMessages(turn)
+        val request = ChatRequestPolicy.buildRequest(
+            turn = turn,
+            options = RALLMGenerationOptions(max_output_tokens = 37),
+            conversationId = "conversation-2",
+            streaming = true,
+        )
 
-        assertEquals(turn.history, messages.dropLast(1))
-        assertEquals(ChatRole.USER, messages.last().role)
-        assertEquals("follow up", messages.last().content)
+        assertEquals(37, requireNotNull(request.options).max_output_tokens)
+        assertEquals(turn.history, request.history)
     }
 
     @Test

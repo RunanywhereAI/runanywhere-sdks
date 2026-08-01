@@ -1,7 +1,7 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
-import com.runanywhere.sdk.public.api.GenerationResult
-import com.runanywhere.sdk.public.api.ToolResult
+import ai.runanywhere.proto.v1.ToolCallingResult
+import ai.runanywhere.proto.v1.ToolResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -11,7 +11,7 @@ class ChatToolResultNormalizerTest {
     @Test
     fun `complete thinking block is split from the visible answer`() {
         val normalized = ChatToolResultNormalizer.normalize(
-            GenerationResult(text = "<think>private calculation</think>\nThe answer is 396."),
+            ToolCallingResult(text = "<think>private calculation</think>\nThe answer is 396."),
         )
 
         assertEquals("The answer is 396.", normalized.text)
@@ -22,7 +22,7 @@ class ChatToolResultNormalizerTest {
     @Test
     fun `malformed and mismatched tags never reach visible or thinking text`() {
         val normalized = ChatToolResultNormalizer.normalize(
-            GenerationResult(
+            ToolCallingResult(
                 text = "</think><think data-bad='1'>private plan</thinking>Visible answer.</think>",
             ),
         )
@@ -35,9 +35,9 @@ class ChatToolResultNormalizerTest {
     @Test
     fun `unclosed reasoning-only result falls back to successful calculation`() {
         val normalized = ChatToolResultNormalizer.normalize(
-            GenerationResult(
+            ToolCallingResult(
                 text = "<think>\nThinking Process: calculate returned successfully but the token cap ended here",
-                toolResults = listOf(
+                tool_results = listOf(
                     ToolResult(
                         name = "calculate",
                         result_json = """{"result":"396"}""",
@@ -55,10 +55,10 @@ class ChatToolResultNormalizerTest {
     @Test
     fun `unclosed raw text is recovered without displaying reasoning`() {
         val normalized = ChatToolResultNormalizer.normalize(
-            GenerationResult(
+            ToolCallingResult(
                 text = "",
-                thinkingText = "<think>still reasoning",
-                toolResults = listOf(
+                raw_text = "<think>still reasoning",
+                tool_results = listOf(
                     ToolResult(
                         name = "search_web",
                         result_json = """{"summary":"A concise sourced answer.","source_url":"https://example.com"}""",
@@ -76,9 +76,9 @@ class ChatToolResultNormalizerTest {
     @Test
     fun `typed thinking is authoritative and sanitized`() {
         val normalized = ChatToolResultNormalizer.normalize(
-            GenerationResult(
+            ToolCallingResult(
                 text = "<think>raw reasoning</think>Visible answer.",
-                thinkingText = "<thinking>typed reasoning</thinking>",
+                thinking_content = "<thinking>typed reasoning</thinking>",
             ),
         )
 

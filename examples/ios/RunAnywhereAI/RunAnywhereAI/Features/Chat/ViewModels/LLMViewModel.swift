@@ -33,6 +33,8 @@ final class LLMViewModel {
     private(set) var loadedModelSupportsThinking = false
     private(set) var selectedFramework: InferenceFramework?
     private(set) var modelSupportsStreaming = true
+    private(set) var isUsingConnect = false
+    private(set) var connectedHostName: String?
     private(set) var currentConversation: Conversation?
 
     // MARK: - LoRA Adapter State
@@ -88,6 +90,12 @@ final class LLMViewModel {
     /// and merges it into the persisted `MessageAnalytics`.
     private(set) var activeGenerationTTFTMs: Double?
     private var isViewModelInitialized = false
+    #if os(iOS)
+    /// Tracks the in-flight hosted request so Stop can cancel by id.
+    /// Written from generation helpers in `LLMViewModel+Generation` (other file),
+    /// so this cannot use `private(set)` — that setter is file-private in Swift.
+    var activeHostedRequestID: String?
+    #endif
 
     // MARK: - Internal Accessors for Extensions
 
@@ -112,6 +120,37 @@ final class LLMViewModel {
         loadedModelSupportsThinking = false
         selectedFramework = nil
     }
+
+    #if os(iOS)
+    /// Hosted Connect model identity used for message analytics when no local
+    /// `ModelListViewModel.currentModel` is loaded (Android already builds
+    /// `GenerationStats` from the Connect model descriptor).
+    private(set) var activeConnectModelId: String?
+    private(set) var activeConnectFramework: String?
+
+    func activateConnectModel(_ model: ConnectModel, hostName: String) {
+        isUsingConnect = true
+        connectedHostName = hostName
+        updateModelLoadedState(isLoaded: true)
+        loadedModelName = model.displayName
+        activeConnectModelId = model.id
+        activeConnectFramework = model.framework
+        loadedModelSupportsThinking = false
+        selectedFramework = nil
+        setModelSupportsStreaming(model.supportsStreaming)
+        updateSystemMessageAfterModelLoad()
+    }
+
+    func deactivateConnectModel() async {
+        guard isUsingConnect else { return }
+        isUsingConnect = false
+        connectedHostName = nil
+        activeConnectModelId = nil
+        activeConnectFramework = nil
+        await checkModelStatusFromSDK()
+        updateSystemMessageAfterModelLoad()
+    }
+    #endif
 
     func recordFirstTokenLatency(generationId: String, latency: Double) {
         firstTokenLatencies[generationId] = latency
@@ -204,6 +243,12 @@ final class LLMViewModel {
         activeGenerationID = nil
         generatingConversationId = nil
         setIsGenerating(false)
+        #if os(iOS)
+        if isUsingConnect, let requestID = activeHostedRequestID {
+            ConnectClientController.shared.session.cancelGeneration(requestID: requestID)
+            activeHostedRequestID = nil
+        }
+        #endif
     }
 
     func clearMessages() {
@@ -398,7 +443,7 @@ final class LLMViewModel {
     ) async throws {
         // Check if tool calling is enabled and we have registered tools
         let registeredTools = await RunAnywhere.llm.tools.list()
-        let shouldUseToolCalling = useToolCalling && !registeredTools.isEmpty
+        let shouldUseToolCalling = useToolCalling && !isUsingConnect && !registeredTools.isEmpty
 
         if shouldUseToolCalling {
             logger.info("Using tool calling with \(registeredTools.count) registered tools")
@@ -457,6 +502,12 @@ final class LLMViewModel {
         // second `sendMessage()` could start and overlap the still-running
         // generation on the single-callback LLM component.
         generationTask?.cancel()
+
+        #if os(iOS)
+        if isUsingConnect, let requestID = activeHostedRequestID {
+            ConnectClientController.shared.session.cancelGeneration(requestID: requestID)
+        }
+        #endif
     }
 
     func createNewConversation() {
@@ -475,8 +526,8 @@ final class LLMViewModel {
             var request = RALoRAApplyRequest()
             request.adapters = [config]
             let result = try await RunAnywhere.lora.apply(request)
-            guard result.success else {
-                throw LLMError.custom(result.errorMessage)
+            guard !result.hasError else {
+                throw LLMError.custom(result.error.message)
             }
             loraAdapters = result.adapters
             logger.info("LoRA adapter loaded: \(path) (scale=\(scale))")
@@ -500,8 +551,8 @@ final class LLMViewModel {
                 localPath: localPath,
                 scale: scale
             )
-            guard result.success else {
-                throw LLMError.custom(result.errorMessage)
+            guard !result.hasError else {
+                throw LLMError.custom(result.error.message)
             }
             loraAdapters = result.adapters
             logger.info("LoRA catalog adapter loaded: \(adapter.id) (scale=\(scale))")
@@ -549,8 +600,8 @@ final class LLMViewModel {
     }
 
     private func handleLoraState(_ state: RALoRAState) throws {
-        if state.hasErrorMessage, !state.errorMessage.isEmpty {
-            throw LLMError.custom(state.errorMessage)
+        if state.hasError, !state.error.message.isEmpty {
+            throw LLMError.custom(state.error.message)
         }
         loraAdapters = state.loadedAdapters
     }
@@ -567,9 +618,9 @@ final class LLMViewModel {
             var query = RALoraAdapterCatalogQuery()
             query.modelID = modelId
             let result = try await RunAnywhere.lora.queryCatalog(query)
-            guard result.success else {
+            guard !result.hasError else {
                 throw LLMError.custom(
-                    result.errorMessage.isEmpty ? "LoRA catalog query failed" : result.errorMessage
+                    result.error.message.isEmpty ? "LoRA catalog query failed" : result.error.message
                 )
             }
             availableAdapters = result.entries
@@ -687,7 +738,31 @@ final class LLMViewModel {
             maxTokens: savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
         )
 
-        let effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
+        var effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
+
+        #if os(iOS)
+        // The get_health_data tool surfaces real vitals (heart rate, SpO2,
+        // resting heart rate, ...). Without guidance, a small on-device model
+        // asked to comment on those numbers will readily improvise a medical
+        // opinion. This instruction is appended (not swapped in) so it holds
+        // even when the user has set their own custom system prompt.
+        if ToolSettingsViewModel.shared.toolCallingEnabled, ToolSettingsViewModel.shared.healthToolEnabled {
+            let healthSafetyInstructions = """
+                You have access to the user's real Apple Health data via get_health_data. \
+                Never provide a medical diagnosis, treatment recommendation, or interpret \
+                vitals as indicating a health condition. If the user describes concerning \
+                symptoms (e.g. chest pain, severe dizziness, fainting, difficulty breathing), \
+                tell them to seek medical attention immediately instead of analyzing their \
+                Health data for it. Present Health data factually and encourage consulting a \
+                qualified healthcare professional for any medical concerns. Only state \
+                numbers that literally appear in a get_health_data tool result — if a field \
+                is missing, say the data isn't available rather than estimating a number.
+                """
+            effectiveSystemPrompt = [effectiveSystemPrompt, healthSafetyInstructions]
+                .compactMap { $0 }
+                .joined(separator: "\n\n")
+        }
+        #endif
 
         let systemPromptInfo: String = {
             guard let prompt = effectiveSystemPrompt else { return "nil" }
