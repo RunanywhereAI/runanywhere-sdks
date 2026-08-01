@@ -4,9 +4,11 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "model_types.proto";
 import "rac_options.proto";
 import "thinking_tag_pattern.proto";
+import "token_usage.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -126,19 +128,16 @@ message VLMGenerationRequest {
 
 message VLMResult {
     string text                = 1;
-    int32  input_tokens        = 2;
-    int32  output_tokens       = 3;
-    int64  total_tokens        = 4;
     int64  processing_time_ms  = 5;
-    float  tokens_per_second   = 6;
     int32  image_tokens             = 7;
     int64  time_to_first_token_ms   = 8;
     int64  image_encode_time_ms     = 9;
     optional string hardware_used   = 10;
-    optional string error_message   = 11;
-    int32 error_code                = 12;
     string finish_reason            = 13;
     int32 images_processed          = 14;
+
+    TokenUsage usage                = 15;
+    optional SDKError error         = 16;
 }
 
 enum VLMStreamEventKind {
@@ -151,7 +150,6 @@ enum VLMStreamEventKind {
 }
 
 message VLMStreamEvent {
-    uint64 seq = 1;
     int64 timestamp_us = 2;
     string request_id = 3;
     VLMStreamEventKind kind = 4;
@@ -160,8 +158,7 @@ message VLMStreamEvent {
     bool is_final = 7;
     float tokens_per_second = 8;
     optional VLMResult result = 9;
-    optional string error_message = 10;
-    int32 error_code = 11;
+    optional SDKError error = 12;
 }
 
 message VLMServiceState {
@@ -171,6 +168,5 @@ message VLMServiceState {
     bool supports_streaming = 4;
     bool supports_multiple_images = 5;
     optional string vision_encoder_type = 6;
-    optional string error_message = 7;
-    int32 error_code = 8;
+    optional SDKError error = 9;
 }

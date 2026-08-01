@@ -8,6 +8,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "model_types.proto";
 import "rac_options.proto";
 
@@ -102,9 +103,6 @@ message TTSSynthesisMetadata {
     int64  processing_time_ms  = 3;
     int32  character_count     = 4;
     int64  audio_duration_ms   = 5;
-
-    // character_count / processing_time_ms, set by the producer.
-    float  characters_per_second = 6;
 }
 
 message TTSOutput {
@@ -131,8 +129,7 @@ message TTSOutput {
     bool                           is_final            = 9;
     int64                          audio_size_bytes    = 10;
 
-    optional string                error_message       = 11;
-    int32                          error_code          = 12;
+    optional SDKError              error               = 13;
 }
 
 // Metadata-only view for callers that let the SDK play the audio and never
@@ -150,8 +147,7 @@ message TTSSpeakResult {
     // Milliseconds since epoch, when speech completed.
     int64                          timestamp_ms        = 6;
 
-    optional string                 error_message       = 7;
-    int32                           error_code          = 8;
+    optional SDKError               error               = 9;
 }
 
 message TTSVoiceInfo {
@@ -190,15 +186,12 @@ enum TTSStreamEventKind {
 }
 
 message TTSStreamEvent {
-    uint64 seq = 1;
     int64 timestamp_us = 2;
     string request_id = 3;
     TTSStreamEventKind kind = 4;
     optional TTSOutput output = 5;
     optional TTSPhonemeTimestamp phoneme = 6;
     optional TTSSpeakResult speak_result = 7;
-    optional string error_message = 8;
-    int32 error_code = 9;
 
     // progress is 0.0-1.0 when known; total_chunks 0 = unknown.
     float progress = 10;
@@ -206,6 +199,7 @@ message TTSStreamEvent {
     int32 total_chunks = 12;
     int64 elapsed_ms = 13;
     string status_message = 14;
+    optional SDKError error = 15;
 }
 
 message TTSServiceState {
@@ -213,6 +207,5 @@ message TTSServiceState {
     optional string current_voice = 2;
     repeated TTSVoiceInfo voices = 3;
     repeated string supported_language_codes = 4;
-    optional string error_message = 5;
-    int32 error_code = 6;
+    optional SDKError error = 7;
 }

@@ -4,6 +4,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "model_types.proto";
 import "rac_options.proto";
 
@@ -15,12 +16,6 @@ option objc_class_prefix         = "RAV1";
 option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
 option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
-
-enum EmbeddingsNormalizeMode {
-    EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED = 0;
-    EMBEDDINGS_NORMALIZE_MODE_NONE        = 1;
-    EMBEDDINGS_NORMALIZE_MODE_L2          = 2;
-}
 
 enum EmbeddingsPoolingStrategy {
     EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED = 0;
@@ -49,7 +44,7 @@ message EmbeddingsConfiguration {
 
     optional InferenceFramework preferred_framework = 5;
 
-    EmbeddingsNormalizeMode normalize_mode = 7 [(runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_L2"];
+    bool normalize = 7 [(runanywhere.v1.rac_default) = "true"];
     EmbeddingsPoolingStrategy pooling      = 8 [(runanywhere.v1.rac_default) = "EMBEDDINGS_POOLING_STRATEGY_MEAN"];
 
     // Backend-specific config such as tokenizer or vocab companion paths.
@@ -68,8 +63,7 @@ message EmbeddingsOptions {
         (runanywhere.v1.rac_max) = 8192
     ];
 
-    // UNSPECIFIED = use the component config.
-    EmbeddingsNormalizeMode normalize_mode = 4 [(runanywhere.v1.rac_default) = "EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED"];
+    bool normalize = 4;
     EmbeddingsPoolingStrategy pooling      = 5;
     int32 n_threads                        = 6 [(runanywhere.v1.rac_default) = "0"];  // 0 = auto
 }
@@ -113,9 +107,8 @@ message EmbeddingsResult {
     int32                    tokens_used        = 4;
 
     optional string          model_id           = 5;
-    optional string          error_message      = 6;
-    int32                    error_code         = 7;
     string                   request_id         = 8;
+    optional SDKError        error              = 9;
 }
 
 message EmbeddingsCreateRequest {
@@ -140,7 +133,5 @@ message EmbeddingsCreateResult {
     int32  dimension = 3;
     int32  max_tokens = 4;
 
-    // Mirrors rac_result_t; negative on failure.
-    int32  error_code = 5;
-    string error_message = 6;
+    optional SDKError error = 7;
 }

@@ -242,9 +242,6 @@ message ComponentInitializationEvent {
     // For COMPONENT_DOWNLOAD_PROGRESS — 0.0..1.0.
     float                            progress        = 5;
 
-    // For COMPONENT_FAILED / *_FAILED.
-    string                           error           = 6;
-
     // For COMPONENT_STATE_CHANGED — RN events.ts:274-278.
     string                           old_state       = 7;
     string                           new_state       = 8;
@@ -255,9 +252,8 @@ message ComponentInitializationEvent {
     repeated SDKComponent            ready_components = 10;
     repeated SDKComponent            pending_components = 11;
 
-    // For INITIALIZATION_COMPLETED — InitializationResult summary
-    // (success bool + count). Full result travels via dedicated RPC.
-    bool                             init_success     = 12;
+    // For INITIALIZATION_COMPLETED — InitializationResult summary count.
+    // Full result travels via dedicated RPC.
     int32                            ready_count      = 13;
     int32                            failed_count     = 14;
 
@@ -265,6 +261,9 @@ message ComponentInitializationEvent {
     // enum-backed component lifecycle state instead of parsing strings.
     ComponentLifecycleState          previous_lifecycle_state = 15;
     ComponentLifecycleState          current_lifecycle_state  = 16;
+
+    // Set on COMPONENT_FAILED / *_FAILED and failed completions.
+    optional SDKError                error            = 17;
 }
 
 enum ComponentInitializationEventKind {
@@ -292,18 +291,17 @@ message ComponentLifecycleSnapshot {
     ComponentLifecycleState state         = 2;
     string                  model_id      = 3;
     int64                   updated_at_ms = 4;
-    string                  error_message = 5;
     ModelCategory           category      = 6;
     InferenceFramework      framework     = 7;
     string                  resolved_path = 8;
     int64                   loaded_at_unix_ms = 9;
     ModelInfo               model         = 10;
+    optional SDKError       error         = 11;
 }
 
 message ComponentLifecycleSnapshotResult {
-    bool success = 1;
     repeated ComponentLifecycleSnapshot snapshots = 2;
-    string error_message = 3;
+    optional SDKError error = 4;
 }
 
 // Operation-aware lifecycle event. The oneof arms intentionally reference the
@@ -529,7 +527,6 @@ message VoiceLifecycleEvent {
     int64          audio_length_ms       = 15;   // STT input audio length
     int32          audio_size_bytes      = 16;
     int32          word_count            = 17;   // STT
-    double         real_time_factor      = 18;   // STT
     string         language              = 19;   // STT
     int32          sample_rate           = 20;   // STT + TTS
     bool           is_streaming          = 21;   // STT
@@ -540,7 +537,6 @@ message VoiceLifecycleEvent {
     int64          audio_duration_ms     = 24;   // distinct from duration_ms(7); telemetry output_duration_ms
     int32          audio_size_bytes_tts  = 25;
     int64          processing_duration_ms = 26;  // telemetry processing_time_ms
-    double         characters_per_second = 27;
 }
 
 enum VoiceEventKind {

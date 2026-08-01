@@ -8,6 +8,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "rac_options.proto";
 
 option cc_enable_arenas      = true;
@@ -110,13 +111,12 @@ message ToolResult {
     string tool_call_id              = 1;
     string name                      = 2;
     string result_json               = 3;
-    optional string error            = 4;
-
-    // When false and error is empty, fall back to result_json semantics.
-    bool success                     = 5;
 
     int64 started_at_ms              = 8;
     int64 completed_at_ms            = 9;
+
+    // Unset means the tool ran successfully; fall back to result_json semantics.
+    optional SDKError error          = 10;
 }
 
 message ToolCallingOptions {
@@ -156,10 +156,9 @@ message ToolCallingResult {
 
     optional string conversation_id  = 5;
     int32  iterations_used           = 6;
-    optional string error_message    = 7;
-    int32 error_code                 = 8;
     string raw_text                  = 9;
     optional string thinking_content = 10;
+    optional SDKError error          = 11;
 }
 
 message ToolParseRequest {
@@ -174,8 +173,7 @@ message ToolParseResult {
     // Model text left over after the calls were extracted.
     string remaining_text = 3;
 
-    optional string error_message = 4;
-    int32 error_code = 5;
+    optional SDKError error = 6;
 }
 
 message ToolPromptFormatRequest {
@@ -190,8 +188,7 @@ message ToolPromptFormatRequest {
 message ToolPromptFormatResult {
     string formatted_prompt = 1;
     ToolCallFormatName format = 2;
-    optional string error_message = 4;
-    int32 error_code = 5;
+    optional SDKError error = 6;
 }
 
 message ToolCallValidationRequest {
@@ -207,6 +204,5 @@ message ToolCallValidationResult {
     // Arguments coerced to the matched tool's parameter types.
     string normalized_arguments_json = 4;
 
-    optional string error_message = 5;
-    int32 error_code = 6;
+    optional SDKError error = 7;
 }

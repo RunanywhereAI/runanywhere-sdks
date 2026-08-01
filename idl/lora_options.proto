@@ -7,6 +7,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "rac_options.proto";
 
 option cc_enable_arenas          = true;
@@ -43,11 +44,10 @@ message LoRAAdapterInfo {
     // Whether it is currently applied to the context.
     bool            applied       = 4;
 
-    // Populated when applied is false.
-    optional string error_message = 5;
-    int32           error_code    = 6;
-
     int64           loaded_at_ms  = 7;
+
+    // Populated when applied is false.
+    optional SDKError error       = 8;
 }
 
 message LoraAdapterCatalogEntry {
@@ -97,14 +97,13 @@ message LoraAdapterCatalogListRequest {
 }
 
 message LoraAdapterCatalogListResult {
-    bool success = 1;
     repeated LoraAdapterCatalogEntry entries = 2;
-    string error_message = 3;
 
     // total_count is unfiltered; filtered_count reflects the query.
     int32 total_count = 4;
     int32 filtered_count = 5;
     int32 downloaded_count = 6;
+    optional SDKError error = 7;
 }
 
 message LoraAdapterCatalogGetRequest {
@@ -114,7 +113,7 @@ message LoraAdapterCatalogGetRequest {
 message LoraAdapterCatalogGetResult {
     bool found = 1;
     LoraAdapterCatalogEntry entry = 2;
-    string error_message = 3;
+    optional SDKError error = 4;
 }
 
 message LoraAdapterDownloadCompletedRequest {
@@ -128,10 +127,9 @@ message LoraAdapterDownloadCompletedRequest {
 }
 
 message LoraAdapterDownloadCompletedResult {
-    bool success = 1;
     LoraAdapterCatalogEntry entry = 2;
-    string error_message = 3;
     bool persisted = 4;
+    optional SDKError error = 5;
 }
 
 message LoraAdapterImportRequest {
@@ -143,26 +141,23 @@ message LoraAdapterImportRequest {
 }
 
 message LoraAdapterImportResult {
-    bool success = 1;
-    string error_message = 2;
-
     // Stable SDK-owned path of the imported file.
     string local_path = 3;
 
     // Whether a catalog entry matched and was completed.
     bool matched = 4;
     LoraAdapterCatalogEntry entry = 5;
+    optional SDKError error = 6;
 }
 
 message LoraCompatibilityResult {
     bool            is_compatible       = 1;
 
-    // Populated when is_compatible is false.
-    optional string error_message       = 2;
-
     optional string base_model_required = 3;
     repeated string warnings           = 4;
-    int32           error_code          = 5;
+
+    // Populated when is_compatible is false.
+    optional SDKError error             = 6;
 }
 
 message LoRAApplyRequest {
@@ -176,9 +171,7 @@ message LoRAApplyRequest {
 message LoRAApplyResult {
     string request_id = 1;
     repeated LoRAAdapterInfo adapters = 2;
-    bool success = 3;
-    optional string error_message = 4;
-    int32 error_code = 5;
+    optional SDKError error = 6;
 }
 
 message LoRARemoveRequest {
@@ -196,6 +189,5 @@ message LoRAState {
     repeated LoRAAdapterInfo loaded_adapters = 1;
     bool has_active_adapters = 2;
     optional string base_model_id = 3;
-    optional string error_message = 4;
-    int32 error_code = 5;
+    optional SDKError error = 6;
 }

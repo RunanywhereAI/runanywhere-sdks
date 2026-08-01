@@ -59,12 +59,11 @@ message SdkInitPhase2Request {
 // Returned by Phase 1, Phase 2, and retryHTTP.
 //
 // A successful Phase 2 may still carry a warning: HTTP/auth setup is allowed
-// to fail in offline mode, in which case success=true, http_configured=false,
+// to fail in offline mode, in which case error is unset, http_configured=false,
 // and warning holds the offline notice while the SDK continues on cached
 // models.
 message SdkInitResult {
     SdkInitPhase phase                  = 1;
-    bool         success                = 2;  // The phase reached its terminal step.
     SDKError     error                  = 3;
     bool         http_configured        = 4;  // HTTP transport wired at this call site.
     bool         device_registered      = 5;

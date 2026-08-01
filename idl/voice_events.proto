@@ -269,7 +269,7 @@ message VoiceAgentComponentStates {
     bool any_loading = 6;
 
     ComponentLifecycleState wakeword_state = 7;
-    optional string error_message = 8;
+    optional SDKError error = 9;
 }
 
 // ---------------------------------------------------------------------------

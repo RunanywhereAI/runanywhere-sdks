@@ -24,12 +24,6 @@ enum HybridBackendKind {
     HYBRID_BACKEND_CLOUD       = 4;
 }
 
-enum HybridModelType {
-    HYBRID_MODEL_TYPE_UNSPECIFIED = 0;
-    HYBRID_MODEL_TYPE_OFFLINE     = 1;
-    HYBRID_MODEL_TYPE_ONLINE      = 2;
-}
-
 // A candidate must pass every hard filter to stay in the running.
 message HybridFilter {
     oneof kind {
@@ -63,21 +57,15 @@ message ConfidenceCascade {
     float threshold = 1;
 }
 
-enum HybridRank {
-    HYBRID_RANK_UNSPECIFIED        = 0;
-    HYBRID_RANK_PREFER_LOCAL_FIRST  = 1;
-    HYBRID_RANK_PREFER_ONLINE_FIRST = 2;
-}
-
 message HybridRoutingPolicy {
     repeated HybridFilter hard_filters = 1;
     HybridCascade         cascade      = 2;
-    HybridRank            rank         = 3;
+    bool                  prefer_local = 3;
 }
 
 message HybridModelDescriptor {
     string            model_id   = 1;
-    HybridModelType   model_type = 2;
+    bool              is_local   = 2;
     HybridBackendKind backend    = 3;
     string            provider   = 4;
 }

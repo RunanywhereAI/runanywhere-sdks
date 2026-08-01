@@ -4,9 +4,11 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "voice_events.proto";
 import "tool_calling.proto";
 import "llm_options.proto";
+import "token_usage.proto";
 import "chat.proto";
 
 option cc_enable_arenas      = true;
@@ -35,19 +37,16 @@ message LLMGenerateRequest {
 message LLMStreamFinalResult {
     string text = 1;
     optional string thinking_content = 2;
-    int32 input_tokens = 3;
-    int32 output_tokens = 4;
-    int32 total_tokens = 5;
     int64 total_time_ms = 6;
     int64 time_to_first_token_ms = 7;
-    float tokens_per_second = 8;
     string finish_reason = 9;
-    int32 error_code = 10;
-    string error_message = 11;
     int64 prompt_eval_time_ms = 12;
     int64 decode_time_ms = 13;
     repeated ToolCall tool_calls = 14;
     repeated ToolResult tool_results = 15;
+
+    TokenUsage usage = 16;
+    optional SDKError error = 17;
 }
 
 enum LLMStreamEventKind {
@@ -63,7 +62,6 @@ enum LLMStreamEventKind {
 
 // `result` is populated only on the terminal event.
 message LLMStreamEvent {
-    uint64 seq             = 1;
     int64  timestamp_us    = 2;
     string token           = 3;
     bool   is_final        = 4;
@@ -71,9 +69,7 @@ message LLMStreamEvent {
     uint32 token_id        = 6;
     float  logprob         = 7;
     string finish_reason   = 8;
-    string error_message   = 9;
     optional LLMStreamFinalResult result = 10;
-    int32 error_code = 11;
     LLMStreamEventKind event_kind = 12;
     string request_id = 13;
     string conversation_id = 14;
@@ -81,6 +77,7 @@ message LLMStreamEvent {
     int32 completion_tokens_generated = 16;
     int64 elapsed_ms = 17;
     optional ToolCall tool_call = 18;
+    optional SDKError error = 19;
 }
 
 // Tool-driven streaming uses this session path, not LLMGenerateRequest.

@@ -7,6 +7,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "model_types.proto";
 import "rac_options.proto";
 
@@ -103,9 +104,6 @@ message TranscriptionMetadata {
     string model_id           = 1;
     int64  processing_time_ms = 2;
     int64  audio_length_ms    = 3;
-
-    // processing_time_ms / audio_length_ms, set by the producer.
-    float  real_time_factor   = 4;
 }
 
 message STTOutput {
@@ -126,11 +124,10 @@ message STTOutput {
 
     repeated string                   speaker_ids   = 10;
 
-    optional string                   error_message = 11;
-    int32                             error_code    = 12;
-
     // For long-running or streaming transcription.
     int32                             segment_index = 13;
+
+    optional SDKError                 error         = 15;
 }
 
 message STTPartialResult {
@@ -162,14 +159,12 @@ enum STTStreamEventKind {
 }
 
 message STTStreamEvent {
-    uint64 seq = 1;
     int64 timestamp_us = 2;
     string request_id = 3;
     STTStreamEventKind kind = 4;
     optional STTPartialResult partial = 5;
     optional STTOutput final_output = 6;
-    optional string error_message = 7;
-    int32 error_code = 8;
+    optional SDKError error = 9;
 }
 
 message STTServiceState {
@@ -177,6 +172,5 @@ message STTServiceState {
     optional string current_model = 2;
     bool supports_streaming = 3;
     repeated string supported_language_codes = 4;
-    optional string error_message = 5;
-    int32 error_code = 6;
+    optional SDKError error = 7;
 }

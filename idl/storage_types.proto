@@ -8,6 +8,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -78,10 +80,9 @@ message StorageInfoRequest {
 }
 
 message StorageInfoResult {
-    bool        success       = 1;
     StorageInfo info          = 2;
-    string      error_message = 3;
     repeated string warnings  = 4;
+    optional SDKError error    = 5;
 }
 
 message StorageAvailabilityRequest {
@@ -99,11 +100,10 @@ message StorageAvailabilityRequest {
 }
 
 message StorageAvailabilityResult {
-    bool                success       = 1;
     StorageAvailability availability  = 2;
     repeated string     warnings      = 3;
-    string              error_message = 4;
     optional StorageDeletePlan delete_plan = 5;
+    optional SDKError   error         = 6;
 }
 
 message StorageDeletePlanRequest {
@@ -139,10 +139,10 @@ message StorageDeletePlan {
     int64                           reclaimable_bytes          = 3;
     repeated StorageDeleteCandidate candidates                 = 4;
     repeated string                 warnings                   = 5;
-    string                          error_message              = 6;
     bool                            requires_unload            = 7;
     bool                            requires_platform_delete   = 8;
     int32                           candidate_count            = 9;
+    optional SDKError               error                      = 10;
 }
 
 message StorageDeleteRequest {
@@ -160,14 +160,13 @@ message StorageDeleteRequest {
 }
 
 message StorageDeleteResult {
-    bool            success           = 1;
     int64           deleted_bytes     = 2;
     repeated string deleted_model_ids = 3;
     repeated string failed_model_ids  = 4;
     repeated string warnings          = 5;
-    string          error_message     = 6;
     repeated string skipped_model_ids = 7;
     bool            dry_run           = 8;
     bool            registry_updated  = 9;
     bool            files_deleted     = 10;
+    optional SDKError error           = 11;
 }

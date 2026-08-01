@@ -8,8 +8,10 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "rac_options.proto";
 import "llm_options.proto";
+import "token_usage.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -117,16 +119,11 @@ message RAGResult {
     int64  generation_time_ms    = 5;
     int64  total_time_ms         = 6;
 
-    // These use the OpenAI legacy names; everything else in the IDL says
-    // input_tokens / output_tokens.
-    int32 prompt_tokens          = 7;
-    int32 completion_tokens      = 8;
-    int32 total_tokens           = 9;
-
-    optional string error_message = 10;
-    int32 error_code             = 11;
     string request_id            = 12;
     optional string thinking_content = 13;
+
+    TokenUsage usage             = 14;
+    optional SDKError error      = 15;
 }
 
 message RAGStatistics {
@@ -139,8 +136,7 @@ message RAGStatistics {
     int64 vector_store_size_bytes = 7;
     bool is_persistent = 8;
     int64 last_query_ms = 9;
-    optional string error_message = 10;
-    int32 error_code = 11;
+    optional SDKError error = 12;
 }
 
 enum RAGStreamEventKind {
@@ -154,13 +150,11 @@ enum RAGStreamEventKind {
 }
 
 message RAGStreamEvent {
-    uint64 seq = 1;
     int64 timestamp_us = 2;
     string request_id = 3;
     RAGStreamEventKind kind = 4;
     optional RAGSearchResult chunk = 5;
     string token = 6;
     optional RAGResult result = 7;
-    optional string error_message = 8;
-    int32 error_code = 9;
+    optional SDKError error = 10;
 }

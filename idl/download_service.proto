@@ -9,6 +9,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "model_types.proto";
 
 option cc_enable_arenas      = true;
@@ -35,7 +36,6 @@ message DownloadProgress {
     int64          eta_seconds       = 7;   // -1 if unknown
     DownloadState  state             = 8;
     int32          retry_attempt     = 9;   // 0 on first try
-    string         error_message     = 10;  // populated when state == FAILED
     string         task_id           = 11;
     int32          current_file_index = 12; // 0-based within the planned file list
     int32          total_files       = 13;
@@ -46,6 +46,7 @@ message DownloadProgress {
     int64          updated_at_unix_ms = 18;
     string         current_file_name  = 19;
     string         resume_token       = 20;  // logical resume marker, not a native handle
+    optional SDKError error           = 21;  // populated when state == FAILED
 }
 
 enum DownloadStage {
@@ -151,11 +152,11 @@ message DownloadPlanResult {
     bool                  can_resume         = 6;
     int64                 resume_from_bytes  = 7;
     repeated string       warnings           = 8;
-    string                error_message      = 9;
     string                storage_namespace  = 10;
     string                resume_token       = 11;
     int64                 required_free_bytes_after_download = 12;
-    DownloadFailureReason failure_reason     = 13;  // structured companion to error_message
+    DownloadFailureReason failure_reason     = 13;  // structured companion to error
+    optional SDKError     error              = 14;
 }
 
 message DownloadStartRequest {
@@ -171,9 +172,9 @@ message DownloadStartResult {
     string           task_id          = 2;
     string           model_id         = 3;
     DownloadProgress initial_progress = 4;
-    string           error_message    = 5;
     string           resume_token     = 6;
-    DownloadFailureReason failure_reason = 7;  // structured companion to error_message
+    DownloadFailureReason failure_reason = 7;  // structured companion to error
+    optional SDKError error           = 8;
 }
 
 message DownloadCancelRequest {
@@ -183,14 +184,13 @@ message DownloadCancelRequest {
 }
 
 message DownloadCancelResult {
-    bool   success               = 1;
     string task_id               = 2;
     string model_id              = 3;
     int64  partial_bytes_deleted = 4;
-    string error_message         = 5;
     bool   was_running           = 6;
     bool   partial_bytes_preserved = 7;
     string resume_token          = 8;
+    optional SDKError error      = 9;
 }
 
 message DownloadResumeRequest {
@@ -206,7 +206,7 @@ message DownloadResumeResult {
     string           task_id          = 2;
     string           model_id         = 3;
     DownloadProgress initial_progress = 4;
-    string           error_message    = 5;
     string           resume_token     = 6;
-    DownloadFailureReason failure_reason = 7;  // structured companion to error_message
+    DownloadFailureReason failure_reason = 7;  // structured companion to error
+    optional SDKError error           = 8;
 }

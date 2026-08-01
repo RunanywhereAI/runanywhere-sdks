@@ -8,6 +8,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "errors.proto";
 import "model_types.proto";
 import "rac_options.proto";
 
@@ -152,11 +153,10 @@ message DiffusionResult {
     int64              total_time_ms   = 5;
     bool               safety_flag     = 6;
     DiffusionScheduler used_scheduler  = 7;
-    optional string     error_message   = 8;
-    int32               error_code      = 9;
     optional string     image_media_type = 10;
     repeated bytes      batch_images     = 11;
     int32               images_generated = 12;
+    optional SDKError   error            = 13;
 }
 
 enum DiffusionStreamEventKind {
@@ -169,12 +169,10 @@ enum DiffusionStreamEventKind {
 }
 
 message DiffusionStreamEvent {
-    uint64 seq = 1;
     int64 timestamp_us = 2;
     string request_id = 3;
     DiffusionStreamEventKind kind = 4;
     optional DiffusionProgress progress = 5;
     optional DiffusionResult result = 6;
-    optional string error_message = 7;
-    int32 error_code = 8;
+    optional SDKError error = 9;
 }
