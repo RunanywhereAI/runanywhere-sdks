@@ -107,7 +107,7 @@ void publish_storage_sdk_event(const runanywhere::v1::SDKEvent& event) {
 
 void publish_storage_info_event(const runanywhere::v1::StorageInfoResult& result,
                                 rac_result_t error_code) {
-    const bool failed = !result.success();
+    const bool failed = result.has_error();
     if (failed && error_code == RAC_SUCCESS) {
         error_code = RAC_ERROR_STORAGE_ERROR;
     }
@@ -119,15 +119,15 @@ void publish_storage_info_event(const runanywhere::v1::StorageInfoResult& result
     storage->set_bytes(result.info().total_models_bytes());
     storage->mutable_info_result()->CopyFrom(result);
     if (failed) {
-        storage->set_error(result.error_message());
-        populate_storage_error(event.mutable_error(), error_code, result.error_message());
+        storage->set_error(result.error().message());
+        populate_storage_error(event.mutable_error(), error_code, result.error().message());
     }
     publish_storage_sdk_event(event);
 }
 
 void publish_storage_availability_event(const runanywhere::v1::StorageAvailabilityResult& result,
                                         rac_result_t error_code) {
-    const bool failed = !result.success();
+    const bool failed = result.has_error();
     if (failed && error_code == RAC_SUCCESS) {
         error_code = RAC_ERROR_STORAGE_ERROR;
     }
@@ -140,15 +140,15 @@ void publish_storage_availability_event(const runanywhere::v1::StorageAvailabili
     storage->set_bytes(result.availability().available_bytes());
     storage->mutable_availability_result()->CopyFrom(result);
     if (failed) {
-        storage->set_error(result.error_message());
-        populate_storage_error(event.mutable_error(), error_code, result.error_message());
+        storage->set_error(result.error().message());
+        populate_storage_error(event.mutable_error(), error_code, result.error().message());
     }
     publish_storage_sdk_event(event);
 }
 
 void publish_storage_delete_plan_event(const runanywhere::v1::StorageDeletePlan& plan,
                                        rac_result_t error_code) {
-    const bool failed = !plan.error_message().empty();
+    const bool failed = plan.has_error();
     if (failed && error_code == RAC_SUCCESS) {
         error_code = RAC_ERROR_STORAGE_ERROR;
     }
@@ -161,15 +161,15 @@ void publish_storage_delete_plan_event(const runanywhere::v1::StorageDeletePlan&
     storage->set_bytes(plan.reclaimable_bytes());
     storage->mutable_delete_plan()->CopyFrom(plan);
     if (failed) {
-        storage->set_error(plan.error_message());
-        populate_storage_error(event.mutable_error(), error_code, plan.error_message());
+        storage->set_error(plan.error().message());
+        populate_storage_error(event.mutable_error(), error_code, plan.error().message());
     }
     publish_storage_sdk_event(event);
 }
 
 void publish_storage_delete_result_event(const runanywhere::v1::StorageDeleteResult& result,
                                          rac_result_t error_code) {
-    const bool failed = !result.success();
+    const bool failed = result.has_error();
     if (failed && error_code == RAC_SUCCESS) {
         error_code = RAC_ERROR_STORAGE_ERROR;
     }
@@ -177,7 +177,7 @@ void publish_storage_delete_result_event(const runanywhere::v1::StorageDeleteRes
     populate_storage_event_envelope(&event,
                                     storage_event_severity(error_code, result.warnings_size()));
     auto* storage = event.mutable_storage_lifecycle();
-    if (result.dry_run() && result.success()) {
+    if (result.dry_run() && !result.has_error()) {
         storage->set_kind(runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED);
     } else {
         storage->set_kind(failed ? runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED
@@ -189,8 +189,8 @@ void publish_storage_delete_result_event(const runanywhere::v1::StorageDeleteRes
     storage->set_bytes(result.deleted_bytes());
     storage->mutable_delete_result()->CopyFrom(result);
     if (failed) {
-        storage->set_error(result.error_message());
-        populate_storage_error(event.mutable_error(), error_code, result.error_message());
+        storage->set_error(result.error().message());
+        populate_storage_error(event.mutable_error(), error_code, result.error().message());
     }
     publish_storage_sdk_event(event);
 }

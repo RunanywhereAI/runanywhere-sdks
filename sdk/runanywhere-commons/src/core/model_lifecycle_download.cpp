@@ -138,9 +138,8 @@ rac_result_t download_and_wait_for_model(const std::string& model_id,
     }
     if (!plan_result.can_start()) {
         if (out_error) {
-            *out_error = plan_result.error_message().empty()
-                             ? "download plan reports can_start=false"
-                             : plan_result.error_message();
+            *out_error = plan_result.has_error() ? plan_result.error().message()
+                                                 : "download plan reports can_start=false";
         }
         return RAC_ERROR_BACKEND_NOT_FOUND;
     }
@@ -185,9 +184,8 @@ rac_result_t download_and_wait_for_model(const std::string& model_id,
     }
     if (!start_result.accepted() || start_result.task_id().empty()) {
         if (out_error) {
-            *out_error = start_result.error_message().empty()
-                             ? "download orchestrator rejected start request"
-                             : start_result.error_message();
+            *out_error = start_result.has_error() ? start_result.error().message()
+                                                  : "download orchestrator rejected start request";
         }
         return RAC_ERROR_BACKEND_NOT_FOUND;
     }
@@ -251,8 +249,8 @@ rac_result_t download_and_wait_for_model(const std::string& model_id,
         }
         if (state == runanywhere::v1::DOWNLOAD_STATE_FAILED) {
             if (out_error) {
-                *out_error = progress.error_message().empty() ? "auto-download failed"
-                                                              : progress.error_message();
+                *out_error = progress.has_error() ? progress.error().message()
+                                                  : "auto-download failed";
             }
             return RAC_ERROR_MODEL_LOAD_FAILED;
         }

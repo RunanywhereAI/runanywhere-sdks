@@ -46,6 +46,7 @@
 #include "features/stt/rac_stt_stream_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/stt/rac_stt_component.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/features/stt/rac_stt_types.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -1313,7 +1314,6 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
     // before destroy threads free user_data.
     rac::stream::InFlightGuard in_flight_guard(g_in_flight);
     rac::stream::CallbackSlot<rac_stt_stream_proto_callback_fn> slot;
-    uint64_t seq = 0;
     std::string request_id;
     uint64_t correlated_session_id = session_id;
     std::shared_ptr<StreamOperationState> operation_state;
@@ -1364,7 +1364,6 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
             ++operation_state->in_flight_dispatches;
         }
         slot = it->second;
-        seq = ++(it->second.seq);
     }
     DispatchOperationGuard dispatch_guard(correlated_session_id, operation_state);
 
@@ -1372,7 +1371,6 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
     thread_local std::vector<uint8_t> scratch;
 
     proto_event.Clear();
-    proto_event.set_seq(seq);
     proto_event.set_timestamp_us(now_us());
     if (!request_id.empty()) {
         proto_event.set_request_id(request_id);
@@ -1384,11 +1382,13 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
     if (final_output) {
         *proto_event.mutable_final_output() = *final_output;
     }
-    if (error_message && error_message[0] != '\0') {
-        proto_event.set_error_message(error_message);
-    }
-    if (error_code != 0) {
-        proto_event.set_error_code(error_code);
+    if (error_code != 0 || (error_message && error_message[0] != '\0')) {
+        rac::foundation::populate_sdk_error(
+            proto_event.mutable_error(),
+            error_code != 0 ? static_cast<rac_result_t>(error_code) : RAC_ERROR_UNKNOWN);
+        if (error_message && error_message[0] != '\0') {
+            proto_event.mutable_error()->set_message(error_message);
+        }
     }
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());

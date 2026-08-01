@@ -71,6 +71,7 @@
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/foundation/rac_sha256.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
@@ -986,7 +987,7 @@ void mark_task_stopped(const std::shared_ptr<proto_download_task>& task) {
             task->download_telemetry_finished = true;
             emit_terminal = true;
             model_id = task->model_id;
-            error_message = task->progress.error_message();
+            error_message = task->progress.error().message();
             bytes = task->progress.bytes_downloaded();
             if (task->started_at_unix_ms > 0) {
                 duration_ms = static_cast<double>(now_unix_ms() - task->started_at_unix_ms);
@@ -1054,9 +1055,10 @@ void set_task_progress(const std::shared_ptr<proto_download_task>& task, rav1::D
         progress->set_local_path(local_path);
     }
     if (!error_message.empty()) {
-        progress->set_error_message(error_message);
+        rac::foundation::populate_sdk_error(progress->mutable_error(), RAC_ERROR_DOWNLOAD_FAILED);
+        progress->mutable_error()->set_message(error_message);
     } else {
-        progress->clear_error_message();
+        progress->clear_error();
     }
 
     float stage_progress = 0.0f;
@@ -2802,12 +2804,14 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
 
     if (model_id.empty()) {
         result.set_can_start(false);
-        result.set_error_message("model_id is required");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_ARGUMENT);
+        result.mutable_error()->set_message("model_id is required");
         return serialize_proto_to_buffer(result, out_result);
     }
     if (!request.has_model()) {
         result.set_can_start(false);
-        result.set_error_message("model metadata is required for download planning");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_ARGUMENT);
+        result.mutable_error()->set_message("model metadata is required for download planning");
         return serialize_proto_to_buffer(result, out_result);
     }
 
@@ -2881,7 +2885,8 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
                                                             model_folder, sizeof(model_folder));
     if (path_rc != RAC_SUCCESS) {
         result.set_can_start(false);
-        result.set_error_message("failed to compute model storage path");
+        rac::foundation::populate_sdk_error(result.mutable_error(), path_rc);
+        result.mutable_error()->set_message("failed to compute model storage path");
         return serialize_proto_to_buffer(result, out_result);
     }
 
@@ -2920,7 +2925,9 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
 
             if (!looks_like_http_url(url)) {
                 result.set_can_start(false);
-                result.set_error_message("invalid or missing file URL");
+                rac::foundation::populate_sdk_error(result.mutable_error(),
+                                                    RAC_ERROR_INVALID_ARGUMENT);
+                result.mutable_error()->set_message("invalid or missing file URL");
                 return serialize_proto_to_buffer(result, out_result);
             }
 
@@ -2968,7 +2975,8 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         std::string url = model.download_url();
         if (!looks_like_http_url(url)) {
             result.set_can_start(false);
-            result.set_error_message("model.download_url must be an http(s) URL");
+            rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_ARGUMENT);
+            result.mutable_error()->set_message("model.download_url must be an http(s) URL");
             return serialize_proto_to_buffer(result, out_result);
         }
 
@@ -2979,7 +2987,8 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
                                              destination, sizeof(destination), &needs_extraction);
         if (dest_rc != RAC_SUCCESS) {
             result.set_can_start(false);
-            result.set_error_message("failed to compute download destination");
+            rac::foundation::populate_sdk_error(result.mutable_error(), dest_rc);
+            result.mutable_error()->set_message("failed to compute download destination");
             return serialize_proto_to_buffer(result, out_result);
         }
 
@@ -3130,7 +3139,8 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
 #endif
     if (invalid_existing_bytes) {
         result.set_can_start(false);
-        result.set_error_message("existing partial bytes exceed expected byte count");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_STATE);
+        result.mutable_error()->set_message("existing partial bytes exceed expected byte count");
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
     } else if (result.files_size() == 0) {
         result.set_can_start(false);
@@ -3141,12 +3151,16 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         if (head_auth_denied) {
             // The size is unknown because the HEAD probe was denied (401/403),
             // not because the server omitted it — surface the actionable cause.
-            result.set_error_message(
+            rac::foundation::populate_sdk_error(result.mutable_error(),
+                                                RAC_ERROR_AUTHENTICATION_FAILED);
+            result.mutable_error()->set_message(
                 "authentication failed while checking the download — check your Hugging Face "
                 "token / repo access, then try again.");
         } else {
             // The caller can retry once the server exposes a Content-Length.
-            result.set_error_message(
+            rac::foundation::populate_sdk_error(result.mutable_error(),
+                                                RAC_ERROR_INSUFFICIENT_STORAGE);
+            result.mutable_error()->set_message(
                 "Cannot verify there is enough storage: the total download size is unknown (the "
                 "server did not report a file size). Try again later or check the model source.");
         }
@@ -3155,17 +3169,19 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         // We know the payload is non-trivial but could not read free space —
         // fail closed instead of proceeding blind.
         result.set_can_start(false);
-        result.set_error_message(
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INSUFFICIENT_STORAGE);
+        result.mutable_error()->set_message(
             "Cannot verify there is enough storage to download this model (about " +
             human_size(total_bytes) +
             "): free space could not be determined. Free up space and try again.");
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE);
     } else if (free_space_known && required_bytes > 0 && required_bytes > available_bytes) {
         result.set_can_start(false);
-        result.set_error_message("Not enough storage to download this model: it needs about " +
-                                 human_size(total_bytes) + " but only " +
-                                 human_size(available_bytes) +
-                                 " is free on the device. Free up space and try again.");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INSUFFICIENT_STORAGE);
+        result.mutable_error()->set_message(
+            "Not enough storage to download this model: it needs about " +
+            human_size(total_bytes) + " but only " + human_size(available_bytes) +
+            " is free on the device. Free up space and try again.");
         result.set_failure_reason(runanywhere::v1::DOWNLOAD_FAILURE_REASON_INSUFFICIENT_STORAGE);
     } else {
         result.set_can_start(result.files_size() > 0);
@@ -3203,12 +3219,14 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     if (model_id.empty() || !request.has_plan() || request.plan().files_size() == 0 ||
         !request.plan().can_start()) {
         result.set_accepted(false);
-        result.set_error_message("start request requires a startable plan");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_ARGUMENT);
+        result.mutable_error()->set_message("start request requires a startable plan");
         return serialize_proto_to_buffer(result, out_result);
     }
     if (rac_http_transport_is_registered() == RAC_FALSE) {
         result.set_accepted(false);
-        result.set_error_message("no HTTP transport adapter registered");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_ADAPTER_NOT_SET);
+        result.mutable_error()->set_message("no HTTP transport adapter registered");
         return serialize_proto_to_buffer(result, out_result);
     }
 
@@ -3319,7 +3337,8 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
         // absolute paths; reject the start request rather than fall back
         // to the syntactic-only check (which accepted /etc/passwd).
         result.set_accepted(false);
-        result.set_error_message(
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_STATE);
+        result.mutable_error()->set_message(
             "start request rejected: cannot resolve a model-folder or downloads-dir root "
             "to validate plan destination paths against (security-privacy-storage-network-001)");
         return serialize_proto_to_buffer(result, out_result);
@@ -3333,7 +3352,8 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
     // proceeding into UB on the empty task->files vector below.
     if (task->files.empty()) {
         result.set_accepted(false);
-        result.set_error_message(
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_PATH);
+        result.mutable_error()->set_message(
             "start request rejected: every plan entry has a traversal-unsafe destination path");
         return serialize_proto_to_buffer(result, out_result);
     }
@@ -3374,7 +3394,8 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
         if (!validate_resume_offset(task->files.front(), resume_from, false, &actual_size,
                                     &resume_error)) {
             result.set_accepted(false);
-            result.set_error_message(resume_error);
+            rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_STATE);
+            result.mutable_error()->set_message(resume_error);
             result.set_resume_token(task->resume_token);
             return serialize_proto_to_buffer(result, out_result);
         }
@@ -3382,7 +3403,10 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes, s
             if (task->files.front().expected_bytes > 0 &&
                 actual_size > task->files.front().expected_bytes) {
                 result.set_accepted(false);
-                result.set_error_message("existing partial bytes exceed expected byte count");
+                rac::foundation::populate_sdk_error(result.mutable_error(),
+                                                    RAC_ERROR_INVALID_STATE);
+                result.mutable_error()->set_message(
+                    "existing partial bytes exceed expected byte count");
                 result.set_failure_reason(
                     runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
                 result.set_resume_token(task->resume_token);
@@ -3448,8 +3472,8 @@ extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, 
 
     auto task = find_task(request.task_id(), request.model_id());
     if (!task) {
-        result.set_success(false);
-        result.set_error_message("download task not found");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_NOT_FOUND);
+        result.mutable_error()->set_message("download task not found");
         return serialize_proto_to_buffer(result, out_result);
     }
 
@@ -3459,11 +3483,11 @@ extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, 
     {
         std::lock_guard<std::mutex> lock(task->mutex);
         if (!task->running && task->progress.state() == rav1::DOWNLOAD_STATE_COMPLETED) {
-            result.set_success(false);
             result.set_task_id(task->task_id);
             result.set_model_id(task->model_id);
             result.set_resume_token(task->resume_token);
-            result.set_error_message("download task already completed");
+            rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_STATE);
+            result.mutable_error()->set_message("download task already completed");
             return serialize_proto_to_buffer(result, out_result);
         }
         task->cancel_requested.store(true);
@@ -3517,15 +3541,14 @@ extern "C" rac_result_t rac_download_cancel_proto(const uint8_t* request_bytes, 
     }
 
     if (!worker_observed_stop) {
-        result.set_success(false);
         result.set_was_running(true);
         result.set_partial_bytes_deleted(0);
         result.set_partial_bytes_preserved(false);
-        result.set_error_message("cancel timed out waiting for worker to drain");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_TIMEOUT);
+        result.mutable_error()->set_message("cancel timed out waiting for worker to drain");
         return serialize_proto_to_buffer(result, out_result);
     }
 
-    result.set_success(true);
     result.set_was_running(was_running);
     result.set_partial_bytes_deleted(deleted);
     result.set_partial_bytes_preserved(!request.delete_partial_bytes() && preserved_bytes > 0);
@@ -3553,12 +3576,14 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
     auto task = find_task(request.task_id(), request.model_id(), request.resume_token());
     if (!task) {
         result.set_accepted(false);
-        result.set_error_message("download task not found");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_NOT_FOUND);
+        result.mutable_error()->set_message("download task not found");
         return serialize_proto_to_buffer(result, out_result);
     }
     if (rac_http_transport_is_registered() == RAC_FALSE) {
         result.set_accepted(false);
-        result.set_error_message("no HTTP transport adapter registered");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_ADAPTER_NOT_SET);
+        result.mutable_error()->set_message("no HTTP transport adapter registered");
         return serialize_proto_to_buffer(result, out_result);
     }
 
@@ -3568,12 +3593,15 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
         if (!request.resume_token().empty() && !task->resume_token.empty() &&
             request.resume_token() != task->resume_token) {
             result.set_accepted(false);
-            result.set_error_message("resume token does not match task");
+            rac::foundation::populate_sdk_error(result.mutable_error(),
+                                                RAC_ERROR_INVALID_ARGUMENT);
+            result.mutable_error()->set_message("resume token does not match task");
             return serialize_proto_to_buffer(result, out_result);
         }
         if (task->running) {
             result.set_accepted(false);
-            result.set_error_message("download task is already running");
+            rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_STATE);
+            result.mutable_error()->set_message("download task is already running");
             return serialize_proto_to_buffer(result, out_result);
         }
     }
@@ -3585,7 +3613,8 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
     }
     if (task->files.empty()) {
         result.set_accepted(false);
-        result.set_error_message("download task has no planned files");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_STATE);
+        result.mutable_error()->set_message("download task has no planned files");
         return serialize_proto_to_buffer(result, out_result);
     }
     int64_t actual_size = 0;
@@ -3596,7 +3625,8 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
         result.set_task_id(task->task_id);
         result.set_model_id(task->model_id);
         result.set_resume_token(task->resume_token);
-        result.set_error_message(resume_error);
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_STATE);
+        result.mutable_error()->set_message(resume_error);
         return serialize_proto_to_buffer(result, out_result);
     }
     if (!request.validate_partial_bytes() && actual_size > resume_from) {
@@ -3606,7 +3636,9 @@ extern "C" rac_result_t rac_download_resume_proto(const uint8_t* request_bytes, 
             result.set_task_id(task->task_id);
             result.set_model_id(task->model_id);
             result.set_resume_token(task->resume_token);
-            result.set_error_message("existing partial bytes exceed expected byte count");
+            rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_STATE);
+            result.mutable_error()->set_message(
+                "existing partial bytes exceed expected byte count");
             result.set_failure_reason(
                 runanywhere::v1::DOWNLOAD_FAILURE_REASON_OVERSIZE_PARTIAL_BYTES);
             return serialize_proto_to_buffer(result, out_result);

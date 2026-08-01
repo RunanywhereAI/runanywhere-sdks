@@ -231,7 +231,6 @@ struct ProtoStreamSlot {
     rac_vad_proto_stream_event_callback_fn callback{nullptr};
     void* user_data{nullptr};
     std::string request_id;
-    uint64_t next_seq{1};
 };
 
 std::mutex& proto_stream_mutex() {
@@ -291,7 +290,7 @@ std::string make_vad_request_id(rac_handle_t handle) {
 }
 
 bool validate_vad_stream_event(const runanywhere::v1::VADStreamEvent& event) {
-    if (event.seq() == 0 || event.timestamp_us() <= 0 || event.request_id().empty()) {
+    if (event.timestamp_us() <= 0 || event.request_id().empty()) {
         return false;
     }
 
@@ -306,7 +305,7 @@ bool validate_vad_stream_event(const runanywhere::v1::VADStreamEvent& event) {
         case runanywhere::v1::VAD_STREAM_EVENT_KIND_STATISTICS:
             return event.has_statistics();
         case runanywhere::v1::VAD_STREAM_EVENT_KIND_ERROR:
-            return event.error_code() != RAC_SUCCESS || event.has_error_message();
+            return event.has_error();
         default:
             return false;
     }
@@ -442,7 +441,6 @@ void flush_lifecycle_vad_end() {
 void proto_activity_trampoline(rac_speech_activity_t activity, void* user_data) {
     const rac_handle_t handle = reinterpret_cast<rac_handle_t>(user_data);
     ProtoStreamSlot slot;
-    uint64_t seq = 0;
     {
         std::lock_guard<std::mutex> lock(proto_stream_mutex());
         auto it = proto_stream_slots().find(handle);
@@ -450,11 +448,9 @@ void proto_activity_trampoline(rac_speech_activity_t activity, void* user_data) 
             return;
         }
         slot = it->second;
-        seq = it->second.next_seq++;
     }
 
     runanywhere::v1::VADStreamEvent event;
-    event.set_seq(seq);
     event.set_timestamp_us(current_time_us());
     event.set_request_id(slot.request_id);
     event.set_kind(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
@@ -1381,10 +1377,10 @@ extern "C" rac_result_t rac_vad_component_set_activity_proto_callback(
 
     {
         std::lock_guard<std::mutex> lock(proto_stream_mutex());
-        proto_stream_slots()[handle] = ProtoStreamSlot{.callback = callback,
-                                                       .user_data = user_data,
-                                                       .request_id = make_vad_request_id(handle),
-                                                       .next_seq = 1};
+        proto_stream_slots()[handle] = ProtoStreamSlot{
+            .callback = callback,
+            .user_data = user_data,
+            .request_id = make_vad_request_id(handle)};
     }
     return rac_vad_component_set_activity_callback(handle, proto_activity_trampoline, handle);
 #endif
@@ -1506,8 +1502,7 @@ rac_result_t emit_vad_service_state(const rac::lifecycle::LifecycleVadRef& ref, 
         state.set_current_model(ref.model_id);
     }
     if (op_rc != RAC_SUCCESS) {
-        state.set_error_code(op_rc);
-        state.set_error_message(rac_error_message(op_rc));
+        rac::foundation::populate_sdk_error(state.mutable_error(), op_rc);
     }
     return copy_proto(state, out_result);
 }

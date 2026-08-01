@@ -36,6 +36,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/lora/rac_lora_service.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -66,8 +67,8 @@ rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_
 
 rac_result_t typed_failure(rac_proto_buffer_t* out, const std::string& message) {
     runanywhere::v1::LoraAdapterImportResult result;
-    result.set_success(false);
-    result.set_error_message(message);
+    rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_PROCESSING_FAILED);
+    result.mutable_error()->set_message(message);
     return copy_proto(result, out);
 }
 
@@ -107,7 +108,7 @@ catalog_entries(rac_lora_registry_handle_t registry) {
     const bool parsed =
         out.size > 0 && list_result.ParseFromArray(out.data, static_cast<int>(out.size));
     rac_proto_buffer_free(&out);
-    if (!parsed || !list_result.success()) {
+    if (!parsed || list_result.has_error()) {
         return {};
     }
     return {list_result.entries().begin(), list_result.entries().end()};
@@ -329,10 +330,10 @@ extern "C" RAC_API rac_result_t rac_lora_adapter_import_proto(rac_lora_registry_
             mark_error = (completed_out.error_message && completed_out.error_message[0] != '\0')
                              ? completed_out.error_message
                              : "LoRA adapter import completion was not persisted";
-        } else if (!completed_result.success()) {
-            mark_error = completed_result.error_message().empty()
+        } else if (completed_result.has_error()) {
+            mark_error = completed_result.error().message().empty()
                              ? "LoRA adapter import completion was not persisted"
-                             : completed_result.error_message();
+                             : completed_result.error().message();
         }
         rac_proto_buffer_free(&completed_out);
         if (!mark_error.empty()) {
@@ -342,7 +343,6 @@ extern "C" RAC_API rac_result_t rac_lora_adapter_import_proto(rac_lora_registry_
         *result.mutable_entry() = completed_result.entry();
     }
 
-    result.set_success(true);
     RAC_LOG_INFO(LOG_CAT, "Imported LoRA adapter '%s' to '%s'%s", filename.c_str(),
                  destination.c_str(), matched != nullptr ? " (catalog matched)" : "");
     return copy_proto(result, out_result);

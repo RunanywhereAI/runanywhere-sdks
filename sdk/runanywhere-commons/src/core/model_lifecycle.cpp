@@ -525,7 +525,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                         request.model_id(), &result, nullptr,
-                                        result.error_message().c_str());
+                                        result.error().message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -546,7 +546,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                         request.model_id(), &result, nullptr,
-                                        result.error_message().c_str());
+                                        result.error().message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -573,7 +573,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                             request.model_id(), &result, nullptr,
-                                            result.error_message().c_str());
+                                            result.error().message().c_str());
             return detail::copy_proto(result, out_result);
         }
 
@@ -609,7 +609,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
                                         runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR,
                                         request.model_id(), &result, nullptr,
-                                        result.error_message().c_str());
+                                        result.error().message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -648,7 +648,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         detail::publish_component_event(
             component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED,
             runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result, nullptr,
-            result.error_message().c_str());
+            result.error().message().c_str());
         return detail::copy_proto(result, out_result);
     }
 
@@ -787,7 +787,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             detail::publish_component_event(
                 component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                 runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result,
-                nullptr, result.error_message().c_str());
+                nullptr, result.error().message().c_str());
         }
         return detail::copy_proto(result, out_result);
     }
@@ -821,7 +821,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
         failed->framework = framework;
         failed->framework_name = runanywhere::v1::InferenceFramework_Name(framework);
         failed->updated_at_ms = detail::now_ms();
-        failed->error_message = result.error_message();
+        failed->error_message = result.error().message();
         // Create-then-swap (A12): the previous READY backend was never torn down
         // for a different-model load, so a failed create keeps it resident
         // instead of stranding the slot.
@@ -849,7 +849,7 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
             detail::publish_component_event(
                 component, runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING,
                 runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR, request.model_id(), &result,
-                nullptr, result.error_message().c_str());
+                nullptr, result.error().message().c_str());
         }
         return detail::copy_proto(result, out_result);
     }
@@ -954,9 +954,9 @@ rac_result_t rac_model_lifecycle_unload_proto(const uint8_t* request_proto_bytes
     }
 
     ModelUnloadResult result;
-    result.set_success(!unloaded.empty());
     if (unloaded.empty()) {
-        result.set_error_message("no loaded model matched unload request");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_MODEL_NOT_LOADED);
+        result.mutable_error()->set_message("no loaded model matched unload request");
     }
     for (const auto& model : unloaded) {
         result.add_unloaded_model_ids(model->model_id);

@@ -482,7 +482,6 @@ rac_result_t phase1_failure(rac_result_t code, const char* message, int64_t star
     rac::events::publish_initialization_failed(code, message);
     SdkInitResult result;
     result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
-    result.set_success(false);
     set_error_from_code(&result, code, message);
     result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
     return serialize_result(result, out_result);
@@ -597,7 +596,6 @@ rac_result_t rac_sdk_init_phase1_proto(const uint8_t* in_request_bytes, size_t i
     rac::events::publish_initialization_completed(duration_ms);
     SdkInitResult result;
     result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_ONE);
-    result.set_success(true);
     result.set_duration_ms(duration_ms);
     return serialize_result(result, out_RASdkInitResult);
 #endif  // RAC_HAVE_PROTOBUF
@@ -620,7 +618,6 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
     if (validate != RAC_SUCCESS) {
         SdkInitResult result;
         result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_TWO);
-        result.set_success(false);
         set_error_from_code(&result, validate, "Invalid SdkInitPhase2Request bytes");
         result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
         return serialize_result(result, out_RASdkInitResult);
@@ -632,7 +629,6 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
         if (!request.ParseFromArray(data, static_cast<int>(in_size))) {
             SdkInitResult result;
             result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_TWO);
-            result.set_success(false);
             set_error_from_code(&result, RAC_ERROR_INVALID_ARGUMENT,
                                 "Failed to parse SdkInitPhase2Request");
             result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
@@ -643,7 +639,6 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
     if (!rac_state_is_initialized()) {
         SdkInitResult result;
         result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_TWO);
-        result.set_success(false);
         set_error_from_code(&result, RAC_ERROR_NOT_INITIALIZED,
                             "Phase 1 must complete before Phase 2");
         result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
@@ -730,7 +725,6 @@ rac_result_t rac_sdk_init_phase2_proto(const uint8_t* in_request_bytes, size_t i
     }
 
     // Phase 2 succeeds in offline mode too — Swift mirrors this policy.
-    result.set_success(true);
     result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
     return serialize_result(result, out_RASdkInitResult);
 #endif  // RAC_HAVE_PROTOBUF
@@ -752,7 +746,6 @@ rac_result_t rac_sdk_retry_http_proto(rac_proto_buffer_t* out_RASdkInitResult) {
     result.set_phase(::runanywhere::v1::SDK_INIT_PHASE_RETRY_HTTP);
 
     if (!rac_state_is_initialized()) {
-        result.set_success(false);
         set_error_from_code(&result, RAC_ERROR_NOT_INITIALIZED,
                             "Phase 1 must complete before retry");
         result.set_duration_ms(rac_monotonic_now_ms() - start_ms);
@@ -762,7 +755,6 @@ rac_result_t rac_sdk_retry_http_proto(rac_proto_buffer_t* out_RASdkInitResult) {
 
     // Idempotent fast path: authenticated and token is still valid.
     if (rac_auth_is_authenticated() && !rac_auth_needs_refresh()) {
-        result.set_success(true);
         result.set_http_configured(true);
         result.set_has_completed_http_setup(true);
         result.set_warning("already authenticated");
@@ -774,7 +766,6 @@ rac_result_t rac_sdk_retry_http_proto(rac_proto_buffer_t* out_RASdkInitResult) {
     // cases itself, including the rejected-refresh → clear + full re-auth
     // fallback — so the retry path must not short-circuit into a bare refresh.
     const rac_result_t auth_rc = perform_authentication(&result);
-    result.set_success(true);
     if (auth_rc != RAC_SUCCESS) {
         append_warning(&result, warning_from_code("auth retry deferred", auth_rc));
     } else if (!result.http_configured() && result.warning().empty()) {

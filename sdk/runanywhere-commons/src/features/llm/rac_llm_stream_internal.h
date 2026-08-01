@@ -104,13 +104,11 @@ int derive_event_kind(int kind, bool is_final, const char* error_message);
  * uses a hand-rolled wire encoder (see rac_llm_stream.cpp). Both
  * branches write the same 13 fields so every SDK sees the full event.
  *
- * @param seq Per-stream monotonic sequence number (bumped by caller).
  * @param p   Field values to encode.
  * @param out Destination buffer — existing contents are cleared.
  * @return true on success, false on protobuf serialize failure.
  */
-bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
-                                std::vector<uint8_t>& out);
+bool serialize_llm_stream_event(const LLMStreamEventParams& p, std::vector<uint8_t>& out);
 
 /**
  * @brief Registry-backed dispatcher used by `llm_component.cpp`.

@@ -17,6 +17,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_compatibility.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -107,8 +108,8 @@ extern "C" rac_result_t rac_model_compatibility_check_proto(const uint8_t* reque
 
     if (request.model_id().empty()) {
         const char* msg = "ModelCompatibilityRequest.model_id is required";
-        proto_result.set_error_code(static_cast<int32_t>(RAC_ERROR_INVALID_ARGUMENT));
-        proto_result.set_error_message(msg);
+        rac::foundation::populate_sdk_error(proto_result.mutable_error(), RAC_ERROR_INVALID_ARGUMENT);
+        proto_result.mutable_error()->set_message(msg);
         proto_result.add_reasons(msg);
         return copy_proto(proto_result, out_result);
     }
@@ -116,8 +117,8 @@ extern "C" rac_result_t rac_model_compatibility_check_proto(const uint8_t* reque
     rac_model_registry_handle_t registry = rac_get_model_registry();
     if (!registry) {
         const char* msg = "model registry is not initialized";
-        proto_result.set_error_code(static_cast<int32_t>(RAC_ERROR_NOT_INITIALIZED));
-        proto_result.set_error_message(msg);
+        rac::foundation::populate_sdk_error(proto_result.mutable_error(), RAC_ERROR_NOT_INITIALIZED);
+        proto_result.mutable_error()->set_message(msg);
         proto_result.add_reasons(msg);
         RAC_LOG_WARNING(LOG_CAT, "compat check called before registry init");
         return copy_proto(proto_result, out_result);
@@ -129,8 +130,7 @@ extern "C" rac_result_t rac_model_compatibility_check_proto(const uint8_t* reque
         request.available_storage_bytes(), &struct_result);
     if (rc != RAC_SUCCESS) {
         const char* msg = rac_error_message(rc);
-        proto_result.set_error_code(static_cast<int32_t>(rc));
-        proto_result.set_error_message(msg ? msg : "compatibility check failed");
+        rac::foundation::populate_sdk_error(proto_result.mutable_error(), rc);
         if (msg && msg[0] != '\0')
             proto_result.add_reasons(msg);
         return copy_proto(proto_result, out_result);

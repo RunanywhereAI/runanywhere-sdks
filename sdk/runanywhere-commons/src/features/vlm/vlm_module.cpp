@@ -32,6 +32,7 @@
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_proto_adapters.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -1052,12 +1053,12 @@ struct StreamCtx {
 void populate_result_from_stream(const StreamCtx& ctx, int64_t elapsed_ms,
                                  runanywhere::v1::VLMResult* out) {
     out->set_text(ctx.text);
-    out->set_output_tokens(ctx.token_count);
-    out->set_total_tokens(ctx.token_count);
+    out->mutable_usage()->set_output_tokens(ctx.token_count);
+    out->mutable_usage()->set_total_tokens(ctx.token_count);
     out->set_processing_time_ms(elapsed_ms);
     if (elapsed_ms > 0) {
-        out->set_tokens_per_second(static_cast<float>(ctx.token_count) /
-                                   (static_cast<float>(elapsed_ms) / 1000.0f));
+        out->mutable_usage()->set_tokens_per_second(static_cast<double>(ctx.token_count) /
+                                                    (static_cast<double>(elapsed_ms) / 1000.0));
     }
 }
 
@@ -1067,7 +1068,6 @@ struct GeneratedStreamCtx {
     rac::vlm::LifecycleVlmRef* ref{nullptr};
     std::string request_id;
     std::string text;
-    uint64_t seq{0};
     int32_t token_count{0};
     int64_t started_ms{0};
     bool terminal_sent{false};
@@ -1088,7 +1088,6 @@ rac_bool_t dispatch_vlm_stream_event(GeneratedStreamCtx* ctx,
     }
 
     runanywhere::v1::VLMStreamEvent event;
-    event.set_seq(++ctx->seq);
     event.set_timestamp_us(now_us());
     event.set_request_id(ctx->request_id);
     event.set_kind(kind);
@@ -1099,13 +1098,15 @@ rac_bool_t dispatch_vlm_stream_event(GeneratedStreamCtx* ctx,
     }
     if (result) {
         event.mutable_result()->CopyFrom(*result);
-        event.set_tokens_per_second(result->tokens_per_second());
+        event.set_tokens_per_second(result->usage().tokens_per_second());
     }
-    if (error_message != nullptr && error_message[0] != '\0') {
-        event.set_error_message(error_message);
-    }
-    if (error_code != 0) {
-        event.set_error_code(error_code);
+    if (error_code != 0 || (error_message != nullptr && error_message[0] != '\0')) {
+        rac::foundation::populate_sdk_error(
+            event.mutable_error(),
+            error_code != 0 ? static_cast<rac_result_t>(error_code) : RAC_ERROR_UNKNOWN);
+        if (error_message != nullptr && error_message[0] != '\0') {
+            event.mutable_error()->set_message(error_message);
+        }
     }
 
     std::vector<uint8_t> bytes;
@@ -1292,10 +1293,10 @@ rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes, size_t r
                                         ? std::to_string(res_w) + "x" + std::to_string(res_h)
                                         : std::string();
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.generate", 1.0f, 1, result.output_tokens(), nullptr,
+                       "vlm.generate", 1.0f, 1, result.usage().output_tokens(), nullptr,
                        static_cast<double>(result.processing_time_ms()), ref.model_id,
-                       result.input_tokens(), result.total_tokens(),
-                       static_cast<double>(result.tokens_per_second()),
+                       result.usage().input_tokens(), result.usage().total_tokens(),
+                       static_cast<double>(result.usage().tokens_per_second()),
                        static_cast<double>(result.time_to_first_token_ms()), ref.framework_name,
                        static_cast<double>(options.temperature), options.max_tokens,
                        result.image_tokens(), static_cast<double>(result.image_encode_time_ms()),
@@ -1409,8 +1410,8 @@ rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes, size_t req
                 : std::string();
         publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
                            "vlm.stream", 1.0f, 1, ctx.token_count, nullptr,
-                           static_cast<double>(elapsed_ms), ref.model_id, result.input_tokens(),
-                           result.total_tokens(), static_cast<double>(result.tokens_per_second()),
+                           static_cast<double>(elapsed_ms), ref.model_id, result.usage().input_tokens(),
+                           result.usage().total_tokens(), static_cast<double>(result.usage().tokens_per_second()),
                            static_cast<double>(result.time_to_first_token_ms()), ref.framework_name,
                            static_cast<double>(options.temperature), options.max_tokens,
                            result.image_tokens(),

@@ -52,6 +52,7 @@
 // EmbeddingsConfiguration (embeddings_options.proto)
 #define RAC_DEFAULT_EMBEDDINGS_CONFIGURATION_EMBEDDING_DIMENSION 384
 #define RAC_DEFAULT_EMBEDDINGS_CONFIGURATION_MAX_SEQUENCE_LENGTH 512
+#define RAC_DEFAULT_EMBEDDINGS_CONFIGURATION_NORMALIZE           RAC_TRUE
 
 // EmbeddingsOptions (embeddings_options.proto)
 #define RAC_DEFAULT_EMBEDDINGS_OPTIONS_N_THREADS 0
@@ -169,5 +170,5 @@
 #define RAC_DEFAULT_VLM_GENERATION_OPTIONS_REPETITION_PENALTY 1.1f
 #define RAC_DEFAULT_VLM_GENERATION_OPTIONS_MIN_P              0.0f
 
-// 94 defaults across 31 messages.
+// 95 defaults across 31 messages.
 #endif  // RAC_DEFAULTS_GENERATED_H

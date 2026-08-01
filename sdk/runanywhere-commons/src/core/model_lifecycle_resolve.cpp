@@ -541,14 +541,18 @@ make_load_result(bool success, const std::string& model_id, runanywhere::v1::Mod
                  const std::vector<runanywhere::v1::ModelFileDescriptor>& artifacts,
                  int64_t loaded_at_ms, const std::string& error) {
     runanywhere::v1::ModelLoadResult result;
-    result.set_success(success);
     result.set_model_id(model_id);
     result.set_category(category);
     result.set_framework(framework);
     result.set_resolved_path(resolved_path);
     add_artifacts_to_result(artifacts, result.mutable_resolved_artifacts());
     result.set_loaded_at_unix_ms(loaded_at_ms);
-    result.set_error_message(error);
+    if (!success) {
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_MODEL_LOAD_FAILED);
+        if (!error.empty()) {
+            result.mutable_error()->set_message(error);
+        }
+    }
     return result;
 }
 
@@ -575,7 +579,10 @@ void fill_snapshot(const LoadedModel* loaded, runanywhere::v1::SDKComponent comp
     out->set_state(loaded->state);
     out->set_model_id(loaded->model_id);
     out->set_updated_at_ms(loaded->updated_at_ms);
-    out->set_error_message(loaded->error_message);
+    if (!loaded->error_message.empty()) {
+        rac::foundation::populate_sdk_error(out->mutable_error(), RAC_ERROR_MODEL_LOAD_FAILED);
+        out->mutable_error()->set_message(loaded->error_message);
+    }
     out->set_category(loaded->category);
     out->set_framework(loaded->framework);
     out->set_resolved_path(loaded->resolved_path);

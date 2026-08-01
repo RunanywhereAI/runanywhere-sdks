@@ -36,6 +36,7 @@
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/features/rag/rac_rag.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_plugin_entry.h"
@@ -893,14 +894,12 @@ rac_result_t rac_rag_query_stream_proto(rac_handle_t session, const uint8_t* que
 
     // Serializes one RAGStreamEvent and hands it to the SDK callback. Runs on the
     // calling thread (the pipeline invokes on_token synchronously).
-    uint64_t seq = 0;
     // Returns true to keep generating; false when the SDK callback asked to stop
     // (backpressure / early stop). Terminal emits ignore the return.
     auto emit = [&](runanywhere::v1::RAGStreamEventKind kind, const std::string* token,
                     const runanywhere::v1::RAGResult* result, rac_result_t err_code,
                     const char* err_msg) -> bool {
         runanywhere::v1::RAGStreamEvent ev;
-        ev.set_seq(seq++);
         ev.set_timestamp_us(now_ms() * 1000);
         ev.set_kind(kind);
         if (token != nullptr)
@@ -908,8 +907,8 @@ rac_result_t rac_rag_query_stream_proto(rac_handle_t session, const uint8_t* que
         if (result != nullptr)
             *ev.mutable_result() = *result;
         if (err_msg != nullptr && err_msg[0] != '\0') {
-            ev.set_error_message(err_msg);
-            ev.set_error_code(static_cast<int32_t>(err_code));
+            rac::foundation::populate_sdk_error(ev.mutable_error(), err_code);
+            ev.mutable_error()->set_message(err_msg);
         }
         std::string bytes;
         if (!ev.SerializeToString(&bytes))

@@ -21,6 +21,7 @@
 #include "rac/core/rac_types.h"
 #include "rac/features/embeddings/rac_embeddings_proto_adapters.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 
@@ -296,8 +297,8 @@ rac_result_t rac_embeddings_create_proto(const uint8_t* request_proto_bytes,
 
     if (request.model_id().empty()) {
         const char* msg = "EmbeddingsCreateRequest.model_id is required";
-        create_result.set_error_code(static_cast<int32_t>(RAC_ERROR_INVALID_ARGUMENT));
-        create_result.set_error_message(msg);
+        rac::foundation::populate_sdk_error(create_result.mutable_error(), RAC_ERROR_INVALID_ARGUMENT);
+        create_result.mutable_error()->set_message(msg);
         publish_failure(RAC_ERROR_INVALID_ARGUMENT, "embeddings.create", msg);
         return copy_proto(create_result, out_result);
     }
@@ -309,13 +310,11 @@ rac_result_t rac_embeddings_create_proto(const uint8_t* request_proto_bytes,
                                          cfg_json.empty() ? nullptr : cfg_json.c_str(), &handle);
 
     if (rc != RAC_SUCCESS || !handle) {
-        const char* msg = rac_error_message(rc != RAC_SUCCESS ? rc : RAC_ERROR_UNKNOWN);
+        const rac_result_t fail_rc = rc != RAC_SUCCESS ? rc : RAC_ERROR_UNKNOWN;
+        const char* msg = rac_error_message(fail_rc);
         create_result.set_handle(0);
-        create_result.set_error_code(
-            static_cast<int32_t>(rc != RAC_SUCCESS ? rc : RAC_ERROR_UNKNOWN));
-        create_result.set_error_message(msg ? msg : "embeddings create failed");
-        publish_failure(rc != RAC_SUCCESS ? rc : RAC_ERROR_UNKNOWN, "embeddings.create",
-                        create_result.error_message().c_str());
+        rac::foundation::populate_sdk_error(create_result.mutable_error(), fail_rc);
+        publish_failure(fail_rc, "embeddings.create", msg ? msg : "embeddings create failed");
         return copy_proto(create_result, out_result);
     }
 

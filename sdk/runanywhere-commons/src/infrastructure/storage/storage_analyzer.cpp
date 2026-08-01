@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "rac/core/rac_logger.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -461,7 +462,8 @@ build_delete_plan(rac_storage_analyzer_handle_t handle, rac_model_registry_handl
     std::unordered_set<std::string> warnings;
     std::vector<DeleteCandidateRow> rows;
     if (!handle) {
-        plan.set_error_message("Storage analyzer handle is required.");
+        rac::foundation::populate_sdk_error(plan.mutable_error(), RAC_ERROR_INVALID_ARGUMENT);
+        plan.mutable_error()->set_message("Storage analyzer handle is required.");
         return plan;
     }
 
@@ -511,8 +513,9 @@ build_delete_plan(rac_storage_analyzer_handle_t handle, rac_model_registry_handl
     plan.set_requires_platform_delete(requires_platform_delete);
     plan.set_can_reclaim_required_bytes(plan.required_bytes() <= 0 ||
                                         reclaimable >= plan.required_bytes());
-    if (!plan.can_reclaim_required_bytes() && plan.error_message().empty()) {
-        plan.set_error_message("Not enough safe reclaimable storage is available.");
+    if (!plan.can_reclaim_required_bytes() && !plan.has_error()) {
+        rac::foundation::populate_sdk_error(plan.mutable_error(), RAC_ERROR_INSUFFICIENT_STORAGE);
+        plan.mutable_error()->set_message("Not enough safe reclaimable storage is available.");
     }
     return plan;
 }
@@ -820,14 +823,16 @@ rac_result_t rac_storage_analyzer_info_proto(rac_storage_analyzer_handle_t handl
     runanywhere::v1::StorageInfoRequest request;
     runanywhere::v1::StorageInfoResult result_proto;
     if (!parse_request_or_empty(request_proto_bytes, request_proto_size, &request)) {
-        result_proto.set_success(false);
-        result_proto.set_error_message("Invalid StorageInfoRequest proto bytes.");
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(), RAC_ERROR_DECODING_ERROR);
+        result_proto.mutable_error()->set_message("Invalid StorageInfoRequest proto bytes.");
         return finish_info_result(result_proto, RAC_ERROR_DECODING_ERROR, out_buffer);
     }
 
     if (!handle || !registry_handle) {
-        result_proto.set_success(false);
-        result_proto.set_error_message("Storage analyzer and registry handles are required.");
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(),
+                                            RAC_ERROR_INVALID_ARGUMENT);
+        result_proto.mutable_error()->set_message(
+            "Storage analyzer and registry handles are required.");
         return finish_info_result(result_proto, RAC_ERROR_INVALID_ARGUMENT, out_buffer);
     }
 
@@ -845,12 +850,11 @@ rac_result_t rac_storage_analyzer_info_proto(rac_storage_analyzer_handle_t handl
     rac_storage_info_t info;
     rac_result_t result = rac_storage_analyzer_analyze(handle, registry_handle, &info);
     if (RAC_FAILED(result)) {
-        result_proto.set_success(false);
-        result_proto.set_error_message(status_message(result, "Storage analysis failed"));
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(), result);
+        result_proto.mutable_error()->set_message(status_message(result, "Storage analysis failed"));
         return finish_info_result(result_proto, result, out_buffer);
     }
 
-    result_proto.set_success(true);
     runanywhere::v1::StorageInfo* storage = result_proto.mutable_info();
 
     if (include_device) {
@@ -918,14 +922,16 @@ rac_result_t rac_storage_analyzer_availability_proto(rac_storage_analyzer_handle
     runanywhere::v1::StorageAvailabilityRequest request;
     runanywhere::v1::StorageAvailabilityResult result_proto;
     if (!parse_request_or_empty(request_proto_bytes, request_proto_size, &request)) {
-        result_proto.set_success(false);
-        result_proto.set_error_message("Invalid StorageAvailabilityRequest proto bytes.");
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(), RAC_ERROR_DECODING_ERROR);
+        result_proto.mutable_error()->set_message(
+            "Invalid StorageAvailabilityRequest proto bytes.");
         return finish_availability_result(result_proto, RAC_ERROR_DECODING_ERROR, out_buffer);
     }
 
     if (!handle) {
-        result_proto.set_success(false);
-        result_proto.set_error_message("Storage analyzer handle is required.");
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(),
+                                            RAC_ERROR_INVALID_ARGUMENT);
+        result_proto.mutable_error()->set_message("Storage analyzer handle is required.");
         return finish_availability_result(result_proto, RAC_ERROR_INVALID_ARGUMENT, out_buffer);
     }
 
@@ -971,7 +977,6 @@ rac_result_t rac_storage_analyzer_availability_proto(rac_storage_analyzer_handle
         available > 0
             ? static_cast<float>(static_cast<double>(required) / static_cast<double>(available))
             : (required > 0 ? 1.0f : 0.0f));
-    result_proto.set_success(true);
 
     if (available < required) {
         char message[192];
@@ -1029,12 +1034,14 @@ rac_result_t rac_storage_analyzer_delete_plan_proto(rac_storage_analyzer_handle_
     runanywhere::v1::StorageDeletePlanRequest request;
     runanywhere::v1::StorageDeletePlan plan;
     if (!parse_request_or_empty(request_proto_bytes, request_proto_size, &request)) {
-        plan.set_error_message("Invalid StorageDeletePlanRequest proto bytes.");
+        rac::foundation::populate_sdk_error(plan.mutable_error(), RAC_ERROR_DECODING_ERROR);
+        plan.mutable_error()->set_message("Invalid StorageDeletePlanRequest proto bytes.");
         return finish_delete_plan(plan, RAC_ERROR_DECODING_ERROR, out_buffer);
     }
 
     if (!handle) {
-        plan.set_error_message("Storage analyzer handle is required.");
+        rac::foundation::populate_sdk_error(plan.mutable_error(), RAC_ERROR_INVALID_ARGUMENT);
+        plan.mutable_error()->set_message("Storage analyzer handle is required.");
         return finish_delete_plan(plan, RAC_ERROR_INVALID_ARGUMENT, out_buffer);
     }
 
@@ -1049,7 +1056,7 @@ rac_result_t rac_storage_analyzer_delete_plan_proto(rac_storage_analyzer_handle_
     plan = build_delete_plan(handle, registry_handle, requested_ids, has_requested_ids, options);
 
     rac_result_t error_code = RAC_SUCCESS;
-    if (!plan.error_message().empty()) {
+    if (plan.has_error()) {
         error_code = plan.can_reclaim_required_bytes() ? RAC_ERROR_STORAGE_ERROR
                                                        : RAC_ERROR_INSUFFICIENT_STORAGE;
     }
@@ -1076,15 +1083,17 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
     runanywhere::v1::StorageDeleteRequest request;
     runanywhere::v1::StorageDeleteResult result_proto;
     if (!parse_request_or_empty(request_proto_bytes, request_proto_size, &request)) {
-        result_proto.set_success(false);
-        result_proto.set_error_message("Invalid StorageDeleteRequest proto bytes.");
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(), RAC_ERROR_DECODING_ERROR);
+        result_proto.mutable_error()->set_message("Invalid StorageDeleteRequest proto bytes.");
         return finish_delete_result(result_proto, RAC_ERROR_DECODING_ERROR, out_buffer);
     }
 
     result_proto.set_dry_run(request.dry_run());
     if (!handle || !registry_handle) {
-        result_proto.set_success(false);
-        result_proto.set_error_message("Storage analyzer and registry handles are required.");
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(),
+                                            RAC_ERROR_INVALID_ARGUMENT);
+        result_proto.mutable_error()->set_message(
+            "Storage analyzer and registry handles are required.");
         return finish_delete_result(result_proto, RAC_ERROR_INVALID_ARGUMENT, out_buffer);
     }
 
@@ -1101,8 +1110,9 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
 
     std::unordered_set<std::string> warnings;
     if (requested_ids.empty()) {
-        result_proto.set_success(false);
-        result_proto.set_error_message("StorageDeleteRequest.model_ids is empty.");
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(),
+                                            RAC_ERROR_INVALID_ARGUMENT);
+        result_proto.mutable_error()->set_message("StorageDeleteRequest.model_ids is empty.");
         if (request.has_plan() && request.plan().candidates_size() > 0) {
             add_warning_once(&result_proto, &warnings,
                              "Delete plans for cache/temp storage require platform adapter "
@@ -1120,8 +1130,10 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
         }
     }
     if (request.require_plan_match() && !request.has_plan()) {
-        result_proto.set_success(false);
-        result_proto.set_error_message("StorageDeleteRequest.require_plan_match requires plan.");
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(),
+                                            RAC_ERROR_INVALID_ARGUMENT);
+        result_proto.mutable_error()->set_message(
+            "StorageDeleteRequest.require_plan_match requires plan.");
         return finish_delete_result(result_proto, RAC_ERROR_INVALID_ARGUMENT, out_buffer);
     }
 
@@ -1338,11 +1350,13 @@ rac_result_t rac_storage_analyzer_delete_proto(rac_storage_analyzer_handle_t han
     result_proto.set_deleted_bytes(deleted_bytes);
     result_proto.set_files_deleted(files_deleted);
     result_proto.set_registry_updated(registry_updated);
-    result_proto.set_success(!had_failure && !had_skipped);
     if (had_failure) {
-        result_proto.set_error_message("One or more requested models could not be deleted.");
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(), RAC_ERROR_DELETE_FAILED);
+        result_proto.mutable_error()->set_message(
+            "One or more requested models could not be deleted.");
     } else if (had_skipped) {
-        result_proto.set_error_message("One or more requested models were skipped.");
+        rac::foundation::populate_sdk_error(result_proto.mutable_error(), RAC_ERROR_INVALID_STATE);
+        result_proto.mutable_error()->set_message("One or more requested models were skipped.");
     }
     return finish_delete_result(result_proto, first_error, out_buffer);
 #endif

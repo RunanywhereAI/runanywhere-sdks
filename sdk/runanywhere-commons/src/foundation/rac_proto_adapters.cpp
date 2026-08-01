@@ -193,7 +193,6 @@ bool rac_transcription_metadata_to_proto(const rac_transcription_metadata_t* in,
         out->set_model_id(in->model_id);
     out->set_processing_time_ms(in->processing_time_ms);
     out->set_audio_length_ms(in->audio_length_ms);
-    out->set_real_time_factor(in->real_time_factor);
     return true;
 }
 
@@ -204,7 +203,6 @@ bool rac_transcription_metadata_from_proto(const ::runanywhere::v1::Transcriptio
     out->model_id = copy_string(in.model_id());
     out->processing_time_ms = in.processing_time_ms();
     out->audio_length_ms = in.audio_length_ms();
-    out->real_time_factor = in.real_time_factor();
     return true;
 }
 
@@ -519,14 +517,14 @@ bool rac_vlm_result_to_proto(const rac_vlm_result_t* in, ::runanywhere::v1::VLMR
     out->Clear();
     if (in->text)
         out->set_text(in->text);
-    out->set_input_tokens(in->prompt_tokens);
+    out->mutable_usage()->set_input_tokens(in->prompt_tokens);
     out->set_image_tokens(in->image_tokens);
-    out->set_output_tokens(in->completion_tokens);
-    out->set_total_tokens(in->total_tokens);
+    out->mutable_usage()->set_output_tokens(in->completion_tokens);
+    out->mutable_usage()->set_total_tokens(in->total_tokens);
     out->set_time_to_first_token_ms(in->time_to_first_token_ms);
     out->set_image_encode_time_ms(in->image_encode_time_ms);
     out->set_processing_time_ms(in->total_time_ms);
-    out->set_tokens_per_second(in->tokens_per_second);
+    out->mutable_usage()->set_tokens_per_second(in->tokens_per_second);
     return true;
 }
 
@@ -839,19 +837,7 @@ bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOption
         return false;
     *out = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
 
-    switch (in.normalize_mode()) {
-        case ::runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED:
-            out->normalize = RAC_EMBEDDINGS_NORMALIZE_L2;
-            break;
-        case ::runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_NONE:
-            out->normalize = RAC_EMBEDDINGS_NORMALIZE_NONE;
-            break;
-        case ::runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_L2:
-            out->normalize = RAC_EMBEDDINGS_NORMALIZE_L2;
-            break;
-        default:
-            return false;
-    }
+    out->normalize = in.normalize() ? RAC_EMBEDDINGS_NORMALIZE_L2 : RAC_EMBEDDINGS_NORMALIZE_NONE;
 
     switch (in.pooling()) {
         case ::runanywhere::v1::EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED:

@@ -34,6 +34,7 @@
 #include "features/common/rac_stream_registry_internal.h"
 #include "features/llm/rac_llm_stream_internal.h"
 #include "rac/core/rac_logger.h"
+#include "rac/foundation/rac_proto_adapters.h"
 
 namespace {
 
@@ -185,12 +186,10 @@ static runanywhere::v1::TokenKind to_proto_kind(int internal_kind) {
     }
 }
 
-bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
-                                std::vector<uint8_t>& out) {
+bool serialize_llm_stream_event(const LLMStreamEventParams& p, std::vector<uint8_t>& out) {
     thread_local runanywhere::v1::LLMStreamEvent proto_event;
     proto_event.Clear();
 
-    proto_event.set_seq(seq);
     proto_event.set_timestamp_us(now_us());
     if (p.token) {
         proto_event.set_token(p.token);
@@ -206,8 +205,13 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
     if (p.finish_reason && p.finish_reason[0] != '\0') {
         proto_event.set_finish_reason(p.finish_reason);
     }
-    if (p.error_message && p.error_message[0] != '\0') {
-        proto_event.set_error_message(p.error_message);
+    if (p.error_code != 0 || (p.error_message && p.error_message[0] != '\0')) {
+        rac::foundation::populate_sdk_error(
+            proto_event.mutable_error(),
+            p.error_code != 0 ? static_cast<rac_result_t>(p.error_code) : RAC_ERROR_UNKNOWN);
+        if (p.error_message && p.error_message[0] != '\0') {
+            proto_event.mutable_error()->set_message(p.error_message);
+        }
     }
 
     // Extended fields (BUG-STREAMING-001 unification). proto3 scalar
@@ -231,9 +235,6 @@ bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
     }
     if (p.elapsed_ms > 0) {
         proto_event.set_elapsed_ms(p.elapsed_ms);
-    }
-    if (p.error_code != 0) {
-        proto_event.set_error_code(p.error_code);
     }
     if (p.final_result != nullptr) {
         *proto_event.mutable_result() = *p.final_result;
@@ -424,12 +425,10 @@ int32_t to_proto_kind_int(int internal_kind) {
 
 namespace rac::llm {
 
-bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
-                                std::vector<uint8_t>& out) {
+bool serialize_llm_stream_event(const LLMStreamEventParams& p, std::vector<uint8_t>& out) {
     out.clear();
     out.reserve(96);
 
-    wire_uint64_field(out, /*field=*/1, seq);
     wire_int64_field(out, /*field=*/2, now_us());
     wire_string_field(out, /*field=*/3, p.token);
     wire_bool_field(out, /*field=*/4, p.is_final);
@@ -492,7 +491,6 @@ void dispatch_llm_stream_event(rac_handle_t handle, const LLMStreamEventParams& 
     // a concurrent unset+quiesce either observes the in-flight count (we won
     // the lock) or finds an empty slot (it won — nothing to wait on).
     CallbackSlot slot;
-    uint64_t seq;
     std::optional<rac::stream::InFlightGuard> in_flight_guard;
     {
         std::lock_guard<std::mutex> lock(g_mu());
@@ -501,13 +499,10 @@ void dispatch_llm_stream_event(rac_handle_t handle, const LLMStreamEventParams& 
             return;
         in_flight_guard.emplace(g_in_flight);
         slot = it->second;
-        // Bump the per-handle counter under the lock so concurrent
-        // dispatches on the same handle still produce monotonic seq values.
-        seq = ++(it->second.seq);
     }
 
     thread_local std::vector<uint8_t> scratch;
-    if (!serialize_llm_stream_event(seq, p, scratch)) {
+    if (!serialize_llm_stream_event(p, scratch)) {
         return;
     }
 

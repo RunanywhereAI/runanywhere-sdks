@@ -21,6 +21,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_sdk_state.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
@@ -1220,12 +1221,12 @@ static rac_result_t parse_assignment_response_models(const char* data, size_t le
 
     ModelRegistryRefreshResult refresh;
     if (refresh.ParseFromArray(data, static_cast<int>(len)) &&
-        (refresh.success() || refresh.models().models_size() > 0 ||
+        (!refresh.has_error() || refresh.models().models_size() > 0 ||
          refresh.registered_count() > 0 || refresh.updated_count() > 0 ||
-         refresh.warnings_size() > 0 || !refresh.error_message().empty())) {
-        if (!refresh.success() && !refresh.error_message().empty()) {
+         refresh.warnings_size() > 0 || refresh.has_error())) {
+        if (refresh.has_error()) {
             if (error_message) {
-                *error_message = refresh.error_message();
+                *error_message = refresh.error().message();
             }
             return RAC_ERROR_INVALID_RESPONSE;
         }
@@ -1299,7 +1300,6 @@ static void populate_assignment_refresh_result(ModelRegistryRefreshResult* resul
         normalize_assignment_model(&model);
     }
     const AssignmentCounts counts = count_assignment_models(models);
-    result->set_success(success);
     result->set_registered_count(counts.total);
     result->set_updated_count(updated_count);
     result->set_discovered_count(0);
@@ -1308,8 +1308,11 @@ static void populate_assignment_refresh_result(ModelRegistryRefreshResult* resul
     result->set_downloaded_count(counts.downloaded);
     result->set_available_count(counts.available);
     result->set_error_count(counts.errors);
-    if (!error_message.empty()) {
-        result->set_error_message(error_message);
+    if (!success) {
+        rac::foundation::populate_sdk_error(result->mutable_error(), RAC_ERROR_REQUEST_FAILED);
+        if (!error_message.empty()) {
+            result->mutable_error()->set_message(error_message);
+        }
     }
     for (const std::string& warning : warnings) {
         result->add_warnings(warning);

@@ -386,7 +386,6 @@ rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handl
     }
 
     ModelDiscoveryResult result;
-    result.set_success(true);
     int32_t scanned = 0;
     for (const ModelInfo& model : models) {
         if (!request.include_built_in() && model_is_built_in(model)) {

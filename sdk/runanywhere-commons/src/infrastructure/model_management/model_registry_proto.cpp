@@ -18,6 +18,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_platform_capabilities.h"
@@ -214,9 +215,7 @@ void sort_query_results(const ModelQuery& query, std::vector<ModelInfo>* models)
     }
 
     const ModelQuerySortField sort_field = query.sort_field();
-    const bool descending =
-        query.has_sort_order() &&
-        query.sort_order() == runanywhere::v1::MODEL_QUERY_SORT_ORDER_DESCENDING;
+    const bool descending = query.has_descending() && query.descending();
 
     std::ranges::sort(*models,
                       [sort_field, descending](const ModelInfo& lhs, const ModelInfo& rhs) {
@@ -800,14 +799,12 @@ rac_result_t rac_model_registry_remove_proto_buffer(rac_model_registry_handle_t 
     result.set_model_id(model_id);
     rac_result_t rc = rac_model_registry_remove(handle, model_id);
     if (rc == RAC_SUCCESS) {
-        result.set_success(true);
         result.set_registry_updated(true);
         result.set_files_deleted(false);
     } else {
-        result.set_success(false);
         result.set_registry_updated(false);
         result.set_files_deleted(false);
-        result.set_error_message(rac_error_message(rc));
+        rac::foundation::populate_sdk_error(result.mutable_error(), rc);
     }
     return serialize_proto_to_buffer(result, out_result);
 #endif
@@ -850,7 +847,8 @@ rac_result_t rac_model_registry_get_model_proto(rac_model_registry_handle_t hand
         result.mutable_model()->CopyFrom(model);
     } else {
         result.set_found(false);
-        result.set_error_message("model not found");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_MODEL_NOT_FOUND);
+        result.mutable_error()->set_message("model not found");
     }
     return serialize_proto_to_buffer(result, out_result);
 #endif
@@ -904,7 +902,6 @@ rac_result_t rac_model_registry_list_models_proto(rac_model_registry_handle_t ha
     const ModelCounts filtered_counts = count_models(filtered);
 
     ModelListResult result;
-    result.set_success(true);
     move_models_to_list(&filtered, result.mutable_models());
     if (request.include_counts()) {
         result.set_total_count(all_counts.total);
@@ -952,8 +949,10 @@ rac_result_t rac_model_registry_import_proto(rac_model_registry_handle_t handle,
     if (model.id().empty()) {
         const std::string base = strip_known_model_extension(basename_from_path(source_path));
         if (base.empty()) {
-            result.set_success(false);
-            result.set_error_message("ModelImportRequest.model.id or source_path is required");
+            rac::foundation::populate_sdk_error(result.mutable_error(),
+                                                RAC_ERROR_INVALID_ARGUMENT);
+            result.mutable_error()->set_message(
+                "ModelImportRequest.model.id or source_path is required");
             return serialize_proto_to_buffer(result, out_result);
         }
         model.set_id(base);
@@ -989,10 +988,10 @@ rac_result_t rac_model_registry_import_proto(rac_model_registry_handle_t handle,
     ModelInfo existing;
     const bool exists = get_model_snapshot_by_id(handle, model.id(), &existing);
     if (exists && !request.overwrite_existing()) {
-        result.set_success(false);
         result.mutable_model()->CopyFrom(existing);
         result.set_local_path(existing.local_path());
-        result.set_error_message("model already exists");
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_INVALID_STATE);
+        result.mutable_error()->set_message("model already exists");
         result.set_registered(false);
         return serialize_proto_to_buffer(result, out_result);
     }
@@ -1027,7 +1026,6 @@ rac_result_t rac_model_registry_import_proto(rac_model_registry_handle_t handle,
         return proto_buffer_error(out_result, RAC_ERROR_NOT_FOUND, "imported model was not found");
     }
 
-    result.set_success(true);
     result.mutable_model()->CopyFrom(saved);
     result.set_local_path(saved.local_path());
     result.set_imported_bytes(imported_size_for_request(request, saved));

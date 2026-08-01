@@ -322,26 +322,27 @@ runanywhere::v1::LoRAAdapterInfo make_info(const runanywhere::v1::LoRAAdapterCon
     info.set_adapter_path(config.adapter_path());
     info.set_scale(config.scale() > 0.0f ? config.scale() : 1.0f);
     info.set_applied(applied);
-    info.set_error_code(static_cast<int32_t>(error_code));
     if (applied)
         info.set_loaded_at_ms(now_ms());
-    if ((error_message != nullptr) && error_message[0] != '\0')
-        info.set_error_message(error_message);
+    if (error_code != RAC_SUCCESS) {
+        rac::foundation::populate_sdk_error(info.mutable_error(), error_code);
+        if ((error_message != nullptr) && error_message[0] != '\0')
+            info.mutable_error()->set_message(error_message);
+    }
     return info;
 }
 
 void mark_apply_error(runanywhere::v1::LoRAApplyResult* result, rac_result_t code,
                       const char* message) {
-    result->set_success(false);
-    result->set_error_code(static_cast<int32_t>(code));
-    result->set_error_message((message != nullptr) && message[0] != '\0' ? message
-                                                                         : rac_error_message(code));
+    rac::foundation::populate_sdk_error(result->mutable_error(), code);
+    if ((message != nullptr) && message[0] != '\0')
+        result->mutable_error()->set_message(message);
 }
 
 void mark_state_error(runanywhere::v1::LoRAState* state, rac_result_t code, const char* message) {
-    state->set_error_code(static_cast<int32_t>(code));
-    state->set_error_message((message != nullptr) && message[0] != '\0' ? message
-                                                                        : rac_error_message(code));
+    rac::foundation::populate_sdk_error(state->mutable_error(), code);
+    if ((message != nullptr) && message[0] != '\0')
+        state->mutable_error()->set_message(message);
 }
 
 const char* no_service_message() {
@@ -463,8 +464,8 @@ validate_lora_config_for_loaded_model(const rac::llm::LifecycleLlmRef& ref,
 void populate_compatibility_error(runanywhere::v1::LoraCompatibilityResult* result,
                                   const LoraConfigValidation& validation) {
     result->set_is_compatible(false);
-    result->set_error_code(static_cast<int32_t>(validation.code));
-    result->set_error_message(validation.message);
+    rac::foundation::populate_sdk_error(result->mutable_error(), validation.code);
+    result->mutable_error()->set_message(validation.message);
     if (!validation.required_model.empty()) {
         result->set_base_model_required(validation.required_model);
     }
@@ -527,8 +528,8 @@ rac_result_t rac_lora_compatibility_proto(const uint8_t* config_proto_bytes,
     rc = acquire_lifecycle_llm_for_lora(&ref);
     if (rc != RAC_SUCCESS) {
         result.set_is_compatible(false);
-        result.set_error_message(no_service_message());
-        result.set_error_code(static_cast<int32_t>(RAC_ERROR_COMPONENT_NOT_READY));
+        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_COMPONENT_NOT_READY);
+        result.mutable_error()->set_message(no_service_message());
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "lora.compatibility", no_service_message());
         return copy_proto(result, out_result);
     }
@@ -544,8 +545,9 @@ rac_result_t rac_lora_compatibility_proto(const uint8_t* config_proto_bytes,
         std::ifstream file(config.adapter_path(), std::ios::binary);
         if (!file.is_open()) {
             result.set_is_compatible(false);
-            result.set_error_message("Adapter file not found");
-            result.set_error_code(static_cast<int32_t>(RAC_ERROR_INVALID_ARGUMENT));
+            rac::foundation::populate_sdk_error(result.mutable_error(),
+                                                RAC_ERROR_INVALID_ARGUMENT);
+            result.mutable_error()->set_message("Adapter file not found");
             rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
@@ -553,8 +555,9 @@ rac_result_t rac_lora_compatibility_proto(const uint8_t* config_proto_bytes,
         file.read(reinterpret_cast<char*>(&magic), sizeof(magic));
         if (!file || magic != 0x46554747u) {  // "GGUF" in little-endian
             result.set_is_compatible(false);
-            result.set_error_message("Adapter file is not a valid GGUF file");
-            result.set_error_code(static_cast<int32_t>(RAC_ERROR_INVALID_ARGUMENT));
+            rac::foundation::populate_sdk_error(result.mutable_error(),
+                                                RAC_ERROR_INVALID_ARGUMENT);
+            result.mutable_error()->set_message("Adapter file is not a valid GGUF file");
             rac::llm::release_lifecycle_llm(&ref);
             return copy_proto(result, out_result);
         }
@@ -663,7 +666,6 @@ rac_result_t rac_lora_apply_proto(const uint8_t* request_proto_bytes, size_t req
                            adapter_file_size(config.adapter_path()));
     }
 
-    result.set_success(true);
     rac::llm::release_lifecycle_llm(&ref);
     return copy_proto(result, out_result);
 #endif

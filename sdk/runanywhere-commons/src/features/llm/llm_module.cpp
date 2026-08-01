@@ -52,6 +52,7 @@
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/core/rac_structured_error.h"
 #include "rac/features/llm/rac_llm_component.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_stream.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
@@ -1621,9 +1622,9 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_res
     if (thinking && thinking_len > 0) {
         out->set_thinking_content(sanitize_utf8(std::string(thinking, thinking_len)));
     }
-    out->set_input_tokens(raw.prompt_tokens);
-    out->set_output_tokens(raw.completion_tokens);
-    out->set_total_tokens(raw.total_tokens);
+    out->mutable_usage()->set_input_tokens(raw.prompt_tokens);
+    out->mutable_usage()->set_output_tokens(raw.completion_tokens);
+    out->mutable_usage()->set_total_tokens(raw.total_tokens);
     out->set_model_used(ref.model_id ? ref.model_id : "");
     out->set_generation_time_ms(static_cast<double>(raw.total_time_ms));
     if (raw.time_to_first_token_ms > 0) {
@@ -1632,7 +1633,7 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_res
     if (raw.prompt_eval_time_ms > 0) {
         out->set_prompt_eval_time_ms(raw.prompt_eval_time_ms);
     }
-    out->set_tokens_per_second(static_cast<double>(raw.tokens_per_second));
+    out->mutable_usage()->set_tokens_per_second(static_cast<double>(raw.tokens_per_second));
     if ((ref.framework_name != nullptr) && ref.framework_name[0] != '\0') {
         out->set_framework(ref.framework_name);
     }
@@ -1647,9 +1648,9 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_res
 
     auto* perf = out->mutable_performance();
     perf->set_latency_ms(raw.total_time_ms);
-    perf->set_throughput_tokens_per_sec(raw.tokens_per_second);
-    perf->set_input_tokens(raw.prompt_tokens);
-    perf->set_output_tokens(raw.completion_tokens);
+    perf->mutable_usage()->set_tokens_per_second(raw.tokens_per_second);
+    perf->mutable_usage()->set_input_tokens(raw.prompt_tokens);
+    perf->mutable_usage()->set_output_tokens(raw.completion_tokens);
 }
 
 void set_structured_output_if_present(const char* response, LLMGenerationResult* out) {
@@ -1677,7 +1678,9 @@ void set_structured_output_if_present(const char* response, LLMGenerationResult*
             structured->set_is_valid(false);
             structured->set_contains_json(false);
             structured->set_raw_output(sanitize_utf8(response));
-            structured->set_error_message(validation.error_message);
+            rac::foundation::populate_sdk_error(structured->mutable_error(),
+                                                RAC_ERROR_VALIDATION_FAILED);
+            structured->mutable_error()->set_message(validation.error_message);
         }
     }
     rac_structured_output_validation_free(&validation);
@@ -1687,7 +1690,6 @@ struct ProtoStreamContext {
     rac_llm_stream_proto_callback_fn callback = nullptr;
     void* user_data = nullptr;
     rac::llm::LifecycleLlmRef* ref = nullptr;
-    uint64_t seq = 0;
     bool terminal_sent = false;
     bool first_token_sent = false;
     bool inside_thinking = false;
@@ -1814,7 +1816,7 @@ void dispatch_stream_event(ProtoStreamContext* ctx, const char* token, bool is_f
     params.tool_call = tool_call;
 
     thread_local std::vector<uint8_t> scratch;
-    if (!rac::llm::serialize_llm_stream_event(++ctx->seq, params, scratch)) {
+    if (!rac::llm::serialize_llm_stream_event(params, scratch)) {
         return;
     }
     ctx->callback(scratch.empty() ? nullptr : scratch.data(), scratch.size(), ctx->user_data);
@@ -2025,9 +2027,9 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     if (!ctx->thinking_text.empty()) {
         final_result.set_thinking_content(ctx->thinking_text);
     }
-    final_result.set_input_tokens(ctx->prompt_tokens);
-    final_result.set_output_tokens(ctx->token_count);
-    final_result.set_total_tokens(ctx->prompt_tokens + ctx->token_count);
+    final_result.mutable_usage()->set_input_tokens(ctx->prompt_tokens);
+    final_result.mutable_usage()->set_output_tokens(ctx->token_count);
+    final_result.mutable_usage()->set_total_tokens(ctx->prompt_tokens + ctx->token_count);
     const int64_t total_time_ms = now_ms() - ctx->started_ms;
     final_result.set_total_time_ms(total_time_ms);
     int64_t ttft_ms = 0;
@@ -2039,13 +2041,15 @@ void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
     const int64_t decode_ms =
         (ttft_ms > 0 && ttft_ms < total_time_ms) ? total_time_ms - ttft_ms : total_time_ms;
     if (decode_ms > 0 && ctx->token_count > 0) {
-        final_result.set_tokens_per_second(static_cast<float>(
+        final_result.mutable_usage()->set_tokens_per_second(static_cast<double>(
             static_cast<double>(ctx->token_count) / (static_cast<double>(decode_ms) / 1000.0)));
     }
     final_result.set_finish_reason(
         (finish_reason != nullptr) && finish_reason[0] != '\0' ? finish_reason : "stop");
     if ((error_message != nullptr) && error_message[0] != '\0') {
-        final_result.set_error_message(error_message);
+        rac::foundation::populate_sdk_error(final_result.mutable_error(),
+                                            RAC_ERROR_GENERATION_FAILED);
+        final_result.mutable_error()->set_message(error_message);
     }
 
     dispatch_stream_event(ctx, "", true, runanywhere::v1::TOKEN_KIND_ANSWER, finish_reason,

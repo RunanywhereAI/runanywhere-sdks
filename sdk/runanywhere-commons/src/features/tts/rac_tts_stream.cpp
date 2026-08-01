@@ -24,6 +24,7 @@
 #include "features/common/rac_stream_registry_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/tts/rac_tts_component.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/features/tts/rac_tts_proto_adapters.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -316,7 +317,6 @@ void dispatch_tts_stream_event(rac_handle_t handle, runanywhere::v1::TTSStreamEv
                                const char* error_message, int error_code, uint64_t session_id) {
     rac::stream::InFlightGuard guard(g_in_flight);
     CallbackSlot slot;
-    uint64_t seq = 0;
     std::string request_id;
     {
         std::lock_guard<std::mutex> lock(g_mu());
@@ -324,7 +324,6 @@ void dispatch_tts_stream_event(rac_handle_t handle, runanywhere::v1::TTSStreamEv
         if (it == g_slots().end() || it->second.fn == nullptr)
             return;
         slot = it->second;
-        seq = ++(it->second.seq);
         if (session_id != 0) {
             auto sit = g_sessions().find(session_id);
             if (sit == g_sessions().end() || sit->second.handle != handle ||
@@ -348,7 +347,6 @@ void dispatch_tts_stream_event(rac_handle_t handle, runanywhere::v1::TTSStreamEv
     thread_local std::vector<uint8_t> scratch;
 
     proto_event.Clear();
-    proto_event.set_seq(seq);
     proto_event.set_timestamp_us(now_us());
     if (!request_id.empty()) {
         proto_event.set_request_id(request_id);
@@ -363,11 +361,13 @@ void dispatch_tts_stream_event(rac_handle_t handle, runanywhere::v1::TTSStreamEv
     if (speak_result) {
         *proto_event.mutable_speak_result() = *speak_result;
     }
-    if (error_message && error_message[0] != '\0') {
-        proto_event.set_error_message(error_message);
-    }
-    if (error_code != 0) {
-        proto_event.set_error_code(error_code);
+    if (error_code != 0 || (error_message && error_message[0] != '\0')) {
+        rac::foundation::populate_sdk_error(
+            proto_event.mutable_error(),
+            error_code != 0 ? static_cast<rac_result_t>(error_code) : RAC_ERROR_UNKNOWN);
+        if (error_message && error_message[0] != '\0') {
+            proto_event.mutable_error()->set_message(error_message);
+        }
     }
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());

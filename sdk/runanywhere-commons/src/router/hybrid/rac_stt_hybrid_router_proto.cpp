@@ -154,7 +154,8 @@ void parse_descriptor(const uint8_t* bytes, size_t size, rac_hybrid_model_descri
     }
     const auto& id = msg.model_id();
     std::strncpy(out.model_id, id.c_str(), sizeof(out.model_id) - 1);
-    out.model_type = static_cast<rac_hybrid_model_type_t>(msg.model_type());
+    out.model_type =
+        msg.is_local() ? RAC_HYBRID_MODEL_TYPE_OFFLINE : RAC_HYBRID_MODEL_TYPE_ONLINE;
     out.backend = static_cast<rac_hybrid_backend_kind_t>(msg.backend());
 }
 
@@ -221,7 +222,8 @@ void parse_policy(const uint8_t* bytes, size_t size, std::vector<rac_hybrid_filt
                     policy.cascade.data.confidence.threshold = c.confidence().threshold();
                 }
             }
-            policy.rank = static_cast<rac_hybrid_rank_t>(msg.rank());
+            policy.rank = msg.prefer_local() ? RAC_HYBRID_RANK_PREFER_LOCAL_FIRST
+                                             : RAC_HYBRID_RANK_PREFER_ONLINE_FIRST;
         }
     }
     policy.hard_filters = filters.empty() ? nullptr : filters.data();

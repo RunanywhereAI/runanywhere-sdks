@@ -18,6 +18,7 @@
  */
 
 #include "rac/core/rac_logger.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_emit.h"
 #include "rac/infrastructure/events/rac_voice_agent_state.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
@@ -71,8 +72,10 @@ void emit_voice_agent_state(v1::SDKComponent component, rac_voice_agent_componen
     ev.set_component(component);
     if (model_id)
         ev.set_model_id(model_id);
-    if (error_message)
-        ev.set_error(error_message);
+    if (error_message && error_message[0] != '\0') {
+        rac::foundation::populate_sdk_error(ev.mutable_error(), RAC_ERROR_COMPONENT_NOT_READY);
+        ev.mutable_error()->set_message(error_message);
+    }
     ev.set_current_lifecycle_state(voice_agent_state_to_proto(state));
     rac::events::publish(component, v1::EVENT_CATEGORY_COMPONENT, std::move(ev));
 }
@@ -240,7 +243,6 @@ void emit_stt_transcription_completed(const char* transcription_id, const char* 
     voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
     voice.set_audio_size_bytes(audio_size_bytes);
     voice.set_word_count(word_count);
-    voice.set_real_time_factor(real_time_factor);
     if (language)
         voice.set_language(language);
     voice.set_sample_rate(sample_rate);
@@ -291,7 +293,6 @@ void emit_tts_synthesis_completed(const char* synthesis_id, const char* model_id
     voice.set_audio_duration_ms(static_cast<int64_t>(audio_duration_ms));
     voice.set_audio_size_bytes_tts(audio_size_bytes);
     voice.set_processing_duration_ms(static_cast<int64_t>(processing_duration_ms));
-    voice.set_characters_per_second(characters_per_second);
     voice.set_sample_rate(sample_rate);
     voice.set_framework(framework_to_proto_int(framework));
     publish_with_session(v1::SDK_COMPONENT_TTS, v1::EVENT_CATEGORY_TTS, std::move(voice),

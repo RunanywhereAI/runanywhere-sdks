@@ -245,8 +245,8 @@ class GenerateTextNode final : public OperatorNode {
             return;
         }
 
-        if (!result.error_message().empty() || result.error_code() != 0) {
-            set_error_detail(name(), "LLM generation failed: " + result.error_message());
+        if (result.has_error()) {
+            set_error_detail(name(), "LLM generation failed: " + result.error().message());
             cancel_graph(this->cancel_token());
             return;
         }
@@ -316,8 +316,8 @@ class TranscribeNode final : public OperatorNode {
             return;
         }
 
-        if (output.error_code() != 0) {
-            set_error_detail(name(), "STT transcription failed: " + output.error_message());
+        if (output.has_error()) {
+            set_error_detail(name(), "STT transcription failed: " + output.error().message());
             cancel_graph(this->cancel_token());
             return;
         }
@@ -395,8 +395,8 @@ class SynthesizeNode final : public OperatorNode {
             return;
         }
 
-        if (output.error_code() != 0) {
-            set_error_detail(name(), "TTS synthesis failed: " + output.error_message());
+        if (output.has_error()) {
+            set_error_detail(name(), "TTS synthesis failed: " + output.error().message());
             cancel_graph(this->cancel_token());
             return;
         }
@@ -472,8 +472,8 @@ class DetectVoiceNode final : public OperatorNode {
             return;
         }
 
-        if (result.error_code() != 0) {
-            set_error_detail(name(), "VAD detect failed: " + result.error_message());
+        if (result.has_error()) {
+            set_error_detail(name(), "VAD detect failed: " + result.error().message());
             cancel_graph(this->cancel_token());
             return;
         }
@@ -542,8 +542,8 @@ class EmbedNode final : public OperatorNode {
             return;
         }
 
-        if (result.error_code() != 0) {
-            set_error_detail(name(), "embeddings call failed: " + result.error_message());
+        if (result.has_error()) {
+            set_error_detail(name(), "embeddings call failed: " + result.error().message());
             cancel_graph(this->cancel_token());
             return;
         }
@@ -675,8 +675,8 @@ class RetrieveNode final : public OperatorNode {
             return;
         }
 
-        if (result.error_code() != 0 || !result.error_message().empty()) {
-            set_error_detail(name(), "RAG query failed: " + result.error_message());
+        if (result.has_error()) {
+            set_error_detail(name(), "RAG query failed: " + result.error().message());
             cancel_graph(this->cancel_token());
             return;
         }

@@ -424,10 +424,6 @@ void fill_stt_output(const rac_stt_result_t& result, const rac_stt_options_t& op
     metadata->set_processing_time_ms(result.processing_time_ms);
     const int64_t audio_length_ms = estimate_audio_length_ms(audio_size, options.sample_rate);
     metadata->set_audio_length_ms(audio_length_ms);
-    if (audio_length_ms > 0 && result.processing_time_ms > 0) {
-        metadata->set_real_time_factor(static_cast<float>(
-            static_cast<double>(result.processing_time_ms) / static_cast<double>(audio_length_ms)));
-    }
 }
 
 int64_t current_time_us() {
@@ -435,7 +431,7 @@ int64_t current_time_us() {
 }
 
 bool validate_stt_stream_event(const runanywhere::v1::STTStreamEvent& event) {
-    if (event.seq() == 0 || event.timestamp_us() <= 0 || event.request_id().empty()) {
+    if (event.timestamp_us() <= 0 || event.request_id().empty()) {
         return false;
     }
 
@@ -448,7 +444,7 @@ bool validate_stt_stream_event(const runanywhere::v1::STTStreamEvent& event) {
         case runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL:
             return (event.has_partial() && event.partial().is_final()) || event.has_final_output();
         case runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR:
-            return event.error_code() != RAC_SUCCESS || event.has_error_message();
+            return event.has_error();
         default:
             return false;
     }
@@ -506,7 +502,7 @@ void publish_stt_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
                                  const char* model_id, const char* text, float confidence,
                                  int64_t processing_ms, int64_t audio_length_ms,
                                  int32_t audio_size_bytes, int32_t word_count,
-                                 double real_time_factor, const char* language, int32_t sample_rate,
+                                 const char* language, int32_t sample_rate,
                                  const char* error, const char* framework_name = nullptr,
                                  bool is_streaming = false) {
     runanywhere::v1::VoiceLifecycleEvent voice;
@@ -531,9 +527,6 @@ void publish_stt_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
     }
     if (word_count > 0) {
         voice.set_word_count(word_count);
-    }
-    if (real_time_factor > 0.0) {
-        voice.set_real_time_factor(real_time_factor);
     }
     if (language != nullptr && language[0] != '\0') {
         voice.set_language(language);
@@ -1007,8 +1000,6 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
 
     // Calculate word count and real-time factor
     int32_t word_count = count_words(out_result->text);
-    double real_time_factor =
-        (audio_length_ms > 0 && duration_ms > 0) ? (audio_length_ms / duration_ms) : 0.0;
 
     RAC_LOG_INFO("STT.Component", "Transcription completed");
 
@@ -1028,7 +1019,6 @@ extern "C" rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const 
         voice.set_audio_length_ms(static_cast<int64_t>(audio_length_ms));
         voice.set_audio_size_bytes(static_cast<int32_t>(audio_size));
         voice.set_word_count(word_count);
-        voice.set_real_time_factor(real_time_factor);
         if (local_options.language)
             voice.set_language(local_options.language);
         voice.set_sample_rate(sample_rate);
@@ -1174,10 +1164,6 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
     } else {
         // Emit STT_TRANSCRIPTION_COMPLETED event with is_streaming = RAC_TRUE
         // Note: For streaming, we don't have final consolidated text, so word_count is not
-        // available. We can still compute real_time_factor from audio_length_ms and duration_ms.
-        double real_time_factor =
-            (audio_length_ms > 0 && duration_ms > 0) ? (audio_length_ms / duration_ms) : 0.0;
-
 #if defined(RAC_HAVE_PROTOBUF)
         runanywhere::v1::VoiceLifecycleEvent voice;
         voice.set_kind(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED);
@@ -1191,7 +1177,6 @@ rac_stt_component_transcribe_stream(rac_handle_t handle, const void* audio_data,
             voice.set_language(effective_options->language);
         voice.set_is_streaming(true);  // Streaming mode!
         voice.set_duration_ms(static_cast<int64_t>(duration_ms));
-        voice.set_real_time_factor(real_time_factor);
         // word_count not available for streaming - text is delivered via callbacks
         voice.set_sample_rate(component->config.sample_rate);
         voice.set_framework(rac::events::framework_to_proto_int(component->actual_framework));
@@ -1415,12 +1400,11 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
         (void)rac_sdk_event_publish_failure(rc, "STT model is not loaded", "stt",
                                             "transcribeStream", RAC_TRUE);
         runanywhere::v1::STTStreamEvent error;
-        error.set_seq(1);
         error.set_timestamp_us(current_time_us());
         error.set_request_id(request_id);
         error.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR);
-        error.set_error_code(rc);
-        error.set_error_message("STT model is not loaded");
+        rac::foundation::populate_sdk_error(error.mutable_error(), rc);
+        error.mutable_error()->set_message("STT model is not loaded");
         emit_stt_stream_event(error, callback, user_data);
         return rc;
     }
@@ -1444,7 +1428,6 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
               .audio_size = audio_size};
 
     runanywhere::v1::STTStreamEvent started;
-    started.set_seq(context.next_seq++);
     started.set_timestamp_us(current_time_us());
     started.set_request_id(context.request_id);
     started.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED);
@@ -1453,7 +1436,6 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
     auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
         auto* ctx = static_cast<StreamContext*>(opaque);
         runanywhere::v1::STTStreamEvent event;
-        event.set_seq(ctx->next_seq++);
         event.set_timestamp_us(current_time_us());
         event.set_request_id(ctx->request_id);
         event.set_kind(is_final == RAC_TRUE ? runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL
@@ -1491,12 +1473,11 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
         (void)rac_sdk_event_publish_failure(rc, "STT streaming transcription failed", "stt",
                                             "transcribeStream", RAC_TRUE);
         runanywhere::v1::STTStreamEvent error;
-        error.set_seq(context.next_seq++);
         error.set_timestamp_us(current_time_us());
         error.set_request_id(context.request_id);
         error.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR);
-        error.set_error_code(rc);
-        error.set_error_message("STT streaming transcription failed");
+        rac::foundation::populate_sdk_error(error.mutable_error(), rc);
+        error.mutable_error()->set_message("STT streaming transcription failed");
         emit_stt_stream_event(error, callback, user_data);
     }
     return rc;
@@ -1776,7 +1757,7 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
     const std::string transcription_id = generate_unique_id();
     publish_stt_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_TRANSCRIPTION_STARTED,
                                 transcription_id.c_str(), ref.model_id, nullptr, 0.0f, 0, 0, 0, 0,
-                                0.0, options.language, options.sample_rate, nullptr,
+                                options.language, options.sample_rate, nullptr,
                                 ref.framework_name, /*is_streaming=*/false);
 
     const auto transcribe_start = std::chrono::steady_clock::now();
@@ -1787,7 +1768,7 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
     if (rc != RAC_SUCCESS) {
         publish_stt_lifecycle_event(
             runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED, transcription_id.c_str(), ref.model_id,
-            nullptr, 0.0f, processing_ms, 0, 0, 0, 0.0, options.language, options.sample_rate,
+            nullptr, 0.0f, processing_ms, 0, 0, 0, options.language, options.sample_rate,
             rac_error_message(rc), ref.framework_name, /*is_streaming=*/false);
         rac::lifecycle::release_lifecycle_stt(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
@@ -1813,21 +1794,12 @@ rac_result_t rac_stt_transcribe_lifecycle_proto(const uint8_t* request_proto_byt
     auto* metadata = output.mutable_metadata();
     metadata->set_model_id(ref.model_id ? ref.model_id : "");
     metadata->set_audio_length_ms(duration_ms);
-    if (duration_ms > 0 && metadata->processing_time_ms() > 0) {
-        metadata->set_real_time_factor(
-            static_cast<float>(static_cast<double>(metadata->processing_time_ms()) /
-                               static_cast<double>(duration_ms)));
-    }
 
     const int32_t word_count = count_words(raw.text);
-    const double real_time_factor =
-        (duration_ms > 0 && processing_ms > 0)
-            ? static_cast<double>(duration_ms) / static_cast<double>(processing_ms)
-            : 0.0;
     publish_stt_lifecycle_event(runanywhere::v1::VOICE_EVENT_KIND_STT_COMPLETED,
                                 transcription_id.c_str(), ref.model_id, raw.text, raw.confidence,
                                 processing_ms, duration_ms, static_cast<int32_t>(audio.size()),
-                                word_count, real_time_factor, options.language, options.sample_rate,
+                                word_count, options.language, options.sample_rate,
                                 nullptr, ref.framework_name, /*is_streaming=*/false);
 
     rc = copy_proto(output, out_result);
@@ -1992,7 +1964,6 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     // their state machine (kind = STARTED, seq = 1).
     {
         runanywhere::v1::STTStreamEvent started;
-        started.set_seq(ctx.next_seq++);
         started.set_timestamp_us(rac_get_current_time_ms() * 1000);
         started.set_request_id(ctx.request_id);
         started.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED);
@@ -2002,7 +1973,6 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
         auto* c = static_cast<StreamCtx*>(opaque);
         runanywhere::v1::STTStreamEvent event;
-        event.set_seq(c->next_seq++);
         event.set_timestamp_us(rac_get_current_time_ms() * 1000);
         event.set_request_id(c->request_id);
         event.set_kind(is_final == RAC_TRUE ? runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL
@@ -2045,12 +2015,10 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     rc = rac_stt_transcribe_stream(&service, audio.data(), audio.size(), &options, bridge, &ctx);
     if (rc != RAC_SUCCESS) {
         runanywhere::v1::STTStreamEvent error_event;
-        error_event.set_seq(ctx.next_seq++);
         error_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
         error_event.set_request_id(ctx.request_id);
         error_event.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR);
-        error_event.set_error_code(rc);
-        error_event.set_error_message(rac_error_message(rc));
+        rac::foundation::populate_sdk_error(error_event.mutable_error(), rc);
         emit_event(error_event, ctx.fn, ctx.user_data);
     }
     rac::lifecycle::release_lifecycle_stt(&ref);

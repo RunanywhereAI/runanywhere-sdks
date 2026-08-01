@@ -27,6 +27,7 @@
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/features/llm/rac_llm_thinking.h"
+#include "rac/foundation/rac_proto_adapters.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "structured_output.pb.h"
@@ -582,8 +583,12 @@ fill_structured_validation_proto(const rac_structured_output_parse_result_t& par
                                  runanywhere::v1::StructuredOutputValidation* validation) {
     validation->set_is_valid(parsed.is_valid == RAC_TRUE);
     validation->set_contains_json(parsed.contains_json == RAC_TRUE);
-    if (parsed.error_message) {
-        validation->set_error_message(parsed.error_message);
+    if (parsed.error_message && parsed.error_message[0] != '\0') {
+        const rac_result_t vrc = parsed.error_code != 0
+                                     ? static_cast<rac_result_t>(parsed.error_code)
+                                     : RAC_ERROR_VALIDATION_FAILED;
+        rac::foundation::populate_sdk_error(validation->mutable_error(), vrc);
+        validation->mutable_error()->set_message(parsed.error_message);
     }
     if (parsed.raw_text) {
         validation->set_raw_output(parsed.raw_text);
@@ -638,10 +643,13 @@ static rac_result_t structured_result_from_text(const std::string& raw_text,
     if (parsed.raw_text) {
         result->set_raw_text(parsed.raw_text);
     }
-    if (parsed.error_message) {
-        result->set_error_message(parsed.error_message);
+    if (parsed.error_code != 0) {
+        rac::foundation::populate_sdk_error(result->mutable_error(),
+                                            static_cast<rac_result_t>(parsed.error_code));
+        if (parsed.error_message && parsed.error_message[0] != '\0') {
+            result->mutable_error()->set_message(parsed.error_message);
+        }
     }
-    result->set_error_code(static_cast<int32_t>(parsed.error_code));
     rac_structured_output_parse_result_free(&parsed);
     return RAC_SUCCESS;
 }
@@ -691,7 +699,6 @@ struct StructuredStreamContext {
     void* user_data = nullptr;
     rac::llm::LifecycleLlmRef* ref = nullptr;
     const rac_structured_output_config_t* config = nullptr;
-    uint64_t seq = 0;
     bool terminal_sent = false;
     std::string request_id;
     std::string raw_text;
@@ -715,7 +722,6 @@ static void dispatch_structured_stream_event(StructuredStreamContext* ctx,
     }
 
     runanywhere::v1::StructuredOutputStreamEvent event;
-    event.set_seq(++ctx->seq);
     event.set_timestamp_us(structured_now_us());
     if (!ctx->request_id.empty()) {
         event.set_request_id(ctx->request_id);
@@ -733,10 +739,14 @@ static void dispatch_structured_stream_event(StructuredStreamContext* ctx,
             *event.mutable_validation() = result->validation();
         }
     }
-    if (error_message != nullptr && error_message[0] != '\0') {
-        event.set_error_message(error_message);
+    if (error_code != 0 || (error_message != nullptr && error_message[0] != '\0')) {
+        rac::foundation::populate_sdk_error(
+            event.mutable_error(),
+            error_code != 0 ? static_cast<rac_result_t>(error_code) : RAC_ERROR_UNKNOWN);
+        if (error_message != nullptr && error_message[0] != '\0') {
+            event.mutable_error()->set_message(error_message);
+        }
     }
-    event.set_error_code(static_cast<int32_t>(error_code));
 
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
@@ -829,17 +839,19 @@ static void dispatch_structured_terminal_once(StructuredStreamContext* ctx,
     const bool transport_ok = status == RAC_SUCCESS;
     const auto kind = transport_ok ? runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED
                                    : runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR;
-    const bool validation_ok = result.error_code() == static_cast<int32_t>(RAC_SUCCESS);
+    const bool validation_ok = !result.has_error();
     const char* message = nullptr;
     if (!transport_ok) {
         message = finish_reason != nullptr && finish_reason[0] != '\0' ? finish_reason
                                                                        : rac_error_message(status);
-    } else if (!validation_ok && result.has_error_message()) {
-        message = result.error_message().c_str();
+    } else if (!validation_ok && result.has_error()) {
+        message = result.error().message().c_str();
     }
-    dispatch_structured_stream_event(ctx, kind, nullptr, nullptr, &result, message,
-                                     transport_ok ? static_cast<rac_result_t>(result.error_code())
-                                                  : status);
+    dispatch_structured_stream_event(
+        ctx, kind, nullptr, nullptr, &result, message,
+        transport_ok ? (result.has_error() ? static_cast<rac_result_t>(result.error().c_abi_code())
+                                            : RAC_SUCCESS)
+                     : status);
 }
 #endif
 
@@ -1340,10 +1352,13 @@ extern "C" rac_result_t rac_structured_output_parse_proto(const uint8_t* request
     if (parsed.raw_text) {
         result.set_raw_text(parsed.raw_text);
     }
-    if (parsed.error_message) {
-        result.set_error_message(parsed.error_message);
+    if (parsed.error_code != 0) {
+        rac::foundation::populate_sdk_error(result.mutable_error(),
+                                            static_cast<rac_result_t>(parsed.error_code));
+        if (parsed.error_message && parsed.error_message[0] != '\0') {
+            result.mutable_error()->set_message(parsed.error_message);
+        }
     }
-    result.set_error_code(static_cast<int32_t>(parsed.error_code));
     rac_structured_output_parse_result_free(&parsed);
 
     return copy_serialized_proto(result, out_result, "StructuredOutputResult");
@@ -1390,12 +1405,13 @@ extern "C" rac_result_t rac_structured_output_generate_proto(const uint8_t* requ
             unsupported_structured_options_message(request.options(), &unsupported_message);
         if (unsupported != RAC_SUCCESS) {
             runanywhere::v1::StructuredOutputResult typed_result;
-            typed_result.set_error_message(unsupported_message);
-            typed_result.set_error_code(static_cast<int32_t>(unsupported));
+            rac::foundation::populate_sdk_error(typed_result.mutable_error(), unsupported);
+            typed_result.mutable_error()->set_message(unsupported_message);
             auto* result_validation = typed_result.mutable_validation();
             result_validation->set_is_valid(false);
             result_validation->set_contains_json(false);
-            result_validation->set_error_message(unsupported_message);
+            rac::foundation::populate_sdk_error(result_validation->mutable_error(), unsupported);
+            result_validation->mutable_error()->set_message(unsupported_message);
             result_validation->add_validation_errors(unsupported_message);
             return copy_serialized_proto(typed_result, out_result, "StructuredOutputResult");
         }
@@ -1628,14 +1644,12 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt_proto(
 
     runanywhere::v1::StructuredOutputPromptResult result;
     if (prepare_rc != RAC_SUCCESS) {
-        result.set_error_message(rac_error_message(prepare_rc));
-        result.set_error_code(static_cast<int32_t>(prepare_rc));
+        rac::foundation::populate_sdk_error(result.mutable_error(), prepare_rc);
         free(prepared_prompt);
         return copy_serialized_proto(result, out_result, "StructuredOutputPromptResult");
     }
 
     result.set_prepared_prompt(prepared_prompt ? prepared_prompt : "");
-    result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
     if (converted.config.json_schema) {
         result.set_json_schema(converted.config.json_schema);
         char* system_prompt = nullptr;

@@ -326,7 +326,6 @@ rac_result_t list_catalog_with_query(rac_lora_registry_handle_t handle,
     }
 
     runanywhere::v1::LoraAdapterCatalogListResult result;
-    result.set_success(true);
     result.set_total_count(static_cast<int32_t>(all_entries.size()));
     result.set_filtered_count(static_cast<int32_t>(filtered.size()));
     result.set_downloaded_count(downloaded_count(filtered));
@@ -670,7 +669,8 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_get_proto(rac_lora_registry_han
         auto it = registry->entries.find(request.adapter_id());
         if (it == registry->entries.end()) {
             result.set_found(false);
-            result.set_error_message("LoRA catalog entry not found");
+            rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_NOT_FOUND);
+            result.mutable_error()->set_message("LoRA catalog entry not found");
         } else {
             result.set_found(true);
             *result.mutable_entry() =
@@ -720,9 +720,9 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
         std::lock_guard<std::mutex> lock(registry->mutex);
         auto it = registry->entries.find(request.adapter_id());
         if (it == registry->entries.end()) {
-            result.set_success(false);
             result.set_persisted(false);
-            result.set_error_message("LoRA catalog entry not found");
+            rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_NOT_FOUND);
+            result.mutable_error()->set_message("LoRA catalog entry not found");
             return copy_proto(result, out_result);
         }
 
@@ -750,7 +750,6 @@ extern "C" RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
         if (rc != RAC_SUCCESS) {
             return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
         }
-        result.set_success(true);
         result.set_persisted(true);
         *result.mutable_entry() = entry;
     }

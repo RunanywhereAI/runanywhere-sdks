@@ -1397,6 +1397,8 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/lora_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/voice_agent_service.pb.cc
     ${_RAC_PROTO_GEN_DIR}/errors.pb.cc
+    # Shared TokenUsage embedded by LLM/VLM/RAG result + metrics messages (D4).
+    ${_RAC_PROTO_GEN_DIR}/token_usage.pb.cc
     ${_RAC_PROTO_GEN_DIR}/router.pb.cc
     ${_RAC_PROTO_GEN_DIR}/thinking_tag_pattern.pb.cc
     ${_RAC_PROTO_GEN_DIR}/component_types.pb.cc

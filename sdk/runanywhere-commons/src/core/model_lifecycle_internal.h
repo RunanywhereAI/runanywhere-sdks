@@ -31,6 +31,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"

@@ -36,6 +36,7 @@
 #include "features/llm/tool_calling_result_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -388,7 +389,6 @@ void emit_final_event(ToolCallingSession& session, bool is_complete) {
 void emit_llm_chunk(ToolCallingSession& session, const std::string& text, bool is_final,
                     const std::string& finish_reason) {
     runanywhere::v1::LLMStreamEvent stream;
-    stream.set_seq(session.seq + 1);
     stream.set_timestamp_us(now_us());
     stream.set_token(text);
     stream.set_is_final(is_final);
@@ -567,7 +567,8 @@ validate_tool_call(const ToolCallingSession& session, const runanywhere::v1::Too
     if (req_size > 0 &&
         !request.SerializeToArray(req_bytes.data(), static_cast<int>(req_bytes.size()))) {
         empty_result.set_is_valid(false);
-        empty_result.set_error_message("failed to serialize validation request");
+        rac::foundation::populate_sdk_error(empty_result.mutable_error(), RAC_ERROR_ENCODING_ERROR);
+        empty_result.mutable_error()->set_message("failed to serialize validation request");
         return empty_result;
     }
 
@@ -581,8 +582,10 @@ validate_tool_call(const ToolCallingSession& session, const runanywhere::v1::Too
         (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     } else {
         result.set_is_valid(false);
-        result.set_error_message(out.error_message ? out.error_message
-                                                   : "validation proto call failed");
+        rac::foundation::populate_sdk_error(
+            result.mutable_error(), rc != RAC_SUCCESS ? rc : RAC_ERROR_INVALID_RESPONSE);
+        result.mutable_error()->set_message(out.error_message ? out.error_message
+                                                              : "validation proto call failed");
     }
     rac_proto_buffer_free(&out);
     return result;
@@ -689,8 +692,8 @@ void run_generate_loop(ToolCallingSession& session) {
         runanywhere::v1::ToolResult failed;
         failed.set_tool_call_id(parsed_call.id());
         failed.set_name(parsed_call.name());
-        failed.set_error(policy_error);
-        failed.set_success(false);
+        rac::foundation::populate_sdk_error(failed.mutable_error(), RAC_ERROR_VALIDATION_FAILED);
+        failed.mutable_error()->set_message(policy_error);
         failed.set_started_at_ms(now_ms());
         failed.set_completed_at_ms(now_ms());
         session.all_tool_calls.push_back(parsed_call);
@@ -713,7 +716,7 @@ void run_generate_loop(ToolCallingSession& session) {
     if (session.validate_calls) {
         auto validation = validate_tool_call(session, parsed_call);
         if (!validation.is_valid()) {
-            std::string msg = validation.error_message();
+            std::string msg = validation.error().message();
             if (msg.empty() && validation.validation_errors_size() > 0) {
                 msg = validation.validation_errors(0);
             }
@@ -724,8 +727,8 @@ void run_generate_loop(ToolCallingSession& session) {
             runanywhere::v1::ToolResult failed;
             failed.set_tool_call_id(parsed_call.id());
             failed.set_name(parsed_call.name());
-            failed.set_error(msg);
-            failed.set_success(false);
+            rac::foundation::populate_sdk_error(failed.mutable_error(), RAC_ERROR_VALIDATION_FAILED);
+            failed.mutable_error()->set_message(msg);
             failed.set_started_at_ms(now_ms());
             failed.set_completed_at_ms(now_ms());
             session.all_tool_calls.push_back(parsed_call);
@@ -961,12 +964,11 @@ rac_tool_calling_session_step_with_result_proto(const uint8_t* request_proto_byt
         tr.set_name(session->pending_tool_name);
         const bool has_error = request.has_error() && !request.error().empty();
         if (has_error) {
-            tr.set_error(request.error());
-            tr.set_success(false);
+            rac::foundation::populate_sdk_error(tr.mutable_error(), RAC_ERROR_PROCESSING_FAILED);
+            tr.mutable_error()->set_message(request.error());
         } else {
             tr.set_result_json(request.result_json().empty() ? std::string("{}")
                                                              : request.result_json());
-            tr.set_success(true);
         }
         tr.set_started_at_ms(now_ms());
         tr.set_completed_at_ms(now_ms());

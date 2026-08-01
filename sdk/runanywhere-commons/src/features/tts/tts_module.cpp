@@ -249,10 +249,6 @@ void publish_tts_lifecycle_event(runanywhere::v1::VoiceEventKind kind, const cha
     }
     if (processing_ms > 0) {
         voice.set_processing_duration_ms(processing_ms);
-        if (char_count > 0) {
-            voice.set_characters_per_second(static_cast<double>(char_count) * 1000.0 /
-                                            static_cast<double>(processing_ms));
-        }
     }
     if (sample_rate > 0) {
         voice.set_sample_rate(sample_rate);
@@ -634,7 +630,6 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
     {
         int32_t char_count = static_cast<int32_t>(std::strlen(text));
         double processing_ms = static_cast<double>(out_result->processing_time_ms);
-        double chars_per_sec = processing_ms > 0 ? (char_count * 1000.0 / processing_ms) : 0.0;
 
 #if defined(RAC_HAVE_PROTOBUF)
         runanywhere::v1::VoiceLifecycleEvent voice;
@@ -647,7 +642,6 @@ extern "C" rac_result_t rac_tts_component_synthesize(rac_handle_t handle, const 
         voice.set_audio_duration_ms(static_cast<int64_t>(out_result->duration_ms));
         voice.set_audio_size_bytes_tts(static_cast<int32_t>(out_result->audio_size));
         voice.set_processing_duration_ms(static_cast<int64_t>(processing_ms));
-        voice.set_characters_per_second(chars_per_sec);
         voice.set_sample_rate(static_cast<int32_t>(out_result->sample_rate));
         voice.set_framework(rac::events::framework_to_proto_int(framework));
         rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
@@ -765,7 +759,6 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
     } else {
         // Emit SYNTHESIS_COMPLETED event (streaming complete)
         double processing_ms = static_cast<double>(duration.count());
-        double chars_per_sec = processing_ms > 0 ? (char_count * 1000.0 / processing_ms) : 0.0;
 
 #if defined(RAC_HAVE_PROTOBUF)
         runanywhere::v1::VoiceLifecycleEvent voice;
@@ -776,7 +769,6 @@ extern "C" rac_result_t rac_tts_component_synthesize_stream(rac_handle_t handle,
             voice.set_model_name(voice_name);
         voice.set_character_count(char_count);
         voice.set_processing_duration_ms(static_cast<int64_t>(processing_ms));
-        voice.set_characters_per_second(chars_per_sec);
         voice.set_framework(rac::events::framework_to_proto_int(framework));
         rac::events::publish_with_session(runanywhere::v1::SDK_COMPONENT_TTS,
                                           runanywhere::v1::EVENT_CATEGORY_TTS, std::move(voice),
@@ -1208,7 +1200,6 @@ rac_result_t rac_tts_synthesize_lifecycle_proto(const uint8_t* request_proto_byt
     }
     output.set_timestamp_ms(rac_get_current_time_ms());
     output.set_is_final(true);
-    output.set_error_code(RAC_SUCCESS);
     output.set_audio_size_bytes(static_cast<int64_t>(raw.audio_size));
     auto* metadata = output.mutable_metadata();
     metadata->set_voice_id(options.voice ? options.voice : (ref.model_id ? ref.model_id : ""));
@@ -1291,7 +1282,6 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
         rac_tts_lifecycle_stream_event_callback_fn fn;
         void* user_data;
         std::string request_id;
-        uint64_t next_seq;
         std::string voice_id;
         std::string language_code;
         int32_t sample_rate;
@@ -1301,7 +1291,6 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
     StreamCtx ctx{.fn = callback,
                   .user_data = user_data,
                   .request_id = request_id,
-                  .next_seq = 1,
                   .voice_id = options.voice ? options.voice : (ref.model_id ? ref.model_id : ""),
                   .language_code = options.language ? options.language : "",
                   .sample_rate =
@@ -1322,7 +1311,6 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
     // STARTED envelope.
     {
         runanywhere::v1::TTSStreamEvent started;
-        started.set_seq(ctx.next_seq++);
         started.set_timestamp_us(rac_get_current_time_ms() * 1000);
         started.set_request_id(ctx.request_id);
         started.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_STARTED);
@@ -1332,7 +1320,6 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
     auto chunk_bridge = [](const void* audio_data, size_t audio_size, void* opaque) {
         auto* c = static_cast<StreamCtx*>(opaque);
         runanywhere::v1::TTSStreamEvent event;
-        event.set_seq(c->next_seq++);
         event.set_timestamp_us(rac_get_current_time_ms() * 1000);
         event.set_request_id(c->request_id);
         event.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_AUDIO_CHUNK);
@@ -1377,16 +1364,13 @@ rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
 
     if (rc != RAC_SUCCESS) {
         runanywhere::v1::TTSStreamEvent error_event;
-        error_event.set_seq(ctx.next_seq++);
         error_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
         error_event.set_request_id(ctx.request_id);
         error_event.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_ERROR);
-        error_event.set_error_code(rc);
-        error_event.set_error_message(rac_error_message(rc));
+        rac::foundation::populate_sdk_error(error_event.mutable_error(), rc);
         emit_event(error_event, ctx.fn, ctx.user_data);
     } else {
         runanywhere::v1::TTSStreamEvent completed;
-        completed.set_seq(ctx.next_seq++);
         completed.set_timestamp_us(rac_get_current_time_ms() * 1000);
         completed.set_request_id(ctx.request_id);
         completed.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_COMPLETED);
@@ -1424,8 +1408,7 @@ rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
         state.set_current_voice(ref.model_id);
     }
     if (stop_rc != RAC_SUCCESS) {
-        state.set_error_code(stop_rc);
-        state.set_error_message(rac_error_message(stop_rc));
+        rac::foundation::populate_sdk_error(state.mutable_error(), stop_rc);
     }
     rc = copy_proto(state, out_result);
     rac::lifecycle::release_lifecycle_tts(&ref);

@@ -18,6 +18,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_assignment.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
@@ -334,7 +335,6 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
     const ModelCounts counts = count_models(models);
 
     ModelRegistryRefreshResult result;
-    result.set_success(refresh_rc == RAC_SUCCESS);
     result.set_registered_count(counts.total);
     result.set_updated_count(adapter_rescan_linked);
     result.set_discovered_count(adapter_rescan_linked + manifest_restored);
@@ -344,7 +344,7 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
     result.set_available_count(counts.available);
     result.set_error_count(counts.errors);
     if (refresh_rc != RAC_SUCCESS) {
-        result.set_error_message(rac_error_message(refresh_rc));
+        rac::foundation::populate_sdk_error(result.mutable_error(), refresh_rc);
     }
     if (request.rescan_local() && !adapter_rescan_ran) {
         result.add_warnings(

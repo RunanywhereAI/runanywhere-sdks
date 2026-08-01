@@ -349,7 +349,7 @@ int test_mocked_generation(rac_model_registry_handle_t registry) {
     CHECK(result.text() == "final {\"ok\":true}", "generate strips thinking from text");
     CHECK(result.thinking_content() == "plan", "generate extracts thinking content");
     CHECK(result.model_used() == "lifecycle.llm", "generate reports lifecycle model id");
-    CHECK(result.output_tokens() == 12, "generate reports completion tokens");
+    CHECK(result.usage().output_tokens() == 12, "generate reports completion tokens");
     CHECK(result.thinking_tokens() > 0, "generate splits thinking tokens");
     CHECK(result.response_tokens() > 0, "generate splits response tokens");
     CHECK(result.has_json_output() && result.json_output() == "{\"ok\":true}",
@@ -475,7 +475,7 @@ int test_hidden_thinking_counts_toward_length(rac_model_registry_handle_t regist
         CHECK(event.result().text().empty(), "hidden thinking terminal has no answer text");
         CHECK(event.result().thinking_content() == "alphabetagamma",
               "hidden thinking terminal preserves reasoning content");
-        CHECK(event.result().output_tokens() == 3,
+        CHECK(event.result().usage().output_tokens() == 3,
               "hidden thinking terminal counts suppressed completion segments");
     }
     CHECK(non_terminal_events == 0, "hidden thinking emits no thought events");
