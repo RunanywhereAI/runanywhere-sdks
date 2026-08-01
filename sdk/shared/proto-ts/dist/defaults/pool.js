@@ -9,7 +9,7 @@
 // here; the C header and the other three SDK languages are generated from
 // the same annotations, so editing this copy only desynchronizes one SDK.
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.storageDefaults = exports.structuredOutputDefaults = exports.environmentDefaults = exports.fFIDefaults = exports.workerDefaults = exports.hybridDefaults = exports.voiceAgentDefaults = exports.audioCaptureDefaults = exports.networkDefaults = void 0;
+exports.storageDefaults = exports.structuredOutputDefaults = exports.environmentDefaults = exports.fFIDefaults = exports.workerDefaults = exports.hybridDefaults = exports.voiceAgentDefaults = exports.audioCaptureDefaults = exports.connectDefaults = exports.networkDefaults = void 0;
 /** Central default pool. Read these instead of retyping a literal. */
 exports.networkDefaults = Object.freeze({
     requestTimeoutMs: 60000,
@@ -20,6 +20,10 @@ exports.networkDefaults = Object.freeze({
     streamChunkBytes: 262144,
     maxRetries: 3,
     retryBackoffBaseMs: 100,
+});
+exports.connectDefaults = Object.freeze({
+    connectTimeoutMs: 5000,
+    generationReadTimeoutMs: 120000,
 });
 exports.audioCaptureDefaults = Object.freeze({
     micSampleRateHz: 16000,

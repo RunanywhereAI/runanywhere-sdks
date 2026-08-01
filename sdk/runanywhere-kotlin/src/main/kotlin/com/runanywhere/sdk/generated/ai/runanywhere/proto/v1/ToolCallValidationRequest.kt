@@ -37,6 +37,10 @@ public class ToolCallValidationRequest(
     schemaIndex = 0,
   )
   public val tool_call: ToolCall? = null,
+  /**
+   * Validation uses options.tools as the registry snapshot and honors
+   * portable flags such as require_json_arguments and forced_tool_name.
+   */
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.ToolCallingOptions#ADAPTER",

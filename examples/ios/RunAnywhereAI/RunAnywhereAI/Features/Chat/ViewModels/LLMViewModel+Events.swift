@@ -18,7 +18,7 @@ extension LLMViewModel {
     func subscribeToModelLifecycle() {
         // Typed lifecycle stream: the SDK folds all native load/unload
         // channels into one publisher.
-        lifecycleCancellable = RunAnywhere.eventBus.modelLifecycle
+        lifecycleCancellable = RunAnywhere.events.modelLifecycle
             .receive(on: DispatchQueue.main)
             .sink { [weak self] change in
                 guard let self = self else { return }
@@ -29,7 +29,7 @@ extension LLMViewModel {
 
         // Generation analytics (TTFT, completion metrics) are chat-screen
         // analytics, not lifecycle — they stay on the raw event bus.
-        generationCancellable = RunAnywhere.eventBus.events
+        generationCancellable = RunAnywhere.events.events
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 guard let self = self else { return }
@@ -40,14 +40,25 @@ extension LLMViewModel {
     }
 
     func checkModelStatusFromSDK() async {
-        let loadedModelId = await RunAnywhere.models.state().loaded[.language]?.id
+        #if os(iOS)
+        guard !isUsingConnect else { return }
+        #endif
+
+        // Resolve currently-loaded LLM via canonical proto snapshot API.
+        var request = RACurrentModelRequest()
+        request.category = .language
+        let snapshot = RunAnywhere.currentModel(request)
+        let isLoaded = snapshot.found
+        let modelId = snapshot.found ? snapshot.modelID : nil
 
         await MainActor.run {
-            self.updateModelLoadedState(isLoaded: loadedModelId != nil)
-            if let loadedModelId,
-               let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == loadedModelId }) {
+            self.updateModelLoadedState(isLoaded: isLoaded)
+            if let id = modelId,
+               let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == id }) {
                 self.updateLoadedModelInfo(name: matchingModel.name, framework: matchingModel.framework)
                 self.setLoadedModelSupportsThinking(matchingModel.supportsThinking)
+            } else if !isLoaded {
+                self.clearLoadedModelInfo()
             }
         }
     }
@@ -56,6 +67,9 @@ extension LLMViewModel {
 
     /// Apply a typed model load/unload change.
     private func handleModelLifecycle(_ change: RAModelLifecycleChange) {
+        #if os(iOS)
+        guard !isUsingConnect else { return }
+        #endif
         guard change.component == .llm || change.event.category == .llm else { return }
 
         switch change.kind {

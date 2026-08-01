@@ -12,23 +12,40 @@ extension LLMViewModel {
     // MARK: - Analytics Creation
 
     func createAnalytics(
-        from result: GenerationResult,
+        from result: RALLMGenerationResult,
         messageId: String,
         conversationId: String,
         wasInterrupted: Bool,
-        options: LlmOptions
+        options: RALLMGenerationOptions
     ) -> MessageAnalytics? {
-        guard let modelName = loadedModelName,
-              let currentModel = ModelListViewModel.shared.currentModel else {
-            return nil
-        }
+        // Android attaches stats whenever the generation result has timing data.
+        // Do not require a local catalog model — Connect clients often have none
+        // loaded, and that used to drop the entire footer (tok/s, TTFT, etc.).
+        guard let modelName = loadedModelName else { return nil }
+
+        let localModel = ModelListViewModel.shared.currentModel
+        #if os(iOS)
+        let modelId = localModel?.id
+            ?? activeConnectModelId
+            ?? (isUsingConnect ? "connect" : "unknown")
+        let frameworkFallback = localModel?.framework.wireString
+            ?? activeConnectFramework
+            ?? selectedFramework?.wireString
+            ?? (isUsingConnect ? "connect" : "unknown")
+        #else
+        let modelId = localModel?.id ?? "unknown"
+        let frameworkFallback = localModel?.framework.wireString
+            ?? selectedFramework?.wireString
+            ?? "unknown"
+        #endif
 
         return buildMessageAnalytics(
             result: result,
             messageId: messageId,
             conversationId: conversationId,
+            modelId: modelId,
             modelName: modelName,
-            currentModel: currentModel,
+            framework: result.framework.isEmpty ? frameworkFallback : result.framework,
             wasInterrupted: wasInterrupted,
             options: options
         )
@@ -36,53 +53,57 @@ extension LLMViewModel {
 
     // swiftlint:disable:next function_parameter_count
     func buildMessageAnalytics(
-        result: GenerationResult,
+        result: RALLMGenerationResult,
         messageId: String,
         conversationId: String,
+        modelId: String,
         modelName: String,
-        currentModel: RAModelInfo,
+        framework: String,
         wasInterrupted: Bool,
-        options: LlmOptions
+        options: RALLMGenerationOptions
     ) -> MessageAnalytics {
         let completionStatus: MessageAnalytics.CompletionStatus = wasInterrupted ? .interrupted : .complete
         let generationParameters = MessageAnalytics.GenerationParameters(
             temperature: Double(options.temperature),
-            maxTokens: options.maxOutputTokens,
+            maxTokens: Int(options.maxTokens),
             topP: nil,
             topK: nil
         )
         // Prefer the TTFT carried on the result (streaming sets it); fall back
         // to the value recorded from the SDK's first-token event. Mirrors
         // Android ChatViewModel.buildStats.
-        let ttftMs = result.timeToFirstTokenMs > 0 ? Double(result.timeToFirstTokenMs) : activeGenerationTTFTMs
-        // GenerationResult reports throughput, not elapsed time, so the decode
-        // duration is recovered from tokens ÷ tokens-per-second.
-        let generationSeconds = result.tokensPerSecond > 0
-            ? Double(result.outputTokens) / Double(result.tokensPerSecond)
-            : 0
+        let ttftMs = result.timeToFirstTokenMs ?? activeGenerationTTFTMs
+        // Mirror Android: derive tok/s from tokens/time when the result omits it.
+        let tokensPerSecond: Double = {
+            if result.tokensPerSecond > 0 { return result.tokensPerSecond }
+            let totalMs = result.latencyMs
+            let tokens = result.tokensUsed
+            guard totalMs > 0, tokens > 0 else { return 0 }
+            return Double(tokens) * 1000.0 / totalMs
+        }()
 
         return MessageAnalytics(
             messageId: messageId,
             conversationId: conversationId,
-            modelId: currentModel.id,
+            modelId: modelId,
             modelName: modelName,
-            framework: currentModel.framework.wireString,
+            framework: framework,
             timestamp: Date(),
             timeToFirstToken: ttftMs.map { $0 / 1000.0 },
-            totalGenerationTime: generationSeconds,
+            totalGenerationTime: result.latencyMs / 1000.0,
             thinkingTime: nil,
             responseTime: nil,
-            inputTokens: result.inputTokens,
-            outputTokens: result.outputTokens,
-            thinkingTokens: nil,
-            responseTokens: result.outputTokens,
-            averageTokensPerSecond: Double(result.tokensPerSecond),
+            inputTokens: Int(result.inputTokens),
+            outputTokens: result.tokensUsed,
+            thinkingTokens: result.thinkingTokens > 0 ? Int(result.thinkingTokens) : nil,
+            responseTokens: result.responseTokens > 0 ? Int(result.responseTokens) : result.tokensUsed,
+            averageTokensPerSecond: tokensPerSecond,
             messageLength: result.text.count,
-            wasThinkingMode: result.thinkingText?.isEmpty == false,
+            wasThinkingMode: result.hasThinkingContent,
             wasInterrupted: wasInterrupted,
             retryCount: 0,
             completionStatus: completionStatus,
-            generationMode: useStreaming ? .streaming : .nonStreaming,
+            generationMode: options.streamingEnabled ? .streaming : .nonStreaming,
             generationParameters: generationParameters
         )
     }

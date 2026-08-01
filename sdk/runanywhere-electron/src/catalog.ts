@@ -28,15 +28,41 @@ export interface CatalogEntry {
   sizeMB?: number;
   /** Slow / memory-heavy on a CPU-only build. */
   heavy?: boolean;
+  /**
+   * The weights' licence. NOT all of these are open source — Gemma and Llama
+   * carry use restrictions the user accepts by downloading, so a UI that offers
+   * the model must be able to say which licence applies and link to it.
+   */
+  license?: string;
+  licenseUrl?: string;
+  /**
+   * The turn markup this model was trained on. Getting it wrong makes a model
+   * ignore the conversation and answer as if every turn were the first.
+   */
+  chatTemplate?: 'chatml' | 'llama3' | 'gemma' | 'mistral';
 }
+
+/** Licences used by the catalog, so a UI can show terms before downloading. */
+export const LICENSES: Record<string, { name: string; url: string }> = {
+  apache2: { name: 'Apache 2.0', url: 'https://www.apache.org/licenses/LICENSE-2.0' },
+  mit: { name: 'MIT', url: 'https://opensource.org/license/mit' },
+  gemma: { name: 'Gemma Terms of Use', url: 'https://ai.google.dev/gemma/terms' },
+  llama32: { name: 'Llama 3.2 Community License', url: 'https://github.com/meta-llama/llama-models/blob/main/models/llama3_2/LICENSE' },
+  nvidiaOpen: { name: 'NVIDIA Open Model License', url: 'https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/' },
+};
 
 const HF = 'https://huggingface.co';
 const K2 = 'https://github.com/k2-fsa/sherpa-onnx/releases/download';
 
-function llm(repo: string, file: string, label: string, params: string, sizeMB: number, heavy = false): CatalogEntry {
-  return { type: 'llm', files: [{ url: `${HF}/${repo}/resolve/main/${file}`, as: 'model.gguf' }], primary: 'model.gguf', label, params, sizeMB, heavy };
+function llm(repo: string, file: string, label: string, params: string, sizeMB: number, heavy = false,
+             license = 'apache2', chatTemplate: CatalogEntry['chatTemplate'] = 'chatml'): CatalogEntry {
+  const l = LICENSES[license];
+  return { type: 'llm', files: [{ url: `${HF}/${repo}/resolve/main/${file}`, as: 'model.gguf' }],
+           primary: 'model.gguf', label, params, sizeMB, heavy, license: l && l.name, licenseUrl: l && l.url, chatTemplate };
 }
-function vlm(repo: string, file: string, mm: string, label: string, params: string, sizeMB: number, heavy = false): CatalogEntry {
+function vlm(repo: string, file: string, mm: string, label: string, params: string, sizeMB: number, heavy = false,
+             license = 'apache2', chatTemplate: CatalogEntry['chatTemplate'] = 'chatml'): CatalogEntry {
+  const l = LICENSES[license];
   return {
     type: 'vlm',
     files: [
@@ -44,6 +70,7 @@ function vlm(repo: string, file: string, mm: string, label: string, params: stri
       { url: `${HF}/${repo}/resolve/main/${mm}`, as: 'mmproj.gguf' },
     ],
     primary: 'model.gguf', mmproj: 'mmproj.gguf', label, params, sizeMB, heavy,
+    license: l && l.name, licenseUrl: l && l.url, chatTemplate,
   };
 }
 function whisper(size: string, label: string, sizeMB: number): CatalogEntry {
@@ -55,23 +82,31 @@ function piper(voice: string, label: string, sizeMB: number): CatalogEntry {
 
 export const CATALOG: Record<string, CatalogEntry> = {
   // ---- LLMs (GGUF, llama.cpp) ----
-  'smollm2-135m': llm('bartowski/SmolLM2-135M-Instruct-GGUF', 'SmolLM2-135M-Instruct-Q4_K_M.gguf', 'SmolLM2 135M', '135M', 92),
-  'smollm2-360m': llm('bartowski/SmolLM2-360M-Instruct-GGUF', 'SmolLM2-360M-Instruct-Q4_K_M.gguf', 'SmolLM2 360M', '360M', 258),
-  'smollm2-1.7b': llm('bartowski/SmolLM2-1.7B-Instruct-GGUF', 'SmolLM2-1.7B-Instruct-Q4_K_M.gguf', 'SmolLM2 1.7B', '1.7B', 1007),
-  'qwen2.5-0.5b': llm('bartowski/Qwen2.5-0.5B-Instruct-GGUF', 'Qwen2.5-0.5B-Instruct-Q4_K_M.gguf', 'Qwen2.5 0.5B', '0.5B', 398),
-  'qwen2.5-1.5b': llm('bartowski/Qwen2.5-1.5B-Instruct-GGUF', 'Qwen2.5-1.5B-Instruct-Q4_K_M.gguf', 'Qwen2.5 1.5B', '1.5B', 940),
-  'qwen2.5-3b': llm('bartowski/Qwen2.5-3B-Instruct-GGUF', 'Qwen2.5-3B-Instruct-Q4_K_M.gguf', 'Qwen2.5 3B', '3B', 1841, true),
-  'llama-3.2-1b': llm('bartowski/Llama-3.2-1B-Instruct-GGUF', 'Llama-3.2-1B-Instruct-Q4_K_M.gguf', 'Llama 3.2 1B', '1B', 770),
-  'llama-3.2-3b': llm('bartowski/Llama-3.2-3B-Instruct-GGUF', 'Llama-3.2-3B-Instruct-Q4_K_M.gguf', 'Llama 3.2 3B', '3B', 1926, true),
-  'gemma-2-2b': llm('bartowski/gemma-2-2b-it-GGUF', 'gemma-2-2b-it-Q4_K_M.gguf', 'Gemma 2 2B', '2B', 1629, true),
-  'phi-3.5-mini': llm('bartowski/Phi-3.5-mini-instruct-GGUF', 'Phi-3.5-mini-instruct-Q4_K_M.gguf', 'Phi 3.5 mini', '3.8B', 2283, true),
+  // Every URL below was HTTP-verified (200 + "GGUF" magic bytes) on 2026-07-27.
+  // Sizes are the real content-length, not estimates.
+  'qwen3.5-0.8b': llm('unsloth/Qwen3.5-0.8B-GGUF', 'Qwen3.5-0.8B-Q4_K_M.gguf', 'Qwen3.5 0.8B', '0.8B', 508),
+  'lfm2.5-1.2b': llm('LiquidAI/LFM2.5-1.2B-Instruct-GGUF', 'LFM2.5-1.2B-Instruct-Q4_K_M.gguf', 'LFM2.5 1.2B', '1.2B', 697),
+  'qwen3.5-2b': llm('unsloth/Qwen3.5-2B-GGUF', 'Qwen3.5-2B-Q4_K_M.gguf', 'Qwen3.5 2B', '2B', 1222),
+  'llama-3.2-3b': llm('unsloth/Llama-3.2-3B-Instruct-GGUF', 'Llama-3.2-3B-Instruct-Q4_K_M.gguf', 'Llama 3.2 3B', '3B', 1926, true, 'llama32', 'llama3'),
+  'ministral-3-3b': llm('mistralai/Ministral-3-3B-Instruct-2512-GGUF', 'Ministral-3-3B-Instruct-2512-Q4_K_M.gguf', 'Ministral 3 3B', '3B', 2048, true, 'apache2', 'mistral'),
+  'phi-4-mini': llm('unsloth/Phi-4-mini-instruct-GGUF', 'Phi-4-mini-instruct-Q4_K_M.gguf', 'Phi-4 mini', '3.8B', 2376, true),
+  'qwen3.5-4b': llm('unsloth/Qwen3.5-4B-GGUF', 'Qwen3.5-4B-Q4_K_M.gguf', 'Qwen3.5 4B', '4B', 2614, true),
+  'nemotron3-nano-4b': llm('nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF', 'NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf', 'Nemotron 3 Nano 4B', '4B', 2706, true, 'nvidiaOpen'),
+  'gemma-4-e2b': llm('unsloth/gemma-4-E2B-it-GGUF', 'gemma-4-E2B-it-Q4_K_M.gguf', 'Gemma 4 E2B', '2B eff.', 2963, true, 'gemma', 'gemma'),
+  'gemma-4-e4b': llm('unsloth/gemma-4-E4B-it-GGUF', 'gemma-4-E4B-it-Q4_K_M.gguf', 'Gemma 4 E4B', '4B eff.', 4747, true, 'gemma', 'gemma'),
+  'qwen3.5-9b': llm('unsloth/Qwen3.5-9B-GGUF', 'Qwen3.5-9B-Q4_K_M.gguf', 'Qwen3.5 9B', '9B', 5417, true),
+  // Reasoning / thinking variant — emits <think>…</think>, which the app splits out.
+  'lfm2.5-1.2b-thinking': llm('LiquidAI/LFM2.5-1.2B-Thinking-GGUF', 'LFM2.5-1.2B-Thinking-Q4_K_M.gguf', 'LFM2.5 1.2B Thinking', '1.2B', 697),
 
   // ---- VLMs (GGUF + mmproj, llama.cpp mtmd) ----
-  'smolvlm-256m': vlm('ggml-org/SmolVLM-256M-Instruct-GGUF', 'SmolVLM-256M-Instruct-Q8_0.gguf', 'mmproj-SmolVLM-256M-Instruct-Q8_0.gguf', 'SmolVLM 256M', '256M', 300),
-  'smolvlm-500m': vlm('ggml-org/SmolVLM-500M-Instruct-GGUF', 'SmolVLM-500M-Instruct-Q8_0.gguf', 'mmproj-SmolVLM-500M-Instruct-Q8_0.gguf', 'SmolVLM 500M', '500M', 521),
-  'smolvlm-2.2b': vlm('ggml-org/SmolVLM-Instruct-GGUF', 'SmolVLM-Instruct-Q8_0.gguf', 'mmproj-SmolVLM-Instruct-Q8_0.gguf', 'SmolVLM 2.2B', '2.2B', 2402, true),
-  'smolvlm2-500m': vlm('ggml-org/SmolVLM2-500M-Video-Instruct-GGUF', 'SmolVLM2-500M-Video-Instruct-Q8_0.gguf', 'mmproj-SmolVLM2-500M-Video-Instruct-Q8_0.gguf', 'SmolVLM2 500M (video)', '500M', 521),
-  'qwen2-vl-2b': vlm('ggml-org/Qwen2-VL-2B-Instruct-GGUF', 'Qwen2-VL-2B-Instruct-Q8_0.gguf', 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf', 'Qwen2-VL 2B', '2B', 2247, true),
+  // The Qwen3.5 / Gemma 4 repos ship the projector alongside the model, so the
+  // vision entries reuse the same repo with its mmproj.
+  'qwen3.5-0.8b-vl': vlm('unsloth/Qwen3.5-0.8B-GGUF', 'Qwen3.5-0.8B-Q4_K_M.gguf', 'mmproj-F16.gguf', 'Qwen3.5 0.8B Vision', '0.8B', 738),
+  'lfm2.5-vl-1.6b': vlm('LiquidAI/LFM2.5-VL-1.6B-GGUF', 'LFM2.5-VL-1.6B-Q4_K_M.gguf', 'mmproj-LFM2.5-VL-1.6b-F16.gguf', 'LFM2.5 VL 1.6B', '1.6B', 1585),
+  'qwen3.5-2b-vl': vlm('unsloth/Qwen3.5-2B-GGUF', 'Qwen3.5-2B-Q4_K_M.gguf', 'mmproj-F16.gguf', 'Qwen3.5 2B Vision', '2B', 1949, true),
+  'qwen3.5-4b-vl': vlm('unsloth/Qwen3.5-4B-GGUF', 'Qwen3.5-4B-Q4_K_M.gguf', 'mmproj-F16.gguf', 'Qwen3.5 4B Vision', '4B', 3413, true),
+  'gemma-4-e2b-vl': vlm('unsloth/gemma-4-E2B-it-GGUF', 'gemma-4-E2B-it-Q4_K_M.gguf', 'mmproj-F16.gguf', 'Gemma 4 E2B Vision', '2B eff.', 4092, true, 'gemma', 'gemma'),
+  'glm-4.6v-flash': vlm('ggml-org/GLM-4.6V-Flash-GGUF', 'GLM-4.6V-Flash-Q4_K_M.gguf', 'mmproj-GLM-4.6V-Flash-Q8_0.gguf', 'GLM-4.6V Flash', '9B', 7147, true),
 
   // ---- Embeddings (ONNX) ----
   minilm: {

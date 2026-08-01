@@ -210,136 +210,167 @@ public nonisolated struct RAChatAttachment: Sendable {
 /// ---------------------------------------------------------------------------
 /// A single message in a chat conversation.
 /// ---------------------------------------------------------------------------
-public nonisolated struct RAChatMessage: Sendable {
+public nonisolated struct RAChatMessage: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Unique identifier for the message (caller-supplied or generated).
   /// Empty = unset (proto3 scalar default).
-  public var id: String = String()
+  public var id: String {
+    get {_storage._id}
+    set {_uniqueStorage()._id = newValue}
+  }
 
   /// Role (user / assistant / system / tool).
-  public var role: RAMessageRole = .unspecified
+  public var role: RAMessageRole {
+    get {_storage._role}
+    set {_uniqueStorage()._role = newValue}
+  }
 
   /// Message text content. May be empty for messages that only carry tool
   /// calls (assistant role) or tool results (tool role).
-  public var content: String = String()
+  public var content: String {
+    get {_storage._content}
+    set {_uniqueStorage()._content = newValue}
+  }
 
   /// Wall-clock timestamp the message was authored, in microseconds since
   /// Unix epoch. 0 = unset; consumers may stamp at receive-time.
-  public var timestampUs: Int64 = 0
+  public var timestampUs: Int64 {
+    get {_storage._timestampUs}
+    set {_uniqueStorage()._timestampUs = newValue}
+  }
 
   /// Optional human-readable display name. Used by some chat UIs to
   /// distinguish multiple users in a multi-party conversation.
   public var name: String {
-    get {_name ?? String()}
-    set {_name = newValue}
+    get {_storage._name ?? String()}
+    set {_uniqueStorage()._name = newValue}
   }
   /// Returns true if `name` has been explicitly set.
-  public var hasName: Bool {self._name != nil}
+  public var hasName: Bool {_storage._name != nil}
   /// Clears the value of `name`. Subsequent reads from it will return its default value.
-  public mutating func clearName() {self._name = nil}
+  public mutating func clearName() {_uniqueStorage()._name = nil}
 
   /// Optional tool-call ID this message is responding to (only set when
   /// role == MESSAGE_ROLE_TOOL).
   public var toolCallID: String {
-    get {_toolCallID ?? String()}
-    set {_toolCallID = newValue}
+    get {_storage._toolCallID ?? String()}
+    set {_uniqueStorage()._toolCallID = newValue}
   }
   /// Returns true if `toolCallID` has been explicitly set.
-  public var hasToolCallID: Bool {self._toolCallID != nil}
+  public var hasToolCallID: Bool {_storage._toolCallID != nil}
   /// Clears the value of `toolCallID`. Subsequent reads from it will return its default value.
-  public mutating func clearToolCallID() {self._toolCallID = nil}
+  public mutating func clearToolCallID() {_uniqueStorage()._toolCallID = nil}
 
   /// Typed tool calls embedded in this assistant message.
-  public var toolCalls: [RAToolCall] = []
+  public var toolCalls: [RAToolCall] {
+    get {_storage._toolCalls}
+    set {_uniqueStorage()._toolCalls = newValue}
+  }
 
   /// Typed tool result carried by role == MESSAGE_ROLE_TOOL messages.
   public var toolResult: RAToolResult {
-    get {_toolResult ?? RAToolResult()}
-    set {_toolResult = newValue}
+    get {_storage._toolResult ?? RAToolResult()}
+    set {_uniqueStorage()._toolResult = newValue}
   }
   /// Returns true if `toolResult` has been explicitly set.
-  public var hasToolResult: Bool {self._toolResult != nil}
+  public var hasToolResult: Bool {_storage._toolResult != nil}
   /// Clears the value of `toolResult`. Subsequent reads from it will return its default value.
-  public mutating func clearToolResult() {self._toolResult = nil}
+  public mutating func clearToolResult() {_uniqueStorage()._toolResult = nil}
 
   /// Optional threading and delivery metadata.
   public var parentID: String {
-    get {_parentID ?? String()}
-    set {_parentID = newValue}
+    get {_storage._parentID ?? String()}
+    set {_uniqueStorage()._parentID = newValue}
   }
   /// Returns true if `parentID` has been explicitly set.
-  public var hasParentID: Bool {self._parentID != nil}
+  public var hasParentID: Bool {_storage._parentID != nil}
   /// Clears the value of `parentID`. Subsequent reads from it will return its default value.
-  public mutating func clearParentID() {self._parentID = nil}
+  public mutating func clearParentID() {_uniqueStorage()._parentID = nil}
 
-  public var status: RAChatMessageStatus = .unspecified
+  public var status: RAChatMessageStatus {
+    get {_storage._status}
+    set {_uniqueStorage()._status = newValue}
+  }
 
   public var errorMessage: String {
-    get {_errorMessage ?? String()}
-    set {_errorMessage = newValue}
+    get {_storage._errorMessage ?? String()}
+    set {_uniqueStorage()._errorMessage = newValue}
   }
   /// Returns true if `errorMessage` has been explicitly set.
-  public var hasErrorMessage: Bool {self._errorMessage != nil}
+  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
   /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
-  public mutating func clearErrorMessage() {self._errorMessage = nil}
+  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
 
-  public var metadata: Dictionary<String,String> = [:]
+  public var metadata: Dictionary<String,String> {
+    get {_storage._metadata}
+    set {_uniqueStorage()._metadata = newValue}
+  }
 
   /// Opaque attachments normalized by platform adapters. Capture, picker,
   /// and permission flows remain native/Web-owned.
-  public var attachments: [RAChatAttachment] = []
+  public var attachments: [RAChatAttachment] {
+    get {_storage._attachments}
+    set {_uniqueStorage()._attachments = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _name: String? = nil
-  fileprivate var _toolCallID: String? = nil
-  fileprivate var _toolResult: RAToolResult? = nil
-  fileprivate var _parentID: String? = nil
-  fileprivate var _errorMessage: String? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-public nonisolated struct RAChatGenerationRequest: Sendable {
+public nonisolated struct RAChatGenerationRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var requestID: String = String()
+  public var requestID: String {
+    get {_storage._requestID}
+    set {_uniqueStorage()._requestID = newValue}
+  }
 
-  public var conversationID: String = String()
+  public var conversationID: String {
+    get {_storage._conversationID}
+    set {_uniqueStorage()._conversationID = newValue}
+  }
 
-  public var messages: [RAChatMessage] = []
+  public var messages: [RAChatMessage] {
+    get {_storage._messages}
+    set {_uniqueStorage()._messages = newValue}
+  }
 
   public var options: RALLMGenerationOptions {
-    get {_options ?? RALLMGenerationOptions()}
-    set {_options = newValue}
+    get {_storage._options ?? RALLMGenerationOptions()}
+    set {_uniqueStorage()._options = newValue}
   }
   /// Returns true if `options` has been explicitly set.
-  public var hasOptions: Bool {self._options != nil}
+  public var hasOptions: Bool {_storage._options != nil}
   /// Clears the value of `options`. Subsequent reads from it will return its default value.
-  public mutating func clearOptions() {self._options = nil}
+  public mutating func clearOptions() {_uniqueStorage()._options = nil}
 
   public var toolCalling: RAToolCallingOptions {
-    get {_toolCalling ?? RAToolCallingOptions()}
-    set {_toolCalling = newValue}
+    get {_storage._toolCalling ?? RAToolCallingOptions()}
+    set {_uniqueStorage()._toolCalling = newValue}
   }
   /// Returns true if `toolCalling` has been explicitly set.
-  public var hasToolCalling: Bool {self._toolCalling != nil}
+  public var hasToolCalling: Bool {_storage._toolCalling != nil}
   /// Clears the value of `toolCalling`. Subsequent reads from it will return its default value.
-  public mutating func clearToolCalling() {self._toolCalling = nil}
+  public mutating func clearToolCalling() {_uniqueStorage()._toolCalling = nil}
 
-  public var metadata: Dictionary<String,String> = [:]
+  public var metadata: Dictionary<String,String> {
+    get {_storage._metadata}
+    set {_uniqueStorage()._metadata = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _options: RALLMGenerationOptions? = nil
-  fileprivate var _toolCalling: RAToolCallingOptions? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -452,91 +483,151 @@ nonisolated extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._Messa
   public static let protoMessageName: String = _protobuf_package + ".ChatMessage"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}role\0\u{1}content\0\u{3}timestamp_us\0\u{1}name\0\u{4}\u{2}tool_call_id\0\u{3}tool_calls\0\u{3}tool_result\0\u{3}parent_id\0\u{1}status\0\u{3}error_message\0\u{1}metadata\0\u{1}attachments\0")
 
+  fileprivate class _StorageClass {
+    var _id: String = String()
+    var _role: RAMessageRole = .unspecified
+    var _content: String = String()
+    var _timestampUs: Int64 = 0
+    var _name: String? = nil
+    var _toolCallID: String? = nil
+    var _toolCalls: [RAToolCall] = []
+    var _toolResult: RAToolResult? = nil
+    var _parentID: String? = nil
+    var _status: RAChatMessageStatus = .unspecified
+    var _errorMessage: String? = nil
+    var _metadata: Dictionary<String,String> = [:]
+    var _attachments: [RAChatAttachment] = []
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _id = source._id
+      _role = source._role
+      _content = source._content
+      _timestampUs = source._timestampUs
+      _name = source._name
+      _toolCallID = source._toolCallID
+      _toolCalls = source._toolCalls
+      _toolResult = source._toolResult
+      _parentID = source._parentID
+      _status = source._status
+      _errorMessage = source._errorMessage
+      _metadata = source._metadata
+      _attachments = source._attachments
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.role) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self.content) }()
-      case 4: try { try decoder.decodeSingularInt64Field(value: &self.timestampUs) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._name) }()
-      case 7: try { try decoder.decodeSingularStringField(value: &self._toolCallID) }()
-      case 8: try { try decoder.decodeRepeatedMessageField(value: &self.toolCalls) }()
-      case 9: try { try decoder.decodeSingularMessageField(value: &self._toolResult) }()
-      case 10: try { try decoder.decodeSingularStringField(value: &self._parentID) }()
-      case 11: try { try decoder.decodeSingularEnumField(value: &self.status) }()
-      case 12: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
-      case 13: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
-      case 14: try { try decoder.decodeRepeatedMessageField(value: &self.attachments) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._id) }()
+        case 2: try { try decoder.decodeSingularEnumField(value: &_storage._role) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._content) }()
+        case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._toolCallID) }()
+        case 8: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolCalls) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._toolResult) }()
+        case 10: try { try decoder.decodeSingularStringField(value: &_storage._parentID) }()
+        case 11: try { try decoder.decodeSingularEnumField(value: &_storage._status) }()
+        case 12: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
+        case 13: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._metadata) }()
+        case 14: try { try decoder.decodeRepeatedMessageField(value: &_storage._attachments) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.id.isEmpty {
-      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
-    }
-    if self.role != .unspecified {
-      try visitor.visitSingularEnumField(value: self.role, fieldNumber: 2)
-    }
-    if !self.content.isEmpty {
-      try visitor.visitSingularStringField(value: self.content, fieldNumber: 3)
-    }
-    if self.timestampUs != 0 {
-      try visitor.visitSingularInt64Field(value: self.timestampUs, fieldNumber: 4)
-    }
-    try { if let v = self._name {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
-    try { if let v = self._toolCallID {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
-    } }()
-    if !self.toolCalls.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.toolCalls, fieldNumber: 8)
-    }
-    try { if let v = self._toolResult {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-    } }()
-    try { if let v = self._parentID {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
-    } }()
-    if self.status != .unspecified {
-      try visitor.visitSingularEnumField(value: self.status, fieldNumber: 11)
-    }
-    try { if let v = self._errorMessage {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 12)
-    } }()
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 13)
-    }
-    if !self.attachments.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.attachments, fieldNumber: 14)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._id.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._id, fieldNumber: 1)
+      }
+      if _storage._role != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._role, fieldNumber: 2)
+      }
+      if !_storage._content.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._content, fieldNumber: 3)
+      }
+      if _storage._timestampUs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 4)
+      }
+      try { if let v = _storage._name {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._toolCallID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+      } }()
+      if !_storage._toolCalls.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._toolCalls, fieldNumber: 8)
+      }
+      try { if let v = _storage._toolResult {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+      try { if let v = _storage._parentID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+      } }()
+      if _storage._status != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._status, fieldNumber: 11)
+      }
+      try { if let v = _storage._errorMessage {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 12)
+      } }()
+      if !_storage._metadata.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._metadata, fieldNumber: 13)
+      }
+      if !_storage._attachments.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._attachments, fieldNumber: 14)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAChatMessage, rhs: RAChatMessage) -> Bool {
-    if lhs.id != rhs.id {return false}
-    if lhs.role != rhs.role {return false}
-    if lhs.content != rhs.content {return false}
-    if lhs.timestampUs != rhs.timestampUs {return false}
-    if lhs._name != rhs._name {return false}
-    if lhs._toolCallID != rhs._toolCallID {return false}
-    if lhs.toolCalls != rhs.toolCalls {return false}
-    if lhs._toolResult != rhs._toolResult {return false}
-    if lhs._parentID != rhs._parentID {return false}
-    if lhs.status != rhs.status {return false}
-    if lhs._errorMessage != rhs._errorMessage {return false}
-    if lhs.metadata != rhs.metadata {return false}
-    if lhs.attachments != rhs.attachments {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._id != rhs_storage._id {return false}
+        if _storage._role != rhs_storage._role {return false}
+        if _storage._content != rhs_storage._content {return false}
+        if _storage._timestampUs != rhs_storage._timestampUs {return false}
+        if _storage._name != rhs_storage._name {return false}
+        if _storage._toolCallID != rhs_storage._toolCallID {return false}
+        if _storage._toolCalls != rhs_storage._toolCalls {return false}
+        if _storage._toolResult != rhs_storage._toolResult {return false}
+        if _storage._parentID != rhs_storage._parentID {return false}
+        if _storage._status != rhs_storage._status {return false}
+        if _storage._errorMessage != rhs_storage._errorMessage {return false}
+        if _storage._metadata != rhs_storage._metadata {return false}
+        if _storage._attachments != rhs_storage._attachments {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -546,56 +637,102 @@ nonisolated extension RAChatGenerationRequest: SwiftProtobuf.Message, SwiftProto
   public static let protoMessageName: String = _protobuf_package + ".ChatGenerationRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}conversation_id\0\u{1}messages\0\u{1}options\0\u{3}tool_calling\0\u{1}metadata\0")
 
+  fileprivate class _StorageClass {
+    var _requestID: String = String()
+    var _conversationID: String = String()
+    var _messages: [RAChatMessage] = []
+    var _options: RALLMGenerationOptions? = nil
+    var _toolCalling: RAToolCallingOptions? = nil
+    var _metadata: Dictionary<String,String> = [:]
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _requestID = source._requestID
+      _conversationID = source._conversationID
+      _messages = source._messages
+      _options = source._options
+      _toolCalling = source._toolCalling
+      _metadata = source._metadata
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.conversationID) }()
-      case 3: try { try decoder.decodeRepeatedMessageField(value: &self.messages) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._options) }()
-      case 5: try { try decoder.decodeSingularMessageField(value: &self._toolCalling) }()
-      case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._conversationID) }()
+        case 3: try { try decoder.decodeRepeatedMessageField(value: &_storage._messages) }()
+        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._options) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._toolCalling) }()
+        case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._metadata) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.requestID.isEmpty {
-      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
-    }
-    if !self.conversationID.isEmpty {
-      try visitor.visitSingularStringField(value: self.conversationID, fieldNumber: 2)
-    }
-    if !self.messages.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.messages, fieldNumber: 3)
-    }
-    try { if let v = self._options {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._toolCalling {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-    } }()
-    if !self.metadata.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 6)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._requestID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 1)
+      }
+      if !_storage._conversationID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._conversationID, fieldNumber: 2)
+      }
+      if !_storage._messages.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._messages, fieldNumber: 3)
+      }
+      try { if let v = _storage._options {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      } }()
+      try { if let v = _storage._toolCalling {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
+      if !_storage._metadata.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._metadata, fieldNumber: 6)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAChatGenerationRequest, rhs: RAChatGenerationRequest) -> Bool {
-    if lhs.requestID != rhs.requestID {return false}
-    if lhs.conversationID != rhs.conversationID {return false}
-    if lhs.messages != rhs.messages {return false}
-    if lhs._options != rhs._options {return false}
-    if lhs._toolCalling != rhs._toolCalling {return false}
-    if lhs.metadata != rhs.metadata {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._requestID != rhs_storage._requestID {return false}
+        if _storage._conversationID != rhs_storage._conversationID {return false}
+        if _storage._messages != rhs_storage._messages {return false}
+        if _storage._options != rhs_storage._options {return false}
+        if _storage._toolCalling != rhs_storage._toolCalling {return false}
+        if _storage._metadata != rhs_storage._metadata {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

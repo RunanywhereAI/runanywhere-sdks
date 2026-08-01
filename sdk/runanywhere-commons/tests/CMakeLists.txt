@@ -63,6 +63,31 @@ function(rac_test_define_have_solutions target)
     endif()
 endfunction()
 
+# --- Connect role policy + transport-independent handshake -----------------
+# Covers the shared contract used by Swift, Kotlin, Flutter, and React Native:
+# role admission, protocol negotiation, model adoption, and reconnect
+# deduplication. Platform discovery/socket adapters are tested in their SDKs.
+add_executable(test_connect_proto_abi test_connect_proto_abi.cpp)
+target_include_directories(test_connect_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_connect_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_connect_proto_abi)
+target_compile_features(test_connect_proto_abi PRIVATE cxx_std_20)
+rac_test_define_have_protobuf(test_connect_proto_abi)
+add_test(NAME connect_proto_abi_tests COMMAND test_connect_proto_abi)
+
+add_executable(test_connect_transport_registry test_connect_transport_registry.cpp)
+target_include_directories(test_connect_transport_registry PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_connect_transport_registry PRIVATE rac_commons)
+rac_link_archive_deps(test_connect_transport_registry)
+target_compile_features(test_connect_transport_registry PRIVATE cxx_std_20)
+add_test(NAME connect_transport_registry_tests COMMAND test_connect_transport_registry)
+
 set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 
 # Tests may need access to commons private headers (e.g. the internal
@@ -356,6 +381,37 @@ rac_link_archive_deps(test_tool_calling_run_loop)
 target_compile_features(test_tool_calling_run_loop PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_run_loop)
 add_test(NAME tool_calling_run_loop_tests COMMAND test_tool_calling_run_loop)
+
+# --- TC-1: tool-call grammar derivation --------------------------------
+# Pure-function test over build_tool_call_grammar() (no mock LLM plugin
+# needed): verifies the GBNF/qhexrt dialect content per tool_choice policy.
+add_executable(test_tool_calling_grammar test_tool_calling_grammar.cpp)
+target_include_directories(test_tool_calling_grammar PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+)
+target_link_libraries(test_tool_calling_grammar PRIVATE rac_commons)
+rac_link_archive_deps(test_tool_calling_grammar)
+target_compile_features(test_tool_calling_grammar PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tool_calling_grammar)
+add_test(NAME tool_calling_grammar_tests COMMAND test_tool_calling_grammar)
+
+# --- AG-2: declarative AgentLoop -> real tool run-loop wiring ----------
+# Verifies expand_agent_loop emits the agent_loop operator (tool params
+# consumed) for tools-bearing configs and generate_text otherwise.
+add_executable(test_agent_loop_converter test_agent_loop_converter.cpp)
+target_include_directories(test_agent_loop_converter PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+)
+target_link_libraries(test_agent_loop_converter PRIVATE rac_commons)
+rac_link_archive_deps(test_agent_loop_converter)
+target_compile_features(test_agent_loop_converter PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_agent_loop_converter)
+add_test(NAME agent_loop_converter_tests COMMAND test_agent_loop_converter)
 
 # --- tool-calling cancel ABI concurrency regression -----------
 # Covers the run_loop_with_handle / run_loop_cancel / session_cancel C

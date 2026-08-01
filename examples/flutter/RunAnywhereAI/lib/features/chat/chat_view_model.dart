@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere.dart'
+    show ToolCallingOptions, ToolCallFormatName;
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
@@ -102,23 +104,22 @@ class ChatViewModel extends ChangeNotifier {
   String? _loadedModelName;
   sdk.InferenceFramework? _loadedFramework;
   bool _loadedModelSupportsThinking = false;
-  sdk.ThinkingTagPattern? _loadedModelThinkingPattern;
   bool _loadedModelSupportsLora = false;
 
   String? get loadedModelName => _loadedModelName;
   sdk.InferenceFramework? get loadedFramework => _loadedFramework;
   bool get loadedModelSupportsLora => _loadedModelSupportsLora;
-  bool get isModelLoaded => _loadedModelId != null;
+  bool get isModelLoaded => sdk.RunAnywhere.llm.isLoaded;
 
   // --- LoRA adapter state ---------------------------------------------------
 
   List<sdk.LoraAdapterCatalogEntry> _availableAdapters = [];
-  List<sdk.AppliedAdapter> _loraAdapters = [];
+  List<sdk.LoRAAdapterInfo> _loraAdapters = [];
   bool _isLoadingLoRA = false;
 
   List<sdk.LoraAdapterCatalogEntry> get availableAdapters =>
       List.unmodifiable(_availableAdapters);
-  List<sdk.AppliedAdapter> get loraAdapters =>
+  List<sdk.LoRAAdapterInfo> get loraAdapters =>
       List.unmodifiable(_loraAdapters);
   bool get isLoadingLoRA => _isLoadingLoRA;
 
@@ -127,7 +128,7 @@ class ChatViewModel extends ChangeNotifier {
   Conversation? _currentConversation;
   DateTime? _generationStartTime;
   double? _timeToFirstToken;
-  StreamSubscription<sdk.SdkEvent>? _lifecycleSubscription;
+  StreamSubscription<sdk.ModelLifecycleChange>? _lifecycleSubscription;
   bool _initialized = false;
 
   // --- Lifecycle ------------------------------------------------------------
@@ -142,16 +143,23 @@ class ChatViewModel extends ChangeNotifier {
     _useStreaming = prefs.getBool(PreferenceKeys.useStreaming) ?? true;
     notifyListeners();
 
-    // Model lifecycle flows through the SDK event stream.
-    _lifecycleSubscription = sdk.RunAnywhere.events.listen((event) {
-      if (event is sdk.SdkModelLoaded) {
-        if (event.category != sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE) return;
-        if (event.id == _loadedModelId) return;
-        unawaited(syncModelState());
-      } else if (event is sdk.SdkModelUnloaded) {
-        if (_loadedModelId == null) return;
-        unawaited(syncModelState());
+    // Model lifecycle flows through the SDK event bus (iOS parity:
+    // LLMViewModel.subscribeToModelLifecycle).
+    _lifecycleSubscription = sdk.RunAnywhere.events.modelLifecycle.listen((
+      change,
+    ) {
+      // iOS parity (LLMViewModel.handleModelLifecycle): only react to LLM
+      // component changes and ignore lifecycle events for other modalities.
+      if (change.component != sdk.SDKComponent.SDK_COMPONENT_LLM &&
+          change.event.category != sdk.EventCategory.EVENT_CATEGORY_LLM) {
+        return;
       }
+      // Re-sync only on an actual transition; duplicate loaded/unloaded
+      // events carry no new snapshot state.
+      final loaded = change.kind == sdk.ModelLifecycleChangeKind.loaded;
+      if (loaded && change.modelId == _loadedModelId) return;
+      if (!loaded && _loadedModelId == null) return;
+      unawaited(syncModelState());
     });
 
     // Reconcile against the SDK's authoritative snapshot in case a model
@@ -163,22 +171,22 @@ class ChatViewModel extends ChangeNotifier {
   void dispose() {
     unawaited(_lifecycleSubscription?.cancel());
     if (_isGenerating) {
-      sdk.RunAnywhere.llm.cancel();
+      _cancelActiveGeneration();
     }
     super.dispose();
   }
 
+  void _cancelActiveGeneration() {
+    sdk.RunAnywhere.llm.cancelGeneration();
+  }
+
   /// Sync loaded-model state from the SDK snapshot.
   Future<void> syncModelState() async {
-    final state = await sdk.RunAnywhere.models.state();
-    final model = state.loaded[sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE];
+    final model = await sdk.RunAnywhere.llm.currentModel();
     _loadedModelId = model?.id;
     _loadedModelName = model?.name;
     _loadedFramework = model?.framework;
     _loadedModelSupportsThinking = model?.supportsThinking ?? false;
-    _loadedModelThinkingPattern = (model != null && model.hasThinkingPattern())
-        ? model.thinkingPattern
-        : null;
     _loadedModelSupportsLora = model?.supportsLora ?? false;
     notifyListeners();
 
@@ -195,7 +203,7 @@ class ChatViewModel extends ChangeNotifier {
   // --- Sending --------------------------------------------------------------
 
   bool canSend(String text) =>
-      text.isNotEmpty && !_isGenerating && _loadedModelId != null;
+      text.isNotEmpty && !_isGenerating && isModelLoaded;
 
   void clearError() {
     _errorMessage = null;
@@ -233,9 +241,11 @@ class ChatViewModel extends ChangeNotifier {
           prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
       final thinkingModeEnabled =
           prefs.getBool(PreferenceKeys.thinkingModeEnabled) ?? true;
+      final disableThinking =
+          _loadedModelSupportsThinking && !thinkingModeEnabled;
 
       debugPrint(
-        '[PARAMS] App sendMessage: temperature=$temperature, maxOutputTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)',
+        '[PARAMS] App sendMessage: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=set(${systemPrompt.length} chars)',
       );
 
       final toolSettings = ToolSettingsViewModel.shared;
@@ -243,20 +253,27 @@ class ChatViewModel extends ChangeNotifier {
           toolSettings.toolCallingEnabled &&
           toolSettings.registeredTools.isNotEmpty;
 
-      final options = sdk.LlmOptions(
-        maxOutputTokens: maxTokens,
-        temperature: temperature,
-        systemPrompt: systemPrompt.isEmpty ? null : systemPrompt,
-        reasoning: _reasoningOptions(thinkingModeEnabled),
-        maxToolCalls: 3,
-      );
-
       if (useToolCalling) {
-        await _generateWithToolCalling(userMessage, options);
-      } else if (_useStreaming) {
-        await _generateStreaming(userMessage, options);
+        await _generateWithToolCalling(
+          userMessage,
+          maxTokens,
+          temperature,
+          systemPrompt,
+          disableThinking,
+        );
       } else {
-        await _generateNonStreaming(userMessage, options);
+        final options = sdk.LLMGenerationOptions(
+          maxTokens: maxTokens,
+          temperature: temperature,
+          systemPrompt: systemPrompt,
+          disableThinking: disableThinking,
+        );
+
+        if (_useStreaming) {
+          await _generateStreaming(userMessage, options);
+        } else {
+          await _generateNonStreaming(userMessage, options);
+        }
       }
     } catch (e) {
       _errorMessage = 'Generation failed: $e';
@@ -267,7 +284,7 @@ class ChatViewModel extends ChangeNotifier {
 
   /// Stop the in-flight generation (mirrors iOS `stopGeneration`).
   void stopGeneration() {
-    sdk.RunAnywhere.llm.cancel();
+    sdk.RunAnywhere.llm.cancelGeneration();
     _isGenerating = false;
     notifyListeners();
   }
@@ -276,7 +293,7 @@ class ChatViewModel extends ChangeNotifier {
   /// message, iOS parity).
   void clearChat() {
     if (_isGenerating) {
-      sdk.RunAnywhere.llm.cancel();
+      _cancelActiveGeneration();
     }
     _messages.clear();
     _errorMessage = null;
@@ -288,7 +305,7 @@ class ChatViewModel extends ChangeNotifier {
   /// Restore a persisted conversation into the chat.
   void loadConversation(Conversation conversation) {
     if (_isGenerating) {
-      sdk.RunAnywhere.llm.cancel();
+      _cancelActiveGeneration();
       _isGenerating = false;
     }
     _currentConversation = conversation;
@@ -301,33 +318,53 @@ class ChatViewModel extends ChangeNotifier {
 
   // --- Generation paths -----------------------------------------------------
 
-  /// Only thinking-capable models get a reasoning config — the runtime's
-  /// no-think prefill leaks as literal text on non-thinking models. Thought
-  /// tokens only emit when includeInOutput is set, so the "show thinking"
-  /// toggle maps to it (Android/iOS example parity).
-  sdk.ReasoningOptions? _reasoningOptions(bool thinkingModeEnabled) {
-    if (!_loadedModelSupportsThinking) return null;
-    if (!thinkingModeEnabled) {
-      return const sdk.ReasoningOptions(
-        mode: sdk.ReasoningMode.REASONING_MODE_OFF,
-      );
+  /// Determines the optimal tool calling format based on the model name/ID.
+  /// Different models are trained on different tool calling formats.
+  ToolCallFormatName _detectToolCallFormat(String? modelName) {
+    if (modelName == null) {
+      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
     }
-    return sdk.ReasoningOptions(
-      includeInOutput: true,
-      pattern: _loadedModelThinkingPattern?.openTag,
-    );
+    final name = modelName.toLowerCase();
+
+    // LFM2-Tool models use the LFM2 function-call format:
+    // <|tool_call_start|>[func(args)]<|tool_call_end|>
+    if (name.contains('lfm2') && name.contains('tool')) {
+      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2;
+    }
+
+    // Default JSON format for general-purpose models
+    return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
   }
 
   Future<void> _generateWithToolCalling(
     String prompt,
-    sdk.LlmOptions options,
+    int maxTokens,
+    double temperature,
+    String systemPrompt,
+    bool disableThinking,
   ) async {
     final modelName = _loadedModelName;
+    final format = _detectToolCallFormat(modelName);
+    debugPrint(
+      'Using tool calling with format: ${format.name} for model: ${modelName ?? "unknown"}',
+    );
+
     final assistantMessage = _appendEmptyAssistantMessage();
     final messageIndex = _messages.length - 1;
 
     try {
-      final result = await sdk.RunAnywhere.llm.generate(prompt, options: options);
+      final result = await sdk.RunAnywhere.tools.generateWithTools(
+        prompt,
+        options: ToolCallingOptions(
+          maxToolCalls: 3,
+          autoExecute: true,
+          format: format,
+          maxTokens: maxTokens,
+          temperature: temperature,
+          systemPrompt: systemPrompt,
+          disableThinking: disableThinking,
+        ),
+      );
 
       final totalTime = _elapsedGenerationSeconds();
 
@@ -338,7 +375,7 @@ class ChatViewModel extends ChangeNotifier {
         final lastResult = result.toolResults.isNotEmpty
             ? result.toolResults.last
             : null;
-        final hasError = lastResult != null && lastResult.hasError();
+        final hasError = lastResult != null && lastResult.error.isNotEmpty;
         toolCallInfo = ToolCallInfo(
           toolName: lastCall.name,
           arguments: lastCall.argumentsJson,
@@ -346,7 +383,7 @@ class ChatViewModel extends ChangeNotifier {
               ? lastResult.resultJson
               : null,
           success: lastResult != null && !hasError,
-          error: hasError ? lastResult.error.message : null,
+          error: hasError ? lastResult.error : null,
         );
       }
 
@@ -358,7 +395,7 @@ class ChatViewModel extends ChangeNotifier {
 
       final finalMessage = _messages[messageIndex].copyWith(
         content: result.text,
-        thinkingContent: result.thinkingText,
+        thinkingContent: result.thinkingContent,
         analytics: analytics,
         toolCallInfo: toolCallInfo,
       );
@@ -376,45 +413,33 @@ class ChatViewModel extends ChangeNotifier {
 
   Future<void> _generateStreaming(
     String prompt,
-    sdk.LlmOptions options,
+    sdk.LLMGenerationOptions options,
   ) async {
     final modelName = _loadedModelName;
     final assistantMessage = _appendEmptyAssistantMessage();
     final messageIndex = _messages.length - 1;
 
-    final answer = StringBuffer();
-    final thoughts = StringBuffer();
     try {
-      sdk.GenerationResult? result;
-      await for (final event in sdk.RunAnywhere.llm.generateStream(
-        prompt,
-        options: options,
-      )) {
-        switch (event) {
-          case sdk.GenerationToken(:final text, :final kind):
-            if (_timeToFirstToken == null && _generationStartTime != null) {
-              _timeToFirstToken =
-                  DateTime.now()
-                      .difference(_generationStartTime!)
-                      .inMilliseconds /
-                  1000.0;
-            }
-            if (kind == sdk.TokenKind.thought) {
-              thoughts.write(text);
-            } else {
-              answer.write(text);
-            }
-            _messages[messageIndex] = _messages[messageIndex].copyWith(
-              content: answer.toString(),
-              thinkingContent: thoughts.isEmpty ? null : thoughts.toString(),
-            );
-            notifyListeners();
-          case sdk.GenerationCompleted(result: final completed):
-            result = completed;
-          case sdk.GenerationStarted():
-          case sdk.GenerationToolCall():
-            break;
-        }
+      final result = await sdk.RunAnywhere.aggregateStream(
+        prompt: prompt,
+        events: sdk.RunAnywhere.llm.generateStream(prompt, options),
+        onToken: (aggregated) async {
+          if (_timeToFirstToken == null && _generationStartTime != null) {
+            _timeToFirstToken =
+                DateTime.now()
+                    .difference(_generationStartTime!)
+                    .inMilliseconds /
+                1000.0;
+          }
+          _messages[messageIndex] = _messages[messageIndex].copyWith(
+            content: aggregated,
+          );
+          notifyListeners();
+        },
+      );
+
+      if (result.errorMessage.isNotEmpty) {
+        throw Exception(result.errorMessage);
       }
 
       final analytics = MessageAnalytics(
@@ -422,16 +447,16 @@ class ChatViewModel extends ChangeNotifier {
         modelName: modelName,
         timeToFirstToken: _timeToFirstToken,
         totalGenerationTime: _elapsedGenerationSeconds(),
-        outputTokens: result?.outputTokens ?? 0,
-        tokensPerSecond: result?.tokensPerSecond ?? 0,
-        wasThinkingMode: thoughts.isNotEmpty,
+        outputTokens: result.tokensGenerated,
+        tokensPerSecond: result.tokensPerSecond,
+        wasThinkingMode: result.thinkingContent.isNotEmpty,
       );
 
-      final thinking = result?.thinkingText ??
-          (thoughts.isEmpty ? null : thoughts.toString());
       final finalMessage = _messages[messageIndex].copyWith(
-        content: result?.text ?? answer.toString(),
-        thinkingContent: thinking,
+        content: result.text,
+        thinkingContent: result.thinkingContent.isNotEmpty
+            ? result.thinkingContent
+            : null,
         analytics: analytics,
       );
       _messages[messageIndex] = finalMessage;
@@ -448,27 +473,27 @@ class ChatViewModel extends ChangeNotifier {
 
   Future<void> _generateNonStreaming(
     String prompt,
-    sdk.LlmOptions options,
+    sdk.LLMGenerationOptions options,
   ) async {
     final modelName = _loadedModelName;
 
     try {
-      final result = await sdk.RunAnywhere.llm.generate(prompt, options: options);
+      final result = await sdk.RunAnywhere.llm.generate(prompt, options);
 
       final analytics = MessageAnalytics(
         messageId: DateTime.now().millisecondsSinceEpoch.toString(),
         modelName: modelName,
         totalGenerationTime: _elapsedGenerationSeconds(),
-        outputTokens: result.outputTokens,
+        outputTokens: result.tokensGenerated,
         tokensPerSecond: result.tokensPerSecond,
-        wasThinkingMode: result.thinkingText != null,
+        wasThinkingMode: result.thinkingContent.isNotEmpty,
       );
 
       final assistantMessage = ChatMessage(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         role: sdk.MessageRole.MESSAGE_ROLE_ASSISTANT,
         content: result.text,
-        thinkingContent: result.thinkingText,
+        thinkingContent: result.thinkingContent,
         timestamp: DateTime.now(),
         analytics: analytics,
       );
@@ -494,9 +519,17 @@ class ChatViewModel extends ChangeNotifier {
       return;
     }
     try {
-      _availableAdapters = await sdk.RunAnywhere.lora.catalog(
-        modelId: modelId,
+      final result = await sdk.RunAnywhere.lora.queryCatalog(
+        sdk.LoraAdapterCatalogQuery(modelId: modelId),
       );
+      if (!result.success) {
+        throw Exception(
+          result.errorMessage.isEmpty
+              ? 'LoRA catalog query failed'
+              : result.errorMessage,
+        );
+      }
+      _availableAdapters = result.entries.toList();
     } catch (e) {
       debugPrint('Failed to refresh LoRA catalog: $e');
       _availableAdapters = [];
@@ -507,7 +540,11 @@ class ChatViewModel extends ChangeNotifier {
   /// Refresh the currently applied adapters from the SDK.
   Future<void> refreshAppliedAdapters() async {
     try {
-      _loraAdapters = (await sdk.RunAnywhere.lora.list()).applied;
+      final state = await sdk.RunAnywhere.lora.list();
+      if (state.errorMessage.isNotEmpty) {
+        throw Exception(state.errorMessage);
+      }
+      _loraAdapters = state.loadedAdapters.toList();
     } catch (e) {
       debugPrint('Failed to refresh applied LoRA adapters: $e');
     }
@@ -525,8 +562,9 @@ class ChatViewModel extends ChangeNotifier {
   bool isAdapterApplied(sdk.LoraAdapterCatalogEntry adapter) =>
       _loraAdapters.any(
         (a) =>
-            a.id == adapter.id ||
-            (adapter.localPath.isNotEmpty && a.id == adapter.localPath),
+            a.adapterId == adapter.id ||
+            (adapter.localPath.isNotEmpty &&
+                a.adapterPath == adapter.localPath),
       );
 
   /// Download (if needed) and apply a catalog adapter. One SDK call owns
@@ -539,11 +577,25 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      if (localPathFor(adapter) == null) {
-        await sdk.RunAnywhere.lora.download(adapter);
+      final localPath =
+          localPathFor(adapter) ?? await sdk.RunAnywhere.lora.download(adapter);
+
+      final scale = adapter.hasDefaultScale() && adapter.defaultScale > 0
+          ? adapter.defaultScale
+          : 1.0;
+      final result = await sdk.RunAnywhere.lora.applyCatalogAdapter(
+        adapter,
+        localPath: localPath,
+        scale: scale,
+      );
+      if (!result.success) {
+        throw Exception(
+          result.errorMessage.isEmpty
+              ? 'LoRA apply failed'
+              : result.errorMessage,
+        );
       }
-      await sdk.RunAnywhere.lora.apply(adapter.id);
-      _loraAdapters = (await sdk.RunAnywhere.lora.list()).applied;
+      _loraAdapters = result.adapters.toList();
       await refreshAvailableAdapters();
     } catch (e) {
       _errorMessage = 'LoRA adapter failed: $e';
@@ -552,11 +604,16 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Remove one applied adapter.
-  Future<void> removeAdapter(String adapterId) async {
+  /// Remove one applied adapter by path.
+  Future<void> removeAdapter(String adapterPath) async {
     try {
-      await sdk.RunAnywhere.lora.remove(adapterId);
-      _loraAdapters = (await sdk.RunAnywhere.lora.list()).applied;
+      final state = await sdk.RunAnywhere.lora.remove(
+        sdk.LoRARemoveRequest(adapterPaths: [adapterPath]),
+      );
+      if (state.errorMessage.isNotEmpty) {
+        throw Exception(state.errorMessage);
+      }
+      _loraAdapters = state.loadedAdapters.toList();
     } catch (e) {
       _errorMessage = 'Failed to remove LoRA adapter: $e';
     }
@@ -566,8 +623,13 @@ class ChatViewModel extends ChangeNotifier {
   /// Remove all applied adapters.
   Future<void> clearAdapters() async {
     try {
-      await sdk.RunAnywhere.lora.remove();
-      _loraAdapters = (await sdk.RunAnywhere.lora.list()).applied;
+      final state = await sdk.RunAnywhere.lora.remove(
+        sdk.LoRARemoveRequest(clearAll: true),
+      );
+      if (state.errorMessage.isNotEmpty) {
+        throw Exception(state.errorMessage);
+      }
+      _loraAdapters = state.loadedAdapters.toList();
     } catch (e) {
       _errorMessage = 'Failed to clear LoRA adapters: $e';
     }

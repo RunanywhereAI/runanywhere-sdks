@@ -35,16 +35,14 @@
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/llm/tool_calling_generation_internal.h"
+#include "features/llm/tool_calling_grammar.h"
 #include "features/llm/tool_calling_internal.h"
 #include "features/llm/tool_calling_result_internal.h"
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
-#include "rac/foundation/rac_proto_adapters.h"
 #include "rac/foundation/rac_proto_buffer.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
-#include "chat.pb.h"
-#include "llm_service.pb.h"
 #include "tool_calling.pb.h"
 #endif
 
@@ -123,6 +121,12 @@ struct LoopContext {
     // When true, the tool-call prompt is built AND parsed in the bare-Pythonic
     // `[name(args)]` format the toolcall_opt grammar enforces (RUN-80).
     bool grammar_backend = false;
+    // TC-2: when true, one model turn may emit multiple tool-call envelopes;
+    // the loop parses and executes all of them before one follow-up prompt.
+    // On QHexRT the native toolcall/toolcall_opt grammar still admits at most
+    // one call per generation; parallel harvesting applies to unconstrained /
+    // GBNF (llamacpp) paths.
+    bool parallel_tool_calls = false;
     rac::llm::tool_calling::GenerationState generation;
 
     // request-level tool_choice / forced_tool_name overrides.
@@ -223,9 +227,17 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const LoopContext& ct
     options.set_format(ctx.format);
     options.set_max_tool_calls(static_cast<int32_t>(ctx.max_tool_calls));
     options.set_keep_tools_available(ctx.keep_tools_available);
-    // Sampling/system prompt stay on the generation snapshot; ToolCallingOptions
-    // carries tool config only.
-    // The request-level tool_choice / forced_tool_name take precedence over any
+    if (ctx.generation.max_tokens > 0) {
+        options.set_max_tokens(ctx.generation.max_tokens);
+    }
+    if (ctx.generation.temperature > 0.0f) {
+        options.set_temperature(ctx.generation.temperature);
+    }
+    if (!ctx.generation.system_prompt.empty()) {
+        options.set_system_prompt(ctx.generation.system_prompt);
+    }
+    // Honor ToolCallingSessionCreateRequest.tool_choice / forced_tool_name
+    // The request-level fields take precedence over any
     // tool_options the caller might have pre-populated, so the high-level
     // run-loop / session APIs surface the OpenAI-style tool_choice knob
     // that the format/validate primitives already read.
@@ -238,6 +250,7 @@ runanywhere::v1::ToolCallingOptions build_options_snapshot(const LoopContext& ct
     options.set_auto_execute(ctx.auto_execute);
     options.set_replace_system_prompt(ctx.replace_system_prompt);
     options.set_require_json_arguments(ctx.require_json_arguments);
+    options.set_parallel_tool_calls(ctx.parallel_tool_calls);
     return options;
 }
 
@@ -288,7 +301,7 @@ std::string format_prompt_proto(const LoopContext& ctx,
 
 bool parse_tool_call_from_output(const LoopContext& ctx, const std::string& llm_output,
                                  std::string* out_clean_text,
-                                 runanywhere::v1::ToolCall* out_tool_call) {
+                                 std::vector<runanywhere::v1::ToolCall>* out_tool_calls) {
     runanywhere::v1::ToolParseRequest request;
     request.set_text(llm_output);
     *request.mutable_options() = build_options_snapshot(ctx);
@@ -323,8 +336,15 @@ bool parse_tool_call_from_output(const LoopContext& ctx, const std::string& llm_
         *out_clean_text = result.remaining_text();
     }
     if (result.has_tool_call() && result.tool_calls_size() > 0) {
-        if (out_tool_call) {
-            *out_tool_call = result.tool_calls(0);
+        if (out_tool_calls) {
+            out_tool_calls->clear();
+            // The parse ABI emits one call unless parallel_tool_calls was set
+            // on the options snapshot; either way, forward everything.
+            const int limit = ctx.parallel_tool_calls ? result.tool_calls_size() : 1;
+            out_tool_calls->reserve(static_cast<size_t>(limit));
+            for (int i = 0; i < limit; ++i) {
+                out_tool_calls->push_back(result.tool_calls(i));
+            }
         }
         return true;
     }
@@ -341,8 +361,7 @@ validate_tool_call(const LoopContext& ctx, const runanywhere::v1::ToolCall& tool
     std::vector<uint8_t> req_bytes;
     if (!serialize(request, &req_bytes)) {
         result.set_is_valid(false);
-        rac::foundation::populate_sdk_error(result.mutable_error(), RAC_ERROR_ENCODING_ERROR);
-        result.mutable_error()->set_message("failed to serialize validation request");
+        result.set_error_message("failed to serialize validation request");
         return result;
     }
 
@@ -354,10 +373,8 @@ validate_tool_call(const LoopContext& ctx, const runanywhere::v1::ToolCall& tool
         (void)result.ParseFromArray(out.data, static_cast<int>(out.size));
     } else {
         result.set_is_valid(false);
-        rac::foundation::populate_sdk_error(
-            result.mutable_error(), rc != RAC_SUCCESS ? rc : RAC_ERROR_INVALID_RESPONSE);
-        result.mutable_error()->set_message(out.error_message ? out.error_message
-                                                              : "validation proto call failed");
+        result.set_error_message(out.error_message ? out.error_message
+                                                   : "validation proto call failed");
     }
     rac_proto_buffer_free(&out);
     return result;
@@ -367,8 +384,8 @@ void emit_failure(rac_proto_buffer_t* out_result, rac_result_t status, const std
     if (!out_result)
         return;
     runanywhere::v1::ToolCallingResult err;
-    rac::foundation::populate_sdk_error(err.mutable_error(), status);
-    err.mutable_error()->set_message(message);
+    err.set_error_code(static_cast<int32_t>(status));
+    err.set_error_message(message);
     err.set_is_complete(false);
     std::vector<uint8_t> bytes;
     serialize(err, &bytes);
@@ -437,64 +454,87 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    const auto& gen = request.generation();
-    const auto& tool_cfg = gen.tool_calling();
-
     LoopContext ctx;
     ctx.user_prompt = request.prompt();
-    ctx.generation.max_tokens = gen.max_output_tokens();
-    ctx.generation.temperature = gen.temperature();
-    ctx.generation.top_p = gen.top_p();
-    ctx.generation.system_prompt = gen.system_prompt();
-    ctx.format = tool_cfg.has_format() ? tool_cfg.format()
-                                       : runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON;
+    ctx.generation.max_tokens = request.max_tokens();
+    ctx.generation.temperature = request.temperature();
+    ctx.generation.top_p = request.top_p();
+    ctx.generation.system_prompt = request.system_prompt();
+    ctx.format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
+                     ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON
+                     : request.format();
     // Probe grammar capability once up front (cheap acquire/release) so the prompt can
     // be built in the bare-Pythonic format the QHexRT grammar enforces. Non-grammar
     // engines keep the caller's declared format — a strict no-op for them (RUN-80).
     ctx.grammar_backend = rac::llm::lifecycle_llm_supports_grammar();
     ctx.max_tool_calls =
-        tool_cfg.max_tool_calls() == 0 ? kDefaultMaxToolCalls : tool_cfg.max_tool_calls();
-    ctx.auto_execute = tool_cfg.has_auto_execute() ? tool_cfg.auto_execute() : true;
-    ctx.replace_system_prompt = tool_cfg.replace_system_prompt();
-    ctx.require_json_arguments = tool_cfg.require_json_arguments();
-    ctx.keep_tools_available = tool_cfg.keep_tools_available();
-    ctx.generation.disable_thinking =
-        gen.has_reasoning() && gen.reasoning().mode() == runanywhere::v1::REASONING_MODE_OFF;
-    // Prior conversation turns, EXCLUDING the current turn (which travels as
-    // prompt). Threaded onto the generation snapshot so EVERY generate in the
-    // loop inherits it. History is role-tagged ChatMessages now; the internal
-    // snapshot is still positional [user0, asst0, ...], so drop leading
-    // assistant turns and keep contents in order.
-    for (const auto& msg : request.history()) {
-        if (ctx.generation.history.empty() &&
-            msg.role() != runanywhere::v1::MessageRole::MESSAGE_ROLE_USER) {
-            continue;
-        }
-        ctx.generation.history.push_back(msg.content());
-    }
+        request.max_tool_calls() == 0 ? kDefaultMaxToolCalls : request.max_tool_calls();
+    ctx.auto_execute = request.has_auto_execute() ? request.auto_execute() : true;
+    ctx.replace_system_prompt = request.replace_system_prompt();
+    ctx.require_json_arguments = request.require_json_arguments();
+    ctx.keep_tools_available = request.keep_tools_available();
+    ctx.generation.disable_thinking = request.disable_thinking();
+    // Prior conversation turns (tool_calling.proto field 19). Threaded onto the
+    // generation snapshot so EVERY generate in the loop inherits it — the initial
+    // tool-decision generate (generation_for_tool_step copies base) and the
+    // follow-up generate (followup_ctx = ctx copies it). request.history already
+    // EXCLUDES the current turn (which travels as prompt) and is pre-alternated
+    // [user,asst,...], so we forward it as-is and do NOT pop a trailing turn —
+    // unlike llm_module's normalizer, whose history includes the current turn.
+    ctx.generation.history.assign(request.history().begin(), request.history().end());
+    // Positional-parity safety net. The history slot is role-less and positional
+    // [user0, asst0, user1, ...], so the CALLER owns full normalization — drop
+    // leading-assistant, coalesce consecutive same-role, exclude the current turn —
+    // exactly as the standard path's commons normalizer (llm_module.cpp) does for a
+    // role-tagged ChatMessage list (the Android app mirrors it in
+    // ChatRequestPolicy.toToolCallingHistory). This guard only corrects an ODD count
+    // (a dangling trailing turn); it deliberately does NOT coalesce interior same-role
+    // runs, which role-less strings cannot detect — that must happen upstream.
     if (ctx.generation.history.size() % 2 != 0) {
         ctx.generation.history.pop_back();
     }
-    // validate_calls is `optional bool`: preserve the documented default
-    // (validate=true) when unset; hosts that delegate validation to their
-    // executor opt out explicitly.
+    // Honor ToolCallingSessionCreateRequest.validate_calls (idl/tool_calling.proto).
+    // The field is `optional bool` so we can preserve the documented default
+    // (validate=true) when the caller did not set it, while still letting hosts
+    // that delegate validation/authorization to their executor opt out by
+    // explicitly setting validate_calls=false.
     ctx.validate_calls = request.has_validate_calls() ? request.validate_calls() : true;
-    if (tool_cfg.tool_choice() != runanywhere::v1::TOOL_CHOICE_MODE_UNSPECIFIED) {
+    // pick up the request-level OpenAI-style tool_choice and
+    // forced_tool_name knobs (idl/tool_calling.proto fields 7/8) — these are
+    // copied onto every ToolCallingOptions snapshot the loop synthesizes for
+    // format/validate proto calls.
+    if (request.has_tool_choice()) {
         ctx.has_tool_choice = true;
-        ctx.tool_choice = tool_cfg.tool_choice();
+        ctx.tool_choice = request.tool_choice();
     }
-    if (tool_cfg.has_forced_tool_name()) {
-        ctx.forced_tool_name = tool_cfg.forced_tool_name();
+    if (request.has_forced_tool_name()) {
+        ctx.forced_tool_name = request.forced_tool_name();
     }
-    for (const auto& tool : tool_cfg.tools()) {
+    ctx.parallel_tool_calls = request.parallel_tool_calls();
+    for (const auto& tool : request.tools()) {
         *ctx.tool_options.add_tools() = tool;
-        // Names drive the QHexRT grammar spec (RUN-80); ignored by non-grammar engines.
-        ctx.generation.tool_names.push_back(tool.name());
     }
     std::string tool_choice_error;
     if (!apply_explicit_tool_choice(&ctx, &tool_choice_error)) {
         emit_failure(out_result, RAC_ERROR_INVALID_ARGUMENT, tool_choice_error);
         return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    // TC-1: pre-build grammar dialects. Scoped to the default JSON wire format
+    // for GBNF (LFM2 keeps post-hoc validation). QHexRT (grammar_backend) also
+    // needs the qhexrt dialect whenever tools are advertised — its prompt path
+    // uses bare-Pythonic regardless of the declared format enum.
+    if (ctx.format == runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON || ctx.grammar_backend) {
+        // parallel only affects the llamacpp GBNF root (call vs call+). QHexRT's
+        // native toolcall/toolcall_opt kinds still admit at most one call per
+        // generation; GBNF is cleared on grammar_backend below.
+        auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
+            ctx.tool_options, ctx.has_tool_choice, ctx.tool_choice, ctx.forced_tool_name,
+            ctx.parallel_tool_calls);
+        // GBNF encodes the JSON <tool_call> envelope; skip it on grammar
+        // backends that speak bare-Pythonic instead.
+        ctx.generation.grammar_gbnf = ctx.grammar_backend ? std::string() : std::move(grammar.gbnf);
+        ctx.generation.grammar_qhexrt = std::move(grammar.qhexrt);
     }
 
     runanywhere::v1::ToolCallingResult final_result;
@@ -512,8 +552,8 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                                                               ctx.generation);
         final_result.set_is_complete(false);
         final_result.set_iterations_used(static_cast<int32_t>(iteration));
-        rac::foundation::populate_sdk_error(final_result.mutable_error(), RAC_ERROR_CANCELLED);
-        final_result.mutable_error()->set_message("LLM generation cancelled");
+        final_result.set_error_code(RAC_ERROR_CANCELLED);
+        final_result.set_error_message("LLM generation cancelled");
         std::vector<uint8_t> bytes;
         serialize(final_result, &bytes);
         rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
@@ -541,15 +581,20 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                 ctx.has_tool_choice && ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_NONE,
                 final_result.tool_calls_size() > 0, ctx.keep_tools_available);
         if (!tools_live_this_turn) {
-            step_generation.tool_names.clear();
+            step_generation.grammar_gbnf.clear();
+            step_generation.grammar_qhexrt.clear();
         } else if (ctx.has_tool_choice &&
                    ctx.tool_choice == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC &&
                    !ctx.forced_tool_name.empty()) {
-            // tool_choice=SPECIFIC: narrow the QHexRT grammar spec to the ONE forced tool so
-            // the grammar can only emit `[<forced>(...)]` (or free text). Without this the
-            // spec still lists every tool and the model could emit a different call that the
-            // SPECIFIC policy then rejects instead of being structurally prevented (RUN-80).
-            step_generation.tool_names = {ctx.forced_tool_name};
+            // tool_choice=SPECIFIC: rebuild grammars narrowed to the ONE forced
+            // tool so decoding can only emit that call (or free text on
+            // toolcall_opt). Without this the spec still lists every tool.
+            auto grammar = rac::llm::tool_calling::build_tool_call_grammar(
+                ctx.tool_options, ctx.has_tool_choice, ctx.tool_choice, ctx.forced_tool_name,
+                ctx.parallel_tool_calls);
+            step_generation.grammar_gbnf =
+                ctx.grammar_backend ? std::string() : std::move(grammar.gbnf);
+            step_generation.grammar_qhexrt = std::move(grammar.qhexrt);
         }
         // Stop over-calling (RUN-80): on the AUTO decision path add the device-proven
         // "only call when genuinely needed" hint to the system prompt so a small model
@@ -581,8 +626,8 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
                                                                   ctx.generation);
             final_result.set_is_complete(false);
             final_result.set_iterations_used(static_cast<int32_t>(iteration));
-            rac::foundation::populate_sdk_error(final_result.mutable_error(), report_rc);
-            final_result.mutable_error()->set_message(msg);
+            final_result.set_error_code(static_cast<int32_t>(report_rc));
+            final_result.set_error_message(msg);
             std::vector<uint8_t> bytes;
             serialize(final_result, &bytes);
             rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(), out_result);
@@ -599,16 +644,16 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
         }
 
         std::string clean_text;
-        runanywhere::v1::ToolCall parsed_call;
-        const bool has_call = parse_tool_call_from_output(ctx, response, &clean_text, &parsed_call);
+        std::vector<runanywhere::v1::ToolCall> parsed_calls;
+        const bool has_call =
+            parse_tool_call_from_output(ctx, response, &clean_text, &parsed_calls);
         final_text = clean_text;
 
         if (!has_call) {
             if (final_result.tool_calls_size() == 0 && tool_choice_requires_call(ctx)) {
                 const std::string msg = missing_required_tool_call_error(ctx);
-                rac::foundation::populate_sdk_error(final_result.mutable_error(),
-                                                    RAC_ERROR_VALIDATION_FAILED);
-                final_result.mutable_error()->set_message(msg);
+                final_result.set_error_code(RAC_ERROR_VALIDATION_FAILED);
+                final_result.set_error_message(msg);
                 is_complete = false;
                 break;
             }
@@ -617,156 +662,173 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
             break;
         }
 
-        if (static_cast<uint32_t>(final_result.tool_calls_size()) >= ctx.max_tool_calls) {
-            constexpr const char* kLimitMessage =
-                "model requested another tool after max_tool_calls was reached";
-            rac::foundation::populate_sdk_error(final_result.mutable_error(),
-                                                RAC_ERROR_VALIDATION_FAILED);
-            final_result.mutable_error()->set_message(kLimitMessage);
-            is_complete = false;
-            break;
-        }
-        if (final_result.tool_calls_size() > 0 && !ctx.keep_tools_available) {
+        // "another tool after tools were removed" is a cross-TURN constraint:
+        // calls parsed from THIS turn's output are one batch, so the check
+        // keys off the count recorded before this batch, not mid-batch.
+        const int calls_before_batch = final_result.tool_calls_size();
+        if (calls_before_batch > 0 && !ctx.keep_tools_available) {
             constexpr const char* kToolsUnavailableMessage =
                 "model requested another tool after tools were removed";
-            rac::foundation::populate_sdk_error(final_result.mutable_error(),
-                                                RAC_ERROR_VALIDATION_FAILED);
-            final_result.mutable_error()->set_message(kToolsUnavailableMessage);
+            final_result.set_error_code(RAC_ERROR_VALIDATION_FAILED);
+            final_result.set_error_message(kToolsUnavailableMessage);
             is_complete = false;
             break;
         }
 
-        // Tool-choice policy is an authorization constraint, not optional
-        // schema validation. It must run even when validate_calls=false.
-        const std::string policy_error = tool_choice_policy_error(ctx, parsed_call);
-        if (!policy_error.empty()) {
-            runanywhere::v1::ToolResult failed;
-            failed.set_tool_call_id(parsed_call.id());
-            failed.set_name(parsed_call.name());
-            rac::foundation::populate_sdk_error(failed.mutable_error(),
-                                                RAC_ERROR_VALIDATION_FAILED);
-            failed.mutable_error()->set_message(policy_error);
-            failed.set_started_at_ms(now_ms());
-            failed.set_completed_at_ms(now_ms());
-            *final_result.add_tool_calls() = parsed_call;
-            *final_result.add_tool_results() = failed;
-            is_complete = false;
-            rac::foundation::populate_sdk_error(final_result.mutable_error(),
-                                                RAC_ERROR_VALIDATION_FAILED);
-            final_result.mutable_error()->set_message(policy_error);
-            break;
-        }
+        // Per-call pipeline: policy -> validate -> execute. With
+        // parallel_tool_calls the batch runs sequentially under the same
+        // policy/limits; the parallelism win is one LLM round-trip for N
+        // calls, not concurrent executors. stop_loop breaks the outer
+        // while(true) after the batch unwinds.
+        bool stop_loop = false;
+        for (runanywhere::v1::ToolCall& parsed_call : parsed_calls) {
+            if (static_cast<uint32_t>(final_result.tool_calls_size()) >= ctx.max_tool_calls) {
+                constexpr const char* kLimitMessage =
+                    "model requested another tool after max_tool_calls was reached";
+                final_result.set_error_code(RAC_ERROR_VALIDATION_FAILED);
+                final_result.set_error_message(kLimitMessage);
+                is_complete = false;
+                stop_loop = true;
+                break;
+            }
 
-        if (ctx.validate_calls) {
-            auto validation = validate_tool_call(ctx, parsed_call);
-            if (!validation.is_valid()) {
-                std::string msg = validation.error().message();
-                if (msg.empty() && validation.validation_errors_size() > 0) {
-                    msg = validation.validation_errors(0);
-                }
-                if (msg.empty()) {
-                    msg = "tool call validation failed";
-                }
+            // Tool-choice policy is an authorization constraint, not optional
+            // schema validation. It must run even when validate_calls=false.
+            const std::string policy_error = tool_choice_policy_error(ctx, parsed_call);
+            if (!policy_error.empty()) {
                 runanywhere::v1::ToolResult failed;
                 failed.set_tool_call_id(parsed_call.id());
                 failed.set_name(parsed_call.name());
-                rac::foundation::populate_sdk_error(failed.mutable_error(),
-                                                    RAC_ERROR_VALIDATION_FAILED);
-                failed.mutable_error()->set_message(msg);
+                failed.set_error(policy_error);
+                failed.set_success(false);
                 failed.set_started_at_ms(now_ms());
                 failed.set_completed_at_ms(now_ms());
                 *final_result.add_tool_calls() = parsed_call;
                 *final_result.add_tool_results() = failed;
                 is_complete = false;
-                rac::foundation::populate_sdk_error(final_result.mutable_error(),
-                                                    RAC_ERROR_VALIDATION_FAILED);
-                final_result.mutable_error()->set_message(msg);
+                final_result.set_error_code(RAC_ERROR_VALIDATION_FAILED);
+                final_result.set_error_message(policy_error);
+                stop_loop = true;
                 break;
             }
-            if (!validation.normalized_arguments_json().empty()) {
-                parsed_call.set_arguments_json(validation.normalized_arguments_json());
+
+            if (ctx.validate_calls) {
+                auto validation = validate_tool_call(ctx, parsed_call);
+                if (!validation.is_valid()) {
+                    std::string msg = validation.error_message();
+                    if (msg.empty() && validation.validation_errors_size() > 0) {
+                        msg = validation.validation_errors(0);
+                    }
+                    if (msg.empty()) {
+                        msg = "tool call validation failed";
+                    }
+                    runanywhere::v1::ToolResult failed;
+                    failed.set_tool_call_id(parsed_call.id());
+                    failed.set_name(parsed_call.name());
+                    failed.set_error(msg);
+                    failed.set_success(false);
+                    failed.set_started_at_ms(now_ms());
+                    failed.set_completed_at_ms(now_ms());
+                    *final_result.add_tool_calls() = parsed_call;
+                    *final_result.add_tool_results() = failed;
+                    is_complete = false;
+                    final_result.set_error_code(RAC_ERROR_VALIDATION_FAILED);
+                    final_result.set_error_message(msg);
+                    stop_loop = true;
+                    break;
+                }
+                if (!validation.normalized_arguments_json().empty()) {
+                    parsed_call.set_arguments_json(validation.normalized_arguments_json());
+                }
             }
-        }
 
-        if (!ctx.auto_execute) {
-            *final_result.add_tool_calls() = parsed_call;
-            is_complete = false;
-            break;
-        }
-
-        // Synchronous tool execution via host callback.
-        std::vector<uint8_t> call_bytes;
-        if (!serialize(parsed_call, &call_bytes)) {
-            emit_failure(out_result, RAC_ERROR_INTERNAL,
-                         "failed to serialize ToolCall for callback");
-            return RAC_ERROR_INTERNAL;
-        }
-
-        rac_proto_buffer_t exec_out;
-        rac_proto_buffer_init(&exec_out);
-        rac_result_t exec_rc = RAC_SUCCESS;
-        {
-            std::lock_guard<std::recursive_mutex> admission_guard(
-                cancel_state->side_effect_admission_mu);
-            if (cancel_state->cancel_requested.load(std::memory_order_acquire)) {
-                return finish_cancelled();
+            if (!ctx.auto_execute) {
+                *final_result.add_tool_calls() = parsed_call;
+                is_complete = false;
+                stop_loop = true;
+                continue;  // hand back every parsed call, execute none
             }
-            exec_rc = on_execute(call_bytes.empty() ? nullptr : call_bytes.data(),
-                                 call_bytes.size(), &exec_out, on_execute_user_data);
-        }
 
-        runanywhere::v1::ToolResult tool_result;
-        std::string executor_error;
-        if (exec_rc == RAC_SUCCESS && exec_out.status != RAC_SUCCESS) {
-            exec_rc = exec_out.status;
-            executor_error = exec_out.error_message ? exec_out.error_message
-                                                    : "tool executor returned an error buffer";
-        } else if (exec_rc == RAC_SUCCESS && (!exec_out.data || exec_out.size == 0)) {
-            exec_rc = RAC_ERROR_DECODING_ERROR;
-            executor_error = "tool executor returned an empty ToolResult";
-        } else if (exec_rc == RAC_SUCCESS &&
-                   !tool_result.ParseFromArray(exec_out.data, static_cast<int>(exec_out.size))) {
-            exec_rc = RAC_ERROR_DECODING_ERROR;
-            executor_error = "tool executor returned malformed ToolResult bytes";
-        } else if (exec_rc == RAC_SUCCESS && !tool_result.tool_call_id().empty() &&
-                   tool_result.tool_call_id() != parsed_call.id()) {
-            exec_rc = RAC_ERROR_VALIDATION_FAILED;
-            executor_error = "tool executor returned a mismatched tool_call_id";
-        } else if (exec_rc == RAC_SUCCESS && !tool_result.name().empty() &&
-                   tool_result.name() != parsed_call.name()) {
-            exec_rc = RAC_ERROR_VALIDATION_FAILED;
-            executor_error = "tool executor returned a mismatched tool name";
-        }
+            // Synchronous tool execution via host callback.
+            std::vector<uint8_t> call_bytes;
+            if (!serialize(parsed_call, &call_bytes)) {
+                emit_failure(out_result, RAC_ERROR_INTERNAL,
+                             "failed to serialize ToolCall for callback");
+                return RAC_ERROR_INTERNAL;
+            }
 
-        if (exec_rc != RAC_SUCCESS) {
-            if (executor_error.empty()) {
+            rac_proto_buffer_t exec_out;
+            rac_proto_buffer_init(&exec_out);
+            rac_result_t exec_rc = RAC_SUCCESS;
+            {
+                std::lock_guard<std::recursive_mutex> admission_guard(
+                    cancel_state->side_effect_admission_mu);
+                if (cancel_state->cancel_requested.load(std::memory_order_acquire)) {
+                    return finish_cancelled();
+                }
+                exec_rc = on_execute(call_bytes.empty() ? nullptr : call_bytes.data(),
+                                     call_bytes.size(), &exec_out, on_execute_user_data);
+            }
+
+            runanywhere::v1::ToolResult tool_result;
+            std::string executor_error;
+            if (exec_rc == RAC_SUCCESS && exec_out.status != RAC_SUCCESS) {
+                exec_rc = exec_out.status;
                 executor_error = exec_out.error_message ? exec_out.error_message
-                                                        : "tool executor returned an error";
+                                                        : "tool executor returned an error buffer";
+            } else if (exec_rc == RAC_SUCCESS && (!exec_out.data || exec_out.size == 0)) {
+                exec_rc = RAC_ERROR_DECODING_ERROR;
+                executor_error = "tool executor returned an empty ToolResult";
+            } else if (exec_rc == RAC_SUCCESS &&
+                       !tool_result.ParseFromArray(exec_out.data,
+                                                   static_cast<int>(exec_out.size))) {
+                exec_rc = RAC_ERROR_DECODING_ERROR;
+                executor_error = "tool executor returned malformed ToolResult bytes";
+            } else if (exec_rc == RAC_SUCCESS && !tool_result.tool_call_id().empty() &&
+                       tool_result.tool_call_id() != parsed_call.id()) {
+                exec_rc = RAC_ERROR_VALIDATION_FAILED;
+                executor_error = "tool executor returned a mismatched tool_call_id";
+            } else if (exec_rc == RAC_SUCCESS && !tool_result.name().empty() &&
+                       tool_result.name() != parsed_call.name()) {
+                exec_rc = RAC_ERROR_VALIDATION_FAILED;
+                executor_error = "tool executor returned a mismatched tool name";
             }
-            tool_result.Clear();
-            rac::foundation::populate_sdk_error(tool_result.mutable_error(), exec_rc);
-            tool_result.mutable_error()->set_message(executor_error);
+
+            if (exec_rc != RAC_SUCCESS) {
+                if (executor_error.empty()) {
+                    executor_error = exec_out.error_message ? exec_out.error_message
+                                                            : "tool executor returned an error";
+                }
+                tool_result.Clear();
+                tool_result.set_success(false);
+                tool_result.set_error(executor_error);
+            }
+            tool_result.set_tool_call_id(parsed_call.id());
+            tool_result.set_name(parsed_call.name());
+            if (tool_result.started_at_ms() == 0)
+                tool_result.set_started_at_ms(now_ms());
+            if (tool_result.completed_at_ms() == 0)
+                tool_result.set_completed_at_ms(now_ms());
+
+            rac_proto_buffer_free(&exec_out);
+
+            *final_result.add_tool_calls() = parsed_call;
+            *final_result.add_tool_results() = tool_result;
+
+            if (exec_rc != RAC_SUCCESS) {
+                final_result.set_error_code(static_cast<int32_t>(exec_rc));
+                final_result.set_error_message(tool_result.error());
+                is_complete = false;
+                stop_loop = true;
+                break;
+            }
         }
-        tool_result.set_tool_call_id(parsed_call.id());
-        tool_result.set_name(parsed_call.name());
-        if (tool_result.started_at_ms() == 0)
-            tool_result.set_started_at_ms(now_ms());
-        if (tool_result.completed_at_ms() == 0)
-            tool_result.set_completed_at_ms(now_ms());
-
-        rac_proto_buffer_free(&exec_out);
-
-        *final_result.add_tool_calls() = parsed_call;
-        *final_result.add_tool_results() = tool_result;
-
-        if (exec_rc != RAC_SUCCESS) {
-            rac::foundation::populate_sdk_error(final_result.mutable_error(), exec_rc);
-            final_result.mutable_error()->set_message(tool_result.error().message());
-            is_complete = false;
+        if (stop_loop) {
             break;
         }
 
-        // Build follow-up prompt from the executed tool result.
+        // Build ONE follow-up prompt from every tool result executed so far
+        // (single call, or the whole parallel batch).
         std::vector<runanywhere::v1::ToolResult> trs;
         trs.reserve(static_cast<size_t>(final_result.tool_results_size()));
         for (const auto& recorded_result : final_result.tool_results()) {

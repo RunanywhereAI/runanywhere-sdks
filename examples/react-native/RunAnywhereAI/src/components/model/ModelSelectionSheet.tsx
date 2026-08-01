@@ -447,7 +447,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           {title}
         </Text>
         <View
-          style={[styles.card, { backgroundColor: colors.surfaceContainerHigh }]}
+          style={[
+            styles.card,
+            { backgroundColor: colors.surfaceContainerHigh },
+          ]}
         >
           {list.map((m) => renderRow(m, ready))}
         </View>
@@ -462,7 +465,11 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     >
       <View style={styles.header}>
         <Text
-          style={[typography.titleLarge, styles.bold, { color: colors.onSurface }]}
+          style={[
+            typography.titleLarge,
+            styles.bold,
+            { color: colors.onSurface },
+          ]}
         >
           {getContextTitle(context)}
         </Text>
@@ -473,7 +480,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           <View style={styles.loading}>
             <ActivityIndicator color={colors.primary} />
             <Text
-              style={[typography.bodyMedium, { color: colors.onSurfaceVariant }]}
+              style={[
+                typography.bodyMedium,
+                { color: colors.onSurfaceVariant },
+              ]}
             >
               Loading models…
             </Text>
@@ -488,7 +498,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
             >
               <View style={styles.storageTop}>
                 <View
-                  style={[styles.storageIcon, { backgroundColor: colors.surface }]}
+                  style={[
+                    styles.storageIcon,
+                    { backgroundColor: colors.surface },
+                  ]}
                 >
                   <Icon name="storageDevice" size={18} color={colors.primary} />
                 </View>
@@ -555,7 +568,8 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                   { color: colors.onPrimaryContainer },
                 ]}
               >
-                {formatBytes(storage?.totalModelsBytes ?? 0)} in models  ·  {onDeviceModels.length} on device
+                {formatBytes(storage?.totalModelsBytes ?? 0)} in models ·{' '}
+                {onDeviceModels.length} on device
               </Text>
             </View>
 

@@ -129,6 +129,23 @@ MLX.register()       // MLX modalities (requires RunAnywhereMLX)
 
 Models are discovered through the RunAnywhere catalog, downloaded on-device, and managed via `RunAnywhere.models.load(id:)`, `RunAnywhere.models.download(id:)`, and the rest of the `models` namespace.
 
+### Connect (trusted LAN)
+
+`ConnectSession` publishes or joins a language-model session on the local network. Commons owns role policy and protocol validation; this SDK owns Bonjour and the framed TCP adapter.
+
+| Role | Platforms |
+|------|-----------|
+| **Host** | macOS only |
+| **Client** | iOS and iPadOS (Android clients use the Kotlin SDK) |
+
+- Service type: `_runanywhere-connect._tcp`
+- Hosting is app-scoped: the macOS app must keep the model loaded and the process alive
+- Clients adopt the **one model the host has selected** — no client-side model download for hosted chat
+- Trust model: **trusted LAN only** (no TLS/pairing in this release). Runtime admission follows commons `platformPolicy()`; compile-time `#if os` guards only gate Apple APIs that do not exist on the other Apple platforms
+- React Native, Flutter, Web, and Electron are **not** Connect participants in this release
+
+See the iOS/macOS example under [`examples/ios/RunAnywhereAI/`](../../examples/ios/RunAnywhereAI/) (`ConnectHostManagementView`, model-selection Connect section).
+
 ---
 
 ## Documentation and Examples

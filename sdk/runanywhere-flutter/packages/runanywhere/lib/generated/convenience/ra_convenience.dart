@@ -27,31 +27,9 @@ import 'package:runanywhere/generated/rerank.pb.dart';
 import 'package:runanywhere/generated/segmentation.pb.dart';
 import 'package:runanywhere/generated/structured_output.pb.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart';
-import 'package:runanywhere/generated/tool_calling.pb.dart';
 import 'package:runanywhere/generated/tts_options.pb.dart';
 import 'package:runanywhere/generated/vad_options.pb.dart';
 import 'package:runanywhere/generated/vlm_options.pb.dart';
-
-extension ToolCallingOptionsConvenience on ToolCallingOptions {
-  static ToolCallingOptions defaults() {
-    final r = ToolCallingOptions();
-    r.autoExecute = true;
-    r.maxToolCalls = 5;
-    return r;
-  }
-}
-
-extension ToolCallingOptionsValidate on ToolCallingOptions {
-  void validate() {
-    final effectiveMaxToolCalls = hasMaxToolCalls() ? maxToolCalls : 5;
-    if (effectiveMaxToolCalls < 1) {
-      throw SDKException.validationFailed(
-        'max_tool_calls must be >= 1 (got $effectiveMaxToolCalls)',
-        fieldPath: 'ToolCallingOptions.max_tool_calls',
-      );
-    }
-  }
-}
 
 extension AudioFormatWireString on AudioFormat {
   String get wireString {
@@ -339,6 +317,68 @@ extension LLMConfigurationConvenience on LLMConfiguration {
   }
 }
 
+extension VADConfigurationConvenience on VADConfiguration {
+  static VADConfiguration defaults() {
+    final r = VADConfiguration();
+    r.sampleRate = 16000;
+    r.frameLengthMs = 100;
+    r.activationThreshold = 0.015;
+    r.calibrationMultiplier = 2.0;
+    return r;
+  }
+}
+
+extension VADConfigurationValidate on VADConfiguration {
+  void validate() {
+    if (sampleRate < 8000 || sampleRate > 48000) {
+      throw SDKException.validationFailed(
+        'sample_rate must be in 8000...48000 (got $sampleRate)',
+        fieldPath: 'VADConfiguration.sample_rate',
+      );
+    }
+    if (frameLengthMs < 20 || frameLengthMs > 1000) {
+      throw SDKException.validationFailed(
+        'frame_length_ms must be in 20...1000 (got $frameLengthMs)',
+        fieldPath: 'VADConfiguration.frame_length_ms',
+      );
+    }
+    if (!activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0) {
+      throw SDKException.validationFailed(
+        'activation_threshold must be in 0.0...1.0 (got $activationThreshold)',
+        fieldPath: 'VADConfiguration.activation_threshold',
+      );
+    }
+    if (!calibrationMultiplier.isFinite || calibrationMultiplier < 1.2 || calibrationMultiplier > 4.0) {
+      throw SDKException.validationFailed(
+        'calibration_multiplier must be in 1.2...4.0 (got $calibrationMultiplier)',
+        fieldPath: 'VADConfiguration.calibration_multiplier',
+      );
+    }
+  }
+}
+
+extension VADOptionsConvenience on VADOptions {
+  static VADOptions defaults() {
+    final r = VADOptions();
+    r.minSpeechDurationMs = 100;
+    r.minSilenceDurationMs = 300;
+    r.maxSpeechDurationMs = 0;
+    r.prefixPaddingMs = 0;
+    return r;
+  }
+}
+
+extension VADOptionsValidate on VADOptions {
+  void validate() {
+    if (!activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0) {
+      throw SDKException.validationFailed(
+        'activation_threshold must be in 0.0...1.0 (got $activationThreshold)',
+        fieldPath: 'VADOptions.activation_threshold',
+      );
+    }
+  }
+}
+
 extension DiarizationOptionsConvenience on DiarizationOptions {
   static DiarizationOptions defaults() {
     final r = DiarizationOptions();
@@ -478,68 +518,6 @@ extension EmbeddingsOptionsValidate on EmbeddingsOptions {
       throw SDKException.validationFailed(
         'batch_size must be in 1...8192 (got $batchSize)',
         fieldPath: 'EmbeddingsOptions.batch_size',
-      );
-    }
-  }
-}
-
-extension VADConfigurationConvenience on VADConfiguration {
-  static VADConfiguration defaults() {
-    final r = VADConfiguration();
-    r.sampleRate = 16000;
-    r.frameLengthMs = 100;
-    r.activationThreshold = 0.015;
-    r.calibrationMultiplier = 2.0;
-    return r;
-  }
-}
-
-extension VADConfigurationValidate on VADConfiguration {
-  void validate() {
-    if (sampleRate < 8000 || sampleRate > 48000) {
-      throw SDKException.validationFailed(
-        'sample_rate must be in 8000...48000 (got $sampleRate)',
-        fieldPath: 'VADConfiguration.sample_rate',
-      );
-    }
-    if (frameLengthMs < 20 || frameLengthMs > 1000) {
-      throw SDKException.validationFailed(
-        'frame_length_ms must be in 20...1000 (got $frameLengthMs)',
-        fieldPath: 'VADConfiguration.frame_length_ms',
-      );
-    }
-    if (!activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0) {
-      throw SDKException.validationFailed(
-        'activation_threshold must be in 0.0...1.0 (got $activationThreshold)',
-        fieldPath: 'VADConfiguration.activation_threshold',
-      );
-    }
-    if (!calibrationMultiplier.isFinite || calibrationMultiplier < 1.2 || calibrationMultiplier > 4.0) {
-      throw SDKException.validationFailed(
-        'calibration_multiplier must be in 1.2...4.0 (got $calibrationMultiplier)',
-        fieldPath: 'VADConfiguration.calibration_multiplier',
-      );
-    }
-  }
-}
-
-extension VADOptionsConvenience on VADOptions {
-  static VADOptions defaults() {
-    final r = VADOptions();
-    r.minSpeechDurationMs = 100;
-    r.minSilenceDurationMs = 300;
-    r.maxSpeechDurationMs = 0;
-    r.prefixPaddingMs = 0;
-    return r;
-  }
-}
-
-extension VADOptionsValidate on VADOptions {
-  void validate() {
-    if (!activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0) {
-      throw SDKException.validationFailed(
-        'activation_threshold must be in 0.0...1.0 (got $activationThreshold)',
-        fieldPath: 'VADOptions.activation_threshold',
       );
     }
   }

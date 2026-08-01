@@ -43,28 +43,10 @@ import ai.runanywhere.proto.v1.SegmentationImage
 import ai.runanywhere.proto.v1.StructuredOutputOptions
 import ai.runanywhere.proto.v1.TTSConfiguration
 import ai.runanywhere.proto.v1.TTSOptions
-import ai.runanywhere.proto.v1.ToolCallingOptions
 import ai.runanywhere.proto.v1.VADConfiguration
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VLMGenerationOptions
 import com.runanywhere.sdk.foundation.errors.SDKException
-
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun ToolCallingOptions.Companion.defaults(): ToolCallingOptions =
-    ToolCallingOptions(
-        auto_execute = true,
-        max_tool_calls = 5,
-    )
-
-/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun ToolCallingOptions.validate() {
-    if (max_tool_calls != null && (max_tool_calls < 1)) {
-        throw SDKException.validationFailed(
-            fieldPath = "ToolCallingOptions.max_tool_calls",
-            message = "max_tool_calls must be >= 1 (got ${max_tool_calls})",
-        )
-    }
-}
 
 /** Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/. */
 public val AudioFormat.wireString: String
@@ -267,6 +249,62 @@ public fun LLMConfiguration.Companion.defaults(): LLMConfiguration =
     )
 
 /** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
+public fun VADConfiguration.Companion.defaults(): VADConfiguration =
+    VADConfiguration(
+        sample_rate = 16000,
+        frame_length_ms = 100,
+        activation_threshold = 0.015f,
+        calibration_multiplier = 2.0f,
+    )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun VADConfiguration.validate() {
+    if (sample_rate < 8000 || sample_rate > 48000) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.sample_rate",
+            message = "sample_rate must be in 8000...48000 (got ${sample_rate})",
+        )
+    }
+    if (frame_length_ms < 20 || frame_length_ms > 1000) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.frame_length_ms",
+            message = "frame_length_ms must be in 20...1000 (got ${frame_length_ms})",
+        )
+    }
+    if (!activation_threshold.isFinite() || activation_threshold < 0.0 || activation_threshold > 1.0) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.activation_threshold",
+            message = "activation_threshold must be in 0.0...1.0 (got ${activation_threshold})",
+        )
+    }
+    if (!calibration_multiplier.isFinite() || calibration_multiplier < 1.2 || calibration_multiplier > 4.0) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADConfiguration.calibration_multiplier",
+            message = "calibration_multiplier must be in 1.2...4.0 (got ${calibration_multiplier})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
+public fun VADOptions.Companion.defaults(): VADOptions =
+    VADOptions(
+        min_speech_duration_ms = 100,
+        min_silence_duration_ms = 300,
+        max_speech_duration_ms = 0,
+        prefix_padding_ms = 0,
+    )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun VADOptions.validate() {
+    if (!activation_threshold.isFinite() || activation_threshold < 0.0 || activation_threshold > 1.0) {
+        throw SDKException.validationFailed(
+            fieldPath = "VADOptions.activation_threshold",
+            message = "activation_threshold must be in 0.0...1.0 (got ${activation_threshold})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
 public fun DiarizationOptions.Companion.defaults(): DiarizationOptions =
     DiarizationOptions(
         sample_rate = 16000,
@@ -391,62 +429,6 @@ public fun EmbeddingsOptions.validate() {
         throw SDKException.validationFailed(
             fieldPath = "EmbeddingsOptions.batch_size",
             message = "batch_size must be in 1...8192 (got ${batch_size})",
-        )
-    }
-}
-
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun VADConfiguration.Companion.defaults(): VADConfiguration =
-    VADConfiguration(
-        sample_rate = 16000,
-        frame_length_ms = 100,
-        activation_threshold = 0.015f,
-        calibration_multiplier = 2.0f,
-    )
-
-/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun VADConfiguration.validate() {
-    if (sample_rate < 8000 || sample_rate > 48000) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.sample_rate",
-            message = "sample_rate must be in 8000...48000 (got ${sample_rate})",
-        )
-    }
-    if (frame_length_ms < 20 || frame_length_ms > 1000) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.frame_length_ms",
-            message = "frame_length_ms must be in 20...1000 (got ${frame_length_ms})",
-        )
-    }
-    if (!activation_threshold.isFinite() || activation_threshold < 0.0 || activation_threshold > 1.0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.activation_threshold",
-            message = "activation_threshold must be in 0.0...1.0 (got ${activation_threshold})",
-        )
-    }
-    if (!calibration_multiplier.isFinite() || calibration_multiplier < 1.2 || calibration_multiplier > 4.0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADConfiguration.calibration_multiplier",
-            message = "calibration_multiplier must be in 1.2...4.0 (got ${calibration_multiplier})",
-        )
-    }
-}
-
-/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
-public fun VADOptions.Companion.defaults(): VADOptions =
-    VADOptions(
-        min_speech_duration_ms = 100,
-        min_silence_duration_ms = 300,
-        max_speech_duration_ms = 0,
-        prefix_padding_ms = 0,
-    )
-
-/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
-public fun VADOptions.validate() {
-    if (!activation_threshold.isFinite() || activation_threshold < 0.0 || activation_threshold > 1.0) {
-        throw SDKException.validationFailed(
-            fieldPath = "VADOptions.activation_threshold",
-            message = "activation_threshold must be in 0.0...1.0 (got ${activation_threshold})",
         )
     }
 }

@@ -51,6 +51,42 @@ Your code never picks hardware. Engines register what they can run, and the high
 
 ---
 
+## See it in action
+
+<div align="center">
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/gifs/text-generation.gif" alt="Text Generation" width="240"/><br/><br/>
+      <strong>Text Generation</strong><br/>
+      <sub>LLM inference, 100% on-device</sub>
+    </td>
+    <td width="40"></td>
+    <td align="center" width="50%">
+      <img src="docs/gifs/voice-ai.gif" alt="Voice AI" width="240"/><br/><br/>
+      <strong>Voice AI</strong><br/>
+      <sub>STT → LLM → TTS pipeline, fully offline</sub>
+    </td>
+  </tr>
+  <tr><td colspan="3" height="30"></td></tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/gifs/image-generation.gif" alt="Image Generation" width="240"/><br/><br/>
+      <strong>Image Generation</strong><br/>
+      <sub>On-device diffusion model</sub>
+    </td>
+    <td width="40"></td>
+    <td align="center" width="50%">
+      <img src="docs/gifs/visual-language-model.gif" alt="Visual Language Model" width="240"/><br/><br/>
+      <strong>Visual Language Model</strong><br/>
+      <sub>Vision + language understanding on-device</sub>
+    </td>
+  </tr>
+</table>
+</div>
+
+---
+
 ## Quick start
 
 The fastest way to feel it. Install, load, generate, all local:
@@ -409,6 +445,22 @@ All SDKs ship on one version line, currently **0.20.11**, from a single C++ core
 | MLX (Apple silicon) | Yes | n/a | Yes | Yes | n/a | n/a | n/a | Yes |
 | OpenAI-compatible server | n/a | n/a | n/a | n/a | n/a | n/a | Yes | Yes |
 | Model download + progress | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| **Connect (LAN host/client)** | Host (macOS) / Client (iOS, iPadOS) | Client | — | — | — | — | — | — |
+
+### Connect (trusted LAN)
+
+Connect lets a **macOS Swift app** host a loaded language model on the local network so **iOS, iPadOS, and Android** clients can discover it and stream generation without downloading that model. It is **app-scoped** (lives with the host app process), not an OS daemon.
+
+| Role | Supported today | Not in this release |
+|------|-----------------|---------------------|
+| **Host** | macOS (Swift example / SDK) | Windows, Electron, Web, RN, Flutter |
+| **Client** | iOS, iPadOS (Swift), Android (Kotlin) | React Native, Flutter, Web, Electron |
+
+- **Discovery:** Bonjour / NSD service type `_runanywhere-connect._tcp`
+- **Transport:** framed TCP on the LAN; commons owns protocol version, role policy, session accounting, and generation validation (`idl/connect.proto`, `rac_connect_*`)
+- **Lifecycle:** the host app selects and loads the model, starts hosting, and supplies generation; stopping the host disconnects clients
+- **Threat model:** **trusted LAN only** — no TLS, pairing PIN, or mutual auth in this release. Do not expose Connect across untrusted networks. Future work may add TLS/pairing, Windows hosting, or a daemon; those change lifecycle and security and are out of scope here
+- **Electron note:** `RunAnywhereMain.connect()` is **local MessagePort / utility-process IPC** inside one Electron app. It is unrelated to LAN Connect
 
 ---
 

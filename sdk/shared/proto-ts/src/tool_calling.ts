@@ -6,10 +6,14 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { SDKError } from "./errors";
 
 export const protobufPackage = "runanywhere.v1";
 
+/**
+ * ---------------------------------------------------------------------------
+ * Supported parameter types.
+ * ---------------------------------------------------------------------------
+ */
 export enum ToolParameterType {
   TOOL_PARAMETER_TYPE_UNSPECIFIED = 0,
   TOOL_PARAMETER_TYPE_STRING = 1,
@@ -67,7 +71,12 @@ export function toolParameterTypeToJSON(object: ToolParameterType): string {
   }
 }
 
-/** LFM2 names a model family in a wire enum, which the rest of the IDL avoids. */
+/**
+ * ---------------------------------------------------------------------------
+ * Tool-call wire formats various LLM families emit. This enum is the single
+ * portable format selector across commons and every generated SDK binding.
+ * ---------------------------------------------------------------------------
+ */
 export enum ToolCallFormatName {
   TOOL_CALL_FORMAT_NAME_UNSPECIFIED = 0,
   TOOL_CALL_FORMAT_NAME_JSON = 1,
@@ -158,7 +167,78 @@ export function toolChoiceModeToJSON(object: ToolChoiceMode): string {
   }
 }
 
-/** A JSON value, typed rather than stringly. */
+export enum ToolCallingStreamEventKind {
+  TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+  TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN = 1,
+  TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED = 2,
+  TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED = 3,
+  TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED = 4,
+  TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED = 5,
+  TOOL_CALLING_STREAM_EVENT_KIND_ERROR = 6,
+  UNRECOGNIZED = -1,
+}
+
+export function toolCallingStreamEventKindFromJSON(object: any): ToolCallingStreamEventKind {
+  switch (object) {
+    case 0:
+    case "TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED":
+      return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED;
+    case 1:
+    case "TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN":
+      return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN;
+    case 2:
+    case "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED":
+      return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED;
+    case 3:
+    case "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED":
+      return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED;
+    case 4:
+    case "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED":
+      return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED;
+    case 5:
+    case "TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED":
+      return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED;
+    case 6:
+    case "TOOL_CALLING_STREAM_EVENT_KIND_ERROR":
+      return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_ERROR;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ToolCallingStreamEventKind.UNRECOGNIZED;
+  }
+}
+
+export function toolCallingStreamEventKindToJSON(object: ToolCallingStreamEventKind): string {
+  switch (object) {
+    case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED:
+      return "TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED";
+    case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN:
+      return "TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN";
+    case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED:
+      return "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED";
+    case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED:
+      return "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED";
+    case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED:
+      return "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED";
+    case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED:
+      return "TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED";
+    case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_ERROR:
+      return "TOOL_CALLING_STREAM_EVENT_KIND_ERROR";
+    case ToolCallingStreamEventKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * JSON-typed scalar / composite carrier for tool arguments and results.
+ * Mirrors Swift's ToolValue enum, Kotlin's sealed class, and the
+ * TypeScript discriminated union. Used inside ToolParameter.enum_values
+ * (string-only) and as the canonical wire shape when consumers want
+ * strongly-typed arguments rather than raw JSON.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolValue {
   stringValue?: string | undefined;
   numberValue?: number | undefined;
@@ -184,28 +264,47 @@ export interface ToolValueObject_FieldsEntry {
   value?: ToolValue | undefined;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * String wrapper used by the rac_tool_value_to_json_proto /
+ * rac_tool_value_from_json_proto ABIs. Carries either the JSON text rendered
+ * from a ToolValue, or the JSON text that should be parsed back into a
+ * ToolValue. Defined here (rather than reusing a stand-alone wrapper) so the
+ * tool-calling round-trip stays self-contained in this proto.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolValueJSON {
   json: string;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * A single parameter definition for a tool.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolParameter {
   name: string;
   type: ToolParameterType;
   description: string;
   required: boolean;
+  /** Allowed values for enum-like parameters. Empty = unconstrained. */
   enumValues: string[];
-  /** Escape hatch for parameters the typed shape cannot express. */
   jsonSchema?: string | undefined;
   defaultValue?: ToolValue | undefined;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * Definition of a tool that the LLM can call.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolDefinition {
   name: string;
   description: string;
-  /** Use parameters for the typed form, or json_schema for a raw one. */
   parameters: ToolParameter[];
-  jsonSchema?: string | undefined;
+  /** Optional category for grouping tools in catalogs / UIs. */
   category?: string | undefined;
+  jsonSchema?: string | undefined;
   metadata: { [key: string]: string };
 }
 
@@ -214,59 +313,154 @@ export interface ToolDefinition_MetadataEntry {
   value: string;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * A tool call requested by the LLM. `arguments_json` is a JSON object
+ * matching the parameter shape declared in the corresponding ToolDefinition.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolCall {
+  /** Unique ID (caller-supplied or generated). Empty = unset. */
   id: string;
+  /** Tool name (matches ToolDefinition.name). */
   name: string;
+  /**
+   * JSON-encoded arguments. Empty object "{}" if no args.
+   *
+   * The C++ tokenizer / tool-prompt formatter
+   * (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
+   * `arguments_json` directly when building LLM prompts. It is the
+   * canonical wire shape for the prompt-formatting path.
+   */
   argumentsJson: string;
-  /** "function" is the only value today. Empty = unset. */
+  /**
+   * Discriminator for OpenAI-compatible flows ("function" is the only
+   * value at the moment). Empty = unset.
+   */
   type: string;
   createdAtMs: number;
-  /** The model text this call was parsed out of. */
   rawText?: string | undefined;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * Result of executing a tool. `result_json` is a JSON-encoded payload;
+ * `error` is non-empty when the execution failed.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolResult {
   toolCallId: string;
   name: string;
+  /**
+   * JSON-encoded tool execution result.
+   *
+   * The C++ tool-prompt formatter
+   * (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
+   * reads `result_json` directly when building follow-up LLM prompts after
+   * tool execution. It is the canonical wire shape.
+   */
   resultJson: string;
+  error?:
+    | string
+    | undefined;
+  /**
+   * Whether execution succeeded. If unset/false and error is empty,
+   * consumers should fall back to result_json/error semantics.
+   */
+  success: boolean;
   startedAtMs: number;
   completedAtMs: number;
-  /** Unset means the tool ran successfully; fall back to result_json semantics. */
-  error?: SDKError | undefined;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * Options for tool-enabled generation.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolCallingOptions {
-  /** Empty means the SDK falls back to its registered tools. */
+  /**
+   * Available tools for this generation. If empty, the SDK falls back to
+   * its registered tools (per-SDK convention).
+   */
   tools: ToolDefinition[];
-  /** Run tools automatically rather than handing calls back to the caller. */
-  autoExecute?: boolean | undefined;
+  /** Whether to auto-execute tools or hand them back to the caller. */
+  autoExecute: boolean;
+  /** Sampling temperature override (Swift: optional Float). */
+  temperature?:
+    | number
+    | undefined;
+  /** Maximum tokens override. */
+  maxTokens?:
+    | number
+    | undefined;
+  /** System prompt to use during tool-enabled generation. */
+  systemPrompt?:
+    | string
+    | undefined;
+  /**
+   * If true, replaces the system prompt entirely (no auto-injected
+   * tool instructions).
+   */
   replaceSystemPrompt: boolean;
-  /** Keep offering tools after the first call resolves. */
+  /**
+   * If true, keeps tool definitions available across multiple sequential
+   * tool calls in one generation.
+   */
   keepToolsAvailable: boolean;
+  /** Typed tool-call format. Unset lets commons select the model default. */
   format?:
     | ToolCallFormatName
     | undefined;
-  /** Iteration cap on the run loop. */
-  maxToolCalls?:
-    | number
-    | undefined;
-  /** forced_tool_name applies when tool_choice is SPECIFIC. */
+  /**
+   * When true, one model turn may emit multiple tool-call envelopes;
+   * commons parses and executes all of them before building a single
+   * follow-up prompt. Default false preserves the historical
+   * one-call-per-turn behavior. (Reclaims the field number that
+   * originally carried this flag before it was reserved.)
+   */
+  parallelToolCalls: boolean;
+  /**
+   * Maximum tool calls in one conversation turn. Unset/0 = SDK default
+   * (typically 5).
+   */
+  maxToolCalls?: number | undefined;
   toolChoice: ToolChoiceMode;
   forcedToolName?: string | undefined;
   requireJsonArguments: boolean;
+  /**
+   * When true, suppress the model's thinking/reasoning phase during
+   * tool-enabled generation (commons prepends the model no-think directive
+   * at the prompt level — same contract as
+   * LLMGenerationOptions.disable_thinking). Default false.
+   */
+  disableThinking?: boolean | undefined;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * Result of a tool-enabled generation.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolCallingResult {
+  /** Final text response from the assistant. */
   text: string;
+  /** Tool calls the LLM made. */
   toolCalls: ToolCall[];
+  /** Results of executed tools (only populated when auto_execute was true). */
   toolResults: ToolResult[];
-  /** False when the loop stopped at max_tool_calls with calls outstanding. */
+  /** Whether the response is complete or waiting for more tool results. */
   isComplete: boolean;
-  conversationId?: string | undefined;
+  /** Conversation ID for continuing with tool results. */
+  conversationId?:
+    | string
+    | undefined;
+  /** Number of LLM generation turns used, including the final synthesis turn. */
   iterationsUsed: number;
+  errorMessage?: string | undefined;
+  errorCode: number;
   rawText: string;
+  /** Optional thinking/reasoning content extracted from the final response. */
   thinkingContent?: string | undefined;
-  error?: SDKError | undefined;
 }
 
 export interface ToolParseRequest {
@@ -277,41 +471,163 @@ export interface ToolParseRequest {
 export interface ToolParseResult {
   hasToolCall: boolean;
   toolCalls: ToolCall[];
-  /** Model text left over after the calls were extracted. */
   remainingText: string;
-  error?: SDKError | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
 }
 
 export interface ToolPromptFormatRequest {
+  /**
+   * User prompt to merge with tool instructions. Empty means return only
+   * the tool-instruction block for the selected format.
+   */
   userPrompt: string;
+  /** Carries available tools plus format/choice/iteration constraints. */
   options?:
     | ToolCallingOptions
     | undefined;
-  /** Prior turn's results and text, for multi-iteration loops. */
+  /**
+   * Tool results to include when formatting a follow-up prompt after host
+   * execution. Empty means an initial tool-enabled prompt.
+   */
   toolResults: ToolResult[];
+  /** Assistant text emitted before tool execution, when available. */
   assistantText?: string | undefined;
 }
 
 export interface ToolPromptFormatResult {
   formattedPrompt: string;
   format: ToolCallFormatName;
-  error?: SDKError | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
 }
 
 export interface ToolCallValidationRequest {
-  toolCall?: ToolCall | undefined;
+  toolCall?:
+    | ToolCall
+    | undefined;
+  /**
+   * Validation uses options.tools as the registry snapshot and honors
+   * portable flags such as require_json_arguments and forced_tool_name.
+   */
   options?: ToolCallingOptions | undefined;
 }
 
 export interface ToolCallValidationResult {
   isValid: boolean;
   validationErrors: string[];
-  matchedTool?:
-    | ToolDefinition
-    | undefined;
-  /** Arguments coerced to the matched tool's parameter types. */
+  matchedTool?: ToolDefinition | undefined;
   normalizedArgumentsJson: string;
-  error?: SDKError | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
+}
+
+export interface ToolCallingStreamEvent {
+  seq: number;
+  timestampUs: number;
+  conversationId: string;
+  kind: ToolCallingStreamEventKind;
+  token: string;
+  toolCall?: ToolCall | undefined;
+  toolResult?: ToolResult | undefined;
+  result?: ToolCallingResult | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
+}
+
+export interface ToolRegistrySnapshot {
+  tools: ToolDefinition[];
+  updatedAtMs: number;
+}
+
+export interface ToolCallingSessionCreateRequest {
+  /** Prompt + LLM generation options inline (avoids cross-proto import cycle). */
+  prompt: string;
+  maxTokens: number;
+  temperature: number;
+  topP: number;
+  systemPrompt: string;
+  tools: ToolDefinition[];
+  format: ToolCallFormatName;
+  maxToolCalls: number;
+  keepToolsAvailable: boolean;
+  /**
+   * proto3 `optional` enables presence detection (has_validate_calls()).
+   * When unset, commons defaults to validate_calls=true so unknown tool
+   * calls short-circuit before host execution.
+   * Callers that delegate validation/authorization to their executor or
+   * use dynamic tool registries must explicitly set validate_calls=false.
+   */
+  validateCalls?:
+    | boolean
+    | undefined;
+  /**
+   * OpenAI-style tool_choice override surfaced through the high-level
+   * run-loop / session APIs. The same fields exist on ToolCallingOptions
+   * (fields 13/14); we re-publish them here so the canonical request
+   * envelope can carry the policy without forcing callers to pass an
+   * inline ToolCallingOptions. commons honors these on every
+   * format/validate primitive via build_options_snapshot.
+   */
+  toolChoice?: ToolChoiceMode | undefined;
+  forcedToolName?:
+    | string
+    | undefined;
+  /**
+   * When true, suppress the model's thinking phase for every generate in
+   * the loop/session (maps from ToolCallingOptions.disable_thinking; same
+   * contract as LLMGenerationOptions.disable_thinking). Default false.
+   */
+  disableThinking: boolean;
+  /**
+   * Default true when absent. False returns the parsed ToolCall without
+   * invoking the host executor.
+   */
+  autoExecute?: boolean | undefined;
+  replaceSystemPrompt: boolean;
+  requireJsonArguments: boolean;
+  /**
+   * Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
+   * EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
+   * in the loop so multi-turn tool use keeps context. Same contract as the standard path's
+   * ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
+   * cross-proto import cycle.
+   */
+  history: string[];
+  /**
+   * Mirrors ToolCallingOptions.parallel_tool_calls for the run-loop /
+   * session envelope: when true, one model turn may emit multiple
+   * tool-call envelopes and commons executes all of them before one
+   * follow-up prompt. Default false = historical single-call behavior.
+   */
+  parallelToolCalls: boolean;
+}
+
+export interface ToolCallingSessionCreateResult {
+  sessionHandle: number;
+}
+
+export interface ToolCallingSessionEvent {
+  /** serialized LLMStreamEvent proto */
+  llmStreamEventBytes?: Uint8Array | undefined;
+  toolCall?: ToolCall | undefined;
+  finalResult?:
+    | ToolCallingResult
+    | undefined;
+  /** serialized SDKError proto */
+  errorBytes?: Uint8Array | undefined;
+  seq: number;
+}
+
+export interface ToolCallingSessionStepWithResultRequest {
+  sessionHandle: number;
+  toolCallId: string;
+  resultJson: string;
+  error?: string | undefined;
+}
+
+export interface ToolCallingSessionDestroyRequest {
+  sessionHandle: number;
 }
 
 function createBaseToolValue(): ToolValue {
@@ -949,7 +1265,7 @@ export const ToolParameter: MessageFns<ToolParameter> = {
 };
 
 function createBaseToolDefinition(): ToolDefinition {
-  return { name: "", description: "", parameters: [], jsonSchema: undefined, category: undefined, metadata: {} };
+  return { name: "", description: "", parameters: [], category: undefined, jsonSchema: undefined, metadata: {} };
 }
 
 export const ToolDefinition: MessageFns<ToolDefinition> = {
@@ -963,11 +1279,11 @@ export const ToolDefinition: MessageFns<ToolDefinition> = {
     for (const v of message.parameters) {
       ToolParameter.encode(v!, writer.uint32(26).fork()).join();
     }
-    if (message.jsonSchema !== undefined) {
-      writer.uint32(42).string(message.jsonSchema);
-    }
     if (message.category !== undefined) {
       writer.uint32(34).string(message.category);
+    }
+    if (message.jsonSchema !== undefined) {
+      writer.uint32(42).string(message.jsonSchema);
     }
     globalThis.Object.entries(message.metadata).forEach(([key, value]: [string, string]) => {
       ToolDefinition_MetadataEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).join();
@@ -1006,20 +1322,20 @@ export const ToolDefinition: MessageFns<ToolDefinition> = {
           message.parameters.push(ToolParameter.decode(reader, reader.uint32()));
           continue;
         }
-        case 5: {
-          if (tag !== 42) {
-            break;
-          }
-
-          message.jsonSchema = reader.string();
-          continue;
-        }
         case 4: {
           if (tag !== 34) {
             break;
           }
 
           message.category = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.jsonSchema = reader.string();
           continue;
         }
         case 6: {
@@ -1049,12 +1365,12 @@ export const ToolDefinition: MessageFns<ToolDefinition> = {
       parameters: globalThis.Array.isArray(object?.parameters)
         ? object.parameters.map((e: any) => ToolParameter.fromJSON(e))
         : [],
+      category: isSet(object.category) ? globalThis.String(object.category) : undefined,
       jsonSchema: isSet(object.jsonSchema)
         ? globalThis.String(object.jsonSchema)
         : isSet(object.json_schema)
         ? globalThis.String(object.json_schema)
         : undefined,
-      category: isSet(object.category) ? globalThis.String(object.category) : undefined,
       metadata: isObject(object.metadata)
         ? (globalThis.Object.entries(object.metadata) as [string, any][]).reduce(
           (acc: { [key: string]: string }, [key, value]: [string, any]) => {
@@ -1078,11 +1394,11 @@ export const ToolDefinition: MessageFns<ToolDefinition> = {
     if (message.parameters?.length) {
       obj.parameters = message.parameters.map((e) => ToolParameter.toJSON(e));
     }
-    if (message.jsonSchema !== undefined) {
-      obj.jsonSchema = message.jsonSchema;
-    }
     if (message.category !== undefined) {
       obj.category = message.category;
+    }
+    if (message.jsonSchema !== undefined) {
+      obj.jsonSchema = message.jsonSchema;
     }
     if (message.metadata) {
       const entries = globalThis.Object.entries(message.metadata) as [string, string][];
@@ -1104,8 +1420,8 @@ export const ToolDefinition: MessageFns<ToolDefinition> = {
     message.name = object.name ?? "";
     message.description = object.description ?? "";
     message.parameters = object.parameters?.map((e) => ToolParameter.fromPartial(e)) || [];
-    message.jsonSchema = object.jsonSchema ?? undefined;
     message.category = object.category ?? undefined;
+    message.jsonSchema = object.jsonSchema ?? undefined;
     message.metadata = (globalThis.Object.entries(object.metadata ?? {}) as [string, string][]).reduce(
       (acc: { [key: string]: string }, [key, value]: [string, string]) => {
         if (value !== undefined) {
@@ -1348,7 +1664,15 @@ export const ToolCall: MessageFns<ToolCall> = {
 };
 
 function createBaseToolResult(): ToolResult {
-  return { toolCallId: "", name: "", resultJson: "", startedAtMs: 0, completedAtMs: 0, error: undefined };
+  return {
+    toolCallId: "",
+    name: "",
+    resultJson: "",
+    error: undefined,
+    success: false,
+    startedAtMs: 0,
+    completedAtMs: 0,
+  };
 }
 
 export const ToolResult: MessageFns<ToolResult> = {
@@ -1362,14 +1686,17 @@ export const ToolResult: MessageFns<ToolResult> = {
     if (message.resultJson !== "") {
       writer.uint32(26).string(message.resultJson);
     }
+    if (message.error !== undefined) {
+      writer.uint32(34).string(message.error);
+    }
+    if (message.success !== false) {
+      writer.uint32(40).bool(message.success);
+    }
     if (message.startedAtMs !== 0) {
       writer.uint32(64).int64(message.startedAtMs);
     }
     if (message.completedAtMs !== 0) {
       writer.uint32(72).int64(message.completedAtMs);
-    }
-    if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(82).fork()).join();
     }
     return writer;
   },
@@ -1405,6 +1732,22 @@ export const ToolResult: MessageFns<ToolResult> = {
           message.resultJson = reader.string();
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.error = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        }
         case 8: {
           if (tag !== 64) {
             break;
@@ -1419,14 +1762,6 @@ export const ToolResult: MessageFns<ToolResult> = {
           }
 
           message.completedAtMs = longToNumber(reader.int64());
-          continue;
-        }
-        case 10: {
-          if (tag !== 82) {
-            break;
-          }
-
-          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1451,6 +1786,8 @@ export const ToolResult: MessageFns<ToolResult> = {
         : isSet(object.result_json)
         ? globalThis.String(object.result_json)
         : "",
+      error: isSet(object.error) ? globalThis.String(object.error) : undefined,
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       startedAtMs: isSet(object.startedAtMs)
         ? globalThis.Number(object.startedAtMs)
         : isSet(object.started_at_ms)
@@ -1461,7 +1798,6 @@ export const ToolResult: MessageFns<ToolResult> = {
         : isSet(object.completed_at_ms)
         ? globalThis.Number(object.completed_at_ms)
         : 0,
-      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1476,14 +1812,17 @@ export const ToolResult: MessageFns<ToolResult> = {
     if (message.resultJson !== "") {
       obj.resultJson = message.resultJson;
     }
+    if (message.error !== undefined) {
+      obj.error = message.error;
+    }
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
     if (message.startedAtMs !== 0) {
       obj.startedAtMs = Math.round(message.startedAtMs);
     }
     if (message.completedAtMs !== 0) {
       obj.completedAtMs = Math.round(message.completedAtMs);
-    }
-    if (message.error !== undefined) {
-      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1496,11 +1835,10 @@ export const ToolResult: MessageFns<ToolResult> = {
     message.toolCallId = object.toolCallId ?? "";
     message.name = object.name ?? "";
     message.resultJson = object.resultJson ?? "";
+    message.error = object.error ?? undefined;
+    message.success = object.success ?? false;
     message.startedAtMs = object.startedAtMs ?? 0;
     message.completedAtMs = object.completedAtMs ?? 0;
-    message.error = (object.error !== undefined && object.error !== null)
-      ? SDKError.fromPartial(object.error)
-      : undefined;
     return message;
   },
 };
@@ -1508,14 +1846,19 @@ export const ToolResult: MessageFns<ToolResult> = {
 function createBaseToolCallingOptions(): ToolCallingOptions {
   return {
     tools: [],
-    autoExecute: undefined,
+    autoExecute: false,
+    temperature: undefined,
+    maxTokens: undefined,
+    systemPrompt: undefined,
     replaceSystemPrompt: false,
     keepToolsAvailable: false,
     format: undefined,
+    parallelToolCalls: false,
     maxToolCalls: undefined,
     toolChoice: 0,
     forcedToolName: undefined,
     requireJsonArguments: false,
+    disableThinking: undefined,
   };
 }
 
@@ -1524,8 +1867,17 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     for (const v of message.tools) {
       ToolDefinition.encode(v!, writer.uint32(10).fork()).join();
     }
-    if (message.autoExecute !== undefined) {
+    if (message.autoExecute !== false) {
       writer.uint32(24).bool(message.autoExecute);
+    }
+    if (message.temperature !== undefined) {
+      writer.uint32(37).float(message.temperature);
+    }
+    if (message.maxTokens !== undefined) {
+      writer.uint32(40).int32(message.maxTokens);
+    }
+    if (message.systemPrompt !== undefined) {
+      writer.uint32(50).string(message.systemPrompt);
     }
     if (message.replaceSystemPrompt !== false) {
       writer.uint32(56).bool(message.replaceSystemPrompt);
@@ -1535,6 +1887,9 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     }
     if (message.format !== undefined) {
       writer.uint32(80).int32(message.format);
+    }
+    if (message.parallelToolCalls !== false) {
+      writer.uint32(120).bool(message.parallelToolCalls);
     }
     if (message.maxToolCalls !== undefined) {
       writer.uint32(96).int32(message.maxToolCalls);
@@ -1547,6 +1902,9 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     }
     if (message.requireJsonArguments !== false) {
       writer.uint32(128).bool(message.requireJsonArguments);
+    }
+    if (message.disableThinking !== undefined) {
+      writer.uint32(136).bool(message.disableThinking);
     }
     return writer;
   },
@@ -1574,6 +1932,30 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
           message.autoExecute = reader.bool();
           continue;
         }
+        case 4: {
+          if (tag !== 37) {
+            break;
+          }
+
+          message.temperature = reader.float();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.maxTokens = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.systemPrompt = reader.string();
+          continue;
+        }
         case 7: {
           if (tag !== 56) {
             break;
@@ -1596,6 +1978,14 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
           }
 
           message.format = reader.int32() as any;
+          continue;
+        }
+        case 15: {
+          if (tag !== 120) {
+            break;
+          }
+
+          message.parallelToolCalls = reader.bool();
           continue;
         }
         case 12: {
@@ -1630,6 +2020,14 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
           message.requireJsonArguments = reader.bool();
           continue;
         }
+        case 17: {
+          if (tag !== 136) {
+            break;
+          }
+
+          message.disableThinking = reader.bool();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1646,6 +2044,17 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
         ? globalThis.Boolean(object.autoExecute)
         : isSet(object.auto_execute)
         ? globalThis.Boolean(object.auto_execute)
+        : false,
+      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : undefined,
+      maxTokens: isSet(object.maxTokens)
+        ? globalThis.Number(object.maxTokens)
+        : isSet(object.max_tokens)
+        ? globalThis.Number(object.max_tokens)
+        : undefined,
+      systemPrompt: isSet(object.systemPrompt)
+        ? globalThis.String(object.systemPrompt)
+        : isSet(object.system_prompt)
+        ? globalThis.String(object.system_prompt)
         : undefined,
       replaceSystemPrompt: isSet(object.replaceSystemPrompt)
         ? globalThis.Boolean(object.replaceSystemPrompt)
@@ -1658,6 +2067,11 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
         ? globalThis.Boolean(object.keep_tools_available)
         : false,
       format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : undefined,
+      parallelToolCalls: isSet(object.parallelToolCalls)
+        ? globalThis.Boolean(object.parallelToolCalls)
+        : isSet(object.parallel_tool_calls)
+        ? globalThis.Boolean(object.parallel_tool_calls)
+        : false,
       maxToolCalls: isSet(object.maxToolCalls)
         ? globalThis.Number(object.maxToolCalls)
         : isSet(object.max_tool_calls)
@@ -1678,6 +2092,11 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
         : isSet(object.require_json_arguments)
         ? globalThis.Boolean(object.require_json_arguments)
         : false,
+      disableThinking: isSet(object.disableThinking)
+        ? globalThis.Boolean(object.disableThinking)
+        : isSet(object.disable_thinking)
+        ? globalThis.Boolean(object.disable_thinking)
+        : undefined,
     };
   },
 
@@ -1686,8 +2105,17 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     if (message.tools?.length) {
       obj.tools = message.tools.map((e) => ToolDefinition.toJSON(e));
     }
-    if (message.autoExecute !== undefined) {
+    if (message.autoExecute !== false) {
       obj.autoExecute = message.autoExecute;
+    }
+    if (message.temperature !== undefined) {
+      obj.temperature = message.temperature;
+    }
+    if (message.maxTokens !== undefined) {
+      obj.maxTokens = Math.round(message.maxTokens);
+    }
+    if (message.systemPrompt !== undefined) {
+      obj.systemPrompt = message.systemPrompt;
     }
     if (message.replaceSystemPrompt !== false) {
       obj.replaceSystemPrompt = message.replaceSystemPrompt;
@@ -1697,6 +2125,9 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     }
     if (message.format !== undefined) {
       obj.format = toolCallFormatNameToJSON(message.format);
+    }
+    if (message.parallelToolCalls !== false) {
+      obj.parallelToolCalls = message.parallelToolCalls;
     }
     if (message.maxToolCalls !== undefined) {
       obj.maxToolCalls = Math.round(message.maxToolCalls);
@@ -1710,6 +2141,9 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
     if (message.requireJsonArguments !== false) {
       obj.requireJsonArguments = message.requireJsonArguments;
     }
+    if (message.disableThinking !== undefined) {
+      obj.disableThinking = message.disableThinking;
+    }
     return obj;
   },
 
@@ -1719,14 +2153,19 @@ export const ToolCallingOptions: MessageFns<ToolCallingOptions> = {
   fromPartial<I extends Exact<DeepPartial<ToolCallingOptions>, I>>(object: I): ToolCallingOptions {
     const message = createBaseToolCallingOptions();
     message.tools = object.tools?.map((e) => ToolDefinition.fromPartial(e)) || [];
-    message.autoExecute = object.autoExecute ?? undefined;
+    message.autoExecute = object.autoExecute ?? false;
+    message.temperature = object.temperature ?? undefined;
+    message.maxTokens = object.maxTokens ?? undefined;
+    message.systemPrompt = object.systemPrompt ?? undefined;
     message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
     message.keepToolsAvailable = object.keepToolsAvailable ?? false;
     message.format = object.format ?? undefined;
+    message.parallelToolCalls = object.parallelToolCalls ?? false;
     message.maxToolCalls = object.maxToolCalls ?? undefined;
     message.toolChoice = object.toolChoice ?? 0;
     message.forcedToolName = object.forcedToolName ?? undefined;
     message.requireJsonArguments = object.requireJsonArguments ?? false;
+    message.disableThinking = object.disableThinking ?? undefined;
     return message;
   },
 };
@@ -1739,9 +2178,10 @@ function createBaseToolCallingResult(): ToolCallingResult {
     isComplete: false,
     conversationId: undefined,
     iterationsUsed: 0,
+    errorMessage: undefined,
+    errorCode: 0,
     rawText: "",
     thinkingContent: undefined,
-    error: undefined,
   };
 }
 
@@ -1765,14 +2205,17 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     if (message.iterationsUsed !== 0) {
       writer.uint32(48).int32(message.iterationsUsed);
     }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(58).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(64).int32(message.errorCode);
+    }
     if (message.rawText !== "") {
       writer.uint32(74).string(message.rawText);
     }
     if (message.thinkingContent !== undefined) {
       writer.uint32(82).string(message.thinkingContent);
-    }
-    if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -1832,6 +2275,22 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
           message.iterationsUsed = reader.int32();
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+        }
         case 9: {
           if (tag !== 74) {
             break;
@@ -1846,14 +2305,6 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
           }
 
           message.thinkingContent = reader.string();
-          continue;
-        }
-        case 11: {
-          if (tag !== 90) {
-            break;
-          }
-
-          message.error = SDKError.decode(reader, reader.uint32());
           continue;
         }
       }
@@ -1893,6 +2344,16 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
         : isSet(object.iterations_used)
         ? globalThis.Number(object.iterations_used)
         : 0,
+      errorMessage: isSet(object.errorMessage)
+        ? globalThis.String(object.errorMessage)
+        : isSet(object.error_message)
+        ? globalThis.String(object.error_message)
+        : undefined,
+      errorCode: isSet(object.errorCode)
+        ? globalThis.Number(object.errorCode)
+        : isSet(object.error_code)
+        ? globalThis.Number(object.error_code)
+        : 0,
       rawText: isSet(object.rawText)
         ? globalThis.String(object.rawText)
         : isSet(object.raw_text)
@@ -1903,7 +2364,6 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
         : isSet(object.thinking_content)
         ? globalThis.String(object.thinking_content)
         : undefined,
-      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
     };
   },
 
@@ -1927,14 +2387,17 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     if (message.iterationsUsed !== 0) {
       obj.iterationsUsed = Math.round(message.iterationsUsed);
     }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
     if (message.rawText !== "") {
       obj.rawText = message.rawText;
     }
     if (message.thinkingContent !== undefined) {
       obj.thinkingContent = message.thinkingContent;
-    }
-    if (message.error !== undefined) {
-      obj.error = SDKError.toJSON(message.error);
     }
     return obj;
   },
@@ -1950,11 +2413,10 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     message.isComplete = object.isComplete ?? false;
     message.conversationId = object.conversationId ?? undefined;
     message.iterationsUsed = object.iterationsUsed ?? 0;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
     message.rawText = object.rawText ?? "";
     message.thinkingContent = object.thinkingContent ?? undefined;
-    message.error = (object.error !== undefined && object.error !== null)
-      ? SDKError.fromPartial(object.error)
-      : undefined;
     return message;
   },
 };
@@ -2038,7 +2500,7 @@ export const ToolParseRequest: MessageFns<ToolParseRequest> = {
 };
 
 function createBaseToolParseResult(): ToolParseResult {
-  return { hasToolCall: false, toolCalls: [], remainingText: "", error: undefined };
+  return { hasToolCall: false, toolCalls: [], remainingText: "", errorMessage: undefined, errorCode: 0 };
 }
 
 export const ToolParseResult: MessageFns<ToolParseResult> = {
@@ -2052,8 +2514,11 @@ export const ToolParseResult: MessageFns<ToolParseResult> = {
     if (message.remainingText !== "") {
       writer.uint32(26).string(message.remainingText);
     }
-    if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(50).fork()).join();
+    if (message.errorMessage !== undefined) {
+      writer.uint32(34).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(40).int32(message.errorCode);
     }
     return writer;
   },
@@ -2089,12 +2554,20 @@ export const ToolParseResult: MessageFns<ToolParseResult> = {
           message.remainingText = reader.string();
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
+        case 4: {
+          if (tag !== 34) {
             break;
           }
 
-          message.error = SDKError.decode(reader, reader.uint32());
+          message.errorMessage = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
           continue;
         }
       }
@@ -2123,7 +2596,16 @@ export const ToolParseResult: MessageFns<ToolParseResult> = {
         : isSet(object.remaining_text)
         ? globalThis.String(object.remaining_text)
         : "",
-      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+      errorMessage: isSet(object.errorMessage)
+        ? globalThis.String(object.errorMessage)
+        : isSet(object.error_message)
+        ? globalThis.String(object.error_message)
+        : undefined,
+      errorCode: isSet(object.errorCode)
+        ? globalThis.Number(object.errorCode)
+        : isSet(object.error_code)
+        ? globalThis.Number(object.error_code)
+        : 0,
     };
   },
 
@@ -2138,8 +2620,11 @@ export const ToolParseResult: MessageFns<ToolParseResult> = {
     if (message.remainingText !== "") {
       obj.remainingText = message.remainingText;
     }
-    if (message.error !== undefined) {
-      obj.error = SDKError.toJSON(message.error);
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
     }
     return obj;
   },
@@ -2152,9 +2637,8 @@ export const ToolParseResult: MessageFns<ToolParseResult> = {
     message.hasToolCall = object.hasToolCall ?? false;
     message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
     message.remainingText = object.remainingText ?? "";
-    message.error = (object.error !== undefined && object.error !== null)
-      ? SDKError.fromPartial(object.error)
-      : undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };
@@ -2282,7 +2766,7 @@ export const ToolPromptFormatRequest: MessageFns<ToolPromptFormatRequest> = {
 };
 
 function createBaseToolPromptFormatResult(): ToolPromptFormatResult {
-  return { formattedPrompt: "", format: 0, error: undefined };
+  return { formattedPrompt: "", format: 0, errorMessage: undefined, errorCode: 0 };
 }
 
 export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
@@ -2293,8 +2777,11 @@ export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
     if (message.format !== 0) {
       writer.uint32(16).int32(message.format);
     }
-    if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(50).fork()).join();
+    if (message.errorMessage !== undefined) {
+      writer.uint32(34).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(40).int32(message.errorCode);
     }
     return writer;
   },
@@ -2322,12 +2809,20 @@ export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
           message.format = reader.int32() as any;
           continue;
         }
-        case 6: {
-          if (tag !== 50) {
+        case 4: {
+          if (tag !== 34) {
             break;
           }
 
-          message.error = SDKError.decode(reader, reader.uint32());
+          message.errorMessage = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
           continue;
         }
       }
@@ -2347,7 +2842,16 @@ export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
         ? globalThis.String(object.formatted_prompt)
         : "",
       format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : 0,
-      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+      errorMessage: isSet(object.errorMessage)
+        ? globalThis.String(object.errorMessage)
+        : isSet(object.error_message)
+        ? globalThis.String(object.error_message)
+        : undefined,
+      errorCode: isSet(object.errorCode)
+        ? globalThis.Number(object.errorCode)
+        : isSet(object.error_code)
+        ? globalThis.Number(object.error_code)
+        : 0,
     };
   },
 
@@ -2359,8 +2863,11 @@ export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
     if (message.format !== 0) {
       obj.format = toolCallFormatNameToJSON(message.format);
     }
-    if (message.error !== undefined) {
-      obj.error = SDKError.toJSON(message.error);
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
     }
     return obj;
   },
@@ -2372,9 +2879,8 @@ export const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult> = {
     const message = createBaseToolPromptFormatResult();
     message.formattedPrompt = object.formattedPrompt ?? "";
     message.format = object.format ?? 0;
-    message.error = (object.error !== undefined && object.error !== null)
-      ? SDKError.fromPartial(object.error)
-      : undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };
@@ -2469,7 +2975,8 @@ function createBaseToolCallValidationResult(): ToolCallValidationResult {
     validationErrors: [],
     matchedTool: undefined,
     normalizedArgumentsJson: "",
-    error: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
   };
 }
 
@@ -2487,8 +2994,11 @@ export const ToolCallValidationResult: MessageFns<ToolCallValidationResult> = {
     if (message.normalizedArgumentsJson !== "") {
       writer.uint32(34).string(message.normalizedArgumentsJson);
     }
-    if (message.error !== undefined) {
-      SDKError.encode(message.error, writer.uint32(58).fork()).join();
+    if (message.errorMessage !== undefined) {
+      writer.uint32(42).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(48).int32(message.errorCode);
     }
     return writer;
   },
@@ -2532,12 +3042,20 @@ export const ToolCallValidationResult: MessageFns<ToolCallValidationResult> = {
           message.normalizedArgumentsJson = reader.string();
           continue;
         }
-        case 7: {
-          if (tag !== 58) {
+        case 5: {
+          if (tag !== 42) {
             break;
           }
 
-          message.error = SDKError.decode(reader, reader.uint32());
+          message.errorMessage = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
           continue;
         }
       }
@@ -2571,7 +3089,16 @@ export const ToolCallValidationResult: MessageFns<ToolCallValidationResult> = {
         : isSet(object.normalized_arguments_json)
         ? globalThis.String(object.normalized_arguments_json)
         : "",
-      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+      errorMessage: isSet(object.errorMessage)
+        ? globalThis.String(object.errorMessage)
+        : isSet(object.error_message)
+        ? globalThis.String(object.error_message)
+        : undefined,
+      errorCode: isSet(object.errorCode)
+        ? globalThis.Number(object.errorCode)
+        : isSet(object.error_code)
+        ? globalThis.Number(object.error_code)
+        : 0,
     };
   },
 
@@ -2589,8 +3116,11 @@ export const ToolCallValidationResult: MessageFns<ToolCallValidationResult> = {
     if (message.normalizedArgumentsJson !== "") {
       obj.normalizedArgumentsJson = message.normalizedArgumentsJson;
     }
-    if (message.error !== undefined) {
-      obj.error = SDKError.toJSON(message.error);
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
     }
     return obj;
   },
@@ -2606,12 +3136,1164 @@ export const ToolCallValidationResult: MessageFns<ToolCallValidationResult> = {
       ? ToolDefinition.fromPartial(object.matchedTool)
       : undefined;
     message.normalizedArgumentsJson = object.normalizedArgumentsJson ?? "";
-    message.error = (object.error !== undefined && object.error !== null)
-      ? SDKError.fromPartial(object.error)
-      : undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };
+
+function createBaseToolCallingStreamEvent(): ToolCallingStreamEvent {
+  return {
+    seq: 0,
+    timestampUs: 0,
+    conversationId: "",
+    kind: 0,
+    token: "",
+    toolCall: undefined,
+    toolResult: undefined,
+    result: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export const ToolCallingStreamEvent: MessageFns<ToolCallingStreamEvent> = {
+  encode(message: ToolCallingStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.seq !== 0) {
+      writer.uint32(8).uint64(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      writer.uint32(16).int64(message.timestampUs);
+    }
+    if (message.conversationId !== "") {
+      writer.uint32(26).string(message.conversationId);
+    }
+    if (message.kind !== 0) {
+      writer.uint32(32).int32(message.kind);
+    }
+    if (message.token !== "") {
+      writer.uint32(42).string(message.token);
+    }
+    if (message.toolCall !== undefined) {
+      ToolCall.encode(message.toolCall, writer.uint32(50).fork()).join();
+    }
+    if (message.toolResult !== undefined) {
+      ToolResult.encode(message.toolResult, writer.uint32(58).fork()).join();
+    }
+    if (message.result !== undefined) {
+      ToolCallingResult.encode(message.result, writer.uint32(66).fork()).join();
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(74).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(80).int32(message.errorCode);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingStreamEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingStreamEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.seq = longToNumber(reader.uint64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.timestampUs = longToNumber(reader.int64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.conversationId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.kind = reader.int32() as any;
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.token = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.toolCall = ToolCall.decode(reader, reader.uint32());
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.toolResult = ToolResult.decode(reader, reader.uint32());
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.result = ToolCallingResult.decode(reader, reader.uint32());
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingStreamEvent {
+    return {
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
+      timestampUs: isSet(object.timestampUs)
+        ? globalThis.Number(object.timestampUs)
+        : isSet(object.timestamp_us)
+        ? globalThis.Number(object.timestamp_us)
+        : 0,
+      conversationId: isSet(object.conversationId)
+        ? globalThis.String(object.conversationId)
+        : isSet(object.conversation_id)
+        ? globalThis.String(object.conversation_id)
+        : "",
+      kind: isSet(object.kind) ? toolCallingStreamEventKindFromJSON(object.kind) : 0,
+      token: isSet(object.token) ? globalThis.String(object.token) : "",
+      toolCall: isSet(object.toolCall)
+        ? ToolCall.fromJSON(object.toolCall)
+        : isSet(object.tool_call)
+        ? ToolCall.fromJSON(object.tool_call)
+        : undefined,
+      toolResult: isSet(object.toolResult)
+        ? ToolResult.fromJSON(object.toolResult)
+        : isSet(object.tool_result)
+        ? ToolResult.fromJSON(object.tool_result)
+        : undefined,
+      result: isSet(object.result) ? ToolCallingResult.fromJSON(object.result) : undefined,
+      errorMessage: isSet(object.errorMessage)
+        ? globalThis.String(object.errorMessage)
+        : isSet(object.error_message)
+        ? globalThis.String(object.error_message)
+        : undefined,
+      errorCode: isSet(object.errorCode)
+        ? globalThis.Number(object.errorCode)
+        : isSet(object.error_code)
+        ? globalThis.Number(object.error_code)
+        : 0,
+    };
+  },
+
+  toJSON(message: ToolCallingStreamEvent): unknown {
+    const obj: any = {};
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      obj.timestampUs = Math.round(message.timestampUs);
+    }
+    if (message.conversationId !== "") {
+      obj.conversationId = message.conversationId;
+    }
+    if (message.kind !== 0) {
+      obj.kind = toolCallingStreamEventKindToJSON(message.kind);
+    }
+    if (message.token !== "") {
+      obj.token = message.token;
+    }
+    if (message.toolCall !== undefined) {
+      obj.toolCall = ToolCall.toJSON(message.toolCall);
+    }
+    if (message.toolResult !== undefined) {
+      obj.toolResult = ToolResult.toJSON(message.toolResult);
+    }
+    if (message.result !== undefined) {
+      obj.result = ToolCallingResult.toJSON(message.result);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingStreamEvent>, I>>(base?: I): ToolCallingStreamEvent {
+    return ToolCallingStreamEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingStreamEvent>, I>>(object: I): ToolCallingStreamEvent {
+    const message = createBaseToolCallingStreamEvent();
+    message.seq = object.seq ?? 0;
+    message.timestampUs = object.timestampUs ?? 0;
+    message.conversationId = object.conversationId ?? "";
+    message.kind = object.kind ?? 0;
+    message.token = object.token ?? "";
+    message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
+      ? ToolCall.fromPartial(object.toolCall)
+      : undefined;
+    message.toolResult = (object.toolResult !== undefined && object.toolResult !== null)
+      ? ToolResult.fromPartial(object.toolResult)
+      : undefined;
+    message.result = (object.result !== undefined && object.result !== null)
+      ? ToolCallingResult.fromPartial(object.result)
+      : undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseToolRegistrySnapshot(): ToolRegistrySnapshot {
+  return { tools: [], updatedAtMs: 0 };
+}
+
+export const ToolRegistrySnapshot: MessageFns<ToolRegistrySnapshot> = {
+  encode(message: ToolRegistrySnapshot, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.tools) {
+      ToolDefinition.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.updatedAtMs !== 0) {
+      writer.uint32(16).int64(message.updatedAtMs);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolRegistrySnapshot {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolRegistrySnapshot();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.tools.push(ToolDefinition.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.updatedAtMs = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolRegistrySnapshot {
+    return {
+      tools: globalThis.Array.isArray(object?.tools) ? object.tools.map((e: any) => ToolDefinition.fromJSON(e)) : [],
+      updatedAtMs: isSet(object.updatedAtMs)
+        ? globalThis.Number(object.updatedAtMs)
+        : isSet(object.updated_at_ms)
+        ? globalThis.Number(object.updated_at_ms)
+        : 0,
+    };
+  },
+
+  toJSON(message: ToolRegistrySnapshot): unknown {
+    const obj: any = {};
+    if (message.tools?.length) {
+      obj.tools = message.tools.map((e) => ToolDefinition.toJSON(e));
+    }
+    if (message.updatedAtMs !== 0) {
+      obj.updatedAtMs = Math.round(message.updatedAtMs);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolRegistrySnapshot>, I>>(base?: I): ToolRegistrySnapshot {
+    return ToolRegistrySnapshot.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolRegistrySnapshot>, I>>(object: I): ToolRegistrySnapshot {
+    const message = createBaseToolRegistrySnapshot();
+    message.tools = object.tools?.map((e) => ToolDefinition.fromPartial(e)) || [];
+    message.updatedAtMs = object.updatedAtMs ?? 0;
+    return message;
+  },
+};
+
+function createBaseToolCallingSessionCreateRequest(): ToolCallingSessionCreateRequest {
+  return {
+    prompt: "",
+    maxTokens: 0,
+    temperature: 0,
+    topP: 0,
+    systemPrompt: "",
+    tools: [],
+    format: 0,
+    maxToolCalls: 0,
+    keepToolsAvailable: false,
+    validateCalls: undefined,
+    toolChoice: undefined,
+    forcedToolName: undefined,
+    disableThinking: false,
+    autoExecute: undefined,
+    replaceSystemPrompt: false,
+    requireJsonArguments: false,
+    history: [],
+    parallelToolCalls: false,
+  };
+}
+
+export const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreateRequest> = {
+  encode(message: ToolCallingSessionCreateRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.prompt !== "") {
+      writer.uint32(10).string(message.prompt);
+    }
+    if (message.maxTokens !== 0) {
+      writer.uint32(88).int32(message.maxTokens);
+    }
+    if (message.temperature !== 0) {
+      writer.uint32(101).float(message.temperature);
+    }
+    if (message.topP !== 0) {
+      writer.uint32(109).float(message.topP);
+    }
+    if (message.systemPrompt !== "") {
+      writer.uint32(114).string(message.systemPrompt);
+    }
+    for (const v of message.tools) {
+      ToolDefinition.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.format !== 0) {
+      writer.uint32(24).int32(message.format);
+    }
+    if (message.maxToolCalls !== 0) {
+      writer.uint32(32).uint32(message.maxToolCalls);
+    }
+    if (message.keepToolsAvailable !== false) {
+      writer.uint32(40).bool(message.keepToolsAvailable);
+    }
+    if (message.validateCalls !== undefined) {
+      writer.uint32(48).bool(message.validateCalls);
+    }
+    if (message.toolChoice !== undefined) {
+      writer.uint32(56).int32(message.toolChoice);
+    }
+    if (message.forcedToolName !== undefined) {
+      writer.uint32(66).string(message.forcedToolName);
+    }
+    if (message.disableThinking !== false) {
+      writer.uint32(120).bool(message.disableThinking);
+    }
+    if (message.autoExecute !== undefined) {
+      writer.uint32(128).bool(message.autoExecute);
+    }
+    if (message.replaceSystemPrompt !== false) {
+      writer.uint32(136).bool(message.replaceSystemPrompt);
+    }
+    if (message.requireJsonArguments !== false) {
+      writer.uint32(144).bool(message.requireJsonArguments);
+    }
+    for (const v of message.history) {
+      writer.uint32(154).string(v!);
+    }
+    if (message.parallelToolCalls !== false) {
+      writer.uint32(160).bool(message.parallelToolCalls);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionCreateRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingSessionCreateRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.prompt = reader.string();
+          continue;
+        }
+        case 11: {
+          if (tag !== 88) {
+            break;
+          }
+
+          message.maxTokens = reader.int32();
+          continue;
+        }
+        case 12: {
+          if (tag !== 101) {
+            break;
+          }
+
+          message.temperature = reader.float();
+          continue;
+        }
+        case 13: {
+          if (tag !== 109) {
+            break;
+          }
+
+          message.topP = reader.float();
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.systemPrompt = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.tools.push(ToolDefinition.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.format = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.maxToolCalls = reader.uint32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.keepToolsAvailable = reader.bool();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.validateCalls = reader.bool();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.toolChoice = reader.int32() as any;
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.forcedToolName = reader.string();
+          continue;
+        }
+        case 15: {
+          if (tag !== 120) {
+            break;
+          }
+
+          message.disableThinking = reader.bool();
+          continue;
+        }
+        case 16: {
+          if (tag !== 128) {
+            break;
+          }
+
+          message.autoExecute = reader.bool();
+          continue;
+        }
+        case 17: {
+          if (tag !== 136) {
+            break;
+          }
+
+          message.replaceSystemPrompt = reader.bool();
+          continue;
+        }
+        case 18: {
+          if (tag !== 144) {
+            break;
+          }
+
+          message.requireJsonArguments = reader.bool();
+          continue;
+        }
+        case 19: {
+          if (tag !== 154) {
+            break;
+          }
+
+          message.history.push(reader.string());
+          continue;
+        }
+        case 20: {
+          if (tag !== 160) {
+            break;
+          }
+
+          message.parallelToolCalls = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingSessionCreateRequest {
+    return {
+      prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
+      maxTokens: isSet(object.maxTokens)
+        ? globalThis.Number(object.maxTokens)
+        : isSet(object.max_tokens)
+        ? globalThis.Number(object.max_tokens)
+        : 0,
+      temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
+      topP: isSet(object.topP)
+        ? globalThis.Number(object.topP)
+        : isSet(object.top_p)
+        ? globalThis.Number(object.top_p)
+        : 0,
+      systemPrompt: isSet(object.systemPrompt)
+        ? globalThis.String(object.systemPrompt)
+        : isSet(object.system_prompt)
+        ? globalThis.String(object.system_prompt)
+        : "",
+      tools: globalThis.Array.isArray(object?.tools)
+        ? object.tools.map((e: any) => ToolDefinition.fromJSON(e))
+        : [],
+      format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : 0,
+      maxToolCalls: isSet(object.maxToolCalls)
+        ? globalThis.Number(object.maxToolCalls)
+        : isSet(object.max_tool_calls)
+        ? globalThis.Number(object.max_tool_calls)
+        : 0,
+      keepToolsAvailable: isSet(object.keepToolsAvailable)
+        ? globalThis.Boolean(object.keepToolsAvailable)
+        : isSet(object.keep_tools_available)
+        ? globalThis.Boolean(object.keep_tools_available)
+        : false,
+      validateCalls: isSet(object.validateCalls)
+        ? globalThis.Boolean(object.validateCalls)
+        : isSet(object.validate_calls)
+        ? globalThis.Boolean(object.validate_calls)
+        : undefined,
+      toolChoice: isSet(object.toolChoice)
+        ? toolChoiceModeFromJSON(object.toolChoice)
+        : isSet(object.tool_choice)
+        ? toolChoiceModeFromJSON(object.tool_choice)
+        : undefined,
+      forcedToolName: isSet(object.forcedToolName)
+        ? globalThis.String(object.forcedToolName)
+        : isSet(object.forced_tool_name)
+        ? globalThis.String(object.forced_tool_name)
+        : undefined,
+      disableThinking: isSet(object.disableThinking)
+        ? globalThis.Boolean(object.disableThinking)
+        : isSet(object.disable_thinking)
+        ? globalThis.Boolean(object.disable_thinking)
+        : false,
+      autoExecute: isSet(object.autoExecute)
+        ? globalThis.Boolean(object.autoExecute)
+        : isSet(object.auto_execute)
+        ? globalThis.Boolean(object.auto_execute)
+        : undefined,
+      replaceSystemPrompt: isSet(object.replaceSystemPrompt)
+        ? globalThis.Boolean(object.replaceSystemPrompt)
+        : isSet(object.replace_system_prompt)
+        ? globalThis.Boolean(object.replace_system_prompt)
+        : false,
+      requireJsonArguments: isSet(object.requireJsonArguments)
+        ? globalThis.Boolean(object.requireJsonArguments)
+        : isSet(object.require_json_arguments)
+        ? globalThis.Boolean(object.require_json_arguments)
+        : false,
+      history: globalThis.Array.isArray(object?.history)
+        ? object.history.map((e: any) => globalThis.String(e))
+        : [],
+      parallelToolCalls: isSet(object.parallelToolCalls)
+        ? globalThis.Boolean(object.parallelToolCalls)
+        : isSet(object.parallel_tool_calls)
+        ? globalThis.Boolean(object.parallel_tool_calls)
+        : false,
+    };
+  },
+
+  toJSON(message: ToolCallingSessionCreateRequest): unknown {
+    const obj: any = {};
+    if (message.prompt !== "") {
+      obj.prompt = message.prompt;
+    }
+    if (message.maxTokens !== 0) {
+      obj.maxTokens = Math.round(message.maxTokens);
+    }
+    if (message.temperature !== 0) {
+      obj.temperature = message.temperature;
+    }
+    if (message.topP !== 0) {
+      obj.topP = message.topP;
+    }
+    if (message.systemPrompt !== "") {
+      obj.systemPrompt = message.systemPrompt;
+    }
+    if (message.tools?.length) {
+      obj.tools = message.tools.map((e) => ToolDefinition.toJSON(e));
+    }
+    if (message.format !== 0) {
+      obj.format = toolCallFormatNameToJSON(message.format);
+    }
+    if (message.maxToolCalls !== 0) {
+      obj.maxToolCalls = Math.round(message.maxToolCalls);
+    }
+    if (message.keepToolsAvailable !== false) {
+      obj.keepToolsAvailable = message.keepToolsAvailable;
+    }
+    if (message.validateCalls !== undefined) {
+      obj.validateCalls = message.validateCalls;
+    }
+    if (message.toolChoice !== undefined) {
+      obj.toolChoice = toolChoiceModeToJSON(message.toolChoice);
+    }
+    if (message.forcedToolName !== undefined) {
+      obj.forcedToolName = message.forcedToolName;
+    }
+    if (message.disableThinking !== false) {
+      obj.disableThinking = message.disableThinking;
+    }
+    if (message.autoExecute !== undefined) {
+      obj.autoExecute = message.autoExecute;
+    }
+    if (message.replaceSystemPrompt !== false) {
+      obj.replaceSystemPrompt = message.replaceSystemPrompt;
+    }
+    if (message.requireJsonArguments !== false) {
+      obj.requireJsonArguments = message.requireJsonArguments;
+    }
+    if (message.history?.length) {
+      obj.history = message.history;
+    }
+    if (message.parallelToolCalls !== false) {
+      obj.parallelToolCalls = message.parallelToolCalls;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingSessionCreateRequest>, I>>(base?: I): ToolCallingSessionCreateRequest {
+    return ToolCallingSessionCreateRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateRequest>, I>>(
+    object: I,
+  ): ToolCallingSessionCreateRequest {
+    const message = createBaseToolCallingSessionCreateRequest();
+    message.prompt = object.prompt ?? "";
+    message.maxTokens = object.maxTokens ?? 0;
+    message.temperature = object.temperature ?? 0;
+    message.topP = object.topP ?? 0;
+    message.systemPrompt = object.systemPrompt ?? "";
+    message.tools = object.tools?.map((e) => ToolDefinition.fromPartial(e)) || [];
+    message.format = object.format ?? 0;
+    message.maxToolCalls = object.maxToolCalls ?? 0;
+    message.keepToolsAvailable = object.keepToolsAvailable ?? false;
+    message.validateCalls = object.validateCalls ?? undefined;
+    message.toolChoice = object.toolChoice ?? undefined;
+    message.forcedToolName = object.forcedToolName ?? undefined;
+    message.disableThinking = object.disableThinking ?? false;
+    message.autoExecute = object.autoExecute ?? undefined;
+    message.replaceSystemPrompt = object.replaceSystemPrompt ?? false;
+    message.requireJsonArguments = object.requireJsonArguments ?? false;
+    message.history = object.history?.map((e) => e) || [];
+    message.parallelToolCalls = object.parallelToolCalls ?? false;
+    return message;
+  },
+};
+
+function createBaseToolCallingSessionCreateResult(): ToolCallingSessionCreateResult {
+  return { sessionHandle: 0 };
+}
+
+export const ToolCallingSessionCreateResult: MessageFns<ToolCallingSessionCreateResult> = {
+  encode(message: ToolCallingSessionCreateResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionHandle !== 0) {
+      writer.uint32(8).uint64(message.sessionHandle);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionCreateResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingSessionCreateResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sessionHandle = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingSessionCreateResult {
+    return {
+      sessionHandle: isSet(object.sessionHandle)
+        ? globalThis.Number(object.sessionHandle)
+        : isSet(object.session_handle)
+        ? globalThis.Number(object.session_handle)
+        : 0,
+    };
+  },
+
+  toJSON(message: ToolCallingSessionCreateResult): unknown {
+    const obj: any = {};
+    if (message.sessionHandle !== 0) {
+      obj.sessionHandle = Math.round(message.sessionHandle);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(base?: I): ToolCallingSessionCreateResult {
+    return ToolCallingSessionCreateResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(
+    object: I,
+  ): ToolCallingSessionCreateResult {
+    const message = createBaseToolCallingSessionCreateResult();
+    message.sessionHandle = object.sessionHandle ?? 0;
+    return message;
+  },
+};
+
+function createBaseToolCallingSessionEvent(): ToolCallingSessionEvent {
+  return { llmStreamEventBytes: undefined, toolCall: undefined, finalResult: undefined, errorBytes: undefined, seq: 0 };
+}
+
+export const ToolCallingSessionEvent: MessageFns<ToolCallingSessionEvent> = {
+  encode(message: ToolCallingSessionEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.llmStreamEventBytes !== undefined) {
+      writer.uint32(10).bytes(message.llmStreamEventBytes);
+    }
+    if (message.toolCall !== undefined) {
+      ToolCall.encode(message.toolCall, writer.uint32(18).fork()).join();
+    }
+    if (message.finalResult !== undefined) {
+      ToolCallingResult.encode(message.finalResult, writer.uint32(26).fork()).join();
+    }
+    if (message.errorBytes !== undefined) {
+      writer.uint32(34).bytes(message.errorBytes);
+    }
+    if (message.seq !== 0) {
+      writer.uint32(40).uint64(message.seq);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingSessionEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.llmStreamEventBytes = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.toolCall = ToolCall.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.finalResult = ToolCallingResult.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.errorBytes = reader.bytes();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.seq = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingSessionEvent {
+    return {
+      llmStreamEventBytes: isSet(object.llmStreamEventBytes)
+        ? bytesFromBase64(object.llmStreamEventBytes)
+        : isSet(object.llm_stream_event_bytes)
+        ? bytesFromBase64(object.llm_stream_event_bytes)
+        : undefined,
+      toolCall: isSet(object.toolCall)
+        ? ToolCall.fromJSON(object.toolCall)
+        : isSet(object.tool_call)
+        ? ToolCall.fromJSON(object.tool_call)
+        : undefined,
+      finalResult: isSet(object.finalResult)
+        ? ToolCallingResult.fromJSON(object.finalResult)
+        : isSet(object.final_result)
+        ? ToolCallingResult.fromJSON(object.final_result)
+        : undefined,
+      errorBytes: isSet(object.errorBytes)
+        ? bytesFromBase64(object.errorBytes)
+        : isSet(object.error_bytes)
+        ? bytesFromBase64(object.error_bytes)
+        : undefined,
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
+    };
+  },
+
+  toJSON(message: ToolCallingSessionEvent): unknown {
+    const obj: any = {};
+    if (message.llmStreamEventBytes !== undefined) {
+      obj.llmStreamEventBytes = base64FromBytes(message.llmStreamEventBytes);
+    }
+    if (message.toolCall !== undefined) {
+      obj.toolCall = ToolCall.toJSON(message.toolCall);
+    }
+    if (message.finalResult !== undefined) {
+      obj.finalResult = ToolCallingResult.toJSON(message.finalResult);
+    }
+    if (message.errorBytes !== undefined) {
+      obj.errorBytes = base64FromBytes(message.errorBytes);
+    }
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingSessionEvent>, I>>(base?: I): ToolCallingSessionEvent {
+    return ToolCallingSessionEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionEvent>, I>>(object: I): ToolCallingSessionEvent {
+    const message = createBaseToolCallingSessionEvent();
+    message.llmStreamEventBytes = object.llmStreamEventBytes ?? undefined;
+    message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
+      ? ToolCall.fromPartial(object.toolCall)
+      : undefined;
+    message.finalResult = (object.finalResult !== undefined && object.finalResult !== null)
+      ? ToolCallingResult.fromPartial(object.finalResult)
+      : undefined;
+    message.errorBytes = object.errorBytes ?? undefined;
+    message.seq = object.seq ?? 0;
+    return message;
+  },
+};
+
+function createBaseToolCallingSessionStepWithResultRequest(): ToolCallingSessionStepWithResultRequest {
+  return { sessionHandle: 0, toolCallId: "", resultJson: "", error: undefined };
+}
+
+export const ToolCallingSessionStepWithResultRequest: MessageFns<ToolCallingSessionStepWithResultRequest> = {
+  encode(message: ToolCallingSessionStepWithResultRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionHandle !== 0) {
+      writer.uint32(8).uint64(message.sessionHandle);
+    }
+    if (message.toolCallId !== "") {
+      writer.uint32(18).string(message.toolCallId);
+    }
+    if (message.resultJson !== "") {
+      writer.uint32(26).string(message.resultJson);
+    }
+    if (message.error !== undefined) {
+      writer.uint32(34).string(message.error);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionStepWithResultRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingSessionStepWithResultRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sessionHandle = longToNumber(reader.uint64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.toolCallId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.resultJson = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.error = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingSessionStepWithResultRequest {
+    return {
+      sessionHandle: isSet(object.sessionHandle)
+        ? globalThis.Number(object.sessionHandle)
+        : isSet(object.session_handle)
+        ? globalThis.Number(object.session_handle)
+        : 0,
+      toolCallId: isSet(object.toolCallId)
+        ? globalThis.String(object.toolCallId)
+        : isSet(object.tool_call_id)
+        ? globalThis.String(object.tool_call_id)
+        : "",
+      resultJson: isSet(object.resultJson)
+        ? globalThis.String(object.resultJson)
+        : isSet(object.result_json)
+        ? globalThis.String(object.result_json)
+        : "",
+      error: isSet(object.error) ? globalThis.String(object.error) : undefined,
+    };
+  },
+
+  toJSON(message: ToolCallingSessionStepWithResultRequest): unknown {
+    const obj: any = {};
+    if (message.sessionHandle !== 0) {
+      obj.sessionHandle = Math.round(message.sessionHandle);
+    }
+    if (message.toolCallId !== "") {
+      obj.toolCallId = message.toolCallId;
+    }
+    if (message.resultJson !== "") {
+      obj.resultJson = message.resultJson;
+    }
+    if (message.error !== undefined) {
+      obj.error = message.error;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingSessionStepWithResultRequest>, I>>(
+    base?: I,
+  ): ToolCallingSessionStepWithResultRequest {
+    return ToolCallingSessionStepWithResultRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionStepWithResultRequest>, I>>(
+    object: I,
+  ): ToolCallingSessionStepWithResultRequest {
+    const message = createBaseToolCallingSessionStepWithResultRequest();
+    message.sessionHandle = object.sessionHandle ?? 0;
+    message.toolCallId = object.toolCallId ?? "";
+    message.resultJson = object.resultJson ?? "";
+    message.error = object.error ?? undefined;
+    return message;
+  },
+};
+
+function createBaseToolCallingSessionDestroyRequest(): ToolCallingSessionDestroyRequest {
+  return { sessionHandle: 0 };
+}
+
+export const ToolCallingSessionDestroyRequest: MessageFns<ToolCallingSessionDestroyRequest> = {
+  encode(message: ToolCallingSessionDestroyRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.sessionHandle !== 0) {
+      writer.uint32(8).uint64(message.sessionHandle);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ToolCallingSessionDestroyRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolCallingSessionDestroyRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.sessionHandle = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolCallingSessionDestroyRequest {
+    return {
+      sessionHandle: isSet(object.sessionHandle)
+        ? globalThis.Number(object.sessionHandle)
+        : isSet(object.session_handle)
+        ? globalThis.Number(object.session_handle)
+        : 0,
+    };
+  },
+
+  toJSON(message: ToolCallingSessionDestroyRequest): unknown {
+    const obj: any = {};
+    if (message.sessionHandle !== 0) {
+      obj.sessionHandle = Math.round(message.sessionHandle);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(
+    base?: I,
+  ): ToolCallingSessionDestroyRequest {
+    return ToolCallingSessionDestroyRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(
+    object: I,
+  ): ToolCallingSessionDestroyRequest {
+    const message = createBaseToolCallingSessionDestroyRequest();
+    message.sessionHandle = object.sessionHandle ?? 0;
+    return message;
+  },
+};
+
+function bytesFromBase64(b64: string): Uint8Array {
+  const bin = globalThis.atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; ++i) {
+    arr[i] = bin.charCodeAt(i);
+  }
+  return arr;
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  const bin: string[] = [];
+  arr.forEach((byte) => {
+    bin.push(globalThis.String.fromCharCode(byte));
+  });
+  return globalThis.btoa(bin.join(""));
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 

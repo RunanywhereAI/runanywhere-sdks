@@ -17,7 +17,10 @@ import kotlin.Int
 import kotlin.Suppress
 
 /**
- * LFM2 names a model family in a wire enum, which the rest of the IDL avoids.
+ * ---------------------------------------------------------------------------
+ * Tool-call wire formats various LLM families emit. This enum is the single
+ * portable format selector across commons and every generated SDK binding.
+ * ---------------------------------------------------------------------------
  */
 public enum class ToolCallFormatName(
   override val `value`: Int,

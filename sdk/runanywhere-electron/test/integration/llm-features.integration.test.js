@@ -22,7 +22,7 @@ before(async () => {
   ({ RunAnywhere, SDKException } = require('../../dist'));
   try {
     RunAnywhere.initialize();
-    llm = await RunAnywhere.loadLLM('qwen2.5-0.5b');
+    llm = await RunAnywhere.loadLLM('qwen3.5-0.8b');
   } catch (e) {
     loadError = e;
   }

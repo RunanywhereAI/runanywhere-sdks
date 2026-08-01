@@ -33,6 +33,10 @@ import kotlin.collections.List
 import okio.ByteString
 
 public class ToolPromptFormatRequest(
+  /**
+   * User prompt to merge with tool instructions. Empty means return only
+   * the tool-instruction block for the selected format.
+   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -41,6 +45,9 @@ public class ToolPromptFormatRequest(
     schemaIndex = 0,
   )
   public val user_prompt: String = "",
+  /**
+   * Carries available tools plus format/choice/iteration constraints.
+   */
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.ToolCallingOptions#ADAPTER",
@@ -48,6 +55,9 @@ public class ToolPromptFormatRequest(
   )
   public val options: ToolCallingOptions? = null,
   tool_results: List<ToolResult> = emptyList(),
+  /**
+   * Assistant text emitted before tool execution, when available.
+   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -58,7 +68,8 @@ public class ToolPromptFormatRequest(
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolPromptFormatRequest, Nothing>(ADAPTER, unknownFields) {
   /**
-   * Prior turn's results and text, for multi-iteration loops.
+   * Tool results to include when formatting a follow-up prompt after host
+   * execution. Empty means an initial tool-enabled prompt.
    */
   @field:WireField(
     tag = 3,

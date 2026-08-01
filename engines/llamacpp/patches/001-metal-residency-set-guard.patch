@@ -1,0 +1,34 @@
+From: RunAnywhere SDK <dev@runanywhere.ai>
+Date: Tue, 8 Jul 2026 10:30:00 +0530
+Subject: [PATCH] ggml-metal: guard residency sets by GPU family
+
+Metal exposes MTLResidencySet APIs on iOS 18, including on devices whose
+GPUs cannot create residency sets. Calling newResidencySetWithDescriptor:
+on those devices triggers a Metal assertion:
+
+  -[MTLDebugDevice newResidencySetWithDescriptor:error:]:2785:
+  failed assertion 'device does not support residency sets.'
+
+Apple's Metal feature tables list residency sets for Apple GPU family 6
+and newer. A13 devices are Apple6 and support the feature; A12 devices
+are Apple5 and do not. Gate residency-set use with supportsFamily:
+MTLGPUFamilyApple6 so the API remains disabled on A12 and older GPUs.
+
+Fixes: https://github.com/RunanywhereAI/runanywhere-sdks/issues/480
+---
+ ggml/src/ggml-metal/ggml-metal-device.m | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/ggml/src/ggml-metal/ggml-metal-device.m b/ggml/src/ggml-metal/ggml-metal-device.m
+index 9065bfb8c384e15cc5ba9494327b13e3eda05bb5..4709229e1c674e5fd8a254a1bfab3db33b34aa9a 100644
+--- a/ggml/src/ggml-metal/ggml-metal-device.m
++++ b/ggml/src/ggml-metal/ggml-metal-device.m
+@@ -827 +827 @@ ggml_metal_device_t ggml_metal_device_init(int device) {
+-            dev->props.use_residency_sets = true;
++            dev->props.use_residency_sets = false;
+@@ -829 +829,4 @@ ggml_metal_device_t ggml_metal_device_init(int device) {
+-            dev->props.use_residency_sets = getenv("GGML_METAL_NO_RESIDENCY") == nil;
++            if ([dev->mtl_device supportsFamily:MTLGPUFamilyApple6]) {
++                dev->props.use_residency_sets = getenv("GGML_METAL_NO_RESIDENCY") == nil;
++            }
++            // Apple5 (A12) and older GPUs do not support residency sets.

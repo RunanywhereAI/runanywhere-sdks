@@ -14,23 +14,19 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/chat.pb.dart'
-    show ChatMessage, MessageRole;
 import 'package:runanywhere/generated/convenience/ra_convenience.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
-import 'package:runanywhere/generated/llm_service.pb.dart'
-    show
-        ToolCallingSessionCreateRequest,
-        ToolCallingSessionEvent,
-        ToolCallingSessionEvent_Kind;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
     show
         ToolCall,
+        ToolCallFormatName,
         ToolCallingOptions,
         ToolCallingResult,
+        ToolCallingSessionCreateRequest,
+        ToolCallingSessionEvent,
+        ToolCallingSessionEvent_Kind,
         ToolChoiceMode,
         ToolDefinition,
         ToolResult,
@@ -117,9 +113,8 @@ class RunAnywhereTools {
   ///
   /// Mirrors Swift `RunAnywhere.executeTool(_:)` semantics
   /// (RunAnywhere+ToolCalling.swift:158-203): unknown tools, argument
-  /// parse failures, and executor errors all surface as error-marked
-  /// [ToolResult]s (populated `error` submessage) — a parse failure must NOT
-  /// silently execute the tool with
+  /// parse failures, and executor errors all surface as `success: false`
+  /// results — a parse failure must NOT silently execute the tool with
   /// empty arguments, which would make bad model output look like a
   /// successful empty-argument call.
   Future<ToolResult> execute(ToolCall toolCall) async {
@@ -128,9 +123,8 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
-        error: SDKException.invalidInput(
-          'Tool not found: ${toolCall.name}',
-        ).error,
+        success: false,
+        error: 'Tool not found: ${toolCall.name}',
       );
     }
 
@@ -144,19 +138,18 @@ class RunAnywhereTools {
           return ToolResult(
             toolCallId: toolCall.id,
             name: toolCall.name,
-            error: SDKException.invalidInput(
-              'Failed to parse tool arguments: expected a JSON object, '
-              'got ${decoded.runtimeType}',
-            ).error,
+            success: false,
+            error:
+                'Failed to parse tool arguments: expected a JSON object, '
+                'got ${decoded.runtimeType}',
           );
         }
       } catch (e) {
         return ToolResult(
           toolCallId: toolCall.id,
           name: toolCall.name,
-          error: SDKException.invalidInput(
-            'Failed to parse tool arguments: $e',
-          ).error,
+          success: false,
+          error: 'Failed to parse tool arguments: $e',
         );
       }
     }
@@ -168,6 +161,7 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
+        success: true,
         resultJson: jsonEncode(result),
       );
     } catch (e) {
@@ -175,7 +169,8 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
-        error: SDKException.processingFailed(e.toString()).error,
+        success: false,
+        error: e.toString(),
       );
     }
   }
@@ -217,13 +212,13 @@ class RunAnywhereTools {
     List<String> history = const [],
   }) async {
     // Swift default: `options: RALLMGenerationOptions = .defaults()`.
-    final generation = (llmOptions ?? _defaultLLMOptions()).deepCopy();
+    final llm = llmOptions ?? _defaultLLMOptions();
     // Swift: `toolOptions ?? (options.hasToolCalling ? options.toolCalling
     // : RAToolCallingOptions.defaults())`.
     final opts =
         (options ??
-                (generation.hasToolCalling()
-                    ? generation.toolCalling
+                (llm.hasToolCalling()
+                    ? llm.toolCalling
                     : _defaultToolOptions()))
             .deepCopy();
     if (toolChoice != null) {
@@ -232,28 +227,52 @@ class RunAnywhereTools {
     if (forcedToolName != null) {
       opts.forcedToolName = forcedToolName;
     }
-    if (opts.tools.isEmpty) {
-      opts.tools.addAll(getRegisteredTools());
-    }
+    final tools = opts.tools.isNotEmpty ? opts.tools : getRegisteredTools();
     final autoExecute = opts.hasAutoExecute() ? opts.autoExecute : true;
-    generation.toolCalling = opts;
 
-    // Tool config travels inside generation.tool_calling; unset knobs
-    // (max_tool_calls, validate_calls, ...) fall back to the generated proto
-    // defaults inside commons.
+    // Mirrors Swift makeRunLoopRequest (RunAnywhere+ToolCalling.swift:491-548).
     final request = ToolCallingSessionCreateRequest(
       prompt: prompt,
-      generation: generation,
-      // Prior conversation turns EXCLUDING the current one (which is
-      // `prompt`). Flutter uses the session ABI — commons threads these into
-      // every generate in the loop so multi-turn tool use keeps context.
-      history: _toChatHistory(history),
+      tools: tools,
+      format: opts.format,
+      maxToolCalls: opts.maxToolCallCount,
+      keepToolsAvailable: opts.keepToolsAvailable,
+      maxTokens: (opts.hasMaxTokens() && opts.maxTokens > 0)
+          ? opts.maxTokens
+          : llm.maxTokens,
+      temperature: opts.hasTemperature() ? opts.temperature : llm.temperature,
+      topP: llm.topP,
+      // Suppress thinking when either options surface asks for it.
+      disableThinking: opts.disableThinking || llm.disableThinking,
+      autoExecute: autoExecute,
+      replaceSystemPrompt: opts.replaceSystemPrompt,
+      requireJsonArguments: opts.requireJsonArguments,
+      // Prior conversation turns as a flat alternating list
+      // [user0, asst0, ...], EXCLUDING the current turn (which is `prompt`).
+      // Flutter uses the session ABI — commons threads these into every
+      // generate in the loop so multi-turn tool use keeps context.
+      history: history,
+      // TC-2: mirror options onto request field 20 — commons reads parallel
+      // mode from the session/run-loop request, not from inline options alone.
+      parallelToolCalls: opts.parallelToolCalls,
     );
     // `validate_calls` is `optional bool` on the proto — leave it UNSET when
     // the caller did not supply a value so commons applies its documented
     // default (true).
     if (validateCalls != null) {
       request.validateCalls = validateCalls;
+    }
+    if (opts.toolChoice != ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED) {
+      request.toolChoice = opts.toolChoice;
+    }
+    if (opts.hasForcedToolName() && opts.forcedToolName.isNotEmpty) {
+      request.forcedToolName = opts.forcedToolName;
+    }
+    // System prompt: tool options win, then the LLM options.
+    if (opts.hasSystemPrompt() && opts.systemPrompt.isNotEmpty) {
+      request.systemPrompt = opts.systemPrompt;
+    } else if (llm.hasSystemPrompt() && llm.systemPrompt.isNotEmpty) {
+      request.systemPrompt = llm.systemPrompt;
     }
 
     final session = DartBridgeToolCalling.shared.createSession(request);
@@ -302,7 +321,7 @@ class RunAnywhereTools {
               session.stepWithResult(
                 toolCallId: call.id,
                 resultJson: result.resultJson,
-                error: result.hasError() ? result.error.message : '',
+                error: result.error,
               );
             } catch (e) {
               _logger.error('Tool executor threw: $e');
@@ -386,21 +405,13 @@ class RunAnywhereTools {
   static LLMGenerationOptions _defaultLLMOptions() =>
       LLMGenerationOptionsConvenience.defaults();
 
-  /// Generated from the rac_default annotations in idl/tool_calling.proto.
-  static ToolCallingOptions _defaultToolOptions() =>
-      ToolCallingOptionsConvenience.defaults();
-
-  /// Flat alternating `[user0, asst0, user1, asst1, ...]` strings to typed
-  /// [ChatMessage]s (even index = user, odd = assistant).
-  static List<ChatMessage> _toChatHistory(List<String> history) => [
-    for (var i = 0; i < history.length; i++)
-      ChatMessage(
-        role: i.isEven
-            ? MessageRole.MESSAGE_ROLE_USER
-            : MessageRole.MESSAGE_ROLE_ASSISTANT,
-        content: history[i],
-      ),
-  ];
+  /// Mirrors Swift `RAToolCallingOptions.defaults()`
+  /// (ToolCallingTypes.swift:148-154).
+  static ToolCallingOptions _defaultToolOptions() => ToolCallingOptions(
+    maxToolCalls: 5,
+    autoExecute: true,
+    format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON,
+  );
 }
 
 /// Run-loop knobs derived from [ToolCallingOptions]. Mirrors Swift's

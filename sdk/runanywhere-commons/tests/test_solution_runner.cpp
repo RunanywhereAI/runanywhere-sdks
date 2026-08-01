@@ -1178,9 +1178,9 @@ TEST(retrieve_without_session_handle_fails_honestly) {
     CHECK(had_retrieve_before);  // Built-in stand-in is always present.
 
     const std::size_t registered = rac::solutions::register_engine_backed_operators(registry);
-    // generate_text + transcribe + synthesize + detect_voice + embed +
-    // retrieve = 6 factories.
-    CHECK(registered == 6);
+    // generate_text + agent_loop + transcribe + synthesize + detect_voice +
+    // embed + retrieve = 7 factories.
+    CHECK(registered == 7);
 
     // Schema contract: text.utf8 in → text.utf8 out, output port "results".
     const auto& in_ports = registry.input_ports("retrieve");

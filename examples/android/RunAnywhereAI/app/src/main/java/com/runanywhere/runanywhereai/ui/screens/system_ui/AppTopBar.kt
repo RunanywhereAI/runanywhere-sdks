@@ -25,12 +25,14 @@ import com.runanywhere.runanywhereai.ui.navigation.Voice
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatTopBar
 import com.runanywhere.runanywhereai.ui.theme.icons.RACIcons
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.connect.ConnectModel
 
 // Pure route dispatcher: picks each screen's own top bar. No UI defined here.
 @Composable
 fun AppTopBar(
     destination: NavDestination?,
     model: RAModelInfo?,
+    hostedModel: ConnectModel?,
     conversationModelName: String?,
     generating: Boolean,
     loraActive: Boolean,
@@ -49,6 +51,7 @@ fun AppTopBar(
         destination == null -> Unit
         destination.hasRoute<Chat>() -> ChatTopBar(
             model = model,
+            hostedModel = hostedModel,
             conversationModelName = conversationModelName,
             generating = generating,
             loraActive = loraActive,

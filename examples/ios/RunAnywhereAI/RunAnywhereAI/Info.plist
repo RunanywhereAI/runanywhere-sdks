@@ -19,6 +19,12 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>RunAnywhere looks for a Mac on your local network when you choose to use a hosted language model.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_runanywhere-connect._tcp</string>
+	</array>
 	<!-- Live Activities (Dynamic Island recording indicator) -->
 	<key>NSSupportsLiveActivities</key>
 	<true/>

@@ -1,6 +1,10 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
-import { SDKError } from "./errors";
 export declare const protobufPackage = "runanywhere.v1";
+/**
+ * ---------------------------------------------------------------------------
+ * Supported parameter types.
+ * ---------------------------------------------------------------------------
+ */
 export declare enum ToolParameterType {
     TOOL_PARAMETER_TYPE_UNSPECIFIED = 0,
     TOOL_PARAMETER_TYPE_STRING = 1,
@@ -12,7 +16,12 @@ export declare enum ToolParameterType {
 }
 export declare function toolParameterTypeFromJSON(object: any): ToolParameterType;
 export declare function toolParameterTypeToJSON(object: ToolParameterType): string;
-/** LFM2 names a model family in a wire enum, which the rest of the IDL avoids. */
+/**
+ * ---------------------------------------------------------------------------
+ * Tool-call wire formats various LLM families emit. This enum is the single
+ * portable format selector across commons and every generated SDK binding.
+ * ---------------------------------------------------------------------------
+ */
 export declare enum ToolCallFormatName {
     TOOL_CALL_FORMAT_NAME_UNSPECIFIED = 0,
     TOOL_CALL_FORMAT_NAME_JSON = 1,
@@ -31,7 +40,27 @@ export declare enum ToolChoiceMode {
 }
 export declare function toolChoiceModeFromJSON(object: any): ToolChoiceMode;
 export declare function toolChoiceModeToJSON(object: ToolChoiceMode): string;
-/** A JSON value, typed rather than stringly. */
+export declare enum ToolCallingStreamEventKind {
+    TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+    TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN = 1,
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED = 2,
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED = 3,
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED = 4,
+    TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED = 5,
+    TOOL_CALLING_STREAM_EVENT_KIND_ERROR = 6,
+    UNRECOGNIZED = -1
+}
+export declare function toolCallingStreamEventKindFromJSON(object: any): ToolCallingStreamEventKind;
+export declare function toolCallingStreamEventKindToJSON(object: ToolCallingStreamEventKind): string;
+/**
+ * ---------------------------------------------------------------------------
+ * JSON-typed scalar / composite carrier for tool arguments and results.
+ * Mirrors Swift's ToolValue enum, Kotlin's sealed class, and the
+ * TypeScript discriminated union. Used inside ToolParameter.enum_values
+ * (string-only) and as the canonical wire shape when consumers want
+ * strongly-typed arguments rather than raw JSON.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolValue {
     stringValue?: string | undefined;
     numberValue?: number | undefined;
@@ -53,26 +82,45 @@ export interface ToolValueObject_FieldsEntry {
     key: string;
     value?: ToolValue | undefined;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * String wrapper used by the rac_tool_value_to_json_proto /
+ * rac_tool_value_from_json_proto ABIs. Carries either the JSON text rendered
+ * from a ToolValue, or the JSON text that should be parsed back into a
+ * ToolValue. Defined here (rather than reusing a stand-alone wrapper) so the
+ * tool-calling round-trip stays self-contained in this proto.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolValueJSON {
     json: string;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * A single parameter definition for a tool.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolParameter {
     name: string;
     type: ToolParameterType;
     description: string;
     required: boolean;
+    /** Allowed values for enum-like parameters. Empty = unconstrained. */
     enumValues: string[];
-    /** Escape hatch for parameters the typed shape cannot express. */
     jsonSchema?: string | undefined;
     defaultValue?: ToolValue | undefined;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * Definition of a tool that the LLM can call.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolDefinition {
     name: string;
     description: string;
-    /** Use parameters for the typed form, or json_schema for a raw one. */
     parameters: ToolParameter[];
-    jsonSchema?: string | undefined;
+    /** Optional category for grouping tools in catalogs / UIs. */
     category?: string | undefined;
+    jsonSchema?: string | undefined;
     metadata: {
         [key: string]: string;
     };
@@ -81,52 +129,139 @@ export interface ToolDefinition_MetadataEntry {
     key: string;
     value: string;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * A tool call requested by the LLM. `arguments_json` is a JSON object
+ * matching the parameter shape declared in the corresponding ToolDefinition.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolCall {
+    /** Unique ID (caller-supplied or generated). Empty = unset. */
     id: string;
+    /** Tool name (matches ToolDefinition.name). */
     name: string;
+    /**
+     * JSON-encoded arguments. Empty object "{}" if no args.
+     *
+     * The C++ tokenizer / tool-prompt formatter
+     * (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
+     * `arguments_json` directly when building LLM prompts. It is the
+     * canonical wire shape for the prompt-formatting path.
+     */
     argumentsJson: string;
-    /** "function" is the only value today. Empty = unset. */
+    /**
+     * Discriminator for OpenAI-compatible flows ("function" is the only
+     * value at the moment). Empty = unset.
+     */
     type: string;
     createdAtMs: number;
-    /** The model text this call was parsed out of. */
     rawText?: string | undefined;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * Result of executing a tool. `result_json` is a JSON-encoded payload;
+ * `error` is non-empty when the execution failed.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolResult {
     toolCallId: string;
     name: string;
+    /**
+     * JSON-encoded tool execution result.
+     *
+     * The C++ tool-prompt formatter
+     * (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
+     * reads `result_json` directly when building follow-up LLM prompts after
+     * tool execution. It is the canonical wire shape.
+     */
     resultJson: string;
+    error?: string | undefined;
+    /**
+     * Whether execution succeeded. If unset/false and error is empty,
+     * consumers should fall back to result_json/error semantics.
+     */
+    success: boolean;
     startedAtMs: number;
     completedAtMs: number;
-    /** Unset means the tool ran successfully; fall back to result_json semantics. */
-    error?: SDKError | undefined;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * Options for tool-enabled generation.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolCallingOptions {
-    /** Empty means the SDK falls back to its registered tools. */
+    /**
+     * Available tools for this generation. If empty, the SDK falls back to
+     * its registered tools (per-SDK convention).
+     */
     tools: ToolDefinition[];
-    /** Run tools automatically rather than handing calls back to the caller. */
-    autoExecute?: boolean | undefined;
+    /** Whether to auto-execute tools or hand them back to the caller. */
+    autoExecute: boolean;
+    /** Sampling temperature override (Swift: optional Float). */
+    temperature?: number | undefined;
+    /** Maximum tokens override. */
+    maxTokens?: number | undefined;
+    /** System prompt to use during tool-enabled generation. */
+    systemPrompt?: string | undefined;
+    /**
+     * If true, replaces the system prompt entirely (no auto-injected
+     * tool instructions).
+     */
     replaceSystemPrompt: boolean;
-    /** Keep offering tools after the first call resolves. */
+    /**
+     * If true, keeps tool definitions available across multiple sequential
+     * tool calls in one generation.
+     */
     keepToolsAvailable: boolean;
+    /** Typed tool-call format. Unset lets commons select the model default. */
     format?: ToolCallFormatName | undefined;
-    /** Iteration cap on the run loop. */
+    /**
+     * When true, one model turn may emit multiple tool-call envelopes;
+     * commons parses and executes all of them before building a single
+     * follow-up prompt. Default false preserves the historical
+     * one-call-per-turn behavior. (Reclaims the field number that
+     * originally carried this flag before it was reserved.)
+     */
+    parallelToolCalls: boolean;
+    /**
+     * Maximum tool calls in one conversation turn. Unset/0 = SDK default
+     * (typically 5).
+     */
     maxToolCalls?: number | undefined;
-    /** forced_tool_name applies when tool_choice is SPECIFIC. */
     toolChoice: ToolChoiceMode;
     forcedToolName?: string | undefined;
     requireJsonArguments: boolean;
+    /**
+     * When true, suppress the model's thinking/reasoning phase during
+     * tool-enabled generation (commons prepends the model no-think directive
+     * at the prompt level — same contract as
+     * LLMGenerationOptions.disable_thinking). Default false.
+     */
+    disableThinking?: boolean | undefined;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * Result of a tool-enabled generation.
+ * ---------------------------------------------------------------------------
+ */
 export interface ToolCallingResult {
+    /** Final text response from the assistant. */
     text: string;
+    /** Tool calls the LLM made. */
     toolCalls: ToolCall[];
+    /** Results of executed tools (only populated when auto_execute was true). */
     toolResults: ToolResult[];
-    /** False when the loop stopped at max_tool_calls with calls outstanding. */
+    /** Whether the response is complete or waiting for more tool results. */
     isComplete: boolean;
+    /** Conversation ID for continuing with tool results. */
     conversationId?: string | undefined;
+    /** Number of LLM generation turns used, including the final synthesis turn. */
     iterationsUsed: number;
+    errorMessage?: string | undefined;
+    errorCode: number;
     rawText: string;
+    /** Optional thinking/reasoning content extracted from the final response. */
     thinkingContent?: string | undefined;
-    error?: SDKError | undefined;
 }
 export interface ToolParseRequest {
     text: string;
@@ -135,33 +270,142 @@ export interface ToolParseRequest {
 export interface ToolParseResult {
     hasToolCall: boolean;
     toolCalls: ToolCall[];
-    /** Model text left over after the calls were extracted. */
     remainingText: string;
-    error?: SDKError | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 export interface ToolPromptFormatRequest {
+    /**
+     * User prompt to merge with tool instructions. Empty means return only
+     * the tool-instruction block for the selected format.
+     */
     userPrompt: string;
+    /** Carries available tools plus format/choice/iteration constraints. */
     options?: ToolCallingOptions | undefined;
-    /** Prior turn's results and text, for multi-iteration loops. */
+    /**
+     * Tool results to include when formatting a follow-up prompt after host
+     * execution. Empty means an initial tool-enabled prompt.
+     */
     toolResults: ToolResult[];
+    /** Assistant text emitted before tool execution, when available. */
     assistantText?: string | undefined;
 }
 export interface ToolPromptFormatResult {
     formattedPrompt: string;
     format: ToolCallFormatName;
-    error?: SDKError | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 export interface ToolCallValidationRequest {
     toolCall?: ToolCall | undefined;
+    /**
+     * Validation uses options.tools as the registry snapshot and honors
+     * portable flags such as require_json_arguments and forced_tool_name.
+     */
     options?: ToolCallingOptions | undefined;
 }
 export interface ToolCallValidationResult {
     isValid: boolean;
     validationErrors: string[];
     matchedTool?: ToolDefinition | undefined;
-    /** Arguments coerced to the matched tool's parameter types. */
     normalizedArgumentsJson: string;
-    error?: SDKError | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface ToolCallingStreamEvent {
+    seq: number;
+    timestampUs: number;
+    conversationId: string;
+    kind: ToolCallingStreamEventKind;
+    token: string;
+    toolCall?: ToolCall | undefined;
+    toolResult?: ToolResult | undefined;
+    result?: ToolCallingResult | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface ToolRegistrySnapshot {
+    tools: ToolDefinition[];
+    updatedAtMs: number;
+}
+export interface ToolCallingSessionCreateRequest {
+    /** Prompt + LLM generation options inline (avoids cross-proto import cycle). */
+    prompt: string;
+    maxTokens: number;
+    temperature: number;
+    topP: number;
+    systemPrompt: string;
+    tools: ToolDefinition[];
+    format: ToolCallFormatName;
+    maxToolCalls: number;
+    keepToolsAvailable: boolean;
+    /**
+     * proto3 `optional` enables presence detection (has_validate_calls()).
+     * When unset, commons defaults to validate_calls=true so unknown tool
+     * calls short-circuit before host execution.
+     * Callers that delegate validation/authorization to their executor or
+     * use dynamic tool registries must explicitly set validate_calls=false.
+     */
+    validateCalls?: boolean | undefined;
+    /**
+     * OpenAI-style tool_choice override surfaced through the high-level
+     * run-loop / session APIs. The same fields exist on ToolCallingOptions
+     * (fields 13/14); we re-publish them here so the canonical request
+     * envelope can carry the policy without forcing callers to pass an
+     * inline ToolCallingOptions. commons honors these on every
+     * format/validate primitive via build_options_snapshot.
+     */
+    toolChoice?: ToolChoiceMode | undefined;
+    forcedToolName?: string | undefined;
+    /**
+     * When true, suppress the model's thinking phase for every generate in
+     * the loop/session (maps from ToolCallingOptions.disable_thinking; same
+     * contract as LLMGenerationOptions.disable_thinking). Default false.
+     */
+    disableThinking: boolean;
+    /**
+     * Default true when absent. False returns the parsed ToolCall without
+     * invoking the host executor.
+     */
+    autoExecute?: boolean | undefined;
+    replaceSystemPrompt: boolean;
+    requireJsonArguments: boolean;
+    /**
+     * Prior conversation turns as a flat alternating list [user0, asst0, user1, asst1, ...],
+     * EXCLUDING the current turn (which is `prompt`). commons threads these into every generate
+     * in the loop so multi-turn tool use keeps context. Same contract as the standard path's
+     * ChatMessage history (llm_service.proto history=27), inlined as strings to avoid a
+     * cross-proto import cycle.
+     */
+    history: string[];
+    /**
+     * Mirrors ToolCallingOptions.parallel_tool_calls for the run-loop /
+     * session envelope: when true, one model turn may emit multiple
+     * tool-call envelopes and commons executes all of them before one
+     * follow-up prompt. Default false = historical single-call behavior.
+     */
+    parallelToolCalls: boolean;
+}
+export interface ToolCallingSessionCreateResult {
+    sessionHandle: number;
+}
+export interface ToolCallingSessionEvent {
+    /** serialized LLMStreamEvent proto */
+    llmStreamEventBytes?: Uint8Array | undefined;
+    toolCall?: ToolCall | undefined;
+    finalResult?: ToolCallingResult | undefined;
+    /** serialized SDKError proto */
+    errorBytes?: Uint8Array | undefined;
+    seq: number;
+}
+export interface ToolCallingSessionStepWithResultRequest {
+    sessionHandle: number;
+    toolCallId: string;
+    resultJson: string;
+    error?: string | undefined;
+}
+export interface ToolCallingSessionDestroyRequest {
+    sessionHandle: number;
 }
 export declare const ToolValue: MessageFns<ToolValue>;
 export declare const ToolValueArray: MessageFns<ToolValueArray>;
@@ -181,6 +425,13 @@ export declare const ToolPromptFormatRequest: MessageFns<ToolPromptFormatRequest
 export declare const ToolPromptFormatResult: MessageFns<ToolPromptFormatResult>;
 export declare const ToolCallValidationRequest: MessageFns<ToolCallValidationRequest>;
 export declare const ToolCallValidationResult: MessageFns<ToolCallValidationResult>;
+export declare const ToolCallingStreamEvent: MessageFns<ToolCallingStreamEvent>;
+export declare const ToolRegistrySnapshot: MessageFns<ToolRegistrySnapshot>;
+export declare const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreateRequest>;
+export declare const ToolCallingSessionCreateResult: MessageFns<ToolCallingSessionCreateResult>;
+export declare const ToolCallingSessionEvent: MessageFns<ToolCallingSessionEvent>;
+export declare const ToolCallingSessionStepWithResultRequest: MessageFns<ToolCallingSessionStepWithResultRequest>;
+export declare const ToolCallingSessionDestroyRequest: MessageFns<ToolCallingSessionDestroyRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

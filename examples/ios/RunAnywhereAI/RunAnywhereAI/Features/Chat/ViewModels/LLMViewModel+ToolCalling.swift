@@ -13,14 +13,20 @@ extension LLMViewModel {
 
     func generateWithToolCalling(
         prompt: String,
-        options: LlmOptions,
+        options: RALLMGenerationOptions,
         messageIndex: Int,
         generationID: UUID?
     ) async throws {
-        // Tool calling is automatic: leaving `options.tools` empty makes the SDK
-        // use the `llm.tools` registry, derive the format from the loaded model,
-        // and run the tool call → execute → respond loop internally.
-        let result = try await RunAnywhere.llm.generate(prompt: prompt, options: options)
+        // The SDK derives the tool-calling format from the loaded model and
+        // orchestrates the tool call → execute → respond loop internally.
+        // parallelToolCalls: true lets one turn request multiple tools (e.g.
+        // weather + time) and get them all executed before one follow-up
+        // reply, instead of one round-trip per tool.
+        let result = try await RunAnywhere.generateWithTools(
+            prompt: prompt,
+            options: options,
+            parallelToolCalls: true
+        )
         let toolCallInfo = ToolCallInfo(from: result)
 
         // Drop the write if this generation was superseded while awaiting.
@@ -30,7 +36,7 @@ extension LLMViewModel {
         await updateMessageWithToolResult(
             at: messageIndex,
             text: result.text,
-            thinkingContent: result.thinkingText,
+            thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
             toolCallInfo: toolCallInfo
         )
     }

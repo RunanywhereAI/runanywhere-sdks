@@ -20,8 +20,6 @@
 
 package com.runanywhere.sdk.public.extensions.LLM
 
-import ai.runanywhere.proto.v1.ChatMessage
-import ai.runanywhere.proto.v1.MessageRole
 import ai.runanywhere.proto.v1.ToolCallingSessionCreateRequest
 import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
@@ -157,35 +155,43 @@ internal fun makeToolCallingRunLoopRequest(
     validateCalls: Boolean?,
     // Prior conversation turns as a flat alternating list [user0, asst0, ...],
     // EXCLUDING the current turn (which is `prompt`). commons threads these into
-    // every generate in the loop so multi-turn tool use keeps context.
+    // every generate in the loop so multi-turn tool use keeps context. Same
+    // contract as the standard path's ChatMessage history, as strings.
     history: List<String> = emptyList(),
 ): ToolCallingSessionCreateRequest =
     ToolCallingSessionCreateRequest(
         prompt = prompt,
-        // Sampling, system_prompt, and reasoning ride on the generation
-        // envelope; tool routing lives in generation.tool_calling. Zero is a
-        // real greedy temperature — commons honors the value exactly.
-        generation =
-            llmOptions.copy(
-                tool_calling =
-                    options.copy(
-                        max_tool_calls = options.effectiveMaxToolCalls(),
-                        tools = tools,
-                    ),
-            ),
+        max_tokens = options.max_tokens?.takeIf { it > 0 } ?: llmOptions.max_tokens,
+        // Zero is a real greedy temperature. Do not use takeIf/non-zero
+        // fallback here; the native tool loop now honors this value exactly.
+        temperature = options.temperature ?: llmOptions.temperature,
+        top_p = llmOptions.top_p,
+        system_prompt =
+            options.system_prompt?.takeIf { it.isNotEmpty() }
+                ?: llmOptions.system_prompt?.takeIf { it.isNotEmpty() }
+                ?: "",
+        format =
+            options.format
+                ?: ai.runanywhere.proto.v1.ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED,
+        max_tool_calls = options.effectiveMaxToolCalls(),
+        keep_tools_available = options.keep_tools_available,
+        // Suppress thinking when either options surface asks for it (commons
+        // prepends the no-think directive).
+        disable_thinking = (options.disable_thinking ?: false) || llmOptions.disable_thinking,
         validate_calls = validateCalls,
-        history =
-            history.mapIndexed { index, content ->
-                ChatMessage(
-                    role =
-                        if (index % 2 == 0) {
-                            MessageRole.MESSAGE_ROLE_USER
-                        } else {
-                            MessageRole.MESSAGE_ROLE_ASSISTANT
-                        },
-                    content = content,
-                )
+        tools = tools,
+        tool_choice =
+            options.tool_choice.takeIf {
+                it != ai.runanywhere.proto.v1.ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED
             },
+        forced_tool_name = options.forced_tool_name?.takeIf { it.isNotEmpty() },
+        auto_execute = options.auto_execute,
+        replace_system_prompt = options.replace_system_prompt,
+        require_json_arguments = options.require_json_arguments,
+        history = history,
+        // TC-2: mirror options onto request field 20 — commons reads parallel
+        // mode from the session/run-loop request, not from inline options alone.
+        parallel_tool_calls = options.parallel_tool_calls,
     )
 
 /**
@@ -292,16 +298,8 @@ internal object ToolCallingOrchestrator {
             tool_call_id = toolCallId,
             name = name,
             result_json = RAToolValue.jsonString(from = result),
-            error =
-                if (!success || error != null) {
-                    ai.runanywhere.proto.v1.SDKError(
-                        code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_UNKNOWN,
-                        category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
-                        message = error ?: "Tool execution failed",
-                    )
-                } else {
-                    null
-                },
+            error = error,
+            success = success,
             started_at_ms = startedAtMs,
             completed_at_ms = completedAtMs,
         )
@@ -415,13 +413,8 @@ internal object ToolCallingOrchestrator {
                     ?: ToolCallingResult(
                         text = "",
                         is_complete = false,
-                        error =
-                            ai.runanywhere.proto.v1.SDKError(
-                                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_UNKNOWN,
-                                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
-                                message = "racToolCallingRunLoopProto returned null",
-                                c_abi_code = -1,
-                            ),
+                        error_message = "racToolCallingRunLoopProto returned null",
+                        error_code = -1,
                     )
             } finally {
                 // On success this tears down the parked watcher without

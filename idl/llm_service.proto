@@ -80,31 +80,4 @@ message LLMStreamEvent {
     optional SDKError error = 19;
 }
 
-// Tool-driven streaming uses this session path, not LLMGenerateRequest.
-message ToolCallingSessionCreateRequest {
-    string prompt = 1;
-    optional LLMGenerationOptions generation = 2;
-
-    // Unset preserves commons' secure default of validate=true.
-    optional bool validate_calls = 3;
-
-    repeated ChatMessage history = 4;
-}
-
-message ToolCallingSessionEvent {
-    oneof kind {
-        bytes llm_stream_event_bytes = 1;  // serialized LLMStreamEvent
-        ToolCall tool_call = 2;
-        ToolCallingResult final_result = 3;
-        bytes error_bytes = 4;             // serialized SDKError
-    }
-    uint64 seq = 5;
-}
-
-// Hands a caller-executed tool result back into a running session.
-message ToolCallingSessionStepWithResultRequest {
-    uint64 session_handle = 1;
-    string tool_call_id = 2;
-    string result_json = 3;
-    optional string error = 4;
-}
+// ToolCallingSession* messages are canonical in tool_calling.proto (see #607).

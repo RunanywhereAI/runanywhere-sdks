@@ -396,6 +396,23 @@ object RACIcons {
             )
         }
 
+        val Desktop: ImageVector by lazy {
+            racOutlineIcon(
+                "Desktop",
+                "M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z",
+                "M8 21h8",
+                "M12 18v3",
+            )
+        }
+
+        val Link: ImageVector by lazy {
+            racOutlineIcon(
+                "Link",
+                "M10 14a3.5 3.5 0 0 0 5 0l4 -4a3.5 3.5 0 0 0 -5 -5l-.5 .5",
+                "M14 10a3.5 3.5 0 0 0 -5 0l-4 4a3.5 3.5 0 0 0 5 5l.5 -.5",
+            )
+        }
+
         val Database: ImageVector by lazy {
             racOutlineIcon(
                 "Database",

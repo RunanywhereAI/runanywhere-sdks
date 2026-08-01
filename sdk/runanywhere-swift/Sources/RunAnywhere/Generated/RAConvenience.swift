@@ -16,29 +16,6 @@
 
 import Foundation
 
-extension RAToolCallingOptions {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RAToolCallingOptions {
-        var r = RAToolCallingOptions()
-        r.autoExecute = true
-        r.maxToolCalls = 5
-        return r
-    }
-}
-
-extension RAToolCallingOptions {
-    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
-    public func validate() throws {
-        let effectiveMaxToolCalls = hasMaxToolCalls ? maxToolCalls : 5
-        if effectiveMaxToolCalls < 1 {
-            throw SDKException.validationFailed(
-                fieldPath: "ToolCallingOptions.max_tool_calls",
-                message: "max_tool_calls must be >= 1 (got \(effectiveMaxToolCalls))"
-            )
-        }
-    }
-}
-
 extension RAAudioFormat {
     /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
     public var wireString: String {
@@ -287,6 +264,72 @@ extension RALLMConfiguration {
     }
 }
 
+extension RAVADConfiguration {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAVADConfiguration {
+        var r = RAVADConfiguration()
+        r.sampleRate = 16000
+        r.frameLengthMs = 100
+        r.activationThreshold = 0.015
+        r.calibrationMultiplier = 2.0
+        return r
+    }
+}
+
+extension RAVADConfiguration {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if sampleRate < 8000 || sampleRate > 48000 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.sample_rate",
+                message: "sample_rate must be in 8000...48000 (got \(sampleRate))"
+            )
+        }
+        if frameLengthMs < 20 || frameLengthMs > 1000 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.frame_length_ms",
+                message: "frame_length_ms must be in 20...1000 (got \(frameLengthMs))"
+            )
+        }
+        if !activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.activation_threshold",
+                message: "activation_threshold must be in 0.0...1.0 (got \(activationThreshold))"
+            )
+        }
+        if !calibrationMultiplier.isFinite || calibrationMultiplier < 1.2 || calibrationMultiplier > 4.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADConfiguration.calibration_multiplier",
+                message: "calibration_multiplier must be in 1.2...4.0 (got \(calibrationMultiplier))"
+            )
+        }
+    }
+}
+
+extension RAVADOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAVADOptions {
+        var r = RAVADOptions()
+        r.minSpeechDurationMs = 100
+        r.minSilenceDurationMs = 300
+        r.maxSpeechDurationMs = 0
+        r.prefixPaddingMs = 0
+        return r
+    }
+}
+
+extension RAVADOptions {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if !activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0 {
+            throw SDKException.validationFailed(
+                fieldPath: "VADOptions.activation_threshold",
+                message: "activation_threshold must be in 0.0...1.0 (got \(activationThreshold))"
+            )
+        }
+    }
+}
+
 extension RADiarizationOptions {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RADiarizationOptions {
@@ -434,72 +477,6 @@ extension RAEmbeddingsOptions {
             throw SDKException.validationFailed(
                 fieldPath: "EmbeddingsOptions.batch_size",
                 message: "batch_size must be in 1...8192 (got \(batchSize))"
-            )
-        }
-    }
-}
-
-extension RAVADConfiguration {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RAVADConfiguration {
-        var r = RAVADConfiguration()
-        r.sampleRate = 16000
-        r.frameLengthMs = 100
-        r.activationThreshold = 0.015
-        r.calibrationMultiplier = 2.0
-        return r
-    }
-}
-
-extension RAVADConfiguration {
-    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
-    public func validate() throws {
-        if sampleRate < 8000 || sampleRate > 48000 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.sample_rate",
-                message: "sample_rate must be in 8000...48000 (got \(sampleRate))"
-            )
-        }
-        if frameLengthMs < 20 || frameLengthMs > 1000 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.frame_length_ms",
-                message: "frame_length_ms must be in 20...1000 (got \(frameLengthMs))"
-            )
-        }
-        if !activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.activation_threshold",
-                message: "activation_threshold must be in 0.0...1.0 (got \(activationThreshold))"
-            )
-        }
-        if !calibrationMultiplier.isFinite || calibrationMultiplier < 1.2 || calibrationMultiplier > 4.0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADConfiguration.calibration_multiplier",
-                message: "calibration_multiplier must be in 1.2...4.0 (got \(calibrationMultiplier))"
-            )
-        }
-    }
-}
-
-extension RAVADOptions {
-    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
-    public static func defaults() -> RAVADOptions {
-        var r = RAVADOptions()
-        r.minSpeechDurationMs = 100
-        r.minSilenceDurationMs = 300
-        r.maxSpeechDurationMs = 0
-        r.prefixPaddingMs = 0
-        return r
-    }
-}
-
-extension RAVADOptions {
-    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
-    public func validate() throws {
-        if !activationThreshold.isFinite || activationThreshold < 0.0 || activationThreshold > 1.0 {
-            throw SDKException.validationFailed(
-                fieldPath: "VADOptions.activation_threshold",
-                message: "activation_threshold must be in 0.0...1.0 (got \(activationThreshold))"
             )
         }
     }

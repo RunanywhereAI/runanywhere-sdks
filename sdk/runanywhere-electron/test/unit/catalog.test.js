@@ -51,8 +51,8 @@ test('isCatalogId returns false for the empty string', () => {
 });
 
 test('isCatalogId is case-sensitive', () => {
-  // 'smollm2-135m' is a real key; upper/mixed-case variants are not.
-  assert.equal(isCatalogId('smollm2-135m'), true);
+  // 'qwen3.5-0.8b' is a real key; upper/mixed-case variants are not.
+  assert.equal(isCatalogId('qwen3.5-0.8b'), true);
   assert.equal(isCatalogId('SmolLM2-135M'), false);
   assert.equal(isCatalogId('SMOLLM2-135M'), false);
   assert.equal(isCatalogId('MiniLM'), false);
@@ -210,9 +210,9 @@ test('every archive entry has exactly one file', () => {
   }
 });
 
-test('spot check: smollm2-135m is a single-file llm', () => {
-  const entry = CATALOG['smollm2-135m'];
-  assert.ok(entry, 'smollm2-135m entry missing');
+test('spot check: qwen3.5-0.8b is a single-file llm', () => {
+  const entry = CATALOG['qwen3.5-0.8b'];
+  assert.ok(entry, 'qwen3.5-0.8b entry missing');
   assert.equal(entry.type, 'llm');
   assert.equal(entry.files.length, 1);
   assert.equal(entry.files[0].as, 'model.gguf');
@@ -221,9 +221,9 @@ test('spot check: smollm2-135m is a single-file llm', () => {
   assert.equal(entry.mmproj, undefined);
 });
 
-test('spot check: qwen2.5-0.5b is a single-file llm', () => {
-  const entry = CATALOG['qwen2.5-0.5b'];
-  assert.ok(entry, 'qwen2.5-0.5b entry missing');
+test('spot check: lfm2.5-1.2b is a single-file llm', () => {
+  const entry = CATALOG['lfm2.5-1.2b'];
+  assert.ok(entry, 'lfm2.5-1.2b entry missing');
   assert.equal(entry.type, 'llm');
   assert.equal(entry.files.length, 1);
   assert.equal(entry.primary, 'model.gguf');
@@ -240,9 +240,9 @@ test('spot check: minilm is an embedder with model + vocab', () => {
   assert.equal(entry.archive, undefined);
 });
 
-test('spot check: smolvlm-256m has exactly 2 files and an mmproj', () => {
-  const entry = CATALOG['smolvlm-256m'];
-  assert.ok(entry, 'smolvlm-256m entry missing');
+test('spot check: qwen3.5-0.8b-vl has exactly 2 files and an mmproj', () => {
+  const entry = CATALOG['qwen3.5-0.8b-vl'];
+  assert.ok(entry, 'qwen3.5-0.8b-vl entry missing');
   assert.equal(entry.type, 'vlm');
   assert.equal(entry.files.length, 2);
   assert.equal(typeof entry.mmproj, 'string');
@@ -272,7 +272,7 @@ test('spot check: piper-lessac is a tts archive', () => {
 });
 
 test('spot check: known ids are present and resolve via isCatalogId', () => {
-  for (const id of ['smollm2-135m', 'qwen2.5-0.5b', 'smolvlm-256m', 'minilm', 'whisper-tiny', 'piper-lessac']) {
+  for (const id of ['qwen3.5-0.8b', 'lfm2.5-1.2b', 'qwen3.5-0.8b-vl', 'minilm', 'whisper-tiny', 'piper-lessac']) {
     assert.ok(Object.prototype.hasOwnProperty.call(CATALOG, id), `${id} missing from CATALOG`);
     assert.equal(isCatalogId(id), true);
   }

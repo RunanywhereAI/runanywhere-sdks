@@ -321,6 +321,7 @@ extension MessageBubbleView {
 
     @ViewBuilder
     private func analyticsContent(_ analytics: MessageAnalytics) -> some View {
+        // Match Android AnalyticsFooter: duration · tok/s · tokens · ttft
         Group {
             Text("\u{2022}")
                 .foregroundColor(AppColors.textSecondary.opacity(0.5))
@@ -334,8 +335,26 @@ extension MessageBubbleView {
                     .foregroundColor(AppColors.textSecondary.opacity(0.5))
 
                 Text("\(Int(analytics.averageTokensPerSecond)) tok/s")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+
+            if analytics.outputTokens > 0 {
+                Text("\u{2022}")
+                    .foregroundColor(AppColors.textSecondary.opacity(0.5))
+
+                Text("\(analytics.outputTokens) tok")
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+
+            if let ttft = analytics.timeToFirstToken, ttft > 0 {
+                Text("\u{2022}")
+                    .foregroundColor(AppColors.textSecondary.opacity(0.5))
+
+                Text("\(Int(ttft * 1000))ms ttft")
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
             }
 
             if analytics.wasThinkingMode {

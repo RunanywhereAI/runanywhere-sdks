@@ -48,9 +48,6 @@ public class ToolCallValidationResult(
     schemaIndex = 2,
   )
   public val matched_tool: ToolDefinition? = null,
-  /**
-   * Arguments coerced to the matched tool's parameter types.
-   */
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -60,11 +57,20 @@ public class ToolCallValidationResult(
   )
   public val normalized_arguments_json: String = "",
   @field:WireField(
-    tag = 7,
-    adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "errorMessage",
     schemaIndex = 4,
   )
-  public val error: SDKError? = null,
+  public val error_message: String? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 5,
+  )
+  public val error_code: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCallValidationResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -91,7 +97,8 @@ public class ToolCallValidationResult(
     if (validation_errors != other.validation_errors) return false
     if (matched_tool != other.matched_tool) return false
     if (normalized_arguments_json != other.normalized_arguments_json) return false
-    if (error != other.error) return false
+    if (error_message != other.error_message) return false
+    if (error_code != other.error_code) return false
     return true
   }
 
@@ -103,7 +110,8 @@ public class ToolCallValidationResult(
       result = result * 37 + validation_errors.hashCode()
       result = result * 37 + (matched_tool?.hashCode() ?: 0)
       result = result * 37 + normalized_arguments_json.hashCode()
-      result = result * 37 + (error?.hashCode() ?: 0)
+      result = result * 37 + (error_message?.hashCode() ?: 0)
+      result = result * 37 + error_code.hashCode()
       super.hashCode = result
     }
     return result
@@ -115,7 +123,8 @@ public class ToolCallValidationResult(
     if (validation_errors.isNotEmpty()) result += """validation_errors=${sanitize(validation_errors)}"""
     if (matched_tool != null) result += """matched_tool=$matched_tool"""
     result += """normalized_arguments_json=${sanitize(normalized_arguments_json)}"""
-    if (error != null) result += """error=$error"""
+    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
+    result += """error_code=$error_code"""
     return result.joinToString(prefix = "ToolCallValidationResult{", separator = ", ", postfix = "}")
   }
 
@@ -124,9 +133,10 @@ public class ToolCallValidationResult(
     validation_errors: List<String> = this.validation_errors,
     matched_tool: ToolDefinition? = this.matched_tool,
     normalized_arguments_json: String = this.normalized_arguments_json,
-    error: SDKError? = this.error,
+    error_message: String? = this.error_message,
+    error_code: Int = this.error_code,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCallValidationResult = ToolCallValidationResult(is_valid, validation_errors, matched_tool, normalized_arguments_json, error, unknownFields)
+  ): ToolCallValidationResult = ToolCallValidationResult(is_valid, validation_errors, matched_tool, normalized_arguments_json, error_message, error_code, unknownFields)
 
   public companion object {
     @JvmField
@@ -149,7 +159,10 @@ public class ToolCallValidationResult(
         if (value.normalized_arguments_json != "") {
           size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.normalized_arguments_json)
         }
-        size += SDKError.ADAPTER.encodedSizeWithTag(7, value.error)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.error_message)
+        if (value.error_code != 0) {
+          size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.error_code)
+        }
         return size
       }
 
@@ -162,13 +175,19 @@ public class ToolCallValidationResult(
         if (value.normalized_arguments_json != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 4, value.normalized_arguments_json)
         }
-        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
+        if (value.error_code != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.error_code)
+        }
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCallValidationResult) {
         writer.writeBytes(value.unknownFields)
-        SDKError.ADAPTER.encodeWithTag(writer, 7, value.error)
+        if (value.error_code != 0) {
+          ProtoAdapter.INT32.encodeWithTag(writer, 6, value.error_code)
+        }
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
         if (value.normalized_arguments_json != "") {
           ProtoAdapter.STRING.encodeWithTag(writer, 4, value.normalized_arguments_json)
         }
@@ -184,14 +203,16 @@ public class ToolCallValidationResult(
         val validation_errors = mutableListOf<String>()
         var matched_tool: ToolDefinition? = null
         var normalized_arguments_json: String = ""
-        var error: SDKError? = null
+        var error_message: String? = null
+        var error_code: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_valid = ProtoAdapter.BOOL.decode(reader)
             2 -> validation_errors.add(ProtoAdapter.STRING.decode(reader))
             3 -> matched_tool = ToolDefinition.ADAPTER.decode(reader)
             4 -> normalized_arguments_json = ProtoAdapter.STRING.decode(reader)
-            7 -> error = SDKError.ADAPTER.decode(reader)
+            5 -> error_message = ProtoAdapter.STRING.decode(reader)
+            6 -> error_code = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -200,14 +221,14 @@ public class ToolCallValidationResult(
           validation_errors = validation_errors,
           matched_tool = matched_tool,
           normalized_arguments_json = normalized_arguments_json,
-          error = error,
+          error_message = error_message,
+          error_code = error_code,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ToolCallValidationResult): ToolCallValidationResult = value.copy(
         matched_tool = value.matched_tool?.let(ToolDefinition.ADAPTER::redact),
-        error = value.error?.let(SDKError.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

@@ -541,9 +541,12 @@ for ABI in "${ABIS[@]}"; do
     LIB_RUNANYWHERE_LLAMACPP="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_llamacpp.so"  -print -quit || true)"
     LIB_RUNANYWHERE_ONNX="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_onnx.so"          -print -quit || true)"
     LIB_RUNANYWHERE_SHERPA="$(find "${BUILD_DIR}" -maxdepth 6 -name "librunanywhere_sherpa.so"      -print -quit || true)"
-    copy_if_exists "${LIB_RUNANYWHERE_LLAMACPP}" "${KOTLIN_LLAMA_DEST}"
-    copy_if_exists "${LIB_RUNANYWHERE_ONNX}"     "${KOTLIN_ONNX_DEST}"
-    copy_if_exists "${LIB_RUNANYWHERE_SHERPA}"   "${KOTLIN_ONNX_DEST}"
+    # Entry-point libs travel with each backend package on every SDK (Kotlin,
+    # RN, Flutter). RN/Flutter ONNX inventories require librunanywhere_onnx.so
+    # and librunanywhere_sherpa.so alongside the plugin .so files.
+    copy_if_exists "${LIB_RUNANYWHERE_LLAMACPP}" "${KOTLIN_LLAMA_DEST}" "${RN_LLAMA_DEST}" "${FLUTTER_LLAMA_DEST}"
+    copy_if_exists "${LIB_RUNANYWHERE_ONNX}"     "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
+    copy_if_exists "${LIB_RUNANYWHERE_SHERPA}"   "${KOTLIN_ONNX_DEST}"  "${RN_ONNX_DEST}"  "${FLUTTER_ONNX_DEST}"
 
     # Per-engine backend + JNI libs. Staged to both RN and Flutter plugin
     # packages so the same jniLibs layout is shipped from every SDK.

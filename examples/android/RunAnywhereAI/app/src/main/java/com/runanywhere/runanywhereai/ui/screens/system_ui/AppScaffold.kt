@@ -11,6 +11,8 @@ import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,11 +20,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.rememberDrawerState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavDestination.Companion.hasRoute
 import com.runanywhere.runanywhereai.RunAnywhereApplication
 import com.runanywhere.runanywhereai.state.GlobalState
 import com.runanywhere.runanywhereai.ui.navigation.AppNavHost
@@ -41,6 +45,8 @@ import com.runanywhere.runanywhereai.ui.screens.intro.IntroScreen
 import com.runanywhere.runanywhereai.ui.screens.lora.LoraSheet
 import com.runanywhere.runanywhereai.ui.screens.lora.LoraViewModel
 import com.runanywhere.runanywhereai.ui.screens.chat.ChatViewModel
+import com.runanywhere.runanywhereai.ui.connect.ConnectClientViewModel
+import com.runanywhere.runanywhereai.ui.connect.ConnectStatusBanner
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionSheet
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionViewModel
@@ -58,6 +64,8 @@ fun AppScaffold() {
 
     // Hoisted at activity scope so the chat top bar and chat screen share one instance.
     val chatViewModel: ChatViewModel = viewModel()
+    val connectController: ConnectClientViewModel = viewModel()
+    val connectState by connectController.state.collectAsState()
     val modelViewModel: ModelSelectionViewModel =
         viewModel(factory = ModelSelectionViewModel.Factory(ModelSelectionContext.LLM))
     val loraViewModel: LoraViewModel = viewModel()
@@ -67,6 +75,10 @@ fun AppScaffold() {
     var showDetailsSheet by remember { mutableStateOf(false) }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(connectController) {
+        chatViewModel.bindConnectSession(connectController.session)
+    }
 
     val isExpanded = isExpandedScreen()
     val showNav = destination != null
@@ -88,6 +100,7 @@ fun AppScaffold() {
                         AppTopBar(
                             destination = destination,
                             model = GlobalState.model.loaded,
+                            hostedModel = connectState.activeModel,
                             conversationModelName = chatViewModel.conversationModelName,
                             generating = chatViewModel.isGenerating,
                             loraActive = GlobalState.lora.isActive,
@@ -105,25 +118,42 @@ fun AppScaffold() {
                     }
                 },
             ) { innerPadding ->
-                AppNavHost(
-                    navController = navController,
-                    chatViewModel = chatViewModel,
-                    onOpenModels = { showModelSheet = true },
-                    isModelSheetVisible = showModelSheet,
-                    // This is an explicit request for live mode. Do not restore a
-                    // previously saved photo-mode Vision destination over its argument.
-                    onOpenVision = {
-                        navController.navigateTopLevel(
-                            Vision(openLiveCamera = true),
-                            restoreState = false,
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AppNavHost(
+                        navController = navController,
+                        chatViewModel = chatViewModel,
+                        onOpenModels = { showModelSheet = true },
+                        isModelSheetVisible = showModelSheet,
+                        // This is an explicit request for live mode. Do not restore a
+                        // previously saved photo-mode Vision destination over its argument.
+                        onOpenVision = {
+                            navController.navigateTopLevel(
+                                Vision(openLiveCamera = true),
+                                restoreState = false,
+                            )
+                        },
+                        onOpenVoice = { navController.navigateTopLevel(Voice) },
+                        onOpenAdvanced = { navController.navigateTopLevel(More) },
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .consumeWindowInsets(innerPadding),
+                    )
+
+                    if (destination?.hasRoute<Chat>() == true) {
+                        ConnectStatusBanner(
+                            state = connectState,
+                            onConnect = {
+                                connectState.availableHosts.firstOrNull()?.let {
+                                    connectController.connect(it)
+                                }
+                            },
+                            onRetry = connectController::startDiscovery,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(innerPadding),
                         )
-                    },
-                    onOpenVoice = { navController.navigateTopLevel(Voice) },
-                    onOpenAdvanced = { navController.navigateTopLevel(More) },
-                    modifier = Modifier
-                        .padding(innerPadding)
-                        .consumeWindowInsets(innerPadding),
-                )
+                    }
+                }
             }
         }
 
@@ -192,6 +222,7 @@ fun AppScaffold() {
             ModelSelectionSheet(
                 viewModel = modelViewModel,
                 onDismiss = { showModelSheet = false },
+                connectController = connectController,
             )
         }
 

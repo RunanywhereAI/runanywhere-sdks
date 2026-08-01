@@ -29,6 +29,45 @@ public extension RunAnywhere {
         return try await generateStreamProto(requestOptions.toRALLMGenerateRequest(prompt: prompt))
     }
 
+    /// Seed the loaded on-device model's adaptive context with a reusable system prompt.
+    static func injectSystemPrompt(_ prompt: String) async throws {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        try await CppBridge.LLM.shared.injectSystemPrompt(prompt)
+    }
+
+    /// Append text to the loaded on-device model's adaptive context.
+    static func appendContext(_ text: String) async throws {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        try await CppBridge.LLM.shared.appendContext(text)
+    }
+
+    /// Generate from the accumulated adaptive context without clearing the KV cache first.
+    static func generateFromContext(
+        query: String,
+        options: RALLMGenerationOptions? = nil
+    ) async throws -> RALLMGenerationResult {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        return try await CppBridge.LLM.shared.generateFromContext(query: query, options: options)
+    }
+
+    /// Clear the loaded on-device model's adaptive context.
+    static func clearContext() async throws {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+        try await ensureServicesReady()
+        try await CppBridge.LLM.shared.clearContext()
+    }
+
     /// Generate text through the generated-proto C++ LLM service ABI.
     @available(*, deprecated, renamed: "llm.generate(prompt:options:)")
     static func generate(_ request: RALLMGenerateRequest) async throws -> RALLMGenerationResult {
@@ -150,11 +189,20 @@ public extension RunAnywhere {
             : InferenceFramework.unknown.analyticsKey
 
         // Prefer the backend's terminal aggregate result (text + metrics) when
-        // the final event carries one; otherwise fall back to the locally
-        // concatenated text and wall-clock metrics.
+        // the final event carries one, matching the Web SDK; otherwise fall back
+        // to the locally concatenated text / wall-clock metrics.
+        //
+        // Connect (and some backends) may emit a final event whose `result.text`
+        // is empty/short even after tokens were streamed. Never replace a longer
+        // accumulated transcript with a weaker terminal payload — that shows up
+        // as "here's the code:" with no code after the stream completes.
         let final = finalEvent.flatMap { $0.hasResult ? $0.result : nil }
         var result = RALLMGenerationResult()
-        result.text = final?.text ?? answerResponse
+        if let finalText = final?.text, !finalText.isEmpty, finalText.count >= answerResponse.count {
+            result.text = finalText
+        } else {
+            result.text = answerResponse.isEmpty ? (final?.text ?? "") : answerResponse
+        }
         if let final, final.hasThinkingContent {
             result.thinkingContent = final.thinkingContent
         } else if !thinkingResponse.isEmpty {

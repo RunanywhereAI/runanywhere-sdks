@@ -1861,6 +1861,15 @@ sync_flutter_frameworks() {
         run cp -R "${DEST}/RABackendSherpa.xcframework" "${flutter_onnx}/"
     fi
 
+    # CoreML Stable-Diffusion engine is co-linked with ONNX on Apple (commons
+    # references _rac_plugin_entry_coreml). Without a local Frameworks copy,
+    # Package.swift falls back to the release zip checksum and local Flutter
+    # iOS builds fail after a fresh XCFramework rebuild.
+    if [ -d "${DEST}/RABackendCoreML.xcframework" ]; then
+        run rm -rf "${flutter_onnx}/RABackendCoreML.xcframework"
+        run cp -R "${DEST}/RABackendCoreML.xcframework" "${flutter_onnx}/"
+    fi
+
     run rm -rf \
         "${flutter_mlx}/RABackendMLX.xcframework" \
         "${flutter_mlx}/RunAnywhereMLXRuntime.xcframework" \

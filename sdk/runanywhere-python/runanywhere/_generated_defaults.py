@@ -24,6 +24,13 @@ class NetworkDefaults:
     RETRY_BACKOFF_BASE_MS: Final[int] = 100
 
 
+class ConnectDefaults:
+    """Generated from ConnectDefaults in idl/sdk_defaults.proto."""
+
+    CONNECT_TIMEOUT_MS: Final[int] = 5000
+    GENERATION_READ_TIMEOUT_MS: Final[int] = 120000
+
+
 class AudioCaptureDefaults:
     """Generated from AudioCaptureDefaults in idl/sdk_defaults.proto."""
 
@@ -84,4 +91,4 @@ class StorageDefaults:
     CONTEXT_LENGTH: Final[int] = 2048
 
 
-__all__ = ["NetworkDefaults", "AudioCaptureDefaults", "VoiceAgentDefaults", "HybridDefaults", "WorkerDefaults", "FFIDefaults", "EnvironmentDefaults", "StructuredOutputDefaults", "StorageDefaults"]
+__all__ = ["NetworkDefaults", "ConnectDefaults", "AudioCaptureDefaults", "VoiceAgentDefaults", "HybridDefaults", "WorkerDefaults", "FFIDefaults", "EnvironmentDefaults", "StructuredOutputDefaults", "StorageDefaults"]

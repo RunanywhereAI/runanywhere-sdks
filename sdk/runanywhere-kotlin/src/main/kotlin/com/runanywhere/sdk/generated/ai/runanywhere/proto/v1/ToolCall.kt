@@ -29,7 +29,16 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * ---------------------------------------------------------------------------
+ * A tool call requested by the LLM. `arguments_json` is a JSON object
+ * matching the parameter shape declared in the corresponding ToolDefinition.
+ * ---------------------------------------------------------------------------
+ */
 public class ToolCall(
+  /**
+   * Unique ID (caller-supplied or generated). Empty = unset.
+   */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -37,6 +46,9 @@ public class ToolCall(
     schemaIndex = 0,
   )
   public val id: String = "",
+  /**
+   * Tool name (matches ToolDefinition.name).
+   */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -44,6 +56,14 @@ public class ToolCall(
     schemaIndex = 1,
   )
   public val name: String = "",
+  /**
+   * JSON-encoded arguments. Empty object "{}" if no args.
+   *
+   * The C++ tokenizer / tool-prompt formatter
+   * (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
+   * `arguments_json` directly when building LLM prompts. It is the
+   * canonical wire shape for the prompt-formatting path.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -53,7 +73,8 @@ public class ToolCall(
   )
   public val arguments_json: String = "",
   /**
-   * "function" is the only value today. Empty = unset.
+   * Discriminator for OpenAI-compatible flows ("function" is the only
+   * value at the moment). Empty = unset.
    */
   @field:WireField(
     tag = 4,
@@ -70,9 +91,6 @@ public class ToolCall(
     schemaIndex = 4,
   )
   public val created_at_ms: Long = 0L,
-  /**
-   * The model text this call was parsed out of.
-   */
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
