@@ -92,8 +92,8 @@ class DiarizationViewModel(application: Application) : AndroidViewModel(applicat
                         validate_before_register = false,
                     ),
                 )
-                if (!importResult.success) {
-                    error = importResult.error_message.ifEmpty { "Model import failed." }
+                if (importResult.error != null) {
+                    error = importResult.error?.message?.ifEmpty { "Model import failed." } ?: "Model import failed."
                     status = ""
                     return@launch
                 }

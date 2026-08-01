@@ -14,7 +14,6 @@ import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.hybrid.HybridCascade
 import com.runanywhere.sdk.hybrid.HybridFilter
 import com.runanywhere.sdk.hybrid.HybridModel
-import com.runanywhere.sdk.hybrid.HybridRank
 import com.runanywhere.sdk.hybrid.HybridRoutedMetadata
 import com.runanywhere.sdk.hybrid.HybridRoutingPolicy
 import com.runanywhere.sdk.hybrid.HybridSTTRouter
@@ -344,11 +343,7 @@ class SttViewModel : ViewModel() {
                 policy = HybridRoutingPolicy(
                     hardFilters = filters,
                     cascade = HybridCascade.Confidence(confidenceThreshold),
-                    rank = if (preferLocalFirst) {
-                        HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST
-                    } else {
-                        HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST
-                    },
+                    preferLocal = preferLocalFirst,
                 ),
             )
         } catch (t: Throwable) {

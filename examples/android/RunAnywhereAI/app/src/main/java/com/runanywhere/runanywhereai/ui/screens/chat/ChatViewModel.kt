@@ -615,8 +615,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 name = call.name,
                 arguments = prettyJson(call.arguments_json),
                 result = toolResult?.result_json?.let(::prettyJson),
-                success = toolResult != null && toolResult.error.isNullOrBlank(),
-                error = toolResult?.error,
+                success = toolResult != null && toolResult.error == null,
+                error = toolResult?.error?.message,
             )
         }
         val normalized = ChatToolResultNormalizer.normalize(result)

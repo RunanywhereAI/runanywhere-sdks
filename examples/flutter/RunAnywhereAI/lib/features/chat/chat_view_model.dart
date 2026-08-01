@@ -338,7 +338,7 @@ class ChatViewModel extends ChangeNotifier {
         final lastResult = result.toolResults.isNotEmpty
             ? result.toolResults.last
             : null;
-        final hasError = lastResult != null && lastResult.error.isNotEmpty;
+        final hasError = lastResult != null && lastResult.hasError();
         toolCallInfo = ToolCallInfo(
           toolName: lastCall.name,
           arguments: lastCall.argumentsJson,
@@ -346,7 +346,7 @@ class ChatViewModel extends ChangeNotifier {
               ? lastResult.resultJson
               : null,
           success: lastResult != null && !hasError,
-          error: hasError ? lastResult.error : null,
+          error: hasError ? lastResult.error.message : null,
         );
       }
 

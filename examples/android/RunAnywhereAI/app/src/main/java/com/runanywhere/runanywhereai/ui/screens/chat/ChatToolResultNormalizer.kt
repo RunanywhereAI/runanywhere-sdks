@@ -112,8 +112,7 @@ internal object ChatToolResultNormalizer {
 
     private fun successfulToolFallback(results: List<ToolResult>): String? =
         results.asReversed().firstNotNullOfOrNull { result ->
-            val succeeded = result.result_json.isNotBlank() &&
-                (result.success || result.error.isNullOrBlank())
+            val succeeded = result.result_json.isNotBlank() && result.error == null
             if (succeeded) summarizeToolResult(result) else null
         }
 

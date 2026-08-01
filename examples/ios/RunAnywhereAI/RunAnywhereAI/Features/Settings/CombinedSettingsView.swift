@@ -612,11 +612,11 @@ private struct DownloadedModelsCard: View {
                         Spacer()
                     }
                 } else {
-                    ForEach(viewModel.storedModels, id: \.modelID) { model in
+                    ForEach(viewModel.storedModels, id: \.id) { model in
                         StoredModelRow(model: model) {
                             await viewModel.deleteModel(model)
                         }
-                        if model.modelID != viewModel.storedModels.last?.modelID {
+                        if model.id != viewModel.storedModels.last?.id {
                             Divider()
                                 .padding(.vertical, AppSpacing.xSmall)
                         }
@@ -936,33 +936,27 @@ private struct ApiConfigurationSheet: View {
 // MARK: - Supporting Views
 
 private struct StoredModelRow: View {
-    let model: RAModelStorageMetrics
+    let model: ModelInfo
     let onDelete: () async -> Void
-    @ObservedObject private var modelListViewModel = ModelListViewModel.shared
     @State private var showingDetails = false
     @State private var showingDeleteConfirmation = false
     @State private var isDeleting = false
 
-    private var registryModel: RAModelInfo? {
-        modelListViewModel.availableModels.first { $0.id == model.modelID }
-    }
-
     private var displayName: String {
-        guard let name = registryModel?.name, !name.isEmpty else { return model.modelID }
-        return name
+        model.name.isEmpty ? model.id : model.name
     }
 
     private var backend: InferenceFramework? {
-        registryModel?.framework
+        model.framework
     }
 
     private var lastUsedDate: Date? {
-        guard model.hasLastUsedMs else { return nil }
-        return Date(timeIntervalSince1970: TimeInterval(model.lastUsedMs) / 1000.0)
+        guard model.hasLastUsedAtUnixMs else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(model.lastUsedAtUnixMs) / 1000.0)
     }
 
     private var isDeletable: Bool {
-        !model.modelID.isEmpty
+        !model.id.isEmpty
     }
 
     var body: some View {
@@ -973,7 +967,7 @@ private struct StoredModelRow: View {
                         .font(AppTypography.subheadlineMedium)
 
                     HStack(spacing: AppSpacing.small) {
-                        Text(ByteCountFormatter.string(fromByteCount: model.sizeOnDiskBytes, countStyle: .file))
+                        Text(ByteCountFormatter.string(fromByteCount: model.downloadSizeBytes, countStyle: .file))
                             .font(AppTypography.caption2)
                             .foregroundColor(AppColors.textSecondary)
                         if let backend {
@@ -985,7 +979,7 @@ private struct StoredModelRow: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: AppSpacing.xSmall) {
-                    Text(ByteCountFormatter.string(fromByteCount: model.sizeOnDiskBytes, countStyle: .file))
+                    Text(ByteCountFormatter.string(fromByteCount: model.downloadSizeBytes, countStyle: .file))
                         .font(AppTypography.captionMedium)
 
                     HStack(spacing: AppSpacing.xSmall) {
@@ -1071,7 +1065,7 @@ private struct StoredModelRow: View {
             HStack {
                 Text("Size:")
                     .font(AppTypography.caption2Medium)
-                Text(ByteCountFormatter.string(fromByteCount: model.sizeOnDiskBytes, countStyle: .file))
+                Text(ByteCountFormatter.string(fromByteCount: model.downloadSizeBytes, countStyle: .file))
                     .font(AppTypography.caption2)
                     .foregroundColor(AppColors.textSecondary)
             }
