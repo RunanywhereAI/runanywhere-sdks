@@ -28,20 +28,24 @@ import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.registerModel
 import ai.runanywhere.proto.v1.InferenceFramework
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
-val npu = QHexRT.probeNpu() // safe on any device
-if (npu.qhexrt_supported) {
-    QHexRT.register() // also installs DSP skels from AAR assets
+lifecycleScope.launch {
+    RunAnywhere.initialize(context = this@MainActivity, /* ... */)
+
+    val npu = QHexRT.probeNpu() // safe on any device
+    if (npu.qhexrt_supported) {
+        QHexRT.register() // also installs DSP skels from AAR assets
+        RunAnywhere.registerModel(
+            id = "my-qhexrt-model",
+            name = "My QHexRT Model",
+            url = "https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json",
+            framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+        )
+        // Download, load, and infer via core APIs.
+    }
 }
-
-RunAnywhere.initialize(context = this, /* ... */)
-RunAnywhere.registerModel(
-    id = "my-qhexrt-model",
-    name = "My QHexRT Model",
-    url = "https://huggingface.co/organization/dedicated-qhexrt-model/resolve/main/model.json",
-    framework = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
-)
-// Download, load, and infer via core APIs.
 ```
 
 See the [Kotlin SDK README](../../README.md) for full setup.

@@ -546,6 +546,12 @@ abstract final class QHexRTModelCatalog {
         framework: request.framework,
         modality: request.category,
         memoryRequirement: request.memoryRequiredBytes.toInt(),
+        downloadSize: request.downloadSizeBytes.toInt(),
+        contextLength: request.hasContextLength()
+            ? request.contextLength
+            : null,
+        source: request.source,
+        description: request.description,
         supportsThinking: request.supportsThinking,
         supportsLora: request.supportsLora,
       ),
