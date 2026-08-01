@@ -1,10 +1,5 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
-import ai.runanywhere.proto.v1.GenerationEventKind
-import ai.runanywhere.proto.v1.RAGDocument
-import ai.runanywhere.proto.v1.RAGQueryOptions
-import ai.runanywhere.proto.v1.SDKComponent
-import ai.runanywhere.proto.v1.VLMImageFormat
 import android.app.Application
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -36,40 +31,28 @@ import com.runanywhere.runanywhereai.ui.screens.models.LlmModelChangeInterlock
 import com.runanywhere.runanywhereai.ui.screens.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSelection
 import com.runanywhere.runanywhereai.ui.screens.models.RuntimeModelSnapshot
-import com.runanywhere.runanywhereai.ui.screens.rag.RagPipelineCoordinator
-import com.runanywhere.runanywhereai.ui.screens.rag.RagPipelineIdentity
-import com.runanywhere.runanywhereai.ui.screens.rag.replaceRagCorpus
 import com.runanywhere.runanywhereai.ui.screens.vision.DEFAULT_VISION_PROMPT
 import com.runanywhere.runanywhereai.ui.screens.vision.VisionAnswerMode
 import com.runanywhere.runanywhereai.ui.screens.vision.VisionGenerationPolicy
 import com.runanywhere.runanywhereai.util.RACLog
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.connect.ConnectModel
-import com.runanywhere.sdk.public.connect.ConnectSession
-import com.runanywhere.sdk.public.connect.ConnectState
-import com.runanywhere.sdk.public.connect.ConnectStatus
-import com.runanywhere.sdk.public.events.EventCategory
-import com.runanywhere.sdk.public.events.SDKEvent
+import com.runanywhere.sdk.public.api.GenerationEvent
+import com.runanywhere.sdk.public.api.GenerationResult
+import com.runanywhere.sdk.public.api.ImageInput
+import com.runanywhere.sdk.public.api.LlmOptions
+import com.runanywhere.sdk.public.api.ModelRef
+import com.runanywhere.sdk.public.api.RagDocument
+import com.runanywhere.sdk.public.api.RagSession
+import com.runanywhere.sdk.public.api.ReasoningMode
+import com.runanywhere.sdk.public.api.ReasoningOptions
+import com.runanywhere.sdk.public.api.TokenKind
+import com.runanywhere.sdk.public.api.ToolDefinition
+import com.runanywhere.sdk.public.api.ChatMessage as SdkChatMessage
+import com.runanywhere.sdk.public.api.llm
+import com.runanywhere.sdk.public.api.rag
+import com.runanywhere.sdk.public.api.vlm
 import com.runanywhere.sdk.public.extensions.Models.analyticsKey
-import com.runanywhere.sdk.public.extensions.aggregateStream
-import com.runanywhere.sdk.public.extensions.cancelGeneration
-import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
-import com.runanywhere.sdk.public.extensions.defaults
-import com.runanywhere.sdk.public.extensions.generate
-import com.runanywhere.sdk.public.extensions.generateStream
-import com.runanywhere.sdk.public.extensions.generateWithTools
-import com.runanywhere.sdk.public.extensions.getRegisteredTools
-import com.runanywhere.sdk.public.extensions.ragCreatePipeline
-import com.runanywhere.sdk.public.extensions.ragClearDocuments
-import com.runanywhere.sdk.public.extensions.ragGetStatistics
-import com.runanywhere.sdk.public.extensions.ragIngest
-import com.runanywhere.sdk.public.extensions.ragQuery
-import com.runanywhere.sdk.public.extensions.processImage
-import com.runanywhere.sdk.public.types.RALLMGenerateRequest
-import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAModelInfo
-import com.runanywhere.sdk.public.types.RAToolDefinition
-import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -126,14 +109,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     val toolsEnabled: Boolean
-        get() = !isUsingConnect && toolsRequested &&
-            ToolCallingModelPolicy.evaluate(GlobalState.model.loaded).isAvailable
+        get() = toolsRequested && ToolCallingModelPolicy.evaluate(GlobalState.model.loaded).isAvailable
 
     val toolsUnavailableMessage: String?
         get() {
-            if (isUsingConnect && toolsRequested) {
-                return "Web & tools are unavailable while using a hosted model."
-            }
             val availability = ToolCallingModelPolicy.evaluate(GlobalState.model.loaded)
             return availability.message.takeIf {
                 !availability.isAvailable && (toolsRequested || showToolGateNotice)
@@ -151,24 +130,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     val canSend: Boolean
-        get() = input.isNotBlank() && !isBusy && !generationOwnership.isBusy() &&
-            (GlobalState.model.isLoaded || isUsingConnect)
-
-    val isUsingConnect: Boolean
-        get() = connectState.status == ConnectStatus.CONNECTED && connectState.activeModel != null
+        get() = input.isNotBlank() && !isBusy && !generationOwnership.isBusy() && GlobalState.model.isLoaded
 
     private var job: Job? = null
     private var cancellationJob: Job? = null
     private var conversationTransitionJob: Job? = null
     private var persistJob: Job? = null
     private var smartTitleJob: Job? = null
-    private var connectStateJob: Job? = null
-    private var connectSession: ConnectSession? = null
-    private var connectState by mutableStateOf(ConnectState())
-    /// In-flight hosted request id for Connect cancel-by-id (Stop keeps session).
-    private var activeHostedRequestId: String? = null
-    /// Invalidates late hosted stream writes after Stop or conversation swap.
-    private var hostedConversationToken: Long = 0
     private val smartTitleLifecycle = SmartTitleLifecycle()
     private val generationOwnership = ChatGenerationOwnership()
     private var activeReplyIndex: Int? = null
@@ -176,30 +144,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var conversationId: String? = null
     private var createdAt: Long = 0L
     private var contentRevision: Long = 0L
-    private val ragPipelineOwner = "chat-${UUID.randomUUID()}"
-
-    // TTFT/completion metrics from the SDK event bus, keyed like iOS
-    // LLMViewModel.firstTokenLatencies. The chat runs one generation at a time,
-    // so the latest values are merged into the message stats (mirrors iOS
-    // activeGenerationTTFTMs).
-    private val firstTokenLatencies = mutableMapOf<String, Long>()
-    private var activeGenerationTTFTMs: Long? = null
-    private var activeGenerationMetrics: SdkGenerationMetrics? = null
+    private var ragSession: RagSession? = null
+    private var ragSessionKey: Pair<String, String>? = null
 
     init {
         LlmModelChangeInterlock.install(this, ::awaitReadyForLlmModelChange)
 
-        // Mirrors iOS LLMViewModel+Events.subscribeToModelLifecycle: generation
-        // analytics (TTFT, completion metrics) come from the raw SDK event bus.
-        viewModelScope.launch {
-            RunAnywhere.events.events.collect { event ->
-                if (event.category == EventCategory.EVENT_CATEGORY_LLM ||
-                    event.component == SDKComponent.SDK_COMPONENT_LLM
-                ) {
-                    handleGenerationEvent(event)
-                }
-            }
-        }
         viewModelScope.launch {
             RuntimeModelSelection.observe(ModelSelectionContext.LLM).collect { snapshot ->
                 val claim = activeGenerationModel ?: return@collect
@@ -219,33 +169,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     @OptIn(DelicateCoroutinesApi::class)
     override fun onCleared() {
         LlmModelChangeInterlock.remove(this)
-        // Cancelling the worker coroutine only unwinds the suspend surface; the
-        // one-shot/VLM JNI call keeps decoding on its native thread. Mirror stop()
-        // and issue the native cancel, but on GlobalScope because viewModelScope is
-        // already being torn down. Guarded so it is a no-op when nothing is running.
-        if (generationOwnership.isBusy()) {
-            GlobalScope.launch(Dispatchers.Default) {
-                runCatching { RunAnywhere.cancelGeneration() }
-                runCatching { RunAnywhere.cancelVLMGeneration() }
-            }
-        }
+        val openRag = ragSession
+        ragSession = null
+        ragSessionKey = null
+        if (openRag != null) GlobalScope.launch { runCatching { openRag.close() } }
         conversationTransitionJob?.cancel()
         cancellationJob?.cancel()
         job?.cancel()
         persistJob?.cancel()
         smartTitleJob?.cancel()
-        connectStateJob?.cancel()
         super.onCleared()
-    }
-
-    fun bindConnectSession(session: ConnectSession) {
-        if (connectSession === session) return
-        connectStateJob?.cancel()
-        connectSession = session
-        connectState = session.state.value
-        connectStateJob = viewModelScope.launch {
-            session.state.collect { connectState = it }
-        }
     }
 
     fun onInputChange(value: String) {
@@ -311,93 +244,55 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 awaitSmartTitleStopped(titleToStop)
                 ensureOwns(request)
-                val hostedModel = connectState.activeModel
-                val hostedSession = connectSession
-                if (isUsingConnect && hostedModel != null && hostedSession != null) {
-                    val streaming = SettingsRepository.settings.streaming && hostedModel.supportsStreaming
-                    val effectiveTurn = ChatRequestPolicy.windowHistory(
-                        turn = turn,
-                        contextTokens = hostedModel.contextWindow,
-                        outputTokens = ChatGenerationBudgetPolicy.resolve(
-                            requestedMaxTokens = SettingsRepository.settings.maxTokens,
-                            modelContextTokens = hostedModel.contextWindow,
-                        ).effectiveMaxTokens,
-                        systemPrompt = SettingsRepository.settings.systemPrompt.ifBlank { null },
-                    )
-                    val llmRequest = ChatRequestPolicy.buildRequest(
-                        turn = effectiveTurn,
-                        // Hosted models do not expose supports_thinking; match iOS
-                        // Connect (loadedModelSupportsThinking = false).
-                        options = generationOptions(
-                            contextTokens = hostedModel.contextWindow,
-                            modelName = hostedModel.displayName,
-                        ).copy(disable_thinking = false),
-                        conversationId = ensureConversationId(),
-                        streaming = streaming,
-                    )
-                    val hostedRequestId = UUID.randomUUID().toString()
-                    activeHostedRequestId = hostedRequestId
-                    val hostedToken = ++hostedConversationToken
-                    generateHostedReply(
-                        request = request,
-                        llmRequest = llmRequest.copy(request_id = hostedRequestId),
-                        index = replyIndex,
-                        model = hostedModel,
-                        session = hostedSession,
-                        streamUpdates = streaming,
-                        hostedToken = hostedToken,
-                    )
+                val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
+                bindActiveModel(request, activeModel)
+                // Trim old turns to the model's context window so small-context models (e.g.
+                // Llama-3.2-1B = 512 on v79) don't rc=-130 once a long conversation overruns MAXCTX.
+                val effectiveTurn = ChatRequestPolicy.windowHistory(
+                    turn = turn,
+                    contextTokens = activeModel.model.context_length,
+                    outputTokens = ChatGenerationBudgetPolicy.resolve(
+                        requestedMaxTokens = SettingsRepository.settings.maxTokens,
+                        modelContextTokens = activeModel.model.context_length,
+                    ).effectiveMaxTokens,
+                    systemPrompt = SettingsRepository.settings.systemPrompt.ifBlank { null },
+                )
+                val registeredTools = if (toolsRequested) {
+                    RunAnywhere.llm.tools.list()
                 } else {
-                    val activeModel = RuntimeModelSelection.requireCurrent(ModelSelectionContext.LLM)
-                    bindActiveModel(request, activeModel)
-                    // Trim old turns to the model's context window so small-context models do not overflow.
-                    val effectiveTurn = ChatRequestPolicy.windowHistory(
-                        turn = turn,
-                        contextTokens = activeModel.model.context_length,
-                        outputTokens = ChatGenerationBudgetPolicy.resolve(
-                            requestedMaxTokens = SettingsRepository.settings.maxTokens,
-                            modelContextTokens = activeModel.model.context_length,
-                        ).effectiveMaxTokens,
-                        systemPrompt = SettingsRepository.settings.systemPrompt.ifBlank { null },
-                    )
-                    val registeredTools = if (toolsRequested) RunAnywhere.getRegisteredTools() else emptyList()
-                    val toolPreflight = ToolCallingModelPolicy.preflight(
-                        toolsRequested = toolsRequested,
-                        registeredToolCount = registeredTools.size,
-                        model = activeModel.model,
-                    )
-                    when (toolPreflight.route) {
-                        ToolCallingRoute.TOOL_GENERATION ->
-                            generateWithTools(
-                                request,
-                                prompt,
-                                replyIndex,
-                                activeModel,
-                                registeredTools,
-                                history = ChatRequestPolicy.toToolCallingHistory(effectiveTurn.history),
+                    emptyList()
+                }
+                val toolPreflight = ToolCallingModelPolicy.preflight(
+                    toolsRequested = toolsRequested,
+                    registeredToolCount = registeredTools.size,
+                    model = activeModel.model,
+                )
+                when (toolPreflight.route) {
+                    ToolCallingRoute.TOOL_GENERATION ->
+                        generateWithTools(
+                            request,
+                            ChatRequestPolicy.toMessages(effectiveTurn),
+                            replyIndex,
+                            activeModel,
+                            registeredTools,
+                        )
+                    ToolCallingRoute.BLOCKED -> {
+                        showToolGateNotice = true
+                        updateReply(request, replyIndex) { reply ->
+                            reply.copy(
+                                text = toolPreflight.availability.message
+                                    ?: "Web & tools are unavailable for the current model.",
                             )
-                        ToolCallingRoute.BLOCKED -> {
-                            showToolGateNotice = true
-                            updateReply(request, replyIndex) { reply ->
-                                reply.copy(
-                                    text = toolPreflight.availability.message
-                                        ?: "Web & tools are unavailable for the current model.",
-                                )
-                            }
                         }
-                        ToolCallingRoute.STANDARD_GENERATION -> {
-                            val streaming = SettingsRepository.settings.streaming
-                            val llmRequest = ChatRequestPolicy.buildRequest(
-                                turn = effectiveTurn,
-                                options = generationOptions(activeModel),
-                                conversationId = ensureConversationId(),
-                                streaming = streaming,
-                            )
-                            if (streaming) {
-                                streamReply(request, llmRequest, replyIndex, activeModel)
-                            } else {
-                                generateReply(request, llmRequest, replyIndex, activeModel)
-                            }
+                    }
+                    ToolCallingRoute.STANDARD_GENERATION -> {
+                        ensureConversationId()
+                        val turnMessages = ChatRequestPolicy.toMessages(effectiveTurn)
+                        val options = generationOptions(activeModel)
+                        if (SettingsRepository.settings.streaming) {
+                            streamReply(request, turnMessages, options, replyIndex, activeModel)
+                        } else {
+                            generateReply(request, turnMessages, options, replyIndex, activeModel)
                         }
                     }
                 }
@@ -450,16 +345,12 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 replyIndex = imageReplyIndex
                 messages += ChatMessage("", isUser = false)
                 activeReplyIndex = imageReplyIndex
-                val image = RAVLMImage(
-                    file_path = file.absolutePath,
-                    format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
-                )
+                val image = ImageInput.file(file.absolutePath)
                 val activeModel = RuntimeModelSelection.requireCurrent(
                     ModelSelectionContext.VLM,
                     listOfNotNull(loadedModel),
                 )
                 val options = VisionGenerationPolicy.options(
-                    prompt = prompt,
                     model = activeModel.model,
                     mode = answerMode,
                     userLimit = SettingsRepository.settings.maxTokens,
@@ -473,18 +364,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // Image answers need the canonical final caption and native
                 // metrics. Use the result path so behavior stays uniform across
                 // backends with token, chunked, or whole-response streams.
-                val result = withContext(Dispatchers.Default) {
-                    RunAnywhere.processImage(image, options)
-                }
+                val started = System.currentTimeMillis()
+                val result = RunAnywhere.vlm.generate(image, prompt, options)
                 updateReply(request, imageReplyIndex) { reply ->
                     reply.copy(
                         text = result.text.ifBlank { "I could not read that image." },
-                        stats = GenerationStats(
-                            tokens = result.completion_tokens,
-                            tokensPerSecond = result.tokens_per_second.toDouble(),
-                            timeToFirstTokenMs = result.time_to_first_token_ms.takeIf { it > 0 },
-                            totalTimeMs = result.processing_time_ms,
-                            modelName = activeModel.model.name,
+                        stats = result.toStats(
+                            activeModel = activeModel,
+                            totalTimeMs = System.currentTimeMillis() - started,
                             mode = GenerationMode.NON_STREAMING,
                         ),
                     )
@@ -543,37 +430,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 activeReplyIndex = documentReplyIndex
                 val embedding = embeddingModel ?: error("Choose or download a document index model first.")
                 val answer = answerModel ?: error("Choose or download a document answer model first.")
-                val pipeline = RagPipelineIdentity(
-                    embeddingModelId = embedding.id,
-                    llmModelId = answer.id,
-                    rerankEnabled = false,
-                )
-                val result = RagPipelineCoordinator.withPipeline(
-                    requestedOwner = ragPipelineOwner,
-                    requestedIdentity = pipeline,
-                    create = {
-                        RunAnywhere.ragCreatePipeline(embeddingModel = embedding, llmModel = answer)
-                    },
-                ) {
-                    replaceRagCorpus(
-                        clear = { RunAnywhere.ragClearDocuments() },
-                        ingest = {
-                            RunAnywhere.ragIngest(
-                                RAGDocument(text = doc.text, metadata = doc.metadata),
-                            )
-                        },
-                    )
-                    runCatching { RunAnywhere.ragGetStatistics() }
-                    // The coordinator lease prevents another screen from
-                    // swapping the singleton pipeline before the native query.
-                    RunAnywhere.ragQuery(prompt, RAGQueryOptions.defaults(question = prompt))
-                }
+                // One question, one attachment: the session's corpus is replaced
+                // per document so an old attachment can never ground a new answer.
+                val session = ragSessionFor(embedding.id, answer.id)
+                session.clear()
+                session.ingest(RagDocument(text = doc.text, metadata = doc.metadata))
+                val startedAt = System.currentTimeMillis()
+                val result = session.query(prompt)
                 ensureOwns(request)
-                val sources = result.retrieved_chunks.map {
+                val sources = result.sources.map {
                     ChatSource(
                         text = it.text.trim(),
-                        score = it.similarity_score,
-                        document = it.source_document.orEmpty(),
+                        score = it.score,
+                        document = it.metadata["source"].orEmpty(),
                     )
                 }
                 updateReply(request, documentReplyIndex) { reply ->
@@ -581,10 +450,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         text = result.answer.ifBlank { "I could not find an answer in that document." },
                         sources = sources,
                         stats = GenerationStats(
-                            tokens = 0,
-                            tokensPerSecond = 0.0,
+                            tokens = result.outputTokens,
+                            tokensPerSecond = result.tokensPerSecond.toDouble(),
                             timeToFirstTokenMs = null,
-                            totalTimeMs = result.total_time_ms,
+                            totalTimeMs = System.currentTimeMillis() - startedAt,
+                            inputTokens = result.inputTokens,
                             modelName = answer.name,
                             mode = GenerationMode.NON_STREAMING,
                         ),
@@ -607,40 +477,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         attachGenerationJob(request, launched)
     }
 
-    // Mirrors iOS LLMViewModel+Events.handleGenerationEvent: record TTFT on
-    // FIRST_TOKEN_GENERATED and completion metrics on COMPLETED/STREAM_COMPLETED.
-    private fun handleGenerationEvent(event: SDKEvent) {
-        val generation = event.generation ?: return
-        val generationId = generation.session_id.ifEmpty { event.operation_id }
-        when (generation.kind) {
-            GenerationEventKind.GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED -> {
-                firstTokenLatencies[generationId] = generation.first_token_latency_ms
-                activeGenerationTTFTMs = generation.first_token_latency_ms
-            }
-            GenerationEventKind.GENERATION_EVENT_KIND_COMPLETED,
-            GenerationEventKind.GENERATION_EVENT_KIND_STREAM_COMPLETED,
-            -> {
-                val outputTokens = generation.tokens_used
-                val durationMs = generation.latency_ms
-                val tps = if (durationMs > 0 && outputTokens > 0) {
-                    outputTokens * 1000.0 / durationMs
-                } else {
-                    0.0
-                }
-                activeGenerationMetrics = SdkGenerationMetrics(
-                    inputTokens = generation.input_tokens,
-                    outputTokens = outputTokens,
-                    durationMs = durationMs,
-                    tokensPerSecond = tps,
-                    timeToFirstTokenMs = firstTokenLatencies[generationId] ?: activeGenerationTTFTMs,
-                )
-                if (firstTokenLatencies.size > MAX_TRACKED_GENERATIONS) firstTokenLatencies.clear()
-            }
-            else -> Unit
+    private fun generationOptions(activeModel: RuntimeModelSnapshot): LlmOptions {
+        val s = SettingsRepository.settings
+        val budget = ChatGenerationBudgetPolicy.resolve(
+            requestedMaxTokens = s.maxTokens,
+            modelContextTokens = activeModel.model.context_length,
+        )
+        if (budget.isCapped) {
+            RACLog.i(
+                "chat output budget capped from ${budget.requestedMaxTokens} to " +
+                    "${budget.effectiveMaxTokens} for ${activeModel.model.id}",
+            )
         }
-    }
-
-    private fun generationOptions(activeModel: RuntimeModelSnapshot): RALLMGenerationOptions {
         // NPU (QHexRT) W8 reasoning bundles — e.g. Cosmos3-Edge Text — put too little probability
         // mass on their end-of-turn token for temperature sampling to reliably select it, so at
         // temperature > 0 they skip it and ramble past the answer (unrelated text / emoji lists).
@@ -648,133 +496,40 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // answers. Well-behaved (non-NPU / non-reasoning) models keep the user's temperature setting.
         val forceGreedy = activeModel.framework ==
             ai.runanywhere.proto.v1.InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
-        val options = generationOptions(
-            contextTokens = activeModel.model.context_length,
-            modelName = activeModel.model.name,
-            forceGreedy = forceGreedy,
-        )
-        val s = SettingsRepository.settings
-        return options.copy(
-            thinking_pattern = activeModel.model.thinking_pattern.takeIf {
-                activeModel.model.supports_thinking && !s.disableThinking
-            },
-            disable_thinking = s.disableThinking && activeModel.model.supports_thinking,
-        )
-    }
-
-    private fun generationOptions(
-        contextTokens: Int,
-        modelName: String,
-        forceGreedy: Boolean = false,
-    ): RALLMGenerationOptions {
-        val s = SettingsRepository.settings
-        val budget = ChatGenerationBudgetPolicy.resolve(
-            requestedMaxTokens = s.maxTokens,
-            modelContextTokens = contextTokens,
-        )
-        if (budget.isCapped) {
-            RACLog.i(
-                "chat output budget capped from ${budget.requestedMaxTokens} to " +
-                    "${budget.effectiveMaxTokens} for $modelName",
-            )
+        // Only apply the "disable thinking" preference to models that actually think — on a
+        // non-thinking model the runtime's no-think prefill leaks as literal text ("no think")
+        // and corrupts the prompt (e.g. Llama). Bug 5 follow-up. Thought tokens are only
+        // emitted when include_in_output is set, so the "show thinking" toggle maps to it.
+        val reasoning = when {
+            !activeModel.model.supports_thinking -> null
+            s.disableThinking -> ReasoningOptions(mode = ReasoningMode.OFF)
+            else -> ReasoningOptions(includeInOutput = true)
         }
-        return RALLMGenerationOptions(
-            max_tokens = budget.effectiveMaxTokens,
+        return LlmOptions(
+            maxOutputTokens = budget.effectiveMaxTokens,
             temperature = if (forceGreedy) 0f else s.temperature,
-            system_prompt = s.systemPrompt.ifBlank { null },
-            thinking_pattern = null,
-            disable_thinking = s.disableThinking,
+            systemPrompt = s.systemPrompt.ifBlank { null },
+            reasoning = reasoning,
         )
-    }
-
-    private suspend fun generateHostedReply(
-        request: ChatGenerationRequest,
-        llmRequest: RALLMGenerateRequest,
-        index: Int,
-        model: ConnectModel,
-        session: ConnectSession,
-        streamUpdates: Boolean,
-        hostedToken: Long,
-    ) {
-        val events = session.generateStream(llmRequest)
-        val result = RunAnywhere.aggregateStream(llmRequest.prompt, events) { accumulated ->
-            if (hostedToken != hostedConversationToken) return@aggregateStream
-            if (streamUpdates) updateReply(request, index) { it.copy(text = accumulated) }
-        }
-
-        if (hostedToken != hostedConversationToken) return
-        ensureOwns(request)
-        if (!result.error_message.isNullOrBlank()) {
-            updateReply(request, index) {
-                it.copy(text = "Error: ${result.error_message}", thinking = null)
-            }
-            return
-        }
-        val totalMs = result.generation_time_ms.toLong()
-        val tokens = result.tokens_generated
-        val tps = result.tokens_per_second.takeIf { it > 0 }
-            ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
-        updateReply(request, index) { reply ->
-            reply.copy(
-                text = result.text,
-                thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-                stats = GenerationStats(
-                    tokens = tokens,
-                    tokensPerSecond = tps,
-                    timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 },
-                    totalTimeMs = totalMs,
-                    inputTokens = result.input_tokens,
-                    modelName = model.displayName,
-                    framework = model.framework,
-                    mode = if (streamUpdates) GenerationMode.STREAMING else GenerationMode.NON_STREAMING,
-                ),
-            )
-        }
-        conversationModelName = model.displayName
-        if (activeHostedRequestId == llmRequest.request_id) {
-            activeHostedRequestId = null
-        }
     }
 
     private suspend fun generateReply(
         request: ChatGenerationRequest,
-        llmRequest: RALLMGenerateRequest,
+        messages: List<SdkChatMessage>,
+        options: LlmOptions,
         index: Int,
         activeModel: RuntimeModelSnapshot,
     ) {
-        // The SDK one-shot bridge is synchronous JNI underneath its suspend
-        // surface. Never let it occupy Android's main dispatcher.
-        val result = withContext(Dispatchers.Default) {
-            RunAnywhere.generate(llmRequest)
-        }
+        val started = System.currentTimeMillis()
+        val result = RunAnywhere.llm.generate(messages, options)
         ensureOwns(request)
-        if (!result.error_message.isNullOrBlank()) {
-            updateReply(request, index) {
-                it.copy(text = "Error: ${result.error_message}", thinking = null)
-            }
-            return
-        }
-        val sdkMetrics = activeGenerationMetrics
-        val totalMs = result.generation_time_ms.toLong()
-        val tps = result.tokens_per_second.takeIf { it > 0 }
-            ?: if (totalMs > 0 && result.tokens_generated > 0) result.tokens_generated * 1000.0 / totalMs else 0.0
         updateReply(request, index) { reply ->
             reply.copy(
                 text = result.text,
-                thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-                // Mirrors iOS buildMessageAnalytics: prefer the result's TTFT and
-                // fall back to the value recorded from the SDK's first-token event;
-                // framework falls back to the loaded model's analytics key.
-                stats = GenerationStats(
-                    tokens = result.tokens_generated,
-                    tokensPerSecond = tps,
-                    timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 }
-                        ?: activeGenerationTTFTMs,
-                    totalTimeMs = totalMs,
-                    inputTokens = result.input_tokens.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
-                    modelName = activeModel.model.name,
-                    framework = result.framework?.takeIf { it.isNotBlank() }
-                        ?: activeModel.framework.analyticsKey,
+                thinking = result.thinkingText?.takeIf { it.isNotBlank() },
+                stats = result.toStats(
+                    activeModel = activeModel,
+                    totalTimeMs = System.currentTimeMillis() - started,
                     mode = GenerationMode.NON_STREAMING,
                 ),
             )
@@ -783,55 +538,43 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun streamReply(
         request: ChatGenerationRequest,
-        llmRequest: RALLMGenerateRequest,
+        messages: List<SdkChatMessage>,
+        options: LlmOptions,
         index: Int,
         activeModel: RuntimeModelSnapshot,
     ) {
-        if (llmRequest.emit_thoughts) {
+        if (options.reasoning?.includeInOutput == true) {
             updateReply(request, index) { it.copy(thinking = "") }
         }
-        val events = RunAnywhere.generateStream(llmRequest)
-        val result =
-            RunAnywhere.aggregateStream(
-                prompt = llmRequest.prompt,
-                events = events,
-                onThinking = { accumulated ->
-                    updateReply(request, index) { it.copy(thinking = accumulated) }
-                },
-                onToken = { accumulated ->
-                    updateReply(request, index) { it.copy(text = accumulated) }
-                },
-            )
+        val started = System.currentTimeMillis()
+        val answer = StringBuilder()
+        val thinking = StringBuilder()
+        var completed: GenerationResult? = null
 
-        ensureOwns(request)
-        if (!result.error_message.isNullOrBlank()) {
-            updateReply(request, index) {
-                it.copy(text = "Error: ${result.error_message}", thinking = null)
+        RunAnywhere.llm.generateStream(messages, options).collect { event ->
+            when (event) {
+                is GenerationEvent.Token ->
+                    if (event.kind == TokenKind.THOUGHT) {
+                        thinking.append(event.text)
+                        updateReply(request, index) { it.copy(thinking = thinking.toString()) }
+                    } else {
+                        answer.append(event.text)
+                        updateReply(request, index) { it.copy(text = answer.toString()) }
+                    }
+                is GenerationEvent.Completed -> completed = event.result
+                is GenerationEvent.Started, is GenerationEvent.ToolCallRequested -> Unit
             }
-            return
         }
 
-        val sdkMetrics = activeGenerationMetrics
-        val totalMs = result.generation_time_ms.toLong()
-        val tokens = result.tokens_generated.takeIf { it > 0 } ?: sdkMetrics?.outputTokens ?: 0
-        val tps = result.tokens_per_second.takeIf { it > 0 }
-            ?: sdkMetrics?.tokensPerSecond?.takeIf { it > 0 }
-            ?: if (totalMs > 0 && tokens > 0) tokens * 1000.0 / totalMs else 0.0
+        ensureOwns(request)
+        val result = completed ?: return
         updateReply(request, index) { reply ->
             reply.copy(
-                text = result.text,
-                thinking = result.thinking_content?.takeIf { it.isNotBlank() },
-                stats = GenerationStats(
-                    tokens = tokens,
-                    tokensPerSecond = tps,
-                    timeToFirstTokenMs = result.ttft_ms?.toLong()?.takeIf { it > 0 }
-                        ?: activeGenerationTTFTMs
-                        ?: sdkMetrics?.timeToFirstTokenMs,
-                    totalTimeMs = totalMs,
-                    inputTokens = result.input_tokens.takeIf { it > 0 } ?: sdkMetrics?.inputTokens ?: 0,
-                    modelName = activeModel.model.name,
-                    framework = result.framework?.takeIf { it.isNotBlank() }
-                        ?: activeModel.framework.analyticsKey,
+                text = result.text.ifBlank { answer.toString() },
+                thinking = result.thinkingText?.takeIf { it.isNotBlank() },
+                stats = result.toStats(
+                    activeModel = activeModel,
+                    totalTimeMs = System.currentTimeMillis() - started,
                     mode = GenerationMode.STREAMING,
                 ),
             )
@@ -840,11 +583,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun generateWithTools(
         request: ChatGenerationRequest,
-        prompt: String,
+        messages: List<SdkChatMessage>,
         index: Int,
         activeModel: RuntimeModelSnapshot,
-        registeredTools: List<RAToolDefinition>,
-        history: List<String> = emptyList(),
+        registeredTools: List<ToolDefinition>,
     ) {
         updateReply(request, index) { it.copy(text = ToolCallingExecutionPolicy.PROGRESS_MESSAGE) }
         val execution = ToolCallingExecutionPolicy.plan(
@@ -853,19 +595,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         )
         val result = try {
             withTimeout(ToolCallingExecutionPolicy.TIMEOUT_MILLIS) {
-                withContext(Dispatchers.Default) {
-                    RunAnywhere.generateWithTools(
-                        prompt = prompt,
-                        options = execution.generationOptions,
-                        toolOptions = execution.toolOptions,
-                        toolChoice = execution.toolChoice,
-                        forcedToolName = execution.forcedToolName,
-                        history = history,
-                    )
-                }
+                RunAnywhere.llm.generate(messages, execution.generationOptions)
             }
         } catch (_: TimeoutCancellationException) {
-            withContext(Dispatchers.Default) { runCatching { RunAnywhere.cancelGeneration() } }
             val timeoutSeconds = ToolCallingExecutionPolicy.TIMEOUT_MILLIS / 1_000
             updateReply(request, index) { reply ->
                 reply.copy(
@@ -877,14 +609,14 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         ensureOwns(request)
-        val toolInfo = result.tool_calls.firstOrNull()?.let { call ->
-            val toolResult = result.tool_results.firstOrNull { it.name == call.name }
+        val toolInfo = result.toolCalls.firstOrNull()?.let { call ->
+            val toolResult = result.toolResults.firstOrNull { it.name == call.name }
             ToolCallInfo(
                 name = call.name,
                 arguments = prettyJson(call.arguments_json),
                 result = toolResult?.result_json?.let(::prettyJson),
-                success = toolResult != null && toolResult.error.isNullOrBlank(),
-                error = toolResult?.error,
+                success = toolResult != null && toolResult.error == null,
+                error = toolResult?.error?.message,
             )
         }
         val normalized = ChatToolResultNormalizer.normalize(result)
@@ -918,7 +650,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         conversationModelName = null
         startConversationTransition(revision) {
             cancellation?.join()
-            RagPipelineCoordinator.release(ragPipelineOwner)
+            closeRagSession()
         }
     }
 
@@ -932,7 +664,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             cancellation?.join()
             // A stored conversation does not rehydrate document bytes, so its
             // questions must never inherit the previous conversation's corpus.
-            RagPipelineCoordinator.release(ragPipelineOwner)
+            closeRagSession()
             val stored = ConversationRepository.get(id) ?: return@transition
             if (contentRevision != revision) return@transition
             input = ""
@@ -963,8 +695,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         if (isBusy) return null
         val request = generationOwnership.tryStart() ?: return null
         isGenerating = true
-        activeGenerationTTFTMs = null
-        activeGenerationMetrics = null
         return request
     }
 
@@ -1041,20 +771,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         barrier = viewModelScope.launch(start = CoroutineStart.LAZY) {
             var canPersistTerminalReply = false
             try {
-                // Both APIs are safe to call when their modality is inactive.
-                // Running them off Main keeps Stop/New Chat/model selection responsive.
-                withContext(Dispatchers.Default) {
-                    if (isUsingConnect) {
-                        activeHostedRequestId?.let { requestId ->
-                            connectSession?.cancelGeneration(requestId)
-                        }
-                        hostedConversationToken += 1
-                        activeHostedRequestId = null
-                    }
-                    // Local modalities still need native cancel; safe when inactive.
-                    runCatching { RunAnywhere.cancelGeneration() }
-                    runCatching { RunAnywhere.cancelVLMGeneration() }
-                }
+                // Cancelling the worker is the whole cancellation contract: the
+                // SDK routes it into the native cancel before joining its
+                // blocking JNI call.
                 request?.let(generationOwnership::markNativeCancellationIssued)
                 worker?.join()
                 titleToStop?.join()
@@ -1135,10 +854,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val storedMessages = messages.map { it.toStored() }
         // Mirrors iOS finalizeGeneration: record the active model on the
         // conversation after each exchange.
-        val activeModelName = when {
-            isUsingConnect -> connectState.activeModel?.displayName
-            else -> RuntimeModelSelection.cached(ModelSelectionContext.LLM)?.model?.name
-        }
+        val activeModelName = RuntimeModelSelection.cached(ModelSelectionContext.LLM)?.model?.name
         val shouldGenerateSmartTitle = messages.size >= 2 &&
             RuntimeModelSelection.cached(ModelSelectionContext.LLM) != null
         val previousSave = persistJob?.takeIf { it.isActive }
@@ -1186,12 +902,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         lateinit var titleJob: Job
         titleJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
-            // withTimeout cancels the coroutine; this sibling watchdog also
-            // reaches the blocking JNI call through the native cancel API.
-            val watchdog = launch {
-                delay(SmartTitlePolicy.TIMEOUT_MILLIS)
-                withContext(Dispatchers.Default) { RunAnywhere.cancelGeneration() }
-            }
             try {
                 withTimeout(SmartTitlePolicy.TIMEOUT_MILLIS) {
                     withContext(Dispatchers.Default) {
@@ -1205,7 +915,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 RACLog.w("smart title generation failed: ${e.message}")
             } finally {
-                watchdog.cancel()
                 smartTitleLifecycle.finish(conversationId)
                 if (smartTitleJob === titleJob) smartTitleJob = null
             }
@@ -1218,7 +927,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun awaitSmartTitleStopped(titleJob: Job?) {
         if (titleJob == null) return
-        withContext(Dispatchers.Default) { RunAnywhere.cancelGeneration() }
+        titleJob.cancel()
         val stopped = withTimeoutOrNull(SmartTitlePolicy.CANCEL_WAIT_MILLIS) {
             titleJob.join()
             true
@@ -1226,19 +935,47 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         check(stopped) { "Background title generation is still stopping. Please try again." }
     }
 
-    private companion object {
-        const val MAX_TRACKED_GENERATIONS = 10
+    private suspend fun closeRagSession() {
+        val open = ragSession ?: return
+        ragSession = null
+        ragSessionKey = null
+        runCatching { open.close() }.onFailure { RACLog.w("rag session close failed: ${it.message}") }
+    }
+
+    /** One session per (index, answer) model pair; a change re-opens it. */
+    private suspend fun ragSessionFor(embeddingId: String, answerId: String): RagSession {
+        val key = embeddingId to answerId
+        ragSession?.let { existing ->
+            if (ragSessionKey == key) return existing
+            ragSession = null
+            ragSessionKey = null
+            runCatching { existing.close() }
+        }
+        val opened = RunAnywhere.rag.open(
+            embeddingModel = ModelRef(embeddingId),
+            llmModel = ModelRef(answerId),
+        )
+        ragSession = opened
+        ragSessionKey = key
+        return opened
     }
 }
 
-// Completion metrics decoded from the SDK event bus (iOS GenerationMetricsFromSDK).
-private data class SdkGenerationMetrics(
-    val inputTokens: Int,
-    val outputTokens: Int,
-    val durationMs: Long,
-    val tokensPerSecond: Double,
-    val timeToFirstTokenMs: Long?,
-)
+private fun GenerationResult.toStats(
+    activeModel: RuntimeModelSnapshot,
+    totalTimeMs: Long,
+    mode: GenerationMode,
+): GenerationStats =
+    GenerationStats(
+        tokens = outputTokens,
+        tokensPerSecond = tokensPerSecond.toDouble(),
+        timeToFirstTokenMs = timeToFirstTokenMs.takeIf { it > 0 },
+        totalTimeMs = totalTimeMs,
+        inputTokens = inputTokens,
+        modelName = activeModel.model.name,
+        framework = activeModel.framework.analyticsKey,
+        mode = mode,
+    )
 
 private fun ChatMessage.toStored() = StoredMessage(
     text = text,

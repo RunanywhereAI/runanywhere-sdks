@@ -33,8 +33,6 @@ final class LLMViewModel {
     private(set) var loadedModelSupportsThinking = false
     private(set) var selectedFramework: InferenceFramework?
     private(set) var modelSupportsStreaming = true
-    private(set) var isUsingConnect = false
-    private(set) var connectedHostName: String?
     private(set) var currentConversation: Conversation?
 
     // MARK: - LoRA Adapter State
@@ -81,18 +79,15 @@ final class LLMViewModel {
     private var firstTokenLatencies: [String: Double] = [:]
     private var generationMetrics: [String: GenerationMetricsFromSDK] = [:]
     var preparedDocumentRAGPipelineKey: ChatDocumentRAGPipelineKey?
+    /// RAG session backing the chat's document questions. Held open across turns
+    /// for the same document/model triple and closed before a new one opens.
+    var documentRAGSession: RagSession?
     /// TTFT (ms) reported by the SDK event bus for the generation in flight.
     /// The event carries an SDK-side generation id the app never sees on the
     /// result, so the single-generation-at-a-time chat keeps the latest value
     /// and merges it into the persisted `MessageAnalytics`.
     private(set) var activeGenerationTTFTMs: Double?
     private var isViewModelInitialized = false
-    #if os(iOS)
-    /// Tracks the in-flight hosted request so Stop can cancel by id.
-    /// Written from generation helpers in `LLMViewModel+Generation` (other file),
-    /// so this cannot use `private(set)` — that setter is file-private in Swift.
-    var activeHostedRequestID: String?
-    #endif
 
     // MARK: - Internal Accessors for Extensions
 
@@ -117,37 +112,6 @@ final class LLMViewModel {
         loadedModelSupportsThinking = false
         selectedFramework = nil
     }
-
-    #if os(iOS)
-    /// Hosted Connect model identity used for message analytics when no local
-    /// `ModelListViewModel.currentModel` is loaded (Android already builds
-    /// `GenerationStats` from the Connect model descriptor).
-    private(set) var activeConnectModelId: String?
-    private(set) var activeConnectFramework: String?
-
-    func activateConnectModel(_ model: ConnectModel, hostName: String) {
-        isUsingConnect = true
-        connectedHostName = hostName
-        updateModelLoadedState(isLoaded: true)
-        loadedModelName = model.displayName
-        activeConnectModelId = model.id
-        activeConnectFramework = model.framework
-        loadedModelSupportsThinking = false
-        selectedFramework = nil
-        setModelSupportsStreaming(model.supportsStreaming)
-        updateSystemMessageAfterModelLoad()
-    }
-
-    func deactivateConnectModel() async {
-        guard isUsingConnect else { return }
-        isUsingConnect = false
-        connectedHostName = nil
-        activeConnectModelId = nil
-        activeConnectFramework = nil
-        await checkModelStatusFromSDK()
-        updateSystemMessageAfterModelLoad()
-    }
-    #endif
 
     func recordFirstTokenLatency(generationId: String, latency: Double) {
         firstTokenLatencies[generationId] = latency
@@ -234,18 +198,12 @@ final class LLMViewModel {
     /// to unwind. `stopGeneration()` (same conversation, wants its partial
     /// persisted) deliberately leaves both untouched.
     func cancelActiveGeneration() {
+        // Cancelling the consuming task terminates the SDK stream, which forwards
+        // the cancellation to the native layer.
         generationTask?.cancel()
         activeGenerationID = nil
         generatingConversationId = nil
         setIsGenerating(false)
-        #if os(iOS)
-        if isUsingConnect, let requestID = activeHostedRequestID {
-            ConnectClientController.shared.session.cancelGeneration(requestID: requestID)
-            activeHostedRequestID = nil
-            return
-        }
-        #endif
-        Task { await RunAnywhere.cancelGeneration() }
     }
 
     func clearMessages() {
@@ -434,13 +392,13 @@ final class LLMViewModel {
 
     private func performGeneration(
         prompt: String,
-        options: RALLMGenerationOptions,
+        options: LlmOptions,
         messageIndex: Int,
         generationID: UUID?
     ) async throws {
         // Check if tool calling is enabled and we have registered tools
-        let registeredTools = await RunAnywhere.getRegisteredTools()
-        let shouldUseToolCalling = useToolCalling && !isUsingConnect && !registeredTools.isEmpty
+        let registeredTools = await RunAnywhere.llm.tools.list()
+        let shouldUseToolCalling = useToolCalling && !registeredTools.isEmpty
 
         if shouldUseToolCalling {
             logger.info("Using tool calling with \(registeredTools.count) registered tools")
@@ -492,23 +450,13 @@ final class LLMViewModel {
     }
 
     func stopGeneration() {
-        // Cancel cooperatively and stop the SDK, but do NOT flip `isGenerating`
-        // here: cancellation is async, so the in-flight generation keeps
-        // unwinding. Its own `finalizeGeneration` owns the true->false
-        // transition, which keeps `canSend` false until the stream has actually
-        // stopped — otherwise a second `sendMessage()` could start and overlap
-        // the still-running generation on the single-callback LLM component.
+        // Cancel cooperatively, but do NOT flip `isGenerating` here: cancellation
+        // is async, so the in-flight generation keeps unwinding. Its own
+        // `finalizeGeneration` owns the true->false transition, which keeps
+        // `canSend` false until the stream has actually stopped — otherwise a
+        // second `sendMessage()` could start and overlap the still-running
+        // generation on the single-callback LLM component.
         generationTask?.cancel()
-
-        #if os(iOS)
-        if isUsingConnect, let requestID = activeHostedRequestID {
-            ConnectClientController.shared.session.cancelGeneration(requestID: requestID)
-            return
-        }
-        #endif
-        Task {
-            await RunAnywhere.cancelGeneration()
-        }
     }
 
     func createNewConversation() {
@@ -590,7 +538,10 @@ final class LLMViewModel {
 
     func refreshLoraAdapters() async {
         do {
-            let state = try await RunAnywhere.lora.list()
+            // `lora.state()` rather than `lora.list()`: the adapter rows key on the
+            // on-disk adapter path (remove, example prompts), which `LoraState`
+            // does not carry.
+            let state = try await RunAnywhere.lora.state()
             try handleLoraState(state)
         } catch {
             logger.error("Failed to refresh LoRA adapters: \(error)")
@@ -724,7 +675,7 @@ final class LLMViewModel {
         }
     }
 
-    private func getGenerationOptions() -> RALLMGenerationOptions {
+    private func getGenerationOptions() -> LlmOptions {
         // Use object(forKey:) to distinguish an unset key (nil) from a value explicitly set to 0.0
         let savedTemperature = UserDefaults.standard.object(forKey: "defaultTemperature") as? Double
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
@@ -736,31 +687,7 @@ final class LLMViewModel {
             maxTokens: savedMaxTokens != 0 ? savedMaxTokens : Self.defaultMaxTokensValue
         )
 
-        var effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
-
-        #if os(iOS)
-        // The get_health_data tool surfaces real vitals (heart rate, SpO2,
-        // resting heart rate, ...). Without guidance, a small on-device model
-        // asked to comment on those numbers will readily improvise a medical
-        // opinion. This instruction is appended (not swapped in) so it holds
-        // even when the user has set their own custom system prompt.
-        if ToolSettingsViewModel.shared.toolCallingEnabled, ToolSettingsViewModel.shared.healthToolEnabled {
-            let healthSafetyInstructions = """
-                You have access to the user's real Apple Health data via get_health_data. \
-                Never provide a medical diagnosis, treatment recommendation, or interpret \
-                vitals as indicating a health condition. If the user describes concerning \
-                symptoms (e.g. chest pain, severe dizziness, fainting, difficulty breathing), \
-                tell them to seek medical attention immediately instead of analyzing their \
-                Health data for it. Present Health data factually and encourage consulting a \
-                qualified healthcare professional for any medical concerns. Only state \
-                numbers that literally appear in a get_health_data tool result — if a field \
-                is missing, say the data isn't available rather than estimating a number.
-                """
-            effectiveSystemPrompt = [effectiveSystemPrompt, healthSafetyInstructions]
-                .compactMap { $0 }
-                .joined(separator: "\n\n")
-        }
-        #endif
+        let effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
 
         let systemPromptInfo: String = {
             guard let prompt = effectiveSystemPrompt else { return "nil" }
@@ -777,24 +704,21 @@ final class LLMViewModel {
             """
         )
 
-        var options = RALLMGenerationOptions.defaults()
-        options.maxTokens = Int32(effectiveSettings.maxTokens)
+        var options = LlmOptions()
+        options.maxOutputTokens = effectiveSettings.maxTokens
         options.temperature = Float(effectiveSettings.temperature)
-        if let effectiveSystemPrompt {
-            options.systemPrompt = effectiveSystemPrompt
+        options.systemPrompt = effectiveSystemPrompt
+        // Structured reasoning control — commons applies the model's no-think
+        // directive; the app never injects control tokens into prompts. Chat
+        // document attachments use the same gate before calling the SDK RAG
+        // pipeline. Thought tokens only reach the UI when includeInOutput is set.
+        // `pattern` stays nil so the SDK uses the loaded model's own thinking tags.
+        var reasoning = ReasoningOptions()
+        if loadedModelSupportsThinking && !thinkingModeEnabled {
+            reasoning.mode = .off
         }
-        options.streamingEnabled = useStreaming
-        // Structured flag — commons applies the model's no-think directive;
-        // the app never injects control tokens into prompts. Chat document
-        // attachments use the same gate before calling the SDK RAG pipeline.
-        options.disableThinking = loadedModelSupportsThinking && !thinkingModeEnabled
-        if let currentModel = ModelListViewModel.shared.currentModel, currentModel.supportsThinking {
-            options.thinkingPattern = currentModel.hasThinkingPattern
-                ? currentModel.thinkingPattern
-                : .defaultPattern
-        } else if loadedModelSupportsThinking {
-            options.thinkingPattern = .defaultPattern
-        }
+        reasoning.includeInOutput = thinkingModeEnabled
+        options.reasoning = reasoning
         return options
     }
 

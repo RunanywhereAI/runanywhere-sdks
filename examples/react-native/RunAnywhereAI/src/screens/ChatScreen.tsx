@@ -14,19 +14,14 @@
  * Architecture:
  * - Uses ConversationStore for state management (matches iOS)
  * - Separates UI from business logic (View + ViewModel pattern)
- * - Model loading via RunAnywhere.loadModel(ModelLoadRequest)
- * - Text generation via RunAnywhere.generate(prompt, options?)
- *   and RunAnywhere.generateStream(prompt, options?) (proto-canonical signatures)
+ * - Model loading via RunAnywhere.models.load(id)
+ * - Text generation via RunAnywhere.llm.generateStream(prompt, options?)
+ *   and RunAnywhere.llm.generate(prompt, options?)
  *
  * Reference: iOS examples/ios/RunAnywhereAI/RunAnywhereAI/Features/Chat/Views/ChatInterfaceView.swift
  */
 
-import React, {
-  useState,
-  useRef,
-  useCallback,
-  useEffect,
-} from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -38,7 +33,10 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import {
   typography,
   useTheme,
@@ -67,23 +65,20 @@ import { APP_STORAGE_KEYS, GENERATION_SETTINGS_KEYS } from '../types/settings';
 import { getPrimaryFramework } from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere } from '@runanywhere/core';
-import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
-import {
-  ToolCallFormatName,
-  ToolCallingOptions,
-} from '@runanywhere/proto-ts/tool_calling';
+import { RunAnywhere, formatFramework } from '@runanywhere/core';
+import type {
+  GenerationResult,
+  LlmOptions,
+  ReasoningOptions,
+} from '@runanywhere/core';
 import {
   ModelCategory,
-  ModelLoadRequest,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/proto-ts/model_types';
 import { logDiagnostic } from '../utils/diagnostics';
 import { isModelLoadedForCategory } from '../utils/runAnywhereLifecycle';
 import { listVisibleCatalogModels } from '../services/ModelRegistryQueries';
-
-// Canonical SDK methods (Swift parity).
-const loadModelWithRequest = RunAnywhere.loadModel;
+import type { ToolCallInfo } from '../types/chat';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -95,24 +90,16 @@ interface GenerationSettings {
   thinkingModeEnabled: boolean;
 }
 
-function makeToolCallInfo(
-  result: Awaited<ReturnType<typeof RunAnywhere.generateWithTools>>
-) {
+// The v3 GenerationResult reports the calls the model made; per-call execution
+// results are no longer surfaced, so the detail sheet shows arguments only.
+function makeToolCallInfo(result: GenerationResult): ToolCallInfo | undefined {
   const firstCall = result.toolCalls[0];
   if (!firstCall) return undefined;
-  const matchingResult =
-    result.toolResults.find(
-      (toolResult) =>
-        toolResult.toolCallId === firstCall.id ||
-        toolResult.name === firstCall.name
-    ) ?? result.toolResults[0];
 
   return {
     toolName: firstCall.name,
     arguments: firstCall.argumentsJson || '{}',
-    result: matchingResult?.resultJson,
-    success: matchingResult?.success ?? !matchingResult?.error,
-    error: matchingResult?.error,
+    success: true,
   };
 }
 
@@ -149,8 +136,13 @@ export const ChatScreen: React.FC = () => {
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
-  const generationAbortRef = useRef<AbortController | null>(null);
-  const generationTokenRef = useRef(0);
+  // Cancelling a v3 stream means returning its iterator; there is no separate
+  // cancelGeneration() verb.
+  const generationIteratorRef = useRef<AsyncIterator<unknown> | null>(null);
+  const wasStoppedRef = useRef(false);
+
+  // Safe area insets for header status bar handling
+  const insets = useSafeAreaInsets();
 
   // Initialize conversation store and create first conversation
   useEffect(() => {
@@ -186,15 +178,10 @@ export const ChatScreen: React.FC = () => {
     checkModelStatus();
     loadAvailableModels();
     // Reflect whatever tools Settings has already registered (badge only).
-    RunAnywhere.getRegisteredTools().then((tools) =>
-      setRegisteredToolCount(tools.length)
-    );
+    RunAnywhere.llm.tools
+      .list()
+      .then((tools) => setRegisteredToolCount(tools.length));
   }, []);
-
-  // Invalidate in-flight generation when the active conversation changes.
-  useEffect(() => {
-    generationTokenRef.current += 1;
-  }, [currentConversation?.id]);
 
   // Messages from current conversation
   const messages = currentConversation?.messages || [];
@@ -313,41 +300,24 @@ export const ChatScreen: React.FC = () => {
         return;
       }
 
-      const result = await loadModelWithRequest(
-        ModelLoadRequest.fromPartial({
-          modelId: model.id,
-          category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-          forceReload: false,
-          validateAvailability: true,
-        })
-      );
+      await RunAnywhere.models.load(model.id);
 
-      if (result.success) {
-        // Set the model info preserving the actual framework from the SDK model
-        const fw = getPrimaryFramework(model);
-        const modelInfo: SDKModelInfo = {
-          ...model,
-          category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-          framework: model.framework || fw,
-          preferredFramework: fw,
-          isDownloaded: true,
-          isAvailable: true,
-          supportsThinking: model.supportsThinking ?? false,
-        };
-        setCurrentModel(modelInfo);
+      // Set the model info preserving the actual framework from the SDK model
+      const fw = getPrimaryFramework(model);
+      const modelInfo: SDKModelInfo = {
+        ...model,
+        category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        framework: model.framework || fw,
+        preferredFramework: fw,
+        isDownloaded: true,
+        isAvailable: true,
+        supportsThinking: model.supportsThinking ?? false,
+      };
+      setCurrentModel(modelInfo);
 
-        // Reflect the tool count that Settings has registered (read-only here).
-        const tools = await RunAnywhere.getRegisteredTools();
-        setRegisteredToolCount(tools.length);
-      } else {
-        const lastError =
-          result.errorMessage ||
-          'Native model lifecycle returned an unsuccessful load result';
-        Alert.alert(
-          'Error',
-          `Failed to load model: ${lastError || 'Unknown error'}`
-        );
-      }
+      // Reflect the tool count that Settings has registered (read-only here).
+      const tools = await RunAnywhere.llm.tools.list();
+      setRegisteredToolCount(tools.length);
     } catch (error) {
       console.error('[ChatScreen] Error loading model:', error);
       Alert.alert('Error', `Failed to load model: ${error}`);
@@ -367,28 +337,28 @@ export const ChatScreen: React.FC = () => {
   const handleToggleTools = useCallback(() => {
     setToolsEnabled((prev) => {
       const next = !prev;
-      AsyncStorage.setItem(
+      void AsyncStorage.setItem(
         APP_STORAGE_KEYS.TOOL_CALLING_ENABLED,
         next ? 'true' : 'false'
-      ).catch(() => undefined);
+      );
       return next;
     });
   }, []);
 
   /**
    * Send a message and stream the response token-by-token.
-   * Uses RunAnywhere.generateStream() for real-time streaming UI.
+   * Uses RunAnywhere.llm.generateStream() for real-time streaming UI.
    *
-   * generateWithTools() is still available on RunAnywhere for callers
-   * that genuinely need the batch tool-calling form. An optional prompt
-   * override lets prompt-suggestion pills send their text directly.
+   * With tools enabled the SDK owns the tool loop, so that path uses the
+   * one-shot RunAnywhere.llm.generate(). An optional prompt override lets
+   * prompt-suggestion pills send their text directly.
    */
   const handleSend = useCallback(
     async (promptOverride?: string) => {
       const text = (
         typeof promptOverride === 'string' ? promptOverride : inputText
       ).trim();
-      if (isLoading || !text || !currentConversation || !currentModel) return;
+      if (isLoading || !text || !currentConversation) return;
 
       const userMessage: Message = {
         id: generateId(),
@@ -405,8 +375,6 @@ export const ChatScreen: React.FC = () => {
 
       const assistantMessageId = generateId();
       let assistantMessageInserted = false;
-      const generationToken = ++generationTokenRef.current;
-      const conversationIdAtStart = currentConversation.id;
 
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -421,44 +389,47 @@ export const ChatScreen: React.FC = () => {
           '[ChatScreen] Starting streaming generation for:',
           prompt,
           'model:',
-          currentModel.id
+          currentModel?.id
         );
 
-        const registeredTools = await RunAnywhere.getRegisteredTools();
+        const registeredTools = await RunAnywhere.llm.tools.list();
         const shouldUseTools = toolsEnabled && registeredTools.length > 0;
-        const supportsThinking = currentModel.supportsThinking ?? false;
+        const supportsThinking = currentModel?.supportsThinking ?? false;
         const wasThinkingMode = supportsThinking && options.thinkingModeEnabled;
-        const disableThinking =
-          supportsThinking && !options.thinkingModeEnabled;
+        // Thought tokens only surface when reasoning.includeInOutput is set,
+        // so the "show thinking" toggle maps to it. Non-thinking models get no
+        // reasoning message at all — the no-think directive leaks as literal
+        // prompt text on models like Llama.
+        const reasoning: ReasoningOptions | undefined = !supportsThinking
+          ? undefined
+          : options.thinkingModeEnabled
+            ? { mode: 'on', includeInOutput: true }
+            : { mode: 'off' };
         const generationStartMs = Date.now();
-        const abortController = new AbortController();
-        generationAbortRef.current = abortController;
+        wasStoppedRef.current = false;
 
-        const genOptions = LLMGenerationOptions.fromPartial({
-          maxTokens: options.maxTokens ?? 512,
-          temperature: options.temperature ?? 0.7,
-          topP: 1.0,
-          topK: 0,
-          repetitionPenalty: 1.0,
-          stopSequences: [],
-          streamingEnabled: true,
-          systemPrompt: options.systemPrompt,
-          enableRealTimeTracking: false,
-          seed: 0,
-          frequencyPenalty: 0,
-          presencePenalty: 0,
-          repeatLastN: 0,
-          minP: 0,
-          echoPrompt: false,
-          nThreads: 0,
-          disableThinking,
-        });
+        const llmOptions: LlmOptions = {
+          maxOutputTokens: options.maxTokens,
+          temperature: options.temperature,
+          ...(options.systemPrompt
+            ? { systemPrompt: options.systemPrompt }
+            : {}),
+          ...(reasoning ? { reasoning } : {}),
+          // Tools registered from Settings are picked up automatically, so the
+          // chat toggle has to opt out explicitly.
+          ...(shouldUseTools ? {} : { toolChoice: 'none' as const }),
+        };
 
-        const activeModelId = currentModel.id;
-        const activeModelName = currentModel.name || 'Unknown Model';
-        const frameworkName = RunAnywhere.formatFramework(
-          currentModel.preferredFramework ?? currentModel.framework
+        const frameworkName = formatFramework(
+          currentModel?.preferredFramework ?? currentModel?.framework
         );
+
+        const messageModelInfo = {
+          modelId: currentModel?.id || 'unknown',
+          modelName: currentModel?.name || 'Unknown Model',
+          framework: frameworkName,
+          frameworkDisplayName: frameworkName,
+        };
 
         // Insert the initial empty assistant message once (matches iOS two-phase pattern).
         const initialAssistantMessage: Message = {
@@ -467,159 +438,96 @@ export const ChatScreen: React.FC = () => {
           content: '',
           timestamp: new Date(),
           isStreaming: true,
-          modelInfo: {
-            modelId: activeModelId,
-            modelName: activeModelName,
-            framework: frameworkName,
-            frameworkDisplayName: frameworkName,
-          },
+          modelInfo: messageModelInfo,
         };
         await addMessage(initialAssistantMessage, currentConversation.id);
         assistantMessageInserted = true;
 
-        let finalMessage: Message;
+        let result: GenerationResult | null = null;
+        let streamedText = '';
+        let streamedThoughts = '';
+
         if (shouldUseTools) {
-          const toolOptions = ToolCallingOptions.fromPartial({
-            tools: registeredTools,
-            autoExecute: true,
-            maxToolCalls: 5,
-            keepToolsAvailable: false,
-            format: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED,
-            maxTokens: options.maxTokens,
-            temperature: options.temperature,
-            systemPrompt: options.systemPrompt,
-            disableThinking,
-          });
-          const result = await RunAnywhere.generateWithTools(
-            prompt,
-            toolOptions,
-            {
-              signal: abortController.signal,
-              llmOptions: {
-                maxTokens: options.maxTokens,
-                temperature: options.temperature,
-                topP: 1.0,
-                systemPrompt: options.systemPrompt,
-              },
-            }
-          );
-          const finalContent =
-            result.text || result.rawText || '(No response generated)';
-          const elapsedMs = Date.now() - generationStartMs;
-          const estimatedTokens = Math.max(
-            1,
-            Math.floor(finalContent.length / 4)
-          );
-
-          finalMessage = {
-            id: assistantMessageId,
-            role: MessageRole.Assistant,
-            content: finalContent,
-            thinkingContent: result.thinkingContent,
-            timestamp: new Date(),
-            modelInfo: {
-              modelId: activeModelId,
-              modelName: activeModelName,
-              framework: frameworkName,
-              frameworkDisplayName: frameworkName,
-            },
-            toolCallInfo: makeToolCallInfo(result),
-            analytics: {
-              performance: {
-                latencyMs: elapsedMs,
-                memoryBytes: 0,
-                throughputTokensPerSec:
-                  elapsedMs > 0 ? estimatedTokens / (elapsedMs / 1000) : 0,
-                promptTokens: Math.max(1, Math.floor(prompt.length / 4)),
-                completionTokens: estimatedTokens,
-              },
-              completionStatus: result.errorMessage ? 'error' : 'completed',
-              wasThinkingMode,
-              wasInterrupted: false,
-              retryCount: 0,
-            },
-          };
+          // The SDK runs the tool loop itself and reports what it called on the
+          // result, so there is nothing to sequence here.
+          result = await RunAnywhere.llm.generate(prompt, llmOptions);
         } else {
-          let accumulatedText = '';
-
-          // Stream tokens as they arrive — canonical cross-SDK path. We drive
-          // the SDK's `aggregateStream(prompt, events, onToken)` helper exactly
-          // like iOS LLMViewModel+Generation.swift.
-          const eventStream = RunAnywhere.generateStream(prompt, genOptions);
-          const result = await RunAnywhere.aggregateStream(
-            prompt,
-            eventStream,
-            async (transcript) => {
-              if (generationToken !== generationTokenRef.current) return;
-              accumulatedText = transcript;
-              updateMessage(
-                {
-                  id: assistantMessageId,
-                  role: MessageRole.Assistant,
-                  content: accumulatedText,
-                  timestamp: new Date(),
-                  isStreaming: true,
-                  modelInfo: {
-                    modelId: activeModelId,
-                    modelName: activeModelName,
-                    framework: frameworkName,
-                    frameworkDisplayName: frameworkName,
-                  },
-                },
-                conversationIdAtStart
-              );
-              flatListRef.current?.scrollToEnd({ animated: false });
-              await new Promise<void>((resolve) => setTimeout(resolve, 0));
+          // Hermes cannot `for await...of` a Nitro async iterable — drive the
+          // iterator by hand and return() it to cancel the native work.
+          const iterator = RunAnywhere.llm
+            .generateStream(prompt, llmOptions)
+            [Symbol.asyncIterator]();
+          generationIteratorRef.current = iterator;
+          try {
+            let step = await iterator.next();
+            while (!step.done) {
+              const event = step.value;
+              if (event.type === 'token') {
+                if (event.kind === 'thought') {
+                  streamedThoughts += event.text;
+                } else {
+                  streamedText += event.text;
+                  updateMessage(
+                    {
+                      id: assistantMessageId,
+                      role: MessageRole.Assistant,
+                      content: streamedText,
+                      timestamp: new Date(),
+                      isStreaming: true,
+                      modelInfo: messageModelInfo,
+                    },
+                    currentConversation.id
+                  );
+                  flatListRef.current?.scrollToEnd({ animated: false });
+                  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+                }
+              } else if (event.type === 'completed') {
+                result = event.result;
+              }
+              step = await iterator.next();
             }
-          );
-
-          if (generationToken !== generationTokenRef.current) return;
-          if (result.errorMessage) {
-            throw new Error(result.errorMessage);
+          } finally {
+            await iterator.return?.();
+            generationIteratorRef.current = null;
           }
-
-          const finalContent =
-            result.text || accumulatedText || '(No response generated)';
-
-          // Build the final message with analytics and persist to disk once
-          // (mirrors iOS finalizeGeneration / updateConversation).
-          finalMessage = {
-            id: assistantMessageId,
-            role: MessageRole.Assistant,
-            content: finalContent,
-            thinkingContent: result.thinkingContent,
-            timestamp: new Date(),
-            modelInfo: {
-              modelId: activeModelId,
-              modelName: activeModelName,
-              framework: frameworkName,
-              frameworkDisplayName: frameworkName,
-            },
-            analytics: {
-              performance: {
-                latencyMs: result.generationTimeMs,
-                memoryBytes: 0,
-                throughputTokensPerSec: result.tokensPerSecond,
-                promptTokens: result.inputTokens,
-                completionTokens: result.tokensGenerated,
-              },
-              timeToFirstToken: result.ttftMs,
-              thinkingTokens: result.thinkingTokens,
-              responseTokens: result.responseTokens,
-              completionStatus: result.errorMessage ? 'error' : 'completed',
-              wasThinkingMode,
-              wasInterrupted: false,
-              retryCount: 0,
-            },
-          };
         }
 
+        const wasStopped = wasStoppedRef.current;
+        const finalContent =
+          result?.text || streamedText || '(No response generated)';
+        const thinkingContent = result?.thinkingText || streamedThoughts;
+
+        // Build the final message with analytics and persist to disk once
+        // (mirrors iOS finalizeGeneration / updateConversation).
+        const finalMessage: Message = {
+          id: assistantMessageId,
+          role: MessageRole.Assistant,
+          content: finalContent,
+          ...(thinkingContent ? { thinkingContent } : {}),
+          timestamp: new Date(),
+          modelInfo: messageModelInfo,
+          ...(result ? { toolCallInfo: makeToolCallInfo(result) } : {}),
+          analytics: {
+            performance: {
+              latencyMs: Date.now() - generationStartMs,
+              memoryBytes: 0,
+              throughputTokensPerSec: result?.tokensPerSecond ?? 0,
+              inputTokens: result?.inputTokens ?? 0,
+              outputTokens: result?.outputTokens ?? 0,
+            },
+            ...(result ? { timeToFirstToken: result.timeToFirstTokenMs } : {}),
+            completionStatus: wasStopped ? 'interrupted' : 'completed',
+            wasThinkingMode,
+            wasInterrupted: wasStopped,
+            retryCount: 0,
+          },
+        };
+
         // Apply analytics fields in-memory first, then persist once.
-        if (generationToken !== generationTokenRef.current) return;
-        updateMessage(finalMessage, conversationIdAtStart);
+        updateMessage(finalMessage, currentConversation.id);
         const latestConversation = useConversationStore
           .getState()
-          .conversations.find((c) => c.id === conversationIdAtStart);
+          .conversations.find((c) => c.id === currentConversation.id);
         if (latestConversation) {
           await updateConversation(latestConversation);
         }
@@ -631,7 +539,7 @@ export const ChatScreen: React.FC = () => {
       } catch (error) {
         console.error('[ChatScreen] Generation error:', error);
 
-        const wasStopped = generationAbortRef.current?.signal.aborted ?? false;
+        const wasStopped = wasStoppedRef.current;
         const errorContent = wasStopped
           ? 'Generation stopped.'
           : `Error: ${error}\n\nThis likely means no LLM model is loaded. Load a model first.`;
@@ -645,8 +553,8 @@ export const ChatScreen: React.FC = () => {
               latencyMs: 0,
               memoryBytes: 0,
               throughputTokensPerSec: 0,
-              promptTokens: 0,
-              completionTokens: 0,
+              inputTokens: 0,
+              outputTokens: 0,
             },
             completionStatus: wasStopped ? 'interrupted' : 'error',
             wasThinkingMode: false,
@@ -660,7 +568,7 @@ export const ChatScreen: React.FC = () => {
           await addMessage(errorMessage, currentConversation.id);
         }
       } finally {
-        generationAbortRef.current = null;
+        generationIteratorRef.current = null;
         setIsLoading(false);
       }
     },
@@ -677,10 +585,10 @@ export const ChatScreen: React.FC = () => {
   );
 
   const handleStopGeneration = useCallback(() => {
-    generationAbortRef.current?.abort();
-    RunAnywhere.cancelGeneration().catch(() => undefined);
-    generationTokenRef.current += 1;
-    setIsLoading(false);
+    wasStoppedRef.current = true;
+    // Returning the iterator cancels the native generation; the loop then ends
+    // normally and finalizes whatever was streamed so far.
+    void generationIteratorRef.current?.return?.();
   }, []);
 
   /**
@@ -759,8 +667,7 @@ export const ChatScreen: React.FC = () => {
     />
   );
 
-  const hasUsableModel = !!currentModel;
-  const showOverlay = !hasUsableModel && !isModelLoading;
+  const showOverlay = !currentModel && !isModelLoading;
 
   return (
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
@@ -825,13 +732,11 @@ export const ChatScreen: React.FC = () => {
           )}
 
           {/* Example prompts (mode follows tool/LoRA state), shown on an empty chat */}
-          {hasUsableModel && messages.length === 0 && (
+          {currentModel && messages.length === 0 && (
             <PromptSuggestions
               toolsEnabled={toolsEnabled}
               loraActive={loraAdapterCount > 0}
-              onSelect={(p) => {
-                handleSend(p).catch(() => undefined);
-              }}
+              onSelect={(p) => void handleSend(p)}
             />
           )}
 
@@ -841,12 +746,12 @@ export const ChatScreen: React.FC = () => {
             onChangeText={setInputText}
             onSend={handleSend}
             onStop={handleStopGeneration}
-            disabled={!hasUsableModel || !currentConversation}
+            disabled={!currentModel || !currentConversation}
             isLoading={isLoading}
             toolsEnabled={toolsEnabled}
             onToggleTools={currentModel ? handleToggleTools : undefined}
             placeholder={
-              hasUsableModel
+              currentModel
                 ? 'Type a message...'
                 : 'Select a model to start chatting'
             }

@@ -1,7 +1,10 @@
 package com.runanywhere.runanywhereai.ui.screens.chat
 
 import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.ToolDefinition
+import com.runanywhere.sdk.public.api.LlmOptions
+import com.runanywhere.sdk.public.api.ReasoningMode
+import com.runanywhere.sdk.public.api.ToolChoice
+import com.runanywhere.sdk.public.api.ToolDefinition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -72,30 +75,29 @@ class ToolCallingModelPolicyTest {
 
     @Test
     fun `tool execution caps final output and makes sampling greedy without changing system prompt`() {
-        val base = ai.runanywhere.proto.v1.LLMGenerationOptions(
-            max_tokens = 1_024,
+        val base = LlmOptions(
+            maxOutputTokens = 1_024,
             temperature = 0.7f,
-            system_prompt = "Be helpful",
-            disable_thinking = false,
+            systemPrompt = "Be helpful",
         )
 
         val generation = ToolCallingExecutionPolicy.generationOptions(base)
 
-        assertEquals(ToolCallingExecutionPolicy.MAX_FINAL_RESPONSE_TOKENS, generation.max_tokens)
+        assertEquals(ToolCallingExecutionPolicy.MAX_FINAL_RESPONSE_TOKENS, generation.maxOutputTokens)
         assertEquals(0f, generation.temperature)
-        assertEquals(1f, generation.top_p)
-        assertEquals("Be helpful", generation.system_prompt)
-        assertTrue(generation.disable_thinking)
+        assertEquals(1f, generation.topP)
+        assertEquals("Be helpful", generation.systemPrompt)
+        assertEquals(ReasoningMode.OFF, generation.reasoning?.mode)
         assertEquals(45_000L, ToolCallingExecutionPolicy.TIMEOUT_MILLIS)
     }
 
     @Test
     fun `tool execution preserves a smaller user token budget`() {
         val generation = ToolCallingExecutionPolicy.generationOptions(
-            ai.runanywhere.proto.v1.LLMGenerationOptions(max_tokens = 64),
+            LlmOptions(maxOutputTokens = 64),
         )
 
-        assertEquals(64, generation.max_tokens)
+        assertEquals(64, generation.maxOutputTokens)
     }
 
     @Test
@@ -103,20 +105,14 @@ class ToolCallingModelPolicyTest {
         val tools = builtInTools()
 
         val plan = ToolCallingExecutionPolicy.plan(
-            base = ai.runanywhere.proto.v1.LLMGenerationOptions(max_tokens = 64),
+            base = LlmOptions(maxOutputTokens = 64),
             registeredTools = tools,
         )
 
-        assertEquals(tools, plan.toolOptions.tools)
-        assertEquals(null, plan.toolChoice)
-        assertEquals(null, plan.forcedToolName)
-        assertEquals(ToolCallingExecutionPolicy.MAX_TOOL_CALLS, plan.toolOptions.max_tool_calls)
-        assertEquals(64, plan.generationOptions.max_tokens)
-        assertEquals(64, plan.toolOptions.max_tokens)
-        assertEquals(0f, plan.toolOptions.temperature)
-        assertTrue(plan.toolOptions.disable_thinking == true)
-        assertFalse(plan.toolOptions.keep_tools_available)
-        assertTrue(plan.toolOptions.parallel_tool_calls)
+        assertEquals(tools, plan.generationOptions.tools)
+        assertEquals(ToolChoice.Auto, plan.generationOptions.toolChoice)
+        assertEquals(ToolCallingExecutionPolicy.MAX_TOOL_CALLS, plan.generationOptions.maxToolCalls)
+        assertEquals(64, plan.generationOptions.maxOutputTokens)
     }
 
     private fun model(name: String, contextLength: Int): ModelInfo = ModelInfo(
