@@ -24,8 +24,7 @@ import {
   type ToolValueArray,
   type ToolValueObject,
 } from '@runanywhere/proto-ts/tool_calling';
-import { ToolCallingSessionCreateRequest } from '@runanywhere/proto-ts/llm_service';
-import { ChatMessage, MessageRole } from '@runanywhere/proto-ts/chat';
+import { ToolCallingSessionCreateRequest } from '@runanywhere/proto-ts/tool_calling';
 import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import { LLMGenerationOptions as LLMGenerationOptionsMessage } from '@runanywhere/proto-ts/llm_options';
 import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
@@ -364,24 +363,30 @@ export async function generateWithTools(
       requireJsonArguments: options?.requireJsonArguments ?? false,
     }),
   });
+  const toolCalling = generation.toolCalling;
   const request = ToolCallingSessionCreateRequest.fromPartial({
     prompt,
-    generation,
+    maxTokens: generation.maxOutputTokens,
+    temperature: generation.temperature,
+    topP: generation.topP,
+    systemPrompt: generation.systemPrompt ?? '',
+    tools: toolCalling?.tools ?? tools,
+    format: toolCalling?.format ?? format,
+    maxToolCalls: toolCalling?.maxToolCalls,
+    keepToolsAvailable: toolCalling?.keepToolsAvailable,
+    toolChoice: toolCalling?.toolChoice,
+    forcedToolName: toolCalling?.forcedToolName,
+    disableThinking: toolCalling?.disableThinking,
+    autoExecute: toolCalling?.autoExecute,
+    replaceSystemPrompt: toolCalling?.replaceSystemPrompt,
+    requireJsonArguments: toolCalling?.requireJsonArguments,
+    parallelToolCalls: toolCalling?.parallelToolCalls,
     // Leave unset unless the caller chose — commons defaults to true.
     validateCalls: extra?.validateCalls,
-    // Prior turns as a flat alternating [user0, asst0, ...] list (excluding
-    // the current turn, which is `prompt`) mapped onto ChatMessage roles;
-    // commons threads these into every generate in the loop so multi-turn
-    // tool use keeps context.
-    history: (extra?.history ?? []).map((content, index) =>
-      ChatMessage.fromPartial({
-        role:
-          index % 2 === 0
-            ? MessageRole.MESSAGE_ROLE_USER
-            : MessageRole.MESSAGE_ROLE_ASSISTANT,
-        content,
-      })
-    ),
+    // Prior turns as a flat alternating [user0, asst0, ...] list of message
+    // contents (excluding the current turn, which is `prompt`); commons threads
+    // these into every generate in the loop so multi-turn tool use keeps context.
+    history: extra?.history ?? [],
   });
 
   logger.debug(

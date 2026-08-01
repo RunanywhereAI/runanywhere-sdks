@@ -11,8 +11,8 @@ import {
   LLMGenerateRequest,
   LLMStreamEvent,
   LLMStreamEventKind,
-  ToolCallingSessionCreateRequest,
 } from '@runanywhere/proto-ts/llm_service';
+import { ToolCallingSessionCreateRequest } from '@runanywhere/proto-ts/tool_calling';
 import { TokenKind as ProtoTokenKind } from '@runanywhere/proto-ts/voice_events';
 import {
   ToolCall,
@@ -114,11 +114,27 @@ async function generateWithToolLoop(
     await ensureModelLoaded(options.model, ModelCategory.MODEL_CATEGORY_LANGUAGE);
   }
   const generation = toLlmOptions(options);
-  generation.toolCalling = toToolCallingOptions(tools, options);
+  const toolCalling = toToolCallingOptions(tools, options);
   const request = ToolCallingSessionCreateRequest.fromPartial({
     prompt,
-    generation,
-    history: toChatMessages(history),
+    maxTokens: generation.maxOutputTokens,
+    temperature: generation.temperature,
+    topP: generation.topP,
+    systemPrompt: generation.systemPrompt ?? '',
+    tools: toolCalling.tools,
+    format: toolCalling.format,
+    maxToolCalls: toolCalling.maxToolCalls,
+    keepToolsAvailable: toolCalling.keepToolsAvailable,
+    toolChoice: toolCalling.toolChoice,
+    forcedToolName: toolCalling.forcedToolName,
+    disableThinking: toolCalling.disableThinking,
+    autoExecute: toolCalling.autoExecute,
+    replaceSystemPrompt: toolCalling.replaceSystemPrompt,
+    requireJsonArguments: toolCalling.requireJsonArguments,
+    parallelToolCalls: toolCalling.parallelToolCalls,
+    // Prior turns flattened to [user0, asst0, ...] message contents; commons
+    // threads these into every generate in the loop (mirrors ToolCallingOrchestrator.kt).
+    history: history.map((message) => message.content),
   });
 
   const resultBytes = await native.toolRunLoopProtoWithHandle(
