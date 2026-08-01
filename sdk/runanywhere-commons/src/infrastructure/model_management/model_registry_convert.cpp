@@ -810,13 +810,24 @@ void preserve_absent_proto_fields(const ModelInfo& existing, ModelInfo* incoming
                 if (prior.url() != file->url()) {
                     continue;
                 }
+                // A downloaded file's recorded local_path/checksum/size are
+                // AUTHORITATIVE over a fresh catalog re-seed estimate. Without
+                // this, the re-seed's estimated size_bytes overwrites the real
+                // downloaded size, and the folder-completeness exact-size check
+                // (model_registry_manifest.cpp) then rejects the real bytes on
+                // the next launch — so a fully downloaded model reads as
+                // not-downloaded. Keep the incoming estimate only for files that
+                // were never downloaded (empty prior local_path).
+                const bool prior_downloaded =
+                    prior.has_local_path() && !prior.local_path().empty();
                 if (!file->has_local_path() && prior.has_local_path()) {
                     file->set_local_path(prior.local_path());
                 }
-                if (!file->has_checksum_sha256() && prior.has_checksum_sha256()) {
+                if (prior.has_checksum_sha256() &&
+                    (prior_downloaded || !file->has_checksum_sha256())) {
                     file->set_checksum_sha256(prior.checksum_sha256());
                 }
-                if (!file->has_size_bytes() && prior.has_size_bytes()) {
+                if (prior.has_size_bytes() && (prior_downloaded || !file->has_size_bytes())) {
                     file->set_size_bytes(prior.size_bytes());
                 }
                 break;
