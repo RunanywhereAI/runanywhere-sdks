@@ -3,7 +3,7 @@ import { ChatMessage } from "./chat";
 import { SDKError } from "./errors";
 import { LLMGenerationOptions } from "./llm_options";
 import { TokenUsage } from "./token_usage";
-import { ToolCall, ToolCallingResult, ToolResult } from "./tool_calling";
+import { ToolCall, ToolResult } from "./tool_calling";
 import { TokenKind } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum LLMStreamEventKind {
@@ -54,6 +54,8 @@ export interface LLMStreamFinalResult {
 }
 /** `result` is populated only on the terminal event. */
 export interface LLMStreamEvent {
+    /** Monotonic sequence for tool-calling session streams (#607). */
+    seq: number;
     timestampUs: number;
     token: string;
     isFinal: boolean;
@@ -71,37 +73,10 @@ export interface LLMStreamEvent {
     toolCall?: ToolCall | undefined;
     error?: SDKError | undefined;
 }
-/** Tool-driven streaming uses this session path, not LLMGenerateRequest. */
-export interface ToolCallingSessionCreateRequest {
-    prompt: string;
-    generation?: LLMGenerationOptions | undefined;
-    /** Unset preserves commons' secure default of validate=true. */
-    validateCalls?: boolean | undefined;
-    history: ChatMessage[];
-}
-export interface ToolCallingSessionEvent {
-    /** serialized LLMStreamEvent */
-    llmStreamEventBytes?: Uint8Array | undefined;
-    toolCall?: ToolCall | undefined;
-    finalResult?: ToolCallingResult | undefined;
-    /** serialized SDKError */
-    errorBytes?: Uint8Array | undefined;
-    seq: number;
-}
-/** Hands a caller-executed tool result back into a running session. */
-export interface ToolCallingSessionStepWithResultRequest {
-    sessionHandle: number;
-    toolCallId: string;
-    resultJson: string;
-    error?: string | undefined;
-}
 export declare const LLMGenerateRequest: MessageFns<LLMGenerateRequest>;
 export declare const LLMGenerateRequest_MetadataEntry: MessageFns<LLMGenerateRequest_MetadataEntry>;
 export declare const LLMStreamFinalResult: MessageFns<LLMStreamFinalResult>;
 export declare const LLMStreamEvent: MessageFns<LLMStreamEvent>;
-export declare const ToolCallingSessionCreateRequest: MessageFns<ToolCallingSessionCreateRequest>;
-export declare const ToolCallingSessionEvent: MessageFns<ToolCallingSessionEvent>;
-export declare const ToolCallingSessionStepWithResultRequest: MessageFns<ToolCallingSessionStepWithResultRequest>;
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {
     [K in keyof T]?: DeepPartial<T[K]>;

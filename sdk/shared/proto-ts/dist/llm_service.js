@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: llm_service.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ToolCallingSessionStepWithResultRequest = exports.ToolCallingSessionEvent = exports.ToolCallingSessionCreateRequest = exports.LLMStreamEvent = exports.LLMStreamFinalResult = exports.LLMGenerateRequest_MetadataEntry = exports.LLMGenerateRequest = exports.LLMStreamEventKind = exports.protobufPackage = void 0;
+exports.LLMStreamEvent = exports.LLMStreamFinalResult = exports.LLMGenerateRequest_MetadataEntry = exports.LLMGenerateRequest = exports.LLMStreamEventKind = exports.protobufPackage = void 0;
 exports.lLMStreamEventKindFromJSON = lLMStreamEventKindFromJSON;
 exports.lLMStreamEventKindToJSON = lLMStreamEventKindToJSON;
 /* eslint-disable */
@@ -583,6 +583,7 @@ exports.LLMStreamFinalResult = {
 };
 function createBaseLLMStreamEvent() {
     return {
+        seq: 0,
         timestampUs: 0,
         token: "",
         isFinal: false,
@@ -603,6 +604,9 @@ function createBaseLLMStreamEvent() {
 }
 exports.LLMStreamEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.seq !== 0) {
+            writer.uint32(8).uint64(message.seq);
+        }
         if (message.timestampUs !== 0) {
             writer.uint32(16).int64(message.timestampUs);
         }
@@ -660,6 +664,13 @@ exports.LLMStreamEvent = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.seq = longToNumber(reader.uint64());
+                    continue;
+                }
                 case 2: {
                     if (tag !== 16) {
                         break;
@@ -782,6 +793,7 @@ exports.LLMStreamEvent = {
     },
     fromJSON(object) {
         return {
+            seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
             timestampUs: isSet(object.timestampUs)
                 ? globalThis.Number(object.timestampUs)
                 : isSet(object.timestamp_us)
@@ -846,6 +858,9 @@ exports.LLMStreamEvent = {
     },
     toJSON(message) {
         const obj = {};
+        if (message.seq !== 0) {
+            obj.seq = Math.round(message.seq);
+        }
         if (message.timestampUs !== 0) {
             obj.timestampUs = Math.round(message.timestampUs);
         }
@@ -901,6 +916,7 @@ exports.LLMStreamEvent = {
     },
     fromPartial(object) {
         const message = createBaseLLMStreamEvent();
+        message.seq = object.seq ?? 0;
         message.timestampUs = object.timestampUs ?? 0;
         message.token = object.token ?? "";
         message.isFinal = object.isFinal ?? false;
@@ -926,368 +942,6 @@ exports.LLMStreamEvent = {
         return message;
     },
 };
-function createBaseToolCallingSessionCreateRequest() {
-    return { prompt: "", generation: undefined, validateCalls: undefined, history: [] };
-}
-exports.ToolCallingSessionCreateRequest = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.prompt !== "") {
-            writer.uint32(10).string(message.prompt);
-        }
-        if (message.generation !== undefined) {
-            llm_options_1.LLMGenerationOptions.encode(message.generation, writer.uint32(18).fork()).join();
-        }
-        if (message.validateCalls !== undefined) {
-            writer.uint32(24).bool(message.validateCalls);
-        }
-        for (const v of message.history) {
-            chat_1.ChatMessage.encode(v, writer.uint32(34).fork()).join();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseToolCallingSessionCreateRequest();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.prompt = reader.string();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.generation = llm_options_1.LLMGenerationOptions.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 24) {
-                        break;
-                    }
-                    message.validateCalls = reader.bool();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.history.push(chat_1.ChatMessage.decode(reader, reader.uint32()));
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
-            generation: isSet(object.generation) ? llm_options_1.LLMGenerationOptions.fromJSON(object.generation) : undefined,
-            validateCalls: isSet(object.validateCalls)
-                ? globalThis.Boolean(object.validateCalls)
-                : isSet(object.validate_calls)
-                    ? globalThis.Boolean(object.validate_calls)
-                    : undefined,
-            history: globalThis.Array.isArray(object?.history) ? object.history.map((e) => chat_1.ChatMessage.fromJSON(e)) : [],
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.prompt !== "") {
-            obj.prompt = message.prompt;
-        }
-        if (message.generation !== undefined) {
-            obj.generation = llm_options_1.LLMGenerationOptions.toJSON(message.generation);
-        }
-        if (message.validateCalls !== undefined) {
-            obj.validateCalls = message.validateCalls;
-        }
-        if (message.history?.length) {
-            obj.history = message.history.map((e) => chat_1.ChatMessage.toJSON(e));
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.ToolCallingSessionCreateRequest.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseToolCallingSessionCreateRequest();
-        message.prompt = object.prompt ?? "";
-        message.generation = (object.generation !== undefined && object.generation !== null)
-            ? llm_options_1.LLMGenerationOptions.fromPartial(object.generation)
-            : undefined;
-        message.validateCalls = object.validateCalls ?? undefined;
-        message.history = object.history?.map((e) => chat_1.ChatMessage.fromPartial(e)) || [];
-        return message;
-    },
-};
-function createBaseToolCallingSessionEvent() {
-    return { llmStreamEventBytes: undefined, toolCall: undefined, finalResult: undefined, errorBytes: undefined, seq: 0 };
-}
-exports.ToolCallingSessionEvent = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.llmStreamEventBytes !== undefined) {
-            writer.uint32(10).bytes(message.llmStreamEventBytes);
-        }
-        if (message.toolCall !== undefined) {
-            tool_calling_1.ToolCall.encode(message.toolCall, writer.uint32(18).fork()).join();
-        }
-        if (message.finalResult !== undefined) {
-            tool_calling_1.ToolCallingResult.encode(message.finalResult, writer.uint32(26).fork()).join();
-        }
-        if (message.errorBytes !== undefined) {
-            writer.uint32(34).bytes(message.errorBytes);
-        }
-        if (message.seq !== 0) {
-            writer.uint32(40).uint64(message.seq);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseToolCallingSessionEvent();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.llmStreamEventBytes = reader.bytes();
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.toolCall = tool_calling_1.ToolCall.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.finalResult = tool_calling_1.ToolCallingResult.decode(reader, reader.uint32());
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.errorBytes = reader.bytes();
-                    continue;
-                }
-                case 5: {
-                    if (tag !== 40) {
-                        break;
-                    }
-                    message.seq = longToNumber(reader.uint64());
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            llmStreamEventBytes: isSet(object.llmStreamEventBytes)
-                ? bytesFromBase64(object.llmStreamEventBytes)
-                : isSet(object.llm_stream_event_bytes)
-                    ? bytesFromBase64(object.llm_stream_event_bytes)
-                    : undefined,
-            toolCall: isSet(object.toolCall)
-                ? tool_calling_1.ToolCall.fromJSON(object.toolCall)
-                : isSet(object.tool_call)
-                    ? tool_calling_1.ToolCall.fromJSON(object.tool_call)
-                    : undefined,
-            finalResult: isSet(object.finalResult)
-                ? tool_calling_1.ToolCallingResult.fromJSON(object.finalResult)
-                : isSet(object.final_result)
-                    ? tool_calling_1.ToolCallingResult.fromJSON(object.final_result)
-                    : undefined,
-            errorBytes: isSet(object.errorBytes)
-                ? bytesFromBase64(object.errorBytes)
-                : isSet(object.error_bytes)
-                    ? bytesFromBase64(object.error_bytes)
-                    : undefined,
-            seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.llmStreamEventBytes !== undefined) {
-            obj.llmStreamEventBytes = base64FromBytes(message.llmStreamEventBytes);
-        }
-        if (message.toolCall !== undefined) {
-            obj.toolCall = tool_calling_1.ToolCall.toJSON(message.toolCall);
-        }
-        if (message.finalResult !== undefined) {
-            obj.finalResult = tool_calling_1.ToolCallingResult.toJSON(message.finalResult);
-        }
-        if (message.errorBytes !== undefined) {
-            obj.errorBytes = base64FromBytes(message.errorBytes);
-        }
-        if (message.seq !== 0) {
-            obj.seq = Math.round(message.seq);
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.ToolCallingSessionEvent.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseToolCallingSessionEvent();
-        message.llmStreamEventBytes = object.llmStreamEventBytes ?? undefined;
-        message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
-            ? tool_calling_1.ToolCall.fromPartial(object.toolCall)
-            : undefined;
-        message.finalResult = (object.finalResult !== undefined && object.finalResult !== null)
-            ? tool_calling_1.ToolCallingResult.fromPartial(object.finalResult)
-            : undefined;
-        message.errorBytes = object.errorBytes ?? undefined;
-        message.seq = object.seq ?? 0;
-        return message;
-    },
-};
-function createBaseToolCallingSessionStepWithResultRequest() {
-    return { sessionHandle: 0, toolCallId: "", resultJson: "", error: undefined };
-}
-exports.ToolCallingSessionStepWithResultRequest = {
-    encode(message, writer = new wire_1.BinaryWriter()) {
-        if (message.sessionHandle !== 0) {
-            writer.uint32(8).uint64(message.sessionHandle);
-        }
-        if (message.toolCallId !== "") {
-            writer.uint32(18).string(message.toolCallId);
-        }
-        if (message.resultJson !== "") {
-            writer.uint32(26).string(message.resultJson);
-        }
-        if (message.error !== undefined) {
-            writer.uint32(34).string(message.error);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
-        const end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseToolCallingSessionStepWithResultRequest();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1: {
-                    if (tag !== 8) {
-                        break;
-                    }
-                    message.sessionHandle = longToNumber(reader.uint64());
-                    continue;
-                }
-                case 2: {
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.toolCallId = reader.string();
-                    continue;
-                }
-                case 3: {
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.resultJson = reader.string();
-                    continue;
-                }
-                case 4: {
-                    if (tag !== 34) {
-                        break;
-                    }
-                    message.error = reader.string();
-                    continue;
-                }
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skip(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            sessionHandle: isSet(object.sessionHandle)
-                ? globalThis.Number(object.sessionHandle)
-                : isSet(object.session_handle)
-                    ? globalThis.Number(object.session_handle)
-                    : 0,
-            toolCallId: isSet(object.toolCallId)
-                ? globalThis.String(object.toolCallId)
-                : isSet(object.tool_call_id)
-                    ? globalThis.String(object.tool_call_id)
-                    : "",
-            resultJson: isSet(object.resultJson)
-                ? globalThis.String(object.resultJson)
-                : isSet(object.result_json)
-                    ? globalThis.String(object.result_json)
-                    : "",
-            error: isSet(object.error) ? globalThis.String(object.error) : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.sessionHandle !== 0) {
-            obj.sessionHandle = Math.round(message.sessionHandle);
-        }
-        if (message.toolCallId !== "") {
-            obj.toolCallId = message.toolCallId;
-        }
-        if (message.resultJson !== "") {
-            obj.resultJson = message.resultJson;
-        }
-        if (message.error !== undefined) {
-            obj.error = message.error;
-        }
-        return obj;
-    },
-    create(base) {
-        return exports.ToolCallingSessionStepWithResultRequest.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseToolCallingSessionStepWithResultRequest();
-        message.sessionHandle = object.sessionHandle ?? 0;
-        message.toolCallId = object.toolCallId ?? "";
-        message.resultJson = object.resultJson ?? "";
-        message.error = object.error ?? undefined;
-        return message;
-    },
-};
-function bytesFromBase64(b64) {
-    const bin = globalThis.atob(b64);
-    const arr = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; ++i) {
-        arr[i] = bin.charCodeAt(i);
-    }
-    return arr;
-}
-function base64FromBytes(arr) {
-    const bin = [];
-    arr.forEach((byte) => {
-        bin.push(globalThis.String.fromCharCode(byte));
-    });
-    return globalThis.btoa(bin.join(""));
-}
 function longToNumber(int64) {
     const num = globalThis.Number(int64.toString());
     if (num > globalThis.Number.MAX_SAFE_INTEGER) {
