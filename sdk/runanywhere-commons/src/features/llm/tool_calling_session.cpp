@@ -837,9 +837,11 @@ extern "C" rac_result_t rac_tool_calling_session_create_proto(
         session->generation.history.pop_back();
     }
 
-    session->format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
-                          ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON
-                          : request.format();
+    // Derive the wire format from the loaded model when the caller left it
+    // UNSPECIFIED (same contract as the run-loop path) so LFM2 and other
+    // non-JSON dialects get an aligned prompt + grammar + parser.
+    session->format = rac::llm::tool_calling::resolve_tool_call_format_for_model(
+        request.format(), rac::llm::lifecycle_llm_model_id());
     // Probe grammar capability once (cheap acquire/release): grammar backends build +
     // parse the tool prompt in the bare-Pythonic format the QHexRT grammar enforces.
     // Non-grammar engines keep the declared format — a strict no-op for them (RUN-80).

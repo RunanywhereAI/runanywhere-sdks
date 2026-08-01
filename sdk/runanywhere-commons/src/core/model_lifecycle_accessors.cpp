@@ -75,6 +75,16 @@ bool lifecycle_llm_supports_grammar() {
     return supported;
 }
 
+std::string lifecycle_llm_model_id() {
+    LifecycleLlmRef ref;
+    if (acquire_lifecycle_llm(&ref) != RAC_SUCCESS) {
+        return std::string();
+    }
+    std::string id = ref.model_id ? ref.model_id : "";
+    release_lifecycle_llm(&ref);
+    return id;
+}
+
 void release_lifecycle_llm(LifecycleLlmRef* ref) {
     if (!ref || !ref->opaque) {
         return;

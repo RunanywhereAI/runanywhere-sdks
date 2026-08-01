@@ -460,9 +460,12 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     ctx.generation.temperature = request.temperature();
     ctx.generation.top_p = request.top_p();
     ctx.generation.system_prompt = request.system_prompt();
-    ctx.format = request.format() == runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED
-                     ? runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON
-                     : request.format();
+    // Derive the wire format from the loaded model when the caller left it
+    // UNSPECIFIED — a bare JSON default garbles models whose native dialect
+    // differs (e.g. LFM2). This aligns prompt + grammar + parser (#607 shipped
+    // without per-model derivation).
+    ctx.format = rac::llm::tool_calling::resolve_tool_call_format_for_model(
+        request.format(), rac::llm::lifecycle_llm_model_id());
     // Probe grammar capability once up front (cheap acquire/release) so the prompt can
     // be built in the bare-Pythonic format the QHexRT grammar enforces. Non-grammar
     // engines keep the caller's declared format — a strict no-op for them (RUN-80).
