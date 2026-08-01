@@ -38,7 +38,7 @@ object CppBridgeToolCalling {
 
     private fun formattedPrompt(request: ToolPromptFormatRequest): String {
         val result = formatPrompt(request)
-        result.error?.let { throw SDKException(it) }
+        result.error_message?.let { throw SDKException.operation(it) }
         return result.formatted_prompt
     }
 

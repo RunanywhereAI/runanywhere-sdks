@@ -25,7 +25,6 @@ package com.runanywhere.sdk.public.extensions.LLM
 import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.ToolValueJSON
 import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 // PROTO TYPEALIASES (RA-prefixed, mirroring Swift)
@@ -79,11 +78,14 @@ internal data class RegisteredTool(
 // live on ToolCallingOptions — they stay on the LLMGenerationOptions envelope.
 
 internal fun LLMGenerationOptions?.toToolCallingOptions(): ToolCallingOptions =
-    this?.tool_calling ?: ToolCallingOptions.defaults()
+    this?.tool_calling ?: ToolCallingOptions()
+
+// main's ToolCallingOptions has no rac_default for max_tool_calls; fall back to
+// the contract value of 5 when it is unset or non-positive.
+private const val DEFAULT_MAX_TOOL_CALLS = 5
 
 internal fun ToolCallingOptions.effectiveMaxToolCalls(): Int =
-    max_tool_calls?.takeIf { it > 0 }
-        ?: checkNotNull(ToolCallingOptions.defaults().max_tool_calls)
+    max_tool_calls?.takeIf { it > 0 } ?: DEFAULT_MAX_TOOL_CALLS
 
 // RAToolValue ergonomic helpers (mirror Swift `RAToolValue` extension)
 

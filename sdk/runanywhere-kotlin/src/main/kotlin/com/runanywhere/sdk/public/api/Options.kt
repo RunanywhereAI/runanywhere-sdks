@@ -18,7 +18,6 @@ import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.TTSOptions
-import ai.runanywhere.proto.v1.ToolCallingOptions
 import ai.runanywhere.proto.v1.VADOptions
 import com.runanywhere.sdk.generated.convenience.defaults
 
@@ -87,12 +86,14 @@ public data class LlmOptions(
     /** Sampling and tool-loop defaults, as annotated in idl/. */
     public companion object {
         private val generationDefaults = LLMGenerationOptions.defaults()
-        private val toolDefaults = ToolCallingOptions.defaults()
 
         public val DEFAULT_MAX_OUTPUT_TOKENS: Int = generationDefaults.max_output_tokens
         public val DEFAULT_TEMPERATURE: Float = generationDefaults.temperature
         public val DEFAULT_TOP_P: Float = generationDefaults.top_p
-        public val DEFAULT_MAX_TOOL_CALLS: Int = checkNotNull(toolDefaults.max_tool_calls)
+
+        // main's ToolCallingOptions carries no rac_default, so max_tool_calls has
+        // no generated default. Restate the contract value as a literal.
+        public const val DEFAULT_MAX_TOOL_CALLS: Int = 5
     }
 }
 

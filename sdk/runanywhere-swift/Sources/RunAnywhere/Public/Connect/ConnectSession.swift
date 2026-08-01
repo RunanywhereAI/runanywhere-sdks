@@ -1278,7 +1278,9 @@ private final class ConnectTransport: @unchecked Sendable {
         event.requestID = requestID
         event.isFinal = true
         event.finishReason = "error"
-        event.errorMessage = message
+        var sdkError = RASDKError()
+        sdkError.message = message
+        event.error = sdkError
         event.eventKind = .error
 
         var envelope = RAConnectInvocationEvent()
@@ -1422,7 +1424,13 @@ private final class ConnectTransport: @unchecked Sendable {
             event.requestID = activeClientRequestID ?? ""
             event.isFinal = true
             event.finishReason = "error"
-            event.errorMessage = error.localizedDescription
+            if let sdkError = error as? SDKException {
+                event.error = sdkError.proto
+            } else {
+                var sdkError = RASDKError()
+                sdkError.message = error.localizedDescription
+                event.error = sdkError
+            }
             event.eventKind = .error
             continuation.yield(event)
         }

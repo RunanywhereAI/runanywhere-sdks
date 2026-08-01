@@ -23,7 +23,7 @@ import SwiftProtobuf
 // MARK: - Tool Registry (Thread-safe)
 
 /// Actor-based tool registry for thread-safe tool registration and lookup.
-private actor ToolRegistry {
+actor ToolRegistry {
     static let shared = ToolRegistry()
 
     private var tools: [String: RegisteredTool] = [:]
@@ -265,7 +265,7 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        var tcOpts = toolOptions ?? (options.hasToolCalling ? options.toolCalling : RAToolCallingOptions.defaults())
+        var tcOpts = toolOptions ?? (options.hasToolCalling ? options.toolCalling : RAToolCallingOptions())
         if let toolChoice {
             tcOpts.toolChoice = toolChoice
         }
@@ -415,7 +415,7 @@ public extension RunAnywhere {
         if toolOptions.hasMaxTokens, toolOptions.maxTokens > 0 {
             maxTokens = toolOptions.maxTokens
         } else {
-            maxTokens = options.maxTokens
+            maxTokens = options.maxOutputTokens
         }
         request.maxTokens = maxTokens
 
@@ -466,7 +466,7 @@ public extension RunAnywhere {
             request.forcedToolName = toolOptions.forcedToolName
         }
         // Suppress thinking when either options surface asks for it.
-        request.disableThinking = toolOptions.disableThinking || options.disableThinking
+        request.disableThinking = toolOptions.disableThinking || (options.hasReasoning && options.reasoning.mode == .off)
         // Prior conversation turns (flat alternating [user, asst, ...] of prior
         // turns, excluding the current turn) so the commons run-loop keeps
         // multi-turn context. `history` is a swift-protobuf repeated field

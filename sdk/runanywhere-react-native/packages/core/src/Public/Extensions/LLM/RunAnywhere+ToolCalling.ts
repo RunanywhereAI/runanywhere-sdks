@@ -218,8 +218,8 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       toolCallId: toolCall.id,
       name: toolCall.name,
       resultJson: '',
-      error: SDKException.processingFailed(`Unknown tool: ${toolCall.name}`)
-        .proto,
+      error: `Unknown tool: ${toolCall.name}`,
+      success: false,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -237,9 +237,8 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       toolCallId: toolCall.id,
       name: toolCall.name,
       resultJson: '',
-      error: SDKException.processingFailed(
-        `Failed to parse tool arguments: ${errorMessage}`
-      ).proto,
+      error: `Failed to parse tool arguments: ${errorMessage}`,
+      success: false,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -252,6 +251,7 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       toolCallId: toolCall.id,
       name: toolCall.name,
       resultJson: toolValueMapToJsonString(result),
+      success: true,
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -262,7 +262,8 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       toolCallId: toolCall.id,
       name: toolCall.name,
       resultJson: '',
-      error: SDKException.processingFailed(errorMessage).proto,
+      error: errorMessage,
+      success: false,
       startedAtMs,
       completedAtMs: Date.now(),
     });

@@ -65,6 +65,7 @@ import {
   type ToolResult,
 } from '@runanywhere/proto-ts/tool_calling';
 import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import { SDKError as SDKErrorMessage } from '@runanywhere/proto-ts/errors';
 import { ProtoErrorCode, SDKException } from '../../Foundation/SDKException.js';
 import { SDKLogger } from '../../Foundation/SDKLogger.js';
@@ -121,7 +122,7 @@ export interface GenerateWithToolsOptions {
   llmOptions?: Partial<
     Pick<
       LLMGenerationOptions,
-      'maxTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'disableThinking'
+      'maxOutputTokens' | 'temperature' | 'topP' | 'systemPrompt' | 'reasoning'
     >
   >;
   /**
@@ -175,7 +176,7 @@ function buildToolCallingOptions(
     maxToolCalls: overrides.maxToolCalls ?? 5,
     autoExecute: overrides.autoExecute ?? true,
     temperature: overrides.temperature ?? options.temperature,
-    maxTokens: overrides.maxTokens ?? options.maxTokens,
+    maxTokens: overrides.maxTokens ?? options.maxOutputTokens,
     systemPrompt: overrides.systemPrompt ?? options.systemPrompt,
     replaceSystemPrompt: overrides.replaceSystemPrompt ?? false,
     keepToolsAvailable: overrides.keepToolsAvailable ?? false,
@@ -428,7 +429,7 @@ function buildSessionCreateRequest(
     maxTokens:
       toolMaxTokens !== undefined && toolMaxTokens > 0
         ? toolMaxTokens
-        : (llm?.maxTokens ?? 100),
+        : (llm?.maxOutputTokens ?? 100),
     temperature: effectiveOptions.temperature ?? llm?.temperature ?? 0.8,
     // topP has no slot on ToolCallingOptions — Swift reads it from the LLM
     // options channel exclusively (RunAnywhere+ToolCalling.swift:516).
@@ -460,7 +461,8 @@ function buildSessionCreateRequest(
     // `toolOptions.disableThinking || options.disableThinking`
     // (RunAnywhere+ToolCalling.swift:548).
     disableThinking:
-      (effectiveOptions.disableThinking ?? false) || (llm?.disableThinking ?? false),
+      (effectiveOptions.disableThinking ?? false) ||
+      llm?.reasoning?.mode === ReasoningMode.REASONING_MODE_OFF,
     autoExecute: effectiveOptions.autoExecute ?? true,
     replaceSystemPrompt: effectiveOptions.replaceSystemPrompt ?? false,
     requireJsonArguments: effectiveOptions.requireJsonArguments ?? false,

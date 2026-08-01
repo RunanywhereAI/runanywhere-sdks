@@ -121,7 +121,7 @@ public struct LlmOptions: Sendable {
     /// Tools offered for this call; empty uses the `llm.tools` registry.
     public var tools: [ToolDefinition] = []
     public var toolChoice: ToolChoice = .auto
-    public var maxToolCalls: Int = Int(RAToolCallingOptions.defaults().maxToolCalls)
+    public var maxToolCalls: Int = 5
 
     /// Build generation options; every field defaults to the IDL value.
     public init(
@@ -141,7 +141,7 @@ public struct LlmOptions: Sendable {
         structuredOutput: StructuredOutput? = nil,
         tools: [ToolDefinition] = [],
         toolChoice: ToolChoice = .auto,
-        maxToolCalls: Int = Int(RAToolCallingOptions.defaults().maxToolCalls)
+        maxToolCalls: Int = 5
     ) {
         self.model = model
         self.maxOutputTokens = maxOutputTokens
@@ -184,7 +184,7 @@ public struct LlmOptions: Sendable {
     /// Tool configuration is only meaningful when tools are in play; the
     /// registry contents are merged in by the `llm` namespace.
     func toolCallingProto() -> RAToolCallingOptions {
-        var options = RAToolCallingOptions.defaults()
+        var options = RAToolCallingOptions()
         options.tools = tools
         options.maxToolCalls = Int32(maxToolCalls)
         switch toolChoice {

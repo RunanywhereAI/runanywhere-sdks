@@ -131,8 +131,8 @@ async function generateWithToolLoop(
     () => undefined
   );
   const result = decode(resultBytes, ToolCallingResult, 'toolRunLoop');
-  if (result.error) {
-    throw new SDKException(result.error);
+  if (result.errorMessage) {
+    throw SDKException.generationFailed(result.errorMessage);
   }
   return {
     text: result.text,

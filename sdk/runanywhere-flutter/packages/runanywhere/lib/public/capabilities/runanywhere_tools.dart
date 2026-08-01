@@ -18,6 +18,8 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/convenience/ra_convenience.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
+import 'package:runanywhere/generated/thinking_tag_pattern.pbenum.dart'
+    show ReasoningMode;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
     show
         ToolCall,
@@ -239,11 +241,13 @@ class RunAnywhereTools {
       keepToolsAvailable: opts.keepToolsAvailable,
       maxTokens: (opts.hasMaxTokens() && opts.maxTokens > 0)
           ? opts.maxTokens
-          : llm.maxTokens,
+          : llm.maxOutputTokens,
       temperature: opts.hasTemperature() ? opts.temperature : llm.temperature,
       topP: llm.topP,
       // Suppress thinking when either options surface asks for it.
-      disableThinking: opts.disableThinking || llm.disableThinking,
+      disableThinking:
+          opts.disableThinking ||
+          llm.reasoning.mode == ReasoningMode.REASONING_MODE_OFF,
       autoExecute: autoExecute,
       replaceSystemPrompt: opts.replaceSystemPrompt,
       requireJsonArguments: opts.requireJsonArguments,

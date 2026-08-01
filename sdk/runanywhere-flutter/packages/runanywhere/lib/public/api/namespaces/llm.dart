@@ -170,8 +170,8 @@ class LlmApi {
       options: request.options.toolCalling,
       history: history,
     );
-    if (result.hasError()) {
-      throw SDKException.generationFailed(result.error.message);
+    if (result.hasErrorMessage()) {
+      throw SDKException.generationFailed(result.errorMessage);
     }
     return GenerationResult(
       text: result.text,

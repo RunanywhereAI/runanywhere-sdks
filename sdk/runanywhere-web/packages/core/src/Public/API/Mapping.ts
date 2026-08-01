@@ -129,6 +129,7 @@ export function toProtoLlmOptions(options?: LlmOptions): LLMGenerationOptions {
       requireJsonArguments: false,
       maxToolCalls: options.maxToolCalls,
       autoExecute: true,
+      parallelToolCalls: false,
     };
   }
 

@@ -231,7 +231,7 @@ public class LlmNamespace internal constructor() {
                 validateCalls = null,
                 history = history.toAlternatingTurns(),
             )
-        result.error?.let { throw SDKException(it) }
+        result.error_message?.let { throw SDKException.operation(it) }
         return GenerationResult(
             text = result.text,
             thinkingText = result.thinking_content?.takeIf { it.isNotEmpty() },

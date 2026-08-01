@@ -106,14 +106,18 @@ public extension RunAnywhere {
             let registered = await ToolRegistry.shared.getAll()
             let activeTools = effective.tools.isEmpty ? registered : effective.tools
             if !activeTools.isEmpty, !LLM.isToolChoiceNone(effective.toolChoice) {
-                let loop = try await RunAnywhere.runToolLoop(
+                let loop = try await RunAnywhere.generateWithTools(
                     prompt: prompt,
                     options: effective.toProto(),
                     toolOptions: effective.toolCallingProto(),
-                    history: history
+                    history: history.map(\.content)
                 )
-                if loop.hasError {
-                    throw SDKException(proto: loop.error)
+                if loop.hasErrorMessage {
+                    throw SDKException(
+                        code: RAErrorCode(rawValue: Int(loop.errorCode)) ?? .unspecified,
+                        message: loop.errorMessage,
+                        category: .component
+                    )
                 }
                 return GenerationResult(proto: loop, requestId: loop.conversationID, model: model)
             }

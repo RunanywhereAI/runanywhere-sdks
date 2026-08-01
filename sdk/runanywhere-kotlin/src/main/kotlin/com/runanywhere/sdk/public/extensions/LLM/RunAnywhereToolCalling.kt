@@ -22,7 +22,6 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ToolChoiceMode
 import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.generated.convenience.defaults
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
 import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingResult
@@ -84,7 +83,7 @@ suspend fun RunAnywhere.generateWithTools(
     val baseToolOptions =
         toolOptions
             ?: options?.toToolCallingOptions()
-            ?: RAToolCallingOptions.defaults()
+            ?: RAToolCallingOptions()
     // Apply `toolChoice` / `forcedToolName` overrides on top of the resolved
     // options. Mirrors Swift's `RunAnywhere+ToolCalling.swift` `tcOpts`
     // mutation. These live on `ToolCallingOptions` proto (fields 13/14) so

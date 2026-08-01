@@ -161,7 +161,7 @@ internal fun makeToolCallingRunLoopRequest(
 ): ToolCallingSessionCreateRequest =
     ToolCallingSessionCreateRequest(
         prompt = prompt,
-        max_tokens = options.max_tokens?.takeIf { it > 0 } ?: llmOptions.max_tokens,
+        max_tokens = options.max_tokens?.takeIf { it > 0 } ?: llmOptions.max_output_tokens,
         // Zero is a real greedy temperature. Do not use takeIf/non-zero
         // fallback here; the native tool loop now honors this value exactly.
         temperature = options.temperature ?: llmOptions.temperature,
@@ -177,7 +177,8 @@ internal fun makeToolCallingRunLoopRequest(
         keep_tools_available = options.keep_tools_available,
         // Suppress thinking when either options surface asks for it (commons
         // prepends the no-think directive).
-        disable_thinking = (options.disable_thinking ?: false) || llmOptions.disable_thinking,
+        disable_thinking = (options.disable_thinking ?: false) ||
+            (llmOptions.reasoning?.mode == ai.runanywhere.proto.v1.ReasoningMode.REASONING_MODE_OFF),
         validate_calls = validateCalls,
         tools = tools,
         tool_choice =
