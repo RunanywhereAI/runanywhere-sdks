@@ -133,6 +133,7 @@ actor AmbientMemoryStore {
         try? fileManager.removeItem(at: sessionsDirectory)
         try? fileManager.removeItem(at: audioDirectory)
         try? fileManager.removeItem(at: benchmarksURL)
+        try? fileManager.removeItem(at: fileRunsURL)
         deletedSessionIDs.removeAll()
         createDirectories()
         logger.info("Ambient memory purged")
@@ -218,8 +219,47 @@ actor AmbientMemoryStore {
         rootDirectory.appendingPathComponent(relativePath)
     }
 
+    /// Copy an already-converted WAV into the note audio slot (offline import).
+    func importRecording(from sourceURL: URL, sessionID: String) throws -> String {
+        let relativePath = Self.audioRelativePath(sessionID: sessionID)
+        let destination = rootDirectory.appendingPathComponent(relativePath)
+        try fileManager.createDirectory(
+            at: destination.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        if fileManager.fileExists(atPath: destination.path) {
+            try fileManager.removeItem(at: destination)
+        }
+        try fileManager.copyItem(at: sourceURL, to: destination)
+        return relativePath
+    }
+
     private static func audioRelativePath(sessionID: String) -> String {
         "Audio/\(sessionID).wav"
+    }
+
+    // MARK: - File-run metrics
+
+    private var fileRunsURL: URL {
+        rootDirectory.appendingPathComponent("file-runs.json")
+    }
+
+    func appendFileRunMetrics(_ metrics: AmbientFileRunMetrics) {
+        var all = loadFileRunMetrics()
+        all.insert(metrics, at: 0)
+        if all.count > 100 { all = Array(all.prefix(100)) }
+        if let data = try? encoder.encode(all) {
+            try? data.write(to: fileRunsURL, options: .atomic)
+        }
+    }
+
+    func loadFileRunMetrics() -> [AmbientFileRunMetrics] {
+        guard let data = try? Data(contentsOf: fileRunsURL) else { return [] }
+        return (try? decoder.decode([AmbientFileRunMetrics].self, from: data)) ?? []
+    }
+
+    func exportFileRunsJSON() -> Data? {
+        try? encoder.encode(loadFileRunMetrics())
     }
 
     // MARK: - Storage Accounting

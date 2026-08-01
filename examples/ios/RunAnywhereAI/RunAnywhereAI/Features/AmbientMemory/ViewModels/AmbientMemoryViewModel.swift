@@ -50,7 +50,7 @@ final class AmbientMemoryViewModel: ObservableObject {
     @Published private(set) var storageBytes: Int64 = 0
     @Published private(set) var retainedAudioBytes: Int64 = 0
 
-    @Published private(set) var errorMessage: String?
+    @Published var errorMessage: String?
 
     // MARK: - Collaborators
 
@@ -267,6 +267,25 @@ final class AmbientMemoryViewModel: ObservableObject {
         await summarize(sessionID: sessionID)
     }
 
+    /// Persist the Sortformer choice from note detail (Get → Use).
+    func selectDiarizationModel(_ model: RAModelInfo, for sessionID: String) async {
+        await sessionManager.setDiarizationModel(for: sessionID, modelID: model.id)
+        await refreshLibrary()
+    }
+
+    /// Opt-in post-pass: label speakers on the saved note's WAV.
+    func labelSpeakers(sessionID: String, modelID: String? = nil) async {
+        await sessionManager.labelSpeakers(for: sessionID, modelID: modelID)
+        await refreshLibrary()
+    }
+
+    /// Rename a machine speaker label across the note (e.g. Speaker 1 → Alice).
+    func renameSpeaker(from oldLabel: String, to newLabel: String, in sessionID: String) async {
+        await update(sessionID: sessionID) { note in
+            note.renameSpeaker(from: oldLabel, to: newLabel)
+        }
+    }
+
     func togglePause() async {
         if sessionManager.phase == .paused {
             await sessionManager.resume()
@@ -384,6 +403,13 @@ final class AmbientMemoryViewModel: ObservableObject {
     /// summary, so the list has to reload to stop showing "Summary pending".
     private func observeDeferredMerges() {
         sessionManager.didFinishDeferredMerge
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                Task { await self?.refreshLibrary() }
+            }
+            .store(in: &cancellables)
+
+        sessionManager.didFinishSpeakerLabeling
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 Task { await self?.refreshLibrary() }

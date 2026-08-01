@@ -10,22 +10,28 @@
 #if os(iOS)
 import RunAnywhere
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AmbientDeveloperView: View {
     @ObservedObject var viewModel: AmbientMemoryViewModel
     @ObservedObject private var modelList = ModelListViewModel.shared
+    @ObservedObject private var offlineRunner = AmbientOfflineImportRunner.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var showBenchmarks = false
     @State private var showVADPicker = false
     @State private var showASRPicker = false
     @State private var showDigestPicker = false
+    @State private var showImporter = false
+    @State private var dogfoodLabelSpeakers = true
+    @State private var dogfoodSummarize = true
 
     var body: some View {
         NavigationStack {
             Form {
                 profileSection
                 modelSection
+                offlineDogfoodSection
                 audioSection
                 contextSection
                 deviceSection
@@ -56,12 +62,101 @@ struct AmbientDeveloperView: View {
                     viewModel.select(digest: model)
                 }
             }
+            .fileImporter(
+                isPresented: $showImporter,
+                allowedContentTypes: [.audio, .mpeg4Audio, UTType(filenameExtension: "wav")].compactMap { $0 },
+                allowsMultipleSelection: false
+            ) { result in
+                guard case .success(let urls) = result, let url = urls.first else { return }
+                Task { await importAndRun(url) }
+            }
             .task {
                 if modelList.availableModels.isEmpty {
                     await modelList.loadModelsFromRegistry()
                 }
             }
         }
+    }
+
+    // MARK: - Offline dogfood
+
+    private var offlineDogfoodSection: some View {
+        Section {
+            Toggle("Label speakers after ASR", isOn: $dogfoodLabelSpeakers)
+            Toggle("Structured digest after ASR", isOn: $dogfoodSummarize)
+
+            Button("Import audio file…") { showImporter = true }
+                .disabled(offlineRunner.isRunning || !viewModel.isCaptureStackReady)
+
+            Button("Run all Fixtures") {
+                Task { await runAllFixtures() }
+            }
+            .disabled(offlineRunner.isRunning || !viewModel.isCaptureStackReady)
+
+            if offlineRunner.isRunning || !offlineRunner.statusMessage.isEmpty {
+                Text(offlineRunner.statusMessage)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            if let metrics = offlineRunner.lastMetrics {
+                Text(Self.metricsSummary(metrics))
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+            if let error = offlineRunner.lastError {
+                Text(error)
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.statusOrange)
+            }
+        } header: {
+            Text("Long-audio dogfood")
+        } footer: {
+            Text(
+                "Drop WAV/m4a into Documents/AmbientMemory/Fixtures, or import one file. "
+                + "Stages: convert → offline ASR → optional Sortformer → structured digest. "
+                + "Metrics land in Benchmark samples (runKind=file)."
+            )
+        }
+    }
+
+    private func importAndRun(_ url: URL) async {
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+        guard viewModel.isCaptureStackReady else { return }
+        _ = await offlineRunner.run(
+            fileURL: url,
+            selection: viewModel.selection,
+            labelSpeakers: dogfoodLabelSpeakers,
+            summarize: dogfoodSummarize && !(viewModel.selection.digestModelID ?? "").isEmpty,
+            context: viewModel.context
+        )
+        await viewModel.refreshLibrary()
+    }
+
+    private func runAllFixtures() async {
+        guard viewModel.isCaptureStackReady else { return }
+        _ = await offlineRunner.runAllFixtures(
+            selection: viewModel.selection,
+            labelSpeakers: dogfoodLabelSpeakers,
+            summarize: dogfoodSummarize && !(viewModel.selection.digestModelID ?? "").isEmpty,
+            context: viewModel.context
+        )
+        await viewModel.refreshLibrary()
+    }
+
+    private static func metricsSummary(_ m: AmbientFileRunMetrics) -> String {
+        var parts = [
+            "\(m.fixtureName)",
+            "convert \(m.convertMs)ms",
+            "asr \(m.asrMs)ms",
+            "first \(m.firstTranscriptMs)ms",
+        ]
+        if m.diarizationMs > 0 { parts.append("diar \(m.diarizationMs)ms") }
+        if m.digestMs > 0 { parts.append("digest \(m.digestMs)ms") }
+        parts.append("segs \(m.segmentCount)")
+        if m.sectionCount > 0 { parts.append("sections \(m.sectionCount)") }
+        parts.append("peak \(m.peakMemoryBytes.formattedFileSize)")
+        return parts.joined(separator: " · ")
     }
 
     // MARK: - Profile

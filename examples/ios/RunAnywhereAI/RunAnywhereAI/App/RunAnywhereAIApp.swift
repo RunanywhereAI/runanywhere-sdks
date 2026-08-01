@@ -54,6 +54,9 @@ struct RunAnywhereAIApp: App {
                             case "ambient", "startAmbient":
                                 logger.info("Received \(url.host ?? "", privacy: .public) deep link")
                                 ambientRouter.open(autoStart: url.host == "startAmbient")
+                            case "notesDogfood":
+                                logger.info("Received notesDogfood deep link")
+                                ambientRouter.openDogfood(AmbientDogfoodRequest.from(url: url))
                             default:
                                 break
                             }

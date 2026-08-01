@@ -91,6 +91,22 @@ struct AmbientCaptureContext: Codable, Sendable, Equatable {
     }
 }
 
+// MARK: - Speaker Labeling
+
+/// Opt-in post-pass speaker labeling for a saved note.
+enum AmbientSpeakerLabelingState: String, Codable, Sendable, Equatable {
+    /// No speaker model chosen for this note yet.
+    case notConfigured
+    /// A model is selected; user has not run labeling (or can re-label).
+    case modelSelected
+    case loadingModel
+    case labeling
+    case completed
+    /// App was backgrounded / suspended mid-pass; transcript is still intact.
+    case interrupted
+    case failed
+}
+
 // MARK: - Segment
 
 /// One finalized speech segment plus its transcription outcome.
@@ -103,13 +119,22 @@ struct AmbientSegmentRecord: Codable, Sendable, Identifiable, Equatable {
     let durationMs: Int
     let sampleRate: Int
     let peakConfidence: Float
+    /// Recording-relative start (excludes pause gaps). Nil on notes captured
+    /// before offset stamping existed — alignment falls back to cumulative duration.
+    var startOffsetMs: Int?
+    var endOffsetMs: Int?
 
     var transcript: String?
     var transcriptConfidence: Float?
     var languageCode: String?
     var sttModelID: String?
     var transcriptionMs: Int?
+    /// Display speaker label (machine or user-renamed).
     var speakerLabel: String?
+    /// Last diarization assignment, kept so re-label can refresh non-manual labels.
+    var machineSpeakerLabel: String?
+    /// User renamed this speaker; re-label must not overwrite `speakerLabel`.
+    var isSpeakerManual: Bool
 
     var realTimeFactor: Double? {
         guard let transcriptionMs, durationMs > 0 else { return nil }
@@ -126,6 +151,9 @@ struct AmbientSegmentRecord: Codable, Sendable, Identifiable, Equatable {
         self.sampleRate = segment.sampleRate
         // JSONEncoder rejects NaN/Inf; Sherpa confidence often arrives as NaN.
         self.peakConfidence = Self.jsonSafe(segment.peakConfidence)
+        self.startOffsetMs = segment.startOffsetMs
+        self.endOffsetMs = segment.endOffsetMs
+        self.isSpeakerManual = false
     }
 
     init(
@@ -136,7 +164,9 @@ struct AmbientSegmentRecord: Codable, Sendable, Identifiable, Equatable {
         endedAt: Date,
         durationMs: Int,
         sampleRate: Int,
-        peakConfidence: Float
+        peakConfidence: Float,
+        startOffsetMs: Int? = nil,
+        endOffsetMs: Int? = nil
     ) {
         self.id = id
         self.sessionID = sessionID
@@ -146,6 +176,31 @@ struct AmbientSegmentRecord: Codable, Sendable, Identifiable, Equatable {
         self.durationMs = durationMs
         self.sampleRate = sampleRate
         self.peakConfidence = Self.jsonSafe(peakConfidence)
+        self.startOffsetMs = startOffsetMs
+        self.endOffsetMs = endOffsetMs
+        self.isSpeakerManual = false
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        sessionID = try container.decode(String.self, forKey: .sessionID)
+        index = try container.decode(Int.self, forKey: .index)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        endedAt = try container.decode(Date.self, forKey: .endedAt)
+        durationMs = try container.decode(Int.self, forKey: .durationMs)
+        sampleRate = try container.decode(Int.self, forKey: .sampleRate)
+        peakConfidence = try container.decode(Float.self, forKey: .peakConfidence)
+        startOffsetMs = try container.decodeIfPresent(Int.self, forKey: .startOffsetMs)
+        endOffsetMs = try container.decodeIfPresent(Int.self, forKey: .endOffsetMs)
+        transcript = try container.decodeIfPresent(String.self, forKey: .transcript)
+        transcriptConfidence = try container.decodeIfPresent(Float.self, forKey: .transcriptConfidence)
+        languageCode = try container.decodeIfPresent(String.self, forKey: .languageCode)
+        sttModelID = try container.decodeIfPresent(String.self, forKey: .sttModelID)
+        transcriptionMs = try container.decodeIfPresent(Int.self, forKey: .transcriptionMs)
+        speakerLabel = try container.decodeIfPresent(String.self, forKey: .speakerLabel)
+        machineSpeakerLabel = try container.decodeIfPresent(String.self, forKey: .machineSpeakerLabel)
+        isSpeakerManual = try container.decodeIfPresent(Bool.self, forKey: .isSpeakerManual) ?? false
     }
 
     mutating func apply(_ transcript: RAAmbientTranscript) {
@@ -177,18 +232,73 @@ struct AmbientActionItem: Codable, Sendable, Identifiable, Equatable {
     /// list, and manual items are carried across untouched so a re-run never
     /// erases something a person added by hand.
     var isManual: Bool
+    /// Segment ids cited from the structured digest (for jump-to-transcript).
+    var sourceSegmentIDs: [String]
 
-    init(id: String = UUID().uuidString, text: String, isDone: Bool = false, isManual: Bool = false) {
+    init(
+        id: String = UUID().uuidString,
+        text: String,
+        isDone: Bool = false,
+        isManual: Bool = false,
+        sourceSegmentIDs: [String] = []
+    ) {
         self.id = id
         self.text = text
         self.isDone = isDone
         self.isManual = isManual
+        self.sourceSegmentIDs = sourceSegmentIDs
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        text = try container.decode(String.self, forKey: .text)
+        isDone = try container.decodeIfPresent(Bool.self, forKey: .isDone) ?? false
+        isManual = try container.decodeIfPresent(Bool.self, forKey: .isManual) ?? false
+        sourceSegmentIDs = try container.decodeIfPresent([String].self, forKey: .sourceSegmentIDs) ?? []
     }
 
     /// Case- and whitespace-insensitive identity, used to keep the same item
     /// from arriving twice across chunk digests and the final merge.
     var dedupeKey: String {
         text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+}
+
+/// Persisted Notion-style digest bullet.
+struct AmbientDigestBullet: Codable, Sendable, Equatable, Identifiable {
+    var id: String
+    var lead: String
+    var text: String
+    var sourceSegmentIDs: [String]
+
+    init(
+        id: String = UUID().uuidString,
+        lead: String = "",
+        text: String,
+        sourceSegmentIDs: [String] = []
+    ) {
+        self.id = id
+        self.lead = lead
+        self.text = text
+        self.sourceSegmentIDs = sourceSegmentIDs
+    }
+}
+
+/// Persisted Notion-style digest section.
+struct AmbientDigestSection: Codable, Sendable, Equatable, Identifiable {
+    var id: String
+    var heading: String
+    var bullets: [AmbientDigestBullet]
+
+    init(
+        id: String = UUID().uuidString,
+        heading: String,
+        bullets: [AmbientDigestBullet]
+    ) {
+        self.id = id
+        self.heading = heading
+        self.bullets = bullets
     }
 }
 
@@ -203,6 +313,8 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
     var vadModelID: String
     var sttModelID: String
     var digestModelID: String?
+    /// Optional Sortformer (or other) model chosen from note detail for labeling.
+    var diarizationModelID: String?
     var retentionPolicy: AmbientRetentionPolicy
     var context: AmbientCaptureContext
     var deviceModel: String
@@ -210,7 +322,12 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
     var segments: [AmbientSegmentRecord]
 
     /// The note-level summary, written by the merge pass at stop.
+    /// Flattened prose kept for search/titles; structured UI prefers `digestSections`.
     var summary: String
+    /// Suggested title from the structured digest (optional).
+    var digestTitle: String?
+    /// Notion-style sectioned summary.
+    var digestSections: [AmbientDigestSection]
     var actionItems: [AmbientActionItem]
     /// Output of each chunk digest, persisted as it lands so a crash or a
     /// deferred merge still leaves something readable behind.
@@ -226,6 +343,12 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
     /// Terminal reason recorded when the session stopped for anything other
     /// than a plain user stop, so failures leave a visible audit record.
     var stopReason: String?
+    var speakerLabelingState: AmbientSpeakerLabelingState
+    /// Human-readable progress / error for the Label speakers card.
+    var speakerLabelingDetail: String?
+    /// True when speaker labels arrived after an existing summary.
+    var digestStale: Bool
+    var speakerCount: Int?
 
     init(
         id: String,
@@ -235,18 +358,25 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
         vadModelID: String,
         sttModelID: String,
         digestModelID: String? = nil,
+        diarizationModelID: String? = nil,
         retentionPolicy: AmbientRetentionPolicy,
         context: AmbientCaptureContext,
         deviceModel: String,
         osVersion: String,
         segments: [AmbientSegmentRecord] = [],
         summary: String = "",
+        digestTitle: String? = nil,
+        digestSections: [AmbientDigestSection] = [],
         actionItems: [AmbientActionItem] = [],
         partialSummaries: [String] = [],
         audioRelativePath: String? = nil,
         customTitle: String? = nil,
         summaryPending: Bool = false,
-        stopReason: String? = nil
+        stopReason: String? = nil,
+        speakerLabelingState: AmbientSpeakerLabelingState = .notConfigured,
+        speakerLabelingDetail: String? = nil,
+        digestStale: Bool = false,
+        speakerCount: Int? = nil
     ) {
         self.id = id
         self.startedAt = startedAt
@@ -255,18 +385,25 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
         self.vadModelID = vadModelID
         self.sttModelID = sttModelID
         self.digestModelID = digestModelID
+        self.diarizationModelID = diarizationModelID
         self.retentionPolicy = retentionPolicy
         self.context = context
         self.deviceModel = deviceModel
         self.osVersion = osVersion
         self.segments = segments
         self.summary = summary
+        self.digestTitle = digestTitle
+        self.digestSections = digestSections
         self.actionItems = actionItems
         self.partialSummaries = partialSummaries
         self.audioRelativePath = audioRelativePath
         self.customTitle = customTitle
         self.summaryPending = summaryPending
         self.stopReason = stopReason
+        self.speakerLabelingState = speakerLabelingState
+        self.speakerLabelingDetail = speakerLabelingDetail
+        self.digestStale = digestStale
+        self.speakerCount = speakerCount
     }
 
     /// Notes written before summaries existed carry none of the new keys, and
@@ -282,18 +419,28 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
         vadModelID = try container.decode(String.self, forKey: .vadModelID)
         sttModelID = try container.decode(String.self, forKey: .sttModelID)
         digestModelID = try container.decodeIfPresent(String.self, forKey: .digestModelID)
+        diarizationModelID = try container.decodeIfPresent(String.self, forKey: .diarizationModelID)
         retentionPolicy = try container.decode(AmbientRetentionPolicy.self, forKey: .retentionPolicy)
         context = try container.decode(AmbientCaptureContext.self, forKey: .context)
         deviceModel = try container.decode(String.self, forKey: .deviceModel)
         osVersion = try container.decode(String.self, forKey: .osVersion)
         segments = try container.decodeIfPresent([AmbientSegmentRecord].self, forKey: .segments) ?? []
         summary = try container.decodeIfPresent(String.self, forKey: .summary) ?? ""
+        digestTitle = try container.decodeIfPresent(String.self, forKey: .digestTitle)
+        digestSections = try container.decodeIfPresent([AmbientDigestSection].self, forKey: .digestSections) ?? []
         actionItems = try container.decodeIfPresent([AmbientActionItem].self, forKey: .actionItems) ?? []
         partialSummaries = try container.decodeIfPresent([String].self, forKey: .partialSummaries) ?? []
         audioRelativePath = try container.decodeIfPresent(String.self, forKey: .audioRelativePath)
         customTitle = try container.decodeIfPresent(String.self, forKey: .customTitle)
         summaryPending = try container.decodeIfPresent(Bool.self, forKey: .summaryPending) ?? false
         stopReason = try container.decodeIfPresent(String.self, forKey: .stopReason)
+        speakerLabelingState = try container.decodeIfPresent(
+            AmbientSpeakerLabelingState.self,
+            forKey: .speakerLabelingState
+        ) ?? .notConfigured
+        speakerLabelingDetail = try container.decodeIfPresent(String.self, forKey: .speakerLabelingDetail)
+        digestStale = try container.decodeIfPresent(Bool.self, forKey: .digestStale) ?? false
+        speakerCount = try container.decodeIfPresent(Int.self, forKey: .speakerCount)
     }
 
     /// Wall-clock length of a finished note. Incomplete orphans (never got a
@@ -315,7 +462,9 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
     }
 
     var transcribedSegments: [AmbientSegmentRecord] {
-        segments.filter { !($0.transcript ?? "").isEmpty }
+        segments
+            .filter { !($0.transcript ?? "").isEmpty }
+            .sorted { $0.index < $1.index }
     }
 
     /// The whole note as one string, so the detail view and search both read a
@@ -327,10 +476,101 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
             .joined(separator: " ")
     }
 
+    /// Transcript with speaker prefixes when labels exist — preferred for
+    /// display and LLM digests after labeling.
+    var attributedTranscript: String {
+        transcribedSegments.compactMap { segment in
+            guard let text = segment.transcript?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty else { return nil }
+            if let speaker = segment.speakerLabel?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+               !speaker.isEmpty {
+                return "\(speaker): \(text)"
+            }
+            return text
+        }
+        .joined(separator: "\n")
+    }
+
+    /// Source text for Summarize / Rewrite with `[S12]` markers for citations.
+    var digestSourceTranscript: String {
+        numberedDigestTranscript
+    }
+
+    /// Numbered turns the digest model can cite (`[S12] Speaker: text`).
+    var numberedDigestTranscript: String {
+        transcribedSegments.compactMap { segment in
+            guard let text = segment.transcript?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !text.isEmpty else { return nil }
+            let speaker = segment.speakerLabel?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if let speaker, !speaker.isEmpty {
+                return "[S\(segment.index)] \(speaker): \(text)"
+            }
+            return "[S\(segment.index)] \(text)"
+        }
+        .joined(separator: "\n")
+    }
+
+    var hasStructuredDigest: Bool {
+        !digestSections.isEmpty
+    }
+
+    /// Map model-cited segment indices onto persisted segment ids.
+    func segmentIDs(forIndices indices: [Int]) -> [String] {
+        let byIndex = Dictionary(uniqueKeysWithValues: segments.map { ($0.index, $0.id) })
+        return indices.compactMap { byIndex[$0] }
+    }
+
+    /// Apply a structured digest onto summary, sections, and machine action items.
+    mutating func applyStructuredDigest(_ digest: RAAmbientNoteDigest) {
+        summary = digest.summary
+        if !digest.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            digestTitle = digest.title
+            if customTitle == nil {
+                // Leave customTitle alone; list title prefers custom, then digestTitle via firstClause(summary).
+            }
+        }
+        digestSections = digest.sections.map { section in
+            AmbientDigestSection(
+                heading: section.heading,
+                bullets: section.bullets.map { bullet in
+                    AmbientDigestBullet(
+                        lead: bullet.lead,
+                        text: bullet.text,
+                        sourceSegmentIDs: segmentIDs(forIndices: bullet.sourceSegmentIndices)
+                    )
+                }
+            )
+        }
+        let cited = digest.citedActionItems.isEmpty
+            ? digest.actionItems.map { RAAmbientDigestActionItem(text: $0) }
+            : digest.citedActionItems
+        replaceMachineActionItems(with: cited.map { item in
+            (item.text, segmentIDs(forIndices: item.sourceSegmentIndices))
+        })
+        summaryPending = false
+        digestStale = false
+    }
+
     var hasAudio: Bool { audioRelativePath != nil }
+
+    var isSpeakerLabelingBusy: Bool {
+        switch speakerLabelingState {
+        case .loadingModel, .labeling: return true
+        default: return false
+        }
+    }
+
+    var hasSpeakerLabels: Bool {
+        segments.contains { $0.speakerLabel != nil }
+    }
 
     var title: String {
         if let customTitle, !customTitle.isEmpty { return customTitle }
+        if let digestTitle, !digestTitle.isEmpty { return digestTitle }
         if let clause = Self.firstClause(of: summary) { return clause }
         return Self.titleFormatter.string(from: startedAt)
     }
@@ -353,12 +593,81 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
         return formatter
     }()
 
+    /// Fill missing recording-relative offsets from segment order + duration
+    /// so citation seek works even when older pipeline events omitted stamps.
+    mutating func stampRecordingOffsetsIfNeeded() {
+        var cursor = 0
+        let order = segments.indices.sorted { segments[$0].index < segments[$1].index }
+        for i in order {
+            if let start = segments[i].startOffsetMs {
+                cursor = segments[i].endOffsetMs ?? (start + segments[i].durationMs)
+                continue
+            }
+            segments[i].startOffsetMs = cursor
+            segments[i].endOffsetMs = cursor + segments[i].durationMs
+            cursor += segments[i].durationMs
+        }
+    }
+
     /// Upsert by id so a replayed event never appends a second copy.
+    /// Preserves manual speaker renames and prior machine labels across ASR
+    /// segment replays.
     mutating func upsert(_ segment: AmbientSegmentRecord) {
         if let index = segments.firstIndex(where: { $0.id == segment.id }) {
-            segments[index] = segment
+            var merged = segment
+            let existing = segments[index]
+            if existing.isSpeakerManual {
+                merged.speakerLabel = existing.speakerLabel
+                merged.isSpeakerManual = true
+            } else if merged.speakerLabel == nil {
+                merged.speakerLabel = existing.speakerLabel
+            }
+            if merged.machineSpeakerLabel == nil {
+                merged.machineSpeakerLabel = existing.machineSpeakerLabel
+            }
+            if merged.startOffsetMs == nil {
+                merged.startOffsetMs = existing.startOffsetMs
+            }
+            if merged.endOffsetMs == nil {
+                merged.endOffsetMs = existing.endOffsetMs
+            }
+            segments[index] = merged
         } else {
             segments.append(segment)
+        }
+    }
+
+    /// Apply diarization assignments while preserving user renames.
+    mutating func applyDiarizationLabels(
+        _ assignments: [String: String],
+        modelID: String,
+        speakerCount: Int
+    ) {
+        for index in segments.indices {
+            guard let machine = assignments[segments[index].id] else { continue }
+            segments[index].machineSpeakerLabel = machine
+            if !segments[index].isSpeakerManual {
+                segments[index].speakerLabel = machine
+            }
+        }
+        diarizationModelID = modelID
+        self.speakerCount = speakerCount
+        speakerLabelingState = .completed
+        speakerLabelingDetail = speakerCount > 0
+            ? "\(speakerCount) speakers labeled."
+            : "Labeling finished — no distinct speakers found."
+        if !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            digestStale = true
+        }
+    }
+
+    /// Rename every segment that currently uses `from` to `to`, marking them manual.
+    mutating func renameSpeaker(from oldLabel: String, to newLabel: String) {
+        let trimmed = newLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        for index in segments.indices where segments[index].speakerLabel == oldLabel {
+            segments[index].speakerLabel = trimmed
+            segments[index].isSpeakerManual = true
         }
     }
 
@@ -376,6 +685,11 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
     /// Replace the machine-written items with the merge pass's list while
     /// preserving manual items and completion state.
     mutating func replaceMachineActionItems(with incoming: [String]) {
+        replaceMachineActionItems(with: incoming.map { ($0, [String]()) })
+    }
+
+    /// Replace machine items, carrying citation segment ids from the digest.
+    mutating func replaceMachineActionItems(with incoming: [(text: String, sourceSegmentIDs: [String])]) {
         let manual = actionItems.filter(\.isManual)
         let previousState = Dictionary(
             actionItems.map { ($0.dedupeKey, $0) },
@@ -383,17 +697,57 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
         )
         var seen = Set(manual.map(\.dedupeKey))
         var rebuilt: [AmbientActionItem] = []
-        for text in incoming {
-            let candidate = AmbientActionItem(text: text)
+        for entry in incoming {
+            let candidate = AmbientActionItem(text: entry.text, sourceSegmentIDs: entry.sourceSegmentIDs)
             guard !candidate.dedupeKey.isEmpty, seen.insert(candidate.dedupeKey).inserted else { continue }
             if let previous = previousState[candidate.dedupeKey] {
-                rebuilt.append(AmbientActionItem(id: previous.id, text: text, isDone: previous.isDone))
+                rebuilt.append(AmbientActionItem(
+                    id: previous.id,
+                    text: entry.text,
+                    isDone: previous.isDone,
+                    sourceSegmentIDs: entry.sourceSegmentIDs.isEmpty
+                        ? previous.sourceSegmentIDs
+                        : entry.sourceSegmentIDs
+                ))
             } else {
                 rebuilt.append(candidate)
             }
         }
         actionItems = manual + rebuilt
     }
+}
+
+// MARK: - File-run metrics
+
+/// Stage timings and memory samples for one offline file dogfood run.
+struct AmbientFileRunMetrics: Codable, Sendable, Equatable {
+    var fixtureName: String
+    var sessionID: String
+    var convertMs: Int = 0
+    var asrMs: Int = 0
+    var firstTranscriptMs: Int = 0
+    var diarizationMs: Int = 0
+    var digestMs: Int = 0
+    var totalMs: Int = 0
+    var peakMemoryBytes: Int64 = 0
+    var memoryAfterASR: Int64 = 0
+    var memoryAfterDiarization: Int64 = 0
+    var memoryAfterDigest: Int64 = 0
+    var segmentCount: Int = 0
+    var transcribedCount: Int = 0
+    var speakerCount: Int = 0
+    var sectionCount: Int = 0
+    var bulletCount: Int = 0
+    var actionItemCount: Int = 0
+    var audioDurationMs: Int = 0
+    var vadModelID: String = ""
+    var asrModelID: String = ""
+    var diarizationModelID: String?
+    var digestModelID: String?
+    var deviceModel: String = ""
+    var osVersion: String = ""
+    var thermalState: String = ""
+    var error: String?
 }
 
 // MARK: - Benchmark Sample
@@ -430,6 +784,130 @@ struct AmbientBenchmarkSample: Codable, Sendable, Identifiable, Equatable {
     let thermalState: String
     let interruptionCount: Int
     let retainedAudioBytes: Int64
+
+    /// "live" mic capture or "file" offline import dogfood.
+    var runKind: String
+    var convertMs: Int
+    var asrMs: Int
+    var diarizationMs: Int
+    var digestMs: Int
+    var sectionCount: Int
+    var bulletCount: Int
+    var speakerCount: Int
+    var fixtureName: String?
+
+    init(
+        id: UUID,
+        recordedAt: Date,
+        sessionID: String,
+        profileID: String,
+        deviceModel: String,
+        chipName: String,
+        osVersion: String,
+        audioRoute: String,
+        environment: String,
+        placement: String,
+        sessionSeconds: Double,
+        speechSeconds: Double,
+        segmentCount: Int,
+        transcribedSegmentCount: Int,
+        droppedSegmentCount: Int,
+        actionItemCount: Int,
+        completedActionItemCount: Int,
+        medianTranscriptionMs: Double,
+        medianRealTimeFactor: Double,
+        medianExtractionMs: Double,
+        firstTranscriptLatencyMs: Double,
+        peakMemoryBytes: Int64,
+        batteryDeltaPerHour: Double,
+        thermalState: String,
+        interruptionCount: Int,
+        retainedAudioBytes: Int64,
+        runKind: String = "live",
+        convertMs: Int = 0,
+        asrMs: Int = 0,
+        diarizationMs: Int = 0,
+        digestMs: Int = 0,
+        sectionCount: Int = 0,
+        bulletCount: Int = 0,
+        speakerCount: Int = 0,
+        fixtureName: String? = nil
+    ) {
+        self.id = id
+        self.recordedAt = recordedAt
+        self.sessionID = sessionID
+        self.profileID = profileID
+        self.deviceModel = deviceModel
+        self.chipName = chipName
+        self.osVersion = osVersion
+        self.audioRoute = audioRoute
+        self.environment = environment
+        self.placement = placement
+        self.sessionSeconds = sessionSeconds
+        self.speechSeconds = speechSeconds
+        self.segmentCount = segmentCount
+        self.transcribedSegmentCount = transcribedSegmentCount
+        self.droppedSegmentCount = droppedSegmentCount
+        self.actionItemCount = actionItemCount
+        self.completedActionItemCount = completedActionItemCount
+        self.medianTranscriptionMs = medianTranscriptionMs
+        self.medianRealTimeFactor = medianRealTimeFactor
+        self.medianExtractionMs = medianExtractionMs
+        self.firstTranscriptLatencyMs = firstTranscriptLatencyMs
+        self.peakMemoryBytes = peakMemoryBytes
+        self.batteryDeltaPerHour = batteryDeltaPerHour
+        self.thermalState = thermalState
+        self.interruptionCount = interruptionCount
+        self.retainedAudioBytes = retainedAudioBytes
+        self.runKind = runKind
+        self.convertMs = convertMs
+        self.asrMs = asrMs
+        self.diarizationMs = diarizationMs
+        self.digestMs = digestMs
+        self.sectionCount = sectionCount
+        self.bulletCount = bulletCount
+        self.speakerCount = speakerCount
+        self.fixtureName = fixtureName
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        recordedAt = try container.decode(Date.self, forKey: .recordedAt)
+        sessionID = try container.decode(String.self, forKey: .sessionID)
+        profileID = try container.decode(String.self, forKey: .profileID)
+        deviceModel = try container.decode(String.self, forKey: .deviceModel)
+        chipName = try container.decode(String.self, forKey: .chipName)
+        osVersion = try container.decode(String.self, forKey: .osVersion)
+        audioRoute = try container.decode(String.self, forKey: .audioRoute)
+        environment = try container.decode(String.self, forKey: .environment)
+        placement = try container.decode(String.self, forKey: .placement)
+        sessionSeconds = try container.decode(Double.self, forKey: .sessionSeconds)
+        speechSeconds = try container.decode(Double.self, forKey: .speechSeconds)
+        segmentCount = try container.decode(Int.self, forKey: .segmentCount)
+        transcribedSegmentCount = try container.decode(Int.self, forKey: .transcribedSegmentCount)
+        droppedSegmentCount = try container.decode(Int.self, forKey: .droppedSegmentCount)
+        actionItemCount = try container.decode(Int.self, forKey: .actionItemCount)
+        completedActionItemCount = try container.decode(Int.self, forKey: .completedActionItemCount)
+        medianTranscriptionMs = try container.decode(Double.self, forKey: .medianTranscriptionMs)
+        medianRealTimeFactor = try container.decode(Double.self, forKey: .medianRealTimeFactor)
+        medianExtractionMs = try container.decode(Double.self, forKey: .medianExtractionMs)
+        firstTranscriptLatencyMs = try container.decode(Double.self, forKey: .firstTranscriptLatencyMs)
+        peakMemoryBytes = try container.decode(Int64.self, forKey: .peakMemoryBytes)
+        batteryDeltaPerHour = try container.decode(Double.self, forKey: .batteryDeltaPerHour)
+        thermalState = try container.decode(String.self, forKey: .thermalState)
+        interruptionCount = try container.decode(Int.self, forKey: .interruptionCount)
+        retainedAudioBytes = try container.decode(Int64.self, forKey: .retainedAudioBytes)
+        runKind = try container.decodeIfPresent(String.self, forKey: .runKind) ?? "live"
+        convertMs = try container.decodeIfPresent(Int.self, forKey: .convertMs) ?? 0
+        asrMs = try container.decodeIfPresent(Int.self, forKey: .asrMs) ?? 0
+        diarizationMs = try container.decodeIfPresent(Int.self, forKey: .diarizationMs) ?? 0
+        digestMs = try container.decodeIfPresent(Int.self, forKey: .digestMs) ?? 0
+        sectionCount = try container.decodeIfPresent(Int.self, forKey: .sectionCount) ?? 0
+        bulletCount = try container.decodeIfPresent(Int.self, forKey: .bulletCount) ?? 0
+        speakerCount = try container.decodeIfPresent(Int.self, forKey: .speakerCount) ?? 0
+        fixtureName = try container.decodeIfPresent(String.self, forKey: .fixtureName)
+    }
 
     /// Fraction of the session that carried detected speech.
     var speechRatio: Double {

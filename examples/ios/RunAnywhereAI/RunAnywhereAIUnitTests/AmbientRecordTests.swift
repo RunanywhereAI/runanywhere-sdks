@@ -55,6 +55,161 @@ final class AmbientRecordTests: XCTestCase {
         XCTAssertEqual(session.fullTranscript, "Ship the beta. Then tell Ana.")
     }
 
+    func testFullTranscriptSortsByIndex() {
+        var session = Self.session()
+        session.upsert(Self.transcribedSegment(index: 2, text: "third"))
+        session.upsert(Self.transcribedSegment(index: 0, text: "first"))
+        session.upsert(Self.transcribedSegment(index: 1, text: "second"))
+
+        XCTAssertEqual(session.fullTranscript, "first second third")
+    }
+
+    func testAttributedTranscriptPrefixesSpeakerLabels() {
+        var session = Self.session()
+        var a = Self.transcribedSegment(index: 0, text: "Hello")
+        a.speakerLabel = "Speaker 1"
+        var b = Self.transcribedSegment(index: 1, text: "Hi")
+        b.speakerLabel = "Speaker 2"
+        session.upsert(a)
+        session.upsert(b)
+
+        XCTAssertEqual(session.attributedTranscript, "Speaker 1: Hello\nSpeaker 2: Hi")
+        XCTAssertEqual(
+            session.digestSourceTranscript,
+            "[S0] Speaker 1: Hello\n[S1] Speaker 2: Hi"
+        )
+    }
+
+    func testManualSpeakerSurvivesReDiarization() {
+        var session = Self.session()
+        var segment = Self.transcribedSegment(index: 0, text: "Hello")
+        segment.speakerLabel = "Alice"
+        segment.machineSpeakerLabel = "Speaker 1"
+        segment.isSpeakerManual = true
+        session.upsert(segment)
+
+        session.applyDiarizationLabels(
+            [segment.id: "Speaker 1"],
+            modelID: "diar-streaming-sortformer-4spk-v2.1",
+            speakerCount: 1
+        )
+
+        XCTAssertEqual(session.segments[0].speakerLabel, "Alice")
+        XCTAssertEqual(session.segments[0].machineSpeakerLabel, "Speaker 1")
+        XCTAssertTrue(session.segments[0].isSpeakerManual)
+        XCTAssertEqual(session.speakerLabelingState, .completed)
+    }
+
+    func testUpsertPreservesManualSpeakerWhenSegmentReplayed() {
+        var session = Self.session()
+        var labeled = Self.transcribedSegment(index: 0, text: "Hello")
+        labeled.speakerLabel = "Alice"
+        labeled.isSpeakerManual = true
+        labeled.machineSpeakerLabel = "Speaker 1"
+        session.upsert(labeled)
+
+        var replay = Self.transcribedSegment(index: 0, text: "Hello again")
+        session.upsert(replay)
+
+        XCTAssertEqual(session.segments.count, 1)
+        XCTAssertEqual(session.segments[0].transcript, "Hello again")
+        XCTAssertEqual(session.segments[0].speakerLabel, "Alice")
+        XCTAssertTrue(session.segments[0].isSpeakerManual)
+    }
+
+    func testApplyDiarizationMarksDigestStaleWhenSummaryExists() {
+        var session = Self.session()
+        session.summary = "A short summary"
+        let segment = Self.transcribedSegment(index: 0, text: "Hello")
+        session.upsert(segment)
+
+        session.applyDiarizationLabels(
+            [segment.id: "Speaker 1"],
+            modelID: "sortformer",
+            speakerCount: 1
+        )
+
+        XCTAssertTrue(session.digestStale)
+        XCTAssertEqual(session.segments[0].speakerLabel, "Speaker 1")
+    }
+
+    func testDiarizationOverlapAssignsDominantSpeaker() {
+        let segments = [
+            Self.offsetSegment(index: 0, start: 0, end: 1_000, text: "one"),
+            Self.offsetSegment(index: 1, start: 1_000, end: 2_000, text: "two"),
+        ]
+        let turns = [
+            AmbientSpeakerAlignment.Turn(startMs: 0, endMs: 900, label: "Speaker 1"),
+            AmbientSpeakerAlignment.Turn(startMs: 1_100, endMs: 2_000, label: "Speaker 2"),
+        ]
+
+        let assignments = AmbientSpeakerAlignment.assignments(segments: segments, turns: turns)
+
+        XCTAssertEqual(assignments[segments[0].id], "Speaker 1")
+        XCTAssertEqual(assignments[segments[1].id], "Speaker 2")
+    }
+
+    func testAmbiguousOverlapLeavesSegmentUnlabeled() {
+        let segments = [Self.offsetSegment(index: 0, start: 0, end: 1_000, text: "hi")]
+        let turns = [
+            AmbientSpeakerAlignment.Turn(startMs: 0, endMs: 50, label: "Speaker 1"),
+        ]
+
+        let assignments = AmbientSpeakerAlignment.assignments(segments: segments, turns: turns)
+        XCTAssertTrue(assignments.isEmpty)
+    }
+
+    func testFallbackIntervalsUseCumulativeDuration() {
+        // Legacy notes have no stamped offsets — only durationMs.
+        var a = AmbientSegmentRecord(
+            id: "segment-0",
+            sessionID: "session",
+            index: 0,
+            startedAt: Date(timeIntervalSince1970: 0),
+            endedAt: Date(timeIntervalSince1970: 0.5),
+            durationMs: 500,
+            sampleRate: 16_000,
+            peakConfidence: 0.9
+        )
+        a.apply(Self.transcript(segmentID: a.id, text: "a"))
+        var b = AmbientSegmentRecord(
+            id: "segment-1",
+            sessionID: "session",
+            index: 1,
+            startedAt: Date(timeIntervalSince1970: 1),
+            endedAt: Date(timeIntervalSince1970: 1.7),
+            durationMs: 700,
+            sampleRate: 16_000,
+            peakConfidence: 0.9
+        )
+        b.apply(Self.transcript(segmentID: b.id, text: "b"))
+
+        let intervals = AmbientSpeakerAlignment.recordingIntervals(for: [a, b])
+        XCTAssertNil(a.startOffsetMs)
+        XCTAssertEqual(intervals[0].startMs, 0)
+        XCTAssertEqual(intervals[0].endMs, 500)
+        XCTAssertEqual(intervals[1].startMs, 500)
+        XCTAssertEqual(intervals[1].endMs, 1_200)
+    }
+
+    func testWAVReaderExtractsPCM16Mono() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ambient-test-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let writer = try WAVFileWriter(url: url, sampleRate: 16_000)
+        var pcm = Data()
+        for sample: Int16 in [0, 1, -1, 100, -100] {
+            var le = sample.littleEndian
+            pcm.append(Data(bytes: &le, count: 2))
+        }
+        try writer.append(pcm)
+        try writer.close()
+
+        let extracted = try AmbientWAVPCMReader.pcm16Mono(from: url, expectedSampleRate: 16_000)
+        XCTAssertEqual(extracted, pcm)
+    }
+
     // MARK: - Action Items
 
     func testMergingActionItemsDropsRepeatsAcrossChunks() {
@@ -238,6 +393,9 @@ final class AmbientRecordTests: XCTestCase {
         XCTAssertTrue(note.partialSummaries.isEmpty)
         XCTAssertFalse(note.summaryPending)
         XCTAssertNil(note.audioRelativePath)
+        XCTAssertEqual(note.speakerLabelingState, .notConfigured)
+        XCTAssertFalse(note.digestStale)
+        XCTAssertNil(note.diarizationModelID)
     }
 
     // MARK: - Search
@@ -269,6 +427,65 @@ final class AmbientRecordTests: XCTestCase {
         let real = Self.benchmarkSample(sessionSeconds: 600, speechSeconds: 150, items: 4, completed: 3)
         XCTAssertEqual(real.speechRatio, 0.25, accuracy: 0.0001)
         XCTAssertEqual(real.completedActionItemRate, 0.75, accuracy: 0.0001)
+    }
+
+    func testBenchmarkSampleDecodesLegacyJSONWithoutFileRunFields() throws {
+        let json = """
+        {
+          "id": "11111111-1111-1111-1111-111111111111",
+          "recordedAt": "2026-07-31T12:00:00Z",
+          "sessionID": "s1",
+          "profileID": "quality",
+          "deviceModel": "iPhone",
+          "chipName": "A18",
+          "osVersion": "18.0",
+          "audioRoute": "MicrophoneBuiltIn",
+          "environment": "office",
+          "placement": "desk",
+          "sessionSeconds": 60,
+          "speechSeconds": 20,
+          "segmentCount": 3,
+          "transcribedSegmentCount": 3,
+          "droppedSegmentCount": 0,
+          "actionItemCount": 1,
+          "completedActionItemCount": 0,
+          "medianTranscriptionMs": 100,
+          "medianRealTimeFactor": 0.2,
+          "medianExtractionMs": 500,
+          "firstTranscriptLatencyMs": 800,
+          "peakMemoryBytes": 1000,
+          "batteryDeltaPerHour": 5,
+          "thermalState": "nominal",
+          "interruptionCount": 0,
+          "retainedAudioBytes": 0
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let sample = try decoder.decode(AmbientBenchmarkSample.self, from: Data(json.utf8))
+        XCTAssertEqual(sample.runKind, "live")
+        XCTAssertEqual(sample.convertMs, 0)
+        XCTAssertNil(sample.fixtureName)
+    }
+
+    func testStampRecordingOffsetsFillsMissingGaps() {
+        var session = Self.session()
+        session.upsert(AmbientSegmentRecord(
+            id: "a", sessionID: "session", index: 0,
+            startedAt: Date(timeIntervalSince1970: 0),
+            endedAt: Date(timeIntervalSince1970: 1),
+            durationMs: 1000, sampleRate: 16_000, peakConfidence: 0.9
+        ))
+        session.upsert(AmbientSegmentRecord(
+            id: "b", sessionID: "session", index: 1,
+            startedAt: Date(timeIntervalSince1970: 1),
+            endedAt: Date(timeIntervalSince1970: 1.5),
+            durationMs: 500, sampleRate: 16_000, peakConfidence: 0.9
+        ))
+        session.stampRecordingOffsetsIfNeeded()
+        let ordered = session.segments.sorted { $0.index < $1.index }
+        XCTAssertEqual(ordered.map(\.startOffsetMs), [0, 1000])
+        XCTAssertEqual(ordered.map(\.endOffsetMs), [1000, 1500])
     }
 
     // MARK: - Session Phase
@@ -328,12 +545,40 @@ final class AmbientRecordTests: XCTestCase {
             durationMs: durationMs,
             sampleRate: 16_000,
             peakConfidence: 0.9,
-            pcm16: nil
+            pcm16: nil,
+            startOffsetMs: 0,
+            endOffsetMs: durationMs
         ))
     }
 
-    private static func transcribedSegment(index: Int, text: String) -> AmbientSegmentRecord {
-        var stored = segment(index: index)
+    private static func transcribedSegment(
+        index: Int,
+        text: String,
+        durationMs: Int = 1_000
+    ) -> AmbientSegmentRecord {
+        var stored = segment(index: index, durationMs: durationMs)
+        stored.apply(transcript(segmentID: stored.id, text: text))
+        return stored
+    }
+
+    private static func offsetSegment(
+        index: Int,
+        start: Int,
+        end: Int,
+        text: String
+    ) -> AmbientSegmentRecord {
+        var stored = AmbientSegmentRecord(
+            id: "segment-\(index)",
+            sessionID: "session",
+            index: index,
+            startedAt: Date(timeIntervalSince1970: Double(start) / 1000),
+            endedAt: Date(timeIntervalSince1970: Double(end) / 1000),
+            durationMs: end - start,
+            sampleRate: 16_000,
+            peakConfidence: 0.9,
+            startOffsetMs: start,
+            endOffsetMs: end
+        )
         stored.apply(transcript(segmentID: stored.id, text: text))
         return stored
     }

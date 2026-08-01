@@ -110,6 +110,19 @@ Models (from Notes, without visiting the Models tab)
       and defers merge when stopped from background.
   [ ] Developer → Apply a profile: IDs fill the slots; still need Get/Use for
       anything not already downloaded.
+  [ ] Speaker model is NOT on the Notes home — only VAD + ASR are required.
+
+Speakers (opt-in post-pass from a saved note)
+  [ ] Record with Silero + Parakeet, stop, open the note: Speakers card shows
+      Choose model; transcript already saved without labels.
+  [ ] Choose → Get Sortformer (~492 MB) → Use; card shows Label speakers.
+  [ ] Tap Label speakers in foreground: Loading → Labeling → Speakers labeled;
+      transcript shows Speaker N turns; Summarize is disabled while busy.
+  [ ] Background during labeling: interrupted state + Resume; transcript intact.
+  [ ] Rename Speaker 1 → a name; Re-label keeps the manual rename.
+  [ ] Summarize / Rewrite with speakers uses attributed transcript; after
+      labeling an already-summarized note, Rewrite with speakers appears.
+  [ ] Confirm ASR + Sortformer + LLM are never loaded together (console).
 
 Lifecycle
   [ ] Tap Record, lock the screen, confirm the Live Activity shows elapsed time

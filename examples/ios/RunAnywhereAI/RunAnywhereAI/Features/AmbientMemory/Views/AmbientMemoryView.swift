@@ -16,6 +16,8 @@ struct AmbientMemoryView: View {
     @ObservedObject private var session = AmbientSessionManager.shared
     /// Observed so Ready / Needs download labels refresh after Get in a sheet.
     @ObservedObject private var modelList = ModelListViewModel.shared
+    @ObservedObject private var offlineRunner = AmbientOfflineImportRunner.shared
+    @ObservedObject private var ambientRouter = AmbientRouter.shared
 
     @State private var showDeveloper = false
     @State private var showPurgeConfirmation = false
@@ -33,8 +35,13 @@ struct AmbientMemoryView: View {
                 modelsSection
                 recordControl
                 if isCapturing { liveRow }
+                if offlineRunner.isRunning || !offlineRunner.live.recentLines.isEmpty || !offlineRunner.statusMessage.isEmpty {
+                    offlineLiveCard
+                }
                 if let warning = warningMessage { warningLine(warning) }
-                if let error = session.lastError ?? viewModel.errorMessage { errorBanner(error) }
+                if let error = session.lastError ?? viewModel.errorMessage ?? offlineRunner.lastError {
+                    errorBanner(error)
+                }
                 searchField
                 notesList
             }
@@ -87,6 +94,10 @@ struct AmbientMemoryView: View {
         }
         .task {
             await viewModel.onAppear()
+            if let dogfood = ambientRouter.consumeDogfood() {
+                await runDogfood(dogfood)
+                return
+            }
             guard autoStartRequested else { return }
             if !viewModel.hasRecordingConsent {
                 showConsent = true
@@ -94,6 +105,89 @@ struct AmbientMemoryView: View {
                 await viewModel.startSession()
             }
         }
+        .onChange(of: ambientRouter.pendingDogfood) { _, request in
+            guard request != nil, let dogfood = ambientRouter.consumeDogfood() else { return }
+            Task { await runDogfood(dogfood) }
+        }
+    }
+
+    /// Live offline import — mirrors the recording row so file dogfood feels
+    /// like capture: progress, RTF, and streaming transcript lines.
+    private var offlineLiveCard: some View {
+        let live = offlineRunner.live
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                if offlineRunner.isRunning {
+                    ProgressView()
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(live.fixtureName.isEmpty ? "Offline import" : live.fixtureName)
+                        .font(AppTypography.subheadlineMedium)
+                    Text(offlineRunner.statusMessage.isEmpty ? live.stage : offlineRunner.statusMessage)
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(2)
+                }
+                Spacer()
+                if live.realtimeFactor > 0 {
+                    Text(String(format: "%.1f×", live.realtimeFactor))
+                        .font(AppTypography.captionMedium)
+                        .foregroundColor(AppColors.statusGreen)
+                }
+            }
+
+            ProgressView(value: live.progress)
+                .tint(AppColors.primaryBlue)
+
+            HStack {
+                Text("\(Self.clock(live.processedAudioMs)) / \(Self.clock(live.totalAudioMs))")
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
+                Spacer()
+                Text("\(live.transcribedCount)/\(live.segmentCount) turns")
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
+            }
+
+            if !live.recentLines.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(live.recentLines.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textPrimary)
+                            .lineLimit(2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(AppColors.backgroundPrimary.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding(12)
+        .background(AppColors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .animation(.easeOut(duration: 0.2), value: live.transcribedCount)
+        .animation(.linear(duration: 0.15), value: live.processedAudioMs)
+    }
+
+    private static func clock(_ ms: Int) -> String {
+        let totalSec = max(0, ms / 1000)
+        return String(format: "%d:%02d", totalSec / 60, totalSec % 60)
+    }
+
+    private func runDogfood(_ request: AmbientDogfoodRequest) async {
+        guard viewModel.isCaptureStackReady else {
+            viewModel.errorMessage = "Pick and download VAD + ASR before dogfood."
+            return
+        }
+        _ = await offlineRunner.runAllFixtures(
+            selection: viewModel.selection,
+            labelSpeakers: request.labelSpeakers,
+            summarize: request.summarize && !(viewModel.selection.digestModelID ?? "").isEmpty,
+            context: viewModel.context
+        )
+        await viewModel.refreshLibrary()
     }
 
     private var isCapturing: Bool {

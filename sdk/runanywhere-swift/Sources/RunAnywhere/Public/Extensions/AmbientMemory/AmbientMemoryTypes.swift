@@ -140,6 +140,11 @@ public struct RAAmbientSegment: Sendable, Identifiable {
     /// Int16 PCM for the segment, present only when the configuration asked
     /// for retained audio.
     public let pcm16: Data?
+    /// Offset into the ingested recording timeline (excludes pause gaps), in
+    /// milliseconds. Aligns with continuous WAV / diarization clocks.
+    public let startOffsetMs: Int
+    /// Exclusive end offset into the ingested recording timeline, in ms.
+    public let endOffsetMs: Int
 
     public init(
         id: String,
@@ -150,7 +155,9 @@ public struct RAAmbientSegment: Sendable, Identifiable {
         durationMs: Int,
         sampleRate: Int,
         peakConfidence: Float,
-        pcm16: Data?
+        pcm16: Data?,
+        startOffsetMs: Int = 0,
+        endOffsetMs: Int = 0
     ) {
         self.id = id
         self.sessionID = sessionID
@@ -161,6 +168,8 @@ public struct RAAmbientSegment: Sendable, Identifiable {
         self.sampleRate = sampleRate
         self.peakConfidence = peakConfidence
         self.pcm16 = pcm16
+        self.startOffsetMs = startOffsetMs
+        self.endOffsetMs = endOffsetMs > 0 ? endOffsetMs : (startOffsetMs + durationMs)
     }
 }
 
@@ -292,13 +301,54 @@ public enum RAAmbientDigestMode: String, Sendable, CaseIterable {
     case merge
 }
 
-/// One summary plus the action items that came with it.
+/// One bullet inside a structured note section.
+public struct RAAmbientDigestBullet: Sendable, Equatable {
+    /// Short bold-ready lead-in (e.g. "Qualcomm"). Empty when unused.
+    public let lead: String
+    public let text: String
+    /// Segment indices cited from the numbered transcript (`[S12]` → 12).
+    public let sourceSegmentIndices: [Int]
+
+    public init(lead: String = "", text: String, sourceSegmentIndices: [Int] = []) {
+        self.lead = lead
+        self.text = text
+        self.sourceSegmentIndices = sourceSegmentIndices
+    }
+}
+
+/// A topical heading with bullets — Notion-style summary block.
+public struct RAAmbientDigestSection: Sendable, Equatable {
+    public let heading: String
+    public let bullets: [RAAmbientDigestBullet]
+
+    public init(heading: String, bullets: [RAAmbientDigestBullet]) {
+        self.heading = heading
+        self.bullets = bullets
+    }
+}
+
+/// One action item with optional transcript citations.
+public struct RAAmbientDigestActionItem: Sendable, Equatable {
+    public let text: String
+    public let sourceSegmentIndices: [Int]
+
+    public init(text: String, sourceSegmentIndices: [Int] = []) {
+        self.text = text
+        self.sourceSegmentIndices = sourceSegmentIndices
+    }
+}
+
+/// Structured note digest: sections + action items (+ flat summary fallback).
 ///
-/// This is the only structured output the ambient solution produces. A note
-/// gets many of these during capture and exactly one after the merge.
+/// A note gets many of these during capture and exactly one after the merge.
 public struct RAAmbientNoteDigest: Sendable, Equatable {
+    /// Flattened prose for hosts that only need a string (search, titles).
     public let summary: String
+    /// Suggested note title when the model provides one.
+    public let title: String
+    public let sections: [RAAmbientDigestSection]
     public let actionItems: [String]
+    public let citedActionItems: [RAAmbientDigestActionItem]
     public let extractionMs: Int
     public let modelID: String
 
@@ -306,10 +356,18 @@ public struct RAAmbientNoteDigest: Sendable, Equatable {
         summary: String,
         actionItems: [String],
         extractionMs: Int,
-        modelID: String
+        modelID: String,
+        title: String = "",
+        sections: [RAAmbientDigestSection] = [],
+        citedActionItems: [RAAmbientDigestActionItem] = []
     ) {
         self.summary = summary
+        self.title = title
+        self.sections = sections
         self.actionItems = actionItems
+        self.citedActionItems = citedActionItems.isEmpty
+            ? actionItems.map { RAAmbientDigestActionItem(text: $0) }
+            : citedActionItems
         self.extractionMs = extractionMs
         self.modelID = modelID
     }

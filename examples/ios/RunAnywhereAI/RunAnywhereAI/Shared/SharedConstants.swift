@@ -21,6 +21,8 @@ enum SharedConstants {
     // to the Lab without starting a session.
     static let ambientURLString = "runanywhere://ambient"
     static let startAmbientURLString = "runanywhere://startAmbient"
+    /// Offline long-audio dogfood: import Fixtures → ASR → optional speakers/digest.
+    static let notesDogfoodURLString = "runanywhere://notesDogfood"
 
     // App Group UserDefaults keys
     enum Keys {

@@ -73,7 +73,10 @@ final class AmbientMemorySurfaceTests: XCTestCase {
         let parsed = AmbientDigestPrompt.parse(response, fallbackText: "transcript")
 
         XCTAssertEqual(parsed.summary, "Planned the release")
-        XCTAssertEqual(parsed.actionItems, ["Ship the beta on Friday", "Switch the build to the quality profile"])
+        XCTAssertEqual(parsed.actionItems.map(\.text), [
+            "Ship the beta on Friday",
+            "Switch the build to the quality profile",
+        ])
     }
 
     func testParsesJSONWrappedInFencesAndCommentary() {
@@ -88,7 +91,7 @@ final class AmbientMemorySurfaceTests: XCTestCase {
         let parsed = AmbientDigestPrompt.parse(response, fallbackText: "transcript")
 
         XCTAssertEqual(parsed.summary, "Grocery list")
-        XCTAssertEqual(parsed.actionItems, ["Buy oat milk"])
+        XCTAssertEqual(parsed.actionItems.map(\.text), ["Buy oat milk"])
     }
 
     func testActionItemObjectsAreUnwrappedToText() {
@@ -96,7 +99,7 @@ final class AmbientMemorySurfaceTests: XCTestCase {
 
         let parsed = AmbientDigestPrompt.parse(response, fallbackText: "transcript")
 
-        XCTAssertEqual(parsed.actionItems, ["Water the plants", "Call Ana"])
+        XCTAssertEqual(parsed.actionItems.map(\.text), ["Water the plants", "Call Ana"])
     }
 
     func testBlankAndDuplicateActionItemsAreDropped() {
@@ -104,7 +107,25 @@ final class AmbientMemorySurfaceTests: XCTestCase {
 
         let parsed = AmbientDigestPrompt.parse(response, fallbackText: "transcript")
 
-        XCTAssertEqual(parsed.actionItems, ["Call Ana"], "A merge pass must not restate the same task twice")
+        XCTAssertEqual(
+            parsed.actionItems.map(\.text),
+            ["Call Ana"],
+            "A merge pass must not restate the same task twice"
+        )
+    }
+
+    func testParsesStructuredSectionsAndCitations() {
+        let response = """
+        {"title":"Advisor sync","sections":[{"heading":"Partners","bullets":[\
+        {"lead":"Qualcomm","text":"Joint GTM planned","sourceSegmentIndices":[3]}\
+        ]}],"actionItems":[{"text":"Send deck","sourceSegmentIndices":[3,4]}]}
+        """
+        let parsed = AmbientDigestPrompt.parse(response, fallbackText: "fallback")
+        XCTAssertEqual(parsed.title, "Advisor sync")
+        XCTAssertEqual(parsed.sections.count, 1)
+        XCTAssertEqual(parsed.sections[0].bullets[0].lead, "Qualcomm")
+        XCTAssertEqual(parsed.sections[0].bullets[0].sourceSegmentIndices, [3])
+        XCTAssertEqual(parsed.actionItems[0].sourceSegmentIndices, [3, 4])
     }
 
     func testNonJSONResponseDegradesToTheTranscriptSummary() {

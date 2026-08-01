@@ -27,6 +27,9 @@ actor AmbientMemoryPipeline {
     private struct OpenSegment {
         let index: Int
         let startedAt: Date
+        /// Sample index into the ingested (non-paused) recording timeline at
+        /// the first sample of this segment, including pre-roll.
+        let startOffsetSamples: Int
         var samples: [Int16]
         var peakConfidence: Float
         /// Audio appended since the last speech frame, used to trim the tail
@@ -66,6 +69,9 @@ actor AmbientMemoryPipeline {
     private var speechRunMs = 0
     private var silenceRunMs = 0
     private var nextSegmentIndex = 0
+    /// Samples ingested while not paused. Matches the continuous WAV timeline
+    /// the host writes, so diarization can align without wall-clock dates.
+    private var ingestedSampleCount = 0
 
     private var pendingTranscriptions: [PendingTranscription] = []
     private var drainTask: Task<Void, Never>?
@@ -181,6 +187,11 @@ actor AmbientMemoryPipeline {
 
     // MARK: - Ingestion
 
+    /// File-feed entry point used by `RAAmbientSession.ingestOffline`.
+    func ingestOffline(_ chunk: Data) async {
+        await ingest(chunk)
+    }
+
     private func ingest(_ chunk: Data) async {
         guard !isPaused, !isFinished else { return }
 
@@ -193,6 +204,9 @@ actor AmbientMemoryPipeline {
     }
 
     private func processFrame(_ frame: [Int16]) async {
+        // Count every non-paused frame so offsets stay aligned with the host WAV.
+        ingestedSampleCount += frame.count
+
         let float32 = Self.float32Data(from: frame)
         let result: RAVADResult
         do {
@@ -244,9 +258,11 @@ actor AmbientMemoryPipeline {
         let startedAt = Date()
         let index = nextSegmentIndex
         nextSegmentIndex += 1
+        let startOffsetSamples = max(0, ingestedSampleCount - preRoll.count)
         openSegment = OpenSegment(
             index: index,
             startedAt: startedAt,
+            startOffsetSamples: startOffsetSamples,
             samples: preRoll,
             peakConfidence: result.confidence,
             trailingSilenceSamples: 0
@@ -320,6 +336,11 @@ actor AmbientMemoryPipeline {
             return
         }
 
+        let startOffsetMs = Self.durationMs(
+            sampleCount: segment.startOffsetSamples,
+            sampleRate: configuration.sampleRate
+        )
+        let endOffsetMs = startOffsetMs + durationMs
         let record = RAAmbientSegment(
             id: Self.segmentID(sessionID: sessionID, index: segment.index),
             sessionID: sessionID,
@@ -329,7 +350,9 @@ actor AmbientMemoryPipeline {
             durationMs: durationMs,
             sampleRate: configuration.sampleRate,
             peakConfidence: segment.peakConfidence,
-            pcm16: configuration.retainSegmentAudio ? Self.pcm16Data(from: samples) : nil
+            pcm16: configuration.retainSegmentAudio ? Self.pcm16Data(from: samples) : nil,
+            startOffsetMs: startOffsetMs,
+            endOffsetMs: endOffsetMs
         )
         continuation.yield(.segmentFinalized(record))
         enqueue(PendingTranscription(segment: record, samples: samples))

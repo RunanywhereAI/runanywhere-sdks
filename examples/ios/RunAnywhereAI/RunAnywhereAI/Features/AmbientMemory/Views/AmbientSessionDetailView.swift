@@ -2,27 +2,48 @@
 //  AmbientSessionDetailView.swift
 //  RunAnywhereAI
 //
-//  One note: its summary, action items, the continuous transcript, and
-//  playback of the recording.
+//  One note with Notion-like Summary / Speakers / Transcript tabs,
+//  structured sections, citation chips, and seek-to-turn playback.
 //
 
 #if os(iOS)
 import AVFoundation
 import SwiftUI
 
+private enum NoteDetailTab: String, CaseIterable, Identifiable {
+    case summary = "Summary"
+    case speakers = "Speakers"
+    case transcript = "Transcript"
+
+    var id: String { rawValue }
+
+    var systemImage: String {
+        switch self {
+        case .summary: return "list.bullet.rectangle"
+        case .speakers: return "person.2.wave.2"
+        case .transcript: return "text.alignleft"
+        }
+    }
+}
+
 struct AmbientSessionDetailView: View {
     let sessionID: String
     @ObservedObject var viewModel: AmbientMemoryViewModel
 
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedTab: NoteDetailTab = .summary
     @State private var showDeleteConfirmation = false
     @State private var showDigestPicker = false
+    @State private var showDiarizationPicker = false
     @State private var isRenaming = false
     @State private var draftTitle = ""
     @State private var draftItem = ""
     @State private var draftSummary = ""
     @State private var summaryNoteID: String?
     @State private var summarySaveTask: Task<Void, Never>?
+    @State private var renamingSpeakerFrom: String?
+    @State private var draftSpeakerName = ""
+    @State private var highlightedSegmentID: String?
     @StateObject private var player = AmbientNotePlayer()
 
     private var record: AmbientSessionRecord? {
@@ -83,7 +104,6 @@ struct AmbientSessionDetailView: View {
             ModelSelectionSheet(context: .llm) { model in
                 viewModel.select(digest: model)
                 Task {
-                    // Persist the choice on this note so Rewrite reuses it.
                     if var note = viewModel.note(id: sessionID) {
                         note.digestModelID = model.id
                         await AmbientMemoryStore.shared.save(note)
@@ -92,11 +112,33 @@ struct AmbientSessionDetailView: View {
                 }
             }
         }
+        .adaptiveSheet(isPresented: $showDiarizationPicker) {
+            ModelSelectionSheet(context: .diarization) { model in
+                Task { await viewModel.selectDiarizationModel(model, for: sessionID) }
+            }
+        }
+        .alert(
+            "Rename speaker",
+            isPresented: Binding(
+                get: { renamingSpeakerFrom != nil },
+                set: { if !$0 { renamingSpeakerFrom = nil } }
+            )
+        ) {
+            TextField("Name", text: $draftSpeakerName)
+            Button("Save") {
+                if let from = renamingSpeakerFrom {
+                    let name = draftSpeakerName
+                    Task { await viewModel.renameSpeaker(from: from, to: name, in: sessionID) }
+                }
+                renamingSpeakerFrom = nil
+            }
+            Button("Cancel", role: .cancel) { renamingSpeakerFrom = nil }
+        } message: {
+            Text("Applies to every turn currently labeled \(renamingSpeakerFrom ?? "this speaker").")
+        }
         .onDisappear { player.stop() }
         .onAppear { syncSummaryDraft(from: record) }
         .onChange(of: record?.summary) { _, _ in
-            // Refresh the editor when Summarize / Rewrite finishes, but not
-            // while the user is mid-keystroke on the same note.
             syncSummaryDraft(from: record, onlyIfIdle: true)
         }
         .onChange(of: viewModel.sessionManager.isSummarizing) { _, busy in
@@ -107,9 +149,6 @@ struct AmbientSessionDetailView: View {
     private func syncSummaryDraft(from record: AmbientSessionRecord?, onlyIfIdle: Bool = false) {
         guard let record else { return }
         if onlyIfIdle, summaryNoteID == record.id, draftSummary != record.summary {
-            // User has local edits that differ from disk — don't clobber.
-            // Still adopt when the note id changes or after a model rewrite
-            // that cleared/replaced summary while we weren't editing.
             if !record.summary.isEmpty, draftSummary.isEmpty {
                 draftSummary = record.summary
                 summaryNoteID = record.id
@@ -121,29 +160,73 @@ struct AmbientSessionDetailView: View {
     }
 
     private func content(for record: AmbientSessionRecord) -> some View {
-        List {
-            summarySection(record)
-            actionItemsSection(record)
-            transcriptSection(record)
-            recordingSection(record)
+        VStack(spacing: 0) {
+            headerBar(record)
+            tabPicker
+            tabBody(record)
         }
     }
 
-    // MARK: - Summary
+    private func headerBar(_ record: AmbientSessionRecord) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("\(Self.dateFormatter.string(from: record.startedAt)) · "
+                + AmbientMemoryView.duration(Int(record.duration)))
+                .font(AppTypography.caption2)
+                .foregroundColor(AppColors.textSecondary)
+            if let path = record.audioRelativePath {
+                AmbientRecordingPlayerView(relativePath: path, player: player) {
+                    await viewModel.audioURL(for: path)
+                }
+            }
+        }
+        .padding(.horizontal, AppSpacing.mediumLarge)
+        .padding(.vertical, AppSpacing.smallMedium)
+    }
+
+    private var tabPicker: some View {
+        Picker("Tab", selection: $selectedTab) {
+            ForEach(NoteDetailTab.allCases) { tab in
+                Label(tab.rawValue, systemImage: tab.systemImage).tag(tab)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, AppSpacing.mediumLarge)
+        .padding(.bottom, AppSpacing.smallMedium)
+    }
 
     @ViewBuilder
-    private func summarySection(_ record: AmbientSessionRecord) -> some View {
+    private func tabBody(_ record: AmbientSessionRecord) -> some View {
+        switch selectedTab {
+        case .summary:
+            List {
+                summarizeControls(record)
+                actionItemsSection(record)
+                structuredSummarySection(record)
+            }
+            .listStyle(.insetGrouped)
+        case .speakers:
+            List { speakersSection(record) }
+                .listStyle(.insetGrouped)
+        case .transcript:
+            List { transcriptSection(record) }
+                .listStyle(.insetGrouped)
+        }
+    }
+
+    // MARK: - Summarize controls
+
+    @ViewBuilder
+    private func summarizeControls(_ record: AmbientSessionRecord) -> some View {
         let hasTranscript = !record.fullTranscript
             .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let digestID = record.digestModelID ?? viewModel.selection.digestModelID
         let busy = viewModel.sessionManager.isSummarizing
+            || viewModel.sessionManager.isLabelingSpeakers
+            || record.isSpeakerLabelingBusy
         let status = viewModel.sessionManager.statusMessage
 
-        Section("Summary") {
-            // LLM pick lives here — recording only needs VAD + ASR.
-            Button {
-                showDigestPicker = true
-            } label: {
+        Section {
+            Button { showDigestPicker = true } label: {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Summarizing model")
@@ -160,49 +243,26 @@ struct AmbientSessionDetailView: View {
             }
             .disabled(busy)
 
-            if busy {
+            if viewModel.sessionManager.isSummarizing {
                 Label(
                     status.isEmpty ? "Loading the summarizing model…" : status,
                     systemImage: "brain"
                 )
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.primaryAccent)
-            } else if let error = viewModel.sessionManager.lastError {
+            } else if record.digestStale {
+                Text("Speakers were labeled after this summary. Rewrite to include who said what.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.statusOrange)
+            } else if let error = viewModel.sessionManager.lastError,
+                      !viewModel.sessionManager.isLabelingSpeakers {
                 Text(error)
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.statusRed)
             }
 
-            // Always editable — LLM output is a starting draft, not locked text.
-            TextEditor(text: $draftSummary)
-                .font(AppTypography.body)
-                .frame(minHeight: 120)
-                .disabled(busy)
-                .onChange(of: draftSummary) { _, newValue in
-                    summarySaveTask?.cancel()
-                    summarySaveTask = Task {
-                        try? await Task.sleep(nanoseconds: 450_000_000)
-                        guard !Task.isCancelled else { return }
-                        await viewModel.updateSummary(sessionID: sessionID, to: newValue)
-                    }
-                }
-                .onDisappear {
-                    summarySaveTask?.cancel()
-                    Task { await viewModel.updateSummary(sessionID: sessionID, to: draftSummary) }
-                }
-
-            if draftSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, hasTranscript, !busy {
-                Text(
-                    digestID == nil
-                        ? "Type a summary, or choose an LLM and tap Summarize."
-                        : "Type a summary, or tap Summarize to draft with the LLM."
-                )
-                .font(AppTypography.caption2)
-                .foregroundColor(AppColors.textSecondary)
-            }
-
             if hasTranscript {
-                if record.summary.isEmpty, draftSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if record.summary.isEmpty, !record.hasStructuredDigest {
                     Button {
                         if digestID == nil {
                             showDigestPicker = true
@@ -211,7 +271,7 @@ struct AmbientSessionDetailView: View {
                         }
                     } label: {
                         Label(
-                            busy ? "Summarizing…" : "Summarize with LLM",
+                            viewModel.sessionManager.isSummarizing ? "Summarizing…" : "Summarize with LLM",
                             systemImage: "text.badge.star"
                         )
                     }
@@ -221,36 +281,143 @@ struct AmbientSessionDetailView: View {
                         Task { await viewModel.rewriteSummary(sessionID: sessionID, modelID: digestID) }
                     } label: {
                         Label(
-                            busy ? "Rewriting…" : "Rewrite summary & action items",
+                            viewModel.sessionManager.isSummarizing
+                                ? "Rewriting…"
+                                : (record.digestStale
+                                    ? "Rewrite with speakers"
+                                    : "Rewrite summary & action items"),
                             systemImage: "arrow.triangle.2.circlepath"
                         )
                     }
                     .disabled(busy || digestID == nil)
                 }
             }
-
-            Text("\(Self.dateFormatter.string(from: record.startedAt)) · "
-                + AmbientMemoryView.duration(Int(record.duration)))
-                .font(AppTypography.caption2)
-                .foregroundColor(AppColors.textSecondary)
         }
     }
 
-    // MARK: - Action Items
+    // MARK: - Structured summary
+
+    @ViewBuilder
+    private func structuredSummarySection(_ record: AmbientSessionRecord) -> some View {
+        let busy = viewModel.sessionManager.isSummarizing
+
+        if record.hasStructuredDigest {
+            ForEach(record.digestSections) { section in
+                Section(section.heading) {
+                    ForEach(section.bullets) { bullet in
+                        VStack(alignment: .leading, spacing: 6) {
+                            bulletText(bullet)
+                            if !bullet.sourceSegmentIDs.isEmpty {
+                                citationRow(ids: bullet.sourceSegmentIDs, in: record)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+            }
+        } else {
+            Section("Overview") {
+                TextEditor(text: $draftSummary)
+                    .font(AppTypography.body)
+                    .frame(minHeight: 120)
+                    .disabled(busy)
+                    .onChange(of: draftSummary) { _, newValue in
+                        summarySaveTask?.cancel()
+                        summarySaveTask = Task {
+                            try? await Task.sleep(nanoseconds: 450_000_000)
+                            guard !Task.isCancelled else { return }
+                            await viewModel.updateSummary(sessionID: sessionID, to: newValue)
+                        }
+                    }
+                    .onDisappear {
+                        summarySaveTask?.cancel()
+                        Task { await viewModel.updateSummary(sessionID: sessionID, to: draftSummary) }
+                    }
+
+                if draftSummary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Type a summary, or choose an LLM and tap Summarize for a structured draft.")
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.textSecondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func bulletText(_ bullet: AmbientDigestBullet) -> some View {
+        if bullet.lead.isEmpty {
+            Text(bullet.text)
+                .font(AppTypography.callout)
+                .foregroundColor(AppColors.textPrimary)
+        } else {
+            (Text(bullet.lead).fontWeight(.semibold) + Text(": \(bullet.text)"))
+                .font(AppTypography.callout)
+                .foregroundColor(AppColors.textPrimary)
+        }
+    }
+
+    private func citationRow(ids: [String], in record: AmbientSessionRecord) -> some View {
+        HStack(spacing: 6) {
+            ForEach(Array(ids.enumerated()), id: \.offset) { _, segmentID in
+                if let segment = record.segments.first(where: { $0.id == segmentID }) {
+                    Button {
+                        jumpToSegment(segment, in: record)
+                    } label: {
+                        Text("\(segment.index)")
+                            .font(AppTypography.caption2.weight(.semibold))
+                            .foregroundColor(AppColors.textSecondary)
+                            .frame(minWidth: 22, minHeight: 22)
+                            .background(Circle().fill(AppColors.backgroundSecondary))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func jumpToSegment(_ segment: AmbientSegmentRecord, in record: AmbientSessionRecord) {
+        highlightedSegmentID = segment.id
+        selectedTab = .transcript
+        let offsetMs = segment.startOffsetMs
+            ?? AmbientSpeakerAlignment.recordingIntervals(for: [segment]).first?.startMs
+            ?? 0
+        let seconds = Double(offsetMs) / 1000.0
+        if let path = record.audioRelativePath {
+            Task {
+                if let url = await viewModel.audioURL(for: path) {
+                    player.prepare(url: url, key: path)
+                    player.seek(to: seconds, key: path)
+                    player.play(url: url, key: path)
+                }
+            }
+        }
+    }
+
+    // MARK: - Action items
 
     @ViewBuilder
     private func actionItemsSection(_ record: AmbientSessionRecord) -> some View {
         Section("Action items") {
+            if record.actionItems.isEmpty {
+                Text("No action items yet — Summarize to extract them.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
+            }
             ForEach(record.actionItems) { item in
-                EditableActionItemRow(
-                    item: item,
-                    onToggle: {
-                        Task { await viewModel.toggleActionItem(item.id, in: sessionID) }
-                    },
-                    onSaveText: { text in
-                        Task { await viewModel.updateActionItem(item.id, text: text, in: sessionID) }
+                VStack(alignment: .leading, spacing: 6) {
+                    EditableActionItemRow(
+                        item: item,
+                        onToggle: {
+                            Task { await viewModel.toggleActionItem(item.id, in: sessionID) }
+                        },
+                        onSaveText: { text in
+                            Task { await viewModel.updateActionItem(item.id, text: text, in: sessionID) }
+                        }
+                    )
+                    if !item.sourceSegmentIDs.isEmpty {
+                        citationRow(ids: item.sourceSegmentIDs, in: record)
                     }
-                )
+                }
                 .swipeActions {
                     Button("Delete", role: .destructive) {
                         Task { await viewModel.deleteActionItem(item.id, from: sessionID) }
@@ -275,7 +442,155 @@ struct AmbientSessionDetailView: View {
         Task { await viewModel.addActionItem(text, to: sessionID) }
     }
 
-    // MARK: - Transcript and Recording
+    // MARK: - Speakers
+
+    @ViewBuilder
+    private func speakersSection(_ record: AmbientSessionRecord) -> some View {
+        let hasTranscript = !record.fullTranscript
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let busy = viewModel.sessionManager.isLabelingSpeakers || record.isSpeakerLabelingBusy
+        let summarizing = viewModel.sessionManager.isSummarizing
+        let diarizationID = record.diarizationModelID
+
+        Section("Speakers") {
+            Text(
+                "Optional. Choose a speaker model, download it, then label who spoke. "
+                    + "Your transcript stays saved either way."
+            )
+            .font(AppTypography.caption2)
+            .foregroundColor(AppColors.textSecondary)
+
+            Button { showDiarizationPicker = true } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Speaker model")
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                        Text(
+                            diarizationID.map { viewModel.displayName(for: $0) }
+                                ?? "Not selected"
+                        )
+                        .font(AppTypography.subheadline)
+                        .foregroundColor(AppColors.textPrimary)
+                    }
+                    Spacer()
+                    Text(diarizationID == nil ? "Choose" : "Change")
+                        .font(AppTypography.caption)
+                }
+            }
+            .disabled(busy || summarizing)
+
+            speakerStatusRow(record)
+
+            if !record.hasAudio {
+                Text("No recording on this note — keep audio when recording to enable labeling.")
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textSecondary)
+            } else if hasTranscript {
+                Button {
+                    if diarizationID == nil {
+                        showDiarizationPicker = true
+                    } else {
+                        Task {
+                            await viewModel.labelSpeakers(
+                                sessionID: sessionID,
+                                modelID: diarizationID
+                            )
+                        }
+                    }
+                } label: {
+                    Label(
+                        speakerActionTitle(for: record, busy: busy),
+                        systemImage: "person.2.wave.2"
+                    )
+                }
+                .disabled(busy || summarizing || !record.hasAudio)
+            }
+
+            if record.hasSpeakerLabels {
+                let labels = Array(Set(record.segments.compactMap(\.speakerLabel))).sorted()
+                ForEach(labels, id: \.self) { label in
+                    Button {
+                        draftSpeakerName = label
+                        renamingSpeakerFrom = label
+                    } label: {
+                        HStack {
+                            Text(label)
+                                .font(AppTypography.callout)
+                                .foregroundColor(AppColors.textPrimary)
+                            Spacer()
+                            Text("Rename")
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                    }
+                    .disabled(busy)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func speakerStatusRow(_ record: AmbientSessionRecord) -> some View {
+        switch record.speakerLabelingState {
+        case .notConfigured:
+            EmptyView()
+        case .modelSelected:
+            Text("Model ready — tap Label speakers when you want to run it.")
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.textSecondary)
+        case .loadingModel:
+            Label(
+                record.speakerLabelingDetail ?? "Loading speaker model…",
+                systemImage: "arrow.down.circle"
+            )
+            .font(AppTypography.caption)
+            .foregroundColor(AppColors.primaryAccent)
+        case .labeling:
+            Label(
+                record.speakerLabelingDetail ?? "Labeling speakers…",
+                systemImage: "waveform"
+            )
+            .font(AppTypography.caption)
+            .foregroundColor(AppColors.primaryAccent)
+        case .completed:
+            Label(
+                record.speakerLabelingDetail ?? "Speakers labeled.",
+                systemImage: "checkmark.circle.fill"
+            )
+            .font(AppTypography.caption)
+            .foregroundColor(AppColors.statusGreen)
+        case .interrupted:
+            Text(
+                record.speakerLabelingDetail
+                    ?? "Labeling interrupted — your transcript is safe. Tap Resume to try again."
+            )
+            .font(AppTypography.caption)
+            .foregroundColor(AppColors.statusOrange)
+        case .failed:
+            Text(record.speakerLabelingDetail ?? "Speaker labeling failed.")
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.statusRed)
+        }
+    }
+
+    private func speakerActionTitle(for record: AmbientSessionRecord, busy: Bool) -> String {
+        if busy {
+            switch record.speakerLabelingState {
+            case .loadingModel: return "Loading speaker model…"
+            default: return "Labeling speakers…"
+            }
+        }
+        switch record.speakerLabelingState {
+        case .completed: return "Re-label speakers"
+        case .interrupted: return "Resume labeling"
+        case .failed: return "Retry labeling"
+        case .notConfigured: return "Choose speaker model"
+        case .modelSelected, .loadingModel, .labeling: return "Label speakers"
+        }
+    }
+
+    // MARK: - Transcript
 
     @ViewBuilder
     private func transcriptSection(_ record: AmbientSessionRecord) -> some View {
@@ -285,27 +600,54 @@ struct AmbientSessionDetailView: View {
                     .font(AppTypography.caption)
                     .foregroundColor(AppColors.textSecondary)
             } else {
-                Text(record.fullTranscript)
-                    .font(AppTypography.callout)
-                    .foregroundColor(AppColors.textPrimary)
-                    .textSelection(.enabled)
+                ForEach(record.transcribedSegments) { segment in
+                    Button {
+                        jumpToSegment(segment, in: record)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                if let speaker = segment.speakerLabel {
+                                    Text(speaker)
+                                        .font(AppTypography.caption.weight(.semibold))
+                                        .foregroundColor(AppColors.primaryAccent)
+                                } else {
+                                    Text("Turn \(segment.index)")
+                                        .font(AppTypography.caption)
+                                        .foregroundColor(AppColors.textSecondary)
+                                }
+                                Spacer()
+                                Text(Self.clock(segment.startOffsetMs ?? 0))
+                                    .font(AppTypography.caption2.monospacedDigit())
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                            Text(segment.transcript ?? "")
+                                .font(AppTypography.callout)
+                                .foregroundColor(AppColors.textPrimary)
+                                .multilineTextAlignment(.leading)
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(
+                                    highlightedSegmentID == segment.id
+                                        ? AppColors.primaryAccent.opacity(0.12)
+                                        : Color.clear
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
     }
 
-    @ViewBuilder
-    private func recordingSection(_ record: AmbientSessionRecord) -> some View {
-        Section("Recording") {
-            if let path = record.audioRelativePath {
-                AmbientRecordingPlayerView(relativePath: path, player: player) {
-                    await viewModel.audioURL(for: path)
-                }
-            } else {
-                Text("Recording removed to save space.")
-                    .font(AppTypography.caption)
-                    .foregroundColor(AppColors.textSecondary)
-            }
-        }
+    private static func clock(_ offsetMs: Int) -> String {
+        let total = max(0, offsetMs) / 1000
+        let minutes = total / 60
+        let seconds = total % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 
     private static let dateFormatter: DateFormatter = {
@@ -353,7 +695,6 @@ private struct EditableActionItemRow: View {
 
 // MARK: - Playback
 
-/// Voice Memos-style transport: play/pause, scrubber, and elapsed/remaining.
 struct AmbientRecordingPlayerView: View {
     let relativePath: String
     @ObservedObject var player: AmbientNotePlayer
@@ -399,7 +740,6 @@ struct AmbientRecordingPlayerView: View {
             }
         }
         .task {
-            // Load duration even before the first play so the scrubber isn't empty.
             if let url = await resolveURL() {
                 player.prepare(url: url, key: relativePath)
             }
@@ -435,10 +775,6 @@ struct AmbientRecordingPlayerView: View {
     }
 }
 
-/// Plays a note's recording with seek support.
-///
-/// `AVAudioPlayer` streams the WAV from disk, which matters because a note can
-/// run for hours and decoding one into memory would not fit.
 @MainActor
 final class AmbientNotePlayer: NSObject, ObservableObject {
     @Published private(set) var playingKey: String?
@@ -449,7 +785,6 @@ final class AmbientNotePlayer: NSObject, ObservableObject {
     private var player: AVAudioPlayer?
     private var loadedKey: String?
     private var tick: Timer?
-    /// True while the user is dragging the scrubber so the timer doesn't fight them.
     private var isScrubbing = false
 
     func isPlaying(_ key: String) -> Bool {
@@ -466,7 +801,6 @@ final class AmbientNotePlayer: NSObject, ObservableObject {
         loadedKey == key ? currentTime : 0
     }
 
-    /// Open the file to learn its duration without starting playback.
     func prepare(url: URL, key: String) {
         guard loadedKey != key else { return }
         do {
@@ -565,7 +899,6 @@ final class AmbientNotePlayer: NSObject, ObservableObject {
         currentTime = player.currentTime
         duration = player.duration
         if !player.isPlaying, playingKey != nil {
-            // Ended or interrupted without the delegate firing.
             playingKey = nil
             stopTicking()
         }

@@ -66,6 +66,15 @@ public final class RAAmbientSession: Sendable {
         audio.yield(pcm16)
     }
 
+    /// Offline / file-feed ingest that waits until VAD has processed the chunk.
+    ///
+    /// Use this for imported WAV/m4a dogfood so the host never outruns the
+    /// bounded live-audio buffer (which would silently drop most of a long file).
+    public func ingestOffline(pcm16: Data) async {
+        guard !pcm16.isEmpty else { return }
+        await pipeline.ingestOffline(pcm16)
+    }
+
     /// Stop consuming audio while keeping segment and queue state.
     public func pause() async {
         await pipeline.pause()
@@ -204,7 +213,8 @@ public extension RunAnywhere {
             let startedAt = Date()
             var options = RALLMGenerationOptions.defaults()
             options.temperature = 0.1
-            options.maxTokens = 512
+            // Structured Notion-style digests need more room than a short prose blob.
+            options.maxTokens = 1_024
             // Thinking models (e.g. Qwen3) otherwise emit <think>…</think> before
             // JSON; parse then falls back to a transcript snippet and empty
             // action items — which looks like a "failed rewrite".
@@ -216,11 +226,15 @@ public extension RunAnywhere {
             )
 
             let parsed = AmbientDigestPrompt.parse(result.text, fallbackText: text)
+            let cited = Array(parsed.actionItems.prefix(maxActionItems))
             return RAAmbientNoteDigest(
                 summary: parsed.summary,
-                actionItems: Array(parsed.actionItems.prefix(maxActionItems)),
+                actionItems: cited.map(\.text),
                 extractionMs: Int(Date().timeIntervalSince(startedAt) * 1000),
-                modelID: snapshot.modelID
+                modelID: snapshot.modelID,
+                title: parsed.title,
+                sections: parsed.sections,
+                citedActionItems: cited
             )
         }
 
@@ -273,127 +287,3 @@ extension RAAmbientConfiguration {
     }
 }
 
-// MARK: - Digest Prompt
-
-/// Prompt construction and response parsing for note summarization.
-/// Lives in the SDK so every consumer gets the same contract and the same
-/// tolerance for models that wrap JSON in prose or code fences.
-enum AmbientDigestPrompt {
-
-    struct Parsed {
-        let summary: String
-        let actionItems: [String]
-    }
-
-    static func system(mode: RAAmbientDigestMode, maxActionItems: Int) -> String {
-        let task: String
-        switch mode {
-        case .chunk:
-            task = """
-            You summarize one part of a longer voice note. Cover only what this part says; \
-            do not invent context from before or after it.
-            """
-        case .merge:
-            task = """
-            You merge the partial summaries of one voice note into a single note summary. \
-            Combine overlapping points and drop duplicate action items, keeping the clearest wording of each.
-            """
-        }
-
-        return """
-        \(task)
-        Reply with JSON only, no prose and no code fences, in exactly this shape:
-        {"summary":"a few sentences","actionItems":["..."]}
-        The summary is plain prose. Each action item is one short imperative sentence \
-        describing something a person still has to do.
-        Include at most \(maxActionItems) action items, and only ones actually stated.
-        If nothing needs doing, return an empty actionItems array.
-        """
-    }
-
-    static func user(text: String, mode: RAAmbientDigestMode) -> String {
-        let heading = mode == .merge ? "Partial summaries:" : "Transcript:"
-        return """
-        \(heading)
-        \(text)
-
-        JSON:
-        """
-    }
-
-    /// Parse a model response into a summary and action items. Models
-    /// frequently wrap JSON in fences or leading commentary, so the payload is
-    /// located by brace span rather than assuming a clean document. A response
-    /// that yields nothing usable degrades to a truncation of the input, which
-    /// keeps a note readable even when the model misbehaves.
-    static func parse(_ response: String, fallbackText: String) -> Parsed {
-        let fallbackSummary = String(fallbackText.prefix(200))
-        let cleaned = stripThinking(response)
-        guard let payload = jsonObject(in: cleaned) else {
-            return Parsed(summary: fallbackSummary, actionItems: [])
-        }
-
-        let summary = (payload["summary"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        // JSONSerialization is the only reader tolerant of the shapes a small
-        // local model emits, so untyped values stop here.
-        let rawItems = payload["actionItems"] as? [Any] ?? [] // swiftlint:disable:this avoid_any_type
-        var seen = Set<String>()
-        let actionItems: [String] = rawItems.compactMap { entry in
-            guard let text = itemText(entry) else { return nil }
-            // Merge passes routinely restate the same task, so identical items
-            // collapse here rather than reaching the note as duplicates.
-            guard seen.insert(text.lowercased()).inserted else { return nil }
-            return text
-        }
-
-        return Parsed(
-            summary: summary.isEmpty ? fallbackSummary : summary,
-            actionItems: actionItems
-        )
-    }
-
-    /// Drop Qwen-style thinking blocks so brace scanning finds the JSON object.
-    private static func stripThinking(_ response: String) -> String {
-        var text = response
-        let patterns = [
-            #"<think>[\s\S]*?</think>"#,
-            #"<thinking>[\s\S]*?</thinking>"#,
-            #"◁think▷[\s\S]*?◁/think▷"#,
-        ]
-        for pattern in patterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) {
-                let range = NSRange(text.startIndex..<text.endIndex, in: text)
-                text = regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: "")
-            }
-        }
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Action items arrive either as bare strings or, from chattier models, as
-    /// objects carrying the sentence under a `text`-like key.
-    private static func itemText(_ entry: Any) -> String? { // swiftlint:disable:this avoid_any_type
-        let candidate: String?
-        if let string = entry as? String {
-            candidate = string
-        } else if let object = entry as? [String: Any] { // swiftlint:disable:this avoid_any_type
-            candidate = (object["text"] ?? object["item"] ?? object["action"]) as? String
-        } else {
-            candidate = nil
-        }
-        guard let text = candidate?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
-            return nil
-        }
-        return text
-    }
-
-    private static func jsonObject(in response: String) -> [String: Any]? { // swiftlint:disable:this prefer_concrete_types avoid_any_type
-        guard let start = response.firstIndex(of: "{"),
-              let end = response.lastIndex(of: "}"),
-              start < end else { return nil }
-        let slice = String(response[start...end])
-        guard let data = slice.data(using: .utf8),
-              let raw = try? JSONSerialization.jsonObject(with: data) else { return nil }
-        // swiftlint:disable:next avoid_any_type
-        return raw as? [String: Any]
-    }
-}

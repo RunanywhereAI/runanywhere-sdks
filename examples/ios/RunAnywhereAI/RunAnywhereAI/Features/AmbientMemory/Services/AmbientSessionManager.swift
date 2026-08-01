@@ -44,6 +44,8 @@ final class AmbientSessionManager: ObservableObject {
     @Published private(set) var lastError: String?
     /// True while a user-triggered Summarize / Rewrite is loading the LLM.
     @Published private(set) var isSummarizing = false
+    /// True while Label speakers is loading Sortformer or aligning turns.
+    @Published private(set) var isLabelingSpeakers = false
     /// Anchor for the Live Activity's system timer (survives backgrounding).
     private var liveActivityTimerStart = Date()
 
@@ -53,6 +55,8 @@ final class AmbientSessionManager: ObservableObject {
 
     /// Fires when Summarize / Rewrite finishes so the notes list can refresh.
     let didFinishDeferredMerge = PassthroughSubject<String, Never>()
+    /// Fires when speaker labeling finishes (or fails) so note detail refreshes.
+    let didFinishSpeakerLabeling = PassthroughSubject<String, Never>()
 
     var isRecording: Bool { phase.isRecording }
 
@@ -79,6 +83,9 @@ final class AmbientSessionManager: ObservableObject {
     /// segment would run the LLM on single sentences; batching gives the model
     /// enough context to write something worth reading.
     private var pendingChunk = ""
+    /// Most recent structured digest from the map/merge pass — applied onto
+    /// the note so sections and citations survive the partial-summary string path.
+    private var latestStructuredDigest: RAAmbientNoteDigest?
     /// True while the note is recording audio to disk, so a storage gate can
     /// stop writing without ending the note.
     private var isWritingAudio = false
@@ -427,10 +434,15 @@ final class AmbientSessionManager: ObservableObject {
             statusMessage = "Summarizing…"
             let digest = try await RunAnywhere.ambient.digest(text: chunk, mode: .chunk)
             guard var record = sessionRecord else { return false }
+            latestStructuredDigest = digest
             record.partialSummaries.append(digest.summary)
             record.mergeActionItems(digest.actionItems)
             if record.summary.isEmpty || record.summaryPending {
                 record.summary = record.partialSummaries.joined(separator: "\n\n")
+            }
+            // Single-chunk notes keep full structure immediately.
+            if record.partialSummaries.count == 1 {
+                record.applyStructuredDigest(digest)
             }
             record.summaryPending = false
             sessionRecord = record
@@ -517,9 +529,14 @@ final class AmbientSessionManager: ObservableObject {
             return
         }
 
-        let source = note.fullTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = note.digestSourceTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !source.isEmpty else {
             lastError = "Nothing to summarize — this note has no transcript."
+            statusMessage = lastError ?? ""
+            return
+        }
+        guard !isLabelingSpeakers else {
+            lastError = "Wait for speaker labeling to finish before summarizing."
             statusMessage = lastError ?? ""
             return
         }
@@ -538,14 +555,18 @@ final class AmbientSessionManager: ObservableObject {
         note.summaryPending = true
         note.digestModelID = modelID
         note.partialSummaries = []
+        let previousSections = note.digestSections
+        let previousDigestTitle = note.digestTitle
         if rewrite {
             // Clear only in memory for the map pass; disk keeps the old draft
             // until we confirm a usable result below.
             note.summary = ""
-            note.replaceMachineActionItems(with: [])
+            note.digestSections = []
+            note.replaceMachineActionItems(with: [String]())
         }
         sessionRecord = note
         pendingChunk = source
+        latestStructuredDigest = nil
 
         let flushed = await flushPendingAsChunks(modelID: modelID)
         guard flushed, var current = sessionRecord else {
@@ -553,7 +574,9 @@ final class AmbientSessionManager: ObservableObject {
             var restored = note
             restored.summary = previousSummary
             restored.partialSummaries = previousPartials
-            restored.replaceMachineActionItems(with: previousMachineItems)
+            restored.digestSections = previousSections
+            restored.digestTitle = previousDigestTitle
+            restored.replaceMachineActionItems(with: previousMachineItems as [String])
             restored.summaryPending = false
             sessionRecord = restored
             await store.save(restored)
@@ -566,17 +589,24 @@ final class AmbientSessionManager: ObservableObject {
         if current.partialSummaries.count > 1 {
             current = await merged(current, modelID: modelID)
         } else if current.partialSummaries.count == 1 {
-            current.summary = current.partialSummaries[0]
-            current.summaryPending = false
+            if let digest = latestStructuredDigest {
+                current.applyStructuredDigest(digest)
+            } else {
+                current.summary = current.partialSummaries[0]
+                current.summaryPending = false
+            }
         }
 
         let newSummary = current.summary.trimmingCharacters(in: .whitespacesAndNewlines)
         let looksLikeFallback = newSummary.count <= 200
-            && source.hasPrefix(newSummary)
+            && (source.hasPrefix(newSummary) || source.contains(newSummary))
             && current.actionItems.filter({ !$0.isManual }).isEmpty
+            && current.digestSections.count <= 1
         if newSummary.isEmpty || (rewrite && looksLikeFallback && !previousSummary.isEmpty) {
             current.summary = previousSummary
             current.partialSummaries = previousPartials
+            current.digestSections = previousSections
+            current.digestTitle = previousDigestTitle
             current.replaceMachineActionItems(with: previousMachineItems)
             current.summaryPending = false
             await store.save(current)
@@ -587,6 +617,7 @@ final class AmbientSessionManager: ObservableObject {
             return
         }
 
+        current.digestStale = false
         await store.save(current)
         await unloadLanguageModel(modelID)
         sessionRecord = current
@@ -598,6 +629,161 @@ final class AmbientSessionManager: ObservableObject {
     /// Back-compat name used by older call sites / tests.
     func retrySummary(for noteID: String) async {
         await generateSummary(for: noteID, rewrite: false)
+    }
+
+    // MARK: - Speaker Labeling (opt-in post-pass)
+
+    /// Persist the chosen Sortformer model on a note without running inference.
+    func setDiarizationModel(for noteID: String, modelID: String) async {
+        guard var note = await store.loadSession(id: noteID) else { return }
+        note.diarizationModelID = modelID
+        if note.speakerLabelingState == .notConfigured
+            || note.speakerLabelingState == .failed
+            || note.speakerLabelingState == .interrupted {
+            note.speakerLabelingState = .modelSelected
+        }
+        note.speakerLabelingDetail = nil
+        await store.save(note)
+        if sessionRecord?.id == noteID {
+            sessionRecord = note
+        }
+        didFinishSpeakerLabeling.send(noteID)
+    }
+
+    /// Load Sortformer, diarize the note WAV, align speakers onto ASR segments,
+    /// then unload. Never runs during capture or while summarizing.
+    func labelSpeakers(for noteID: String, modelID overrideModelID: String? = nil) async {
+        guard !isLabelingSpeakers else { return }
+        guard !isSummarizing else {
+            lastError = "Wait for summarization to finish before labeling speakers."
+            statusMessage = lastError ?? ""
+            return
+        }
+        guard !phase.holdsAudioSession else {
+            lastError = "Stop the current recording before labeling speakers."
+            statusMessage = lastError ?? ""
+            return
+        }
+        guard UIApplication.shared.applicationState == .active else {
+            lastError = "Bring the app to the foreground to label speakers."
+            statusMessage = lastError ?? ""
+            return
+        }
+
+        guard var note = await store.loadSession(id: noteID) else { return }
+        let modelID = overrideModelID ?? note.diarizationModelID
+        guard let modelID, !modelID.isEmpty else {
+            lastError = "Choose a speaker model first."
+            statusMessage = lastError ?? ""
+            return
+        }
+        guard let relativePath = note.audioRelativePath else {
+            lastError = "This note has no recording to label. Keep audio when recording."
+            statusMessage = lastError ?? ""
+            note.speakerLabelingState = .failed
+            note.speakerLabelingDetail = lastError
+            await store.save(note)
+            didFinishSpeakerLabeling.send(noteID)
+            return
+        }
+        guard !note.fullTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            lastError = "Nothing to label — this note has no transcript."
+            statusMessage = lastError ?? ""
+            return
+        }
+
+        isLabelingSpeakers = true
+        lastError = nil
+        defer { isLabelingSpeakers = false }
+
+        note.diarizationModelID = modelID
+        note.speakerLabelingState = .loadingModel
+        note.speakerLabelingDetail = "Loading speaker model…"
+        await store.save(note)
+        sessionRecord = note
+        statusMessage = "Loading speaker model…"
+        didFinishSpeakerLabeling.send(noteID)
+
+        do {
+            try await ensureLoaded(modelID: modelID, category: .speakerDiarization)
+            guard UIApplication.shared.applicationState == .active else {
+                throw NSError(
+                    domain: "AmbientMemory",
+                    code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "Labeling interrupted — open the note and tap Resume."]
+                )
+            }
+
+            note.speakerLabelingState = .labeling
+            note.speakerLabelingDetail = "Labeling speakers…"
+            await store.save(note)
+            sessionRecord = note
+            statusMessage = "Labeling speakers…"
+            didFinishSpeakerLabeling.send(noteID)
+
+            let url = await store.audioURL(for: relativePath)
+            let pcm = try AmbientWAVPCMReader.pcm16Mono(from: url, expectedSampleRate: 16_000)
+            guard pcm.count >= 16_000 else {
+                throw NSError(
+                    domain: "AmbientMemory",
+                    code: 3,
+                    userInfo: [NSLocalizedDescriptionKey: "Recording is too short to label speakers."]
+                )
+            }
+
+            var options = RADiarizationOptions.defaults()
+            options.sampleRateHz = 16_000
+            options.channelCount = 1
+            options.encoding = .pcmS16Le
+
+            let result = try await RunAnywhere.diarize(audioData: pcm, options: options)
+            let turns = AmbientSpeakerAlignment.turns(from: result)
+            let assignments = AmbientSpeakerAlignment.assignments(
+                segments: note.segments,
+                turns: turns
+            )
+
+            // Reload in case the user edited the note while we ran.
+            if let fresh = await store.loadSession(id: noteID) {
+                note = fresh
+            }
+            note.applyDiarizationLabels(
+                assignments,
+                modelID: modelID,
+                speakerCount: Int(result.speakerCount)
+            )
+            await store.save(note)
+            sessionRecord = note
+            await unloadDiarizationModel(modelID)
+            statusMessage = note.speakerLabelingDetail ?? "Speakers labeled."
+            lastError = nil
+            didFinishSpeakerLabeling.send(noteID)
+        } catch {
+            await unloadDiarizationModel(modelID)
+            let detail = error.localizedDescription
+            let interrupted = UIApplication.shared.applicationState != .active
+                || detail.localizedCaseInsensitiveContains("interrupted")
+            if let fresh = await store.loadSession(id: noteID) {
+                note = fresh
+            }
+            note.speakerLabelingState = interrupted ? .interrupted : .failed
+            note.speakerLabelingDetail = interrupted
+                ? "Labeling interrupted — your transcript is safe. Tap Resume to try again."
+                : detail
+            await store.save(note)
+            sessionRecord = note
+            lastError = note.speakerLabelingDetail
+            statusMessage = lastError ?? ""
+            didFinishSpeakerLabeling.send(noteID)
+            logger.warning("Speaker labeling failed: \(detail, privacy: .public)")
+        }
+    }
+
+    private func unloadDiarizationModel(_ modelID: String) async {
+        var unload = RAModelUnloadRequest()
+        unload.modelID = modelID
+        unload.category = .speakerDiarization
+        _ = await RunAnywhere.unloadModel(unload)
     }
 
     /// The reduce half of the map-reduce: one pass over the partial summaries.
@@ -612,7 +798,7 @@ final class AmbientSessionManager: ObservableObject {
             return record
         }
         if record.partialSummaries.isEmpty {
-            let source = record.fullTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+            let source = record.digestSourceTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
             if !source.isEmpty {
                 do {
                     try await ensureLoaded(modelID: modelID, category: .language)
@@ -622,9 +808,9 @@ final class AmbientSessionManager: ObservableObject {
                         return record
                     }
                     let digest = try await RunAnywhere.ambient.digest(text: source, mode: .chunk)
+                    latestStructuredDigest = digest
                     record.partialSummaries = [digest.summary]
-                    record.mergeActionItems(digest.actionItems)
-                    record.summary = digest.summary
+                    record.applyStructuredDigest(digest)
                     benchmarkRecorder.markDigest(digest)
                 } catch {
                     let detail = error.localizedDescription
@@ -660,8 +846,8 @@ final class AmbientSessionManager: ObservableObject {
                 .map { "Part \($0.offset + 1): \($0.element)" }
                 .joined(separator: "\n\n")
             let digest = try await RunAnywhere.ambient.digest(text: joined, mode: .merge)
-            record.summary = digest.summary
-            record.replaceMachineActionItems(with: digest.actionItems)
+            latestStructuredDigest = digest
+            record.applyStructuredDigest(digest)
             benchmarkRecorder.markDigest(digest)
         } catch {
             record.summary = record.partialSummaries.joined(separator: "\n\n")
@@ -686,6 +872,21 @@ final class AmbientSessionManager: ObservableObject {
     private func runDeferredDigests() async {
         // Intentionally empty — kept so the foreground observer can stay wired
         // for a future opt-in auto-finish without reintroducing silent loads.
+    }
+
+    /// Persist a resumable interrupted state if labeling was in flight when
+    /// the app left the foreground (iOS may suspend before the pass finishes).
+    private func markSpeakerLabelingInterruptedIfNeeded() async {
+        guard isLabelingSpeakers, let noteID = sessionRecord?.id else { return }
+        guard var note = await store.loadSession(id: noteID) else { return }
+        guard note.speakerLabelingState == .loadingModel
+            || note.speakerLabelingState == .labeling else { return }
+        note.speakerLabelingState = .interrupted
+        note.speakerLabelingDetail =
+            "Labeling interrupted — your transcript is safe. Tap Resume to try again."
+        await store.save(note)
+        sessionRecord = note
+        didFinishSpeakerLabeling.send(noteID)
     }
 
     private func ensureLoaded(modelID: String, category: RAModelCategory) async throws {
@@ -820,6 +1021,14 @@ final class AmbientSessionManager: ObservableObject {
     /// GPU summarization can only run on screen, so returning to the
     /// foreground is the trigger for anything that had to wait.
     private func observeForeground() {
+        interruptionObservers.append(NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in await self?.markSpeakerLabelingInterruptedIfNeeded() }
+        })
+
         interruptionObservers.append(NotificationCenter.default.addObserver(
             forName: UIApplication.didBecomeActiveNotification,
             object: nil,

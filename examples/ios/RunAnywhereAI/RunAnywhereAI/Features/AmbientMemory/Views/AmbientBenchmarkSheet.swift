@@ -120,7 +120,17 @@ struct AmbientBenchmarkRow: View {
     }
 
     private var detailLine: String {
-        String(
+        if sample.runKind == "file" {
+            return String(
+                format: "file · convert %d · asr %d · diar %d · digest %d ms · peak %@",
+                sample.convertMs,
+                sample.asrMs,
+                sample.diarizationMs,
+                sample.digestMs,
+                sample.peakMemoryBytes.formattedFileSize
+            )
+        }
+        return String(
             format: "%@ · RTF %.2f · first transcript %.0f ms · peak %@",
             AmbientMemoryView.duration(Int(sample.sessionSeconds)),
             sample.medianRealTimeFactor,
@@ -131,6 +141,11 @@ struct AmbientBenchmarkRow: View {
 
     private var environmentLine: String {
         var parts = ["\(sample.segmentCount) segments", "\(sample.actionItemCount) action items"]
+        if sample.runKind == "file" {
+            if let fixture = sample.fixtureName, !fixture.isEmpty { parts.insert(fixture, at: 0) }
+            if sample.sectionCount > 0 { parts.append("\(sample.sectionCount) sections") }
+            if sample.speakerCount > 0 { parts.append("\(sample.speakerCount) speakers") }
+        }
         if sample.droppedSegmentCount > 0 { parts.append("\(sample.droppedSegmentCount) dropped") }
         if sample.interruptionCount > 0 { parts.append("\(sample.interruptionCount) interruptions") }
         parts.append("thermals \(sample.thermalState)")
@@ -192,42 +207,53 @@ final class AmbientBenchmarkViewModel: ObservableObject {
             "segments", "transcribed", "dropped", "actionItems", "completedActionItems",
             "medianTranscriptionMs", "medianRTF", "medianDigestMs", "firstTranscriptMs",
             "peakMemoryBytes", "batteryPerHour", "thermalState", "interruptions", "retainedAudioBytes",
+            "runKind", "convertMs", "asrMs", "diarizationMs", "digestMs",
+            "sectionCount", "bulletCount", "speakerCount", "fixtureName",
         ].joined(separator: ",")
 
-        let rows = samples.map { sample in
-            [
-                ISO8601DateFormatter().string(from: sample.recordedAt),
-                sample.sessionID,
-                sample.profileID,
-                sample.deviceModel,
-                sample.chipName,
-                sample.osVersion,
-                sample.audioRoute,
-                sample.environment,
-                sample.placement,
-                String(format: "%.1f", sample.sessionSeconds),
-                String(format: "%.1f", sample.speechSeconds),
-                String(format: "%.3f", sample.speechRatio),
-                String(sample.segmentCount),
-                String(sample.transcribedSegmentCount),
-                String(sample.droppedSegmentCount),
-                String(sample.actionItemCount),
-                String(sample.completedActionItemCount),
-                String(format: "%.1f", sample.medianTranscriptionMs),
-                String(format: "%.3f", sample.medianRealTimeFactor),
-                String(format: "%.1f", sample.medianExtractionMs),
-                String(format: "%.1f", sample.firstTranscriptLatencyMs),
-                String(sample.peakMemoryBytes),
-                String(format: "%.2f", sample.batteryDeltaPerHour),
-                sample.thermalState,
-                String(sample.interruptionCount),
-                String(sample.retainedAudioBytes),
-            ]
-            .map(Self.escapeCSV)
-            .joined(separator: ",")
-        }
-
+        let rows = samples.map { Self.csvRow(for: $0) }
         return write(([header] + rows).joined(separator: "\n"), extension: "csv")
+    }
+
+    private static func csvRow(for sample: AmbientBenchmarkSample) -> String {
+        let cells: [String] = [
+            ISO8601DateFormatter().string(from: sample.recordedAt),
+            sample.sessionID,
+            sample.profileID,
+            sample.deviceModel,
+            sample.chipName,
+            sample.osVersion,
+            sample.audioRoute,
+            sample.environment,
+            sample.placement,
+            String(format: "%.1f", sample.sessionSeconds),
+            String(format: "%.1f", sample.speechSeconds),
+            String(format: "%.3f", sample.speechRatio),
+            String(sample.segmentCount),
+            String(sample.transcribedSegmentCount),
+            String(sample.droppedSegmentCount),
+            String(sample.actionItemCount),
+            String(sample.completedActionItemCount),
+            String(format: "%.1f", sample.medianTranscriptionMs),
+            String(format: "%.3f", sample.medianRealTimeFactor),
+            String(format: "%.1f", sample.medianExtractionMs),
+            String(format: "%.1f", sample.firstTranscriptLatencyMs),
+            String(sample.peakMemoryBytes),
+            String(format: "%.2f", sample.batteryDeltaPerHour),
+            sample.thermalState,
+            String(sample.interruptionCount),
+            String(sample.retainedAudioBytes),
+            sample.runKind,
+            String(sample.convertMs),
+            String(sample.asrMs),
+            String(sample.diarizationMs),
+            String(sample.digestMs),
+            String(sample.sectionCount),
+            String(sample.bulletCount),
+            String(sample.speakerCount),
+            sample.fixtureName ?? "",
+        ]
+        return cells.map(escapeCSV).joined(separator: ",")
     }
 
     func jsonDocument() -> AmbientExportDocument? {
