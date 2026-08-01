@@ -51,8 +51,8 @@ class EmbeddingsApi {
         modelId: modelId,
       ),
     );
-    if (result.errorMessage.isNotEmpty) {
-      throw SDKException.processingFailed(result.errorMessage);
+    if (result.hasError()) {
+      throw SDKException.processingFailed(result.error.message);
     }
     final vectors = result.vectors.map(Embedding.fromProto).toList()
       ..sort((a, b) => a.index.compareTo(b.index));

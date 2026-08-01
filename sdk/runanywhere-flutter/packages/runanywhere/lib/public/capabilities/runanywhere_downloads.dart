@@ -75,7 +75,7 @@ class RunAnywhereDownloads {
       yield DownloadProgress(
         modelId: modelId,
         state: DownloadState.DOWNLOAD_STATE_FAILED,
-        errorMessage: 'Model not found: $modelId',
+        error: SDKException.modelNotFound(modelId).error,
       );
       return;
     }
@@ -96,9 +96,11 @@ class RunAnywhereDownloads {
       yield DownloadProgress(
         modelId: modelId,
         state: DownloadState.DOWNLOAD_STATE_FAILED,
-        errorMessage: planResult.errorMessage.isNotEmpty
-            ? planResult.errorMessage
-            : 'Download cannot start for model: $modelId',
+        error: planResult.hasError()
+            ? planResult.error
+            : SDKException.internalError(
+                'Download cannot start for model: $modelId',
+              ).error,
       );
       return;
     }
@@ -125,9 +127,11 @@ class RunAnywhereDownloads {
       yield DownloadProgress(
         modelId: modelId,
         state: DownloadState.DOWNLOAD_STATE_FAILED,
-        errorMessage: startResult.errorMessage.isNotEmpty
-            ? startResult.errorMessage
-            : 'Download start was rejected for model: $modelId',
+        error: startResult.hasError()
+            ? startResult.error
+            : SDKException.internalError(
+                'Download start was rejected for model: $modelId',
+              ).error,
       );
       return;
     }
@@ -162,8 +166,8 @@ class RunAnywhereDownloads {
           logger.info('Extracting model...');
         } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
           logger.info('Download completed for model: $modelId');
-        } else if (progress.errorMessage.isNotEmpty) {
-          logger.error('Download failed: ${progress.errorMessage}');
+        } else if (progress.hasError()) {
+          logger.error('Download failed: ${progress.error.message}');
         }
 
         if (_isTerminalState(progress.state)) {
@@ -297,8 +301,7 @@ class RunAnywhereDownloads {
   ]) async {
     if (!DartBridge.isInitialized) {
       return StorageInfoResult(
-        success: false,
-        errorMessage: 'SDK not initialized',
+        error: SDKException.notInitialized().error,
       );
     }
 

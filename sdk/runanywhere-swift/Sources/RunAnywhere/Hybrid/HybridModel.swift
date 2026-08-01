@@ -30,12 +30,6 @@ public extension HybridBackendKind {
     static var cloud: HybridBackendKind { .hybridBackendCloud }
 }
 
-// MARK: - Model type
-
-/// Whether a candidate runs on-device or in the cloud. Backed by the generated
-/// `RAHybridModelType` (wire values match `rac_hybrid_model_type_t`).
-public typealias HybridModelType = RAHybridModelType
-
 // MARK: - Model descriptor
 
 /// One side of the hybrid pair. `id` is the resolution key:
@@ -46,7 +40,9 @@ public typealias HybridModelType = RAHybridModelType
 ///     provider, model string + credentials.
 public struct HybridModel: Sendable {
     public let id: String
-    public let modelType: HybridModelType
+    /// `true` when the candidate runs on-device (offline), `false` for cloud
+    /// (online). Marshalled into the descriptor's `is_local` field (proto tag 2).
+    public let isLocal: Bool
     public let backend: HybridBackendKind
     /// Concrete cloud provider when `backend == .cloud` (e.g. "sarvam"). Empty
     /// for non-cloud backends; marshalled into the descriptor's `provider`
@@ -55,19 +51,19 @@ public struct HybridModel: Sendable {
 
     public init(
         id: String,
-        modelType: HybridModelType,
+        isLocal: Bool,
         backend: HybridBackendKind,
         provider: String = ""
     ) {
         self.id = id
-        self.modelType = modelType
+        self.isLocal = isLocal
         self.backend = backend
         self.provider = provider
     }
 
     /// Convenience for an on-device sherpa model.
     public static func offlineSherpa(_ id: String) -> HybridModel {
-        HybridModel(id: id, modelType: .offline, backend: .sherpa)
+        HybridModel(id: id, isLocal: true, backend: .sherpa)
     }
 
     /// Convenience for a cloud model (registered via `Cloud.register`).
@@ -77,7 +73,7 @@ public struct HybridModel: Sendable {
         _ id: String,
         provider: String = Cloud.defaultProvider
     ) -> HybridModel {
-        HybridModel(id: id, modelType: .online, backend: .cloud, provider: provider)
+        HybridModel(id: id, isLocal: false, backend: .cloud, provider: provider)
     }
 
     /// Encode as `runanywhere.v1.HybridModelDescriptor` bytes for
@@ -87,7 +83,7 @@ public struct HybridModel: Sendable {
     func descriptorBytes() throws -> [UInt8] {
         var descriptor = RAHybridModelDescriptor()
         descriptor.modelID = id
-        descriptor.modelType = modelType
+        descriptor.isLocal = isLocal
         descriptor.backend = backend
         descriptor.provider = provider
         return try [UInt8](descriptor.serializedData())

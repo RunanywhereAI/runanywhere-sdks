@@ -58,7 +58,7 @@ export const stt = {
     if (!output) {
       throw SDKException.processingFailed('The STT proto path returned no transcription.');
     }
-    if (output.errorMessage) throw SDKException.processingFailed(output.errorMessage);
+    if (output.error) throw new SDKException(output.error);
     return toTranscription(output);
   },
 
@@ -91,11 +91,7 @@ export const stt = {
         toProtoSttOptions(options),
       );
       for await (const event of events) {
-        if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
-          throw SDKException.processingFailed(
-            event.errorMessage || `STT stream failed with code ${event.errorCode}`,
-          );
-        }
+        if (event.error) throw new SDKException(event.error);
         if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL) {
           const final = event.finalOutput ?? event.partial?.finalOutput;
           if (final) yield { type: 'final', transcription: toTranscription(final) };

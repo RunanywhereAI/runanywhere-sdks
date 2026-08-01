@@ -52,7 +52,7 @@ public extension RunAnywhere {
             proto.embeddingModelID = embeddingId
             proto.llmModelID = llmId
 
-            let handle = try await CppBridge.RAG.shared.createPipeline(proto)
+            let handle = try CppBridge.RAG.shared.createPipeline(proto)
             return RagSession(handle: handle, llmModelId: llmId, defaultTopK: effective.topK)
         }
     }

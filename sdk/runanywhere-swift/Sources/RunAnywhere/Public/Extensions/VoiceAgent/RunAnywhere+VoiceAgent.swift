@@ -48,9 +48,9 @@ public extension RunAnywhere {
         loadRequest.modelID = targetID
         loadRequest.category = .voiceActivityDetection
         let result = await performLoad(loadRequest)
-        if !result.success {
+        if result.hasError {
             SDKLogger.voiceAgent.warning(
-                "Default VAD '\(targetID)' auto-load failed: \(result.errorMessage) — voice agent will use energy fallback"
+                "Default VAD '\(targetID)' auto-load failed: \(result.error.message) — voice agent will use energy fallback"
             )
             return false
         }

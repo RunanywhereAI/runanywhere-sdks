@@ -72,31 +72,25 @@ public let RAHybridSTTConfidenceThreshold: Float = 0.5
 
 // MARK: - Rank
 
-/// Comparator that orders eligible candidates. Exactly one rank per policy.
-/// Backed by the generated `RAHybridRank` (wire values match
-/// `HybridRank` in hybrid_router.proto): `.preferLocalFirst` (1) prefers the
-/// offline candidate, `.preferOnlineFirst` (2) prefers the online candidate.
-public typealias HybridRank = RAHybridRank
-
 // MARK: - Routing policy
 
 /// The full routing policy attached to a model pair: filters (AND-composed),
-/// an optional cascade, and a rank. Defaults to `.preferLocalFirst` with no
-/// filters or cascade — i.e. "use the local candidate, fall back to online on
-/// hard failure".
+/// an optional cascade, and a rank preference. Defaults to `preferLocal == true`
+/// with no filters or cascade — i.e. "use the local candidate, fall back to
+/// online on hard failure". `preferLocal == false` prefers the online candidate.
 public struct HybridRoutingPolicy: Sendable {
     public var hardFilters: [HybridFilter]
     public var cascade: HybridCascade?
-    public var rank: HybridRank
+    public var preferLocal: Bool
 
     public init(
         hardFilters: [HybridFilter] = [],
         cascade: HybridCascade? = nil,
-        rank: HybridRank = .preferLocalFirst
+        preferLocal: Bool = true
     ) {
         self.hardFilters = hardFilters
         self.cascade = cascade
-        self.rank = rank
+        self.preferLocal = preferLocal
     }
 
     // MARK: Convenience constructors (mirror Kotlin SimpleRouterPolicy)
@@ -112,8 +106,8 @@ public struct HybridRoutingPolicy: Sendable {
     }
 
     /// Rank-only policy.
-    public static func rank(_ rank: HybridRank) -> HybridRoutingPolicy {
-        HybridRoutingPolicy(rank: rank)
+    public static func rank(preferLocal: Bool) -> HybridRoutingPolicy {
+        HybridRoutingPolicy(preferLocal: preferLocal)
     }
 }
 
@@ -144,7 +138,7 @@ extension HybridRoutingPolicy {
         if let cascade {
             message.cascade = encodeCascade(cascade)
         }
-        message.rank = rank
+        message.preferLocal = preferLocal
         return try [UInt8](message.serializedData())
     }
 

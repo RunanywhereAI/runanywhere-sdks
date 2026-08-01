@@ -274,7 +274,6 @@ export {
   ModelFormat,
   ModelArtifactType,
   ModelQuerySortField,
-  ModelQuerySortOrder,
   ModelRegistryStatus,
   ModelSource,
   RoutingPolicy,

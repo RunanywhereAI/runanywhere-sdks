@@ -170,8 +170,8 @@ class LlmApi {
       options: request.options.toolCalling,
       history: history,
     );
-    if (result.errorMessage.isNotEmpty) {
-      throw SDKException.generationFailed(result.errorMessage);
+    if (result.hasError()) {
+      throw SDKException.generationFailed(result.error.message);
     }
     return GenerationResult(
       text: result.text,
@@ -246,8 +246,8 @@ class LlmApi {
         }
       }
 
-      if (terminal != null && terminal.errorMessage.isNotEmpty) {
-        throw SDKException.generationFailed(terminal.errorMessage);
+      if (terminal != null && terminal.hasError()) {
+        throw SDKException.generationFailed(terminal.error.message);
       }
 
       final result = terminal != null && terminal.hasResult()

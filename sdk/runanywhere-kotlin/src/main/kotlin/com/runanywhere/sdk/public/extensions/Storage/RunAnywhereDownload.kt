@@ -86,7 +86,7 @@ private suspend fun RunAnywhere.downloadCompatibleModel(
 
     val plan = planDownload(planRequest)
     if (plan == null || !plan.can_start) {
-        val message = plan?.error_message.orEmpty().ifBlank { "Unable to create a download plan" }
+        val message = plan?.error?.message.orEmpty().ifBlank { "Unable to create a download plan" }
         downloadLogger.error("Download plan rejected for ${resolvedModel.id}: $message")
         throw SDKException.make(
             code = ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
@@ -111,7 +111,7 @@ private suspend fun RunAnywhere.downloadCompatibleModel(
 
     val startResult = CppBridgeDownload.start(startRequest)
     if (startResult == null || !startResult.accepted) {
-        val message = startResult?.error_message.orEmpty().ifBlank { "The download could not be started" }
+        val message = startResult?.error?.message.orEmpty().ifBlank { "The download could not be started" }
         downloadLogger.error("Download start rejected for ${resolvedModel.id}: $message")
         throw SDKException.make(
             code = ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
@@ -199,7 +199,7 @@ private suspend fun RunAnywhere.resolveModelForDownload(model: RAModelInfo): RAM
     }
 
     val listResult = listModels(ModelListRequest())
-    if (!listResult.success) return model
+    if (listResult.error != null) return model
     val listed = listResult.models?.models?.firstOrNull { it.id == model.id } ?: return model
     if (!listed.download_url.isNullOrBlank() || model.download_url.isNullOrBlank()) {
         return listed
@@ -236,7 +236,7 @@ private suspend fun reportDownloadProgress(
         DownloadState.DOWNLOAD_STATE_FAILED ->
             throw SDKException.make(
                 code = ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-                message = progress.error_message.ifBlank { "Download failed" },
+                message = progress.error?.message.orEmpty().ifBlank { "Download failed" },
                 category = ErrorCategory.ERROR_CATEGORY_NETWORK,
                 shouldLog = false,
             )

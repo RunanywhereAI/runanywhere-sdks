@@ -108,7 +108,7 @@ public class RagSession internal constructor(
                         }
                         RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR ->
                             throw SDKException.operation(
-                                event.error_message?.takeIf { it.isNotBlank() } ?: "RAG search failed",
+                                event.error?.message?.takeIf { it.isNotBlank() } ?: "RAG search failed",
                             )
                         else -> true
                     }
@@ -135,7 +135,7 @@ public class RagSession internal constructor(
                 request = { requestId -> CppBridgeRAG.queryOn(live, requestId, request) },
                 cancel = { requestId -> CppBridgeRAG.cancelRequestOn(live, requestId) },
             )
-        result.error_message?.takeIf { it.isNotBlank() }?.let { throw SDKException.operation(it) }
+        result.error?.let { throw SDKException(it) }
         return result.toRagResult(llmModelId.orEmpty())
     }
 
@@ -231,7 +231,7 @@ public class RagSession internal constructor(
             }
             RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR ->
                 throw SDKException.operation(
-                    event.error_message?.takeIf { it.isNotBlank() } ?: "RAG query failed",
+                    event.error?.message?.takeIf { it.isNotBlank() } ?: "RAG query failed",
                 )
             else -> true
         }

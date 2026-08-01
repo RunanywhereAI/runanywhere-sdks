@@ -29,12 +29,8 @@ public extension RunAnywhere {
             var request = RAModelListRequest()
             if let filter { request.query = filter.toProto() }
             let result = await RunAnywhere.performList(request)
-            guard result.success else {
-                throw SDKException(
-                    code: .processingFailed,
-                    message: result.errorMessage.isEmpty ? "Model list failed" : result.errorMessage,
-                    category: .internal
-                )
+            guard !result.hasError else {
+                throw SDKException(proto: result.error)
             }
             return result.models.models
         }
@@ -147,12 +143,8 @@ public extension RunAnywhere {
         /// - Throws: `SDKException` when deletion fails.
         public func delete(id: String) async throws {
             let result = await RunAnywhere.performDelete(id)
-            guard result.success else {
-                throw SDKException(
-                    code: .deleteFailed,
-                    message: result.errorMessage.isEmpty ? "Model delete failed" : result.errorMessage,
-                    category: .io
-                )
+            guard !result.hasError else {
+                throw SDKException(proto: result.error)
             }
         }
 
@@ -191,12 +183,8 @@ public extension RunAnywhere {
                 request.unloadAll = true
             }
             let result = await RunAnywhere.performUnload(request)
-            guard result.success else {
-                throw SDKException(
-                    code: .processingFailed,
-                    message: result.errorMessage.isEmpty ? "Model unload failed" : result.errorMessage,
-                    category: .component
-                )
+            guard !result.hasError else {
+                throw SDKException(proto: result.error)
             }
         }
 
@@ -351,11 +339,10 @@ extension RunAnywhere {
         request.validateAvailability = true
 
         let result = await performLoad(request)
-        guard result.success else {
-            let message = result.errorMessage.isEmpty ? "Model load failed" : result.errorMessage
+        guard !result.hasError else {
             throw SDKException(
                 code: .modelLoadFailed,
-                message: "Model '\(model.id)': \(message)",
+                message: "Model '\(model.id)': \(result.error.message)",
                 category: .component
             )
         }

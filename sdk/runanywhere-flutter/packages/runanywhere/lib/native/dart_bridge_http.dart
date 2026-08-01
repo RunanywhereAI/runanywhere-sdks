@@ -260,7 +260,7 @@ class DartBridgeHTTP {
       _logger.debug('Token needs refresh, attempting commons retryHTTP...');
       try {
         final result = DartBridgeSdkInit.retryHTTP();
-        if (!result.success) {
+        if (result.hasError()) {
           _logger.warning('commons retryHTTP returned unsuccessful result');
         }
         final newToken = authBridge.getAccessToken();

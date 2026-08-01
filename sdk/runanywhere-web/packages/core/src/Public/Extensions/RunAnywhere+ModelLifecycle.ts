@@ -164,7 +164,6 @@ function currentModelFromBackendWorker(
       model: request.includeModelMetadata ? model : undefined,
       loadedAtUnixMs: entry.loadedAtUnixMs,
       found: true,
-      errorMessage: '',
       category: model.category ?? ModelCategoryEnum.MODEL_CATEGORY_UNSPECIFIED,
       framework: model.framework ?? InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
       resolvedPath: model.localPath ?? '',
@@ -215,7 +214,7 @@ async function loadModelViaBackendWorker(
     );
   }
   const result = ModelLoadResultCodec.decode(response.resultBytes);
-  if (result.success) {
+  if (!result.error) {
     markModelOwnedByBackendWorker(request.modelId, backendId);
     recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
   }
@@ -264,21 +263,19 @@ function aggregateUnloadResults(
   if (present.length === 0) return null;
   if (present.length === 1) return present[0];
 
-  const success = present.some((result) => result.success);
+  const anySuccess = present.some((result) => !result.error);
   const unloadedModelIds = Array.from(new Set(
     present.flatMap((result) => result.unloadedModelIds),
   )).sort((left, right) => left.localeCompare(right));
   const warnings = Array.from(new Set(
     present.flatMap((result) => result.warnings),
   )).sort((left, right) => left.localeCompare(right));
-  const errors = Array.from(new Set(
-    present.map((result) => result.errorMessage).filter((message) => message.length > 0),
-  )).sort((left, right) => left.localeCompare(right));
 
   return {
-    success,
     unloadedModelIds,
-    errorMessage: success ? '' : errors.join('; '),
+    // Success signalled by absence of error; all-failed aggregates carry the
+    // first failure's structured error.
+    error: anySuccess ? undefined : present.find((result) => result.error)?.error,
     unloadedAtUnixMs: Math.max(...present.map((result) => result.unloadedAtUnixMs)),
     warnings,
   };
@@ -291,7 +288,7 @@ function unloadAcrossAdapters(request: ModelUnloadRequest): ModelUnloadResult | 
     try {
       const result = adapter.unload(request);
       results.push(result);
-      if (result?.success) {
+      if (result && !result.error) {
         for (const modelId of result.unloadedModelIds) {
           recordModelLifecycle(modelId, lifecycleModuleAsEmscripten(adapter), false);
         }
@@ -315,7 +312,7 @@ async function unloadAcrossAdaptersAsync(
     try {
       const result = await adapter.unloadAsync(request);
       results.push(result);
-      if (result?.success) {
+      if (result && !result.error) {
         for (const modelId of result.unloadedModelIds) {
           recordModelLifecycle(modelId, lifecycleModuleAsEmscripten(adapter), false);
         }
@@ -490,7 +487,7 @@ export const WebModelLifecycle = {
     const snapshot = request.modelId ? safeGetModelSnapshot(request.modelId) : null;
     const adapter = requireAdapter(snapshot?.framework);
     const result = adapter.load(request);
-    if (result?.success) recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
+    if (result && !result.error) recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
     return result;
   },
 
@@ -589,7 +586,7 @@ export const WebModelLifecycle = {
       if (workerResult) return workerResult;
 
       const result = await adapter.loadAsync(request);
-      if (result?.success) {
+      if (result && !result.error) {
         clearModelOwnedByBackendWorker(request.modelId);
         recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(adapter), true);
       }
@@ -608,7 +605,7 @@ export const WebModelLifecycle = {
       const workerResult = await loadModelViaBackendWorker(request, modelSnapshot, retryAdapter);
       if (workerResult) return workerResult;
       const result = await retryAdapter.loadAsync(request);
-      if (result?.success) {
+      if (result && !result.error) {
         clearModelOwnedByBackendWorker(request.modelId);
         recordModelLifecycle(request.modelId, lifecycleModuleAsEmscripten(retryAdapter), true);
       }

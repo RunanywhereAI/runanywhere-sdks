@@ -381,7 +381,7 @@ bool llm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    const int32_t out_tokens = r.output_tokens();
+    const int32_t out_tokens = r.usage().output_tokens();
     if (out_tokens <= 0) {
         *err = "no output tokens";
         return false;
@@ -389,7 +389,7 @@ bool llm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     const double e2e = r.generation_time_ms() > 0.0 ? r.generation_time_ms() : measured_e2e;
     const double explicit_decode =
         r.decode_time_ms() > 0 ? static_cast<double>(r.decode_time_ms()) : 0.0;
-    double tps = r.tokens_per_second() > 0.0 ? r.tokens_per_second() : 0.0;
+    double tps = r.usage().tokens_per_second() > 0.0 ? r.usage().tokens_per_second() : 0.0;
     if (tps <= 0.0 && explicit_decode > 0.0) {
         tps = out_tokens * 1000.0 / explicit_decode;
     }
@@ -484,10 +484,10 @@ bool vlm_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    const int32_t out_tokens = r.output_tokens();
+    const int32_t out_tokens = r.usage().output_tokens();
     m->end_to_end_ms = r.processing_time_ms() > 0 ? static_cast<double>(r.processing_time_ms())
                                                   : measured_e2e;
-    m->tokens_per_second = r.tokens_per_second();
+    m->tokens_per_second = r.usage().tokens_per_second();
     m->prompt_eval_ms = static_cast<double>(r.time_to_first_token_ms());
     m->output_tokens = out_tokens;
     if (m->tokens_per_second <= 0.0 && out_tokens > 0 && m->end_to_end_ms > 0.0) {

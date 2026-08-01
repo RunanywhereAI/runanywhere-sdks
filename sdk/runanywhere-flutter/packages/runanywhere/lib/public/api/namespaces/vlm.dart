@@ -89,8 +89,8 @@ class VlmApi {
         }
       }
 
-      if (terminal != null && terminal.errorMessage.isNotEmpty) {
-        throw SDKException.vlmProcessingFailed(terminal.errorMessage);
+      if (terminal != null && terminal.hasError()) {
+        throw SDKException.vlmProcessingFailed(terminal.error.message);
       }
       final result = terminal != null && terminal.hasResult()
           ? GenerationResult.fromVlm(

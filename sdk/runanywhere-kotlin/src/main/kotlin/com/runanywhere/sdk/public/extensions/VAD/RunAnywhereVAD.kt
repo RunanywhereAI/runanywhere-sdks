@@ -104,8 +104,12 @@ fun RunAnywhere.streamVAD(
             val sdkError = SDKException.from(error, ErrorCategory.ERROR_CATEGORY_COMPONENT)
             emit(
                 RAVADResult(
-                    error_message = "VAD stream failed: ${sdkError.error.message}",
-                    error_code = sdkError.code.value,
+                    error =
+                        ai.runanywhere.proto.v1.SDKError(
+                            code = sdkError.code,
+                            category = sdkError.category,
+                            message = "VAD stream failed: ${sdkError.error.message}",
+                        ),
                 ),
             )
         }

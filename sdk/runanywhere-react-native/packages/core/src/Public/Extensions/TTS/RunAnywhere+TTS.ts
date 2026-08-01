@@ -145,8 +145,8 @@ export async function synthesize(
  *   - SDK not initialized / services not ready / no TTS voice loaded →
  *     the stream finishes silently.
  *   - A stream failure surfaces as a terminal error-marked `TTSOutput`
- *     (`isFinal=true`, non-empty `errorMessage`,
- *     `errorCode=RAC_ERROR_PROCESSING_FAILED`) followed by completion.
+ *     (`isFinal=true`, populated `error` SDKError with
+ *     `ERROR_CODE_PROCESSING_FAILED`) followed by completion.
  */
 export function synthesizeStream(
   text: string,
@@ -158,10 +158,6 @@ export function synthesizeStream(
 
   const native = requireNativeModule();
   const requestBytes = encodeTTSSynthesisRequest(text, options);
-
-  // RAC_ERROR_PROCESSING_FAILED — mirrors Swift's terminal failure marker
-  // (RunAnywhere+TTS.swift:84).
-  const RAC_ERROR_PROCESSING_FAILED = -234;
 
   return {
     [Symbol.asyncIterator](): AsyncIterator<TTSOutput> {
@@ -194,8 +190,8 @@ export function synthesizeStream(
           TTSOutputMessage.fromPartial({
             timestampMs: Date.now(),
             isFinal: true,
-            errorMessage: `TTS stream failed: ${message}`,
-            errorCode: RAC_ERROR_PROCESSING_FAILED,
+            error: SDKException.processingFailed(`TTS stream failed: ${message}`)
+              .proto,
           })
         );
         finish();
@@ -239,7 +235,7 @@ export function synthesizeStream(
                 try {
                   const event = TTSStreamEvent.decode(arrayBufferToBytes(eventBytes));
                   if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
-                    failStream(event.errorMessage ?? 'unknown error');
+                    failStream(event.error?.message ?? 'unknown error');
                     return;
                   }
                   if (event.output) {

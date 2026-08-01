@@ -24,7 +24,6 @@ __all__ = [
     "Interruption",
     "LlmOptions",
     "LoadOptions",
-    "NormalizeMode",
     "PoolingMode",
     "RagConfig",
     "ReasoningMode",
@@ -161,13 +160,6 @@ class VadOptions:
     model: Optional[str] = None
 
 
-class NormalizeMode(IntEnum):
-    """Vector normalization applied to embeddings."""
-
-    NONE = 0
-    L2 = 1
-
-
 class PoolingMode(IntEnum):
     """Token-pooling strategy used to build one vector per input."""
 
@@ -180,7 +172,7 @@ class PoolingMode(IntEnum):
 class EmbedOptions:
     """Embedding controls."""
 
-    normalize: NormalizeMode = NormalizeMode.L2
+    normalize: bool = True
     pooling: PoolingMode = PoolingMode.MEAN
     model: Optional[str] = None
 

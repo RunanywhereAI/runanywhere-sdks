@@ -18,14 +18,11 @@
  */
 
 import {
-  HybridRank,
   HybridRoutingPolicy as HybridRoutingPolicyProto,
   type HybridFilter as HybridFilterProto,
 } from '@runanywhere/proto-ts/hybrid_router';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
 import { hybridDefaults } from '@runanywhere/proto-ts/defaults/pool';
-
-export { HybridRank };
 
 /**
  * A caller-supplied eligibility predicate. Registered with commons under
@@ -123,13 +120,14 @@ export const Cascades = {
 
 /**
  * The full routing policy attached to a model pair: filters (AND-composed), an
- * optional cascade, and a rank. Defaults to "prefer local, fall back to online
- * on hard failure" (`preferLocalFirst`, no filters or cascade).
+ * optional cascade, and a rank preference. Defaults to "prefer local, fall back
+ * to online on hard failure" (`preferLocal: true`, no filters or cascade).
  */
 export interface HybridRoutingPolicy {
   hardFilters?: HybridFilter[];
   cascade?: HybridCascade;
-  rank?: HybridRank;
+  /** Prefer the local (offline) candidate first. Defaults to true. */
+  preferLocal?: boolean;
 }
 
 /** The custom filters in a policy, with their registered name + predicate. */
@@ -171,7 +169,7 @@ export function encodeHybridRoutingPolicy(policy: HybridRoutingPolicy): ArrayBuf
       policy.cascade != null
         ? { confidence: { threshold: policy.cascade.threshold } }
         : undefined,
-    rank: policy.rank ?? HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST,
+    preferLocal: policy.preferLocal ?? true,
   });
   return encodeProtoMessage(message, HybridRoutingPolicyProto);
 }

@@ -133,7 +133,7 @@ class ModelsApi {
         case DownloadState.DOWNLOAD_STATE_FAILED:
           throw SDKException.downloadFailed(
             id,
-            progress.errorMessage.isEmpty ? null : progress.errorMessage,
+            progress.hasError() ? progress.error.message : null,
           );
         case DownloadState.DOWNLOAD_STATE_CANCELLED:
           throw SDKException.cancelled('Download cancelled for $id');
@@ -167,11 +167,11 @@ class ModelsApi {
   /// Throws [SDKException] when deletion fails.
   Future<void> delete(String id) async {
     final result = await RunAnywhereStorage.deleteModel(id);
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.storageError(
-        result.errorMessage.isEmpty
+        result.error.message.isEmpty
             ? 'Failed to delete model: $id'
-            : result.errorMessage,
+            : result.error.message,
       );
     }
   }
@@ -287,8 +287,8 @@ class LoraApi {
         ],
       ),
     );
-    if (result.errorMessage.isNotEmpty) {
-      throw SDKException.invalidState(result.errorMessage);
+    if (result.hasError()) {
+      throw SDKException.invalidState(result.error.message);
     }
   }
 
@@ -303,8 +303,8 @@ class LoraApi {
         ? LoRARemoveRequest(clearAll: true)
         : LoRARemoveRequest(adapterIds: [adapterId]);
     final state = await RunAnywhereLoRACapability.shared.remove(request);
-    if (state.errorMessage.isNotEmpty) {
-      throw SDKException.invalidState(state.errorMessage);
+    if (state.hasError()) {
+      throw SDKException.invalidState(state.error.message);
     }
   }
 

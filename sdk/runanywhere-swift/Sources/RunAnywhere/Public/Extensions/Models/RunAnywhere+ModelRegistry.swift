@@ -14,8 +14,11 @@ extension RunAnywhere {
     internal static func performList(_ request: RAModelListRequest = RAModelListRequest()) async -> RAModelListResult {
         guard isReady else {
             var result = RAModelListResult()
-            result.success = false
-            result.errorMessage = "SDK not initialized"
+            result.error = RASDKError.make(
+                code: .notInitialized,
+                message: "SDK not initialized",
+                category: .component
+            )
             return result
         }
         try? await ensureServicesReady()
@@ -26,7 +29,11 @@ extension RunAnywhere {
         guard isReady else {
             var result = RAModelGetResult()
             result.found = false
-            result.errorMessage = "SDK not initialized"
+            result.error = RASDKError.make(
+                code: .notInitialized,
+                message: "SDK not initialized",
+                category: .component
+            )
             return result
         }
         try? await ensureServicesReady()

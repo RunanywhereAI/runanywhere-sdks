@@ -99,8 +99,11 @@ extension CppBridge {
             cancelActiveQuery(handle: protoSession)
         }
 
-        /// Session-scoped cancel for a caller-owned handle.
-        func cancelActiveQuery(handle: rac_handle_t) {
+        /// Session-scoped cancel for a caller-owned handle. `nonisolated`: the
+        /// caller (a `RagSession` actor) owns the handle, so this runs in the
+        /// caller's isolation rather than sending a non-Sendable handle across
+        /// the actor boundary.
+        nonisolated func cancelActiveQuery(handle: rac_handle_t) {
             guard let cancel = RAGCancelProtoABI.cancel else {
                 logger.debug("rac_rag_cancel_proto unavailable; relying on cooperative cancellation")
                 return
@@ -111,8 +114,9 @@ extension CppBridge {
             }
         }
 
-        /// Release a caller-owned session handle.
-        func destroySession(handle: rac_handle_t) {
+        /// Release a caller-owned session handle. `nonisolated` for the same
+        /// reason as `cancelActiveQuery(handle:)`.
+        nonisolated func destroySession(handle: rac_handle_t) {
             destroyRAGProtoSessionIfAvailable(handle)
         }
 
@@ -170,7 +174,9 @@ extension CppBridge {
 
         /// Same contract as `runQueryStream(_:)`, scoped to a caller-owned
         /// session handle so independent `RagSession`s can run side by side.
-        func runQueryStream(
+        /// `nonisolated`: the owning `RagSession` actor passes its handle in,
+        /// so this must not hop the `CppBridge.RAG` actor.
+        nonisolated func runQueryStream(
             handle: rac_handle_t,
             _ options: RARAGQueryOptions
         ) throws -> AsyncStream<RARAGStreamEvent> {

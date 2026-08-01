@@ -47,10 +47,10 @@ internal suspend fun ensureModelLoaded(
                 validate_availability = true,
             ),
         )
-    if (!result.success) {
+    if (result.error != null) {
         throw SDKException.modelLoadFailed(
             modelId,
-            result.error_message.ifBlank { "Model load failed" },
+            result.error!!.message.ifBlank { "Model load failed" },
         )
     }
 }

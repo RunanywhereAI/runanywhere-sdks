@@ -5,6 +5,7 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/ra_result_codes.dart';
@@ -43,22 +44,24 @@ class DartBridgeModelLifecycle {
     final fn = RacNative.bindings.rac_model_lifecycle_load_proto;
     if (fn == null) {
       return model_pb.ModelLoadResult(
-        success: false,
         modelId: request.modelId,
         category: request.category,
         framework: request.framework,
-        errorMessage: 'Model lifecycle load proto API is unavailable',
+        error: SDKException.serviceUnavailable(
+          'Model lifecycle load proto API is unavailable',
+        ).error,
       );
     }
 
     final registry = DartBridgeModelRegistry.instance.nativeHandle;
     if (registry == null || registry == nullptr) {
       return model_pb.ModelLoadResult(
-        success: false,
         modelId: request.modelId,
         category: request.category,
         framework: request.framework,
-        errorMessage: 'Model registry is not initialized',
+        error: SDKException.componentNotReady(
+          'Model registry is not initialized',
+        ).error,
       );
     }
 
@@ -84,22 +87,22 @@ class DartBridgeModelLifecycle {
           '${_protoBufferError(out, code)}',
         );
         return model_pb.ModelLoadResult(
-          success: false,
           modelId: request.modelId,
           category: request.category,
           framework: request.framework,
-          errorMessage: _protoBufferError(out, code),
+          error: SDKException.internalError(_protoBufferError(out, code)).error,
         );
       }
       return _decodeBuffer(out, model_pb.ModelLoadResult.fromBuffer);
     } catch (e) {
       _logger.debug('rac_model_lifecycle_load_proto error: $e');
       return model_pb.ModelLoadResult(
-        success: false,
         modelId: request.modelId,
         category: request.category,
         framework: request.framework,
-        errorMessage: 'rac_model_lifecycle_load_proto threw: $e',
+        error: SDKException.internalError(
+          'rac_model_lifecycle_load_proto threw: $e',
+        ).error,
       );
     } finally {
       bindings.rac_proto_buffer_free(out);
@@ -114,8 +117,9 @@ class DartBridgeModelLifecycle {
     final fn = RacNative.bindings.rac_model_lifecycle_unload_proto;
     if (fn == null) {
       return model_pb.ModelUnloadResult(
-        success: false,
-        errorMessage: 'Model lifecycle unload proto API is unavailable',
+        error: SDKException.serviceUnavailable(
+          'Model lifecycle unload proto API is unavailable',
+        ).error,
       );
     }
 
@@ -127,8 +131,9 @@ class DartBridgeModelLifecycle {
     );
     return result ??
         model_pb.ModelUnloadResult(
-          success: false,
-          errorMessage: 'Model lifecycle unload returned no result',
+          error: SDKException.internalError(
+            'Model lifecycle unload returned no result',
+          ).error,
         );
   }
 

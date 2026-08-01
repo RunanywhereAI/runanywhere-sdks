@@ -112,12 +112,8 @@ public extension RunAnywhere {
                     toolOptions: effective.toolCallingProto(),
                     history: history
                 )
-                if loop.errorCode != 0 {
-                    throw SDKException(
-                        code: .generationFailed,
-                        message: loop.hasErrorMessage ? loop.errorMessage : "Tool-calling loop failed",
-                        category: .component
-                    )
+                if loop.hasError {
+                    throw SDKException(proto: loop.error)
                 }
                 return GenerationResult(proto: loop, requestId: loop.conversationID, model: model)
             }
@@ -129,12 +125,8 @@ public extension RunAnywhere {
             request.modelID = model
 
             let result = try await CppBridge.LLM.shared.generate(request)
-            if result.errorCode != 0 {
-                throw SDKException(
-                    code: .generationFailed,
-                    message: result.hasErrorMessage ? result.errorMessage : "Generation failed",
-                    category: .component
-                )
+            if result.hasError {
+                throw SDKException(proto: result.error)
             }
             return GenerationResult(proto: result, requestId: request.requestID)
         }
@@ -242,12 +234,8 @@ extension RunAnywhere {
                     if Task.isCancelled { break }
                     requestId = event.requestID
 
-                    if event.errorCode != 0 || event.eventKind == .error {
-                        continuation.finish(throwing: SDKException(
-                            code: .generationFailed,
-                            message: event.errorMessage.isEmpty ? "Generation failed" : event.errorMessage,
-                            category: .component
-                        ))
+                    if event.hasError || event.eventKind == .error {
+                        continuation.finish(throwing: SDKException(proto: event.error))
                         return
                     }
 

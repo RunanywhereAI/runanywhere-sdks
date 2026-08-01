@@ -53,7 +53,11 @@ public extension RunAnywhere {
                     var failure = RATTSOutput()
                     failure.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
                     failure.isFinal = true
-                    failure.errorMessage = "TTS stream failed: \(error)"
+                    failure.error = RASDKError.make(
+                        code: .internal,
+                        message: "TTS stream failed: \(error)",
+                        category: .internal
+                    )
                     continuation.yield(failure)
                 }
                 continuation.finish()

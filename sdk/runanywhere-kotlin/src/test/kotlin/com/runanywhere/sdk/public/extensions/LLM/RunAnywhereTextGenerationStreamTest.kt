@@ -44,7 +44,6 @@ class RunAnywhereTextGenerationStreamTest {
                                 "native callback must accept token $index",
                                 onEvent(
                                     LLMStreamEvent(
-                                        seq = index.toLong() + 1,
                                         token = "<$index>",
                                     ),
                                 ),
@@ -54,7 +53,6 @@ class RunAnywhereTextGenerationStreamTest {
                             "terminal callback must stop native generation",
                             onEvent(
                                 LLMStreamEvent(
-                                    seq = tokenCount.toLong() + 1,
                                     is_final = true,
                                     finish_reason = "stop",
                                 ),
@@ -65,17 +63,17 @@ class RunAnywhereTextGenerationStreamTest {
                     cancel = { cancelCalls.incrementAndGet() },
                 )
 
-            val observedSequences = mutableListOf<Long>()
+            var observedCount = 0
             val deliberatelyStalledEvents =
-                events.onEach { event ->
-                    if (observedSequences.isEmpty()) {
+                events.onEach {
+                    if (observedCount == 0) {
                         // Hold the collector on event 1 until the synchronous
                         // producer has enqueued all 2,049 events. This creates
                         // deterministic pressure far beyond callbackFlow's
                         // default capacity (64), without timing assumptions.
                         withTimeout(2_000) { productionFinished.await() }
                     }
-                    observedSequences += event.seq
+                    observedCount += 1
                 }
 
             val result =
@@ -92,7 +90,7 @@ class RunAnywhereTextGenerationStreamTest {
                     nowMillis = { 10_000L },
                 )
 
-            assertEquals((1L..tokenCount.toLong() + 1).toList(), observedSequences)
+            assertEquals(tokenCount + 1, observedCount)
             assertEquals(expectedText, result.text)
             assertEquals(tokenCount, result.output_tokens)
             assertEquals(tokenCount, result.response_tokens)
@@ -122,9 +120,8 @@ class RunAnywhereTextGenerationStreamTest {
                 )
             val events =
                 flowOf(
-                    LLMStreamEvent(seq = 1, token = "streamed fallback"),
+                    LLMStreamEvent(token = "streamed fallback"),
                     LLMStreamEvent(
-                        seq = 2,
                         is_final = true,
                         finish_reason = "stop",
                         result = canonical,
@@ -171,13 +168,13 @@ class RunAnywhereTextGenerationStreamTest {
                 losslessLLMStreamFlow(
                     prepare = {},
                     generate = { onEvent ->
-                        assertTrue(onEvent(LLMStreamEvent(seq = 1, token = "first")))
+                        assertTrue(onEvent(LLMStreamEvent(token = "first")))
                         assertTrue(
                             "cancellation hook did not release producer",
                             continueAfterCancellation.await(2, TimeUnit.SECONDS),
                         )
                         callbackAfterCancellation.complete(
-                            onEvent(LLMStreamEvent(seq = 2, token = "must-not-deliver")),
+                            onEvent(LLMStreamEvent(token = "must-not-deliver")),
                         )
                     },
                     cancel = {

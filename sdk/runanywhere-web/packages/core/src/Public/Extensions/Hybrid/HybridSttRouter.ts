@@ -101,7 +101,7 @@ function pinnedEngineName(backend: HybridBackendKind): string {
  *   offlineSherpa('sherpa-onnx-whisper-tiny.en'),
  *   onlineCloud('saaras'),
  *   { hardFilters: [networkFilter()], cascade: confidenceCascade(0.5),
- *     rank: HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST },
+ *     preferLocal: true },
  * );
  * const result = router.transcribe(audioBytes, { audioFormat: 1 });
  * router.close();

@@ -26,7 +26,10 @@ function toSdkEvent(event: SDKEvent): SdkEvent | undefined {
       recoverable: false,
     };
   }
-  if (event.componentLifecycle?.modelLoadResult?.success) {
+  if (
+    event.componentLifecycle?.modelLoadResult &&
+    !event.componentLifecycle.modelLoadResult.error
+  ) {
     return {
       type: 'modelLoaded',
       id: event.componentLifecycle.modelLoadResult.modelId,

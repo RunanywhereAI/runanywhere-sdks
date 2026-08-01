@@ -135,8 +135,8 @@ suspend fun RunAnywhere.ensureDefaultVAD(modelID: String? = null): Boolean {
             category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
         )
     val result = loadModel(loadRequest)
-    if (!result.success) {
-        val errorMessage = result.error_message
+    if (result.error != null) {
+        val errorMessage = result.error!!.message
         voiceAgentLogger.warning(
             "Default VAD '$targetID' auto-load failed: $errorMessage — voice agent will use energy fallback",
         )

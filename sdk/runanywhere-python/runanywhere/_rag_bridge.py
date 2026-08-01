@@ -127,20 +127,18 @@ def parse_result(raw: bytes, model: str) -> RagResult:
     """
     pb = _pb.RAGResult()
     pb.ParseFromString(raw)
-    if pb.error_code != 0:
-        raise SDKException.generation_failed(
-            pb.error_message or f"RAG query failed (code {pb.error_code})"
-        )
+    if pb.HasField("error"):
+        raise SDKException.from_proto(pb.error)
     return _result_from_pb(pb, model)
 
 
 def _result_from_pb(pb: Any, model: str) -> RagResult:
     generation_ms = float(pb.generation_time_ms)
-    tokens = int(pb.completion_tokens)
+    tokens = int(pb.usage.output_tokens)
     return RagResult(
         answer=pb.answer,
         sources=[_match(chunk) for chunk in pb.retrieved_chunks],
-        input_tokens=int(pb.prompt_tokens),
+        input_tokens=int(pb.usage.input_tokens),
         output_tokens=tokens,
         # The pipeline reports phase timings, not a first-token timestamp.
         time_to_first_token_ms=float(pb.retrieval_time_ms),
@@ -179,9 +177,9 @@ def parse_stream_event(raw: bytes, model: str) -> Optional[RagEvent]:
             kind=RagEventKind.COMPLETED, result=_result_from_pb(pb.result, model)
         )
     if kind == _STREAM_ERROR:
-        raise SDKException.generation_failed(
-            pb.error_message or f"RAG stream failed (code {pb.error_code})"
-        )
+        if pb.HasField("error"):
+            raise SDKException.from_proto(pb.error)
+        raise SDKException.generation_failed("RAG stream failed")
     return None
 
 

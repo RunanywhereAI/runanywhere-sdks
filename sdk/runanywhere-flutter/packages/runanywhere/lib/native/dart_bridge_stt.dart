@@ -348,8 +348,8 @@ class DartBridgeSTT {
                   controller.add(partial);
                 case STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR:
                   emitFailure(
-                    event.hasErrorMessage()
-                        ? event.errorMessage
+                    event.hasError()
+                        ? event.error.message
                         : 'STT stream failed',
                   );
                 default:

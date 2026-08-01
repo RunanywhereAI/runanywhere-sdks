@@ -93,11 +93,7 @@ public extension RunAnywhere {
                             ))
                             sawCompletion = true
                         case .error:
-                            continuation.finish(throwing: SDKException(
-                                code: .generationFailed,
-                                message: event.hasErrorMessage ? event.errorMessage : "VLM generation failed",
-                                category: .component
-                            ))
+                            continuation.finish(throwing: SDKException(proto: event.error))
                             return
                         default:
                             break
@@ -144,12 +140,8 @@ public extension RunAnywhere {
 extension RunAnywhere {
 
     internal static func throwIfVLMFailed(_ result: RAVLMResult) throws {
-        guard result.errorCode != 0 else { return }
-        throw SDKException(
-            code: .generationFailed,
-            message: result.hasErrorMessage ? result.errorMessage : "VLM generation failed",
-            category: .component
-        )
+        guard result.hasError else { return }
+        throw SDKException(proto: result.error)
     }
 
     internal static func requireVLMModel() throws {

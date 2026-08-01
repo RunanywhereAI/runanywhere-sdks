@@ -49,8 +49,8 @@ export const lora = {
         ],
       })
     );
-    if (result.errorMessage) {
-      throw SDKException.processingFailed(result.errorMessage);
+    if (result.error) {
+      throw new SDKException(result.error);
     }
   },
 

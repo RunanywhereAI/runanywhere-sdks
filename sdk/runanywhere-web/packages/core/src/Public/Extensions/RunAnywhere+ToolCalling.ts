@@ -280,12 +280,8 @@ function readToolPromptFormat(
       'rac_tool_call_format_prompt_proto returned no ToolPromptFormatResult bytes.',
     );
   }
-  if (result.errorCode !== 0) {
-    throw SDKException.fromCode(
-      -ProtoErrorCode.ERROR_CODE_BACKEND_ERROR,
-      'Tool prompt formatting failed',
-      result.errorMessage,
-    );
+  if (result.error) {
+    throw new SDKException(result.error);
   }
   return result;
 }
@@ -395,9 +391,8 @@ function makeToolResult(params: {
 }): ToolResult {
   return ToolResultMessage.fromPartial({
     name: params.name,
-    success: params.success,
     resultJson: jsonStringFromObject(params.result ?? {}),
-    error: params.error,
+    error: params.error ? SDKException.processingFailed(params.error).proto : undefined,
     toolCallId: params.toolCallId,
     startedAtMs: params.startedAtMs,
     completedAtMs: Date.now(),
@@ -591,7 +586,7 @@ async function generateWithToolsInBackendWorker(
           sessionHandle,
           toolCallId,
           toolResult.resultJson ?? '',
-          toolResult.success ? undefined : toolResult.error,
+          toolResult.error?.message,
         ),
       }) as WorkerToolSessionResponse;
       events = decodeWorkerSessionEvents(stepped.eventBytes);
@@ -1018,7 +1013,7 @@ export const ToolCalling = {
           sessionHandle,
           toolCallId,
           toolResult.resultJson ?? '',
-          toolResult.success ? undefined : toolResult.error,
+          toolResult.error?.message,
         );
         const stepRc = await bridge.withHeapBytesAsync(stepBytes, (ptr, size) => (
           callEmscriptenAsyncNumber(

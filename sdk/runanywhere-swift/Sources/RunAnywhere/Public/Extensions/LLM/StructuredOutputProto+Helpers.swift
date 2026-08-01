@@ -64,7 +64,13 @@ extension RAStructuredOutputValidation {
         self.init()
         self.isValid = isValid
         self.containsJson = containsJson
-        if let err = errorMessage { self.errorMessage = err }
+        if let err = errorMessage {
+            self.error = RASDKError.make(
+                code: .validationFailed,
+                message: err,
+                category: .validation
+            )
+        }
         if let raw = rawOutput { self.rawOutput = raw }
     }
 }

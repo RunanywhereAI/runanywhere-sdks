@@ -11,7 +11,6 @@ package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.DiffusionMode
-import ai.runanywhere.proto.v1.EmbeddingsNormalizeMode
 import ai.runanywhere.proto.v1.EmbeddingsOptions
 import ai.runanywhere.proto.v1.EmbeddingsPoolingStrategy
 import ai.runanywhere.proto.v1.LLMGenerationOptions
@@ -154,11 +153,7 @@ internal fun EmbedOptions?.orDefault(): EmbedOptions = this ?: EmbedOptions()
 
 internal fun EmbedOptions.toProto(): EmbeddingsOptions =
     EmbeddingsOptions(
-        normalize_mode =
-            when (normalize) {
-                NormalizeMode.NONE -> EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_NONE
-                NormalizeMode.L2 -> EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2
-            },
+        normalize = normalize == NormalizeMode.L2,
         pooling =
             when (pooling) {
                 PoolingMode.MEAN -> EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN

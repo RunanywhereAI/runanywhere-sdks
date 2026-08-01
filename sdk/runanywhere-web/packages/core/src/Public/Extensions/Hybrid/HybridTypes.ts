@@ -23,8 +23,6 @@
 import {
   HybridBackendKind,
   HybridModelDescriptor,
-  HybridModelType,
-  HybridRank,
   HybridRoutedMetadata,
   HybridRoutingPolicy,
   HybridSttTranscribeRequest,
@@ -44,7 +42,7 @@ import { hybridDefaults } from '@runanywhere/proto-ts/defaults/pool';
 // Re-export the wire enums so callers can use them directly without importing
 // from `@runanywhere/proto-ts` (the structured-types-as-data rule: provider is
 // data, backend is a wire enum).
-export { HybridBackendKind, HybridModelType, HybridRank };
+export { HybridBackendKind };
 
 // Re-export the generated routing metadata so downstream consumers keep a
 // stable `HybridRoutedMetadata` import path from this module. The hand-written
@@ -136,15 +134,16 @@ export function confidenceCascade(
 
 /**
  * The full routing policy attached to a model pair: filters (AND-composed),
- * an optional cascade, and a rank. Defaults to `PREFER_LOCAL_FIRST` with no
- * filters or cascade — i.e. "use the local candidate, fall back to online on
- * hard failure". Mirrors Swift's `HybridRoutingPolicy` /
- * Kotlin's `SimpleRouterPolicy` + `AdvanceRouterPolicy`.
+ * an optional cascade, and a rank. `preferLocal` defaults to `true` (prefer the
+ * local candidate first) with no filters or cascade — i.e. "use the local
+ * candidate, fall back to online on hard failure". Mirrors Swift's
+ * `HybridRoutingPolicy` / Kotlin's `SimpleRouterPolicy` + `AdvanceRouterPolicy`.
  */
 export interface HybridRoutingPolicySpec {
   hardFilters?: HybridFilterSpec[];
   cascade?: HybridCascadeSpec;
-  rank?: HybridRank;
+  /** Prefer the local candidate first when true (the default). */
+  preferLocal?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +162,8 @@ export interface HybridRoutingPolicySpec {
  */
 export interface HybridModelSpec {
   id: string;
-  modelType: HybridModelType;
+  /** True for an on-device (offline) model, false for a cloud (online) one. */
+  isLocal: boolean;
   backend: HybridBackendKind;
   /**
    * Concrete cloud provider when `backend === CLOUD` (e.g. "sarvam"). Empty
@@ -177,7 +177,7 @@ export interface HybridModelSpec {
 export function offlineSherpa(id: string): HybridModelSpec {
   return {
     id,
-    modelType: HybridModelType.HYBRID_MODEL_TYPE_OFFLINE,
+    isLocal: true,
     backend: HybridBackendKind.HYBRID_BACKEND_SHERPA,
   };
 }
@@ -189,7 +189,7 @@ export function onlineCloud(
 ): HybridModelSpec {
   return {
     id,
-    modelType: HybridModelType.HYBRID_MODEL_TYPE_ONLINE,
+    isLocal: false,
     backend: HybridBackendKind.HYBRID_BACKEND_CLOUD,
     provider,
   };
@@ -247,7 +247,7 @@ export function customFiltersOf(
 export function encodeModelDescriptor(model: HybridModelSpec): Uint8Array {
   const descriptor: HybridModelDescriptor = {
     modelId: model.id,
-    modelType: model.modelType,
+    isLocal: model.isLocal,
     backend: model.backend,
     provider: model.provider ?? '',
   };
@@ -286,7 +286,7 @@ export function encodeRoutingPolicy(policy: HybridRoutingPolicySpec): Uint8Array
   const message: HybridRoutingPolicy = {
     hardFilters: (policy.hardFilters ?? []).map(encodeFilter),
     cascade: policy.cascade ? encodeCascade(policy.cascade) : undefined,
-    rank: policy.rank ?? HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST,
+    preferLocal: policy.preferLocal ?? true,
   };
   return HybridRoutingPolicy.encode(message).finish();
 }

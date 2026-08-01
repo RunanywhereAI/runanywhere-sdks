@@ -16,8 +16,6 @@
 import 'dart:typed_data';
 
 import 'package:runanywhere/generated/hybrid_router.pb.dart' as pb;
-import 'package:runanywhere/generated/hybrid_router.pbenum.dart'
-    show HybridRank;
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
 
 /// Suggested default confidence threshold for an STT confidence cascade.
@@ -127,18 +125,19 @@ class HybridConfidenceCascade extends HybridCascade {
 }
 
 /// Comparator that orders eligible candidates. Exactly one rank per policy.
-/// Wire values match `HybridRank` in hybrid_router.proto.
+/// Maps to the `prefer_local` bool on `HybridRoutingPolicy` in
+/// hybrid_router.proto.
 enum HybridRankOrder {
   /// Prefer the offline candidate when both are eligible.
-  preferLocalFirst(HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST),
+  preferLocalFirst(true),
 
   /// Prefer the online candidate when both are eligible.
-  preferOnlineFirst(HybridRank.HYBRID_RANK_PREFER_ONLINE_FIRST);
+  preferOnlineFirst(false);
 
-  const HybridRankOrder(this.proto);
+  const HybridRankOrder(this.preferLocal);
 
-  /// The generated proto enum this maps to on the wire.
-  final HybridRank proto;
+  /// Wire value carried in the policy's `prefer_local` field.
+  final bool preferLocal;
 }
 
 /// The full routing policy attached to a model pair: filters (AND-composed),
@@ -187,7 +186,7 @@ class HybridRoutingPolicy {
     final policy = pb.HybridRoutingPolicy(
       hardFilters: hardFilters.map(_encodeFilter),
       cascade: cascade == null ? null : _encodeCascade(cascade!),
-      rank: rank.proto,
+      preferLocal: rank.preferLocal,
     );
     return policy.writeToBuffer();
   }

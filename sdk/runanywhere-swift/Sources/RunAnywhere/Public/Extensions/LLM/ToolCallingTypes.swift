@@ -142,15 +142,3 @@ public extension RAToolDefinition {
         if let category { self.category = category }
     }
 }
-
-// MARK: - Tool Calling Options Helpers
-
-public extension RAToolCallingOptions {
-    static func defaults() -> RAToolCallingOptions {
-        var output = RAToolCallingOptions()
-        output.maxToolCalls = 5
-        output.autoExecute = true
-        output.format = .json
-        return output
-    }
-}

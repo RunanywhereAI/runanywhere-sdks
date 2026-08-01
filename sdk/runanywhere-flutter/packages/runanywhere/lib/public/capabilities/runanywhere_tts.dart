@@ -18,7 +18,6 @@ import 'package:runanywhere/generated/errors.pbenum.dart' show ErrorCode;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
-import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
@@ -100,13 +99,8 @@ class RunAnywhereTTS {
           validateAvailability: true,
         ),
       );
-      if (!result.success) {
-        throw SDKException.modelLoadFailed(
-          voiceId,
-          result.errorMessage.isNotEmpty
-              ? result.errorMessage
-              : 'TTS lifecycle load failed',
-        );
+      if (result.hasError()) {
+        throw SDKException(result.error);
       }
 
       logger.info('TTS voice loaded: $voiceId');
@@ -136,12 +130,8 @@ class RunAnywhereTTS {
         category: _ttsCategory,
       ),
     );
-    if (!result.success) {
-      throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
-            : 'TTS lifecycle unload failed',
-      );
+    if (result.hasError()) {
+      throw SDKException(result.error);
     }
     _isSpeaking = false;
   }
@@ -207,8 +197,7 @@ class RunAnywhereTTS {
       yield TTSOutput(
         timestampMs: Int64(DateTime.now().millisecondsSinceEpoch),
         isFinal: true,
-        errorMessage: 'TTS stream failed: $e',
-        errorCode: RacResultCodes.errorProcessingFailed,
+        error: SDKException.processingFailed('TTS stream failed: $e').error,
       );
       return;
     }

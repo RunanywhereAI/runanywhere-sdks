@@ -72,9 +72,9 @@ export const tts = {
             const event = decodeEvent(eventBytes, TTSStreamEvent);
             if (event.kind === TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR) {
               controller.fail(
-                SDKException.processingFailed(
-                  event.errorMessage || 'TTS stream failed'
-                )
+                event.error
+                  ? new SDKException(event.error)
+                  : SDKException.processingFailed('TTS stream failed')
               );
               return;
             }

@@ -74,7 +74,7 @@ export const tts = {
     if (!output) {
       throw SDKException.processingFailed('The TTS proto path returned no audio.');
     }
-    if (output.errorMessage) throw SDKException.processingFailed(output.errorMessage);
+    if (output.error) throw new SDKException(output.error);
     return toAudio(output);
   },
 
@@ -91,7 +91,7 @@ export const tts = {
       let index = 0;
       let last: { data: Uint8Array; index: number } | null = null;
       for await (const output of outputs) {
-        if (output.errorMessage) throw SDKException.processingFailed(output.errorMessage);
+        if (output.error) throw new SDKException(output.error);
         if (last) yield { data: last.data, index: last.index, isFinal: false };
         last = { data: output.audioData, index: output.chunkIndex || index };
         index += 1;

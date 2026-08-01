@@ -34,7 +34,7 @@ public actor RagSession {
     /// - Throws: `SDKException` when the session is closed or embedding fails.
     public func ingest(document: RagDocument) async throws {
         try requireOpen()
-        _ = try await CppBridge.RAG.shared.ingest(handle: handle, document.toProto())
+        _ = try CppBridge.RAG.shared.ingest(handle: handle, document.toProto())
     }
 
     /// Add several documents to the index.
@@ -43,7 +43,7 @@ public actor RagSession {
     public func ingest(documents: [RagDocument]) async throws {
         try requireOpen()
         for document in documents {
-            _ = try await CppBridge.RAG.shared.ingest(handle: handle, document.toProto())
+            _ = try CppBridge.RAG.shared.ingest(handle: handle, document.toProto())
         }
     }
 
@@ -58,7 +58,7 @@ public actor RagSession {
         var generation = RALLMGenerationOptions.defaults()
         generation.maxOutputTokens = 0
         options.generation = generation
-        let result = try await CppBridge.RAG.shared.query(handle: handle, options)
+        let result = try CppBridge.RAG.shared.query(handle: handle, options)
         try RagSession.throwIfFailed(result)
         return result.retrievedChunks.map(Match.init(proto:))
     }
@@ -70,7 +70,7 @@ public actor RagSession {
     public func query(question: String, options: LlmOptions? = nil) async throws -> RagResult {
         try requireOpen()
         try requireGenerationModel()
-        let result = try await CppBridge.RAG.shared.query(
+        let result = try CppBridge.RAG.shared.query(
             handle: handle,
             queryOptions(question: question, options: options)
         )
@@ -89,7 +89,7 @@ public actor RagSession {
         try requireOpen()
         try requireGenerationModel()
         let sessionHandle = RagSessionHandleRef(handle: handle)
-        let events = try await CppBridge.RAG.shared.runQueryStream(
+        let events = try CppBridge.RAG.shared.runQueryStream(
             handle: handle,
             queryOptions(question: question, options: options)
         )
@@ -121,11 +121,7 @@ public actor RagSession {
                         continuation.yield(.completed(RagResult(proto: result, model: model)))
                         sawCompletion = true
                     case .error:
-                        continuation.finish(throwing: SDKException(
-                            code: .processingFailed,
-                            message: event.hasErrorMessage ? event.errorMessage : "RAG query failed",
-                            category: .component
-                        ))
+                        continuation.finish(throwing: SDKException(proto: event.error))
                         return
                     default:
                         break
@@ -152,7 +148,7 @@ public actor RagSession {
             continuation.onTermination = { @Sendable termination in
                 task.cancel()
                 if case .cancelled = termination {
-                    Task { await CppBridge.RAG.shared.cancelActiveQuery(handle: sessionHandle.handle) }
+                    Task { CppBridge.RAG.shared.cancelActiveQuery(handle: sessionHandle.handle) }
                 }
             }
         }
@@ -163,7 +159,7 @@ public actor RagSession {
     /// - Throws: `SDKException` when the session is closed.
     public func stats() async throws -> RagStats {
         try requireOpen()
-        return RagStats(proto: try await CppBridge.RAG.shared.statsProto(handle: handle))
+        return RagStats(proto: try CppBridge.RAG.shared.statsProto(handle: handle))
     }
 
     /// Drop every ingested document from the index.
@@ -171,14 +167,14 @@ public actor RagSession {
     /// - Throws: `SDKException` when the session is closed or the index cannot be cleared.
     public func clear() async throws {
         try requireOpen()
-        _ = try await CppBridge.RAG.shared.clearProto(handle: handle)
+        _ = try CppBridge.RAG.shared.clearProto(handle: handle)
     }
 
     /// Release the session and its native index.
     public func close() async {
         guard !isClosed else { return }
         isClosed = true
-        await CppBridge.RAG.shared.destroySession(handle: handle)
+        CppBridge.RAG.shared.destroySession(handle: handle)
     }
 
     // MARK: - Private
@@ -213,11 +209,7 @@ public actor RagSession {
     }
 
     private static func throwIfFailed(_ result: RARAGResult) throws {
-        guard result.errorCode != 0 else { return }
-        throw SDKException(
-            code: .processingFailed,
-            message: result.hasErrorMessage ? result.errorMessage : "RAG query failed",
-            category: .component
-        )
+        guard result.hasError else { return }
+        throw SDKException(proto: result.error)
     }
 }

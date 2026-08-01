@@ -209,8 +209,8 @@ export const models = {
       forceReload: options?.forceReload ?? false,
       validateAvailability: true,
     });
-    if (!result?.success) {
-      throw SDKException.processingFailed(result?.errorMessage || `Loading '${id}' failed.`);
+    if (result?.error) {
+      throw new SDKException(result.error);
     }
   },
 
@@ -221,8 +221,8 @@ export const models = {
       category,
       unloadAll: category === undefined,
     });
-    if (!result?.success) {
-      throw SDKException.processingFailed(result?.errorMessage || 'Unload failed.');
+    if (result?.error) {
+      throw new SDKException(result.error);
     }
   },
 

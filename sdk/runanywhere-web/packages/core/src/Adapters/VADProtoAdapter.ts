@@ -8,7 +8,6 @@ import {
   VADServiceState,
   VADStatistics,
   VADStreamEvent,
-  VADStreamEventKind,
   type SpeechActivityEvent as ProtoSpeechActivityEvent,
   type VADConfiguration as ProtoVADConfiguration,
   type VADOptions as ProtoVADOptions,
@@ -361,15 +360,8 @@ export class VADProtoAdapter {
 
             const emitted = events.splice(0, events.length);
             for (const event of emitted) {
-              if (
-                event.kind === VADStreamEventKind.VAD_STREAM_EVENT_KIND_ERROR
-                || event.errorCode !== 0
-              ) {
-                throw SDKException.fromRACResult(
-                  event.errorCode || -1,
-                  event.errorMessage || 'VAD stream emitted an error event',
-                  { module, logger },
-                );
+              if (event.error) {
+                throw new SDKException(event.error);
               }
               if (event.result) yield event.result;
             }

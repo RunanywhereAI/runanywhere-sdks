@@ -32,12 +32,8 @@ public extension RunAnywhere.Embeddings {
         request.modelID = model
 
         let result = try CppBridge.EmbeddingsProto.embedBatchLifecycle(request)
-        if result.errorCode != 0 {
-            throw SDKException(
-                code: .processingFailed,
-                message: result.hasErrorMessage ? result.errorMessage : "Embedding failed",
-                category: .component
-            )
+        if result.hasError {
+            throw SDKException(proto: result.error)
         }
         return result.vectors.enumerated().map { index, vector in
             Embedding(proto: vector, fallbackIndex: index)

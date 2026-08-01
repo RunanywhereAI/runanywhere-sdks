@@ -173,12 +173,12 @@ function toRagResult(raw: RAGResult, requestId: string, model: string): PublicRa
     answer: raw.answer,
     sources: raw.retrievedChunks.map(toMatch),
     thinkingText: raw.thinkingContent || undefined,
-    inputTokens: raw.promptTokens,
-    outputTokens: raw.completionTokens,
+    inputTokens: raw.usage?.inputTokens ?? 0,
+    outputTokens: raw.usage?.outputTokens ?? 0,
     // Commons reports retrieval and generation time but not time-to-first-token for
     // a non-streamed query, so retrieval time is the closest honest stand-in.
     timeToFirstTokenMs: raw.retrievalTimeMs,
-    tokensPerSecond: generationMs > 0 ? raw.completionTokens / (generationMs / 1000) : 0,
+    tokensPerSecond: generationMs > 0 ? (raw.usage?.outputTokens ?? 0) / (generationMs / 1000) : 0,
     requestId: raw.requestId || requestId,
     model,
   };
@@ -332,10 +332,8 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
             queryBytes(question, options, defaultTopK, false)
           );
           const raw = RAGResult.decode(bytes);
-          if (raw.errorCode) {
-            throw SDKException.generationFailed(
-              raw.errorMessage || `rag query failed (${raw.errorCode})`
-            );
+          if (raw.error) {
+            throw SDKException.fromProto(raw.error);
           }
           return toRagResult(raw, newRequestId('rag'), llmId || embeddingId);
         },
@@ -370,9 +368,9 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
                       break;
                     case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR:
                       sink.fail(
-                        SDKException.generationFailed(
-                          event.errorMessage || `rag stream failed (${event.errorCode})`
-                        )
+                        event.error
+                          ? SDKException.fromProto(event.error)
+                          : SDKException.generationFailed('rag stream failed')
                       );
                       break;
                     default:

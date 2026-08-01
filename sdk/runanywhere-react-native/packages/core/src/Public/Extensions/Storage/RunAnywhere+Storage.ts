@@ -10,6 +10,7 @@
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   StorageDeleteRequest,
   StorageDeleteResult as StorageDeleteResultCodec,
@@ -67,8 +68,7 @@ async function getStorageInfoProto(
 ): Promise<StorageInfoResult> {
   if (!isNativeModuleAvailable()) {
     return StorageInfoResultCodec.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
 
@@ -80,8 +80,7 @@ async function getStorageInfoProto(
     buffer,
     StorageInfoResultCodec,
     StorageInfoResultCodec.fromPartial({
-      success: false,
-      errorMessage: 'storageInfoProto returned an empty result',
+      error: SDKException.protoDecodeFailed('storageInfoProto').proto,
     })
   );
 }
@@ -94,8 +93,7 @@ export async function deleteStorage(
 ): Promise<StorageDeleteResult> {
   if (!isNativeModuleAvailable()) {
     return StorageDeleteResultCodec.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
 
@@ -107,8 +105,7 @@ export async function deleteStorage(
     buffer,
     StorageDeleteResultCodec,
     StorageDeleteResultCodec.fromPartial({
-      success: false,
-      errorMessage: 'storageDeleteProto returned an empty result',
+      error: SDKException.protoDecodeFailed('storageDeleteProto').proto,
     })
   );
 }
@@ -120,7 +117,7 @@ export async function deleteStorage(
 export async function getStorageInfo(): Promise<StorageInfo | null> {
   try {
     const result = await getStorageInfoProto();
-    return result.success ? result.info ?? null : null;
+    return result.error ? null : result.info ?? null;
   } catch (error) {
     logger.warning('Failed to get storage info:', { error });
     return null;

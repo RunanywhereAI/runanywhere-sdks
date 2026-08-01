@@ -71,7 +71,7 @@ export const vlm = {
   ): Promise<GenerationResult> {
     await ensureVisionModel(options?.model);
     const result = await VisionLanguage.processImage(image, toProtoVlmOptions(prompt, options));
-    if (result.errorMessage) throw SDKException.processingFailed(result.errorMessage);
+    if (result.error) throw new SDKException(result.error);
     return vlmToGenerationResult(result);
   },
 
@@ -99,7 +99,7 @@ export const vlm = {
             announced = true;
             yield { type: 'started', requestId: event.requestId };
           }
-          if (event.errorMessage) throw SDKException.processingFailed(event.errorMessage);
+          if (event.error) throw new SDKException(event.error);
           if (event.token) yield { type: 'token', text: event.token, kind: 'text' };
           if (event.kind === VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED && event.result) {
             completed = true;

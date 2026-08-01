@@ -18,6 +18,7 @@ import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../../Foundation/Errors/SDKException';
+import type { SDKError } from '@runanywhere/proto-ts/errors';
 import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 import {
   type STTOptions,
@@ -197,14 +198,13 @@ function transcribeStreamFromAsyncIterable(
 
       // Terminal failure partial — bridge errors never throw out of the
       // iterator (RunAnywhere+STT.swift:91-98).
-      const failTerminally = (message: string, errorCode = 0): void => {
+      const failTerminally = (error: SDKError): void => {
         deliver(
           STTPartialResultMessage.fromPartial({
             isFinal: true,
-            text: message,
+            text: error.message,
             finalOutput: STTOutputMessage.fromPartial({
-              errorMessage: message,
-              errorCode,
+              error,
             }),
           })
         );
@@ -239,7 +239,10 @@ function transcribeStreamFromAsyncIterable(
             break;
           }
           case STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR:
-            failTerminally(event.errorMessage || 'STT stream failed', event.errorCode);
+            failTerminally(
+              event.error ??
+                SDKException.processingFailed('STT stream failed').proto
+            );
             break;
           default:
             // STARTED / UNSPECIFIED — ignored.
@@ -299,7 +302,11 @@ function transcribeStreamFromAsyncIterable(
         const modelPath = snapshot.resolvedPath || snapshot.model?.localPath || '';
         const modelName = snapshot.model?.name || modelId;
         if (!modelId || !modelPath) {
-          failTerminally('STT stream failed: loaded STT model is missing a resolved path');
+          failTerminally(
+            SDKException.processingFailed(
+              'STT stream failed: loaded STT model is missing a resolved path'
+            ).proto
+          );
           return;
         }
 
@@ -317,7 +324,9 @@ function transcribeStreamFromAsyncIterable(
           );
         } catch (error) {
           failTerminally(
-            `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            SDKException.processingFailed(
+              `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            ).proto
           );
           return;
         }
@@ -342,7 +351,9 @@ function transcribeStreamFromAsyncIterable(
           }
         } catch (error) {
           failTerminally(
-            `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            SDKException.processingFailed(
+              `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            ).proto
           );
           await cancelNativeSession();
           return;
@@ -361,7 +372,9 @@ function transcribeStreamFromAsyncIterable(
           await native.sttStreamStop(activeSessionId);
         } catch (error) {
           failTerminally(
-            `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            SDKException.processingFailed(
+              `STT stream failed: ${error instanceof Error ? error.message : String(error)}`
+            ).proto
           );
           return;
         }

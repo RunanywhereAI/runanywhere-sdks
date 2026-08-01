@@ -49,7 +49,7 @@ import SwiftProtobuf
 ///     offline: .offlineSherpa("sherpa-onnx-whisper-tiny.en"),
 ///     online:  .onlineCloud("saaras"),
 ///     policy:  .init(hardFilters: [.network], cascade: .confidence(threshold: 0.5),
-///                    rank: .preferLocalFirst)
+///                    preferLocal: true)
 /// )
 /// var options = HybridTranscribeOptions()
 /// options.sampleRate = 16_000

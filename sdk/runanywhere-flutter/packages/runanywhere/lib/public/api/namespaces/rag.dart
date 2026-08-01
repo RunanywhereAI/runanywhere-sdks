@@ -117,8 +117,8 @@ class RagSession {
     final result = await DartBridgeRAG.shared.queryAsync(
       _queryOptions(query, LlmOptions(maxOutputTokens: 1), topK: topK),
     );
-    if (result.errorMessage.isNotEmpty) {
-      throw SDKException.processingFailed(result.errorMessage);
+    if (result.hasError()) {
+      throw SDKException.processingFailed(result.error.message);
     }
     return List<Match>.unmodifiable(
       result.retrievedChunks.map(Match.fromProto),
@@ -135,8 +135,8 @@ class RagSession {
     final result = await DartBridgeRAG.shared.queryAsync(
       _queryOptions(question, options),
     );
-    if (result.errorMessage.isNotEmpty) {
-      throw SDKException.generationFailed(result.errorMessage);
+    if (result.hasError()) {
+      throw SDKException.generationFailed(result.error.message);
     }
     return RagResult.fromProto(result);
   }
@@ -171,7 +171,9 @@ class RagSession {
           }
         case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR:
           throw SDKException.generationFailed(
-            event.errorMessage.isEmpty ? 'RAG query failed' : event.errorMessage,
+            event.hasError() && event.error.message.isNotEmpty
+                ? event.error.message
+                : 'RAG query failed',
           );
         case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED:
         case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED:

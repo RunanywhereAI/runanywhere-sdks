@@ -6,6 +6,7 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/ra_result_codes.dart';
@@ -427,8 +428,9 @@ class DartBridgeModelRegistry {
     final handle = _registryHandle;
     if (handle == null) {
       return model_pb.ModelImportResult(
-        success: false,
-        errorMessage: 'Model registry not initialized',
+        error: SDKException.componentNotReady(
+          'Model registry not initialized',
+        ).error,
       );
     }
     final fn = RacNative.bindings.rac_model_registry_import_proto;
@@ -445,8 +447,7 @@ class DartBridgeModelRegistry {
     } catch (e) {
       _logger.debug('rac_model_registry_import_proto error: $e');
       return model_pb.ModelImportResult(
-        success: false,
-        errorMessage: e.toString(),
+        error: SDKException.internalError(e.toString()).error,
       );
     }
   }
@@ -563,7 +564,7 @@ class DartBridgeModelRegistry {
             decode: model_pb.ModelRegistryRefreshResult.fromBuffer,
             symbol: 'rac_model_registry_refresh_proto',
           );
-      return result.success;
+      return !result.hasError();
     } catch (e) {
       _logger.debug('rac_model_registry_refresh_proto error: $e');
       return false;
@@ -587,7 +588,11 @@ class DartBridgeModelRegistry {
   ]) async {
     final handle = _registryHandle;
     if (handle == null) {
-      return model_pb.ModelDiscoveryResult(success: false);
+      return model_pb.ModelDiscoveryResult(
+        error: SDKException.componentNotReady(
+          'Model registry not initialized',
+        ).error,
+      );
     }
 
     final discoverFn = RacNative.bindings.rac_model_registry_discover_proto;
@@ -606,8 +611,7 @@ class DartBridgeModelRegistry {
     } catch (e) {
       _logger.debug('rac_model_registry_discover_proto error: $e');
       return model_pb.ModelDiscoveryResult(
-        success: false,
-        errorMessage: e.toString(),
+        error: SDKException.internalError(e.toString()).error,
       );
     }
   }

@@ -143,8 +143,10 @@ private final class TTSStreamSessionContext: @unchecked Sendable {
         var output = RATTSOutput()
         output.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
         output.isFinal = true
-        output.errorMessage = message
-        output.errorCode = Int32(code)
+        var error = RASDKError.from(rcResult: code)
+            ?? RASDKError.make(code: .streamCancelled, message: message, category: .component)
+        error.message = message
+        output.error = error
         continuation.yield(output)
         terminalSemaphore.signal()
     }
@@ -173,8 +175,9 @@ private final class TTSStreamSessionContext: @unchecked Sendable {
             }
             terminalSemaphore.signal()
         case .error:
-            let message = event.hasErrorMessage ? event.errorMessage : "TTS stream failed"
-            yieldFailure(message, code: rac_result_t(event.errorCode))
+            let message = event.hasError ? event.error.message : "TTS stream failed"
+            let code = event.hasError ? rac_result_t(event.error.cAbiCode) : RAC_ERROR_STREAM_CANCELLED
+            yieldFailure(message, code: code)
         case .started, .progress, .phoneme, .unspecified, .UNRECOGNIZED:
             break
         }

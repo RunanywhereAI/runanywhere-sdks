@@ -60,12 +60,10 @@ export async function ensureModelForCategory(
     forceReload: false,
     validateAvailability: true,
   });
-  if (!result?.success) {
-    throw SDKException.fromCode(
-      -1,
-      result?.errorMessage || `Loading '${modelId}' failed.`,
-      'models.load',
-    );
+  if (!result || result.error) {
+    throw result?.error
+      ? new SDKException(result.error)
+      : SDKException.fromCode(-1, `Loading '${modelId}' failed.`, 'models.load');
   }
   return modelId;
 }

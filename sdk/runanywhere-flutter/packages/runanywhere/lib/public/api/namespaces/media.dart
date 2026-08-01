@@ -48,8 +48,8 @@ class ImagesApi {
     final result = await RunAnywhereDiffusion.shared.generateImage(
       effective.toProto(prompt),
     );
-    if (result.errorMessage.isNotEmpty) {
-      throw SDKException.processingFailed(result.errorMessage);
+    if (result.hasError()) {
+      throw SDKException.processingFailed(result.error.message);
     }
     return ImageResult.fromProto(result, steps: effective.steps);
   }
@@ -91,9 +91,9 @@ class ImagesApi {
           }
         case DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_ERROR:
           throw SDKException.processingFailed(
-            event.errorMessage.isEmpty
-                ? 'Image generation failed'
-                : event.errorMessage,
+            event.hasError() && event.error.message.isNotEmpty
+                ? event.error.message
+                : 'Image generation failed',
           );
         case DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_STARTED:
         case DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED:

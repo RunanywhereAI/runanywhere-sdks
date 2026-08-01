@@ -378,10 +378,13 @@ public extension RunAnywhere {
         // directly when building follow-up LLM prompts).
         var toolResult = RAToolResult()
         toolResult.name = name
-        toolResult.success = success
         toolResult.resultJson = RAToolValue.jsonString(from: result)
-        if let error {
-            toolResult.error = error
+        if !success || error != nil {
+            toolResult.error = RASDKError.make(
+                code: .processingFailed,
+                message: error ?? "Tool execution failed",
+                category: .component
+            )
         }
         if let toolCallID {
             toolResult.toolCallID = toolCallID
@@ -594,9 +597,12 @@ private final class HandleBox: @unchecked Sendable {
 private func failedResult(name: String, error: String) -> RAToolResult {
     var result = RAToolResult()
     result.name = name
-    result.success = false
     result.resultJson = "{}"
-    result.error = error
+    result.error = RASDKError.make(
+        code: .processingFailed,
+        message: error,
+        category: .component
+    )
     return result
 }
 

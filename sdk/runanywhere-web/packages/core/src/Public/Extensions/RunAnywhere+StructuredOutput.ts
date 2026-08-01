@@ -363,11 +363,9 @@ export async function generateWithStructuredOutput(
   let systemPrompt = options?.systemPrompt;
   if (normalizedStructured.includeSchemaInPrompt) {
     const prep = preparePrompt(prompt, normalizedStructured);
-    if (prep.errorCode !== 0) {
+    if (prep.error) {
       // Swift parity: RunAnywhere+StructuredOutput.swift:149.
-      throw SDKException.processingFailed(
-        prep.errorMessage ?? 'structured-output prompt preparation failed',
-      );
+      throw new SDKException(prep.error);
     }
     if (prep.systemPrompt !== undefined) {
       systemPrompt = prep.systemPrompt;

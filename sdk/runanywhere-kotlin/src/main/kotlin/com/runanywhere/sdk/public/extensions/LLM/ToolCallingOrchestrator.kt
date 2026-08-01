@@ -292,8 +292,16 @@ internal object ToolCallingOrchestrator {
             tool_call_id = toolCallId,
             name = name,
             result_json = RAToolValue.jsonString(from = result),
-            error = error,
-            success = success,
+            error =
+                if (!success || error != null) {
+                    ai.runanywhere.proto.v1.SDKError(
+                        code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_UNKNOWN,
+                        category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
+                        message = error ?: "Tool execution failed",
+                    )
+                } else {
+                    null
+                },
             started_at_ms = startedAtMs,
             completed_at_ms = completedAtMs,
         )
@@ -407,8 +415,13 @@ internal object ToolCallingOrchestrator {
                     ?: ToolCallingResult(
                         text = "",
                         is_complete = false,
-                        error_message = "racToolCallingRunLoopProto returned null",
-                        error_code = -1,
+                        error =
+                            ai.runanywhere.proto.v1.SDKError(
+                                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_UNKNOWN,
+                                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
+                                message = "racToolCallingRunLoopProto returned null",
+                                c_abi_code = -1,
+                            ),
                     )
             } finally {
                 // On success this tears down the parked watcher without

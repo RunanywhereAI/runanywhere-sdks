@@ -16,14 +16,6 @@
 
 package com.runanywhere.sdk.hybrid
 
-/**
- * Candidate comparator for a routing policy. Exactly one rank per policy.
- * Backed by the generated `HybridRank` (wire values match `HybridRank` in
- * hybrid_router.proto): `HYBRID_RANK_PREFER_LOCAL_FIRST` prefers the offline
- * candidate, `HYBRID_RANK_PREFER_ONLINE_FIRST` prefers the online candidate.
- */
-typealias HybridRank = ai.runanywhere.proto.v1.HybridRank
-
 const val RAHybridSTTConfidenceThreshold: Float = 0.5f
 
 /**
@@ -95,26 +87,26 @@ sealed class HybridCascade {
 
 /**
  * The full routing policy attached to a model pair: filters (AND-composed),
- * an optional cascade, and a rank. Defaults to `PREFER_LOCAL_FIRST` with no
- * filters or cascade — i.e. "use the local candidate, fall back to online on
+ * an optional cascade, and a preference. Defaults to `preferLocal = true` with
+ * no filters or cascade — i.e. "use the local candidate, fall back to online on
  * hard failure".
  */
 class HybridRoutingPolicy(
     val hardFilters: List<HybridFilter> = emptyList(),
     val cascade: HybridCascade? = null,
-    val rank: HybridRank = HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST,
+    val preferLocal: Boolean = true,
 ) {
     companion object {
         /** One-filter policy. */
         @JvmStatic
         fun filter(filter: HybridFilter): HybridRoutingPolicy = HybridRoutingPolicy(hardFilters = listOf(filter))
 
-        /** One-cascade policy (no filters, default rank). */
+        /** One-cascade policy (no filters, default preference). */
         @JvmStatic
         fun cascade(cascade: HybridCascade): HybridRoutingPolicy = HybridRoutingPolicy(cascade = cascade)
 
-        /** Rank-only policy. */
+        /** Preference-only policy. */
         @JvmStatic
-        fun rank(rank: HybridRank): HybridRoutingPolicy = HybridRoutingPolicy(rank = rank)
+        fun preferLocal(preferLocal: Boolean): HybridRoutingPolicy = HybridRoutingPolicy(preferLocal = preferLocal)
     }
 }

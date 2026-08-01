@@ -183,15 +183,13 @@ export interface VadOptions {
   prefixPaddingMs?: number;
 }
 
-/** Vector normalization applied to embeddings. */
-export type NormalizeMode = 'none' | 'l2';
-
 /** Token pooling used to collapse an embedding sequence into one vector. */
 export type PoolingMode = 'mean' | 'cls' | 'last';
 
 /** Embedding knobs. */
 export interface EmbedOptions {
-  normalize?: NormalizeMode;
+  /** L2-normalize the output vectors. */
+  normalize?: boolean;
   pooling?: PoolingMode;
 }
 

@@ -134,8 +134,10 @@ private final class STTStreamSessionContext: @unchecked Sendable {
         var partial = RASTTPartialResult()
         partial.isFinal = true
         partial.text = message
-        partial.finalOutput.errorMessage = message
-        partial.finalOutput.errorCode = Int32(code)
+        var error = RASDKError.from(rcResult: code)
+            ?? RASDKError.make(code: .streamCancelled, message: message, category: .component)
+        error.message = message
+        partial.finalOutput.error = error
         continuation.yield(partial)
     }
 
@@ -156,8 +158,9 @@ private final class STTStreamSessionContext: @unchecked Sendable {
             }
             continuation.yield(partial)
         case .error:
-            let message = event.hasErrorMessage ? event.errorMessage : "STT stream failed"
-            yieldFailure(message, code: rac_result_t(event.errorCode))
+            let message = event.hasError ? event.error.message : "STT stream failed"
+            let code = event.hasError ? rac_result_t(event.error.cAbiCode) : RAC_ERROR_STREAM_CANCELLED
+            yieldFailure(message, code: code)
         case .started, .unspecified, .UNRECOGNIZED:
             break
         }

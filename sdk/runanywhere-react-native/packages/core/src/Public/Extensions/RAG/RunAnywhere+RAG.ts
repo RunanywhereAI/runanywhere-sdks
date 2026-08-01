@@ -284,9 +284,9 @@ export function ragQueryStream(
               );
               if (
                 event.kind === RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR &&
-                event.errorMessage
+                event.error
               ) {
-                streamError = new Error(event.errorMessage);
+                streamError = new SDKException(event.error);
               }
               push(event);
               if (isTerminal(event)) {
@@ -438,13 +438,8 @@ async function loadRAGArtifactModel(
       : {}),
   });
   const result = await loadModel(request);
-  if (!result.success) {
-    const message =
-      result.errorMessage ||
-      `${errorLabel} model lifecycle artifact resolution failed`;
-    throw SDKException.modelLoadFailed(
-      `${errorLabel} model '${model.id}': ${message}`
-    );
+  if (result.error) {
+    throw new SDKException(result.error);
   }
   return result;
 }

@@ -52,8 +52,8 @@ class TtsApi {
     final request = await _request(text, options);
     await for (final event in DartBridgeTTS.shared
         .synthesizeStreamLifecycleProto(request)) {
-      if (event.errorMessage.isNotEmpty) {
-        throw SDKException.processingFailed(event.errorMessage);
+      if (event.hasError()) {
+        throw SDKException.processingFailed(event.error.message);
       }
       if (event.hasOutput()) {
         yield AudioChunk.fromProto(event.output);

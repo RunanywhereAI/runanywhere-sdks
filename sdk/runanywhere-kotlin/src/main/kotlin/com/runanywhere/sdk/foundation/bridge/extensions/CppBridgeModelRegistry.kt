@@ -167,8 +167,8 @@ object CppBridgeModelRegistry {
      *
      * Uses the canonical [ProtoModelDiscoveryRequest] / [ProtoModelDiscoveryResult]
      * proto ABI (`rac_model_registry_discover_proto`). On failure (native
-     * operation failure, deserialization issue, etc.) returns a result with
-     * `success = false` and the failure reason in `error_message`.
+     * operation failure, deserialization issue, etc.) returns a result whose
+     * `error` submessage carries the failure reason.
      *
      * @param request The discovery request. Defaults to the same configuration
      *                Swift uses for SDK-init discovery (recursive, link downloaded,
@@ -181,8 +181,12 @@ object CppBridgeModelRegistry {
             RunAnywhereBridge.racModelRegistryDiscoverProto(
                 ProtoModelDiscoveryRequest.ADAPTER.encode(request),
             ) ?: return ProtoModelDiscoveryResult(
-                success = false,
-                error_message = "Native registry returned no response for discoverProto",
+                error =
+                    ai.runanywhere.proto.v1.SDKError(
+                        code = ProtoErrorCode.ERROR_CODE_UNKNOWN,
+                        category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+                        message = "Native registry returned no response for discoverProto",
+                    ),
             )
 
         return try {
@@ -195,8 +199,12 @@ object CppBridgeModelRegistry {
         } catch (e: Exception) {
             log(CppBridgePlatformAdapter.LogLevel.WARN, "Discovery proto decode failed: ${e.message}")
             ProtoModelDiscoveryResult(
-                success = false,
-                error_message = "Failed to decode ModelDiscoveryResult proto: ${e.message}",
+                error =
+                    ai.runanywhere.proto.v1.SDKError(
+                        code = ProtoErrorCode.ERROR_CODE_UNKNOWN,
+                        category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+                        message = "Failed to decode ModelDiscoveryResult proto: ${e.message}",
+                    ),
             )
         }
     }

@@ -60,12 +60,8 @@ public extension RunAnywhere {
                 let task = Task {
                     for await output in outputs {
                         if Task.isCancelled { break }
-                        if output.errorCode != 0 {
-                            continuation.finish(throwing: SDKException(
-                                code: .processingFailed,
-                                message: output.hasErrorMessage ? output.errorMessage : "TTS stream failed",
-                                category: .component
-                            ))
+                        if output.hasError {
+                            continuation.finish(throwing: SDKException(proto: output.error))
                             return
                         }
                         continuation.yield(AudioChunk(proto: output))

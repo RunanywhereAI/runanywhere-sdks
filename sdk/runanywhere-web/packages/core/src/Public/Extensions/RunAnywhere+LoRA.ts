@@ -89,7 +89,6 @@ function emptyLoRAState(): LoRAState {
   return {
     loadedAdapters: [],
     hasActiveAdapters: false,
-    errorCode: 0,
   };
 }
 
@@ -200,7 +199,9 @@ export async function checkLoraCompatibility(
   } catch (error) {
     return LoraCompatibilityResultMessage.fromPartial({
       isCompatible: false,
-      errorMessage: error instanceof Error ? error.message : String(error),
+      error: SDKException.processingFailed(
+        error instanceof Error ? error.message : String(error),
+      ).proto,
     });
   }
 }
@@ -305,12 +306,8 @@ export async function importLoraAdapter(
         LoraAdapterImportRequestMessage.fromPartial({ sourcePath: staged, filename: name }),
       ),
     );
-    if (!result.success) {
-      throw SDKException.fromCode(
-        -ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
-        result.errorMessage || 'LoRA adapter import failed',
-        'lora.import',
-      );
+    if (result.error) {
+      throw new SDKException(result.error);
     }
     // Persist the canonical destination and mirror it into every backend
     // module — the same flush the download path performs on completion.
@@ -338,12 +335,8 @@ export async function loraAdaptersForModel(
   modelId: string,
 ): Promise<LoraAdapterCatalogEntry[]> {
   const result = await queryLoraCatalog({ modelId, tags: [] });
-  if (!result.success) {
-    // Swift parity: .processingFailed.
-    throw SDKException.fromCode(
-      -ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
-      result.errorMessage || 'LoRA catalog query failed',
-    );
+  if (result.error) {
+    throw new SDKException(result.error);
   }
   return result.entries;
 }
@@ -354,12 +347,8 @@ export async function loraAdaptersForModel(
  */
 export async function allRegisteredLoraAdapters(): Promise<LoraAdapterCatalogEntry[]> {
   const result = await listLoraCatalog();
-  if (!result.success) {
-    // Swift parity: .processingFailed.
-    throw SDKException.fromCode(
-      -ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
-      result.errorMessage || 'LoRA catalog list failed',
-    );
+  if (result.error) {
+    throw new SDKException(result.error);
   }
   return result.entries;
 }

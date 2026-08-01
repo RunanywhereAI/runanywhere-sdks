@@ -15,7 +15,6 @@ from .grammar import json_schema_to_grammar
 from .options import (
     EmbedOptions,
     LlmOptions,
-    NormalizeMode,
     PoolingMode,
     ReasoningMode,
     SttOptions,
@@ -154,7 +153,7 @@ def check_embed_options(options: Optional[EmbedOptions]) -> None:
     """
     if options is None:
         return
-    if options.normalize != NormalizeMode.L2:
+    if not options.normalize:
         raise SDKException.not_implemented(
             "EmbedOptions.normalize: the bridge's embed() returns L2-normalized vectors and "
             "binds no rac_embeddings_options_t"

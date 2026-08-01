@@ -17,7 +17,6 @@ import type { STTOptions, STTOutput } from '@runanywhere/proto-ts/stt_options';
 import type { TTSOptions, TTSOutput, TTSVoiceInfo } from '@runanywhere/proto-ts/tts_options';
 import type { VADOptions, VADResult as ProtoVadResult } from '@runanywhere/proto-ts/vad_options';
 import {
-  EmbeddingsNormalizeMode,
   EmbeddingsPoolingStrategy,
   type EmbeddingsOptions,
   type EmbeddingsResult,
@@ -163,10 +162,10 @@ function finishReasonFrom(raw: string | undefined, cancelled: boolean): FinishRe
 
 function metricsFrom(result: LLMGenerationResult, requestId: string): GenerationMetrics {
   return {
-    inputTokens: result.inputTokens,
-    outputTokens: result.outputTokens,
+    inputTokens: result.usage?.inputTokens ?? 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: Math.round(result.ttftMs ?? 0),
-    tokensPerSecond: result.tokensPerSecond,
+    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
     requestId,
     model: result.modelUsed,
   };
@@ -194,16 +193,16 @@ export function streamFinalToGenerationResult(
   model: string,
   fallback: { text: string; thinkingText: string; outputTokens: number; ttftMs: number; tokensPerSecond: number },
 ): GenerationResult {
-  const outputTokens = final.outputTokens || fallback.outputTokens;
+  const outputTokens = (final.usage?.outputTokens ?? 0) || fallback.outputTokens;
   return {
     text: final.text || fallback.text,
     thinkingText: final.thinkingContent || fallback.thinkingText || undefined,
     toolCalls: final.toolCalls,
     finishReason: finishReasonFrom(final.finishReason, false),
-    inputTokens: final.inputTokens,
+    inputTokens: final.usage?.inputTokens ?? 0,
     outputTokens,
     timeToFirstTokenMs: Math.round(final.timeToFirstTokenMs || fallback.ttftMs),
-    tokensPerSecond: final.tokensPerSecond || fallback.tokensPerSecond,
+    tokensPerSecond: (final.usage?.tokensPerSecond ?? 0) || fallback.tokensPerSecond,
     requestId,
     model,
   };
@@ -216,10 +215,10 @@ export function vlmToGenerationResult(result: VLMResult, requestId = ''): Genera
     thinkingText: undefined,
     toolCalls: [],
     finishReason: finishReasonFrom(result.finishReason, false),
-    inputTokens: result.inputTokens,
-    outputTokens: result.outputTokens,
+    inputTokens: result.usage?.inputTokens ?? 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: Math.round(result.timeToFirstTokenMs),
-    tokensPerSecond: result.tokensPerSecond,
+    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
     requestId,
     model: '',
   };
@@ -353,11 +352,6 @@ export function toVadResult(result: ProtoVadResult): VadResult {
   };
 }
 
-const NORMALIZE_MODES: Record<NonNullable<EmbedOptions['normalize']>, EmbeddingsNormalizeMode> = {
-  none: EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_NONE,
-  l2: EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2,
-};
-
 const POOLING_MODES: Record<NonNullable<EmbedOptions['pooling']>, EmbeddingsPoolingStrategy> = {
   mean: EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN,
   cls: EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_CLS,
@@ -369,9 +363,7 @@ export function toProtoEmbedOptions(options?: EmbedOptions): EmbeddingsOptions {
   const defaults = optionDefaults.embed();
   return {
     ...defaults,
-    normalizeMode: options?.normalize
-      ? NORMALIZE_MODES[options.normalize]
-      : EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2,
+    normalize: options?.normalize ? options.normalize === 'l2' : true,
     pooling: options?.pooling
       ? POOLING_MODES[options.pooling]
       : EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN,
@@ -486,10 +478,10 @@ export function toRagResult(result: RAGResult): RagResult {
   return {
     answer: result.answer,
     sources: result.retrievedChunks.map(toMatch),
-    inputTokens: result.promptTokens,
-    outputTokens: result.completionTokens,
+    inputTokens: result.usage?.inputTokens ?? 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: 0,
-    tokensPerSecond: totalMs > 0 ? (result.completionTokens / totalMs) * 1000 : 0,
+    tokensPerSecond: totalMs > 0 ? ((result.usage?.outputTokens ?? 0) / totalMs) * 1000 : 0,
     requestId: result.requestId ?? '',
     model: '',
   };

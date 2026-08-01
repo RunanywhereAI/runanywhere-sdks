@@ -72,11 +72,11 @@ abstract final class ModelGate {
     // ModelLoadRequest carries no context/thread/GPU fields (model_types.proto);
     // those LoadOptions knobs have no commons load-time path yet.
     final result = await RunAnywhereModelLifecycle.shared.load(request);
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.modelLoadFailed(
         modelId,
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
+        result.error.message.isNotEmpty
+            ? result.error.message
             : 'Model lifecycle load failed',
       );
     }
@@ -101,10 +101,10 @@ abstract final class ModelGate {
         category: category,
       ),
     );
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
+        result.error.message.isNotEmpty
+            ? result.error.message
             : 'Model lifecycle unload failed',
       );
     }
@@ -137,7 +137,7 @@ abstract final class ModelGate {
       if (progress.state == DownloadState.DOWNLOAD_STATE_FAILED) {
         throw SDKException.downloadFailed(
           modelId,
-          progress.errorMessage.isEmpty ? null : progress.errorMessage,
+          progress.hasError() ? progress.error.message : null,
         );
       }
       if (progress.state == DownloadState.DOWNLOAD_STATE_CANCELLED) {

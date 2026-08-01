@@ -301,9 +301,9 @@ int generate_once(const GlobalOptions& options, const std::string& model_id,
             .field("response", result.text())
             .field("thinking", result.thinking_content())
             .field("finish_reason", result.finish_reason())
-            .field("input_tokens", static_cast<int64_t>(result.input_tokens()))
-            .field("output_tokens", static_cast<int64_t>(result.output_tokens()))
-            .field("tokens_per_second", result.tokens_per_second())
+            .field("input_tokens", static_cast<int64_t>(result.usage().input_tokens()))
+            .field("output_tokens", static_cast<int64_t>(result.usage().output_tokens()))
+            .field("tokens_per_second", result.usage().tokens_per_second())
             .field("total_ms", static_cast<int64_t>(result.generation_time_ms()))
             .end_object();
         out::result_line(json.str());
@@ -317,7 +317,7 @@ int generate_once(const GlobalOptions& options, const std::string& model_id,
     out::result_line(result.text());
     if (options.verbose) {
         out::status_line("(" + std::to_string(static_cast<int64_t>(result.generation_time_ms())) +
-                         " ms, " + std::to_string(result.tokens_per_second()) + " tok/s)");
+                         " ms, " + std::to_string(result.usage().tokens_per_second()) + " tok/s)");
     }
     return 0;
 }
@@ -429,14 +429,14 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
             .field("model", model_id)
             .field("response", result.text())
             .field("total_ms", static_cast<int64_t>(result.processing_time_ms()))
-            .field("tokens_per_second", static_cast<double>(result.tokens_per_second()))
+            .field("tokens_per_second", static_cast<double>(result.usage().tokens_per_second()))
             .end_object();
         out::result_line(json.str());
     } else {
         out::result_line(result.text());
         if (options.verbose) {
             out::status_line("(" + std::to_string(result.processing_time_ms()) + " ms, " +
-                             std::to_string(result.tokens_per_second()) + " tok/s)");
+                             std::to_string(result.usage().tokens_per_second()) + " tok/s)");
         }
     }
     return 0;

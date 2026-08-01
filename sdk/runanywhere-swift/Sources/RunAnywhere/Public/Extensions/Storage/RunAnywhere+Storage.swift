@@ -297,7 +297,7 @@ extension RunAnywhere {
 
         let plan = await planDownload(planRequest)
         guard plan.canStart else {
-            let message = plan.errorMessage.isEmpty ? "Unable to create a download plan" : plan.errorMessage
+            let message = plan.hasError ? plan.error.message : "Unable to create a download plan"
             SDKLogger.download.error("Download plan rejected for \(resolvedModel.id): \(message)")
             throw SDKException(
                 code: .downloadFailed,
@@ -319,9 +319,9 @@ extension RunAnywhere {
 
         let startResult = await CppBridge.Download.shared.start(startRequest)
         guard startResult.accepted else {
-            let message = startResult.errorMessage.isEmpty
-                ? "The download could not be started"
-                : startResult.errorMessage
+            let message = startResult.hasError
+                ? startResult.error.message
+                : "The download could not be started"
             SDKLogger.download.error("Download start rejected for \(resolvedModel.id): \(message)")
             throw SDKException(
                 code: .downloadFailed,
@@ -472,7 +472,7 @@ private extension RunAnywhere {
         }
 
         let listResult = await performList()
-        guard listResult.success else { return model }
+        guard !listResult.hasError else { return model }
         if let listed = listResult.models.models.first(where: { $0.id == model.id }) {
             if !listed.downloadURL.isEmpty || model.downloadURL.isEmpty {
                 return listed
@@ -531,7 +531,7 @@ private extension RunAnywhere {
         case .failed:
             throw SDKException(
                 code: .downloadFailed,
-                message: progress.errorMessage.isEmpty ? "Download failed" : progress.errorMessage,
+                message: progress.hasError ? progress.error.message : "Download failed",
                 category: .network
             )
         case .cancelled:

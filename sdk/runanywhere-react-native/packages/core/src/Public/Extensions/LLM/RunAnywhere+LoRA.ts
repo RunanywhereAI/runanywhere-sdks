@@ -423,11 +423,9 @@ async function adaptersForModel(
   const result = await queryCatalog(
     LoraAdapterCatalogQueryMessage.fromPartial({ modelId })
   );
-  if (!result.success) {
+  if (result.error) {
     // Swift parity: .processingFailed (RunAnywhere+LoRA.swift:157-163).
-    throw SDKException.processingFailed(
-      result.errorMessage || 'LoRA catalog query failed'
-    );
+    throw new SDKException(result.error);
   }
   return result.entries;
 }
@@ -438,11 +436,9 @@ async function adaptersForModel(
  */
 async function allRegistered(): Promise<LoraAdapterCatalogEntry[]> {
   const result = await listCatalog();
-  if (!result.success) {
+  if (result.error) {
     // Swift parity: .processingFailed (RunAnywhere+LoRA.swift:172-178).
-    throw SDKException.processingFailed(
-      result.errorMessage || 'LoRA catalog list failed'
-    );
+    throw new SDKException(result.error);
   }
   return result.entries;
 }

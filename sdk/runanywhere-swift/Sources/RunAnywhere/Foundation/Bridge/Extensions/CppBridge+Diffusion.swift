@@ -128,7 +128,7 @@ extension CppBridge {
                     if !Task.isCancelled {
                         var errorEvent = RADiffusionStreamEvent()
                         errorEvent.kind = .error
-                        errorEvent.errorMessage = error.message
+                        errorEvent.error = error.proto
                         continuation.yield(errorEvent)
                     }
                 } catch {
@@ -136,7 +136,11 @@ extension CppBridge {
                         logger.warning("Diffusion stream failed: \(error.localizedDescription)")
                         var errorEvent = RADiffusionStreamEvent()
                         errorEvent.kind = .error
-                        errorEvent.errorMessage = error.localizedDescription
+                        errorEvent.error = RASDKError.make(
+                            code: .internal,
+                            message: error.localizedDescription,
+                            category: .internal
+                        )
                         continuation.yield(errorEvent)
                     }
                 }

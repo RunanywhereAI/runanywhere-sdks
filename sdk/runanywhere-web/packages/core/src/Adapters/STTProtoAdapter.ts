@@ -146,8 +146,7 @@ export class STTProtoAdapter {
       undefined,
       (rc) => STTStreamEvent.fromPartial({
         kind: STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR,
-        errorCode: rc,
-        errorMessage: `STT stream failed: ${rc}`,
+        error: SDKException.fromCode(rc, `STT stream failed: ${rc}`).proto,
       }),
     );
   }

@@ -40,10 +40,8 @@ export const lora = {
         targetModules: [],
       }],
     });
-    if (!result.success) {
-      throw SDKException.processingFailed(
-        result.errorMessage || `Applying LoRA adapter '${adapterId}' failed.`,
-      );
+    if (result.error) {
+      throw new SDKException(result.error);
     }
   },
 

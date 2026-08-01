@@ -45,11 +45,14 @@ extension CppBridge {
                   NativeProtoABI.canReceiveProtoBuffer,
                   let registry = await CppBridge.ModelRegistry.shared.getHandle() else {
                 var result = RAModelLoadResult()
-                result.success = false
                 result.modelID = request.modelID
                 result.category = request.category
                 result.framework = request.framework
-                result.errorMessage = NativeProtoABI.unavailableMessage
+                result.error = RASDKError.make(
+                    code: .modelLoadFailed,
+                    message: NativeProtoABI.unavailableMessage,
+                    category: .model
+                )
                 return result
             }
 
@@ -61,21 +64,27 @@ extension CppBridge {
                 }
                 guard status == RAC_SUCCESS else {
                     var result = RAModelLoadResult()
-                    result.success = false
                     result.modelID = request.modelID
                     result.category = request.category
                     result.framework = request.framework
-                    result.errorMessage = "Model lifecycle load failed: \(status)"
+                    result.error = RASDKError.make(
+                        code: .modelLoadFailed,
+                        message: "Model lifecycle load failed: \(status)",
+                        category: .model
+                    )
                     return result
                 }
                 return try NativeProtoABI.decode(RAModelLoadResult.self, from: outBuffer)
             } catch {
                 var result = RAModelLoadResult()
-                result.success = false
                 result.modelID = request.modelID
                 result.category = request.category
                 result.framework = request.framework
-                result.errorMessage = String(describing: error)
+                result.error = RASDKError.make(
+                    code: .modelLoadFailed,
+                    message: String(describing: error),
+                    category: .model
+                )
                 return result
             }
         }
@@ -90,8 +99,11 @@ extension CppBridge {
                 )
             } catch {
                 var result = RAModelUnloadResult()
-                result.success = false
-                result.errorMessage = String(describing: error)
+                result.error = RASDKError.make(
+                    code: .internal,
+                    message: String(describing: error),
+                    category: .internal
+                )
                 return result
             }
         }

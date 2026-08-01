@@ -356,7 +356,7 @@ export function transcribeStream(
   return (async function* (): AsyncIterable<STTPartialResult> {
     for await (const event of events) {
       if (event.kind === STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR) {
-        const detail = event.errorMessage || String(event.errorCode);
+        const detail = event.error?.message || String(event.error?.cAbiCode ?? '');
         yield STTPartialResult.fromPartial({
           text: detail.startsWith('STT stream failed')
             ? detail

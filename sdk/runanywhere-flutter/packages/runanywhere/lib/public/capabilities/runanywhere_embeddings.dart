@@ -101,12 +101,8 @@ class RunAnywhereEmbeddings {
         category: _embeddingsCategory,
       ),
     );
-    if (!result.success) {
-      throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
-            : 'Embeddings lifecycle unload failed',
-      );
+    if (result.hasError()) {
+      throw SDKException(result.error);
     }
   }
 
@@ -125,13 +121,8 @@ class RunAnywhereEmbeddings {
         validateAvailability: true,
       ),
     );
-    if (!result.success) {
-      throw SDKException.modelLoadFailed(
-        modelId,
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
-            : 'Embeddings lifecycle load failed',
-      );
+    if (result.hasError()) {
+      throw SDKException(result.error);
     }
   }
 

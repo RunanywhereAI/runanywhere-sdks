@@ -102,13 +102,8 @@ class RunAnywhereSTT {
           validateAvailability: true,
         ),
       );
-      if (!result.success) {
-        throw SDKException.modelLoadFailed(
-          modelId,
-          result.errorMessage.isNotEmpty
-              ? result.errorMessage
-              : 'STT lifecycle load failed',
-        );
+      if (result.hasError()) {
+        throw SDKException(result.error);
       }
 
       logger.info('STT model loaded: $modelId');
@@ -138,12 +133,8 @@ class RunAnywhereSTT {
         category: _sttCategory,
       ),
     );
-    if (!result.success) {
-      throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
-            : 'STT lifecycle unload failed',
-      );
+    if (result.hasError()) {
+      throw SDKException(result.error);
     }
     _isStreaming = false;
   }

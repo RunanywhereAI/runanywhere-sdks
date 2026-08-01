@@ -50,9 +50,9 @@ public class LoraNamespace internal constructor() {
                         ),
                 ),
             )
-        if (!result.success) {
+        if (result.error != null) {
             throw SDKException.operation(
-                result.error_message?.takeIf { it.isNotBlank() } ?: "LoRA apply failed",
+                result.error!!.message.takeIf { it.isNotBlank() } ?: "LoRA apply failed",
             )
         }
     }

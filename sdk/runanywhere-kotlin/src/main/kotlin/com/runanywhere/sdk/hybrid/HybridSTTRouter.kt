@@ -52,7 +52,7 @@ import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
  *     policy = HybridRoutingPolicy(
  *         hardFilters = listOf(HybridFilter.Network),
  *         cascade = HybridCascade.Confidence(threshold = 0.5f),
- *         rank = HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST,
+ *         preferLocal = true,
  *     ),
  * )
  * val result = router.transcribe(pcm16Audio, HybridTranscribeOptions(sample_rate = 16000))

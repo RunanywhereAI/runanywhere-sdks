@@ -204,7 +204,7 @@ internal data class LLMStreamModelIdentity(
  *   accumulated answer transcript so far.
  * @return A populated [RALLMGenerationResult] whose [RALLMGenerationResult.framework]
  *   matches the loaded LLM model's analytics key; on terminal error events the
- *   [RALLMGenerationResult.error_message] is propagated.
+ *   [RALLMGenerationResult.error] submessage is propagated.
  */
 @Deprecated("Collect RunAnywhere.llm.generateStream and read GenerationEvent.Completed.")
 suspend fun RunAnywhere.aggregateStream(
@@ -250,7 +250,7 @@ internal suspend fun aggregateLLMStream(
     var firstTokenTimeMs: Long? = null
     val startTimeMs = nowMillis()
     var finishReason = ""
-    var terminalError = ""
+    var terminalError: ai.runanywhere.proto.v1.SDKError? = null
     var finalEvent: RALLMStreamEvent? = null
 
     events
@@ -276,7 +276,7 @@ internal suspend fun aggregateLLMStream(
             if (event.is_final) {
                 finalEvent = event
                 finishReason = event.finish_reason
-                terminalError = event.error_message
+                terminalError = event.error
             }
         }
 
@@ -288,25 +288,28 @@ internal suspend fun aggregateLLMStream(
     // final event carries one, matching the Web SDK; otherwise fall back to the
     // locally concatenated text / wall-clock metrics.
     val final = finalEvent?.result
-    val inputTokens = final?.input_tokens ?: maxOf(1, prompt.length / 4)
-    val tokensGenerated = final?.output_tokens ?: tokenCount
+    val inputTokens = final?.usage?.input_tokens ?: maxOf(1, prompt.length / 4)
+    val tokensGenerated = final?.usage?.output_tokens ?: tokenCount
+    val tokensPerSecond =
+        final?.usage?.tokens_per_second
+            ?: if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0
     return RALLMGenerationResult(
         text = final?.text ?: answerResponse.toString(),
         thinking_content = final?.thinking_content ?: thinkingResponse.toString().takeIf { it.isNotEmpty() },
-        input_tokens = inputTokens,
-        output_tokens = tokensGenerated,
         response_tokens = tokensGenerated,
-        total_tokens = final?.total_tokens ?: (inputTokens + tokensGenerated),
         model_used = modelIdentity.modelID,
         generation_time_ms = final?.total_time_ms?.toDouble() ?: totalLatencyMs,
         framework = modelIdentity.framework,
         prompt_eval_time_ms = final?.prompt_eval_time_ms ?: 0L,
         decode_time_ms = final?.decode_time_ms ?: 0L,
-        tokens_per_second =
-            final?.tokens_per_second?.toDouble()
-                ?: if (totalLatencyMs > 0) tokenCount / (totalLatencyMs / 1000.0) else 0.0,
         ttft_ms = final?.time_to_first_token_ms?.toDouble() ?: ttftMs,
         finish_reason = finishReason,
-        error_message = terminalError.ifEmpty { null },
+        error = terminalError,
+        usage = ai.runanywhere.proto.v1.TokenUsage(
+            input_tokens = inputTokens,
+            output_tokens = tokensGenerated,
+            total_tokens = final?.usage?.total_tokens ?: (inputTokens + tokensGenerated),
+            tokens_per_second = tokensPerSecond,
+        ),
     )
 }

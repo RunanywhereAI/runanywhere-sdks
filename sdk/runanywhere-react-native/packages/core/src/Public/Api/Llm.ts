@@ -131,8 +131,8 @@ async function generateWithToolLoop(
     () => undefined
   );
   const result = decode(resultBytes, ToolCallingResult, 'toolRunLoop');
-  if (result.errorMessage) {
-    throw SDKException.generationFailedWith(result.errorMessage);
+  if (result.error) {
+    throw new SDKException(result.error);
   }
   return {
     text: result.text,
@@ -219,10 +219,8 @@ export const llm = {
             encode(request, LLMGenerateRequest),
             (eventBytes: ArrayBuffer) => {
               const event = decodeEvent(eventBytes, LLMStreamEvent);
-              if (event.errorMessage) {
-                controller.fail(
-                  SDKException.generationFailedWith(event.errorMessage)
-                );
+              if (event.error) {
+                controller.fail(new SDKException(event.error));
                 return;
               }
               if (event.toolCall) {

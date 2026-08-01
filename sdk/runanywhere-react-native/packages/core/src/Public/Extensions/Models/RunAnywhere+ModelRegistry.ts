@@ -371,14 +371,12 @@ export async function listModels(
   // (RunAnywhere+ModelRegistry.swift:11-16).
   if (!isSDKInitialized()) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'SDK not initialized',
+      error: SDKException.notInitialized().proto,
     });
   }
   if (!isNativeModuleAvailable()) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
   // Swift parity: `try? await ensureServicesReady()` (ModelRegistry.swift:17).
@@ -393,8 +391,7 @@ export async function listModels(
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'getAvailableModelsProto returned an empty result',
+      error: SDKException.protoDecodeFailed('getAvailableModelsProto').proto,
     });
   }
   return modelListResult(ModelInfoList.decode(bytes));
@@ -408,14 +405,12 @@ export async function queryModels(query: ModelQuery): Promise<ModelListResult> {
   // guard returns a failed result (RunAnywhere+ModelRegistry.swift:11-25).
   if (!isSDKInitialized()) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'SDK not initialized',
+      error: SDKException.notInitialized().proto,
     });
   }
   if (!isNativeModuleAvailable()) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
   const native = requireNativeModule();
@@ -425,8 +420,7 @@ export async function queryModels(query: ModelQuery): Promise<ModelListResult> {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'queryModelsProto returned an empty result',
+      error: SDKException.protoDecodeFailed('queryModelsProto').proto,
     });
   }
   return modelListResult(ModelInfoList.decode(bytes));
@@ -441,13 +435,13 @@ export async function getModel(request: ModelGetRequest): Promise<ModelGetResult
   if (!isSDKInitialized()) {
     return ModelGetResult.fromPartial({
       found: false,
-      errorMessage: 'SDK not initialized',
+      error: SDKException.notInitialized().proto,
     });
   }
   if (!isNativeModuleAvailable()) {
     return ModelGetResult.fromPartial({
       found: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
   // Swift parity: `try? await ensureServicesReady()` (ModelRegistry.swift:34).
@@ -458,7 +452,7 @@ export async function getModel(request: ModelGetRequest): Promise<ModelGetResult
   if (bytes.byteLength === 0) {
     return ModelGetResult.fromPartial({
       found: false,
-      errorMessage: `Model not found: ${request.modelId}`,
+      error: SDKException.modelNotFound(request.modelId).proto,
     });
   }
   return ModelGetResult.fromPartial({
@@ -473,8 +467,7 @@ export async function getModel(request: ModelGetRequest): Promise<ModelGetResult
 export async function downloadedModels(): Promise<ModelListResult> {
   if (!isNativeModuleAvailable()) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
   const native = requireNativeModule();
@@ -482,8 +475,7 @@ export async function downloadedModels(): Promise<ModelListResult> {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
     return ModelListResult.fromPartial({
-      success: false,
-      errorMessage: 'getDownloadedModelsProto returned an empty result',
+      error: SDKException.protoDecodeFailed('getDownloadedModelsProto').proto,
     });
   }
   return modelListResult(ModelInfoList.decode(bytes));
@@ -500,8 +492,7 @@ export async function importModel(
   requireInitialized();
   if (!isNativeModuleAvailable()) {
     return ModelImportResult.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
+      error: SDKException.nativeModuleUnavailable().proto,
     });
   }
 
@@ -512,8 +503,7 @@ export async function importModel(
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
     return ModelImportResult.fromPartial({
-      success: false,
-      errorMessage: 'importModelProto returned an empty result',
+      error: SDKException.protoDecodeFailed('importModelProto').proto,
     });
   }
   return ModelImportResult.decode(bytes);
@@ -521,7 +511,6 @@ export async function importModel(
 
 function modelListResult(models: ModelInfoList): ModelListResult {
   return ModelListResult.fromPartial({
-    success: true,
     models,
     totalCount: models.models.length,
     downloadedCount: models.models.filter((model) => model.isDownloaded).length,
@@ -628,11 +617,13 @@ function isTerminalProgress(progress: DownloadProgress): boolean {
 
 function isCompletedProgress(progress: DownloadProgress): boolean {
   if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
-    throw SDKException.of(
-      ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-      progress.errorMessage || 'Download failed',
-      { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
-    );
+    throw progress.error
+      ? new SDKException(progress.error)
+      : SDKException.of(
+          ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+          'Download failed',
+          { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
+        );
   }
   if (progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED) {
     throw SDKException.of(
@@ -732,12 +723,8 @@ async function persistDownloadCompletion(
     })
   );
 
-  if (!result.success) {
-    throw SDKException.of(
-      ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-      result.errorMessage || 'Downloaded model could not be imported into the registry',
-      { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
-    );
+  if (result.error) {
+    throw new SDKException(result.error);
   }
 }
 
@@ -843,9 +830,9 @@ export function downloadModelStream(model: ModelInfo): AsyncIterable<DownloadPro
           });
           const plan = await planDownload(native, planRequest);
           if (!plan.canStart) {
-            streamError = new Error(
-              plan.errorMessage || `download plan rejected for ${modelId}`
-            );
+            streamError = plan.error
+              ? new SDKException(plan.error)
+              : new Error(`download plan rejected for ${modelId}`);
             await teardownSubscription();
             finish();
             return;
@@ -862,9 +849,9 @@ export function downloadModelStream(model: ModelInfo): AsyncIterable<DownloadPro
             arrayBufferToBytes(startBytes)
           );
           if (!startResult.accepted) {
-            streamError = new Error(
-              startResult.errorMessage || `download not accepted for ${modelId}`
-            );
+            streamError = startResult.error
+              ? new SDKException(startResult.error)
+              : new Error(`download not accepted for ${modelId}`);
             await teardownSubscription();
             finish();
             return;

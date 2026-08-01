@@ -158,12 +158,11 @@ export class LLMProtoAdapter {
       (rc) => LLMStreamEvent.fromPartial({
         isFinal: true,
         finishReason: 'error',
-        errorCode: rc,
-        errorMessage: SDKException.fromRACResult(
+        error: SDKException.fromRACResult(
           rc,
           `LLM stream failed: ${rc}`,
           { module: this.module, logger },
-        ).message,
+        ).proto,
       }),
     );
   }

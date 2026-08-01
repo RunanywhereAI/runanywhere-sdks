@@ -73,13 +73,8 @@ public extension RunAnywhere {
                         // The bridge reports stream failures on the terminal
                         // partial's `finalOutput`; surface them as a thrown
                         // error instead of leaking them through `text`.
-                        if partial.hasFinalOutput, partial.finalOutput.errorCode != 0 {
-                            let message = partial.finalOutput.errorMessage
-                            continuation.finish(throwing: SDKException(
-                                code: .processingFailed,
-                                message: message.isEmpty ? "STT stream failed" : message,
-                                category: .component
-                            ))
+                        if partial.hasFinalOutput, partial.finalOutput.hasError {
+                            continuation.finish(throwing: SDKException(proto: partial.finalOutput.error))
                             return
                         }
                         if partial.isFinal {

@@ -221,10 +221,8 @@ private extension RunAnywhere {
             request.framework = model.framework
         }
         let result = await performLoad(request)
-        guard result.success else {
-            let message = result.errorMessage.isEmpty
-                ? "\(errorLabel) model lifecycle artifact resolution failed"
-                : result.errorMessage
+        guard !result.hasError else {
+            let message = result.error.message
             let code: RAErrorCode = message.contains(NativeProtoABI.unavailableMessage)
                 ? .featureNotAvailable
                 : .modelLoadFailed

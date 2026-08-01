@@ -319,8 +319,8 @@ object CppBridgeSTT {
             }
             STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR ->
                 errorPartial(
-                    event.error_message ?: "STT stream failed",
-                    event.error_code,
+                    event.error?.message?.takeIf { it.isNotBlank() } ?: "STT stream failed",
+                    event.error?.code?.value ?: 0,
                 )
             STTStreamEventKind.STT_STREAM_EVENT_KIND_STARTED,
             STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED,
@@ -331,7 +331,17 @@ object CppBridgeSTT {
         STTPartialResult(
             text = message,
             is_final = true,
-            final_output = STTOutput(text = message, error_message = message, error_code = code),
+            final_output =
+                STTOutput(
+                    text = message,
+                    error =
+                        ai.runanywhere.proto.v1.SDKError(
+                            code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_UNKNOWN,
+                            category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_COMPONENT,
+                            message = message,
+                            c_abi_code = code,
+                        ),
+                ),
         )
 
     private fun InferenceFramework.toCFramework(): Int =

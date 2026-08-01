@@ -12,7 +12,7 @@ import 'package:runanywhere/generated/diffusion_options.pbenum.dart'
     show DiffusionMode;
 import 'package:runanywhere/generated/embeddings_options.pb.dart' as embed_pb;
 import 'package:runanywhere/generated/embeddings_options.pbenum.dart'
-    show EmbeddingsNormalizeMode, EmbeddingsPoolingStrategy;
+    show EmbeddingsPoolingStrategy;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
@@ -40,7 +40,7 @@ import 'package:runanywhere/generated/vlm_options.pb.dart'
 import 'package:runanywhere/public/api/types/inputs.dart';
 
 export 'package:runanywhere/generated/embeddings_options.pbenum.dart'
-    show EmbeddingsNormalizeMode, EmbeddingsPoolingStrategy;
+    show EmbeddingsPoolingStrategy;
 export 'package:runanywhere/generated/model_types.pbenum.dart'
     show AudioFormat, InferenceFramework, ModelCategory;
 export 'package:runanywhere/generated/thinking_tag_pattern.pbenum.dart'
@@ -467,17 +467,16 @@ class VadOptions {
 class EmbedOptions {
   /// Override any subset of the embedding defaults.
   EmbedOptions({
-    EmbeddingsNormalizeMode? normalize,
+    bool? normalize,
     EmbeddingsPoolingStrategy? pooling,
   }) : _argNormalize = normalize,
        _argPooling = pooling;
 
-  final EmbeddingsNormalizeMode? _argNormalize;
+  final bool? _argNormalize;
   final EmbeddingsPoolingStrategy? _argPooling;
 
-  /// Vector normalization applied after pooling.
-  EmbeddingsNormalizeMode get normalize =>
-      _argNormalize ?? EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2;
+  /// True L2-normalizes each vector after pooling.
+  bool get normalize => _argNormalize ?? true;
 
   /// How token vectors collapse into one sentence vector.
   EmbeddingsPoolingStrategy get pooling =>
@@ -485,7 +484,7 @@ class EmbedOptions {
 
   /// Build the generated embeddings options.
   embed_pb.EmbeddingsOptions toProto() => embed_pb.EmbeddingsOptions(
-    normalizeMode: normalize,
+    normalize: normalize,
     pooling: pooling,
     nThreads: _embed.nThreads,
   );

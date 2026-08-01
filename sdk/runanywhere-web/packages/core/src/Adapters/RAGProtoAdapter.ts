@@ -174,8 +174,7 @@ export class RAGProtoAdapter {
       // the iterator (parity with the LLM stream adapter).
       (rc) => RAGStreamEvent.fromPartial({
         kind: RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR,
-        errorCode: rc,
-        errorMessage: `RAG stream failed: ${formatRacResult(rc)}`,
+        error: SDKException.fromCode(rc, `RAG stream failed: ${formatRacResult(rc)}`).proto,
       }),
       /* callbackReturnsBool */ true,
     );

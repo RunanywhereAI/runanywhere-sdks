@@ -88,13 +88,8 @@ class RunAnywhereLLM {
           validateAvailability: true,
         ),
       );
-      if (!lifecycleResult.success) {
-        throw SDKException.modelLoadFailed(
-          modelId,
-          lifecycleResult.errorMessage.isNotEmpty
-              ? lifecycleResult.errorMessage
-              : 'Model lifecycle proto load failed',
-        );
+      if (lifecycleResult.hasError()) {
+        throw SDKException(lifecycleResult.error);
       }
 
       logger.info('Model loaded successfully: $modelId');
@@ -120,12 +115,8 @@ class RunAnywhereLLM {
         category: model_pb.ModelCategory.MODEL_CATEGORY_LANGUAGE,
       ),
     );
-    if (!result.success) {
-      throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
-            : 'LLM lifecycle unload failed',
-      );
+    if (result.hasError()) {
+      throw SDKException(result.error);
     }
     logger.info('Model unloaded');
   }

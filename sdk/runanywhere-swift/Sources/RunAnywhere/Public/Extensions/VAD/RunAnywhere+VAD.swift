@@ -34,8 +34,9 @@ public extension RunAnywhere {
                     } catch {
                         let sdkError = SDKException.from(error, category: .component)
                         var failure = RAVADResult()
-                        failure.errorMessage = "VAD stream failed: \(sdkError.message)"
-                        failure.errorCode = Int32(sdkError.code.rawValue)
+                        var failureError = sdkError.proto
+                        failureError.message = "VAD stream failed: \(sdkError.message)"
+                        failure.error = failureError
                         continuation.yield(failure)
                         break
                     }

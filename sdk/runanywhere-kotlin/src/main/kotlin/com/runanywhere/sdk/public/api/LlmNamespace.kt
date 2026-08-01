@@ -231,7 +231,7 @@ public class LlmNamespace internal constructor() {
                 validateCalls = null,
                 history = history.toAlternatingTurns(),
             )
-        result.error_message?.takeIf { it.isNotBlank() }?.let { throw SDKException.operation(it) }
+        result.error?.let { throw SDKException(it) }
         return GenerationResult(
             text = result.text,
             thinkingText = result.thinking_content?.takeIf { it.isNotEmpty() },
@@ -318,9 +318,8 @@ private fun List<ChatMessage>.toAlternatingTurns(): List<String> {
 }
 
 private fun LLMStreamEvent.failureOrNull(): SDKException? {
-    if (event_kind != LLMStreamEventKind.LLM_STREAM_EVENT_KIND_ERROR && error_code == 0) return null
-    val message = error_message.ifBlank { "Generation failed" }
-    return SDKException.operation(message)
+    val err = error ?: return null
+    return SDKException(err)
 }
 
 private fun LLMStreamEvent.tokenEventOrNull(

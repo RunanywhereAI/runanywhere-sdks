@@ -142,7 +142,7 @@ public class VoiceNamespace internal constructor() {
             )
         if (!states.ready) {
             throw SDKException.invalidState(
-                states.error_message?.takeIf { it.isNotBlank() }
+                states.error?.message?.takeIf { it.isNotBlank() }
                     ?: "Voice pipeline did not come up ready",
             )
         }

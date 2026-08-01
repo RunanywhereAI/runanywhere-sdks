@@ -330,8 +330,8 @@ class RunAnywhereLoRACapability {
         // (`.downloadFailed`, network category).
         throw SDKException.make(
           code: ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-          message: progress.errorMessage.isNotEmpty
-              ? progress.errorMessage
+          message: progress.hasError()
+              ? progress.error.message
               : 'LoRA adapter download failed for ${entry.id}',
           category: ErrorCategory.ERROR_CATEGORY_NETWORK,
         );

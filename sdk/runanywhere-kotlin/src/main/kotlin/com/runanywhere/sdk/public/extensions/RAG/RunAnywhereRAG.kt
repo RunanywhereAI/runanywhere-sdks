@@ -105,9 +105,9 @@ private suspend fun loadRagArtifactModel(
                 },
         )
     val result = sdk.loadModel(request)
-    if (!result.success) {
+    if (result.error != null) {
         val message =
-            result.error_message.ifBlank { "$errorLabel model lifecycle artifact resolution failed" }
+            result.error!!.message.ifBlank { "$errorLabel model lifecycle artifact resolution failed" }
         throw SDKException.model("$errorLabel model '${model.id}': $message")
     }
     return result

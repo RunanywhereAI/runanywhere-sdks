@@ -383,9 +383,9 @@ export async function ensureDefaultVAD(modelID?: string): Promise<boolean> {
       forceReload: false,
       validateAvailability: false,
     });
-    if (!result?.success) {
+    if (!result || result.error) {
       logger.warning(
-        `Default VAD '${targetID}' auto-load failed: ${result?.errorMessage ?? 'unknown error'} — voice agent will use energy fallback`,
+        `Default VAD '${targetID}' auto-load failed: ${result?.error?.message ?? 'unknown error'} — voice agent will use energy fallback`,
       );
       return false;
     }
@@ -592,7 +592,6 @@ class CrossWasmVoiceAgentProvider implements VoiceAgentProvider {
       ready: this.initialized && sttReady && llmReady && ttsReady,
       anyLoading: false,
       wakewordState: notLoaded,
-      errorMessage: undefined,
     };
   }
 
@@ -1116,8 +1115,7 @@ function voiceTurnResult(
     llmTimeMs: values.llmTimeMs ?? 0,
     ttsTimeMs: values.ttsTimeMs ?? 0,
     totalTimeMs: values.totalTimeMs ?? 0,
-    errorMessage: values.errorMessage,
-    errorCode: values.errorCode ?? 0,
+    error: values.error,
   };
 }
 

@@ -101,11 +101,11 @@ class RunAnywhereDiffusion {
         validateAvailability: true,
       ),
     );
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.modelLoadFailed(
         modelId,
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
+        result.error.message.isNotEmpty
+            ? result.error.message
             : 'Diffusion lifecycle load failed',
       );
     }
@@ -128,10 +128,10 @@ class RunAnywhereDiffusion {
         category: _diffusionCategory,
       ),
     );
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
+        result.error.message.isNotEmpty
+            ? result.error.message
             : 'Diffusion lifecycle unload failed',
       );
     }
@@ -181,13 +181,13 @@ class RunAnywhereDiffusion {
     } on SDKException catch (e) {
       yield DiffusionStreamEvent(
         kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_ERROR,
-        errorMessage: e.message,
+        error: e.error,
       );
       return;
     } catch (e) {
       yield DiffusionStreamEvent(
         kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_ERROR,
-        errorMessage: e.toString(),
+        error: SDKException.from(e).error,
       );
       return;
     }

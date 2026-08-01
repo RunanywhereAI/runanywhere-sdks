@@ -102,10 +102,8 @@ export const stt = {
               const step = await iterator.next();
               if (step.done) break;
               const partial = step.value;
-              if (partial.finalOutput?.errorMessage) {
-                controller.fail(
-                  SDKException.processingFailed(partial.finalOutput.errorMessage)
-                );
+              if (partial.finalOutput?.error) {
+                controller.fail(new SDKException(partial.finalOutput.error));
                 return;
               }
               if (partial.isFinal) {

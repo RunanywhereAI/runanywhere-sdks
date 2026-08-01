@@ -299,7 +299,7 @@ class DartBridgeAuth {
   Future<String?> _retryHTTPViaCommons() async {
     try {
       final result = DartBridgeSdkInit.retryHTTP();
-      if (!result.success) return null;
+      if (result.hasError()) return null;
     } catch (_) {
       _logger.debug('HTTP retry did not refresh auth');
       return null;

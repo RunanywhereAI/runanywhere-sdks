@@ -220,9 +220,11 @@ export const voice = {
         const outputBytes = await native.voiceAgentSynthesizeSpeechProto(text);
         const output = decodeOptional(outputBytes, TTSOutput);
         if (!output || output.audioData.byteLength === 0) {
-          throw SDKException.processingFailed(
-            output?.errorMessage || 'Voice session could not synthesize speech'
-          );
+          throw output?.error
+            ? new SDKException(output.error)
+            : SDKException.processingFailed(
+                'Voice session could not synthesize speech'
+              );
         }
         const copy = new Uint8Array(output.audioData.byteLength);
         copy.set(output.audioData);

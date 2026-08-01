@@ -75,25 +75,20 @@ public extension RunAnywhere {
                 do {
                     let stream = try await generateStreamProto(request)
                     var accumulated = ""
-                    var seq: UInt64 = 0
                     for await event in stream {
                         if Task.isCancelled { break }
                         if !event.token.isEmpty {
                             accumulated += event.token
-                            seq &+= 1
                             var emitted = RAStructuredOutputStreamEvent()
                             emitted.kind = .token
                             emitted.token = event.token
-                            emitted.seq = seq
                             continuation.yield(emitted)
                         }
                     }
-                    seq &+= 1
                     let parsed = try parseStructuredOutput(text: accumulated, schema: schema)
                     var terminal = RAStructuredOutputStreamEvent()
                     terminal.kind = .completed
                     terminal.result = parsed
-                    terminal.seq = seq
                     continuation.yield(terminal)
                     continuation.finish()
                 } catch {
@@ -140,8 +135,8 @@ public extension RunAnywhere {
         internalOptions.structuredOutput = structuredOutput
         if structuredOutput.includeSchemaInPrompt {
             let prep = try CppBridge.StructuredOutput.preparePrompt(prompt: prompt, options: structuredOutput)
-            guard prep.errorCode == 0 else {
-                throw SDKException(code: .processingFailed, message: prep.errorMessage, category: .internal)
+            guard !prep.hasError else {
+                throw SDKException(proto: prep.error)
             }
             if prep.hasSystemPrompt { internalOptions.systemPrompt = prep.systemPrompt }
         }

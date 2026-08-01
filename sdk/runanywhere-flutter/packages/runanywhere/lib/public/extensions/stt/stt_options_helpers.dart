@@ -42,11 +42,11 @@ extension TranscriptionMetadataHelpers on TranscriptionMetadata {
   /// Total audio length in seconds.
   double get audioLengthSeconds => audioLengthMs.toInt() / 1000.0;
 
-  /// Real-time factor (`processingTime / audioLength`). Falls back to
-  /// the proto-recorded `realTimeFactor` when audio length is zero.
+  /// Real-time factor (`processingTime / audioLength`). Zero when audio
+  /// length is unknown, since the ratio is undefined.
   double get computedRealTimeFactor {
     final audio = audioLengthMs.toInt();
-    if (audio <= 0) return realTimeFactor;
+    if (audio <= 0) return 0.0;
     return processingTimeMs.toInt() / audio;
   }
 }

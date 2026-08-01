@@ -14,6 +14,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/chat.pb.dart'
     show ChatMessage, MessageRole;
@@ -116,8 +117,9 @@ class RunAnywhereTools {
   ///
   /// Mirrors Swift `RunAnywhere.executeTool(_:)` semantics
   /// (RunAnywhere+ToolCalling.swift:158-203): unknown tools, argument
-  /// parse failures, and executor errors all surface as `success: false`
-  /// results — a parse failure must NOT silently execute the tool with
+  /// parse failures, and executor errors all surface as error-marked
+  /// [ToolResult]s (populated `error` submessage) — a parse failure must NOT
+  /// silently execute the tool with
   /// empty arguments, which would make bad model output look like a
   /// successful empty-argument call.
   Future<ToolResult> execute(ToolCall toolCall) async {
@@ -126,8 +128,9 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
-        success: false,
-        error: 'Tool not found: ${toolCall.name}',
+        error: SDKException.invalidInput(
+          'Tool not found: ${toolCall.name}',
+        ).error,
       );
     }
 
@@ -141,18 +144,19 @@ class RunAnywhereTools {
           return ToolResult(
             toolCallId: toolCall.id,
             name: toolCall.name,
-            success: false,
-            error:
-                'Failed to parse tool arguments: expected a JSON object, '
-                'got ${decoded.runtimeType}',
+            error: SDKException.invalidInput(
+              'Failed to parse tool arguments: expected a JSON object, '
+              'got ${decoded.runtimeType}',
+            ).error,
           );
         }
       } catch (e) {
         return ToolResult(
           toolCallId: toolCall.id,
           name: toolCall.name,
-          success: false,
-          error: 'Failed to parse tool arguments: $e',
+          error: SDKException.invalidInput(
+            'Failed to parse tool arguments: $e',
+          ).error,
         );
       }
     }
@@ -164,7 +168,6 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
-        success: true,
         resultJson: jsonEncode(result),
       );
     } catch (e) {
@@ -172,8 +175,7 @@ class RunAnywhereTools {
       return ToolResult(
         toolCallId: toolCall.id,
         name: toolCall.name,
-        success: false,
-        error: e.toString(),
+        error: SDKException.processingFailed(e.toString()).error,
       );
     }
   }
@@ -300,7 +302,7 @@ class RunAnywhereTools {
               session.stepWithResult(
                 toolCallId: call.id,
                 resultJson: result.resultJson,
-                error: result.error,
+                error: result.hasError() ? result.error.message : '',
               );
             } catch (e) {
               _logger.error('Tool executor threw: $e');

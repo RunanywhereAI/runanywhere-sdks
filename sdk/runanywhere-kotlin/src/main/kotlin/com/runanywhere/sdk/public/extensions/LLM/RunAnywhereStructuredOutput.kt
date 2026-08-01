@@ -72,12 +72,7 @@ suspend fun RunAnywhere.generateWithStructuredOutput(
                     ),
                 )
             }
-        if (promptResult.error_code != 0) {
-            throw SDKException.operation(
-                promptResult.error_message
-                    ?: "Structured output prompt preparation failed: ${promptResult.error_code}",
-            )
-        }
+        promptResult.error?.let { throw SDKException(it) }
         promptResult.system_prompt?.let { sys ->
             internalOptions = internalOptions.copy(system_prompt = sys)
         }
@@ -118,28 +113,23 @@ fun RunAnywhere.generateStructuredStream(
 
     return flow {
         var accumulated = ""
-        var seq = 0L
         generateStream(request).collect { event ->
             if (event.token.isNotEmpty()) {
                 accumulated += event.token
-                seq += 1
                 emit(
                     StructuredOutputStreamEvent(
                         kind = StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
                         token = event.token,
-                        seq = seq,
                     ),
                 )
             }
         }
 
-        seq += 1
         val parsed = extractStructuredOutput(accumulated, schema)
         emit(
             StructuredOutputStreamEvent(
                 kind = StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
                 result = parsed,
-                seq = seq,
             ),
         )
     }.onCompletion { cause ->

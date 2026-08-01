@@ -345,7 +345,7 @@ export const TTS = {
     const adapter = TTSProtoAdapter.tryDefault();
     if (!adapter || !currentLifecycleVoiceId()) return false;
     const state = adapter.stopLifecycle();
-    return state?.errorCode === 0;
+    return state != null && !state.error;
   },
 
   /** Unload the voice but keep the component handle alive. */

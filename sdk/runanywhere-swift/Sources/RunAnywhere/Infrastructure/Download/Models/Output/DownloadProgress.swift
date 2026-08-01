@@ -83,8 +83,8 @@ public extension RADownloadProgress {
         return msg
     }
 
-    /// Failed progress. The canonical proto uses a string error message
-    /// rather than a Swift `Error`; we capture `localizedDescription`.
+    /// Failed progress. The canonical proto carries a structured `SDKError`
+    /// submessage; we capture the Swift error's `localizedDescription`.
     static func failed(
         _ error: Error,
         modelId: String = "",
@@ -99,7 +99,11 @@ public extension RADownloadProgress {
         msg.totalBytes = totalBytes
         msg.stageProgress = 0
         msg.etaSeconds = -1
-        msg.errorMessage = error.localizedDescription
+        msg.error = RASDKError.make(
+            code: .internal,
+            message: error.localizedDescription,
+            category: .internal
+        )
         return msg
     }
 
@@ -128,7 +132,13 @@ public extension RADownloadProgress {
         self.etaSeconds = estimatedTimeRemaining.map { Int64($0) } ?? -1
         self.state = state
         self.retryAttempt = retryAttempt
-        self.errorMessage = errorMessage
+        if !errorMessage.isEmpty {
+            self.error = RASDKError.make(
+                code: .internal,
+                message: errorMessage,
+                category: .internal
+            )
+        }
     }
 }
 

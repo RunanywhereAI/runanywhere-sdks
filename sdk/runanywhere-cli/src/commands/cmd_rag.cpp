@@ -216,8 +216,8 @@ int run_rag(const GlobalOptions& options, const RagParams& params,
             .field("retrieval_time_ms", static_cast<int64_t>(result.retrieval_time_ms()))
             .field("generation_time_ms", static_cast<int64_t>(result.generation_time_ms()))
             .field("total_time_ms", static_cast<int64_t>(result.total_time_ms()))
-            .field("prompt_tokens", static_cast<int64_t>(result.prompt_tokens()))
-            .field("completion_tokens", static_cast<int64_t>(result.completion_tokens()));
+            .field("prompt_tokens", static_cast<int64_t>(result.usage().input_tokens()))
+            .field("completion_tokens", static_cast<int64_t>(result.usage().output_tokens()));
         json.begin_array("matches");
         for (const v1::RAGSearchResult& match : result.retrieved_chunks()) {
             json.begin_array_object()

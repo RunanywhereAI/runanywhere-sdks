@@ -64,10 +64,10 @@ class RunAnywhereVLM {
           validateAvailability: true,
         ),
       );
-      if (!lifecycleResult.success) {
+      if (lifecycleResult.hasError()) {
         throw SDKException.vlmModelLoadFailed(
-          lifecycleResult.errorMessage.isNotEmpty
-              ? lifecycleResult.errorMessage
+          lifecycleResult.error.message.isNotEmpty
+              ? lifecycleResult.error.message
               : 'VLM lifecycle load failed',
         );
       }
@@ -99,10 +99,10 @@ class RunAnywhereVLM {
         category: category,
       ),
     );
-    if (!result.success) {
+    if (result.hasError()) {
       throw SDKException.invalidState(
-        result.errorMessage.isNotEmpty
-            ? result.errorMessage
+        result.error.message.isNotEmpty
+            ? result.error.message
             : 'VLM lifecycle unload failed',
       );
     }
@@ -139,8 +139,8 @@ class RunAnywhereVLM {
       );
 
       logger.info(
-        'VLM processing complete: ${result.outputTokens} tokens, '
-        '${result.tokensPerSecond.toStringAsFixed(1)} tok/s',
+        'VLM processing complete: ${result.usage.outputTokens} tokens, '
+        '${result.usage.tokensPerSecond.toStringAsFixed(1)} tok/s',
       );
 
       return result;

@@ -19,8 +19,6 @@ export {
 export type { HybridDeviceStateProvider } from './HybridDeviceState.js';
 export {
   HybridBackendKind,
-  HybridModelType,
-  HybridRank,
   DEFAULT_CLOUD_PROVIDER,
   HYBRID_STT_CONFIDENCE_THRESHOLD,
   networkFilter,

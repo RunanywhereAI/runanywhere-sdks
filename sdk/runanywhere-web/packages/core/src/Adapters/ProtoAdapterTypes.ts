@@ -436,7 +436,6 @@ export function emptyLoRAState(): ProtoLoRAState {
   return {
     loadedAdapters: [],
     hasActiveAdapters: false,
-    errorCode: 0,
   };
 }
 

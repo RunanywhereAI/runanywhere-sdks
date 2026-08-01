@@ -160,7 +160,11 @@ extension CppBridge {
                 var result = RADownloadPlanResult()
                 result.canStart = false
                 result.modelID = request.modelID
-                result.errorMessage = String(describing: error)
+                result.error = RASDKError.make(
+                    code: .internal,
+                    message: String(describing: error),
+                    category: .internal
+                )
                 return result
             }
         }
@@ -177,7 +181,11 @@ extension CppBridge {
                 var result = RADownloadStartResult()
                 result.accepted = false
                 result.modelID = request.modelID
-                result.errorMessage = String(describing: error)
+                result.error = RASDKError.make(
+                    code: .internal,
+                    message: String(describing: error),
+                    category: .internal
+                )
                 return result
             }
         }
@@ -192,10 +200,13 @@ extension CppBridge {
                 )
             } catch {
                 var result = RADownloadCancelResult()
-                result.success = false
                 result.modelID = request.modelID
                 result.taskID = request.taskID
-                result.errorMessage = String(describing: error)
+                result.error = RASDKError.make(
+                    code: .internal,
+                    message: String(describing: error),
+                    category: .internal
+                )
                 return result
             }
         }
@@ -213,7 +224,11 @@ extension CppBridge {
                 result.accepted = false
                 result.modelID = request.modelID
                 result.taskID = request.taskID
-                result.errorMessage = String(describing: error)
+                result.error = RASDKError.make(
+                    code: .internal,
+                    message: String(describing: error),
+                    category: .internal
+                )
                 return result
             }
         }
@@ -231,7 +246,11 @@ extension CppBridge {
                 progress.modelID = request.modelID
                 progress.taskID = request.taskID
                 progress.state = .failed
-                progress.errorMessage = String(describing: error)
+                progress.error = RASDKError.make(
+                    code: .internal,
+                    message: String(describing: error),
+                    category: .internal
+                )
                 return progress
             }
         }

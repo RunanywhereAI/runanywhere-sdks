@@ -677,7 +677,7 @@ export class BrowserStorageAnalyzerAdapter implements StorageAnalyzerLifecycle {
               modelId,
               unloadAll: false,
             });
-            if (!result?.success) this.unloadFailures.add(modelId);
+            if (!result || result.error) this.unloadFailures.add(modelId);
           } catch {
             this.unloadFailures.add(modelId);
           }

@@ -381,21 +381,8 @@ function throwIfSdkInitFailed(result: ProtoSdkInitResult | null, phase: string):
       `${phase} returned no sdk-init result.`,
     );
   }
-  if (!result.success) {
-    throw new SDKException(result.error ?? {
-      category: 0,
-      code: 0,
-      cAbiCode: -ProtoErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
-      message: `${phase} failed.`,
-      nestedMessage: result.warning || undefined,
-      context: undefined,
-      timestampMs: Date.now(),
-      severity: 0,
-      component: 'sdk',
-      retryable: false,
-      remediationHint: '',
-      correlationId: '',
-    });
+  if (result.error) {
+    throw new SDKException(result.error);
   }
   if (result.warning) {
     logger.warning(`${phase} completed with a warning`);
@@ -660,14 +647,14 @@ function mirrorDownloadCompletionToRegistry(model: ModelInfo, localPath: string)
     validateBeforeRegister: false,
     files: importedModel.multiFile?.files ?? [],
   });
-  if (!result?.success) {
-    throw SDKException.fromCode(
-      -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-      result?.errorMessage
-        ? result.errorMessage
-        : 'Downloaded model could not be imported into the registry',
-      'downloadModel',
-    );
+  if (!result || result.error) {
+    throw result?.error
+      ? new SDKException(result.error)
+      : SDKException.fromCode(
+        -ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+        'Downloaded model could not be imported into the registry',
+        'downloadModel',
+      );
   }
 }
 
@@ -1419,7 +1406,7 @@ export const SDKCore = {
     // `RunAnywhere.visionLanguage.loadCurrentModel()` itself after every
     // load — the SDK now owns that coupling so example views stay free
     // of SDK-internal lifecycle bridge calls.
-    if (result?.success && isVisionLanguageCategory(result.category)) {
+    if (result && !result.error && isVisionLanguageCategory(result.category)) {
       await nextLifecycleTurn();
       await syncVisionLanguageProviderToLifecycle();
     }
@@ -1434,7 +1421,7 @@ export const SDKCore = {
     // when the lifecycle no longer reports a current VLM model so the
     // next processImage call surfaces "no model loaded" instead of
     // dispatching against a stale provider handle.
-    if (result?.success) {
+    if (result && !result.error) {
       await nextLifecycleTurn();
       await syncVisionLanguageProviderToLifecycle();
     }
@@ -1530,7 +1517,7 @@ export const SDKCore = {
     if (!plan?.canStart) {
       throwDownloadFailure(
         'downloadModel',
-        plan?.errorMessage || `Download plan for '${request.modelId}' could not start.`,
+        plan?.error?.message || `Download plan for '${request.modelId}' could not start.`,
         plan?.failureReason,
       );
     }
@@ -1556,7 +1543,7 @@ export const SDKCore = {
     if (!start?.accepted) {
       throwDownloadFailure(
         'downloadModel',
-        start?.errorMessage || `Download start for '${request.modelId}' was rejected.`,
+        start?.error?.message || `Download start for '${request.modelId}' was rejected.`,
       );
     }
 
@@ -1608,7 +1595,7 @@ export const SDKCore = {
     if (lastProgress.state !== DownloadState.DOWNLOAD_STATE_COMPLETED) {
       throwDownloadFailure(
         'downloadModel',
-        lastProgress.errorMessage || `Download for '${request.modelId}' ended in state ${lastProgress.state}.`,
+        lastProgress.error?.message || `Download for '${request.modelId}' ended in state ${lastProgress.state}.`,
       );
     }
 

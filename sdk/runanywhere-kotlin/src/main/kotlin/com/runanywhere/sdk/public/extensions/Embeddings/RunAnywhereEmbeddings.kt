@@ -120,9 +120,9 @@ object Embeddings {
                     category = ModelCategory.MODEL_CATEGORY_EMBEDDING,
                 ),
             )
-        if (!result.success) {
+        if (result.error != null) {
             val message =
-                result.error_message.ifEmpty { "Embeddings lifecycle unload failed" }
+                result.error!!.message.ifEmpty { "Embeddings lifecycle unload failed" }
             throw SDKException.operation(message)
         }
     }
@@ -147,9 +147,9 @@ object Embeddings {
                     validate_availability = true,
                 ),
             )
-        if (!result.success) {
+        if (result.error != null) {
             val reason =
-                result.error_message.ifEmpty { "Embeddings lifecycle load failed" }
+                result.error!!.message.ifEmpty { "Embeddings lifecycle load failed" }
             throw SDKException.modelLoadFailed(modelId, reason)
         }
     }

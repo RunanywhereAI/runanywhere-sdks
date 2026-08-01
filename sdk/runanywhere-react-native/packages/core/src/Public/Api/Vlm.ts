@@ -108,10 +108,8 @@ export const vlm = {
         void native
           .vlmProcessStreamProto(requestBytes, (eventBytes: ArrayBuffer) => {
             const event = decodeEvent(eventBytes, VLMStreamEvent);
-            if (event.errorMessage) {
-              controller.fail(
-                SDKException.generationFailedWith(event.errorMessage)
-              );
+            if (event.error) {
+              controller.fail(new SDKException(event.error));
               return;
             }
             if (event.token.length > 0) {

@@ -247,7 +247,7 @@ class HybridSttRouter {
   Uint8List _descriptorBytes(HybridModel model) {
     final descriptor = pb.HybridModelDescriptor(
       modelId: model.id,
-      modelType: model.kind.proto,
+      isLocal: model.kind.isLocal,
       backend: model.backend.proto,
       provider: model.provider,
     );

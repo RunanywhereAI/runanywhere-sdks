@@ -20,16 +20,19 @@ extension RunAnywhere {
     internal static func performLoad(_ request: RAModelLoadRequest) async -> RAModelLoadResult {
         guard isReady else {
             var result = RAModelLoadResult()
-            result.success = false
             result.modelID = request.modelID
             result.category = request.category
             result.framework = request.framework
-            result.errorMessage = "SDK not initialized"
+            result.error = RASDKError.make(
+                code: .notInitialized,
+                message: "SDK not initialized",
+                category: .component
+            )
             return result
         }
         try? await ensureServicesReady()
         let result = await CppBridge.ModelLifecycle.load(request)
-        if result.success {
+        if !result.hasError {
             let modelID = result.modelID.isEmpty ? request.modelID : result.modelID
             SDKLogger.models.info("Model load succeeded for \(modelID)")
         }
@@ -39,12 +42,15 @@ extension RunAnywhere {
     internal static func performUnload(_ request: RAModelUnloadRequest) async -> RAModelUnloadResult {
         guard isReady else {
             var result = RAModelUnloadResult()
-            result.success = false
-            result.errorMessage = "SDK not initialized"
+            result.error = RASDKError.make(
+                code: .notInitialized,
+                message: "SDK not initialized",
+                category: .component
+            )
             return result
         }
         let result = CppBridge.ModelLifecycle.unload(request)
-        if result.success {
+        if !result.hasError {
             await CppBridge.Diarization.shared.reconcileCanonicalUnload(
                 request: request,
                 result: result

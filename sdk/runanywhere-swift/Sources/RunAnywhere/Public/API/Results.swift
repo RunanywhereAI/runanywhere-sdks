@@ -74,10 +74,10 @@ public struct GenerationResult: Sendable {
             thinkingText: proto.hasThinkingContent && !proto.thinkingContent.isEmpty ? proto.thinkingContent : nil,
             toolCalls: proto.toolCalls,
             finishReason: FinishReason.parse(proto.finishReason),
-            inputTokens: Int(proto.inputTokens),
-            outputTokens: Int(proto.outputTokens),
+            inputTokens: Int(proto.usage.inputTokens),
+            outputTokens: Int(proto.usage.outputTokens),
             timeToFirstTokenMs: Int64(proto.ttftMs.rounded()),
-            tokensPerSecond: Float(proto.tokensPerSecond),
+            tokensPerSecond: Float(proto.usage.tokensPerSecond),
             requestId: requestId,
             model: proto.modelUsed
         )
@@ -89,10 +89,10 @@ public struct GenerationResult: Sendable {
             thinkingText: proto.hasThinkingContent && !proto.thinkingContent.isEmpty ? proto.thinkingContent : nil,
             toolCalls: proto.toolCalls,
             finishReason: FinishReason.parse(proto.finishReason),
-            inputTokens: Int(proto.inputTokens),
-            outputTokens: Int(proto.outputTokens),
+            inputTokens: Int(proto.usage.inputTokens),
+            outputTokens: Int(proto.usage.outputTokens),
             timeToFirstTokenMs: Int64(proto.timeToFirstTokenMs),
-            tokensPerSecond: proto.tokensPerSecond,
+            tokensPerSecond: Float(proto.usage.tokensPerSecond),
             requestId: requestId,
             model: model
         )
@@ -104,10 +104,10 @@ public struct GenerationResult: Sendable {
             thinkingText: nil,
             toolCalls: [],
             finishReason: FinishReason.parse(proto.finishReason),
-            inputTokens: Int(proto.inputTokens),
-            outputTokens: Int(proto.outputTokens),
+            inputTokens: Int(proto.usage.inputTokens),
+            outputTokens: Int(proto.usage.outputTokens),
             timeToFirstTokenMs: Int64(proto.timeToFirstTokenMs),
-            tokensPerSecond: proto.tokensPerSecond,
+            tokensPerSecond: Float(proto.usage.tokensPerSecond),
             requestId: requestId,
             model: model
         )
@@ -398,11 +398,11 @@ public struct RagResult: Sendable {
     init(proto: RARAGResult, model: String) {
         self.answer = proto.answer
         self.sources = proto.retrievedChunks.map(Match.init(proto:))
-        self.inputTokens = Int(proto.promptTokens)
-        self.outputTokens = Int(proto.completionTokens)
+        self.inputTokens = Int(proto.usage.inputTokens)
+        self.outputTokens = Int(proto.usage.outputTokens)
         self.timeToFirstTokenMs = Int64(proto.retrievalTimeMs)
         let seconds = Double(proto.generationTimeMs) / 1000.0
-        self.tokensPerSecond = seconds > 0 ? Float(Double(proto.completionTokens) / seconds) : 0
+        self.tokensPerSecond = seconds > 0 ? Float(Double(proto.usage.outputTokens) / seconds) : 0
         self.requestId = proto.requestID
         self.model = model
     }

@@ -153,18 +153,12 @@ extension CppBridge {
 
         /// Throw the embedded RASDKError when the C ABI signals a hard failure
         /// (validation/parse/state init). Soft failures (offline mode) come
-        /// back with `success=true` plus warnings — the caller decides how to
-        /// react to those.
+        /// back with no error submessage plus warnings — the caller decides how
+        /// to react to those.
         private static func assertSuccess(_ result: RASdkInitResult) throws {
-            guard !result.success else { return }
             if result.hasError {
                 throw SDKException(proto: result.error)
             }
-            throw SDKException(
-                code: .processingFailed,
-                message: "SDK init phase \(result.phase) failed without error detail",
-                category: .internal
-            )
         }
     }
 }

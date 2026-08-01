@@ -57,7 +57,7 @@ fun RALLMGenerationOptions.toRALLMGenerateRequest(prompt: String): RALLMGenerate
  * Alias for `output_tokens` matching Swift `RALLMGenerationResult.tokensUsed`.
  */
 val RALLMGenerationResult.tokensUsed: Int
-    get() = output_tokens
+    get() = usage?.output_tokens ?: 0
 
 /**
  * Alias for `generation_time_ms` matching Swift `RALLMGenerationResult.latencyMs`.

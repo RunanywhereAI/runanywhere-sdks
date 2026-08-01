@@ -6,6 +6,7 @@ import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart' as download_pb;
 import 'package:runanywhere/generated/ra_result_codes.dart';
@@ -212,7 +213,9 @@ class DartBridgeDownload {
     return result ??
         download_pb.DownloadPlanResult(
           canStart: false,
-          errorMessage: 'Download plan proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Download plan proto API is unavailable',
+          ).error,
         );
   }
 
@@ -235,7 +238,9 @@ class DartBridgeDownload {
         download_pb.DownloadStartResult(
           accepted: false,
           modelId: request.modelId,
-          errorMessage: 'Download start proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Download start proto API is unavailable',
+          ).error,
         );
   }
 
@@ -254,10 +259,11 @@ class DartBridgeDownload {
     _untrackActive(request.taskId, request.modelId);
     return result ??
         download_pb.DownloadCancelResult(
-          success: false,
           taskId: request.taskId,
           modelId: request.modelId,
-          errorMessage: 'Download cancel proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Download cancel proto API is unavailable',
+          ).error,
         );
   }
 
@@ -279,7 +285,9 @@ class DartBridgeDownload {
           accepted: false,
           taskId: request.taskId,
           modelId: request.modelId,
-          errorMessage: 'Download resume proto API is unavailable',
+          error: SDKException.serviceUnavailable(
+            'Download resume proto API is unavailable',
+          ).error,
         );
   }
 

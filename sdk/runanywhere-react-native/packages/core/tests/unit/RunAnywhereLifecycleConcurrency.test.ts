@@ -36,7 +36,6 @@ function phase2Payload(
 ): ArrayBuffer {
   const bytes = SdkInitResult.encode(
     SdkInitResult.create({
-      success: true,
       hasCompletedHttpSetup: httpConfigured,
       httpConfigured,
       httpApplicable,

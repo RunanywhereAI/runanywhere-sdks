@@ -85,8 +85,8 @@ suspend fun RunAnywhere.processImage(
         )
 
     vlmLogger.info(
-        "VLM processing complete: ${result.output_tokens} tokens in ${result.processing_time_ms}ms " +
-            "(${String.format(java.util.Locale.ROOT, "%.1f", result.tokens_per_second)} tok/s)",
+        "VLM processing complete: ${result.usage?.output_tokens ?: 0} tokens in ${result.processing_time_ms}ms " +
+            "(${String.format(java.util.Locale.ROOT, "%.1f", result.usage?.tokens_per_second ?: 0.0)} tok/s)",
     )
 
     return result
@@ -123,7 +123,7 @@ fun RunAnywhere.processImageStream(
                 when (event.kind) {
                     VLMStreamEventKind.VLM_STREAM_EVENT_KIND_ERROR -> {
                         val message =
-                            event.error_message?.takeIf { it.isNotBlank() }
+                            event.error?.message?.takeIf { it.isNotBlank() }
                                 ?: "VLM stream failed"
                         close(SDKException.vlm(message))
                         false
@@ -131,8 +131,8 @@ fun RunAnywhere.processImageStream(
                     VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED -> {
                         val result = event.result
                         vlmLogger.info(
-                            "VLM processing complete: ${result?.output_tokens ?: 0} tokens " +
-                                "(${String.format(java.util.Locale.ROOT, "%.1f", result?.tokens_per_second ?: 0f)} tok/s)",
+                            "VLM processing complete: ${result?.usage?.output_tokens ?: 0} tokens " +
+                                "(${String.format(java.util.Locale.ROOT, "%.1f", result?.usage?.tokens_per_second ?: 0.0)} tok/s)",
                         )
                         true
                     }

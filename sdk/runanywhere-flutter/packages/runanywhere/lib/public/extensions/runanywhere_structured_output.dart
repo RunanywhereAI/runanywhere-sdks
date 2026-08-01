@@ -11,10 +11,10 @@ import 'dart:async';
 import 'dart:ffi' as ffi;
 
 import 'package:ffi/ffi.dart' show calloc;
-import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:runanywhere/core/native/rac_native.dart'
     show RacNative, RacProtoBuffer;
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/generated/errors.pb.dart' show SDKError;
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
 import 'package:runanywhere/generated/llm_service.pb.dart' show LLMStreamEvent;
@@ -113,20 +113,18 @@ class RunAnywhereStructuredOutput {
   }) {
     final controller = StreamController<StructuredOutputStreamEvent>();
     StreamSubscription<LLMStreamEvent>? subscription;
-    var seq = Int64.ZERO;
     final accumulated = StringBuffer();
 
     StructuredOutputStreamEvent makeEvent(
       StructuredOutputStreamEventKind kind, {
       String? token,
       StructuredOutputResult? result,
-      String? errorMessage,
+      SDKError? error,
     }) {
-      seq += Int64.ONE;
-      final event = StructuredOutputStreamEvent(kind: kind, seq: seq);
+      final event = StructuredOutputStreamEvent(kind: kind);
       if (token != null) event.token = token;
       if (result != null) event.result = result;
-      if (errorMessage != null) event.errorMessage = errorMessage;
+      if (error != null) event.error = error;
       return event;
     }
 
@@ -136,7 +134,7 @@ class RunAnywhereStructuredOutput {
         makeEvent(
           StructuredOutputStreamEventKind
               .STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR,
-          errorMessage: error.toString(),
+          error: SDKException.from(error).error,
         ),
       );
       await controller.close();
@@ -240,12 +238,12 @@ class RunAnywhereStructuredOutput {
         prompt: prompt,
         options: structuredOutput,
       );
-      if (result.errorCode != 0) {
+      if (result.hasError()) {
         // Mirrors Swift `.processingFailed` on prep failure
         // (RunAnywhere+StructuredOutput.swift:148-150).
         throw SDKException.processingFailed(
-          result.errorMessage.isNotEmpty
-              ? result.errorMessage
+          result.error.message.isNotEmpty
+              ? result.error.message
               : 'Structured-output prompt preparation failed',
         );
       }
@@ -282,10 +280,12 @@ class RunAnywhereStructuredOutput {
       prompt: prompt,
       options: options,
     );
-    if (result.errorCode != 0) {
+    if (result.hasError()) {
       // Mirrors Swift `.processingFailed` on prep failure.
       throw SDKException.processingFailed(
-        'preparePromptForStructuredOutput failed (rc=${result.errorCode})',
+        result.error.message.isNotEmpty
+            ? result.error.message
+            : 'preparePromptForStructuredOutput failed',
       );
     }
     final systemPrompt = result.systemPrompt;

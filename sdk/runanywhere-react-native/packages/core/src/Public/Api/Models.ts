@@ -20,6 +20,7 @@ import {
 
 import { SDKException } from '../../Foundation/Errors/SDKException';
 import { ErrorCategory, ErrorCode } from '@runanywhere/proto-ts/errors';
+import type { SDKError } from '@runanywhere/proto-ts/errors';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import {
   downloadModelStream,
@@ -110,16 +111,18 @@ function toDownloadEventInput(
     bytesDownloaded: number;
     totalBytes: number;
     overallProgress: number;
-    errorMessage: string;
+    error?: SDKError | undefined;
   },
   model: ModelInfo
 ): DownloadEvent | undefined {
   if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
-    throw SDKException.of(
-      ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-      progress.errorMessage || `download failed for ${model.id}`,
-      { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
-    );
+    throw progress.error
+      ? new SDKException(progress.error)
+      : SDKException.of(
+          ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+          `download failed for ${model.id}`,
+          { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
+        );
   }
   if (
     progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED ||
@@ -282,10 +285,8 @@ export const models = {
    */
   async delete(id: string): Promise<void> {
     const result = await deleteModel(id);
-    if (!result.success) {
-      throw SDKException.processingFailed(
-        result.errorMessage || `Failed to delete model ${id}`
-      );
+    if (result.error) {
+      throw new SDKException(result.error);
     }
   },
 
@@ -315,10 +316,8 @@ export const models = {
         validateAvailability: true,
       })
     );
-    if (!result.success) {
-      throw SDKException.modelLoadFailed(
-        result.errorMessage || `Failed to load model ${id}`
-      );
+    if (result.error) {
+      throw new SDKException(result.error);
     }
   },
 

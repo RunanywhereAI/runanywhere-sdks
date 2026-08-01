@@ -169,9 +169,8 @@ function streamingResultFromEvents(
             if (event.toolCall) {
               accumulatedToolCalls.push(event.toolCall);
             }
-            if (event.errorMessage) {
-              // Swift taxonomy: failed operations throw `.processingFailed`.
-              throw SDKException.processingFailed(event.errorMessage);
+            if (event.error) {
+              throw new SDKException(event.error);
             }
           }
           queue.complete();
@@ -232,8 +231,8 @@ function finalLLMResult(
 ): LLMGenerationResult {
   const final = finalEvent?.result;
   const generationTimeMs = final?.totalTimeMs ?? performance.now() - startedAt;
-  const inputTokens = final?.inputTokens ?? 0;
-  const outputTokens = final?.outputTokens ?? tokenCount;
+  const inputTokens = final?.usage?.inputTokens ?? 0;
+  const outputTokens = final?.usage?.outputTokens ?? tokenCount;
   // Prefer tool_calls from the final LLMGenerationResult (whole-call snapshot)
   // when present; otherwise fall back to the per-event accumulator so callers
   // still see streamed tool calls on backends that don't emit a final result.
@@ -246,19 +245,20 @@ function finalLLMResult(
   return {
     text,
     thinkingContent: answerText ? thinkingContent : undefined,
-    inputTokens,
-    outputTokens,
     modelUsed: '',
     generationTimeMs,
     ttftMs: final?.timeToFirstTokenMs,
-    tokensPerSecond: final?.tokensPerSecond
-      ?? (generationTimeMs > 0 ? (outputTokens / generationTimeMs) * 1000 : 0),
     finishReason: finalEvent?.finishReason || final?.finishReason || '',
     thinkingTokens: 0,
     responseTokens: outputTokens,
-    totalTokens: final?.totalTokens ?? inputTokens + outputTokens,
-    errorMessage: finalEvent?.errorMessage || undefined,
-    errorCode: final?.errorCode ?? finalEvent?.errorCode ?? 0,
+    usage: {
+      inputTokens,
+      outputTokens,
+      totalTokens: final?.usage?.totalTokens ?? inputTokens + outputTokens,
+      tokensPerSecond: final?.usage?.tokensPerSecond
+        ?? (generationTimeMs > 0 ? (outputTokens / generationTimeMs) * 1000 : 0),
+    },
+    error: final?.error ?? finalEvent?.error,
     cachedPromptTokens: 0,
     promptEvalTimeMs: final?.promptEvalTimeMs ?? 0,
     decodeTimeMs: final?.decodeTimeMs ?? 0,
@@ -403,21 +403,23 @@ export async function aggregateStream(
   // Swift parity (RunAnywhere+TextGeneration.swift:179-182): estimate
   // inputTokens as max(1, prompt/4) when the backend did not report them and
   // recompute totalTokens from that estimate when absent.
-  const inputTokens = result.inputTokens || Math.max(1, Math.floor(prompt.length / 4));
-  const outputTokens = result.outputTokens || tokenCount;
+  const inputTokens = (result.usage?.inputTokens ?? 0) || Math.max(1, Math.floor(prompt.length / 4));
+  const outputTokens = (result.usage?.outputTokens ?? 0) || tokenCount;
   return {
     ...result,
     text: result.text || fullResponse,
     thinkingContent: result.thinkingContent || fullThinking || undefined,
-    inputTokens,
-    outputTokens,
     responseTokens: outputTokens,
-    totalTokens: result.totalTokens || inputTokens + outputTokens,
+    usage: {
+      inputTokens,
+      outputTokens,
+      totalTokens: (result.usage?.totalTokens ?? 0) || inputTokens + outputTokens,
+      tokensPerSecond: (result.usage?.tokensPerSecond ?? 0)
+        || (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0),
+    },
     modelUsed: model?.id ?? '',
     framework: model ? inferenceFrameworkToJSON(model.framework) : '',
     generationTimeMs: result.generationTimeMs || totalLatencyMs,
-    tokensPerSecond: result.tokensPerSecond
-      || (totalLatencyMs > 0 ? tokenCount / (totalLatencyMs / 1000) : 0),
     ttftMs: result.ttftMs ?? ttftMs,
     promptEvalTimeMs: result.promptEvalTimeMs ?? 0,
     decodeTimeMs: result.decodeTimeMs ?? 0,
@@ -461,28 +463,23 @@ export async function* generateStructuredStream(
   });
 
   let accumulated = '';
-  let seq = 0;
   let nativeStreamDone = false;
   try {
     for await (const token of streaming.stream) {
       if (!token) continue;
       accumulated += token;
-      seq += 1;
       yield StructuredOutputStreamEventMessage.fromPartial({
         kind: StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
         token,
-        seq,
       });
     }
     nativeStreamDone = true;
     // Surface in-flight generation failures as throws before parsing.
     await streaming.result;
     const result = extractStructuredOutput(accumulated, schema);
-    seq += 1;
     yield StructuredOutputStreamEventMessage.fromPartial({
       kind: StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
       result,
-      seq,
     });
   } catch (error) {
     // Producer self-terminated (stream/result/parse failure) — never fire

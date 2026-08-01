@@ -51,9 +51,7 @@ public class ModelsNamespace internal constructor() {
      */
     public suspend fun list(filter: ModelFilter? = null): List<ModelInfo> {
         val result = legacyListModels(ModelListRequest(query = filter.toProto()))
-        if (!result.success) {
-            throw SDKException.operation(result.error_message.ifBlank { "Model list failed" })
-        }
+        result.error?.let { throw SDKException(it) }
         return result.models?.models.orEmpty()
     }
 
@@ -112,9 +110,7 @@ public class ModelsNamespace internal constructor() {
      */
     public suspend fun delete(id: String) {
         val result = legacyDeleteModel(id)
-        if (!result.success) {
-            throw SDKException.storage(result.error_message.ifBlank { "Model delete failed" })
-        }
+        result.error?.let { throw SDKException(it) }
     }
 
     /**
@@ -145,9 +141,7 @@ public class ModelsNamespace internal constructor() {
                     validate_availability = true,
                 ),
             )
-        if (!result.success) {
-            throw SDKException.modelLoadFailed(id, result.error_message.ifBlank { "Model load failed" })
-        }
+        result.error?.let { throw SDKException(it) }
     }
 
     /**
@@ -163,9 +157,7 @@ public class ModelsNamespace internal constructor() {
                 ModelUnloadRequest(category = category)
             }
         val result = legacyUnloadModel(request)
-        if (!result.success) {
-            throw SDKException.operation(result.error_message.ifBlank { "Model unload failed" })
-        }
+        result.error?.let { throw SDKException(it) }
     }
 
     /** What is resident right now, and how much storage is used and free. */

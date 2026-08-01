@@ -196,12 +196,8 @@ public extension RunAnywhere {
             var query = RALoraAdapterCatalogQuery()
             query.modelID = modelId
             let result = try await queryCatalog(query)
-            guard result.success else {
-                throw SDKException(
-                    code: .processingFailed,
-                    message: result.errorMessage.isEmpty ? "LoRA catalog query failed" : result.errorMessage,
-                    category: .internal
-                )
+            guard !result.hasError else {
+                throw SDKException(proto: result.error)
             }
             return result.entries
         }
@@ -211,12 +207,8 @@ public extension RunAnywhere {
         /// - Returns: Generated catalog entries for all registered adapters.
         public func allRegistered() async throws -> [RALoraAdapterCatalogEntry] {
             let result = try await listCatalog()
-            guard result.success else {
-                throw SDKException(
-                    code: .processingFailed,
-                    message: result.errorMessage.isEmpty ? "LoRA catalog list failed" : result.errorMessage,
-                    category: .internal
-                )
+            guard !result.hasError else {
+                throw SDKException(proto: result.error)
             }
             return result.entries
         }
@@ -224,7 +216,11 @@ public extension RunAnywhere {
         private func incompatibleResult(_ message: String) -> RALoraCompatibilityResult {
             var result = RALoraCompatibilityResult()
             result.isCompatible = false
-            result.errorMessage = message
+            result.error = RASDKError.make(
+                code: .processingFailed,
+                message: message,
+                category: .component
+            )
             return result
         }
     }

@@ -67,14 +67,13 @@ void main() {
             applied: true,
           ),
         ],
-        success: true,
       );
 
       final resultRoundTrip =
           LoRAApplyResult.fromBuffer(result.writeToBuffer());
 
       expect(resultRoundTrip.requestId, 'apply-1');
-      expect(resultRoundTrip.success, isTrue);
+      expect(resultRoundTrip.hasError(), isFalse);
       expect(resultRoundTrip.adapters.single.applied, isTrue);
     });
 
@@ -159,7 +158,6 @@ void main() {
         includeCounts: true,
       );
       final listResult = LoraAdapterCatalogListResult(
-        success: true,
         entries: [entryRoundTrip],
         totalCount: 1,
         filteredCount: 1,
@@ -174,7 +172,7 @@ void main() {
       expect(requestRoundTrip.query.modelId, 'base-a');
       expect(requestRoundTrip.query.downloadedOnly, isTrue);
       expect(requestRoundTrip.includeCounts, isTrue);
-      expect(resultRoundTrip.success, isTrue);
+      expect(resultRoundTrip.hasError(), isFalse);
       expect(resultRoundTrip.entries.single.id, 'style-a');
       expect(resultRoundTrip.downloadedCount, 1);
 
@@ -207,7 +205,6 @@ void main() {
         statusMessage: 'ready',
       );
       final completedResult = LoraAdapterDownloadCompletedResult(
-        success: true,
         entry: entryRoundTrip,
         persisted: true,
       );
@@ -239,7 +236,6 @@ void main() {
       DartBridgeLoraRegistry.setListCatalogProtoForTesting((request) {
         seenList = request;
         return LoraAdapterCatalogListResult(
-          success: true,
           entries: [entry],
           totalCount: 1,
         );
@@ -259,7 +255,7 @@ void main() {
       late LoraAdapterCatalogQuery seenQuery;
       DartBridgeLoraRegistry.setQueryCatalogProtoForTesting((query) {
         seenQuery = query;
-        return LoraAdapterCatalogListResult(success: true, entries: [entry]);
+        return LoraAdapterCatalogListResult(entries: [entry]);
       });
 
       final queryResult = DartBridgeLoraRegistry.shared.queryCatalog(
@@ -289,7 +285,6 @@ void main() {
         (request) {
           seenCompleted = request;
           return LoraAdapterDownloadCompletedResult(
-            success: true,
             entry: entry,
             persisted: true,
           );
@@ -314,7 +309,6 @@ void main() {
       DartBridgeLoraRegistry.setQueryCatalogProtoForTesting((query) {
         expect(query.modelId, 'base-a');
         return LoraAdapterCatalogListResult(
-          success: true,
           entries: [
             LoraAdapterCatalogEntry(id: 'style-a', name: 'Style A'),
           ],
@@ -323,7 +317,6 @@ void main() {
       DartBridgeLoraRegistry.setListCatalogProtoForTesting((request) {
         expect(request.hasQuery(), isFalse);
         return LoraAdapterCatalogListResult(
-          success: true,
           entries: [
             LoraAdapterCatalogEntry(id: 'style-a', name: 'Style A'),
             LoraAdapterCatalogEntry(id: 'tone-a', name: 'Tone A'),

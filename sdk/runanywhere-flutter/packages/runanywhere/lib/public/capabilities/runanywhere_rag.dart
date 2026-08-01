@@ -248,9 +248,9 @@ class RunAnywhereRAG {
           : null,
     );
     final result = await RunAnywhereModelLifecycle.shared.load(request);
-    if (!result.success) {
-      final message = result.errorMessage.isNotEmpty
-          ? result.errorMessage
+    if (result.hasError()) {
+      final message = result.error.message.isNotEmpty
+          ? result.error.message
           : '$errorLabel model lifecycle artifact resolution failed';
       throw SDKException.modelLoadFailed(model.id, message);
     }

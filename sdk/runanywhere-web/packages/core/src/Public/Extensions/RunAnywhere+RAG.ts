@@ -796,10 +796,7 @@ class CrossWasmRAGProvider implements RAGProvider {
         retrievalTimeMs,
         generationTimeMs: 0,
         totalTimeMs,
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-        errorCode: 0,
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, tokensPerSecond: 0 },
         requestId: createId('rag-query'),
       };
     }
@@ -851,10 +848,8 @@ class CrossWasmRAGProvider implements RAGProvider {
       retrievalTimeMs,
       generationTimeMs,
       totalTimeMs,
-      promptTokens: generated.inputTokens,
-      completionTokens: generated.outputTokens,
-      totalTokens: generated.inputTokens + generated.outputTokens,
-      errorCode: 0,
+      usage: generated.usage
+        ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0, tokensPerSecond: 0 },
       requestId: createId('rag-query'),
       thinkingContent: generated.thinkingContent,
     };
@@ -913,8 +908,6 @@ class CrossWasmRAGProvider implements RAGProvider {
       vectorStoreSizeBytes,
       isPersistent: false,
       lastQueryMs: this.lastQueryMs,
-      errorMessage: undefined,
-      errorCode: 0,
     };
   }
 
@@ -1340,8 +1333,6 @@ function emptyRAGStatistics(config: RAGConfiguration): RAGStatistics {
     vectorStoreSizeBytes: 0,
     isPersistent: config.persistIndex,
     lastQueryMs: 0,
-    errorMessage: undefined,
-    errorCode: 0,
   };
 }
 
@@ -1373,8 +1364,8 @@ async function loadRagArtifactModel(
     forceReload: false,
     validateAvailability: false,
   });
-  if (!result?.success) {
-    const message = result?.errorMessage
+  if (!result || result.error) {
+    const message = result?.error?.message
       || `${errorLabel} model lifecycle artifact resolution failed`;
     throw SDKException.fromCode(
       -ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED,
@@ -1640,8 +1631,6 @@ export async function ragGetStatistics(): Promise<RAGStatistics> {
     vectorStoreSizeBytes: 0,
     isPersistent: false,
     lastQueryMs: 0,
-    errorMessage: undefined,
-    errorCode: 0,
   };
 }
 

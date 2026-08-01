@@ -13,12 +13,11 @@
 
 import {
   HybridBackendKind,
-  HybridModelType,
   type HybridRoutedMetadata,
   type HybridSttTranscribeOptions,
 } from '@runanywhere/proto-ts/hybrid_router';
 
-export { HybridBackendKind, HybridModelType };
+export { HybridBackendKind };
 export type { HybridRoutedMetadata };
 
 /** Default cloud STT provider when a caller omits one. */
@@ -33,7 +32,8 @@ export const DEFAULT_CLOUD_PROVIDER = 'sarvam';
  */
 export interface HybridModel {
   readonly id: string;
-  readonly modelType: HybridModelType;
+  /** True for an on-device (offline) model, false for a cloud (online) one. */
+  readonly isLocal: boolean;
   readonly backend: HybridBackendKind;
   /**
    * Concrete cloud provider when `backend === HYBRID_BACKEND_CLOUD` (e.g.
@@ -48,7 +48,7 @@ export interface HybridModel {
 export function offlineSherpa(id: string): HybridModel {
   return {
     id,
-    modelType: HybridModelType.HYBRID_MODEL_TYPE_OFFLINE,
+    isLocal: true,
     backend: HybridBackendKind.HYBRID_BACKEND_SHERPA,
     provider: '',
   };
@@ -65,7 +65,7 @@ export function onlineCloud(
 ): HybridModel {
   return {
     id,
-    modelType: HybridModelType.HYBRID_MODEL_TYPE_ONLINE,
+    isLocal: false,
     backend: HybridBackendKind.HYBRID_BACKEND_CLOUD,
     provider,
   };

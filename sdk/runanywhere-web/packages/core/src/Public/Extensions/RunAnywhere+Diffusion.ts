@@ -162,11 +162,9 @@ export async function* generateImageStream(
   };
 
   yield {
-    seq: 0,
     timestampUs: Math.floor(performance.now() * 1000),
     requestId: '',
     kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_STARTED,
-    errorCode: 0,
   } satisfies DiffusionStreamEvent;
 
   try {
@@ -180,23 +178,19 @@ export async function* generateImageStream(
       throw featureNotAvailable('generateImageStream');
     }
     yield {
-      seq: 1,
       timestampUs: Math.floor(performance.now() * 1000),
       requestId: '',
       kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_COMPLETED,
       result,
-      errorCode: 0,
     } satisfies DiffusionStreamEvent;
   } catch (error) {
     if (cancelled) return;
     const message = error instanceof Error ? error.message : String(error);
     yield {
-      seq: 1,
       timestampUs: Math.floor(performance.now() * 1000),
       requestId: '',
       kind: DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_ERROR,
-      errorCode: -1,
-      errorMessage: message,
+      error: SDKException.processingFailed(message).proto,
     } satisfies DiffusionStreamEvent;
   } finally {
     activeCancel = null;

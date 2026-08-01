@@ -191,10 +191,10 @@ interface LoRA {
      */
     suspend fun adaptersForModel(modelId: String): List<LoraAdapterCatalogEntry> {
         val result = queryCatalog(LoraAdapterCatalogQuery(model_id = modelId))
-        if (!result.success) {
+        if (result.error != null) {
             throw SDKException.make(
                 code = ErrorCode.ERROR_CODE_PROCESSING_FAILED,
-                message = result.error_message.ifBlank { "LoRA catalog query failed" },
+                message = result.error!!.message.ifBlank { "LoRA catalog query failed" },
                 category = ErrorCategory.ERROR_CATEGORY_INTERNAL,
                 shouldLog = false,
             )
@@ -208,10 +208,10 @@ interface LoRA {
      */
     suspend fun allRegistered(): List<LoraAdapterCatalogEntry> {
         val result = listCatalog()
-        if (!result.success) {
+        if (result.error != null) {
             throw SDKException.make(
                 code = ErrorCode.ERROR_CODE_PROCESSING_FAILED,
-                message = result.error_message.ifBlank { "LoRA catalog list failed" },
+                message = result.error!!.message.ifBlank { "LoRA catalog list failed" },
                 category = ErrorCategory.ERROR_CATEGORY_INTERNAL,
                 shouldLog = false,
             )
@@ -349,7 +349,12 @@ internal object AndroidLoRA : LoRA {
         } catch (e: Exception) {
             LoraCompatibilityResult(
                 is_compatible = false,
-                error_message = e.message.orEmpty(),
+                error =
+                    ai.runanywhere.proto.v1.SDKError(
+                        code = ErrorCode.ERROR_CODE_UNKNOWN,
+                        category = ErrorCategory.ERROR_CATEGORY_COMPONENT,
+                        message = e.message.orEmpty(),
+                    ),
             )
         }
 

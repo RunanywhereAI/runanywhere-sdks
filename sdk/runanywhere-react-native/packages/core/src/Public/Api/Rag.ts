@@ -172,9 +172,9 @@ function createSession(config: RagConfig | undefined): RagSession {
                   break;
                 case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR:
                   controller.fail(
-                    SDKException.generationFailedWith(
-                      event.errorMessage || 'RAG query failed'
-                    )
+                    event.error
+                      ? new SDKException(event.error)
+                      : SDKException.generationFailedWith('RAG query failed')
                   );
                   break;
                 default:

@@ -32,12 +32,8 @@ public extension RunAnywhere.LoRA {
             )
         }
         let result = try await apply(lookup.entry, scale: scale)
-        guard result.success else {
-            throw SDKException(
-                code: .processingFailed,
-                message: result.hasErrorMessage ? result.errorMessage : "LoRA apply failed",
-                category: .component
-            )
+        guard !result.hasError else {
+            throw SDKException(proto: result.error)
         }
     }
 
@@ -52,12 +48,8 @@ public extension RunAnywhere.LoRA {
             request.clearAll_p = true
         }
         let state = try await remove(request)
-        if state.errorCode != 0 {
-            throw SDKException(
-                code: .processingFailed,
-                message: state.hasErrorMessage ? state.errorMessage : "LoRA remove failed",
-                category: .component
-            )
+        if state.hasError {
+            throw SDKException(proto: state.error)
         }
     }
 }

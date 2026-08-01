@@ -11,7 +11,7 @@
 // concrete HTTP provider (Sarvam first) from this string.
 
 import 'package:runanywhere/generated/hybrid_router.pbenum.dart'
-    show HybridBackendKind, HybridModelType;
+    show HybridBackendKind;
 
 /// Default cloud STT provider when a caller omits one. Carried into the
 /// descriptor's `provider` field + the create config so the cloud engine
@@ -19,19 +19,19 @@ import 'package:runanywhere/generated/hybrid_router.pbenum.dart'
 const String kHybridDefaultCloudProvider = 'sarvam';
 
 /// Whether a candidate runs on-device or in the cloud. Convenience mirror of
-/// `ROUTER.OFFLINE` / `ROUTER.ONLINE` in the Kotlin SDK; wire values match
-/// `HybridModelType` in hybrid_router.proto.
+/// `ROUTER.OFFLINE` / `ROUTER.ONLINE` in the Kotlin SDK; maps to the
+/// `is_local` bool on `HybridModelDescriptor` in hybrid_router.proto.
 enum HybridModelKind {
   /// On-device backend (e.g. sherpa-onnx).
-  offline(HybridModelType.HYBRID_MODEL_TYPE_OFFLINE),
+  offline(true),
 
   /// Cloud backend (the generic cloud engine).
-  online(HybridModelType.HYBRID_MODEL_TYPE_ONLINE);
+  online(false);
 
-  const HybridModelKind(this.proto);
+  const HybridModelKind(this.isLocal);
 
-  /// The generated proto enum this maps to on the wire.
-  final HybridModelType proto;
+  /// Wire value carried in the descriptor's `is_local` field.
+  final bool isLocal;
 }
 
 /// Identifies one of the two models a hybrid router dispatches between.

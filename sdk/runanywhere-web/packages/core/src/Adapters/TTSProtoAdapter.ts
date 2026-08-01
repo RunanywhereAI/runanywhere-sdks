@@ -148,8 +148,7 @@ export class TTSProtoAdapter {
       undefined,
       (rc) => TTSStreamEvent.fromPartial({
         kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR,
-        errorCode: rc,
-        errorMessage: `TTS stream failed: ${rc}`,
+        error: SDKException.fromCode(rc, `TTS stream failed: ${rc}`).proto,
       }),
     );
   }
@@ -323,8 +322,7 @@ async function* outputsFromLifecycleEvents(
       yield TTSOutput.fromPartial({
         isFinal: true,
         timestampMs: Date.now(),
-        errorCode: event.errorCode,
-        errorMessage: event.errorMessage ?? 'TTS lifecycle stream failed',
+        error: event.error ?? SDKException.processingFailed('TTS lifecycle stream failed').proto,
       });
     }
   }

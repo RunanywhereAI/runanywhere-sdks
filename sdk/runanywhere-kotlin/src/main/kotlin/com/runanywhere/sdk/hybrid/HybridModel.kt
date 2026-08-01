@@ -18,12 +18,6 @@ package com.runanywhere.sdk.hybrid
 typealias HybridBackendKind = ai.runanywhere.proto.v1.HybridBackendKind
 
 /**
- * Whether a candidate runs on-device or in the cloud. Backed by the generated
- * `HybridModelType` (wire values match `rac_hybrid_model_type_t`).
- */
-typealias HybridModelType = ai.runanywhere.proto.v1.HybridModelType
-
-/**
  * STT options carried through the router (mirror of the C `rac_stt_options_t`
  * knobs the router forwards). All optional with backend-default behaviour.
  * Backed by the generated `HybridSttTranscribeOptions` (`language`,
@@ -49,7 +43,7 @@ typealias HybridRoutedMetadata = ai.runanywhere.proto.v1.HybridRoutedMetadata
  *     credentials.
  *
  * @property id        Registry identifier shared with the SDK.
- * @property modelType Whether this side of the pair runs on-device or in the cloud.
+ * @property isLocal   Whether this side of the pair runs on-device (true) or in the cloud (false).
  * @property backend   Structured backend identity used to pin the engine the
  *                     router creates the service through.
  * @property provider  Concrete cloud provider when [backend] is
@@ -60,7 +54,7 @@ typealias HybridRoutedMetadata = ai.runanywhere.proto.v1.HybridRoutedMetadata
  */
 data class HybridModel(
     val id: String,
-    val modelType: HybridModelType,
+    val isLocal: Boolean,
     val backend: HybridBackendKind,
     val provider: String = "",
 ) {
@@ -70,7 +64,7 @@ data class HybridModel(
         fun offlineSherpa(id: String): HybridModel =
             HybridModel(
                 id = id,
-                modelType = HybridModelType.HYBRID_MODEL_TYPE_OFFLINE,
+                isLocal = true,
                 backend = HybridBackendKind.HYBRID_BACKEND_SHERPA,
             )
 
@@ -87,7 +81,7 @@ data class HybridModel(
         ): HybridModel =
             HybridModel(
                 id = id,
-                modelType = HybridModelType.HYBRID_MODEL_TYPE_ONLINE,
+                isLocal = false,
                 backend = HybridBackendKind.HYBRID_BACKEND_CLOUD,
                 provider = provider,
             )

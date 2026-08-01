@@ -76,7 +76,7 @@ interface AttachedService {
  *   offlineSherpa('sherpa-onnx-whisper-tiny.en'),
  *   onlineCloud('saaras'),
  *   { hardFilters: [Filters.network()], cascade: Cascades.confidence(0.5),
- *     rank: HybridRank.HYBRID_RANK_PREFER_LOCAL_FIRST }
+ *     preferLocal: true }
  * );
  * const result = await router.transcribe(audio, { audioFormat: 1 });
  * await router.close();
@@ -324,7 +324,7 @@ export class HybridSTTRouter {
   private descriptorBytes(model: HybridModel): ArrayBuffer {
     const descriptor = HybridModelDescriptor.fromPartial({
       modelId: model.id,
-      modelType: model.modelType,
+      isLocal: model.isLocal,
       backend: model.backend,
       provider: model.provider,
     });

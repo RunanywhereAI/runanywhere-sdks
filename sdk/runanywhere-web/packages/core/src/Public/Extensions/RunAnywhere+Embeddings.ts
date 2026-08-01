@@ -97,10 +97,12 @@ async function ensureLoaded(modelID: string): Promise<InferenceFramework | undef
     validateAvailability: true,
   });
 
-  if (!result?.success) {
-    const msg = result?.errorMessage || 'Embeddings lifecycle load failed';
+  if (!result || result.error) {
+    const msg = result?.error?.message || 'Embeddings lifecycle load failed';
     logger.warning(`ensureLoaded(${modelID}) failed: ${msg}`);
-    throw SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED, msg, 'Embeddings.ensureLoaded');
+    throw result?.error
+      ? new SDKException(result.error)
+      : SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_MODEL_LOAD_FAILED, msg, 'Embeddings.ensureLoaded');
   }
   const framework = result.framework ?? requestedFramework;
   activeEmbedding = { modelID, framework };
@@ -159,9 +161,8 @@ async function embedBatch(
     );
   }
 
-  if (result.errorCode !== 0) {
-    const msg = result.errorMessage || 'Embeddings embed failed';
-    throw SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_GENERATION_FAILED, msg, 'Embeddings.embedBatch');
+  if (result.error) {
+    throw new SDKException(result.error);
   }
 
   return result;
@@ -180,9 +181,10 @@ async function unload(): Promise<void> {
     unloadAll: false,
   });
 
-  if (!result?.success) {
-    const msg = result?.errorMessage || 'Embeddings lifecycle unload failed';
-    throw SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_GENERATION_FAILED, msg, 'Embeddings.unload');
+  if (!result || result.error) {
+    throw result?.error
+      ? new SDKException(result.error)
+      : SDKException.fromCode(-ProtoErrorCode.ERROR_CODE_GENERATION_FAILED, 'Embeddings lifecycle unload failed', 'Embeddings.unload');
   }
   activeEmbedding = null;
 }

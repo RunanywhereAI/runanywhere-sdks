@@ -120,7 +120,7 @@ object CppBridgeSdkInit {
      * Mirrors Swift's `assertSuccess`.
      */
     private fun assertSuccess(result: SdkInitResult) {
-        if (result.success) return
+        if (result.error == null) return
         result.error?.let { throw SDKException(it) }
         throw SDKException.operation(
             "SDK init phase ${result.phase} failed without error detail",

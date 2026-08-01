@@ -32,7 +32,6 @@ import { tTSOptionsDefaults } from '@runanywhere/proto-ts/convenience/tts_option
 import { VADOptions } from '@runanywhere/proto-ts/vad_options';
 import { vADOptionsDefaults } from '@runanywhere/proto-ts/convenience/vad_options_convenience';
 import {
-  EmbeddingsNormalizeMode,
   EmbeddingsOptions,
   EmbeddingsPoolingStrategy,
 } from '@runanywhere/proto-ts/embeddings_options';
@@ -269,12 +268,6 @@ export function toVadOptions(options?: VadOptions): VADOptions {
 
 /** Merge public embedding options over the generated proto defaults. */
 export function toEmbedOptions(options?: EmbedOptions): EmbeddingsOptions {
-  const normalize =
-    options?.normalize === undefined
-      ? undefined
-      : options.normalize === 'none'
-        ? EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_NONE
-        : EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_L2;
   const pooling =
     options?.pooling === undefined
       ? undefined
@@ -285,7 +278,7 @@ export function toEmbedOptions(options?: EmbedOptions): EmbeddingsOptions {
           : EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_MEAN;
   return EmbeddingsOptions.fromPartial({
     ...embeddingsOptionsDefaults(),
-    ...defined({ normalizeMode: normalize, pooling }),
+    ...defined({ normalize: options?.normalize, pooling }),
   });
 }
 

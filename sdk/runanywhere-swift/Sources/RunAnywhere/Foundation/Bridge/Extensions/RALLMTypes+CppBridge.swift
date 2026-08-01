@@ -61,7 +61,7 @@ public extension RALLMGenerationOptions {
 // path remains. Deleted per swift.md SWIFT-DUP-RACTYPES-CPPBRIDGE-DEAD.
 
 public extension RALLMGenerationResult {
-    var tokensUsed: Int { Int(outputTokens) }
+    var tokensUsed: Int { Int(usage.outputTokens) }
     var latencyMs: TimeInterval { generationTimeMs }
     var timeToFirstTokenMs: Double? { hasTtftMs ? ttftMs : nil }
 }

@@ -172,7 +172,7 @@ export const llm = {
             announced = true;
             yield { type: 'started', requestId: event.requestId };
           }
-          if (event.errorMessage) throw SDKException.processingFailed(event.errorMessage);
+          if (event.error) throw new SDKException(event.error);
           if (event.token) {
             firstTokenAt ??= performance.now();
             const thought = event.eventKind === LLMStreamEventKind.LLM_STREAM_EVENT_KIND_THINKING;

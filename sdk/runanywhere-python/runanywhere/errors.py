@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import NoReturn
+from typing import Any, NoReturn
 
 from ._generated_errors import ErrorCategory, ErrorCode
 
@@ -114,6 +114,34 @@ class SDKException(Exception):
             category=category,
             c_abi_code=c_abi_code,
             nested_message=nested_message,
+            field_path=field_path,
+        )
+
+    @staticmethod
+    def from_proto(err: Any) -> "SDKException":
+        """Build an SDKException from an ``SDKError`` proto submessage.
+
+        Mirrors the proto-backed constructor every other SDK exposes
+        (Swift ``SDKException(proto:)``): the carried failure now lives in the
+        structured ``SDKError`` rather than a loose success/message/code triad.
+        """
+        try:
+            code = ErrorCode(err.code)
+        except ValueError:
+            code = ErrorCode.UNKNOWN
+        try:
+            category = ErrorCategory(err.category)
+        except ValueError:
+            category = None
+        field_path = None
+        if err.HasField("context") and err.context.HasField("field_path"):
+            field_path = err.context.field_path
+        return SDKException.of(
+            code,
+            err.message,
+            category=category,
+            c_abi_code=err.c_abi_code if err.HasField("c_abi_code") else None,
+            nested_message=err.nested_message if err.HasField("nested_message") else None,
             field_path=field_path,
         )
 

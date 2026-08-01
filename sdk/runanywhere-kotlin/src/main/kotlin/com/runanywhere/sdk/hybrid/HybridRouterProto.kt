@@ -46,7 +46,7 @@ internal object HybridRouterProto {
         val msg =
             HybridModelDescriptor(
                 model_id = model.id,
-                model_type = model.modelType,
+                is_local = model.isLocal,
                 backend = model.backend,
                 provider = model.provider,
             )
@@ -62,7 +62,7 @@ internal object HybridRouterProto {
         val msg =
             HybridRoutingPolicyProto(
                 cascade = policy.cascade?.let(::cascadeToProto),
-                rank = policy.rank,
+                prefer_local = policy.preferLocal,
                 hard_filters = policy.hardFilters.map(::filterToProto),
             )
         return PackedPolicy(

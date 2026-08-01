@@ -122,15 +122,8 @@ public extension RunAnywhere {
             unloadRequest.modelID = modelID
             unloadRequest.category = .embedding
             let result = await RunAnywhere.performUnload(unloadRequest)
-            if !result.success {
-                let message = result.errorMessage.isEmpty
-                    ? "Embeddings lifecycle unload failed"
-                    : result.errorMessage
-                throw SDKException(
-                    code: .processingFailed,
-                    message: message,
-                    category: .internal
-                )
+            if result.hasError {
+                throw SDKException(proto: result.error)
             }
         }
 
@@ -148,15 +141,8 @@ public extension RunAnywhere {
             loadRequest.forceReload = true
             loadRequest.validateAvailability = true
             let result = await RunAnywhere.performLoad(loadRequest)
-            if !result.success {
-                let message = result.errorMessage.isEmpty
-                    ? "Embeddings lifecycle load failed"
-                    : result.errorMessage
-                throw SDKException(
-                    code: .modelLoadFailed,
-                    message: message,
-                    category: .internal
-                )
+            if result.hasError {
+                throw SDKException(proto: result.error)
             }
         }
 

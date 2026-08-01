@@ -26,12 +26,6 @@ public enum ToolChoice: Sendable {
     case forced(name: String)
 }
 
-/// Vector post-processing applied to every embedding.
-public enum NormalizeMode: Sendable {
-    case none
-    case l2
-}
-
 /// How token vectors collapse into one sentence vector.
 public enum PoolingMode: Sendable {
     case mean
@@ -349,18 +343,19 @@ public struct VadOptions: Sendable {
 
 /// Normalization and pooling for one embedding batch.
 public struct EmbedOptions: Sendable {
-    public var normalize: NormalizeMode = .l2
+    /// Apply L2 normalization to each embedding vector.
+    public var normalize: Bool = true
     public var pooling: PoolingMode = .mean
 
     /// Build embedding options.
-    public init(normalize: NormalizeMode = .l2, pooling: PoolingMode = .mean) {
+    public init(normalize: Bool = true, pooling: PoolingMode = .mean) {
         self.normalize = normalize
         self.pooling = pooling
     }
 
     func toProto() -> RAEmbeddingsOptions {
         var proto = RAEmbeddingsOptions.defaults()
-        proto.normalizeMode = normalize == .l2 ? .l2 : .none
+        proto.normalize = normalize
         switch pooling {
         case .mean: proto.pooling = .mean
         case .cls: proto.pooling = .cls

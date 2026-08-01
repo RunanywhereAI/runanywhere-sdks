@@ -5,6 +5,7 @@
 import * as path from 'path';
 
 import { SDKException } from './errors';
+import type { SDKError } from './proto/errors';
 
 /** Configuration for a RAG session. Only `embeddingModelId` is required. */
 export interface RagConfig {
@@ -73,12 +74,15 @@ export interface RagResult {
   retrievalTimeMs: number;
   generationTimeMs: number;
   totalTimeMs: number;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    tokensPerSecond: number;
+  };
   thinkingContent?: string;
-  errorMessage?: string;
-  errorCode: number;
+  /** Structured error when the query failed; absence means success (D5). */
+  error?: SDKError;
 }
 
 /** Index statistics. */

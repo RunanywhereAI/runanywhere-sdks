@@ -142,8 +142,8 @@ export class VoiceAgentMicDriver {
           if (bytes.byteLength === 0) continue; // utterance still open
 
           const result = VoiceAgentResultMessage.decode(bytes);
-          if (result.errorMessage && result.errorMessage.length > 0) {
-            this.logger.warning(`Voice turn failed: ${result.errorMessage}`);
+          if (result.error) {
+            this.logger.warning(`Voice turn failed: ${result.error.message}`);
           }
           if (await this.playReply(result)) {
             // Drop frames captured during the turn + playback.

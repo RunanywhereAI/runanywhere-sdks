@@ -3,7 +3,6 @@
  */
 
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
-import { DiffusionStreamEventKind } from '@runanywhere/proto-ts/diffusion_options';
 import { SDKException } from '../../../Foundation/SDKException.js';
 import {
   cancelImageGeneration,
@@ -36,7 +35,7 @@ export const images = {
     await ensureImageModel();
     const protoOptions = toProtoImageOptions(prompt, options);
     const result = await generateImage(protoOptions);
-    if (result.errorMessage) throw SDKException.processingFailed(result.errorMessage);
+    if (result.error) throw new SDKException(result.error);
     return toImageResult(result, protoOptions.steps ?? 0);
   },
 
@@ -63,11 +62,7 @@ export const images = {
             };
             continue;
           }
-          if (event.kind === DiffusionStreamEventKind.DIFFUSION_STREAM_EVENT_KIND_ERROR) {
-            throw SDKException.processingFailed(
-              event.errorMessage || `Image generation failed with code ${event.errorCode}`,
-            );
-          }
+          if (event.error) throw new SDKException(event.error);
           if (!announced) {
             announced = true;
             yield { type: 'started' };

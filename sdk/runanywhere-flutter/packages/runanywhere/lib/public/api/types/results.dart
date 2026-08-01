@@ -92,10 +92,10 @@ class GenerationResult {
       proto.finishReason,
       hasToolCalls: proto.toolCalls.isNotEmpty,
     ),
-    inputTokens: proto.inputTokens,
-    outputTokens: proto.outputTokens,
+    inputTokens: proto.usage.inputTokens,
+    outputTokens: proto.usage.outputTokens,
     timeToFirstTokenMs: proto.hasTtftMs() ? proto.ttftMs.round() : 0,
-    tokensPerSecond: proto.tokensPerSecond,
+    tokensPerSecond: proto.usage.tokensPerSecond,
     requestId: requestId,
     model: proto.modelUsed,
   );
@@ -116,10 +116,10 @@ class GenerationResult {
       proto.finishReason,
       hasToolCalls: proto.toolCalls.isNotEmpty,
     ),
-    inputTokens: proto.inputTokens,
-    outputTokens: proto.outputTokens,
+    inputTokens: proto.usage.inputTokens,
+    outputTokens: proto.usage.outputTokens,
     timeToFirstTokenMs: proto.timeToFirstTokenMs.toInt(),
-    tokensPerSecond: proto.tokensPerSecond,
+    tokensPerSecond: proto.usage.tokensPerSecond,
     requestId: requestId,
     model: model,
   );
@@ -133,10 +133,10 @@ class GenerationResult {
     text: proto.text,
     toolCalls: const <ToolCall>[],
     finishReason: _finishReason(proto.finishReason),
-    inputTokens: proto.inputTokens,
-    outputTokens: proto.outputTokens,
+    inputTokens: proto.usage.inputTokens,
+    outputTokens: proto.usage.outputTokens,
     timeToFirstTokenMs: proto.timeToFirstTokenMs.toInt(),
-    tokensPerSecond: proto.tokensPerSecond,
+    tokensPerSecond: proto.usage.tokensPerSecond,
     requestId: requestId,
     model: model,
   );
@@ -662,10 +662,10 @@ class RagResult {
     metrics: GenerationResult(
       text: proto.answer,
       thinkingText: proto.hasThinkingContent() ? proto.thinkingContent : null,
-      inputTokens: proto.promptTokens,
-      outputTokens: proto.completionTokens,
+      inputTokens: proto.usage.inputTokens,
+      outputTokens: proto.usage.outputTokens,
       tokensPerSecond: proto.generationTimeMs.toInt() > 0
-          ? proto.completionTokens /
+          ? proto.usage.outputTokens /
                 (proto.generationTimeMs.toInt() / 1000.0)
           : 0,
       requestId: proto.requestId,

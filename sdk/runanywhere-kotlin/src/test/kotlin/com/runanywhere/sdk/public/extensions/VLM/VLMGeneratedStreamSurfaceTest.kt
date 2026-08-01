@@ -14,7 +14,7 @@ class VLMGeneratedStreamSurfaceTest {
     fun `generated typed VLMStreamEvent is the public VLM stream surface`() {
         val event = VLMStreamEvent()
 
-        assertEquals(0L, event.seq)
+        assertEquals(0L, event.timestamp_us)
     }
 }
 

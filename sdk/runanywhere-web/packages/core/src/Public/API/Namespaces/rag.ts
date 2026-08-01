@@ -93,7 +93,7 @@ function createSession(): RagSession {
     async query(question: string, options?: LlmOptions): Promise<RagResult> {
       requireOpen(session, 'query');
       const result = await ragQuery(question, { generation: toProtoLlmOptions(options) });
-      if (result.errorMessage) throw SDKException.processingFailed(result.errorMessage);
+      if (result.error) throw new SDKException(result.error);
       return toRagResult(result);
     },
 
@@ -103,11 +103,7 @@ function createSession(): RagSession {
         const events = ragQueryStream(question, { generation: toProtoLlmOptions(options) });
         let announcedSources = false;
         for await (const event of events) {
-          if (event.kind === RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR) {
-            throw SDKException.processingFailed(
-              event.errorMessage || `RAG stream failed with code ${event.errorCode}`,
-            );
-          }
+          if (event.error) throw new SDKException(event.error);
           if (!announcedSources && event.result?.retrievedChunks.length) {
             announcedSources = true;
             yield { type: 'retrieved', matches: event.result.retrievedChunks.map(toMatch) };

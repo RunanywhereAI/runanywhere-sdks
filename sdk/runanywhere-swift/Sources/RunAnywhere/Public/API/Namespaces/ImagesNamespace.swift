@@ -31,12 +31,8 @@ public extension RunAnywhere {
             let effective = options ?? ImageOptions()
             let protoOptions = try effective.toProto(prompt: prompt)
             let result = try await RunAnywhere.generateImageProto(protoOptions)
-            if result.errorCode != 0 {
-                throw SDKException(
-                    code: .generationFailed,
-                    message: result.hasErrorMessage ? result.errorMessage : "Image generation failed",
-                    category: .component
-                )
+            if result.hasError {
+                throw SDKException(proto: result.error)
             }
             return ImageResult(proto: result, requestedSteps: effective.steps ?? Int(protoOptions.steps))
         }
@@ -84,11 +80,7 @@ public extension RunAnywhere {
                             continuation.yield(.completed(ImageResult(proto: result, requestedSteps: steps)))
                             sawCompletion = true
                         case .error:
-                            continuation.finish(throwing: SDKException(
-                                code: .generationFailed,
-                                message: event.hasErrorMessage ? event.errorMessage : "Image generation failed",
-                                category: .component
-                            ))
+                            continuation.finish(throwing: SDKException(proto: event.error))
                             return
                         default:
                             break

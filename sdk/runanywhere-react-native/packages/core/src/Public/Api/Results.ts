@@ -1,9 +1,10 @@
 /**
  * Projection of the generated proto results onto the public v3 result shapes.
  *
- * Proto results carry `error_message` / `error_code` fields; the public surface
- * throws instead, so every mapper here raises an {@link SDKException} when a
- * proto result reports failure rather than handing back a half-filled object.
+ * Proto results carry a structured `error` (SDKError) submessage; the public
+ * surface throws instead, so every mapper here raises an {@link SDKException}
+ * when a proto result reports failure rather than handing back a half-filled
+ * object.
  */
 
 import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
@@ -25,6 +26,7 @@ import type {
 import type { LoRAState } from '@runanywhere/proto-ts/lora_options';
 import type { StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';
 import type { VLMResult } from '@runanywhere/proto-ts/vlm_options';
+import type { SDKError } from '@runanywhere/proto-ts/errors';
 
 import { SDKException } from '../../Foundation/Errors/SDKException';
 import { fromAudioFormat } from './Options';
@@ -49,14 +51,10 @@ import type {
   Voice,
 } from './Types';
 
-/** Raise the proto error carried by a result, if any. */
-function throwIfFailed(
-  result: { errorMessage?: string; errorCode?: number },
-  operation: string
-): void {
-  const message = result.errorMessage;
-  if (!message) return;
-  throw SDKException.generationFailedWith(`${operation}: ${message}`);
+/** Raise the structured proto error carried by a result, if any. */
+function throwIfFailed(result: { error?: SDKError }): void {
+  if (!result.error) return;
+  throw new SDKException(result.error);
 }
 
 function toFinishReason(raw: string, toolCallCount: number): FinishReason {
@@ -78,16 +76,16 @@ export function toGenerationResult(
   result: LLMGenerationResult,
   requestId: string
 ): GenerationResult {
-  throwIfFailed(result, 'llm.generate');
+  throwIfFailed(result);
   return {
     text: result.text,
     ...(result.thinkingContent ? { thinkingText: result.thinkingContent } : {}),
     toolCalls: [],
     finishReason: toFinishReason(result.finishReason, 0),
-    inputTokens: result.inputTokens,
-    outputTokens: result.outputTokens,
+    inputTokens: result.usage?.inputTokens ?? 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: Math.round(result.ttftMs ?? 0),
-    tokensPerSecond: result.tokensPerSecond,
+    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
     requestId,
     model: result.modelUsed,
   };
@@ -99,16 +97,16 @@ export function toGenerationResultFromStream(
   requestId: string,
   model: string
 ): GenerationResult {
-  throwIfFailed(final, 'llm.generateStream');
+  throwIfFailed(final);
   return {
     text: final.text,
     ...(final.thinkingContent ? { thinkingText: final.thinkingContent } : {}),
     toolCalls: final.toolCalls,
     finishReason: toFinishReason(final.finishReason, final.toolCalls.length),
-    inputTokens: final.inputTokens,
-    outputTokens: final.outputTokens,
+    inputTokens: final.usage?.inputTokens ?? 0,
+    outputTokens: final.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: final.timeToFirstTokenMs,
-    tokensPerSecond: final.tokensPerSecond,
+    tokensPerSecond: final.usage?.tokensPerSecond ?? 0,
     requestId,
     model,
   };
@@ -120,15 +118,15 @@ export function toGenerationResultFromVlm(
   requestId: string,
   model: string
 ): GenerationResult {
-  throwIfFailed(result, 'vlm.generate');
+  throwIfFailed(result);
   return {
     text: result.text,
     toolCalls: [],
     finishReason: toFinishReason(result.finishReason, 0),
-    inputTokens: result.inputTokens,
-    outputTokens: result.outputTokens,
+    inputTokens: result.usage?.inputTokens ?? 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: result.timeToFirstTokenMs,
-    tokensPerSecond: result.tokensPerSecond,
+    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
     requestId,
     model,
   };
@@ -157,7 +155,7 @@ export function toStructuredResult<T>(
   result: StructuredOutputResult,
   metrics: GenerationResult
 ): StructuredResult<T> {
-  throwIfFailed(result, 'llm.generateStructured');
+  throwIfFailed(result);
   const raw = result.rawText ?? '';
   const json = new TextDecoder('utf-8').decode(result.parsedJson);
   let value: T | null = null;
@@ -181,7 +179,7 @@ export function toStructuredResult<T>(
 
 /** Project an STT result onto the public transcription. */
 export function toTranscription(output: STTOutput): Transcription {
-  throwIfFailed(output, 'stt.transcribe');
+  throwIfFailed(output);
   return {
     text: output.text,
     ...(output.language ? { language: output.language } : {}),
@@ -209,7 +207,7 @@ export function toSttState(state: STTServiceState): SttState {
 
 /** Project a TTS result onto the public audio. */
 export function toAudio(output: TTSOutput): Audio {
-  throwIfFailed(output, 'tts.synthesize');
+  throwIfFailed(output);
   return {
     data: output.audioData,
     sampleRate: output.sampleRate,
@@ -220,7 +218,7 @@ export function toAudio(output: TTSOutput): Audio {
 
 /** Project a streamed TTS chunk onto the public audio chunk. */
 export function toAudioChunk(output: TTSOutput): AudioChunk {
-  throwIfFailed(output, 'tts.synthesizeStream');
+  throwIfFailed(output);
   return {
     data: output.audioData,
     index: output.chunkIndex,
@@ -248,7 +246,7 @@ export function toVoice(info: TTSVoiceInfo): Voice {
 
 /** Project a VAD result onto the public verdict. */
 export function toVadResult(result: VADResult): VadResult {
-  throwIfFailed(result, 'vad.detect');
+  throwIfFailed(result);
   return {
     isSpeech: result.isSpeech,
     probability: result.confidence,
@@ -261,7 +259,7 @@ export function toVadResult(result: VADResult): VadResult {
 
 /** Project an embeddings result onto the public vectors, in input order. */
 export function toEmbeddings(result: EmbeddingsResult): Embedding[] {
-  throwIfFailed(result, 'embeddings.embed');
+  throwIfFailed(result);
   return result.vectors
     .map((vector, position) => ({
       index: vector.inputIndex > 0 ? vector.inputIndex : position,
@@ -279,7 +277,7 @@ export function toRankedResults(result: RerankResult): RankedResult[] {
 
 /** Project a diffusion result onto the public image result. */
 export function toImageResult(result: DiffusionResult): ImageResult {
-  throwIfFailed(result, 'images.generate');
+  throwIfFailed(result);
   const images = [
     ...(result.imageData.byteLength > 0 ? [result.imageData] : []),
     ...result.batchImages,
@@ -345,8 +343,8 @@ export function toMatch(chunk: RAGSearchResult): Match {
 
 /** Project a RAG result onto the public answer plus sources and metrics. */
 export function toRagResult(result: RAGResult): RagResult {
-  throwIfFailed(result, 'rag.query');
-  const outputTokens = result.completionTokens;
+  throwIfFailed(result);
+  const outputTokens = result.usage?.outputTokens ?? 0;
   const totalMs = Number(result.generationTimeMs);
   return {
     answer: result.answer,
@@ -355,7 +353,7 @@ export function toRagResult(result: RAGResult): RagResult {
     ...(result.thinkingContent ? { thinkingText: result.thinkingContent } : {}),
     toolCalls: [],
     finishReason: 'stop',
-    inputTokens: result.promptTokens,
+    inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens,
     timeToFirstTokenMs: Number(result.retrievalTimeMs),
     tokensPerSecond: totalMs > 0 ? outputTokens / (totalMs / 1000) : 0,

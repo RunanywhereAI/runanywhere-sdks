@@ -160,9 +160,9 @@ export async function ensureDefaultVAD(modelID?: string): Promise<boolean> {
       category: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
     })
   );
-  if (!result.success) {
+  if (result.error) {
     logger.warning(
-      `Default VAD '${targetID}' auto-load failed: ${result.errorMessage} — voice agent will use energy fallback`
+      `Default VAD '${targetID}' auto-load failed: ${result.error.message} — voice agent will use energy fallback`
     );
     return false;
   }

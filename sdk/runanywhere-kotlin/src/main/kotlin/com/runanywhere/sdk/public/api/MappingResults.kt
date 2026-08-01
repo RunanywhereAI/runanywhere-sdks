@@ -42,10 +42,10 @@ internal fun LLMGenerationResult.toGenerationResult(requestId: String): Generati
         toolCalls = tool_calls,
         toolResults = tool_results,
         finishReason = finishReasonOf(finish_reason),
-        inputTokens = input_tokens,
-        outputTokens = output_tokens,
+        inputTokens = usage?.input_tokens ?: 0,
+        outputTokens = usage?.output_tokens ?: 0,
         timeToFirstTokenMs = ttft_ms?.toLong() ?: 0L,
-        tokensPerSecond = tokens_per_second.toFloat(),
+        tokensPerSecond = (usage?.tokens_per_second ?: 0.0).toFloat(),
         requestId = requestId,
         model = model_used,
     )
@@ -62,10 +62,10 @@ internal fun LLMStreamFinalResult.toGenerationResult(
         toolCalls = tool_calls,
         toolResults = tool_results,
         finishReason = finishReasonOf(finish_reason),
-        inputTokens = input_tokens,
-        outputTokens = output_tokens,
+        inputTokens = usage?.input_tokens ?: 0,
+        outputTokens = usage?.output_tokens ?: 0,
         timeToFirstTokenMs = time_to_first_token_ms,
-        tokensPerSecond = tokens_per_second,
+        tokensPerSecond = (usage?.tokens_per_second ?: 0.0).toFloat(),
         requestId = requestId,
         model = model,
     )
@@ -74,10 +74,10 @@ internal fun VLMResult.toGenerationResult(requestId: String, model: String): Gen
     GenerationResult(
         text = text,
         finishReason = finishReasonOf(finish_reason),
-        inputTokens = input_tokens,
-        outputTokens = output_tokens,
+        inputTokens = usage?.input_tokens ?: 0,
+        outputTokens = usage?.output_tokens ?: 0,
         timeToFirstTokenMs = time_to_first_token_ms,
-        tokensPerSecond = tokens_per_second,
+        tokensPerSecond = (usage?.tokens_per_second ?: 0.0).toFloat(),
         requestId = requestId,
         model = model,
     )
@@ -206,12 +206,12 @@ internal fun RAGResult.toRagResult(model: String): RagResult {
     return RagResult(
         answer = answer,
         sources = retrieved_chunks.map { it.toMatch() },
-        inputTokens = prompt_tokens,
-        outputTokens = completion_tokens,
+        inputTokens = usage?.input_tokens ?: 0,
+        outputTokens = usage?.output_tokens ?: 0,
         timeToFirstTokenMs = retrieval_time_ms,
         tokensPerSecond =
             if (generationSeconds > 0.0) {
-                (completion_tokens / generationSeconds).toFloat()
+                ((usage?.output_tokens ?: 0) / generationSeconds).toFloat()
             } else {
                 0f
             },

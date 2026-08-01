@@ -59,7 +59,6 @@ class RunAnywhereModels {
         ? await available()
         : await DartBridgeModelRegistry.instance.queryProtoModels(query);
     return ModelListResult(
-      success: true,
       models: ModelInfoList(models: models),
     );
   }
@@ -74,7 +73,10 @@ class RunAnywhereModels {
   /// Mirrors Swift `RunAnywhere.getModel(_:)`.
   Future<ModelGetResult> getModel(ModelGetRequest request) async {
     if (!DartBridge.isInitialized) {
-      return ModelGetResult(found: false, errorMessage: 'SDK not initialized');
+      return ModelGetResult(
+        found: false,
+        error: SDKException.notInitialized().error,
+      );
     }
     final model = await DartBridgeModelRegistry.instance.getProtoModel(
       request.modelId,
@@ -99,7 +101,6 @@ class RunAnywhereModels {
     final models = await DartBridgeModelRegistry.instance
         .listDownloadedProtoModels();
     return ModelListResult(
-      success: true,
       models: ModelInfoList(models: models),
     );
   }
