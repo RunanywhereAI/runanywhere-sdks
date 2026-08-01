@@ -49,6 +49,7 @@ PROTOS=(
   storage_types.proto
   structured_output.proto
   thinking_tag_pattern.proto
+  token_usage.proto
   tool_calling.proto
 )
 

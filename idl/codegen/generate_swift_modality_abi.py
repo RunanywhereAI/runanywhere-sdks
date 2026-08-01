@@ -67,18 +67,20 @@ OUTPUT_PATH = (
 
 STREAM_ON_ERROR_FACTORIES: dict[str, str] = {
     "rac_llm_generate_stream_proto": """{ rc in
-                let mapped = RASDKError.from(rcResult: rc)
                 var event = RALLMStreamEvent()
                 event.isFinal = true
                 event.finishReason = "error"
-                event.errorCode = rc
-                event.errorMessage = mapped?.message ?? "LLM stream failed: \\(rc)"
+                if let mapped = RASDKError.from(rcResult: rc) {
+                    event.error = mapped
+                }
                 return event
             }""",
     "rac_structured_output_generate_stream_proto": """{ rc in
                 var event = RAStructuredOutputStreamEvent()
                 event.kind = .error
-                event.errorMessage = "Structured output stream failed: \\(rc)"
+                if let mapped = RASDKError.from(rcResult: rc) {
+                    event.error = mapped
+                }
                 return event
             }""",
     "rac_stt_transcribe_stream_lifecycle_proto": """{ rc in
@@ -362,7 +364,11 @@ def render_invoke_method(modality: dict[str, Any], method: dict[str, Any]) -> st
     # Visibility / static-ness. Methods without `static: true` become instance
     # methods on the actor/enum extension (matching the hand-written shape).
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
 
     if context:
         # Context-threaded invocation: `(handle:, request:)` shape. The handle
@@ -430,7 +436,11 @@ def render_stream_method(modality: dict[str, Any], method: dict[str, Any]) -> st
         on_cancel_clause = f"\n            onCancel: {cancel_factory},"
 
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
     # Category mirrors the hand-written file: `CppBridge.<Name>.ProtoStream`
     # (no `Generated` suffix anymore — the hand-written copy was deleted).
     category = f"CppBridge.{name}.ProtoStream"
@@ -485,7 +495,11 @@ def render_get_with_context_method(
     context = method["context"]
     is_static = bool(method.get("static"))
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
 
     head = (
         f"    {keyword} {swift}(handle: {context}) "
@@ -528,7 +542,11 @@ def render_void_call_method(
     context = method["context"]
     is_static = bool(method.get("static"))
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
 
     error_code = method.get("error_code", "processingFailed")
     error_category = method.get("error_category", "internal")
@@ -586,7 +604,11 @@ def render_create_handle_method(
     out_handle = method.get("output_handle", "rac_handle_t")
     is_static = bool(method.get("static"))
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
 
     error_code = method.get("error_code", "processingFailed")
     error_category = method.get("error_category", "internal")
@@ -630,7 +652,11 @@ def render_invoke_out_only_method(
     response_proto = method["response"]
     is_static = bool(method.get("static"))
     vis = visibility(method)
-    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    keyword = (
+        f"{vis} nonisolated func"
+        if method.get("nonisolated")
+        else (f"{vis} static func" if is_static else f"{vis} func")
+    )
 
     head = (
         f"    {keyword} {swift}() throws -> {response_proto} {{"

@@ -373,7 +373,14 @@ modalities:
         # Caller passes the handle explicitly: embedBatch(handle:, request:).
 
   # --------------------------------------------------------------------------
-  # RAG  (extension CppBridge.RAG -- session handle is owned by the actor)
+  # RAG  (extension CppBridge.RAG)
+  #
+  # Every method takes a caller-owned session handle: a `RagSession` actor owns
+  # the handle and passes it in, so these are `nonisolated` — they run in the
+  # caller's isolation, never hopping the `CppBridge.RAG` actor and never
+  # sending the non-Sendable `rac_handle_t` across an isolation boundary. The
+  # actor's own single-session facade (CppBridge+RAG.swift) still calls them
+  # from its isolated context, which a nonisolated method allows.
   # --------------------------------------------------------------------------
   - name: RAG
     handle: rac_handle_t
@@ -384,6 +391,7 @@ modalities:
         request: RARAGConfiguration
         response: ~
         kind: createHandle
+        nonisolated: true
         # ABI: (bytes, size, outHandle*) -> rc. Returns a fresh rac_handle_t.
         # Caller decides what to do with the handle (the RAG actor's facade
         # stashes it via setProtoSession()).
@@ -398,7 +406,7 @@ modalities:
         response: RARAGStatistics
         kind: invoke
         context: rac_handle_t
-        # Context is requireProtoSession() -- the session handle the actor owns.
+        nonisolated: true
 
       - swift_name: query
         c_symbol: rac_rag_query_proto
@@ -406,6 +414,7 @@ modalities:
         response: RARAGResult
         kind: invoke
         context: rac_handle_t
+        nonisolated: true
 
       - swift_name: clearProto
         c_symbol: rac_rag_clear_proto
@@ -413,6 +422,7 @@ modalities:
         response: RARAGStatistics
         kind: getWithContext
         context: rac_handle_t
+        nonisolated: true
 
       - swift_name: statsProto
         c_symbol: rac_rag_stats_proto
@@ -420,6 +430,7 @@ modalities:
         response: RARAGStatistics
         kind: getWithContext
         context: rac_handle_t
+        nonisolated: true
 
   # --------------------------------------------------------------------------
   # RAG -- top-level free functions (not on any extension)
