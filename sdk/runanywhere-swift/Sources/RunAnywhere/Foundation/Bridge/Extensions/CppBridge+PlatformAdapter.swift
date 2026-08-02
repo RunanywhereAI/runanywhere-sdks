@@ -7,12 +7,6 @@
 //  directory enumeration, vendor id, and HTTP download fallback.
 //
 
-// file_length disabled: every callback must live at file scope (no captures)
-// for C interop, so splitting across files would require making them
-// `internal`. The directory + HTTP blocks push past the 800-line warning;
-// the 1500-line error threshold remains a hard limit.
-// swiftlint:disable file_length
-
 import CRACommons
 import Darwin
 import Foundation

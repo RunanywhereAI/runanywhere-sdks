@@ -47,7 +47,6 @@ public extension RunAnywhere {
         ///
         /// - Throws: `SDKException` from this call when the model cannot be
         ///   loaded, and into the returned stream when generation fails.
-        // swiftlint:disable:next function_body_length
         public func generateStream(
             image: ImageInput,
             prompt: String,

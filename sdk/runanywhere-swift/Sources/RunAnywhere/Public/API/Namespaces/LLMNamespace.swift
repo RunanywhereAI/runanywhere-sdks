@@ -216,9 +216,9 @@ public extension RunAnywhere {
 
 extension RunAnywhere {
 
+    // swiftlint:disable function_body_length
     /// Fold the native LLM stream onto the spec event grammar, throwing on
     /// terminal error events instead of leaking them through a payload field.
-    // swiftlint:disable:next function_body_length
     internal static func mapGenerationStream(
         _ events: AsyncStream<RALLMStreamEvent>,
         model: String
@@ -324,6 +324,7 @@ extension RunAnywhere {
             }
         }
     }
+    // swiftlint:enable function_body_length
 
     /// Wall-clock metrics for backends that end a stream without a terminal
     /// aggregate result.

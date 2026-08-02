@@ -104,7 +104,7 @@ public struct StructuredOutput: Sendable {
 public struct LlmOptions: Sendable {
     /// Model slug; an absent model auto-loads, downloading if needed.
     public var model: String?
-    public var maxOutputTokens: Int = Int(RALLMGenerationOptions.defaults().maxOutputTokens)
+    public var maxOutputTokens = Int(RALLMGenerationOptions.defaults().maxOutputTokens)
     public var temperature: Float = RALLMGenerationOptions.defaults().temperature
     public var topP: Float = RALLMGenerationOptions.defaults().topP
     public var topK: Int?
@@ -273,7 +273,7 @@ public struct TtsOptions: Sendable {
     public var speed: Float = RATTSOptions.defaults().speed
     public var pitch: Float = RATTSOptions.defaults().pitch
     public var format: RAAudioFormat = RATTSOptions.defaults().audioFormat
-    public var sampleRate: Int = Int(RATTSOptions.defaults().sampleRate)
+    public var sampleRate = Int(RATTSOptions.defaults().sampleRate)
 
     /// Build synthesis options.
     public init(
@@ -312,9 +312,9 @@ public struct TtsOptions: Sendable {
 public struct VadOptions: Sendable {
     /// `nil` uses the model's calibrated default.
     public var activationThreshold: Float?
-    public var minSpeechMs: Int = Int(RAVADOptions.defaults().minSpeechDurationMs)
-    public var minSilenceMs: Int = Int(RAVADOptions.defaults().minSilenceDurationMs)
-    public var prefixPaddingMs: Int = Int(RAVADOptions.defaults().prefixPaddingMs)
+    public var minSpeechMs = Int(RAVADOptions.defaults().minSpeechDurationMs)
+    public var minSilenceMs = Int(RAVADOptions.defaults().minSilenceDurationMs)
+    public var prefixPaddingMs = Int(RAVADOptions.defaults().prefixPaddingMs)
 
     /// Build detection options.
     public init(
@@ -513,8 +513,8 @@ public struct Interruption: Sendable {
 
 /// Turn-taking behaviour for a voice session.
 public struct TurnHandlingOptions: Sendable {
-    public var endpointing: Endpointing = Endpointing()
-    public var interruption: Interruption = Interruption()
+    public var endpointing = Endpointing()
+    public var interruption = Interruption()
 
     /// Build turn-handling options.
     public init(endpointing: Endpointing = Endpointing(), interruption: Interruption = Interruption()) {
@@ -529,9 +529,9 @@ public struct TurnHandlingOptions: Sendable {
 ///
 /// Defaults come from the generated IDL defaults, not hand-copied constants.
 public struct RagConfig: Sendable {
-    public var topK: Int = Int(RARAGConfiguration.defaults().topK)
-    public var chunkSize: Int = Int(RARAGConfiguration.defaults().chunkSize)
-    public var chunkOverlap: Int = Int(RARAGConfiguration.defaults().chunkOverlap)
+    public var topK = Int(RARAGConfiguration.defaults().topK)
+    public var chunkSize = Int(RARAGConfiguration.defaults().chunkSize)
+    public var chunkOverlap = Int(RARAGConfiguration.defaults().chunkOverlap)
     public var similarityThreshold: Float?
     public var persistPath: String?
 

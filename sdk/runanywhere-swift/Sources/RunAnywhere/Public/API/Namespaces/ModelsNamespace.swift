@@ -234,7 +234,7 @@ public extension RunAnywhere {
         private static let trackedCategories: [ModelCategory] = [
             .language, .multimodal, .vision, .speechRecognition, .speechSynthesis,
             .voiceActivityDetection, .embedding, .imageGeneration,
-            .speakerDiarization, .semanticSegmentation,
+            .speakerDiarization, .semanticSegmentation
         ]
     }
 }
@@ -319,7 +319,7 @@ extension RunAnywhere {
             let ignored = [
                 options.contextLength != nil ? "contextLength" : nil,
                 options.threads != nil ? "threads" : nil,
-                options.useGpu != nil ? "useGpu" : nil,
+                options.useGpu != nil ? "useGpu" : nil
             ].compactMap { $0 }
             if !ignored.isEmpty {
                 SDKLogger.models.warning(
