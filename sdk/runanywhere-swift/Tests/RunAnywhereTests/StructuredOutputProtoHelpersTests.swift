@@ -59,8 +59,9 @@ final class StructuredOutputProtoHelpersTests: XCTestCase {
         let options = RAStructuredOutputOptions.defaults(schema: schema)
         XCTAssertEqual(options.mode, .jsonSchema)
         XCTAssertTrue(options.includeSchemaInPrompt)
-        XCTAssertEqual(options.schema.type, .array)
 
+        // `schema` and `json_schema` are a oneof; defaults(schema:) carries the
+        // schema as the json_schema string for the C ABI, so the typed arm is unset.
         let json = try parseObject(options.jsonSchema)
         XCTAssertEqual(json["type"] as? String, "array")
     }
@@ -105,7 +106,6 @@ final class StructuredOutputProtoHelpersTests: XCTestCase {
 
         XCTAssertEqual(request.requestID, "structured-test")
         XCTAssertEqual(request.text, "answer {\"status\":\"ok\"}")
-        XCTAssertEqual(request.options.schema.type, .object)
         XCTAssertEqual(request.options.mode, .jsonSchema)
         XCTAssertTrue(request.options.includeSchemaInPrompt)
         XCTAssertTrue(request.options.jsonSchema.contains("\"status\""))
@@ -131,7 +131,6 @@ final class StructuredOutputProtoHelpersTests: XCTestCase {
 
         XCTAssertEqual(request.requestID, "prepare-test")
         XCTAssertEqual(request.prompt, "Return rows")
-        XCTAssertEqual(request.options.schema.type, .array)
         XCTAssertEqual(request.options.mode, .jsonSchema)
         XCTAssertTrue(request.options.jsonSchema.contains("\"array\""))
     }
