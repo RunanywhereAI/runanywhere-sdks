@@ -1214,10 +1214,12 @@ extern "C" rac_result_t rac_vad_component_configure_proto(rac_handle_t handle,
 #endif
 }
 
+#if defined(RAC_HAVE_PROTOBUF)
 namespace {
 rac_result_t decode_vad_samples(const runanywhere::v1::VADAudioSource& audio,
                                 std::vector<float>* out, rac_proto_buffer_t* out_error);
 }
+#endif
 
 extern "C" rac_result_t rac_vad_component_process_proto(rac_handle_t handle,
                                                         const uint8_t* request_proto_bytes,
