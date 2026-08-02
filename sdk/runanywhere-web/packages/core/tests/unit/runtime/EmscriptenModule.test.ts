@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
 
 import { ModelRegistryAdapter } from '../../../src/Adapters/ModelRegistryAdapter';
+import { ModalityProtoAdapter } from '../../../src/Adapters/ModalityProtoAdapter';
 import { ModelLifecycleAdapter } from '../../../src/Adapters/ModelLifecycleAdapter';
 import { SolutionAdapter } from '../../../src/Adapters/SolutionAdapter';
 import {
@@ -202,6 +203,21 @@ describe('Emscripten module capability wiring', () => {
     expect(resetCommons).toHaveBeenCalledOnce();
     expect(resetA).toHaveBeenCalledOnce();
     expect(resetB).not.toHaveBeenCalled();
+  });
+
+  it('keeps a modality default when the survivor only owns a lower-priority slot', () => {
+    const llmBackend = fakeModule();
+    const ragBackend = fakeModule();
+
+    registerWasmModule(['llm'], llmBackend, ['llamacpp']);
+    registerWasmModule(['rag'], ragBackend, ['onnx']);
+    expect(ModalityProtoAdapter.tryDefault()).not.toBeNull();
+
+    unregisterWasmModule(llmBackend);
+
+    // `rag` is still claimed, so the aggregate default must fall back to it
+    // rather than going null.
+    expect(ModalityProtoAdapter.tryDefault()).not.toBeNull();
   });
 
   it.each([
