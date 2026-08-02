@@ -239,12 +239,25 @@ async function writeBytesToOPFSFile(
   // require a sync-access handle (i.e. no main-thread restrictions on
   // Chrome / Firefox).
   if (typeof (handle as { createWritable?: unknown }).createWritable === 'function') {
+    let writable: Awaited<ReturnType<FileSystemFileHandle['createWritable']>> | undefined;
     try {
-      const writable = await handle.createWritable({ keepExistingData: false });
+      writable = await handle.createWritable({ keepExistingData: false });
       await writable.write(toOwnedArrayBuffer(bytes));
       await writable.close();
       return;
     } catch (err) {
+      // An open writable stream holds an exclusive lock on the file, so it has
+      // to be released before the fallback below asks the same handle for a
+      // sync-access handle — otherwise the fallback fails too and the write is
+      // lost. abort() itself throws when close() already ran, hence the
+      // nested catch.
+      if (writable !== undefined) {
+        try {
+          await writable.abort();
+        } catch {
+          // Stream was already closed or errored; the lock is gone either way.
+        }
+      }
       logger.debug(
         `OPFS createWritable failed, falling back to sync-access handle: ${
           err instanceof Error ? err.message : String(err)
