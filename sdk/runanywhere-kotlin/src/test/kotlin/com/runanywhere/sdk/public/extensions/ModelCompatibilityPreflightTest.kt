@@ -107,7 +107,8 @@ class ModelCompatibilityPreflightTest {
             assertEquals(request.model_id, result.model_id)
             assertEquals(request.category, result.category)
             assertEquals(request.framework, result.framework)
-            assertTrue(result.error?.message.orEmpty().contains("Unload the current model"))
+            val errorMessage = result.error?.message ?: ""
+            assertTrue(errorMessage.contains("Unload the current model"))
         }
 
     @Test

@@ -9,7 +9,6 @@ package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.LLMGenerateRequest
 import ai.runanywhere.proto.v1.LLMStreamEvent
-import ai.runanywhere.proto.v1.LLMStreamEventKind
 import ai.runanywhere.proto.v1.StructuredOutputParseRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStructuredOutput

@@ -177,8 +177,9 @@ internal fun makeToolCallingRunLoopRequest(
         keep_tools_available = options.keep_tools_available,
         // Suppress thinking when either options surface asks for it (commons
         // prepends the no-think directive).
-        disable_thinking = (options.disable_thinking ?: false) ||
-            (llmOptions.reasoning?.mode == ai.runanywhere.proto.v1.ReasoningMode.REASONING_MODE_OFF),
+        disable_thinking =
+            (options.disable_thinking ?: false) ||
+                (llmOptions.reasoning?.mode == ai.runanywhere.proto.v1.ReasoningMode.REASONING_MODE_OFF),
         validate_calls = validateCalls,
         tools = tools,
         tool_choice =

@@ -305,11 +305,12 @@ internal suspend fun aggregateLLMStream(
         ttft_ms = final?.time_to_first_token_ms?.toDouble() ?: ttftMs,
         finish_reason = finishReason,
         error = terminalError,
-        usage = ai.runanywhere.proto.v1.TokenUsage(
-            input_tokens = inputTokens,
-            output_tokens = tokensGenerated,
-            total_tokens = final?.usage?.total_tokens ?: (inputTokens + tokensGenerated),
-            tokens_per_second = tokensPerSecond,
-        ),
+        usage =
+            ai.runanywhere.proto.v1.TokenUsage(
+                input_tokens = inputTokens,
+                output_tokens = tokensGenerated,
+                total_tokens = final?.usage?.total_tokens ?: (inputTokens + tokensGenerated),
+                tokens_per_second = tokensPerSecond,
+            ),
     )
 }
