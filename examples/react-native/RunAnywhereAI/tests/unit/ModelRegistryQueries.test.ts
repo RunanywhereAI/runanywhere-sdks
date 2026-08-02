@@ -1,7 +1,8 @@
 jest.mock('@runanywhere/core', () => ({
   RunAnywhere: {
-    downloadedModels: jest.fn(),
-    listModels: jest.fn(),
+    models: {
+      list: jest.fn(),
+    },
   },
 }));
 
@@ -9,8 +10,6 @@ import { RunAnywhere } from '@runanywhere/core';
 import {
   InferenceFramework,
   ModelInfo,
-  ModelInfoList,
-  ModelListResult,
 } from '@runanywhere/proto-ts/model_types';
 import {
   listDownloadedCatalogModels,
@@ -18,8 +17,7 @@ import {
 } from '../../src/services/ModelRegistryQueries';
 import { publishNpuCatalogAcceptance } from '../../src/services/NpuModelCatalog';
 
-const listModelsMock = jest.mocked(RunAnywhere.listModels);
-const downloadedModelsMock = jest.mocked(RunAnywhere.downloadedModels);
+const listMock = jest.mocked(RunAnywhere.models.list);
 
 describe('visible model registry query', () => {
   it('filters direct and preferred QHexRT rows before consumers receive them', async () => {
@@ -41,14 +39,7 @@ describe('visible model registry query', () => {
       preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
     });
     publishNpuCatalogAcceptance(['accepted']);
-    const result = ModelListResult.fromPartial({
-      success: true,
-      models: ModelInfoList.fromPartial({
-        models: [ordinary, accepted, stale, stalePreferred],
-      }),
-    });
-    listModelsMock.mockResolvedValue(result);
-    downloadedModelsMock.mockResolvedValue(result);
+    listMock.mockResolvedValue([ordinary, accepted, stale, stalePreferred]);
 
     await expect(listVisibleCatalogModels()).resolves.toEqual([
       ordinary,
