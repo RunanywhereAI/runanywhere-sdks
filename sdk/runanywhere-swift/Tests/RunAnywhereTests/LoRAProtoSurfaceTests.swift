@@ -91,11 +91,10 @@ final class LoRAProtoSurfaceTests: XCTestCase {
         var result = RALoRAApplyResult()
         result.requestID = "apply-1"
         result.adapters = [adapter]
-        result.success = true
 
         XCTAssertEqual(result.requestID, "apply-1")
         XCTAssertEqual(result.adapters.first?.adapterID, "adapter-a")
-        XCTAssertTrue(result.success)
+        XCTAssertFalse(result.hasError)
 
         var state = RALoRAState()
         state.loadedAdapters = [adapter]
@@ -129,7 +128,6 @@ final class LoRAProtoSurfaceTests: XCTestCase {
         listRequest.includeCounts = true
 
         var listResult = RALoraAdapterCatalogListResult()
-        listResult.success = true
         listResult.entries = [entry]
         listResult.totalCount = 1
         listResult.filteredCount = 1
@@ -150,7 +148,6 @@ final class LoRAProtoSurfaceTests: XCTestCase {
         completed.imported = true
 
         var completedResult = RALoraAdapterDownloadCompletedResult()
-        completedResult.success = true
         completedResult.persisted = true
         completedResult.entry = entry
 

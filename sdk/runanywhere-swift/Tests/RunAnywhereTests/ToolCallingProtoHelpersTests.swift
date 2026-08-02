@@ -66,11 +66,13 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
         XCTAssertEqual(parsed?["temperature"] as? Int, 72)
     }
 
-    func testToolCallingOptionsUseCanonicalFields() {
-        let options = RAToolCallingOptions.defaults()
-        XCTAssertEqual(options.format, .json)
-        XCTAssertEqual(options.maxToolCalls, 5)
-        XCTAssertTrue(options.autoExecute)
+    func testToolCallingOptionsDeferToCommonsForDefaults() {
+        // The client no longer bakes in canonical tool-calling defaults; an unset
+        // options proto lets commons select the model-appropriate format and limits.
+        let options = RAToolCallingOptions()
+        XCTAssertEqual(options.format, .unspecified)
+        XCTAssertEqual(options.maxToolCalls, 0)
+        XCTAssertFalse(options.autoExecute)
     }
 
     func testExecuteToolSurfacesParseFailureWhenArgumentsJsonIsInvalid() async {
@@ -93,7 +95,7 @@ final class ToolCallingProtoHelpersTests: XCTestCase {
         toolCall.id = "call_parse_fail"
 
         // Tool execution has no public v3 verb: the SDK runs the loop itself.
-        let result = await RunAnywhere.executeToolInternal(toolCall)
+        let result = await RunAnywhere.executeTool(toolCall)
         XCTAssertFalse(result.success)
         XCTAssertFalse(result.error.isEmpty)
     }
