@@ -332,6 +332,9 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
     /// Output of each chunk digest, persisted as it lands so a crash or a
     /// deferred merge still leaves something readable behind.
     var partialSummaries: [String]
+    /// How many map-pass chunks have been committed into `partialSummaries`.
+    /// Used to resume a killed digester without redoing finished chunks.
+    var digestMapChunksCompleted: Int
     /// The one continuous recording for this note, relative to the ambient
     /// root. Cleared when audio expires; the note itself survives.
     var audioRelativePath: String?
@@ -369,6 +372,7 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
         digestSections: [AmbientDigestSection] = [],
         actionItems: [AmbientActionItem] = [],
         partialSummaries: [String] = [],
+        digestMapChunksCompleted: Int = 0,
         audioRelativePath: String? = nil,
         customTitle: String? = nil,
         summaryPending: Bool = false,
@@ -396,6 +400,7 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
         self.digestSections = digestSections
         self.actionItems = actionItems
         self.partialSummaries = partialSummaries
+        self.digestMapChunksCompleted = digestMapChunksCompleted
         self.audioRelativePath = audioRelativePath
         self.customTitle = customTitle
         self.summaryPending = summaryPending
@@ -430,6 +435,8 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
         digestSections = try container.decodeIfPresent([AmbientDigestSection].self, forKey: .digestSections) ?? []
         actionItems = try container.decodeIfPresent([AmbientActionItem].self, forKey: .actionItems) ?? []
         partialSummaries = try container.decodeIfPresent([String].self, forKey: .partialSummaries) ?? []
+        digestMapChunksCompleted = try container.decodeIfPresent(Int.self, forKey: .digestMapChunksCompleted)
+            ?? partialSummaries.count
         audioRelativePath = try container.decodeIfPresent(String.self, forKey: .audioRelativePath)
         customTitle = try container.decodeIfPresent(String.self, forKey: .customTitle)
         summaryPending = try container.decodeIfPresent(Bool.self, forKey: .summaryPending) ?? false
@@ -441,6 +448,11 @@ struct AmbientSessionRecord: Codable, Sendable, Identifiable, Equatable {
         speakerLabelingDetail = try container.decodeIfPresent(String.self, forKey: .speakerLabelingDetail)
         digestStale = try container.decodeIfPresent(Bool.self, forKey: .digestStale) ?? false
         speakerCount = try container.decodeIfPresent(Int.self, forKey: .speakerCount)
+    }
+
+    /// True when a prior digester pass saved map chunks but never finished merge.
+    var hasResumableDigest: Bool {
+        summaryPending && (!partialSummaries.isEmpty || digestMapChunksCompleted > 0)
     }
 
     /// Wall-clock length of a finished note. Incomplete orphans (never got a
@@ -776,10 +788,12 @@ struct AmbientBenchmarkSample: Codable, Sendable, Identifiable, Equatable {
 
     let medianTranscriptionMs: Double
     let medianRealTimeFactor: Double
-    let medianExtractionMs: Double
+    /// Updated when a post-pass digest amends the live sample.
+    var medianExtractionMs: Double
     let firstTranscriptLatencyMs: Double
 
-    let peakMemoryBytes: Int64
+    /// Updated as post-pass Label/Summarize peaks are merged in.
+    var peakMemoryBytes: Int64
     let batteryDeltaPerHour: Double
     let thermalState: String
     let interruptionCount: Int
@@ -795,6 +809,44 @@ struct AmbientBenchmarkSample: Codable, Sendable, Identifiable, Equatable {
     var bulletCount: Int
     var speakerCount: Int
     var fixtureName: String?
+
+    // MARK: Performance-feature instrumentation
+
+    /// Live VAD mode: `silero`, `economy`, `hybrid`, or `offline-energy` for file runs.
+    var vadMode: String
+    /// Warm-keep policy: `none`, `diarization`, or `digester`.
+    var warmKeep: String
+    /// Developer toggle was on for streaming Sortformer during capture.
+    var streamDiarEnabled: Bool
+    /// Sortformer stream actually loaded and ran alongside ASR.
+    var streamDiarUsed: Bool
+    /// Free RAM reported at session start.
+    var availableMemoryAtStartBytes: Int64
+    /// Process footprint at session start.
+    var memoryAtStartBytes: Int64
+    /// Peak footprint while capture / ASR was resident.
+    var memoryPeakCaptureBytes: Int64
+    /// Footprint right after ASR/VAD unload.
+    var memoryAfterASRUnloadBytes: Int64
+    /// Footprint after diarization stage (stream finish or post-pass).
+    var memoryAfterDiarizationBytes: Int64
+    /// Footprint after digest stage.
+    var memoryAfterDigestBytes: Int64
+    /// Battery fraction at start/end (`-1` when unavailable).
+    var batteryLevelStart: Float
+    var batteryLevelEnd: Float
+    var thermalStateStart: String
+    var thermalStateEnd: String
+    /// True when Sortformer was already warm (skipped cold load).
+    var warmKeepDiarizationHit: Bool
+    /// True when digester was already warm (skipped cold load).
+    var warmKeepDigestHit: Bool
+    /// Wall time spent loading Sortformer (0 on warm hit).
+    var diarizationLoadMs: Int
+    /// Wall time spent loading the digester (0 on warm hit).
+    var digestLoadMs: Int
+    /// How many times the live STT backlog shed a segment.
+    var backpressureEventCount: Int
 
     init(
         id: UUID,
@@ -831,7 +883,26 @@ struct AmbientBenchmarkSample: Codable, Sendable, Identifiable, Equatable {
         sectionCount: Int = 0,
         bulletCount: Int = 0,
         speakerCount: Int = 0,
-        fixtureName: String? = nil
+        fixtureName: String? = nil,
+        vadMode: String = "silero",
+        warmKeep: String = "none",
+        streamDiarEnabled: Bool = false,
+        streamDiarUsed: Bool = false,
+        availableMemoryAtStartBytes: Int64 = 0,
+        memoryAtStartBytes: Int64 = 0,
+        memoryPeakCaptureBytes: Int64 = 0,
+        memoryAfterASRUnloadBytes: Int64 = 0,
+        memoryAfterDiarizationBytes: Int64 = 0,
+        memoryAfterDigestBytes: Int64 = 0,
+        batteryLevelStart: Float = -1,
+        batteryLevelEnd: Float = -1,
+        thermalStateStart: String = "",
+        thermalStateEnd: String = "",
+        warmKeepDiarizationHit: Bool = false,
+        warmKeepDigestHit: Bool = false,
+        diarizationLoadMs: Int = 0,
+        digestLoadMs: Int = 0,
+        backpressureEventCount: Int = 0
     ) {
         self.id = id
         self.recordedAt = recordedAt
@@ -868,6 +939,25 @@ struct AmbientBenchmarkSample: Codable, Sendable, Identifiable, Equatable {
         self.bulletCount = bulletCount
         self.speakerCount = speakerCount
         self.fixtureName = fixtureName
+        self.vadMode = vadMode
+        self.warmKeep = warmKeep
+        self.streamDiarEnabled = streamDiarEnabled
+        self.streamDiarUsed = streamDiarUsed
+        self.availableMemoryAtStartBytes = availableMemoryAtStartBytes
+        self.memoryAtStartBytes = memoryAtStartBytes
+        self.memoryPeakCaptureBytes = memoryPeakCaptureBytes
+        self.memoryAfterASRUnloadBytes = memoryAfterASRUnloadBytes
+        self.memoryAfterDiarizationBytes = memoryAfterDiarizationBytes
+        self.memoryAfterDigestBytes = memoryAfterDigestBytes
+        self.batteryLevelStart = batteryLevelStart
+        self.batteryLevelEnd = batteryLevelEnd
+        self.thermalStateStart = thermalStateStart
+        self.thermalStateEnd = thermalStateEnd
+        self.warmKeepDiarizationHit = warmKeepDiarizationHit
+        self.warmKeepDigestHit = warmKeepDigestHit
+        self.diarizationLoadMs = diarizationLoadMs
+        self.digestLoadMs = digestLoadMs
+        self.backpressureEventCount = backpressureEventCount
     }
 
     init(from decoder: Decoder) throws {
@@ -907,6 +997,25 @@ struct AmbientBenchmarkSample: Codable, Sendable, Identifiable, Equatable {
         bulletCount = try container.decodeIfPresent(Int.self, forKey: .bulletCount) ?? 0
         speakerCount = try container.decodeIfPresent(Int.self, forKey: .speakerCount) ?? 0
         fixtureName = try container.decodeIfPresent(String.self, forKey: .fixtureName)
+        vadMode = try container.decodeIfPresent(String.self, forKey: .vadMode) ?? "silero"
+        warmKeep = try container.decodeIfPresent(String.self, forKey: .warmKeep) ?? "none"
+        streamDiarEnabled = try container.decodeIfPresent(Bool.self, forKey: .streamDiarEnabled) ?? false
+        streamDiarUsed = try container.decodeIfPresent(Bool.self, forKey: .streamDiarUsed) ?? false
+        availableMemoryAtStartBytes = try container.decodeIfPresent(Int64.self, forKey: .availableMemoryAtStartBytes) ?? 0
+        memoryAtStartBytes = try container.decodeIfPresent(Int64.self, forKey: .memoryAtStartBytes) ?? 0
+        memoryPeakCaptureBytes = try container.decodeIfPresent(Int64.self, forKey: .memoryPeakCaptureBytes) ?? 0
+        memoryAfterASRUnloadBytes = try container.decodeIfPresent(Int64.self, forKey: .memoryAfterASRUnloadBytes) ?? 0
+        memoryAfterDiarizationBytes = try container.decodeIfPresent(Int64.self, forKey: .memoryAfterDiarizationBytes) ?? 0
+        memoryAfterDigestBytes = try container.decodeIfPresent(Int64.self, forKey: .memoryAfterDigestBytes) ?? 0
+        batteryLevelStart = try container.decodeIfPresent(Float.self, forKey: .batteryLevelStart) ?? -1
+        batteryLevelEnd = try container.decodeIfPresent(Float.self, forKey: .batteryLevelEnd) ?? -1
+        thermalStateStart = try container.decodeIfPresent(String.self, forKey: .thermalStateStart) ?? ""
+        thermalStateEnd = try container.decodeIfPresent(String.self, forKey: .thermalStateEnd) ?? thermalState
+        warmKeepDiarizationHit = try container.decodeIfPresent(Bool.self, forKey: .warmKeepDiarizationHit) ?? false
+        warmKeepDigestHit = try container.decodeIfPresent(Bool.self, forKey: .warmKeepDigestHit) ?? false
+        diarizationLoadMs = try container.decodeIfPresent(Int.self, forKey: .diarizationLoadMs) ?? 0
+        digestLoadMs = try container.decodeIfPresent(Int.self, forKey: .digestLoadMs) ?? 0
+        backpressureEventCount = try container.decodeIfPresent(Int.self, forKey: .backpressureEventCount) ?? droppedSegmentCount
     }
 
     /// Fraction of the session that carried detected speech.

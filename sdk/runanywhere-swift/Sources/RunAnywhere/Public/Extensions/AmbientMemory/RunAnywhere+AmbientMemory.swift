@@ -213,8 +213,12 @@ public extension RunAnywhere {
             let startedAt = Date()
             var options = RALLMGenerationOptions.defaults()
             options.temperature = 0.1
-            // Structured Notion-style digests need more room than a short prose blob.
-            options.maxTokens = 1_024
+            // Polish/merge need room for a full Notion-style note; chunks stay tighter.
+            switch mode {
+            case .polish: options.maxTokens = 2_560
+            case .merge: options.maxTokens = 2_048
+            case .chunk: options.maxTokens = 1_024
+            }
             // Thinking models (e.g. Qwen3) otherwise emit <think>…</think> before
             // JSON; parse then falls back to a transcript snippet and empty
             // action items — which looks like a "failed rewrite".
@@ -225,8 +229,16 @@ public extension RunAnywhere {
                 options: options
             )
 
-            let parsed = AmbientDigestPrompt.parse(result.text, fallbackText: text)
-            let cited = Array(parsed.actionItems.prefix(maxActionItems))
+            let parsed = AmbientDigestPrompt.parse(result.text, fallbackText: text, mode: mode)
+            var cited = Array(parsed.actionItems.prefix(maxActionItems))
+            // Small models often leave actionItems [] and bury todos in bullets.
+            if cited.isEmpty, mode == .polish || mode == .merge {
+                cited = AmbientDigestPrompt.harvestActionItems(
+                    fromSections: parsed.sections,
+                    fallbackText: text,
+                    max: maxActionItems
+                )
+            }
             return RAAmbientNoteDigest(
                 summary: parsed.summary,
                 actionItems: cited.map(\.text),

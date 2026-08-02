@@ -44,6 +44,8 @@ final class AmbientSessionManager: ObservableObject {
     @Published private(set) var lastError: String?
     /// True while a user-triggered Summarize / Rewrite is loading the LLM.
     @Published private(set) var isSummarizing = false
+    /// Map-pass progress for long digests (`completed` / `total` chunks).
+    @Published private(set) var digestChunkProgress: (completed: Int, total: Int) = (0, 0)
     /// True while Label speakers is loading Sortformer or aligning turns.
     @Published private(set) var isLabelingSpeakers = false
     /// Anchor for the Live Activity's system timer (survives backgrounding).
@@ -89,6 +91,27 @@ final class AmbientSessionManager: ObservableObject {
     /// True while the note is recording audio to disk, so a storage gate can
     /// stop writing without ending the note.
     private var isWritingAudio = false
+
+    /// When true, digest/label paths avoid intermediate `@Published` churn so
+    /// SwiftUI cannot burn the 10s scene-update watchdog during Metal LLM work.
+    private var quietPostASRUI = false
+    /// Working note while `quietPostASRUI` — never assigned to `sessionRecord`
+    /// until the pass finishes (one publish instead of one per chunk).
+    private var digestScratch: AmbientSessionRecord?
+    /// Quiet digests skip `@Published isSummarizing` so Notes chrome is not
+    /// invalidated; this private latch still prevents overlapping passes.
+    private var quietSummarizeInFlight = false
+
+    /// Live capture performance knobs (economy VAD, warm-keep, stream diar).
+    private var performanceSettings = AmbientCapturePerformanceSettings.load()
+    /// Post-ASR model intentionally left resident between Label/Summarize passes.
+    private var warmKeptDiarizationModelID: String?
+    private var warmKeptDigestModelID: String?
+    /// Live Sortformer stream tee (PCM → `diarizeStream`) while capturing.
+    private var diarAudioContinuation: AsyncStream<Data>.Continuation?
+    private var diarStreamTask: Task<Void, Never>?
+    private var streamingDiarModelID: String?
+    private var latestStreamingDiarResult: RADiarizationResult?
 
     @available(iOS 16.1, *)
     private var liveActivity: Activity<AmbientActivityAttributes>? {
@@ -145,6 +168,9 @@ final class AmbientSessionManager: ObservableObject {
         reset()
         self.selection = selection
         self.retentionPolicy = retention
+        performanceSettings = AmbientCapturePerformanceSettings.load()
+        // ASR never shares RAM with a warm post-ASR model.
+        await releaseWarmModelsBeforeCapture()
         transition(to: .preparing)
         statusMessage = "Loading \(selection.asrModelID)…"
 
@@ -156,6 +182,12 @@ final class AmbientSessionManager: ObservableObject {
         // The note keeps its own continuous recording, so the pipeline does not
         // need to hand back per-segment audio as well.
         configuration.retainSegmentAudio = false
+        configuration.vadMode = performanceSettings.vadMode
+        if performanceSettings.vadMode != .silero {
+            // Economy/hybrid produce segments more aggressively on long notes;
+            // allow a deeper STT backlog when CPU RTF ≪ 1.
+            configuration.maxQueuedSegments = max(configuration.maxQueuedSegments, 8)
+        }
 
         let started: RAAmbientSession
         do {
@@ -198,13 +230,29 @@ final class AmbientSessionManager: ObservableObject {
         sessionRecord = record
         await store.save(record)
 
+        // After the note exists so live labels can persist onto it.
+        await maybeStartStreamingDiarization(
+            sessionID: sessionID,
+            conditions: conditions
+        )
+
         consumeEvents(from: started)
         benchmarkRecorder.begin(sessionID: sessionID, conditions: conditions)
+        benchmarkRecorder.configurePerformance(performanceSettings)
         if #available(iOS 16.1, *) { startLiveActivity(sessionID: sessionID) }
         startElapsedTimer()
 
         transition(to: .listening)
-        statusMessage = "Listening. Lock the screen if you like — recording stays visible."
+        var listenStatus = "Listening. Lock the screen if you like — recording stays visible."
+        if performanceSettings.vadMode == .economy {
+            listenStatus = "Listening (economy VAD). Lock the screen if you like — recording stays visible."
+        } else if performanceSettings.vadMode == .hybrid {
+            listenStatus = "Listening (hybrid VAD). Lock the screen if you like — recording stays visible."
+        }
+        if streamingDiarModelID != nil {
+            listenStatus += " Speakers labeling in the background."
+        }
+        statusMessage = listenStatus
         logger.info("Ambient session \(sessionID, privacy: .public) started")
     }
 
@@ -242,12 +290,17 @@ final class AmbientSessionManager: ObservableObject {
             unload.category = .speechRecognition
             _ = await RunAnywhere.unloadModel(unload)
         }
-        if let vad = selection?.vadModelID {
+        if let vad = selection?.vadModelID, performanceSettings.vadMode != .economy {
             var unload = RAModelUnloadRequest()
             unload.modelID = vad
             unload.category = .voiceActivityDetection
             _ = await RunAnywhere.unloadModel(unload)
         }
+        benchmarkRecorder.markMemoryAfterASRUnload()
+
+        // Finish live Sortformer (if any) only after ASR is gone — then either
+        // warm-keep it or unload before any digester work.
+        await finishStreamingDiarization()
 
         if var record = sessionRecord {
             let hasTranscript = !record.fullTranscript
@@ -403,9 +456,9 @@ final class AmbientSessionManager: ObservableObject {
 
     // MARK: - Summarization
 
-    /// Roughly one page of transcript. Small enough that a 0.6B model still has
-    /// room for its answer, large enough that the summary has real context.
-    private static let chunkCharacterLimit = 2_000
+    /// Map-chunk size. Larger ⇒ fewer slow LLM passes on long notes.
+    /// Resume keys off chunk index, so keep this stable across an in-flight run.
+    private static let chunkCharacterLimit = 8_000
 
     /// Buffer finalized transcript. LLM work waits until stop/retry so ASR and
     /// the digest model are never coresident (a common jetsam cause for 4B).
@@ -415,103 +468,146 @@ final class AmbientSessionManager: ObservableObject {
         pendingChunk += pendingChunk.isEmpty ? trimmed : " " + trimmed
     }
 
-    /// Digests one chunk. Returns `false` on failure so callers stop retrying
-    /// (putting text back into `pendingChunk` used to infinite-loop the flush).
+    /// Split transcript into stable map chunks (word-boundary aware).
+    static func splitDigestChunks(_ source: String, limit: Int = chunkCharacterLimit) -> [String] {
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        var chunks: [String] = []
+        var remaining = trimmed
+        while !remaining.isEmpty {
+            if remaining.count <= limit {
+                chunks.append(remaining)
+                break
+            }
+            let endIdx = remaining.index(remaining.startIndex, offsetBy: limit)
+            var split = endIdx
+            if let space = remaining[..<endIdx].lastIndex(of: " "),
+               space > remaining.startIndex {
+                split = space
+            }
+            let piece = String(remaining[..<split])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let rest = String(remaining[split...])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if rest.count >= remaining.count {
+                remaining = String(remaining[endIdx...])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            } else {
+                remaining = rest
+            }
+            if !piece.isEmpty { chunks.append(piece) }
+            if chunks.count > 64 { break }
+        }
+        return chunks
+    }
+
+    /// Digests one chunk. Returns `false` on failure / background interrupt.
     @discardableResult
     private func digestChunk(_ chunk: String, modelID: String) async -> Bool {
         guard canRunDigestNow else {
-            lastError = "Bring the app to the foreground to run the summarizer."
+            lastError = "Keep the app in the foreground — digester paused. Tap Resume to continue."
             logger.info("Chunk digest deferred — app is not in the foreground")
             return false
         }
         do {
-            statusMessage = "Loading \(modelID)…"
-            try await ensureLoaded(modelID: modelID, category: .language)
+            if !quietPostASRUI {
+                statusMessage = "Loading \(modelID)…"
+            }
+            let loadID = modelID
+            try await Task.detached(priority: .userInitiated) {
+                var request = RACurrentModelRequest()
+                request.category = .language
+                if RunAnywhere.currentModel(request).modelID == loadID { return }
+                var load = RAModelLoadRequest()
+                load.modelID = loadID
+                load.category = .language
+                let result = await RunAnywhere.loadModel(load)
+                guard result.success else {
+                    throw NSError(
+                        domain: "AmbientMemory",
+                        code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: result.errorMessage]
+                    )
+                }
+            }.value
             guard canRunDigestNow else {
-                lastError = "Bring the app to the foreground to run the summarizer."
+                lastError = "Keep the app in the foreground — digester paused. Tap Resume to continue."
                 return false
             }
-            statusMessage = "Summarizing…"
-            let digest = try await RunAnywhere.ambient.digest(text: chunk, mode: .chunk)
-            guard var record = sessionRecord else { return false }
+            if !quietPostASRUI {
+                let progress = digestChunkProgress
+                statusMessage = "Summarizing chunk \(progress.completed + 1)/\(max(progress.total, 1))…"
+            }
+            let chunkText = chunk
+            let digest = try await Task.detached(priority: .userInitiated) {
+                try await RunAnywhere.ambient.digest(text: chunkText, mode: .chunk)
+            }.value
+            guard var record = (quietPostASRUI ? digestScratch : sessionRecord) else { return false }
             latestStructuredDigest = digest
             record.partialSummaries.append(digest.summary)
+            record.digestMapChunksCompleted = record.partialSummaries.count
             record.mergeActionItems(digest.actionItems)
             if record.summary.isEmpty || record.summaryPending {
                 record.summary = record.partialSummaries.joined(separator: "\n\n")
             }
-            // Single-chunk notes keep full structure immediately.
             if record.partialSummaries.count == 1 {
                 record.applyStructuredDigest(digest)
             }
-            record.summaryPending = false
-            sessionRecord = record
-            benchmarkRecorder.markDigest(digest)
+            // Stay pending until merge finishes so kills remain resumable.
+            record.summaryPending = true
+            if quietPostASRUI {
+                digestScratch = record
+            } else {
+                sessionRecord = record
+            }
             await store.save(record)
+            digestChunkProgress = (record.digestMapChunksCompleted, digestChunkProgress.total)
+            benchmarkRecorder.markDigest(digest)
+            // Let the scene breathe between Metal bursts.
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 150_000_000)
             return true
         } catch {
             let detail = error.localizedDescription
             lastError = "Summarization failed: \(detail)"
             logger.warning("Chunk digest failed: \(detail, privacy: .public)")
-            if var record = sessionRecord {
+            if var record = (quietPostASRUI ? digestScratch : sessionRecord) {
                 record.summaryPending = true
-                sessionRecord = record
+                if quietPostASRUI {
+                    digestScratch = record
+                } else {
+                    sessionRecord = record
+                }
                 await store.save(record)
             }
             return false
         }
     }
 
-    /// Drain `pendingChunk` in sized pieces. Stops on the first failure.
-    private func flushPendingAsChunks(modelID: String) async -> Bool {
-        var guardCounter = 0
-        while !pendingChunk.isEmpty {
-            guardCounter += 1
-            if guardCounter > 64 {
-                lastError = "Summarization stopped — transcript is too large to process safely."
-                return false
-            }
-            if pendingChunk.count <= Self.chunkCharacterLimit {
-                let all = pendingChunk
-                pendingChunk = ""
-                return await digestChunk(all, modelID: modelID)
-            }
-            let endIdx = pendingChunk.index(
-                pendingChunk.startIndex,
-                offsetBy: Self.chunkCharacterLimit
-            )
-            var split = endIdx
-            if let space = pendingChunk[..<endIdx].lastIndex(of: " "),
-               space > pendingChunk.startIndex {
-                split = space
-            }
-            let piece = String(pendingChunk[..<split])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            let rest = String(pendingChunk[split...])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            // Always advance — an empty piece with unchanged remainder would loop.
-            if rest.count >= pendingChunk.count {
-                pendingChunk = String(pendingChunk[endIdx...])
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-            } else {
-                pendingChunk = rest
-            }
-            if piece.isEmpty { continue }
+    /// Run remaining map chunks. On interrupt, leaves `summaryPending` + partials.
+    private func runMapChunks(_ chunks: [String], modelID: String, startingAt skip: Int) async -> Bool {
+        let remaining = Array(chunks.dropFirst(skip))
+        guard !remaining.isEmpty else { return true }
+        for (offset, piece) in remaining.enumerated() {
+            digestChunkProgress = (skip + offset, chunks.count)
             guard await digestChunk(piece, modelID: modelID) else { return false }
         }
+        digestChunkProgress = (chunks.count, chunks.count)
         return true
     }
 
     /// Load the chosen digest model on demand, write summary + action items,
-    /// then unload. Pass `rewrite: true` to replace prior machine summary/items
-    /// only after a usable new digest (failed rewrites keep the previous draft).
+    /// then unload. Map chunks are persisted after each success so a kill can
+    /// resume. Pass `rewrite: true` to discard prior machine draft + partials.
     /// `modelID` overrides the note's stored choice (from the note-detail picker).
     func generateSummary(
         for noteID: String,
         modelID overrideModelID: String? = nil,
-        rewrite: Bool = false
+        rewrite: Bool = false,
+        quietUI: Bool = false,
+        maxSourceChars: Int? = nil
     ) async {
-        guard !isSummarizing else { return }
+        guard !isSummarizing, !quietSummarizeInFlight else { return }
         guard !phase.holdsAudioSession else {
             lastError = "Stop the current recording before summarizing."
             return
@@ -524,77 +620,174 @@ final class AmbientSessionManager: ObservableObject {
             lastError = "Pick a summarizing model, then try again."
             return
         }
+        // Long digests on MLX were the main scene-watchdog path; steer to llama.cpp.
+        if modelID.lowercased().hasPrefix("mlx-"),
+           note.digestSourceTranscript.count > Self.chunkCharacterLimit {
+            lastError = "Use a llama.cpp digester (e.g. Qwen3 4B GGUF) for long notes — MLX digests trip the scene watchdog."
+            if !quietUI { statusMessage = lastError ?? "" }
+            return
+        }
         guard canRunDigestNow else {
             lastError = "Bring the app to the foreground to run the summarizer."
             return
         }
 
-        let source = note.digestSourceTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        var source = note.digestSourceTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let maxSourceChars, maxSourceChars > 0, source.count > maxSourceChars {
+            var cut = source.index(source.startIndex, offsetBy: maxSourceChars)
+            if let nl = source[..<cut].lastIndex(of: "\n") { cut = source.index(after: nl) }
+            source = String(source[..<cut])
+            logger.info("Digest capped to \(source.count, privacy: .public) chars")
+        }
         guard !source.isEmpty else {
             lastError = "Nothing to summarize — this note has no transcript."
-            statusMessage = lastError ?? ""
+            if !quietUI { statusMessage = lastError ?? "" }
             return
         }
         guard !isLabelingSpeakers else {
             lastError = "Wait for speaker labeling to finish before summarizing."
-            statusMessage = lastError ?? ""
+            if !quietUI { statusMessage = lastError ?? "" }
             return
         }
 
+        // Long notes always use quiet persistence so each chunk lands on disk.
+        let useQuiet = quietUI || source.count > Self.chunkCharacterLimit
+        if useQuiet {
+            guard !quietSummarizeInFlight else { return }
+            quietSummarizeInFlight = true
+        }
         isSummarizing = true
+        quietPostASRUI = useQuiet
         lastError = nil
-        statusMessage = rewrite ? "Rewriting summary…" : "Loading model and summarizing…"
-        defer { isSummarizing = false }
+        UIApplication.shared.isIdleTimerDisabled = true
+        var backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "AmbientDigest") {}
+        defer {
+            quietSummarizeInFlight = false
+            isSummarizing = false
+            quietPostASRUI = false
+            digestChunkProgress = (0, 0)
+            UIApplication.shared.isIdleTimerDisabled = false
+            if backgroundTaskID != .invalid {
+                UIApplication.shared.endBackgroundTask(backgroundTaskID)
+                backgroundTaskID = .invalid
+            }
+        }
 
-        // Keep the previous draft until the new pass succeeds — a failed or
-        // unparseable rewrite used to wipe summary + machine action items.
+        await prepareExclusiveWarmKeep(for: .digester)
+
         let previousSummary = note.summary
         let previousMachineItems = note.actionItems.filter { !$0.isManual }.map(\.text)
         let previousPartials = note.partialSummaries
+        let previousChunksCompleted = note.digestMapChunksCompleted
+        let previousSections = note.digestSections
+        let previousDigestTitle = note.digestTitle
+
+        let resuming = !rewrite && note.hasResumableDigest
+        let allChunks = Self.splitDigestChunks(source)
+        let skip = resuming
+            ? min(max(note.digestMapChunksCompleted, note.partialSummaries.count), allChunks.count)
+            : 0
 
         note.summaryPending = true
         note.digestModelID = modelID
-        note.partialSummaries = []
-        let previousSections = note.digestSections
-        let previousDigestTitle = note.digestTitle
-        if rewrite {
-            // Clear only in memory for the map pass; disk keeps the old draft
-            // until we confirm a usable result below.
-            note.summary = ""
-            note.digestSections = []
-            note.replaceMachineActionItems(with: [String]())
+        if rewrite || !resuming {
+            note.partialSummaries = []
+            note.digestMapChunksCompleted = 0
+            if rewrite {
+                note.summary = ""
+                note.digestSections = []
+                note.replaceMachineActionItems(with: [String]())
+            }
+        } else {
+            // Keep committed map chunks; align counter with partials.
+            note.digestMapChunksCompleted = skip
+            if note.partialSummaries.count > skip {
+                note.partialSummaries = Array(note.partialSummaries.prefix(skip))
+            }
         }
-        sessionRecord = note
-        pendingChunk = source
+
+        digestChunkProgress = (skip, allChunks.count)
+        statusMessage = resuming
+            ? "Resuming digester at chunk \(skip + 1)/\(allChunks.count)…"
+            : (rewrite ? "Rewriting summary…" : "Loading model and summarizing…")
+
+        if useQuiet {
+            digestScratch = note
+        } else {
+            sessionRecord = note
+        }
+        await store.save(note)
+        pendingChunk = ""
         latestStructuredDigest = nil
 
-        let flushed = await flushPendingAsChunks(modelID: modelID)
-        guard flushed, var current = sessionRecord else {
-            // Restore prior content so Rewrite never leaves an empty note.
-            var restored = note
-            restored.summary = previousSummary
-            restored.partialSummaries = previousPartials
-            restored.digestSections = previousSections
-            restored.digestTitle = previousDigestTitle
-            restored.replaceMachineActionItems(with: previousMachineItems as [String])
-            restored.summaryPending = false
-            sessionRecord = restored
-            await store.save(restored)
-            statusMessage = lastError ?? "Summarization failed — previous summary kept."
-            await unloadLanguageModel(modelID)
+        let load: (loadMs: Int, warmHit: Bool)
+        let digestWallStarted = Date()
+        do {
+            load = try await ensureLoaded(modelID: modelID, category: .language)
+        } catch {
+            lastError = error.localizedDescription
+            statusMessage = lastError ?? ""
+            // Keep resumable pending state if we already had chunks.
+            if !resuming {
+                note.summaryPending = false
+                note.partialSummaries = previousPartials
+                note.digestMapChunksCompleted = previousChunksCompleted
+            }
+            await store.save(note)
             return
         }
-        // Short single-chunk notes already have a usable summary from the map
-        // pass; multi-chunk notes get a merge.
+
+        let flushed = await runMapChunks(allChunks, modelID: modelID, startingAt: skip)
+        let working = useQuiet ? digestScratch : sessionRecord
+        guard flushed, var current = working else {
+            // Interrupted or failed — keep map progress for Resume.
+            if var paused = working {
+                paused.summaryPending = true
+                paused.digestMapChunksCompleted = paused.partialSummaries.count
+                if paused.summary.isEmpty {
+                    paused.summary = paused.partialSummaries.joined(separator: "\n\n")
+                }
+                await store.save(paused)
+                if !useQuiet { sessionRecord = paused }
+                digestScratch = nil
+            } else if rewrite {
+                var restored = note
+                restored.summary = previousSummary
+                restored.partialSummaries = previousPartials
+                restored.digestMapChunksCompleted = previousChunksCompleted
+                restored.digestSections = previousSections
+                restored.digestTitle = previousDigestTitle
+                restored.replaceMachineActionItems(with: previousMachineItems as [String])
+                restored.summaryPending = false
+                await store.save(restored)
+                sessionRecord = restored
+                digestScratch = nil
+            }
+            if lastError == nil {
+                lastError = "Digester paused — keep the app foregrounded and tap Resume."
+            }
+            statusMessage = lastError ?? ""
+            await unloadLanguageModelUnlessWarm(modelID)
+            return
+        }
+
         if current.partialSummaries.count > 1 {
+            guard canRunDigestNow else {
+                current.summaryPending = true
+                await store.save(current)
+                lastError = "Keep the app in the foreground — digester paused before merge. Tap Resume."
+                statusMessage = lastError ?? ""
+                await unloadLanguageModelUnlessWarm(modelID)
+                return
+            }
             current = await merged(current, modelID: modelID)
         } else if current.partialSummaries.count == 1 {
             if let digest = latestStructuredDigest {
                 current.applyStructuredDigest(digest)
             } else {
                 current.summary = current.partialSummaries[0]
-                current.summaryPending = false
             }
+            current.summaryPending = false
         }
 
         let newSummary = current.summary.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -605,22 +798,39 @@ final class AmbientSessionManager: ObservableObject {
         if newSummary.isEmpty || (rewrite && looksLikeFallback && !previousSummary.isEmpty) {
             current.summary = previousSummary
             current.partialSummaries = previousPartials
+            current.digestMapChunksCompleted = previousChunksCompleted
             current.digestSections = previousSections
             current.digestTitle = previousDigestTitle
             current.replaceMachineActionItems(with: previousMachineItems)
             current.summaryPending = false
             await store.save(current)
             sessionRecord = current
-            await unloadLanguageModel(modelID)
-            lastError = "Rewrite did not produce a usable summary — previous draft kept. Try LFM2 350M or disable thinking models."
+            digestScratch = nil
+            await unloadLanguageModelUnlessWarm(modelID)
+            lastError = "Rewrite did not produce a usable summary — previous draft kept."
             statusMessage = lastError ?? ""
             return
         }
 
         current.digestStale = false
+        current.summaryPending = false
+        current.digestMapChunksCompleted = current.partialSummaries.count
         await store.save(current)
-        await unloadLanguageModel(modelID)
+        let digestWallMs = Int(Date().timeIntervalSince(digestWallStarted) * 1000)
+        let digestMemory = AmbientBenchmarkRecorder.residentMemoryBytes()
+        await benchmarkRecorder.amendDigestPass(
+            sessionID: noteID,
+            store: store,
+            loadMs: load.loadMs,
+            warmHit: load.warmHit,
+            wallMs: digestWallMs,
+            memoryBytes: digestMemory,
+            sectionCount: current.digestSections.count,
+            bulletCount: current.digestSections.reduce(0) { $0 + $1.bullets.count }
+        )
+        await unloadLanguageModelUnlessWarm(modelID)
         sessionRecord = current
+        digestScratch = nil
         didFinishDeferredMerge.send(current.id)
         statusMessage = rewrite ? "Summary rewritten." : "Summary ready."
         lastError = nil
@@ -696,6 +906,9 @@ final class AmbientSessionManager: ObservableObject {
         lastError = nil
         defer { isLabelingSpeakers = false }
 
+        // Sortformer and digester never share RAM.
+        await prepareExclusiveWarmKeep(for: .diarization)
+
         note.diarizationModelID = modelID
         note.speakerLabelingState = .loadingModel
         note.speakerLabelingDetail = "Loading speaker model…"
@@ -705,7 +918,7 @@ final class AmbientSessionManager: ObservableObject {
         didFinishSpeakerLabeling.send(noteID)
 
         do {
-            try await ensureLoaded(modelID: modelID, category: .speakerDiarization)
+            let load = try await ensureLoaded(modelID: modelID, category: .speakerDiarization)
             guard UIApplication.shared.applicationState == .active else {
                 throw NSError(
                     domain: "AmbientMemory",
@@ -736,7 +949,9 @@ final class AmbientSessionManager: ObservableObject {
             options.channelCount = 1
             options.encoding = .pcmS16Le
 
+            let diarStarted = Date()
             let result = try await RunAnywhere.diarize(audioData: pcm, options: options)
+            let diarWallMs = Int(Date().timeIntervalSince(diarStarted) * 1000)
             let turns = AmbientSpeakerAlignment.turns(from: result)
             let assignments = AmbientSpeakerAlignment.assignments(
                 segments: note.segments,
@@ -754,12 +969,21 @@ final class AmbientSessionManager: ObservableObject {
             )
             await store.save(note)
             sessionRecord = note
-            await unloadDiarizationModel(modelID)
+            let diarMemory = AmbientBenchmarkRecorder.residentMemoryBytes()
+            await benchmarkRecorder.amendDiarizationPass(
+                sessionID: noteID,
+                store: store,
+                loadMs: load.loadMs,
+                warmHit: load.warmHit,
+                wallMs: diarWallMs,
+                memoryBytes: diarMemory
+            )
+            await unloadDiarizationModelUnlessWarm(modelID)
             statusMessage = note.speakerLabelingDetail ?? "Speakers labeled."
             lastError = nil
             didFinishSpeakerLabeling.send(noteID)
         } catch {
-            await unloadDiarizationModel(modelID)
+            await unloadDiarizationModelUnlessWarm(modelID)
             let detail = error.localizedDescription
             let interrupted = UIApplication.shared.applicationState != .active
                 || detail.localizedCaseInsensitiveContains("interrupted")
@@ -784,6 +1008,20 @@ final class AmbientSessionManager: ObservableObject {
         unload.modelID = modelID
         unload.category = .speakerDiarization
         _ = await RunAnywhere.unloadModel(unload)
+        if warmKeptDiarizationModelID == modelID {
+            warmKeptDiarizationModelID = nil
+        }
+    }
+
+    private func unloadDiarizationModelUnlessWarm(_ modelID: String) async {
+        performanceSettings = AmbientCapturePerformanceSettings.load()
+        if performanceSettings.warmKeep == .diarization {
+            warmKeptDiarizationModelID = modelID
+            warmKeptDigestModelID = nil
+            logger.info("Warm-keeping Sortformer \(modelID, privacy: .public)")
+            return
+        }
+        await unloadDiarizationModel(modelID)
     }
 
     /// The reduce half of the map-reduce: one pass over the partial summaries.
@@ -807,6 +1045,7 @@ final class AmbientSessionManager: ObservableObject {
                         await store.save(record)
                         return record
                     }
+                    // Must stay on MainActor — see digestChunk note about MLX main.sync.
                     let digest = try await RunAnywhere.ambient.digest(text: source, mode: .chunk)
                     latestStructuredDigest = digest
                     record.partialSummaries = [digest.summary]
@@ -842,21 +1081,267 @@ final class AmbientSessionManager: ObservableObject {
                 await store.save(record)
                 return record
             }
-            let joined = record.partialSummaries.enumerated()
-                .map { "Part \($0.offset + 1): \($0.element)" }
-                .joined(separator: "\n\n")
-            let digest = try await RunAnywhere.ambient.digest(text: joined, mode: .merge)
-            latestStructuredDigest = digest
-            record.applyStructuredDigest(digest)
-            benchmarkRecorder.markDigest(digest)
+            // Speed path: one polish over a compressed draft. No tree-reduce
+            // (that was ~5 extra 4B calls and made Summarize feel multi-minute).
+            let draftText: String
+            if record.digestSections.count >= 2 && record.digestSections.count <= 10 {
+                draftText = compressSectionsForPolish(record.digestSections)
+            } else {
+                draftText = compressPartialsForPolish(record.partialSummaries)
+            }
+            statusMessage = "Writing meeting note…"
+            var digest = try await polishDigest(from: draftText)
+            if !isAcceptableFinalNote(digest) {
+                logger.warning("Polish still messy — one retry")
+                statusMessage = "Retrying note…"
+                let retry = try await polishDigest(from: String(draftText.prefix(2_800)))
+                if isAcceptableFinalNote(retry) {
+                    digest = retry
+                }
+            }
+            if isAcceptableFinalNote(digest) {
+                latestStructuredDigest = digest
+                record.applyStructuredDigest(digest)
+                benchmarkRecorder.markDigest(digest)
+            } else {
+                logger.warning("Polish did not synthesize — applying thematic draft from map chunks")
+                applyThematicPartialDraft(to: &record)
+            }
         } catch {
-            record.summary = record.partialSummaries.joined(separator: "\n\n")
+            applyThematicPartialDraft(to: &record)
             let detail = error.localizedDescription
-            logger.warning("Merge failed, keeping the partial summaries: \(detail, privacy: .public)")
+            logger.warning("Merge failed, keeping a thematic draft: \(detail, privacy: .public)")
         }
         record.summaryPending = false
         await store.save(record)
         return record
+    }
+
+    private func polishDigest(from draftText: String) async throws -> RAAmbientNoteDigest {
+        try await Task.detached(priority: .userInitiated) {
+            try await RunAnywhere.ambient.digest(text: draftText, mode: .polish)
+        }.value
+    }
+
+    /// Keep polish input bounded so Qwen finishes valid JSON, but retain themes.
+    private func compressSectionsForPolish(_ sections: [AmbientDigestSection]) -> String {
+        let blocks = sections.prefix(8).map { section -> String in
+            let bullets = section.bullets.prefix(4).map { bullet -> String in
+                let raw = bullet.lead.isEmpty ? bullet.text : "\(bullet.lead): \(bullet.text)"
+                let cleaned = raw
+                    .replacingOccurrences(of: #"^Speaker\s+\d+\s*:\s*"#, with: "", options: .regularExpression)
+                return "• \(String(cleaned.prefix(180)))"
+            }.joined(separator: "\n")
+            let heading = section.heading.trimmingCharacters(in: .whitespacesAndNewlines)
+            return "\(heading)\n\(bullets)"
+        }
+        return String(blocks.joined(separator: "\n\n").prefix(4_000))
+    }
+
+    /// Compress map partials directly — avoids a slow merge tree before polish.
+    private func compressPartialsForPolish(_ partials: [String]) -> String {
+        let stride = max(1, (partials.count + 5) / 6)
+        var blocks: [String] = []
+        var index = 0
+        while index < partials.count && blocks.count < 6 {
+            let end = min(index + stride, partials.count)
+            let group = Array(partials[index..<end])
+            var lines: [String] = []
+            for partial in group {
+                for line in partial.split(whereSeparator: \.isNewline) {
+                    let trimmed = String(line)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "•- "))
+                    guard trimmed.count >= 20 else { continue }
+                    guard !trimmed.lowercased().hasPrefix("speaker ") else { continue }
+                    lines.append("• \(String(trimmed.prefix(160)))")
+                    if lines.count >= 5 { break }
+                }
+                if lines.count >= 5 { break }
+            }
+            let heading = group[0].split(whereSeparator: \.isNewline).first.map(String.init)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? "Theme \(blocks.count + 1)"
+            let title = (heading.count >= 6 && heading.count <= 48) ? heading : "Theme \(blocks.count + 1)"
+            blocks.append("\(title)\n\(lines.joined(separator: "\n"))")
+            index = end
+        }
+        return String(blocks.joined(separator: "\n\n").prefix(4_000))
+    }
+
+    private func isAcceptableFinalNote(_ digest: RAAmbientNoteDigest) -> Bool {
+        let count = digest.sections.count
+        guard (4...6).contains(count) else { return false }
+        let bullets = digest.sections.reduce(0) { $0 + $1.bullets.count }
+        guard bullets >= 10 else { return false }
+        let garbage = digest.sections.contains { section in
+            let h = section.heading.trimmingCharacters(in: .whitespacesAndNewlines)
+            if h.count < 3 { return true }
+            if h.lowercased().hasPrefix("part ") { return true }
+            if h.lowercased() == "meeting summary" { return true }
+            // Truncated ASR crumbs like "3: Uh" / "out to the"
+            if h.count <= 12 && h.contains("Uh") { return true }
+            if section.bullets.count == 1 && section.bullets[0].text.count > 600 { return true }
+            return false
+        }
+        return !garbage
+    }
+
+    /// Fallback when the model won't synthesize: 5 themed buckets from map chunks.
+    private func applyThematicPartialDraft(to record: inout AmbientSessionRecord) {
+        applyCompactPartialDraft(to: &record, maxSections: 5)
+        // Prefer clearer titles than raw first-line crumbs when possible.
+        let themes = [
+            "Goals & direction",
+            "Product & SDK",
+            "Go-to-market",
+            "Open source & community",
+            "Next steps",
+        ]
+        if record.digestSections.count == themes.count {
+            for i in record.digestSections.indices {
+                let heading = record.digestSections[i].heading
+                if heading.count < 8 || heading.contains("Uh") || heading.lowercased().hasPrefix("part") {
+                    record.digestSections[i].heading = themes[i]
+                }
+            }
+        }
+        record.digestTitle = "YC discussion"
+        record.summary = record.digestSections.map { section in
+            let body = section.bullets.map(\.text).joined(separator: "\n")
+            return "\(section.heading)\n\(body)"
+        }.joined(separator: "\n\n")
+        // SDK polish path already harvests; thematic fallback just scrapes partials.
+        let scraped = scrapeActionLines(from: record.partialSummaries.joined(separator: "\n"), max: 8)
+        if !scraped.isEmpty {
+            record.replaceMachineActionItems(with: scraped)
+        }
+    }
+
+    private func scrapeActionLines(from text: String, max: Int) -> [String] {
+        var seen = Set<String>()
+        var items: [String] = []
+        for line in text.split(whereSeparator: \.isNewline) {
+            var s = String(line)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "•- "))
+            s = s.replacingOccurrences(
+                of: #"^Speaker\s+\d+\s*:\s*"#,
+                with: "",
+                options: .regularExpression
+            )
+            guard s.count >= 18, s.count <= 160 else { continue }
+            let low = s.lowercased()
+            let looks =
+                low.contains("follow up") || low.contains("follow-up")
+                || low.contains("need to") || low.contains("should ")
+                || low.contains("next step") || low.contains("pilot")
+                || low.contains("schedule") || low.contains("define ")
+            guard looks, seen.insert(low).inserted else { continue }
+            items.append(s)
+            if items.count >= max { break }
+        }
+        return items
+    }
+
+    /// Compact fallback: at most N sections from map partials.
+    private func applyCompactPartialDraft(to record: inout AmbientSessionRecord, maxSections: Int = 6) {
+        let partials = record.partialSummaries
+        guard !partials.isEmpty else { return }
+        let stride = max(1, (partials.count + maxSections - 1) / maxSections)
+        var sections: [AmbientDigestSection] = []
+        var index = 0
+        while index < partials.count && sections.count < maxSections {
+            let end = min(index + stride, partials.count)
+            let group = Array(partials[index..<end])
+            // Keep a few short bullets, not one giant blob.
+            var bullets: [AmbientDigestBullet] = []
+            for partial in group {
+                for line in partial.split(whereSeparator: \.isNewline) {
+                    let trimmed = String(line)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "•- "))
+                    guard trimmed.count >= 24 else { continue }
+                    guard !trimmed.lowercased().hasPrefix("speaker ") else { continue }
+                    bullets.append(AmbientDigestBullet(text: String(trimmed.prefix(180))))
+                    if bullets.count >= 5 { break }
+                }
+                if bullets.count >= 5 { break }
+            }
+            if bullets.isEmpty {
+                bullets = [AmbientDigestBullet(text: String(group.joined(separator: " ").prefix(220)))]
+            }
+            let firstLine = group[0].split(whereSeparator: \.isNewline).first.map(String.init)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? "Theme \(sections.count + 1)"
+            let heading = (firstLine.count >= 8 && firstLine.count <= 48)
+                ? firstLine
+                : "Theme \(sections.count + 1)"
+            sections.append(AmbientDigestSection(heading: heading, bullets: bullets))
+            index = end
+        }
+        record.digestSections = sections
+        record.summary = sections.map { section in
+            let body = section.bullets.map { "• \($0.text)" }.joined(separator: "\n")
+            return "\(section.heading)\n\(body)"
+        }.joined(separator: "\n\n")
+        let existingTitle = record.digestTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if existingTitle.isEmpty || existingTitle == "Meeting notes" {
+            record.digestTitle = "Meeting notes"
+        }
+    }
+
+    /// Re-run only the reduce pass over saved map chunks (fixes thin merges
+    /// without redoing a 30‑min map).
+    func remergeSummary(for noteID: String, modelID overrideModelID: String? = nil) async {
+        guard !isSummarizing, !quietSummarizeInFlight else { return }
+        guard !phase.holdsAudioSession else {
+            lastError = "Stop the current recording before summarizing."
+            return
+        }
+        guard var note = await store.loadSession(id: noteID) else { return }
+        guard note.partialSummaries.count > 1 else {
+            lastError = "Nothing to re-merge — this note has no map-pass chunks."
+            return
+        }
+        let modelID = overrideModelID ?? note.digestModelID ?? selection?.digestModelID
+        guard let modelID, !modelID.isEmpty else {
+            lastError = "Pick a summarizing model, then try again."
+            return
+        }
+        // Deep-link launch can still be inactive for a beat; wait briefly.
+        for _ in 0..<20 where !canRunDigestNow {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        guard canRunDigestNow else {
+            lastError = "Bring the app to the foreground to run the summarizer."
+            return
+        }
+        isSummarizing = true
+        quietPostASRUI = true
+        quietSummarizeInFlight = true
+        statusMessage = "Re-merging \(note.partialSummaries.count) chunks…"
+        lastError = nil
+        UIApplication.shared.isIdleTimerDisabled = true
+        defer {
+            isSummarizing = false
+            quietPostASRUI = false
+            quietSummarizeInFlight = false
+            UIApplication.shared.isIdleTimerDisabled = false
+            digestChunkProgress = (0, 0)
+        }
+        await prepareExclusiveWarmKeep(for: .digester)
+        note.digestModelID = modelID
+        digestScratch = note
+        note = await merged(note, modelID: modelID)
+        digestScratch = nil
+        sessionRecord = note
+        didFinishDeferredMerge.send(note.id)
+        if (4...6).contains(note.digestSections.count) {
+            lastError = nil
+            statusMessage = "Summary ready (\(note.digestSections.count) sections)."
+        } else {
+            lastError = "Note still has \(note.digestSections.count) sections — keep app unlocked and tap Rebuild again."
+            statusMessage = lastError ?? "Summary ready."
+        }
     }
 
     /// Summarization always needs the foreground. Stop-from-Lock-Screen leaves
@@ -889,15 +1374,23 @@ final class AmbientSessionManager: ObservableObject {
         didFinishSpeakerLabeling.send(noteID)
     }
 
-    private func ensureLoaded(modelID: String, category: RAModelCategory) async throws {
+    @discardableResult
+    private func ensureLoaded(
+        modelID: String,
+        category: RAModelCategory
+    ) async throws -> (loadMs: Int, warmHit: Bool) {
         var request = RACurrentModelRequest()
         request.category = category
-        if RunAnywhere.currentModel(request).modelID == modelID { return }
+        if RunAnywhere.currentModel(request).modelID == modelID {
+            return (0, true)
+        }
 
+        let started = Date()
         var load = RAModelLoadRequest()
         load.modelID = modelID
         load.category = category
         let result = await RunAnywhere.loadModel(load)
+        let loadMs = Int(Date().timeIntervalSince(started) * 1000)
         guard result.success else {
             throw NSError(
                 domain: "AmbientMemory",
@@ -905,6 +1398,7 @@ final class AmbientSessionManager: ObservableObject {
                 userInfo: [NSLocalizedDescriptionKey: result.errorMessage]
             )
         }
+        return (loadMs, false)
     }
 
     /// Free the digest LLM after summarize/retry so Notes does not keep it
@@ -914,6 +1408,170 @@ final class AmbientSessionManager: ObservableObject {
         unload.modelID = modelID
         unload.category = .language
         _ = await RunAnywhere.unloadModel(unload)
+        if warmKeptDigestModelID == modelID {
+            warmKeptDigestModelID = nil
+        }
+    }
+
+    private func unloadLanguageModelUnlessWarm(_ modelID: String) async {
+        performanceSettings = AmbientCapturePerformanceSettings.load()
+        if performanceSettings.warmKeep == .digester {
+            warmKeptDigestModelID = modelID
+            warmKeptDiarizationModelID = nil
+            logger.info("Warm-keeping digester \(modelID, privacy: .public)")
+            return
+        }
+        await unloadLanguageModel(modelID)
+    }
+
+    /// Unload the opposite warm model before loading the requested post-ASR role.
+    private func prepareExclusiveWarmKeep(for target: AmbientWarmKeepTarget) async {
+        switch target {
+        case .diarization:
+            if let digestID = warmKeptDigestModelID {
+                await unloadLanguageModel(digestID)
+            }
+        case .digester:
+            if let diarID = warmKeptDiarizationModelID {
+                await unloadDiarizationModel(diarID)
+            }
+        case .none:
+            break
+        }
+    }
+
+    /// ASR never shares RAM with a warm Sortformer or digester.
+    private func releaseWarmModelsBeforeCapture() async {
+        if let diarID = warmKeptDiarizationModelID {
+            await unloadDiarizationModel(diarID)
+        }
+        if let digestID = warmKeptDigestModelID {
+            await unloadLanguageModel(digestID)
+        }
+    }
+
+    // MARK: - Streaming diarization during capture
+
+    private static let defaultSortformerModelID = "diar-streaming-sortformer-4spk-v2.1"
+
+    private func maybeStartStreamingDiarization(
+        sessionID: String,
+        conditions: AmbientDeviceConditions
+    ) async {
+        guard performanceSettings.canStreamDiarization(
+            availableMemoryBytes: conditions.availableMemoryBytes,
+            tier: conditions.tier
+        ) else { return }
+
+        let modelID = sessionRecord?.diarizationModelID
+            ?? Self.defaultSortformerModelID
+        guard isModelDownloaded(modelID) else {
+            logger.info("Stream diar skipped — \(modelID, privacy: .public) not downloaded")
+            return
+        }
+
+        do {
+            let load = try await ensureLoaded(modelID: modelID, category: .speakerDiarization)
+            benchmarkRecorder.markDiarizationLoad(ms: load.loadMs, warmHit: load.warmHit)
+        } catch {
+            logger.warning(
+                "Stream diar load failed: \(error.localizedDescription, privacy: .public)"
+            )
+            return
+        }
+
+        var continuation: AsyncStream<Data>.Continuation!
+        let stream = AsyncStream<Data> { continuation = $0 }
+        diarAudioContinuation = continuation
+        streamingDiarModelID = modelID
+        if var record = sessionRecord {
+            record.diarizationModelID = modelID
+            record.speakerLabelingState = .labeling
+            record.speakerLabelingDetail = "Labeling speakers during capture…"
+            sessionRecord = record
+            await store.save(record)
+        }
+
+        var options = RADiarizationOptions.defaults()
+        options.sampleRateHz = 16_000
+        options.channelCount = 1
+        options.encoding = .pcmS16Le
+
+        diarStreamTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                let events = try await RunAnywhere.diarizeStream(audio: stream, options: options)
+                for try await event in events {
+                    self.consumeStreamingDiarEvent(event)
+                }
+            } catch {
+                self.logger.warning(
+                    "Stream diar ended: \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+        benchmarkRecorder.markStreamDiarUsed()
+        logger.info(
+            "Streaming Sortformer during capture for \(sessionID, privacy: .public)"
+        )
+    }
+
+    private func consumeStreamingDiarEvent(_ event: RADiarizationStreamEvent) {
+        switch event.kind {
+        case .update, .final:
+            latestStreamingDiarResult = event.result
+        case .error:
+            logger.warning("Stream diar error event")
+        default:
+            break
+        }
+    }
+
+    private func teeDiarAudio(_ data: Data) {
+        diarAudioContinuation?.yield(data)
+    }
+
+    private func finishStreamingDiarization() async {
+        diarAudioContinuation?.finish()
+        diarAudioContinuation = nil
+        await diarStreamTask?.value
+        diarStreamTask = nil
+
+        let modelID = streamingDiarModelID
+        streamingDiarModelID = nil
+        guard let modelID else { return }
+
+        if var note = sessionRecord, let result = latestStreamingDiarResult {
+            let turns = AmbientSpeakerAlignment.turns(from: result)
+            let assignments = AmbientSpeakerAlignment.assignments(
+                segments: note.segments,
+                turns: turns
+            )
+            if !assignments.isEmpty {
+                note.applyDiarizationLabels(
+                    assignments,
+                    modelID: modelID,
+                    speakerCount: Int(result.speakerCount)
+                )
+                sessionRecord = note
+                await store.save(note)
+                didFinishSpeakerLabeling.send(note.id)
+            } else if note.speakerLabelingState == .labeling {
+                note.speakerLabelingState = .modelSelected
+                note.speakerLabelingDetail = "Live labeling finished — tap Label speakers if needed."
+                sessionRecord = note
+                await store.save(note)
+            }
+        }
+        latestStreamingDiarResult = nil
+        benchmarkRecorder.markMemoryAfterDiarization()
+        await unloadDiarizationModelUnlessWarm(modelID)
+    }
+
+    private func isModelDownloaded(_ modelID: String) -> Bool {
+        guard let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelID })
+        else { return false }
+        return model.isBuiltIn || model.localPathURL != nil
     }
 
     // MARK: - Audio Engine
@@ -950,6 +1608,7 @@ final class AmbientSessionManager: ObservableObject {
                 self.audioLevel = self.audioCapture.audioLevel
                 guard self.phase.isRecording else { return }
                 session.ingest(pcm16: data)
+                self.teeDiarAudio(data)
                 // Every buffer goes to the recording, not just the speech the
                 // detector kept, so playback is the room as it sounded rather
                 // than a cut of detected utterances.

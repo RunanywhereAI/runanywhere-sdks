@@ -147,6 +147,7 @@ final class AmbientOfflineImportRunner: ObservableObject {
             await unload(modelID: selection.vadModelID, category: .voiceActivityDetection)
 
             if labelSpeakers {
+                live.recentLines = []
                 statusMessage = "Labeling speakers…"
                 live.stage = "Labeling speakers"
                 // Prefer an already-downloaded Sortformer catalog id.
@@ -176,13 +177,19 @@ final class AmbientOfflineImportRunner: ObservableObject {
             }
 
             if summarize, let digestID = selection.digestModelID, !digestID.isEmpty {
-                statusMessage = "Summarizing…"
+                // Keep the live card minimal while Metal LLM runs — layout work
+                // on the main thread during 4B decode is what got us watchdog-killed.
+                live.recentLines = []
+                live.latestTranscript = ""
+                statusMessage = "Summarizing with \(digestID)…"
                 live.stage = "Summarizing"
+                await Task.yield()
                 let digestStarted = Date()
                 await AmbientSessionManager.shared.generateSummary(
                     for: metrics.sessionID,
                     modelID: digestID,
-                    rewrite: false
+                    rewrite: false,
+                    quietUI: true
                 )
                 metrics.digestMs = Int(Date().timeIntervalSince(digestStarted) * 1000)
                 if let fresh = await store.loadSession(id: metrics.sessionID) {
@@ -224,6 +231,9 @@ final class AmbientOfflineImportRunner: ObservableObject {
         summarize: Bool,
         context: AmbientCaptureContext
     ) async -> [AmbientFileRunMetrics] {
+        UIApplication.shared.isIdleTimerDisabled = true
+        defer { UIApplication.shared.isIdleTimerDisabled = false }
+
         let dir = Self.fixturesDirectory
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let urls = (try? FileManager.default.contentsOfDirectory(
@@ -249,6 +259,216 @@ final class AmbientOfflineImportRunner: ObservableObject {
             ))
         }
         return results
+    }
+
+    /// Re-run only the reduce pass for Diana/Finn notes that already have map chunks.
+    /// Use after a thin merge wiped coverage — skips the expensive 16-chunk map.
+    @discardableResult
+    func remergeMappedNotes(
+        selection: AmbientModelSelection,
+        digestModelOverride: String? = nil
+    ) async -> Int {
+        guard !isRunning else {
+            lastError = "Another offline run is already in progress."
+            return 0
+        }
+
+        UIApplication.shared.isIdleTimerDisabled = true
+        defer { UIApplication.shared.isIdleTimerDisabled = false }
+        isRunning = true
+        lastError = nil
+        statusMessage = "Finding notes with map chunks to re-merge…"
+        live = AmbientOfflineLiveProgress(
+            fixtureName: "remerge",
+            stage: "Scanning",
+            wallStartedAt: Date()
+        )
+        defer { isRunning = false }
+        await Task.yield()
+
+        // Diana-only by default: Finn already had a good note before a bad dump
+        // remerge, and hierarchical reduce is expensive (~5 LLM passes / note).
+        let notes = await store.loadSessions().filter { note in
+            let title = (note.customTitle ?? "").lowercased()
+            guard title.contains("diana") else { return false }
+            return note.partialSummaries.count > 1
+        }
+        var best: [String: AmbientSessionRecord] = [:]
+        for note in notes {
+            let key = (note.customTitle ?? note.id).lowercased()
+            if let existing = best[key], existing.startedAt > note.startedAt { continue }
+            best[key] = note
+        }
+        let targets = Array(best.values).sorted { $0.startedAt > $1.startedAt }
+        guard !targets.isEmpty else {
+            statusMessage = "No Finn/Diana notes with map chunks to re-merge."
+            live.stage = "Done"
+            return 0
+        }
+
+        let fallbackDigest = digestModelOverride ?? selection.digestModelID
+        var completed = 0
+        for note in targets {
+            let digestID = digestModelOverride ?? note.digestModelID ?? fallbackDigest
+            guard let digestID, !digestID.isEmpty else {
+                lastError = "No summarizing model on \(note.customTitle ?? note.id) — pick one in Models."
+                live.stage = "Failed"
+                statusMessage = lastError ?? ""
+                continue
+            }
+            live = AmbientOfflineLiveProgress(
+                fixtureName: note.customTitle ?? note.id,
+                stage: "Re-merging",
+                totalAudioMs: note.segments.last.map { ($0.startOffsetMs ?? 0) + $0.durationMs } ?? 0,
+                processedAudioMs: 0,
+                wallStartedAt: Date()
+            )
+            statusMessage = "Re-merging \(note.partialSummaries.count) chunks for \(note.customTitle ?? note.id)… keep app foreground"
+            live.stage = "Re-merging"
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            let beforeSections = note.digestSections.count
+            await AmbientSessionManager.shared.remergeSummary(for: note.id, modelID: digestID)
+            if let mgrErr = AmbientSessionManager.shared.lastError, !mgrErr.isEmpty {
+                live.stage = "Failed"
+                lastError = mgrErr
+                statusMessage = mgrErr
+                continue
+            }
+            if let fresh = await store.loadSession(id: note.id),
+               !fresh.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               (4...6).contains(fresh.digestSections.count) {
+                completed += 1
+                live.stage = "Done"
+                live.processedAudioMs = live.totalAudioMs
+                statusMessage = "Re-merged \(note.customTitle ?? note.id): \(fresh.digestSections.count) sections (was \(beforeSections))."
+            } else if let fresh = await store.loadSession(id: note.id) {
+                live.stage = "Failed"
+                lastError = "Polish did not finish for \(note.customTitle ?? note.id) (\(fresh.digestSections.count) sections). Keep app foreground and retry."
+                statusMessage = lastError ?? ""
+            } else {
+                live.stage = "Failed"
+                lastError = "Re-merge lost note \(note.customTitle ?? note.id)"
+                statusMessage = lastError ?? ""
+            }
+        }
+        if completed == targets.count {
+            statusMessage = "Re-merge complete (\(completed))."
+            live.stage = "Done"
+        }
+        return completed
+    }
+
+    /// Summarize notes that already have a transcript but no digest — used after
+    /// a digest watchdog crash so we do not re-pay ASR/Sortformer.
+    func digestPendingNotes(
+        selection: AmbientModelSelection,
+        digestModelOverride: String? = nil,
+        maxSourceChars: Int? = nil,
+        rewrite: Bool = false
+    ) async -> Int {
+        guard !isRunning else {
+            lastError = "Another offline run is already in progress."
+            return 0
+        }
+
+        UIApplication.shared.isIdleTimerDisabled = true
+        defer { UIApplication.shared.isIdleTimerDisabled = false }
+        isRunning = true
+        lastError = nil
+        statusMessage = "Finding notes that still need a digest…"
+        live = AmbientOfflineLiveProgress(
+            fixtureName: "digest-pending",
+            stage: "Scanning",
+            wallStartedAt: Date()
+        )
+        defer { isRunning = false }
+        await Task.yield()
+
+        let notes = await store.loadSessions().filter { note in
+            let title = (note.customTitle ?? "").lowercased()
+            guard title.contains("diana") || title.contains("finn") else { return false }
+            let hasTranscript = !note.fullTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            guard hasTranscript else { return false }
+            if rewrite {
+                // Full rewrite dogfood targets Diana (Finn already has a long digest).
+                return title.contains("diana")
+            }
+            // Resume incomplete map passes, or notes with no usable digest yet.
+            if note.hasResumableDigest { return true }
+            let hasDigest = (!note.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !note.digestSections.isEmpty)
+                && !note.summaryPending
+            return !hasDigest
+        }
+        // Prefer newest per title.
+        var best: [String: AmbientSessionRecord] = [:]
+        for note in notes {
+            let key = (note.customTitle ?? note.id).lowercased()
+            if let existing = best[key], existing.startedAt > note.startedAt { continue }
+            best[key] = note
+        }
+        let targets = Array(best.values).sorted { $0.startedAt > $1.startedAt }
+        guard !targets.isEmpty else {
+            statusMessage = "No pending digests — Finn/Diana already summarized."
+            live.stage = "Done"
+            return 0
+        }
+
+        let fallbackDigest = digestModelOverride ?? selection.digestModelID
+        var completed = 0
+        for note in targets {
+            let digestID = digestModelOverride ?? note.digestModelID ?? fallbackDigest
+            guard let digestID, !digestID.isEmpty else {
+                lastError = "No summarizing model on \(note.customTitle ?? note.id) — pick one in Models."
+                live.stage = "Failed"
+                statusMessage = lastError ?? ""
+                continue
+            }
+            live = AmbientOfflineLiveProgress(
+                fixtureName: note.customTitle ?? note.id,
+                stage: "Summarizing",
+                totalAudioMs: note.segments.last.map { ($0.startOffsetMs ?? 0) + $0.durationMs } ?? 0,
+                processedAudioMs: 0,
+                wallStartedAt: Date()
+            )
+            statusMessage = "Loading \(digestID) for \(note.customTitle ?? note.id)… keep app foreground"
+            live.stage = "Loading model"
+            // Let SwiftUI paint the overlay before Metal/llama blocks MainActor.
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            let capNote = maxSourceChars.map { " (first \($0) chars)" } ?? ""
+            statusMessage = "Summarizing \(note.customTitle ?? note.id) with \(digestID)\(capNote)… keep app foreground"
+            live.stage = "Summarizing"
+            await AmbientSessionManager.shared.generateSummary(
+                for: note.id,
+                modelID: digestID,
+                rewrite: rewrite,
+                quietUI: true,
+                maxSourceChars: maxSourceChars
+            )
+            if let fresh = await store.loadSession(id: note.id),
+               !fresh.summaryPending,
+               (!fresh.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                || !fresh.digestSections.isEmpty) {
+                completed += 1
+                live.stage = "Done"
+                live.processedAudioMs = live.totalAudioMs
+            } else if let fresh = await store.loadSession(id: note.id), fresh.hasResumableDigest {
+                live.stage = "Paused"
+                lastError = AmbientSessionManager.shared.lastError
+                    ?? "Paused \(note.customTitle ?? note.id) at chunk \(fresh.digestMapChunksCompleted) — relaunch to resume."
+                statusMessage = lastError ?? ""
+            } else {
+                live.stage = "Failed"
+                lastError = AmbientSessionManager.shared.lastError
+                    ?? "Digest failed for \(note.customTitle ?? note.id)"
+            }
+        }
+        statusMessage = completed == targets.count
+            ? "Pending digests finished (\(completed))."
+            : "Pending digests: \(completed)/\(targets.count) succeeded."
+        return completed
     }
 
     // MARK: - Offline ASR
@@ -352,18 +572,23 @@ final class AmbientOfflineImportRunner: ObservableObject {
             }
 
             record.upsert(segment)
+            // Never force-publish every span — that queued hundreds of MainActor
+            // SwiftUI updates and tripped the scene-update watchdog (0x8BADF00D)
+            // once Sortformer / Qwen3-4B also saturated the device.
+            let isLast = index == spans.count - 1
             publishLive(
                 processedMs: endMs,
                 segments: record.segments.count,
                 transcribed: record.transcribedSegments.count,
                 line: text.isEmpty ? nil : text,
-                force: true
+                force: isLast || index % 8 == 0
             )
 
             eventsSinceSave += 1
-            if eventsSinceSave >= 4 {
+            if eventsSinceSave >= 8 {
                 await store.save(record)
                 eventsSinceSave = 0
+                await Task.yield()
             }
         }
 
@@ -622,7 +847,21 @@ final class AmbientOfflineImportRunner: ObservableObject {
             sectionCount: metrics.sectionCount,
             bulletCount: metrics.bulletCount,
             speakerCount: metrics.speakerCount,
-            fixtureName: metrics.fixtureName
+            fixtureName: metrics.fixtureName,
+            vadMode: "offline-energy",
+            warmKeep: "none",
+            streamDiarEnabled: false,
+            streamDiarUsed: false,
+            availableMemoryAtStartBytes: DeviceInfoService.shared.deviceInfo?.availableMemory ?? 0,
+            memoryAtStartBytes: 0,
+            memoryPeakCaptureBytes: metrics.peakMemoryBytes,
+            memoryAfterASRUnloadBytes: metrics.memoryAfterASR,
+            memoryAfterDiarizationBytes: metrics.memoryAfterDiarization,
+            memoryAfterDigestBytes: metrics.memoryAfterDigest,
+            batteryLevelStart: -1,
+            batteryLevelEnd: -1,
+            thermalStateStart: metrics.thermalState,
+            thermalStateEnd: metrics.thermalState
         )
         await store.append(sample)
     }
@@ -647,7 +886,7 @@ final class AmbientOfflineImportRunner: ObservableObject {
         force: Bool = false
     ) {
         let now = Date()
-        if !force, line == nil, now.timeIntervalSince(lastUIPublish) < 0.2 {
+        if !force, now.timeIntervalSince(lastUIPublish) < 0.5 {
             live.processedAudioMs = max(live.processedAudioMs, processedMs)
             return
         }
@@ -659,7 +898,7 @@ final class AmbientOfflineImportRunner: ObservableObject {
             live.latestTranscript = line
             var lines = live.recentLines
             lines.append(line)
-            if lines.count > 6 { lines = Array(lines.suffix(6)) }
+            if lines.count > 3 { lines = Array(lines.suffix(3)) }
             live.recentLines = lines
         }
         let pct = Int(live.progress * 100)

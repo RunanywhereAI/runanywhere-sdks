@@ -11,7 +11,7 @@
 #   scripts/notes-longform-dogfood.sh prepare
 #   scripts/notes-longform-dogfood.sh install <device-udid>
 #   scripts/notes-longform-dogfood.sh push <device-udid>
-#   scripts/notes-longform-dogfood.sh run <device-udid> [--asr-only|--no-speakers|--no-summarize]
+#   scripts/notes-longform-dogfood.sh run <device-udid> [--asr-only|--no-speakers|--no-summarize|--digest-pending|--digest-full|--remerge]
 #   scripts/notes-longform-dogfood.sh pull <device-udid>
 #   scripts/notes-longform-dogfood.sh all <device-udid>   # prepare+install+push+run+pull
 #
@@ -19,6 +19,13 @@
 #   FINN_M4A / DIANA_M4A   override source paths
 #   AMBIENT_BUNDLE_ID      default com.runanywhere.RunAnywhere
 #   DOGFOOD_WAIT_MINUTES   how long to wait before pull (default 90)
+#   DIGEST_MODEL           digester id (default qwen3-4b-q4_k_m).
+#                          Best notes pick: qwen3-4b-instruct-2507-q4_k_m
+#                          Fast experiment: lfm2.5-1.2b-instruct-q4_k_m
+#                          Quality alts:    phi-4-mini-instruct-q4_k_m
+#                                           llama-3.2-3b-instruct-q4_k_m
+#                                           gemma-4-e4b-it-q4_k_m
+#                          Dense 8B-class:  bonsai-8b-q1_0
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +36,7 @@ FIXTURES_HOST="${APP_ROOT}/.ambient-fixtures"
 FINN_M4A="${FINN_M4A:-/Users/shubhammalhotra/Downloads/Finn barr YC arrogance.m4a}"
 DIANA_M4A="${DIANA_M4A:-/Users/shubhammalhotra/Downloads/Diana YC.m4a}"
 WAIT_MINUTES="${DOGFOOD_WAIT_MINUTES:-90}"
+DIGEST_MODEL="${DIGEST_MODEL:-qwen3-4b-q4_k_m}"
 
 log() { printf '\n==> %s\n' "$*"; }
 
@@ -121,23 +129,41 @@ cmd_push() {
 }
 
 cmd_run() {
-    local udid="${1:?usage: run <device-udid> [--asr-only|--no-speakers|--no-summarize]}"
+    local udid="${1:?usage: run <device-udid> [--asr-only|--no-speakers|--no-summarize|--digest-pending|--digest-full|--remerge]}"
     shift || true
     local speakers=1
     local summarize=1
+    local digest_pending=0
+    local digest_full=0
+    local remerge=0
     while [ $# -gt 0 ]; do
         case "$1" in
             --asr-only) speakers=0; summarize=0 ;;
             --no-speakers) speakers=0 ;;
             --no-summarize) summarize=0 ;;
+            --digest-pending) digest_pending=1 ;;
+            --digest-full) digest_full=1; digest_pending=1 ;;
+            --remerge) remerge=1; digest_pending=1 ;;
             *) echo "unknown flag: $1" >&2; exit 1 ;;
         esac
         shift
     done
 
     require_command xcrun
-    local url="runanywhere://notesDogfood?speakers=${speakers}&summarize=${summarize}"
+    local url
+    if [ "${remerge}" -eq 1 ]; then
+        # Reduce-only over saved map chunks (fixes thin merges without a 30‑min map).
+        url="runanywhere://notesDogfood?mode=remerge&summarize=1&digestModel=${DIGEST_MODEL}"
+    elif [ "${digest_full}" -eq 1 ]; then
+        # Full-transcript resumable digester (llama.cpp). Keep phone unlocked.
+        url="runanywhere://notesDogfood?mode=digestFull&summarize=1&digestModel=${DIGEST_MODEL}&rewrite=1"
+    elif [ "${digest_pending}" -eq 1 ]; then
+        url="runanywhere://notesDogfood?mode=digestPending&summarize=1&digestModel=${DIGEST_MODEL}"
+    else
+        url="runanywhere://notesDogfood?speakers=${speakers}&summarize=${summarize}"
+    fi
     log "Launching dogfood via ${url}"
+    log "DIGEST_MODEL=${DIGEST_MODEL}"
     # Flags must come before the bundle id; --payload-url after it is treated as an app arg.
     xcrun devicectl device process launch \
         --device "${udid}" \
@@ -148,8 +174,11 @@ cmd_run() {
 
     cat <<NOTE
 
-Dogfood launched. On device, ensure VAD + ASR (+ optional Sortformer / digest)
-are downloaded under Notes → Models before / while the run starts.
+Dogfood launched. Keep the app in the foreground (screen unlocked) until
+Summarizing finishes — backgrounding during 4B digest triggers 0x8BADF00D.
+
+On device, ensure VAD + ASR (+ optional Sortformer / digest) are downloaded
+under Notes → Models before / while the run starts.
 
 Waiting up to ${WAIT_MINUTES} minutes before suggesting pull…
 NOTE

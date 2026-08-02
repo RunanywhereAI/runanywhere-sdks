@@ -26,9 +26,9 @@ struct AmbientBenchmarkSheet: View {
                         Text("No ambient runs recorded yet.")
                             .font(AppTypography.subheadlineMedium)
                         Text(
-                            "Every session you stop writes one sample here: real-time factor, "
-                            + "latency, memory, battery drain per hour, thermals, and "
-                            + "useful-memory rate."
+                            "Every session you stop writes one sample: VAD mode, warm-keep, "
+                            + "stream-diar flags, RTF, RAM checkpoints, battery start/end, "
+                            + "thermals, and post-pass Label/Summarize load times."
                         )
                             .font(AppTypography.caption)
                             .foregroundColor(AppColors.textSecondary)
@@ -130,25 +130,56 @@ struct AmbientBenchmarkRow: View {
                 sample.peakMemoryBytes.formattedFileSize
             )
         }
+        var battery = ""
+        if sample.batteryLevelStart >= 0, sample.batteryLevelEnd >= 0 {
+            battery = String(
+                format: " · bat %.0f→%.0f%% (%.1f%%/h)",
+                sample.batteryLevelStart * 100,
+                sample.batteryLevelEnd * 100,
+                sample.batteryDeltaPerHour
+            )
+        }
         return String(
-            format: "%@ · RTF %.2f · first transcript %.0f ms · peak %@",
+            format: "%@ · %@ · RTF %.2f · first %.0f ms · peak %@%@",
             AmbientMemoryView.duration(Int(sample.sessionSeconds)),
+            sample.vadMode,
             sample.medianRealTimeFactor,
             sample.firstTranscriptLatencyMs,
-            sample.peakMemoryBytes.formattedFileSize
+            sample.peakMemoryBytes.formattedFileSize,
+            battery
         )
     }
 
     private var environmentLine: String {
         var parts = ["\(sample.segmentCount) segments", "\(sample.actionItemCount) action items"]
+        parts.append("warm \(sample.warmKeep)")
+        if sample.streamDiarEnabled {
+            parts.append(sample.streamDiarUsed ? "stream-diar on" : "stream-diar skipped")
+        }
+        if sample.warmKeepDiarizationHit { parts.append("diar warm-hit") }
+        if sample.warmKeepDigestHit { parts.append("digest warm-hit") }
+        if sample.diarizationLoadMs > 0 { parts.append("diar-load \(sample.diarizationLoadMs)ms") }
+        if sample.digestLoadMs > 0 { parts.append("digest-load \(sample.digestLoadMs)ms") }
+        if sample.memoryAfterASRUnloadBytes > 0 {
+            parts.append("after-asr \(sample.memoryAfterASRUnloadBytes.formattedFileSize)")
+        }
         if sample.runKind == "file" {
             if let fixture = sample.fixtureName, !fixture.isEmpty { parts.insert(fixture, at: 0) }
             if sample.sectionCount > 0 { parts.append("\(sample.sectionCount) sections") }
             if sample.speakerCount > 0 { parts.append("\(sample.speakerCount) speakers") }
         }
-        if sample.droppedSegmentCount > 0 { parts.append("\(sample.droppedSegmentCount) dropped") }
+        if sample.backpressureEventCount > 0 {
+            parts.append("\(sample.backpressureEventCount) backpressure")
+        } else if sample.droppedSegmentCount > 0 {
+            parts.append("\(sample.droppedSegmentCount) dropped")
+        }
         if sample.interruptionCount > 0 { parts.append("\(sample.interruptionCount) interruptions") }
-        parts.append("thermals \(sample.thermalState)")
+        let thermal = sample.thermalStateEnd.isEmpty ? sample.thermalState : sample.thermalStateEnd
+        if sample.thermalStateStart != thermal, !sample.thermalStateStart.isEmpty {
+            parts.append("thermals \(sample.thermalStateStart)→\(thermal)")
+        } else {
+            parts.append("thermals \(thermal)")
+        }
         if !sample.environment.isEmpty { parts.append(sample.environment) }
         if !sample.placement.isEmpty { parts.append(sample.placement) }
         return parts.joined(separator: " · ")
@@ -209,6 +240,12 @@ final class AmbientBenchmarkViewModel: ObservableObject {
             "peakMemoryBytes", "batteryPerHour", "thermalState", "interruptions", "retainedAudioBytes",
             "runKind", "convertMs", "asrMs", "diarizationMs", "digestMs",
             "sectionCount", "bulletCount", "speakerCount", "fixtureName",
+            "vadMode", "warmKeep", "streamDiarEnabled", "streamDiarUsed",
+            "availableMemoryAtStartBytes", "memoryAtStartBytes", "memoryPeakCaptureBytes",
+            "memoryAfterASRUnloadBytes", "memoryAfterDiarizationBytes", "memoryAfterDigestBytes",
+            "batteryLevelStart", "batteryLevelEnd", "thermalStateStart", "thermalStateEnd",
+            "warmKeepDiarizationHit", "warmKeepDigestHit",
+            "diarizationLoadMs", "digestLoadMs", "backpressureEventCount",
         ].joined(separator: ",")
 
         let rows = samples.map { Self.csvRow(for: $0) }
@@ -252,6 +289,25 @@ final class AmbientBenchmarkViewModel: ObservableObject {
             String(sample.bulletCount),
             String(sample.speakerCount),
             sample.fixtureName ?? "",
+            sample.vadMode,
+            sample.warmKeep,
+            sample.streamDiarEnabled ? "1" : "0",
+            sample.streamDiarUsed ? "1" : "0",
+            String(sample.availableMemoryAtStartBytes),
+            String(sample.memoryAtStartBytes),
+            String(sample.memoryPeakCaptureBytes),
+            String(sample.memoryAfterASRUnloadBytes),
+            String(sample.memoryAfterDiarizationBytes),
+            String(sample.memoryAfterDigestBytes),
+            String(format: "%.3f", sample.batteryLevelStart),
+            String(format: "%.3f", sample.batteryLevelEnd),
+            sample.thermalStateStart,
+            sample.thermalStateEnd,
+            sample.warmKeepDiarizationHit ? "1" : "0",
+            sample.warmKeepDigestHit ? "1" : "0",
+            String(sample.diarizationLoadMs),
+            String(sample.digestLoadMs),
+            String(sample.backpressureEventCount),
         ]
         return cells.map(escapeCSV).joined(separator: ",")
     }

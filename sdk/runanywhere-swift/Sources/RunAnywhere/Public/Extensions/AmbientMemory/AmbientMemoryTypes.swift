@@ -38,6 +38,17 @@ public enum RAAmbientState: String, Sendable, CaseIterable {
 
 // MARK: - Configuration
 
+/// How the ambient pipeline decides speech vs silence on each frame.
+public enum RAAmbientVADMode: String, Sendable, CaseIterable {
+    /// Run the configured neural VAD (Silero) on every frame. Highest quality.
+    case silero
+    /// RMS energy only — skips Silero entirely. Cheapest for long live sessions.
+    case economy
+    /// Energy gates Silero: neural VAD runs at most every `hybridSileroHopFrames`
+    /// while energy is hot or a segment is open.
+    case hybrid
+}
+
 /// Tuning for one ambient-memory session.
 ///
 /// Durations are milliseconds of audio, not wall clock, so they stay stable
@@ -45,6 +56,7 @@ public enum RAAmbientState: String, Sendable, CaseIterable {
 /// tests, or a backlogged host).
 public struct RAAmbientConfiguration: Sendable {
     /// VAD model id loaded into `.voiceActivityDetection` before listening.
+    /// Unused when `vadMode == .economy`.
     public var vadModelID: String
     /// STT model id loaded into `.speechRecognition` before listening.
     public var sttModelID: String
@@ -71,6 +83,12 @@ public struct RAAmbientConfiguration: Sendable {
     /// Finalized segments allowed to queue for transcription before the
     /// pipeline sheds load and reports a backpressure gate.
     public var maxQueuedSegments: Int
+    /// Speech detector strategy. Defaults to full Silero; economy/hybrid cut
+    /// per-frame neural VAD cost on long live captures.
+    public var vadMode: RAAmbientVADMode
+    /// When `vadMode == .hybrid`, call Silero at most once per this many
+    /// candidate frames (energy-hot or segment-open).
+    public var hybridSileroHopFrames: Int
     /// Transcription options forwarded to `RunAnywhere.transcribe`.
     public var sttOptions: RASTTOptions
     /// Detector overrides forwarded to `RunAnywhere.detectVoiceActivity`.
@@ -88,6 +106,8 @@ public struct RAAmbientConfiguration: Sendable {
         maxSegmentMs: Int = 25_000,
         retainSegmentAudio: Bool = false,
         maxQueuedSegments: Int = 4,
+        vadMode: RAAmbientVADMode = .silero,
+        hybridSileroHopFrames: Int = 4,
         sttOptions: RASTTOptions = .defaults(),
         vadOptions: RAVADOptions? = nil
     ) {
@@ -102,6 +122,8 @@ public struct RAAmbientConfiguration: Sendable {
         self.maxSegmentMs = maxSegmentMs
         self.retainSegmentAudio = retainSegmentAudio
         self.maxQueuedSegments = maxQueuedSegments
+        self.vadMode = vadMode
+        self.hybridSileroHopFrames = max(1, hybridSileroHopFrames)
         self.sttOptions = sttOptions
         self.vadOptions = vadOptions
     }
@@ -119,6 +141,11 @@ public struct RAAmbientConfiguration: Sendable {
     /// 32 ms frames at 16 kHz; the value scales with `sampleRate`.
     public var vadFrameSampleCount: Int {
         max(160, sampleRate * 32 / 1000)
+    }
+
+    /// Whether prepare must load a neural VAD model.
+    public var requiresNeuralVAD: Bool {
+        vadMode != .economy
     }
 }
 
@@ -293,12 +320,15 @@ public enum RAAmbientEvent: Sendable {
 
 /// Which pass of the map-reduce summarization a digest call is performing.
 ///
-/// A whole note rarely fits in a small local model's context, so transcripts
-/// are digested in chunks while capture runs (`chunk`) and those partial
-/// summaries are folded into one final answer at the end (`merge`).
+/// On-device models (e.g. Qwen3 4B) cannot reliably take a full 30‑minute
+/// transcript in one shot: context is too small, and long generations also
+/// trip iOS scene-watchdog kills. So we map in `chunk`s, fold with `merge`,
+/// then `polish` into a short Notion-style note (the “single LLM” feel).
 public enum RAAmbientDigestMode: String, Sendable, CaseIterable {
     case chunk
     case merge
+    /// Final rewrite: 4–6 thematic sections + action items from a draft note.
+    case polish
 }
 
 /// One bullet inside a structured note section.

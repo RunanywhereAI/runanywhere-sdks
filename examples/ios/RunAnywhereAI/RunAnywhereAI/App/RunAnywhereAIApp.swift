@@ -75,6 +75,9 @@ struct RunAnywhereAIApp: App {
                                     }
                             }
                         }
+                        .fullScreenCover(isPresented: $ambientRouter.isDigestPendingCoverPresented) {
+                            AmbientDigestPendingCover()
+                        }
                         #endif
                         .onAppear {
                             logger.info("__RUNANYWHERE_AI_READY__")

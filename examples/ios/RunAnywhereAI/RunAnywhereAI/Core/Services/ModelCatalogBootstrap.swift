@@ -137,6 +137,23 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 2_800_000_000,
             supportsThinking: true
         )
+        // MeetMemo 2026 on-device meeting-summary winner (non-thinking Instruct).
+        // Prefer this over base Qwen3-4B for Notes digester experiments.
+        await registerLLM(
+            id: "qwen3-4b-instruct-2507-q4_k_m",
+            name: "Qwen3 4B Instruct 2507 Q4_K_M (Notes digester)",
+            url: "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 2_500_000_000
+        )
+        // Strong small generalist; optional digester A/B vs Qwen Instruct.
+        await registerLLM(
+            id: "phi-4-mini-instruct-q4_k_m",
+            name: "Phi-4 Mini Instruct Q4_K_M",
+            url: "https://huggingface.co/bartowski/microsoft_Phi-4-mini-instruct-GGUF/resolve/main/microsoft_Phi-4-mini-instruct-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 2_500_000_000
+        )
         // Exact P0 NVIDIA checkpoint. The pinned llama.cpp fork has native
         // `nemotron` support; this exact Q4_K_M artifact was load/inference
         // checked through rcli on macOS before being exposed in the catalog.

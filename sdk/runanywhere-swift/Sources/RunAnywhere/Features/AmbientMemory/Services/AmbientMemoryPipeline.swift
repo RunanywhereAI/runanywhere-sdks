@@ -77,6 +77,11 @@ actor AmbientMemoryPipeline {
     private var drainTask: Task<Void, Never>?
     private var isBackpressureActive = false
 
+    /// Rolling frame energies for adaptive economy/hybrid thresholds.
+    private var recentEnergies: [Float] = []
+    private var hybridFrameCounter = 0
+    private var lastNeuralResult: RAVADResult?
+
     // MARK: - Init
 
     init(
@@ -112,18 +117,22 @@ actor AmbientMemoryPipeline {
     func prepare() async throws {
         transition(to: .preparing)
 
-        try await loadModel(
-            id: configuration.vadModelID,
-            category: .voiceActivityDetection,
-            label: "VAD"
-        )
+        if configuration.requiresNeuralVAD {
+            try await loadModel(
+                id: configuration.vadModelID,
+                category: .voiceActivityDetection,
+                label: "VAD"
+            )
+            try? await RunAnywhere.resetVAD()
+        } else {
+            logger.info("Ambient economy VAD — skipping neural VAD load")
+        }
         try await loadModel(
             id: configuration.sttModelID,
             category: .speechRecognition,
             label: "STT"
         )
 
-        try? await RunAnywhere.resetVAD()
         transition(to: .listening)
     }
 
@@ -207,20 +216,52 @@ actor AmbientMemoryPipeline {
         // Count every non-paused frame so offsets stay aligned with the host WAV.
         ingestedSampleCount += frame.count
 
-        let float32 = Self.float32Data(from: frame)
+        let energy = Self.frameRMS(frame)
+        rememberEnergy(energy)
+        let energyResult = energySpeechResult(energy: energy)
+
         let result: RAVADResult
-        do {
-            result = try await RunAnywhere.detectVoiceActivity(
-                float32,
-                options: configuration.vadOptions
-            )
-        } catch {
-            continuation.yield(.failure(RAAmbientFailure(
-                stage: .vad,
-                message: "Voice activity detection failed: \(error.localizedDescription)",
-                isFatal: false
-            )))
-            return
+        switch configuration.vadMode {
+        case .economy:
+            result = energyResult
+
+        case .silero:
+            do {
+                result = try await runNeuralVAD(frame: frame)
+            } catch {
+                continuation.yield(.failure(RAAmbientFailure(
+                    stage: .vad,
+                    message: "Voice activity detection failed: \(error.localizedDescription)",
+                    isFatal: false
+                )))
+                return
+            }
+
+        case .hybrid:
+            // Energy silence while idle skips Silero entirely. When energy is
+            // hot or a segment is open, Silero runs on a hop schedule.
+            let needsNeural = energyResult.isSpeech || openSegment != nil
+            if needsNeural {
+                hybridFrameCounter += 1
+                let hop = configuration.hybridSileroHopFrames
+                if hybridFrameCounter >= hop || lastNeuralResult == nil {
+                    hybridFrameCounter = 0
+                    do {
+                        let neural = try await runNeuralVAD(frame: frame)
+                        lastNeuralResult = neural
+                        result = neural
+                    } catch {
+                        // Fall back to energy rather than dropping the frame.
+                        result = energyResult
+                    }
+                } else {
+                    result = lastNeuralResult ?? energyResult
+                }
+            } else {
+                hybridFrameCounter = 0
+                lastNeuralResult = nil
+                result = energyResult
+            }
         }
 
         guard result.errorMessage.isEmpty else {
@@ -237,6 +278,34 @@ actor AmbientMemoryPipeline {
         } else {
             advanceWhileSpeaking(frame: frame, result: result)
         }
+    }
+
+    private func runNeuralVAD(frame: [Int16]) async throws -> RAVADResult {
+        let float32 = Self.float32Data(from: frame)
+        return try await RunAnywhere.detectVoiceActivity(
+            float32,
+            options: configuration.vadOptions
+        )
+    }
+
+    private func rememberEnergy(_ energy: Float) {
+        recentEnergies.append(energy)
+        if recentEnergies.count > 200 {
+            recentEnergies.removeFirst(recentEnergies.count - 200)
+        }
+    }
+
+    /// Offline-style adaptive RMS threshold mapped onto a single live frame.
+    private func energySpeechResult(energy: Float) -> RAVADResult {
+        let sorted = recentEnergies.sorted()
+        let noiseIdx = min(sorted.count - 1, max(0, sorted.count / 10))
+        let noise = sorted.isEmpty ? 0 : sorted[noiseIdx]
+        let threshold = max(350, noise * 3.5)
+        let isSpeech = energy >= threshold
+        var result = RAVADResult()
+        result.isSpeech = isSpeech
+        result.confidence = min(1, energy / 8_000)
+        return result
     }
 
     /// No segment open: keep a rolling pre-roll window and wait for enough
@@ -516,5 +585,15 @@ actor AmbientMemoryPipeline {
     private static func float32Data(from samples: [Int16]) -> Data {
         let floats = samples.map { Float($0) / 32_768.0 }
         return floats.withUnsafeBufferPointer { Data(buffer: $0) }
+    }
+
+    private static func frameRMS(_ samples: [Int16]) -> Float {
+        guard !samples.isEmpty else { return 0 }
+        var acc: Float = 0
+        for sample in samples {
+            let v = Float(sample)
+            acc += v * v
+        }
+        return sqrt(acc / Float(samples.count))
     }
 }

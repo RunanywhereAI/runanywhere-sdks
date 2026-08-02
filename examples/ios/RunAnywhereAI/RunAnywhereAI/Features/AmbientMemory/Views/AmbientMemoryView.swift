@@ -13,39 +13,33 @@ import SwiftUI
 
 struct AmbientMemoryView: View {
     @StateObject private var viewModel = AmbientMemoryViewModel()
-    @ObservedObject private var session = AmbientSessionManager.shared
-    /// Observed so Ready / Needs download labels refresh after Get in a sheet.
-    @ObservedObject private var modelList = ModelListViewModel.shared
+    /// Only observe the offline runner at this level. Session / model-list
+    /// observation lives in `AmbientMemoryInteractiveContent` so Metal digests
+    /// cannot invalidate a heavy SwiftUI tree (scene-update watchdog).
     @ObservedObject private var offlineRunner = AmbientOfflineImportRunner.shared
     @ObservedObject private var ambientRouter = AmbientRouter.shared
 
     @State private var showDeveloper = false
     @State private var showPurgeConfirmation = false
-    @State private var showConsent = false
-    @State private var showVADPicker = false
-    @State private var showASRPicker = false
+    @State private var pendingAutoStart = false
 
     /// Set by the App Shortcut / Action Button deep link so recording starts as
     /// soon as the screen is up and consent is already in place.
     var autoStartRequested: Bool = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
-                modelsSection
-                recordControl
-                if isCapturing { liveRow }
-                if offlineRunner.isRunning || !offlineRunner.live.recentLines.isEmpty || !offlineRunner.statusMessage.isEmpty {
-                    offlineLiveCard
-                }
-                if let warning = warningMessage { warningLine(warning) }
-                if let error = session.lastError ?? viewModel.errorMessage ?? offlineRunner.lastError {
-                    errorBanner(error)
-                }
-                searchField
-                notesList
+        Group {
+            if offlineRunner.isRunning {
+                AmbientOfflineDogfoodOverlay(runner: offlineRunner)
+            } else {
+                AmbientMemoryInteractiveContent(
+                    viewModel: viewModel,
+                    offlineRunner: offlineRunner,
+                    showDeveloper: $showDeveloper,
+                    showPurgeConfirmation: $showPurgeConfirmation,
+                    pendingAutoStart: $pendingAutoStart
+                )
             }
-            .padding(AppSpacing.mediumLarge)
         }
         .navigationTitle("Notes")
         .navigationBarTitleDisplayModeCompat(.inline)
@@ -58,10 +52,218 @@ struct AmbientMemoryView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .disabled(offlineRunner.isRunning)
             }
         }
         .adaptiveSheet(isPresented: $showDeveloper) {
             AmbientDeveloperView(viewModel: viewModel)
+        }
+        .confirmationDialog(
+            "Delete every note?",
+            isPresented: $showPurgeConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete all notes and recordings", role: .destructive) {
+                Task { await viewModel.purgeEverything() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes every transcript, summary, action item, recording, and benchmark sample.")
+        }
+        .task {
+            // Dogfood must not wait on registry/library refresh — that was
+            // leaving the Notes sheet idle with no status while onAppear hung.
+            if let dogfood = ambientRouter.consumeDogfood() {
+                Task { await viewModel.onAppear() }
+                await runDogfood(dogfood)
+                return
+            }
+            await viewModel.onAppear()
+            if autoStartRequested {
+                pendingAutoStart = true
+            }
+        }
+        .onChange(of: ambientRouter.pendingDogfood) { _, request in
+            guard request != nil, let dogfood = ambientRouter.consumeDogfood() else { return }
+            Task { await runDogfood(dogfood) }
+        }
+    }
+
+    private func runDogfood(_ request: AmbientDogfoodRequest) async {
+        if request.remergeOnly {
+            _ = await offlineRunner.remergeMappedNotes(
+                selection: viewModel.selection,
+                digestModelOverride: request.digestModelID
+            )
+            await viewModel.refreshLibrary()
+            return
+        }
+        if request.digestPendingOnly {
+            _ = await offlineRunner.digestPendingNotes(
+                selection: viewModel.selection,
+                digestModelOverride: request.digestModelID,
+                maxSourceChars: request.digestMaxChars,
+                rewrite: request.rewriteDigest
+            )
+            await viewModel.refreshLibrary()
+            return
+        }
+        guard viewModel.isCaptureStackReady else {
+            viewModel.errorMessage = "Pick and download VAD + ASR before dogfood."
+            return
+        }
+        _ = await offlineRunner.runAllFixtures(
+            selection: viewModel.selection,
+            labelSpeakers: request.labelSpeakers,
+            summarize: request.summarize && !(viewModel.selection.digestModelID ?? "").isEmpty,
+            context: viewModel.context
+        )
+        await viewModel.refreshLibrary()
+    }
+
+    static func duration(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let secs = seconds % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
+        }
+        return String(format: "%d:%02d", minutes, secs)
+    }
+}
+
+/// Full-screen digester recovery — no Notes list, search field, or nav stack.
+struct AmbientDigestPendingCover: View {
+    @ObservedObject private var router = AmbientRouter.shared
+    @ObservedObject private var runner = AmbientOfflineImportRunner.shared
+    @StateObject private var viewModel = AmbientMemoryViewModel()
+
+    var body: some View {
+        ZStack {
+            AppColors.backgroundPrimary.ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Digest recovery")
+                    .font(AppTypography.title3)
+                AmbientOfflineDogfoodOverlay(runner: runner)
+                if let err = runner.lastError ?? viewModel.errorMessage {
+                    Text(err)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.statusRed)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if !runner.isRunning {
+                    Button("Close") {
+                        router.isDigestPendingCoverPresented = false
+                    }
+                    .buttonStyle(.bordered)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(AppSpacing.mediumLarge)
+        }
+        .interactiveDismissDisabled(runner.isRunning)
+        .task {
+            guard let request = router.consumeDogfood() else { return }
+            // Do not await registry refresh — that blocked digests earlier.
+            Task { await viewModel.onAppear() }
+            if request.remergeOnly {
+                _ = await runner.remergeMappedNotes(
+                    selection: viewModel.selection,
+                    digestModelOverride: request.digestModelID
+                )
+            } else {
+                _ = await runner.digestPendingNotes(
+                    selection: viewModel.selection,
+                    digestModelOverride: request.digestModelID,
+                    maxSourceChars: request.digestMaxChars,
+                    rewrite: request.rewriteDigest
+                )
+            }
+            await viewModel.refreshLibrary()
+        }
+    }
+}
+
+/// Minimal overlay — observes only the offline runner so AttributeGraph stays quiet.
+struct AmbientOfflineDogfoodOverlay: View {
+    @ObservedObject var runner: AmbientOfflineImportRunner
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            offlineLiveCard
+            Text("Screen may freeze for a few minutes while the digester loads — that is expected. Do not lock the phone.")
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.statusOrange)
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Status updates only between chunks. A stuck spinner does not mean it failed.")
+                .font(AppTypography.caption2)
+                .foregroundColor(AppColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(AppSpacing.mediumLarge)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .transaction { $0.animation = nil }
+    }
+
+    private var offlineLiveCard: some View {
+        let live = runner.live
+        let status = runner.statusMessage.isEmpty ? live.stage : runner.statusMessage
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                ProgressView()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(live.fixtureName.isEmpty ? "Offline digest" : live.fixtureName)
+                        .font(AppTypography.subheadlineMedium)
+                    Text(status.isEmpty ? "Starting…" : status)
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.textSecondary)
+                        .lineLimit(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer()
+            }
+            ProgressView(value: max(0.02, live.progress))
+                .tint(AppColors.primaryBlue)
+        }
+        .padding(12)
+        .background(AppColors.backgroundSecondary)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+/// Full Notes chrome — mounted only when offline dogfood is not running.
+private struct AmbientMemoryInteractiveContent: View {
+    @ObservedObject var viewModel: AmbientMemoryViewModel
+    @ObservedObject var offlineRunner: AmbientOfflineImportRunner
+    @ObservedObject private var session = AmbientSessionManager.shared
+    @ObservedObject private var modelList = ModelListViewModel.shared
+
+    @Binding var showDeveloper: Bool
+    @Binding var showPurgeConfirmation: Bool
+    @Binding var pendingAutoStart: Bool
+
+    @State private var showConsent = false
+    @State private var showVADPicker = false
+    @State private var showASRPicker = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
+                modelsSection
+                recordControl
+                if isCapturing { liveRow }
+                if !offlineRunner.live.recentLines.isEmpty || !offlineRunner.statusMessage.isEmpty {
+                    offlineLiveCard
+                }
+                if let warning = warningMessage { warningLine(warning) }
+                if let error = session.lastError ?? viewModel.errorMessage ?? offlineRunner.lastError {
+                    errorBanner(error)
+                }
+                searchField
+                notesList
+            }
+            .padding(AppSpacing.mediumLarge)
         }
         .adaptiveSheet(isPresented: $showConsent) {
             AmbientConsentSheet {
@@ -80,34 +282,26 @@ struct AmbientMemoryView: View {
                 viewModel.select(asr: model)
             }
         }
-        .confirmationDialog(
-            "Delete every note?",
-            isPresented: $showPurgeConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Delete all notes and recordings", role: .destructive) {
-                Task { await viewModel.purgeEverything() }
+        .onChange(of: pendingAutoStart) { _, should in
+            guard should else { return }
+            pendingAutoStart = false
+            Task {
+                if !viewModel.hasRecordingConsent {
+                    showConsent = true
+                } else if viewModel.canStartSession, !session.isRecording {
+                    await viewModel.startSession()
+                }
             }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This removes every transcript, summary, action item, recording, and benchmark sample.")
         }
         .task {
-            await viewModel.onAppear()
-            if let dogfood = ambientRouter.consumeDogfood() {
-                await runDogfood(dogfood)
-                return
+            if pendingAutoStart {
+                pendingAutoStart = false
+                if !viewModel.hasRecordingConsent {
+                    showConsent = true
+                } else if viewModel.canStartSession, !session.isRecording {
+                    await viewModel.startSession()
+                }
             }
-            guard autoStartRequested else { return }
-            if !viewModel.hasRecordingConsent {
-                showConsent = true
-            } else if viewModel.canStartSession, !session.isRecording {
-                await viewModel.startSession()
-            }
-        }
-        .onChange(of: ambientRouter.pendingDogfood) { _, request in
-            guard request != nil, let dogfood = ambientRouter.consumeDogfood() else { return }
-            Task { await runDogfood(dogfood) }
         }
     }
 
@@ -149,45 +343,28 @@ struct AmbientMemoryView: View {
                     .foregroundColor(AppColors.textSecondary)
             }
 
-            if !live.recentLines.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(Array(live.recentLines.enumerated()), id: \.offset) { _, line in
-                        Text(line)
-                            .font(AppTypography.caption)
-                            .foregroundColor(AppColors.textPrimary)
-                            .lineLimit(2)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
-                .background(AppColors.backgroundPrimary.opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+            // Only show a short tail — animating large transcript stacks during
+            // ASR/digest contended with Metal and tripped iOS's 10s scene watchdog.
+            if live.stage == "Transcribing", let line = live.recentLines.last, !line.isEmpty {
+                Text(line)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textPrimary)
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(8)
+                    .background(AppColors.backgroundPrimary.opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
         .padding(12)
         .background(AppColors.backgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .animation(.easeOut(duration: 0.2), value: live.transcribedCount)
-        .animation(.linear(duration: 0.15), value: live.processedAudioMs)
+        .transaction { $0.animation = nil }
     }
 
     private static func clock(_ ms: Int) -> String {
         let totalSec = max(0, ms / 1000)
         return String(format: "%d:%02d", totalSec / 60, totalSec % 60)
-    }
-
-    private func runDogfood(_ request: AmbientDogfoodRequest) async {
-        guard viewModel.isCaptureStackReady else {
-            viewModel.errorMessage = "Pick and download VAD + ASR before dogfood."
-            return
-        }
-        _ = await offlineRunner.runAllFixtures(
-            selection: viewModel.selection,
-            labelSpeakers: request.labelSpeakers,
-            summarize: request.summarize && !(viewModel.selection.digestModelID ?? "").isEmpty,
-            context: viewModel.context
-        )
-        await viewModel.refreshLibrary()
     }
 
     private var isCapturing: Bool {
@@ -320,7 +497,7 @@ struct AmbientMemoryView: View {
                     .font(AppTypography.subheadlineMedium)
                     .foregroundColor(AppColors.statusRed)
                 Spacer()
-                Text(Self.duration(session.elapsedSeconds))
+                Text(AmbientMemoryView.duration(session.elapsedSeconds))
                     .font(AppTypography.caption.monospacedDigit())
                     .foregroundColor(AppColors.textSecondary)
                 Button(session.phase == .paused ? "Resume" : "Pause") {
@@ -423,15 +600,6 @@ struct AmbientMemoryView: View {
             )
     }
 
-    static func duration(_ seconds: Int) -> String {
-        let hours = seconds / 3600
-        let minutes = (seconds % 3600) / 60
-        let secs = seconds % 60
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, secs)
-        }
-        return String(format: "%d:%02d", minutes, secs)
-    }
 }
 
 // MARK: - Consent

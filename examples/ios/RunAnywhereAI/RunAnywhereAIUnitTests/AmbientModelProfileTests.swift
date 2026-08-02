@@ -26,14 +26,49 @@ final class AmbientModelProfileTests: XCTestCase {
                 "silero-vad",
                 "sherpa-onnx-whisper-tiny.en",
                 "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
+                "lfm2-350m-q4_k_m",
                 "qwen3-1.7b-q4_k_m",
             ])
         )
 
         XCTAssertEqual(selection.asrModelID, "sherpa-nemo-parakeet-tdt-0.6b-v3-int8")
-        XCTAssertEqual(selection.digestModelID, "qwen3-1.7b-q4_k_m")
+        XCTAssertNil(selection.digestModelID, "Digester must stay unset until the user picks one")
         XCTAssertTrue(selection.canStartCapture)
-        XCTAssertTrue(selection.isDigestBackgroundSafe)
+        XCTAssertFalse(selection.supportsDigest)
+    }
+
+    func testSuggestedDigestIsNotAppliedToSelection() {
+        let models = Self.models([
+            "silero-vad",
+            "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
+            "lfm2-350m-q4_k_m",
+        ])
+        XCTAssertEqual(
+            resolver.suggestedDigestID(for: .quality, available: models),
+            "lfm2-350m-q4_k_m"
+        )
+        XCTAssertNil(resolver.resolve(profile: .quality, available: models).digestModelID)
+        XCTAssertEqual(
+            AmbientModelProfile.highEnd.digestCandidateIDs.first,
+            "qwen3-4b-q4_k_m"
+        )
+    }
+
+    func testStreamingDiarizationRequiresHeadroomAndHighEnd() {
+        var settings = AmbientCapturePerformanceSettings()
+        settings.streamDiarDuringCapture = true
+        XCTAssertFalse(settings.canStreamDiarization(
+            availableMemoryBytes: 500_000_000,
+            tier: .highEnd
+        ))
+        XCTAssertFalse(settings.canStreamDiarization(
+            availableMemoryBytes: 3_000_000_000,
+            tier: .midRange
+        ))
+        XCTAssertTrue(settings.canStreamDiarization(
+            availableMemoryBytes: 3_000_000_000,
+            tier: .highEnd
+        ))
     }
 
     func testResolveFallsBackWhenThePreferredASRIsMissing() {
@@ -77,18 +112,17 @@ final class AmbientModelProfileTests: XCTestCase {
         XCTAssertTrue(selection.canStartCapture)
     }
 
-    /// Summarizing is not always-on, so a GPU model is allowed — it is just
-    /// flagged so its work gets deferred to the foreground.
-    func testAGPUDigestModelIsAllowedButFlaggedForDeferral() {
+    /// Digester is opt-in; resolving a profile must not force a GPU (or any)
+    /// summarizer into the selection.
+    func testResolveNeverAutoSelectsADigestModel() {
         let selection = resolver.resolve(
             profile: .compatibility,
             available: Self.models(["silero-vad", "sherpa-onnx-whisper-tiny.en"])
                 + Self.models(["qwen3-0.6b-q4_k_m", "mlx-qwen3-0.6b-4bit"], framework: .mlx)
         )
 
-        XCTAssertEqual(selection.digestModelID, "qwen3-0.6b-q4_k_m")
-        XCTAssertFalse(selection.isDigestBackgroundSafe)
-        XCTAssertTrue(selection.canStartCapture, "A GPU summarizer must not block recording")
+        XCTAssertNil(selection.digestModelID)
+        XCTAssertTrue(selection.canStartCapture, "Missing digester must not block recording")
     }
 
     func testIsBackgroundSafeIsFalseForMetalBackendsAndTrueForSherpa() {
@@ -173,6 +207,7 @@ final class AmbientModelProfileTests: XCTestCase {
         "silero-vad",
         "sherpa-onnx-whisper-tiny.en",
         "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
+        "lfm2-350m-q4_k_m",
         "qwen3-0.6b-q4_k_m",
         "qwen3-1.7b-q4_k_m",
         "qwen3-4b-q4_k_m",

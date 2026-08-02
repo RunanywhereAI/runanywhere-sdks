@@ -244,12 +244,34 @@ struct AmbientSessionDetailView: View {
             .disabled(busy)
 
             if viewModel.sessionManager.isSummarizing {
-                Label(
-                    status.isEmpty ? "Loading the summarizing model…" : status,
-                    systemImage: "brain"
-                )
-                .font(AppTypography.caption)
-                .foregroundColor(AppColors.primaryAccent)
+                let progress = viewModel.sessionManager.digestChunkProgress
+                let progressText = progress.total > 0
+                    ? "Chunk \(min(progress.completed + 1, progress.total))/\(progress.total)"
+                    : nil
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(
+                        status.isEmpty ? "Loading the summarizing model…" : status,
+                        systemImage: "brain"
+                    )
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.primaryAccent)
+                    if let progressText {
+                        Text(progressText)
+                            .font(AppTypography.caption2)
+                            .foregroundColor(AppColors.textSecondary)
+                        ProgressView(
+                            value: Double(progress.completed),
+                            total: Double(max(progress.total, 1))
+                        )
+                    }
+                    Text("Keep this screen open — locking the phone pauses the digester.")
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.statusOrange)
+                }
+            } else if record.hasResumableDigest {
+                Text("Digester paused after \(record.digestMapChunksCompleted) chunk(s). Resume to finish the full note.")
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.statusOrange)
             } else if record.digestStale {
                 Text("Speakers were labeled after this summary. Rewrite to include who said what.")
                     .font(AppTypography.caption)
@@ -262,7 +284,23 @@ struct AmbientSessionDetailView: View {
             }
 
             if hasTranscript {
-                if record.summary.isEmpty, !record.hasStructuredDigest {
+                if record.hasResumableDigest {
+                    Button {
+                        if digestID == nil {
+                            showDigestPicker = true
+                        } else {
+                            Task { await viewModel.summarize(sessionID: sessionID, modelID: digestID) }
+                        }
+                    } label: {
+                        Label(
+                            viewModel.sessionManager.isSummarizing
+                                ? "Resuming…"
+                                : "Resume digester",
+                            systemImage: "play.fill"
+                        )
+                    }
+                    .disabled(busy)
+                } else if record.summary.isEmpty, !record.hasStructuredDigest {
                     Button {
                         if digestID == nil {
                             showDigestPicker = true
@@ -290,6 +328,20 @@ struct AmbientSessionDetailView: View {
                         )
                     }
                     .disabled(busy || digestID == nil)
+
+                    if record.partialSummaries.count > 1 {
+                        Button {
+                            Task { await viewModel.remergeSummary(sessionID: sessionID, modelID: digestID) }
+                        } label: {
+                            Label(
+                                viewModel.sessionManager.isSummarizing
+                                    ? "Re-merging…"
+                                    : "Rebuild summary from chunks",
+                                systemImage: "square.stack.3d.up"
+                            )
+                        }
+                        .disabled(busy || digestID == nil)
+                    }
                 }
             }
         }

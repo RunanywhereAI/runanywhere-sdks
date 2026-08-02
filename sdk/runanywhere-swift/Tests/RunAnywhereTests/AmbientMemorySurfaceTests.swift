@@ -48,6 +48,19 @@ final class AmbientMemorySurfaceTests: XCTestCase {
         XCTAssertEqual(config.maxQueuedAudioChunks, 128)
     }
 
+    func testEconomyVADSkipsNeuralModelLoad() {
+        var config = RAAmbientConfiguration.defaults(sttModelID: "stt")
+        XCTAssertEqual(config.vadMode, .silero)
+        XCTAssertTrue(config.requiresNeuralVAD)
+
+        config.vadMode = .economy
+        XCTAssertFalse(config.requiresNeuralVAD)
+
+        config.vadMode = .hybrid
+        XCTAssertTrue(config.requiresNeuralVAD)
+        XCTAssertEqual(config.hybridSileroHopFrames, 4)
+    }
+
     // MARK: - Transcript
 
     func testRealTimeFactorComparesTranscriptionAgainstAudioLength() {
@@ -150,10 +163,33 @@ final class AmbientMemorySurfaceTests: XCTestCase {
     func testMergePromptAsksForDeduplication() {
         let system = AmbientDigestPrompt.system(mode: .merge, maxActionItems: 8)
 
-        XCTAssertTrue(system.contains("merge"))
-        XCTAssertTrue(system.contains("duplicate"))
+        XCTAssertTrue(system.contains("merge") || system.contains("Synthesize"))
+        XCTAssertTrue(system.contains("Deduplicate") || system.contains("duplicate"))
+        XCTAssertTrue(system.contains("4–8"))
         XCTAssertTrue(AmbientDigestPrompt.user(text: "a", mode: .merge).contains("Partial summaries:"))
         XCTAssertTrue(AmbientDigestPrompt.user(text: "a", mode: .chunk).contains("Transcript:"))
+    }
+
+    func testMergeParseFailureKeepsFullPartialsNot200CharPrefix() {
+        let partials = (1...8).map { "Part \($0) covers topic \($0) with enough detail to matter in the note." }
+            .joined(separator: "\n\n")
+        let parsed = AmbientDigestPrompt.parse(
+            "sorry I cannot help with that",
+            fallbackText: partials,
+            mode: .merge
+        )
+        XCTAssertGreaterThan(parsed.summary.count, 200, "Merge fallback must not truncate to 200 chars")
+        XCTAssertGreaterThanOrEqual(parsed.sections.count, 2)
+        XCTAssertFalse(AmbientDigestPrompt.isThin(parsed))
+    }
+
+    func testThinMergeJSONIsReplacedByPartialFallback() {
+        let partials = (1...6).map { "Part \($0): Important discussion point number \($0) with concrete detail." }
+            .joined(separator: "\n\n")
+        let thin = #"{"title":"Meeting Discussion","sections":[{"heading":"Overview","bullets":[{"text":"Part 1: Meeting Discussion"}]}],"actionItems":[]}"#
+        let parsed = AmbientDigestPrompt.parse(thin, fallbackText: partials, mode: .merge)
+        XCTAssertGreaterThan(parsed.summary.count, 200)
+        XCTAssertGreaterThan(parsed.sections.count, 1)
     }
 
     // MARK: - Helpers

@@ -35,6 +35,7 @@ final class AmbientMemoryViewModel: ObservableObject {
     @Published var retentionPolicy: AmbientRetentionPolicy = .default
     @Published var audioExpiry: AmbientRetentionWindow = .default
     @Published var context = AmbientCaptureContext.empty
+    @Published var performanceSettings = AmbientCapturePerformanceSettings.load()
     @Published private(set) var conditions: AmbientDeviceConditions?
     @Published private(set) var recommendedProfileID: String?
 
@@ -162,15 +163,20 @@ final class AmbientMemoryViewModel: ObservableObject {
         ).id
     }
 
-    /// Explicit Developer action: copy this profile's preferred catalog IDs
-    /// into the three slots. Does not download anything.
+    /// Explicit Developer action: copy capture model IDs (VAD + ASR) from the
+    /// profile. Digester is never auto-filled — keeps any prior user pick.
     func applyProfile(_ profileID: String) {
         selectedProfileID = profileID
+        let previousDigestID = selection.digestModelID
         let resolved = resolver.resolve(
             profile: AmbientModelProfile.profile(id: profileID) ?? .quality,
             available: ModelListViewModel.shared.availableModels
         )
         selection = resolved
+        if let previousDigestID, !previousDigestID.isEmpty {
+            selection.digestModelID = previousDigestID
+            selection.isDigestBackgroundSafe = modelInfo(for: previousDigestID)?.isBackgroundSafe ?? true
+        }
         persistSettings()
     }
 
@@ -189,6 +195,27 @@ final class AmbientMemoryViewModel: ObservableObject {
         selection.digestModelID = model?.id
         selection.isDigestBackgroundSafe = model?.isBackgroundSafe ?? true
         persistSettings()
+    }
+
+    func setVADMode(_ mode: RAAmbientVADMode) {
+        var next = performanceSettings
+        next.vadMode = mode
+        performanceSettings = next
+        performanceSettings.save()
+    }
+
+    func setWarmKeep(_ target: AmbientWarmKeepTarget) {
+        var next = performanceSettings
+        next.warmKeep = target
+        performanceSettings = next
+        performanceSettings.save()
+    }
+
+    func setStreamDiarDuringCapture(_ enabled: Bool) {
+        var next = performanceSettings
+        next.streamDiarDuringCapture = enabled
+        performanceSettings = next
+        performanceSettings.save()
     }
 
     func clearDigest() {
@@ -234,7 +261,7 @@ final class AmbientMemoryViewModel: ObservableObject {
         await refreshLibrary()
     }
 
-    /// First-time summarize with an explicit LLM (from the note-detail picker).
+    /// First-time summarize / resume a paused digester (chunked + resumable).
     func summarize(sessionID: String, modelID: String? = nil) async {
         let resolved = modelID ?? selection.digestModelID
         if let resolved, let model = modelInfo(for: resolved) {
@@ -243,7 +270,8 @@ final class AmbientMemoryViewModel: ObservableObject {
         await sessionManager.generateSummary(
             for: sessionID,
             modelID: resolved,
-            rewrite: false
+            rewrite: false,
+            quietUI: true
         )
         await refreshLibrary()
     }
@@ -257,8 +285,19 @@ final class AmbientMemoryViewModel: ObservableObject {
         await sessionManager.generateSummary(
             for: sessionID,
             modelID: resolved,
-            rewrite: true
+            rewrite: true,
+            quietUI: true
         )
+        await refreshLibrary()
+    }
+
+    /// Rebuild the final note from saved map chunks only (no full re-ASR map).
+    func remergeSummary(sessionID: String, modelID: String? = nil) async {
+        let resolved = modelID ?? selection.digestModelID
+        if let resolved, let model = modelInfo(for: resolved) {
+            select(digest: model)
+        }
+        await sessionManager.remergeSummary(for: sessionID, modelID: resolved)
         await refreshLibrary()
     }
 
@@ -443,6 +482,7 @@ final class AmbientMemoryViewModel: ObservableObject {
                 ?? .default
         }
         hasRecordingConsent = defaults.bool(forKey: SettingsKey.consent)
+        performanceSettings = AmbientCapturePerformanceSettings.load(from: defaults)
 
         selection = AmbientModelSelection(
             profileID: selectedProfileID,

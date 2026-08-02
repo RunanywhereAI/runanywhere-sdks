@@ -31,6 +31,7 @@ struct AmbientDeveloperView: View {
             Form {
                 profileSection
                 modelSection
+                performanceSection
                 offlineDogfoodSection
                 audioSection
                 contextSection
@@ -186,7 +187,8 @@ struct AmbientDeveloperView: View {
             Text("Lab profile preset")
         } footer: {
             Text(
-                "Applying a profile only copies candidate model IDs into the slots below. "
+                "Applying a profile copies VAD + ASR candidates only. "
+                + "Summarizer is never auto-selected — pick one under Models when you want digests. "
                 + "Nothing downloads automatically — use Change → Get → Use for each role."
             )
         }
@@ -234,7 +236,8 @@ struct AmbientDeveloperView: View {
             Text("Models")
         } footer: {
             Text(
-                "Any catalog model is allowed, including GPU backends, so you can stress-test limits. "
+                "Capture needs detector + transcription. Summarizer is optional — leave it unset until you want digests. "
+                + "Any catalog model is allowed, including GPU backends. "
                 + "A soft warning appears when lock-screen transcription or background summarizing may stall."
             )
         }
@@ -265,6 +268,67 @@ struct AmbientDeveloperView: View {
             Button("Change", action: onChange)
                 .font(AppTypography.caption)
         }
+    }
+
+    // MARK: - Performance
+
+    private var performanceSection: some View {
+        Section {
+            Picker("Live VAD", selection: vadModeBinding) {
+                Text("Silero (quality)").tag(RAAmbientVADMode.silero)
+                Text("Economy (energy)").tag(RAAmbientVADMode.economy)
+                Text("Hybrid").tag(RAAmbientVADMode.hybrid)
+            }
+
+            Picker("Warm-keep", selection: warmKeepBinding) {
+                ForEach(AmbientWarmKeepTarget.allCases, id: \.self) { target in
+                    Text(target.displayName).tag(target)
+                }
+            }
+
+            Toggle("Stream Sortformer during capture", isOn: streamDiarBinding)
+
+            if let conditions = viewModel.conditions {
+                let canStream = viewModel.performanceSettings.canStreamDiarization(
+                    availableMemoryBytes: conditions.availableMemoryBytes,
+                    tier: conditions.tier
+                )
+                if viewModel.performanceSettings.streamDiarDuringCapture && !canStream {
+                    Text("Needs high-end tier and ~1.8 GB free (ASR + Sortformer).")
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.statusOrange)
+                }
+            }
+        } header: {
+            Text("Capture performance")
+        } footer: {
+            Text(
+                "Economy VAD skips Silero on every frame (best for long locked sessions). "
+                + "Warm-keep leaves Sortformer or the digester resident between Label/Summarize — never both, never with ASR. "
+                + "Streaming Sortformer hides diarization wall time behind recording when RAM allows."
+            )
+        }
+    }
+
+    private var vadModeBinding: Binding<RAAmbientVADMode> {
+        Binding(
+            get: { viewModel.performanceSettings.vadMode },
+            set: { viewModel.setVADMode($0) }
+        )
+    }
+
+    private var warmKeepBinding: Binding<AmbientWarmKeepTarget> {
+        Binding(
+            get: { viewModel.performanceSettings.warmKeep },
+            set: { viewModel.setWarmKeep($0) }
+        )
+    }
+
+    private var streamDiarBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.performanceSettings.streamDiarDuringCapture },
+            set: { viewModel.setStreamDiarDuringCapture($0) }
+        )
     }
 
     // MARK: - Audio

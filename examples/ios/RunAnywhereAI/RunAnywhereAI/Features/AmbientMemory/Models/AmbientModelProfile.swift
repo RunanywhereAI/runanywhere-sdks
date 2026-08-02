@@ -50,9 +50,9 @@ struct AmbientModelProfile: Identifiable, Sendable, Equatable {
     /// applies this profile in Developer — the main Notes UI never auto-fills
     /// from these lists.
     let asrCandidateIDs: [String]
-    /// Ordered LLM candidates for the summary-and-action-items digest. A GPU
-    /// model is allowed here because digesting is not always-on; it just gets
-    /// deferred to the foreground.
+    /// Suggested LLM candidates for the opt-in summarizer picker (never
+    /// auto-applied). A GPU model is allowed because digesting is not always-on;
+    /// it just gets deferred to the foreground.
     let digestCandidateIDs: [String]
     /// Lowest tier this profile is allowed to auto-select on.
     let minimumTier: HardwareTier
@@ -70,59 +70,138 @@ struct AmbientModelProfile: Identifiable, Sendable, Equatable {
     var preferredASRModelID: String { asrCandidateIDs.first ?? "" }
 
     /// Smallest testable stack. Everything is serialized; use it to confirm the
-    /// pipeline runs at all before judging quality.
+    /// pipeline runs at all before judging quality. Digester stays unset until
+    /// the user picks one.
     static let compatibility = AmbientModelProfile(
         id: "compatibility",
         displayName: "Compatibility",
-        summary: "Whisper Tiny + Qwen3 0.6B. Smallest download, serialized jobs.",
+        summary: "Whisper Tiny capture. Digester optional (LFM2 350M suggested).",
         vadModelID: "silero-vad",
         asrCandidateIDs: [
             "sherpa-onnx-whisper-tiny.en",
         ],
         digestCandidateIDs: [
+            "lfm2-350m-q4_k_m",
             "qwen3-0.6b-q4_k_m",
+            "mlx-lfm2-350m",
             "mlx-qwen3-0.6b-4bit",
         ],
         minimumTier: .lowEnd,
         residentBudgetBytes: 1_200_000_000
     )
 
-    /// The dogfood default. Optimized for end-to-end quality rather than the
-    /// smallest possible footprint, so what you judge is the ceiling of the
-    /// idea and not the floor of the models.
+    /// The dogfood default capture stack. Digester is never auto-selected —
+    /// LFM2 / Qwen ids below are picker suggestions only.
     static let quality = AmbientModelProfile(
         id: "quality",
         displayName: "Quality",
-        summary: "Parakeet TDT 0.6B + Qwen3 1.7B. Best end-to-end quality.",
+        summary: "Parakeet TDT 0.6B capture. Digester optional (LFM2 350M suggested).",
         vadModelID: "silero-vad",
         asrCandidateIDs: [
             "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
             "sherpa-onnx-whisper-tiny.en",
         ],
         digestCandidateIDs: [
+            "lfm2-350m-q4_k_m",
+            "lfm2.5-1.2b-instruct-q4_k_m",
             "qwen3-1.7b-q4_k_m",
             "qwen3-0.6b-q4_k_m",
+            "mlx-lfm2-350m",
             "mlx-qwen3-0.6b-4bit",
         ],
         minimumTier: .midRange,
         residentBudgetBytes: 2_600_000_000
     )
 
-    /// Quality capture with a 4B model doing the summarizing, for devices with
-    /// the memory to hold it.
+    /// Larger capture budget with Qwen3 4B as the suggested digester when the
+    /// user opts in to summarizing.
     static let highEnd = AmbientModelProfile(
         id: "high-end",
         displayName: "High-end",
-        summary: "Quality capture with Qwen3 4B writing the summaries.",
+        summary: "Parakeet capture. Digester optional (Qwen3 4B suggested).",
         vadModelID: "silero-vad",
         asrCandidateIDs: AmbientModelProfile.quality.asrCandidateIDs,
         digestCandidateIDs: [
+            // Best meeting-note pick at phone size (MeetMemo 2026 A/B).
+            "qwen3-4b-instruct-2507-q4_k_m",
+            // Speed-first long notes.
+            "lfm2.5-1.2b-instruct-q4_k_m",
+            // Quality A/Bs (llama.cpp only for long digests — avoid MLX).
             "qwen3-4b-q4_k_m",
-            "mlx-qwen3-4b-4bit",
+            "phi-4-mini-instruct-q4_k_m",
+            "llama-3.2-3b-instruct-q4_k_m",
+            "gemma-4-e4b-it-q4_k_m",
+            "bonsai-8b-q1_0",
+            "qwen3-1.7b-q4_k_m",
         ] + AmbientModelProfile.quality.digestCandidateIDs,
         minimumTier: .highEnd,
         residentBudgetBytes: 3_200_000_000
     )
+}
+
+// MARK: - Capture Performance Policy
+
+/// Which post-ASR model (if any) stays resident between Label / Summarize passes.
+/// Never coresident with ASR, and never both at once (jetsam policy).
+enum AmbientWarmKeepTarget: String, CaseIterable, Sendable {
+    case none
+    case diarization
+    case digester
+
+    var displayName: String {
+        switch self {
+        case .none: return "Unload after use"
+        case .diarization: return "Keep Sortformer warm"
+        case .digester: return "Keep digester warm"
+        }
+    }
+}
+
+/// Live-capture speed knobs for Notes (Developer / dogfood).
+struct AmbientCapturePerformanceSettings: Equatable, Sendable {
+    var vadMode: RAAmbientVADMode = .silero
+    var warmKeep: AmbientWarmKeepTarget = .none
+    /// When RAM allows, run Sortformer on the live PCM tee during capture.
+    var streamDiarDuringCapture: Bool = false
+
+    /// Sortformer (~492 MB) + ASR headroom required before streaming diarization.
+    static let streamingDiarizationHeadroomBytes: Int64 = 1_800_000_000
+
+    private enum Key {
+        static let vadMode = "ambient.vadMode"
+        static let warmKeep = "ambient.warmKeep"
+        static let streamDiar = "ambient.streamDiarDuringCapture"
+    }
+
+    static func load(from defaults: UserDefaults = .standard) -> AmbientCapturePerformanceSettings {
+        var settings = AmbientCapturePerformanceSettings()
+        if let raw = defaults.string(forKey: Key.vadMode),
+           let mode = RAAmbientVADMode(rawValue: raw) {
+            settings.vadMode = mode
+        }
+        if let raw = defaults.string(forKey: Key.warmKeep),
+           let keep = AmbientWarmKeepTarget(rawValue: raw) {
+            settings.warmKeep = keep
+        }
+        settings.streamDiarDuringCapture = defaults.bool(forKey: Key.streamDiar)
+        return settings
+    }
+
+    func save(to defaults: UserDefaults = .standard) {
+        defaults.set(vadMode.rawValue, forKey: Key.vadMode)
+        defaults.set(warmKeep.rawValue, forKey: Key.warmKeep)
+        defaults.set(streamDiarDuringCapture, forKey: Key.streamDiar)
+    }
+
+    /// Whether the device can host ASR + Sortformer together for live diarization.
+    func canStreamDiarization(
+        availableMemoryBytes: Int64,
+        tier: HardwareTier
+    ) -> Bool {
+        streamDiarDuringCapture
+            && tier >= .highEnd
+            && availableMemoryBytes >= Self.streamingDiarizationHeadroomBytes
+    }
 }
 
 // MARK: - Resolved Selection
@@ -207,10 +286,9 @@ struct AmbientModelProfileResolver {
         return candidates.last ?? .compatibility
     }
 
-    /// Bind a profile to real catalog ids, keeping the first candidate that is
-    /// actually registered for each role. Any framework is accepted — dogfooding
-    /// includes GPU ASR — and `isASRBackgroundSafe` / `isDigestBackgroundSafe`
-    /// flag risk for the UI and deferred digest path.
+    /// Bind a profile to real catalog ids for capture roles only. Digester is
+    /// never filled here — Summarize stays an explicit user pick. Any ASR
+    /// framework is accepted for dogfooding; `isASRBackgroundSafe` flags risk.
     func resolve(profile: AmbientModelProfile, available models: [RAModelInfo]) -> AmbientModelSelection {
         let byID = Dictionary(models.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         func firstAvailable(_ ids: [String]) -> RAModelInfo? {
@@ -219,16 +297,22 @@ struct AmbientModelProfileResolver {
 
         let vad = firstAvailable([profile.vadModelID])
         let asr = firstAvailable(profile.asrCandidateIDs)
-        let digest = firstAvailable(profile.digestCandidateIDs)
 
         return AmbientModelSelection(
             profileID: profile.id,
             vadModelID: vad?.id ?? "",
             asrModelID: asr?.id ?? "",
-            digestModelID: digest?.id,
+            digestModelID: nil,
             isASRBackgroundSafe: asr?.isBackgroundSafe ?? true,
-            isDigestBackgroundSafe: digest?.isBackgroundSafe ?? true
+            isDigestBackgroundSafe: true
         )
+    }
+
+    /// First suggested digester still registered in the catalog — for picker
+    /// hints only, never written into selection automatically.
+    func suggestedDigestID(for profile: AmbientModelProfile, available models: [RAModelInfo]) -> String? {
+        let byID = Dictionary(models.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return profile.digestCandidateIDs.first { byID[$0] != nil }
     }
 
     /// Read current conditions from the device. Battery monitoring is enabled

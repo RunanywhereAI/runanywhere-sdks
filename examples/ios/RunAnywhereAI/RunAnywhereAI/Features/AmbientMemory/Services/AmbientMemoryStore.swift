@@ -361,6 +361,26 @@ actor AmbientMemoryStore {
         }
     }
 
+    /// Merge post-ASR Label/Summarize metrics into the live sample for a note.
+    @discardableResult
+    func updateBenchmarkSample(
+        sessionID: String,
+        _ mutate: (inout AmbientBenchmarkSample) -> Void
+    ) -> Bool {
+        var samples = loadBenchmarkSamples()
+        guard let index = samples.lastIndex(where: { $0.sessionID == sessionID }) else {
+            return false
+        }
+        mutate(&samples[index])
+        do {
+            try write(try encoder.encode(samples), to: benchmarksURL)
+            return true
+        } catch {
+            logger.error("Ambient benchmark update failed: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+    }
+
     func clearBenchmarkSamples() {
         try? fileManager.removeItem(at: benchmarksURL)
     }
