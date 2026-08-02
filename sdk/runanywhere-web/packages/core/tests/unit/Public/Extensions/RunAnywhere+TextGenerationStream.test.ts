@@ -321,7 +321,7 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
 
     const handle = await TextGeneration.generateStream({
       prompt: 'Say hi',
-      maxTokens: 16,
+      maxOutputTokens: 16,
       temperature: 0,
     });
 
@@ -346,12 +346,11 @@ describe('RunAnywhere.textGeneration.generateStream — live handle + cancel', (
 
     const result = await handle.result;
     expect(result.text).toBe('Hello, world!');
-    expect(result.tokensGenerated).toBe(3);
+    expect(result.responseTokens).toBe(3);
     expect(result.finishReason).toBe('stop');
 
     expect(capturedRequest?.prompt).toBe('Say hi');
-    expect(capturedRequest?.options?.streamingEnabled).toBe(true);
-    expect(capturedRequest?.options?.maxTokens).toBe(16);
+    expect(capturedRequest?.options?.maxOutputTokens).toBe(16);
     expect(capturedRequest?.options?.temperature).toBe(0);
     expect(capturedRequest?.options?.topP).toBe(1);
     expect(capturedRequest?.options?.repetitionPenalty).toBe(1);

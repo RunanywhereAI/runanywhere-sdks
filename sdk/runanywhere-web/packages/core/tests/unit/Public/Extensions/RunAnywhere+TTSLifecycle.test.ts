@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CurrentModelResult } from '@runanywhere/proto-ts/model_types';
+import { SDKError } from '@runanywhere/proto-ts/errors';
 import {
   TTSOptions,
   TTSOutput,
@@ -74,7 +75,7 @@ describe('lifecycle-owned Web TTS', () => {
 
     const output = await synthesize('Keep this voice loaded.', {
       voiceId: 'speaker-2',
-      speakingRate: 1.1,
+      speed: 1.1,
     });
 
     expect(new TextDecoder().decode(output.audioData)).toBe('lifecycle-audio');
@@ -85,7 +86,7 @@ describe('lifecycle-owned Web TTS', () => {
         voice: 'speaker-2',
       },
     });
-    expect(harness.lifecycleRequests[0]?.options?.speakingRate).toBeCloseTo(1.1);
+    expect(harness.lifecycleRequests[0]?.options?.speed).toBeCloseTo(1.1);
     expect(harness.counters).toMatchObject({
       lifecycleSyntheses: 1,
       componentCreates: 0,
@@ -135,8 +136,10 @@ describe('lifecycle-owned Web TTS', () => {
     expect(failed).toHaveLength(1);
     expect(failed[0]).toMatchObject({
       isFinal: true,
-      errorCode: -42,
-      errorMessage: 'forced lifecycle stream failure',
+      error: {
+        cAbiCode: -42,
+        message: 'forced lifecycle stream failure',
+      },
     });
     expect(harness.counters).toMatchObject({
       lifecycleStreams: 2,
@@ -308,8 +311,10 @@ function fakeTTSModule(): FakeTTSHarness {
       if (streamFailure) {
         emit(callbackPointer, TTSStreamEvent.create({
           kind: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR,
-          errorCode: -42,
-          errorMessage: 'forced lifecycle stream failure',
+          error: SDKError.create({
+            cAbiCode: -42,
+            message: 'forced lifecycle stream failure',
+          }),
         }));
         return -42;
       }

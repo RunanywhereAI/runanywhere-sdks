@@ -72,7 +72,6 @@ describe('LoRA catalog proto facade', () => {
       query: { modelId: 'base-model', tags: [] },
       includeCounts: true,
     })).resolves.toMatchObject({
-      success: true,
       totalCount: 1,
       filteredCount: 1,
       downloadedCount: 0,
@@ -84,7 +83,6 @@ describe('LoRA catalog proto facade', () => {
       downloadedOnly: true,
       tags: ['style'],
     })).resolves.toMatchObject({
-      success: true,
       entries: [expect.objectContaining({ id: 'style' })],
     });
 
@@ -100,7 +98,6 @@ describe('LoRA catalog proto facade', () => {
       imported: false,
       statusMessage: 'download completed',
     })).resolves.toMatchObject({
-      success: true,
       persisted: true,
       entry: expect.objectContaining({ id: 'style' }),
     });
@@ -201,9 +198,7 @@ function makeLoRACatalogModule(captured: CapturedCatalogCalls): ModalityProtoMod
     const request = LoraAdapterCatalogListRequest.decode(readBytes(module, requestPtr, requestSize));
     captured.list = { registry, request };
     writeResult(module, outResult, LoraAdapterCatalogListResult.encode({
-      success: true,
       entries: [catalogEntry()],
-      errorMessage: '',
       totalCount: 1,
       filteredCount: 1,
       downloadedCount: 0,
@@ -219,9 +214,7 @@ function makeLoRACatalogModule(captured: CapturedCatalogCalls): ModalityProtoMod
     const query = LoraAdapterCatalogQuery.decode(readBytes(module, queryPtr, querySize));
     captured.query = { registry, query };
     writeResult(module, outResult, LoraAdapterCatalogListResult.encode({
-      success: true,
       entries: [catalogEntry()],
-      errorMessage: '',
       totalCount: 1,
       filteredCount: 1,
       downloadedCount: 0,
@@ -239,7 +232,6 @@ function makeLoRACatalogModule(captured: CapturedCatalogCalls): ModalityProtoMod
     writeResult(module, outResult, LoraAdapterCatalogGetResult.encode({
       found: true,
       entry: catalogEntry(),
-      errorMessage: '',
     }).finish());
     return 0;
   };
@@ -254,7 +246,6 @@ function makeLoRACatalogModule(captured: CapturedCatalogCalls): ModalityProtoMod
     );
     captured.markDownloadCompleted = { registry, request };
     writeResult(module, outResult, LoraAdapterDownloadCompletedResult.encode({
-      success: true,
       entry: {
         ...catalogEntry(),
         localPath: request.localPath,
@@ -263,7 +254,6 @@ function makeLoRACatalogModule(captured: CapturedCatalogCalls): ModalityProtoMod
         isImported: request.imported,
         statusMessage: request.statusMessage,
       },
-      errorMessage: '',
       persisted: true,
     }).finish());
     return 0;

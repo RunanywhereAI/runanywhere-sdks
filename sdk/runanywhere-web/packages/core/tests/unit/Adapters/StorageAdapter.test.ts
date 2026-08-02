@@ -232,7 +232,6 @@ function createFakeModule(fs: MemoryFS): FakeModuleHandle {
         else failedModelIds.push(modelId);
       }
       writeDeleteResult(outResultPtr, StorageDeleteResult.fromPartial({
-        success: failedModelIds.length === 0,
         deletedModelIds,
         failedModelIds,
         filesDeleted: deletedModelIds.length > 0,
@@ -479,7 +478,8 @@ describe('BrowserStorageAnalyzerAdapter', () => {
     const result = await deletion;
     await shutdown;
 
-    expect(result?.success).toBe(true);
+    expect(result?.deletedModelIds).toContain('vad-shutdown');
+    expect(result?.failedModelIds ?? []).toHaveLength(0);
     expect(handle.lifecycle.indexOf('native-delete')).toBeGreaterThanOrEqual(0);
     expect(handle.lifecycle.indexOf('destroy:777')).toBeGreaterThan(
       handle.lifecycle.indexOf('native-delete'),
@@ -553,7 +553,7 @@ describe('BrowserStorageAnalyzerAdapter', () => {
     resolveRemoval();
     const result = await deletion;
 
-    expect(result?.success).toBe(false);
+    expect(result?.deletedModelIds).not.toContain('vad-reloaded');
     expect(result?.failedModelIds).toContain('vad-reloaded');
     expect(handle.lifecycle).not.toContain('memfs-delete');
     expect(fs.analyzePath(modelPath).exists).toBe(true);

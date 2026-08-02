@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AudioEncoding } from '@runanywhere/proto-ts/voice_events';
+import { AudioEncoding } from '@runanywhere/proto-ts/model_types';
 
 const mocks = vi.hoisted(() => ({
   captures: [] as Array<{

@@ -195,7 +195,7 @@ describe('canonical lifecycle VAD facade', () => {
 
     const samples = new Float32Array([0.25, -0.5, 1]);
     const result = await VAD.detectVoice(samples, {
-      threshold: 0.2,
+      activationThreshold: 0.2,
       config: { sampleRate: 16_000 },
     });
 
@@ -209,14 +209,14 @@ describe('canonical lifecycle VAD facade', () => {
       lifecycleProcesses: 1,
     });
     expect(counters.configurations[0]?.sampleRate).toBe(16_000);
-    expect(counters.configurations[0]?.threshold).toBeCloseTo(0.2);
+    expect(counters.configurations[0]?.activationThreshold).toBeCloseTo(0.2);
     const request = counters.requests[0];
     expect(request?.audio).toMatchObject({
       encoding: AudioEncoding.AUDIO_ENCODING_PCM_F32_LE,
       sampleRate: 16_000,
       channels: 1,
     });
-    expect(request?.options?.threshold).toBe(0);
+    expect(request?.options?.activationThreshold).toBe(0);
     const audioBytes = request?.audio?.audioData;
     expect(audioBytes).toBeDefined();
     const view = new DataView(
@@ -234,7 +234,7 @@ describe('canonical lifecycle VAD facade', () => {
     registerWasmModule(['vad'], module, ['onnx', 'sherpa']);
 
     const results: VADResult[] = [];
-    for await (const result of VAD.streamVoiceActivity(chunks(3), { threshold: 0.15 })) {
+    for await (const result of VAD.streamVoiceActivity(chunks(3), { activationThreshold: 0.15 })) {
       results.push(result);
     }
 
@@ -249,7 +249,7 @@ describe('canonical lifecycle VAD facade', () => {
       'reset',
     ]);
     expect(counters.requests).toHaveLength(3);
-    expect(counters.requests.every((request) => request.options?.threshold === 0)).toBe(true);
+    expect(counters.requests.every((request) => request.options?.activationThreshold === 0)).toBe(true);
     expect(counters).toMatchObject({
       componentCreates: 0,
       componentLoads: 0,

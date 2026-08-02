@@ -400,7 +400,7 @@ describe('generateStructuredStream', () => {
     for await (const event of generateStructuredStream(
       'weather in SF',
       { jsonSchema: '{"type":"object","required":["city"]}' },
-      { maxTokens: 64 },
+      { maxOutputTokens: 64 },
     )) {
       events.push(event);
     }
@@ -410,16 +410,17 @@ describe('generateStructuredStream', () => {
     // RALLMTypes+CppBridge.swift:66-74 parity) and the Swift defaults
     // (RALLMTypes+CppBridge.swift:13-21) filling the unset knobs.
     expect(capturedGenerate?.prompt).toBe('weather in SF');
-    expect(capturedGenerate?.options?.streamingEnabled).toBe(true);
-    expect(capturedGenerate?.options?.jsonSchema).toBe('{"type":"object","required":["city"]}');
-    expect(capturedGenerate?.options?.responseFormat).toBe('json_schema');
-    expect(capturedGenerate?.options?.maxTokens).toBe(64);
-    expect(capturedGenerate?.options?.temperature).toBeCloseTo(0.8);
+    expect(capturedGenerate?.options?.structuredOutput?.includeSchemaInPrompt).toBe(true);
+    expect(capturedGenerate?.options?.structuredOutput?.jsonSchema).toBe('{"type":"object","required":["city"]}');
+    expect(capturedGenerate?.options?.structuredOutput?.mode).toBe(
+      StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
+    );
+    expect(capturedGenerate?.options?.maxOutputTokens).toBe(64);
+    expect(capturedGenerate?.options?.temperature).toBeCloseTo(0.7);
     expect(capturedGenerate?.options?.topP).toBeCloseTo(1.0);
     expect(capturedGenerate?.options?.repetitionPenalty).toBeCloseTo(1.0);
 
-    // Three TOKEN events stream through before the terminal COMPLETED event;
-    // `seq` is monotonically increasing across the whole stream.
+    // Three TOKEN events stream through before the terminal COMPLETED event.
     expect(events).toHaveLength(4);
     expect(events.map((event) => event.kind)).toEqual([
       StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
@@ -432,7 +433,6 @@ describe('generateStructuredStream', () => {
       '{"city":"San Francisco"}',
       ' suffix',
     ]);
-    expect(events.map((event) => event.seq)).toEqual([1, 2, 3, 4]);
 
     // The accumulated transcript is parsed through StructuredOutput.Parse
     // proto bytes and carried on the terminal event's `result`.

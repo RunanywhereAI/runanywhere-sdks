@@ -4,6 +4,7 @@ import type {
   EmbeddingVector,
 } from '@runanywhere/proto-ts/embeddings_options';
 import type { LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import {
   InferenceFramework,
   ModelCategory,
@@ -102,8 +103,13 @@ describe('CrossWasmRAGProvider', () => {
 
     const result = await provider.ragQuery('What is the Zephyr launch code?', {
       retrievalTopK: 1,
-      maxTokens: 64,
-      disableThinking: true,
+      generation: {
+        maxOutputTokens: 64,
+        reasoning: {
+          mode: ReasoningMode.REASONING_MODE_OFF,
+          includeInOutput: false,
+        },
+      },
     });
 
     expect(embedBatch).toHaveBeenCalledTimes(2);
@@ -116,7 +122,10 @@ describe('CrossWasmRAGProvider', () => {
     expect(result.contextUsed).toContain('ORBIT-7');
     expect(generate).toHaveBeenCalledWith(expect.objectContaining({
       prompt: expect.stringContaining('ORBIT-7'),
-      disableThinking: true,
+      maxOutputTokens: 64,
+      reasoning: expect.objectContaining({
+        mode: ReasoningMode.REASONING_MODE_OFF,
+      }),
     }));
     expect(loadModel).toHaveBeenCalledTimes(1);
     expect(loadModel).toHaveBeenCalledWith(expect.objectContaining({
@@ -150,7 +159,6 @@ describe('CrossWasmRAGProvider', () => {
       indexedDocuments: 1,
       indexedChunks: 1,
       isPersistent: false,
-      errorCode: 0,
     });
     expect(provider.ragGetCapabilities?.()).toEqual({
       native: false,

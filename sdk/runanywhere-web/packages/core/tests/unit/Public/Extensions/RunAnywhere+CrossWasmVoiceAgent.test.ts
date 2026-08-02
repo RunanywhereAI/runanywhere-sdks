@@ -118,10 +118,10 @@ describe('CrossWasmVoiceAgentProvider', () => {
       config: {
         sampleRate: 16_000,
         frameLengthMs: 100,
-        threshold: 0.5,
+        activationThreshold: 0.5,
       },
     });
-    expect(mocks.detectVoice.mock.calls[0]?.[1]).not.toHaveProperty('threshold');
+    expect(mocks.detectVoice.mock.calls[0]?.[1]).not.toHaveProperty('activationThreshold');
   });
 
   it('applies the spoken system prompt and bounded conversational history', async () => {
@@ -144,7 +144,7 @@ describe('CrossWasmVoiceAgentProvider', () => {
     // which was Web's own voice-agent cap while the other four platforms
     // inherited 96 from the C++ orchestrator; re-pinning a number here would
     // just recreate that divergence in the test suite.
-    expect(firstOptions.maxTokens).toBe(voiceAgentDefaults.maxTokens);
+    expect(firstOptions.maxOutputTokens).toBe(voiceAgentDefaults.maxTokens);
     expect(firstOptions.history).toEqual([]);
     expect(secondOptions.history).toHaveLength(2);
     expect(secondOptions.history.map((message: { content: string }) => message.content))
