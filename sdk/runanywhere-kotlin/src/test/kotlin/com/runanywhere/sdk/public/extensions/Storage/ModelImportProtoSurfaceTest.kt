@@ -10,6 +10,7 @@ import com.runanywhere.sdk.public.extensions.importModel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -78,7 +79,6 @@ class ModelImportProtoSurfaceTest {
     fun testModelImportResultCarriesPersistenceMetadata() {
         val result =
             ModelImportResult(
-                success = true,
                 model =
                     ModelInfo(
                         id = "demo-model",
@@ -96,7 +96,7 @@ class ModelImportProtoSurfaceTest {
                 ModelImportResult.ADAPTER.encode(result),
             )
 
-        assertTrue(decoded.success)
+        assertNull(decoded.error)
         assertTrue(decoded.registered)
         assertEquals("demo-model", decoded.model?.id)
         assertEquals("/models/demo.gguf", decoded.local_path)

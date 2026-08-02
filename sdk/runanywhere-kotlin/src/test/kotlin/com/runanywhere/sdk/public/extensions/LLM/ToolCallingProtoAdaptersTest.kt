@@ -5,7 +5,6 @@ import ai.runanywhere.proto.v1.ToolCallFormatName
 import ai.runanywhere.proto.v1.ToolCallingOptions
 import ai.runanywhere.proto.v1.ToolChoiceMode
 import ai.runanywhere.proto.v1.ToolDefinition
-import com.runanywhere.sdk.generated.convenience.defaults
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -16,7 +15,7 @@ class ToolCallingProtoAdaptersTest {
     fun `absent nested tool contract falls back to generated defaults`() {
         val options = LLMGenerationOptions(temperature = 0.4f).toToolCallingOptions()
 
-        assertEquals(ToolCallingOptions.defaults().max_tool_calls, options.max_tool_calls)
+        assertEquals(ToolCallingOptions().max_tool_calls, options.max_tool_calls)
         assertEquals(null, options.format)
     }
 
@@ -39,7 +38,7 @@ class ToolCallingProtoAdaptersTest {
     }
 
     @Test
-    fun `run loop request keeps sampling on the generation envelope and routing in tool_calling`() {
+    fun `run loop request inlines sampling and tool routing onto the request`() {
         val search = ToolDefinition(name = "search_web", description = "Search current information")
         val request =
             makeToolCallingRunLoopRequest(
@@ -63,18 +62,16 @@ class ToolCallingProtoAdaptersTest {
                 validateCalls = null,
             )
 
-        val generation = assertNotNull(request.generation)
-        assertEquals(96, generation.max_output_tokens)
-        assertEquals(0f, generation.temperature)
-        assertEquals(1f, generation.top_p)
+        assertEquals(96, request.max_tokens)
+        assertEquals(0f, request.temperature)
+        assertEquals(1f, request.top_p)
 
-        val toolCalling = assertNotNull(generation.tool_calling)
-        assertEquals(2, toolCalling.max_tool_calls)
-        assertEquals(ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2, toolCalling.format)
-        assertFalse(assertNotNull(toolCalling.auto_execute))
-        assertEquals(ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC, toolCalling.tool_choice)
-        assertEquals("search_web", toolCalling.forced_tool_name)
-        assertEquals(listOf("search_web"), toolCalling.tools.map { it.name })
+        assertEquals(2, request.max_tool_calls)
+        assertEquals(ToolCallFormatName.TOOL_CALL_FORMAT_NAME_LFM2, request.format)
+        assertFalse(assertNotNull(request.auto_execute))
+        assertEquals(ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC, request.tool_choice)
+        assertEquals("search_web", request.forced_tool_name)
+        assertEquals(listOf("search_web"), request.tools.map { it.name })
         assertEquals(null, request.validate_calls)
     }
 
@@ -91,7 +88,7 @@ class ToolCallingProtoAdaptersTest {
                 history = priorTurns,
             )
 
-        assertEquals(priorTurns, request.history.map { it.content })
+        assertEquals(priorTurns, request.history)
         assertEquals("and in London?", request.prompt)
     }
 

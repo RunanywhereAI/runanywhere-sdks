@@ -7,6 +7,7 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.LLMStreamEvent
 import ai.runanywhere.proto.v1.LLMStreamFinalResult
+import ai.runanywhere.proto.v1.TokenUsage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onEach
@@ -92,13 +93,14 @@ class RunAnywhereTextGenerationStreamTest {
 
             assertEquals(tokenCount + 1, observedCount)
             assertEquals(expectedText, result.text)
-            assertEquals(tokenCount, result.output_tokens)
+            val usage = result.usage!!
+            assertEquals(tokenCount, usage.output_tokens)
             assertEquals(tokenCount, result.response_tokens)
-            assertEquals(tokenCount + 1, result.total_tokens)
+            assertEquals(tokenCount + 1, usage.total_tokens)
             assertEquals("stop", result.finish_reason)
             assertEquals("stress-model", result.model_used)
             assertEquals("stress-framework", result.framework)
-            assertNull(result.error_message)
+            assertNull(result.error)
             assertEquals(0, cancelCalls.get())
         }
 
@@ -109,14 +111,17 @@ class RunAnywhereTextGenerationStreamTest {
                 LLMStreamFinalResult(
                     text = "canonical answer",
                     thinking_content = "canonical reasoning",
-                    input_tokens = 7,
-                    output_tokens = 9,
-                    total_tokens = 16,
                     total_time_ms = 123L,
                     time_to_first_token_ms = 8L,
-                    tokens_per_second = 45.5f,
                     prompt_eval_time_ms = 20L,
                     decode_time_ms = 100L,
+                    usage =
+                        TokenUsage(
+                            input_tokens = 7,
+                            output_tokens = 9,
+                            total_tokens = 16,
+                            tokens_per_second = 45.5,
+                        ),
                 )
             val events =
                 flowOf(
@@ -144,13 +149,14 @@ class RunAnywhereTextGenerationStreamTest {
 
             assertEquals("canonical answer", result.text)
             assertEquals("canonical reasoning", result.thinking_content)
-            assertEquals(7, result.input_tokens)
-            assertEquals(9, result.output_tokens)
+            val usage = result.usage!!
+            assertEquals(7, usage.input_tokens)
+            assertEquals(9, usage.output_tokens)
             assertEquals(9, result.response_tokens)
-            assertEquals(16, result.total_tokens)
+            assertEquals(16, usage.total_tokens)
             assertEquals(123.0, result.generation_time_ms, 0.0)
             assertEquals(8.0, result.ttft_ms!!, 0.0)
-            assertEquals(45.5, result.tokens_per_second, 0.0)
+            assertEquals(45.5, usage.tokens_per_second, 0.0)
             assertEquals(20L, result.prompt_eval_time_ms)
             assertEquals(100L, result.decode_time_ms)
             assertEquals("stop", result.finish_reason)

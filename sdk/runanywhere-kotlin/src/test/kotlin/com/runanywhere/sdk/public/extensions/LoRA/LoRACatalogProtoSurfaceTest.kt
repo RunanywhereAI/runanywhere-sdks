@@ -7,6 +7,7 @@ import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedRequest
 import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class LoRACatalogProtoSurfaceTest {
@@ -49,7 +50,6 @@ class LoRACatalogProtoSurfaceTest {
             )
         val result =
             LoraAdapterDownloadCompletedResult(
-                success = true,
                 persisted = true,
                 entry =
                     LoraAdapterCatalogEntry(
@@ -66,7 +66,7 @@ class LoRACatalogProtoSurfaceTest {
                 LoraAdapterDownloadCompletedResult.ADAPTER.encode(result),
             )
 
-        assertTrue(decoded.success)
+        assertNull(decoded.error)
         assertTrue(decoded.persisted)
         assertEquals("/models/lora/adapter-1.gguf", decoded.entry?.local_path)
         assertEquals(true, decoded.entry?.is_downloaded)
