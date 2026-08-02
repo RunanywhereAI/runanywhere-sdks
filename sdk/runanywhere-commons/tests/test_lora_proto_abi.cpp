@@ -209,7 +209,7 @@ bool lifecycle_load(rac_model_registry_handle_t registry, const std::string& mod
     const rac_result_t rc =
         rac_model_lifecycle_load_proto(registry, bytes.data(), bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
-    const bool ok = rc == RAC_SUCCESS && parse_buffer(out, &result) && result.success();
+    const bool ok = rc == RAC_SUCCESS && parse_buffer(out, &result) && result.has_error() == false;
     rac_proto_buffer_free(&out);
     return ok;
 }
@@ -249,10 +249,10 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
     runanywhere::v1::LoRAApplyResult precheck_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &precheck_result),
           "apply without lifecycle returns typed LoRAApplyResult");
-    CHECK(!precheck_result.success(), "apply without lifecycle is unsuccessful");
-    CHECK(precheck_result.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
+    CHECK(!precheck_result.has_error() == false, "apply without lifecycle is unsuccessful");
+    CHECK(precheck_result.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "apply without lifecycle reports COMPONENT_NOT_READY");
-    CHECK(precheck_result.error_message().find("LoRA service is not loaded") != std::string::npos,
+    CHECK(precheck_result.error().message().find("LoRA service is not loaded") != std::string::npos,
           "apply without lifecycle explains missing service");
     rac_proto_buffer_free(&out);
 
@@ -287,7 +287,7 @@ int test_apply_remove_via_lifecycle_only(rac_model_registry_handle_t registry) {
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "lifecycle apply returns typed result");
-    CHECK(apply_result.success(), "lifecycle apply succeeds");
+    CHECK(apply_result.has_error() == false, "lifecycle apply succeeds");
     CHECK(apply_result.adapters_size() == 2, "lifecycle apply returns adapter info");
     CHECK(apply_result.request_id() == "apply-lifecycle", "lifecycle apply preserves request id");
     rac_proto_buffer_free(&out);
@@ -382,7 +382,7 @@ int test_unload_reverts_to_not_ready(rac_model_registry_handle_t registry) {
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "apply-before-unload returns LoRAApplyResult");
-    CHECK(apply_result.success(), "apply-before-unload succeeds");
+    CHECK(apply_result.has_error() == false, "apply-before-unload succeeds");
     rac_proto_buffer_free(&out);
 
     rac_model_lifecycle_reset();
@@ -396,9 +396,9 @@ int test_unload_reverts_to_not_ready(rac_model_registry_handle_t registry) {
     runanywhere::v1::LoRAState state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
           "lifecycle state after unload returns typed LoRAState");
-    CHECK(state.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
+    CHECK(state.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "lifecycle state after unload reports COMPONENT_NOT_READY");
-    CHECK(state.error_message().find("LoRA service is not loaded") != std::string::npos,
+    CHECK(state.error().message().find("LoRA service is not loaded") != std::string::npos,
           "lifecycle state after unload explains missing service");
     rac_proto_buffer_free(&out);
 
@@ -509,8 +509,8 @@ int test_apis_before_load_report_component_not_ready() {
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "apply-before-load returns typed LoRAApplyResult");
-    CHECK(!apply_result.success(), "apply-before-load reports failure");
-    CHECK(apply_result.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
+    CHECK(!apply_result.has_error() == false, "apply-before-load reports failure");
+    CHECK(apply_result.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "apply-before-load reports COMPONENT_NOT_READY");
     rac_proto_buffer_free(&out);
 
@@ -526,7 +526,7 @@ int test_apis_before_load_report_component_not_ready() {
     runanywhere::v1::LoRAState remove_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &remove_state),
           "remove-before-load returns typed LoRAState");
-    CHECK(remove_state.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
+    CHECK(remove_state.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "remove-before-load reports COMPONENT_NOT_READY");
     rac_proto_buffer_free(&out);
 
@@ -541,7 +541,7 @@ int test_apis_before_load_report_component_not_ready() {
     runanywhere::v1::LoRAState list_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &list_state),
           "list-before-load returns typed LoRAState");
-    CHECK(list_state.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
+    CHECK(list_state.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "list-before-load reports COMPONENT_NOT_READY");
     rac_proto_buffer_free(&out);
 
@@ -550,7 +550,7 @@ int test_apis_before_load_report_component_not_ready() {
     runanywhere::v1::LoRAState lora_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &lora_state),
           "state-before-load returns typed LoRAState");
-    CHECK(lora_state.error_code() == RAC_ERROR_COMPONENT_NOT_READY,
+    CHECK(lora_state.error().c_abi_code() == RAC_ERROR_COMPONENT_NOT_READY,
           "state-before-load reports COMPONENT_NOT_READY");
     rac_proto_buffer_free(&out);
 
@@ -590,7 +590,7 @@ int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "apply-pre-clear returns LoRAApplyResult");
-    CHECK(apply_result.success(), "apply-pre-clear succeeds");
+    CHECK(apply_result.has_error() == false, "apply-pre-clear succeeds");
     rac_proto_buffer_free(&out);
 
     // First clear_all → state empties.
@@ -604,7 +604,7 @@ int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
     runanywhere::v1::LoRAState first_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &first_state),
           "first clear_all returns LoRAState");
-    CHECK(first_state.error_code() == 0, "first clear_all carries no error");
+    CHECK(first_state.error().c_abi_code() == 0, "first clear_all carries no error");
     CHECK(first_state.loaded_adapters_size() == 0, "first clear_all empties tracked adapters");
     CHECK(!first_state.has_active_adapters(), "first clear_all sets has_active_adapters=false");
     rac_proto_buffer_free(&out);
@@ -616,7 +616,7 @@ int test_double_clear_is_idempotent(rac_model_registry_handle_t registry) {
     runanywhere::v1::LoRAState second_state;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &second_state),
           "second clear_all returns LoRAState");
-    CHECK(second_state.error_code() == 0, "second clear_all carries no error (idempotent)");
+    CHECK(second_state.error().c_abi_code() == 0, "second clear_all carries no error (idempotent)");
     CHECK(second_state.loaded_adapters_size() == 0,
           "second clear_all leaves tracked adapters empty");
     CHECK(!second_state.has_active_adapters(), "second clear_all keeps has_active_adapters=false");

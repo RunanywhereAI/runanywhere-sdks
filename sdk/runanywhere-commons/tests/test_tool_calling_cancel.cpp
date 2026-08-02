@@ -309,7 +309,7 @@ bool load_mock_llm() {
         rac_model_lifecycle_load_proto(g_registry, load_bytes.data(), load_bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
     bool ok = rc == RAC_SUCCESS && out.data != nullptr && out.size > 0 &&
-              result.ParseFromArray(out.data, static_cast<int>(out.size)) && result.success();
+              result.ParseFromArray(out.data, static_cast<int>(out.size)) && !result.has_error();
     rac_proto_buffer_free(&out);
     return ok;
 }
@@ -334,13 +334,13 @@ runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string&
                                                               uint32_t max_tool_calls = 0) {
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(prompt);
-    request.mutable_generation()->set_max_output_tokens(64);
-    request.mutable_generation()->set_temperature(0.5f);
-    *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_weather_tool();
-    request.mutable_generation()->mutable_tool_calling()->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
-    request.mutable_generation()->mutable_tool_calling()->set_auto_execute(true);
+    request.set_max_tokens(64);
+    request.set_temperature(0.5f);
+    *request.add_tools() = make_weather_tool();
+    request.set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    request.set_auto_execute(true);
     if (max_tool_calls > 0)
-        request.mutable_generation()->mutable_tool_calling()->set_max_tool_calls(max_tool_calls);
+        request.set_max_tool_calls(max_tool_calls);
     return request;
 }
 

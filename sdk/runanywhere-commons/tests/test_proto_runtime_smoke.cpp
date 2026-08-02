@@ -143,7 +143,7 @@ int test_storage_info_proto_is_active() {
     runanywhere::v1::StorageInfoResult result;
     CHECK(rc == RAC_SUCCESS, "storage info proto returns success");
     CHECK(parse_buffer(out, &result), "storage info proto parses");
-    CHECK(result.success(), "storage info reports success");
+    CHECK(result.has_error() == false, "storage info reports success");
     CHECK(result.info().device().total_bytes() == fixture.total,
           "storage info carries device total");
     CHECK(result.info().device().free_bytes() == fixture.free, "storage info carries device free");

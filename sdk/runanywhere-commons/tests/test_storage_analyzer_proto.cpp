@@ -234,7 +234,7 @@ int test_info_aggregation_and_model_breakdown() {
 
     runanywhere::v1::StorageInfoResult result;
     ASSERT_TRUE(parse_buffer(buffer, &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.info().device().total_bytes(), 1000);
     ASSERT_EQ(result.info().device().free_bytes(), 400);
     ASSERT_EQ(result.info().device().used_bytes(), 600);
@@ -298,7 +298,7 @@ int test_availability_offsets_existing_model_bytes() {
 
     runanywhere::v1::StorageAvailabilityResult result;
     ASSERT_TRUE(parse_buffer(buffer, &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.availability().required_bytes(), 450);
     ASSERT_EQ(result.availability().available_bytes(), 500);
     ASSERT_TRUE(result.availability().is_available());
@@ -350,7 +350,7 @@ int test_availability_includes_cache_delete_plan() {
 
     runanywhere::v1::StorageAvailabilityResult result;
     ASSERT_TRUE(parse_buffer(buffer, &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_TRUE(!result.availability().is_available());
     ASSERT_EQ(result.availability().shortfall_bytes(), 200);
     ASSERT_TRUE(result.has_delete_plan());
@@ -415,7 +415,7 @@ int test_delete_plan_blocks_loaded_missing_and_missing_path() {
     ASSERT_TRUE(!plan.requires_unload());
     ASSERT_TRUE(!plan.can_reclaim_required_bytes());
     ASSERT_TRUE(plan.warnings_size() >= 3);
-    ASSERT_TRUE(!plan.error_message().empty());
+    ASSERT_TRUE(!plan.error().message().empty());
 
     runanywhere::v1::SDKEvent event;
     ASSERT_TRUE(poll_sdk_event(&event));
@@ -492,7 +492,7 @@ int test_delete_dry_run_vs_execute() {
               RAC_SUCCESS);
     runanywhere::v1::StorageDeleteResult dry_run;
     ASSERT_TRUE(parse_buffer(buffer, &dry_run));
-    ASSERT_TRUE(dry_run.success());
+    ASSERT_TRUE(dry_run.has_error() == false);
     ASSERT_EQ(dry_run.deleted_bytes(), 100);
     ASSERT_EQ(dry_run.deleted_model_ids_size(), 1);
     ASSERT_TRUE(dry_run.dry_run());
@@ -510,7 +510,7 @@ int test_delete_dry_run_vs_execute() {
               RAC_SUCCESS);
     runanywhere::v1::StorageDeleteResult executed;
     ASSERT_TRUE(parse_buffer(buffer, &executed));
-    ASSERT_TRUE(!executed.success());
+    ASSERT_TRUE(!executed.has_error() == false);
     ASSERT_EQ(executed.skipped_model_ids_size(), 1);
     ASSERT_EQ(executed.skipped_model_ids(0), "m1");
     ASSERT_TRUE(storage.deleted_paths.empty());
@@ -524,7 +524,7 @@ int test_delete_dry_run_vs_execute() {
                   request_bytes.size(), &buffer),
               RAC_SUCCESS);
     ASSERT_TRUE(parse_buffer(buffer, &executed));
-    ASSERT_TRUE(executed.success());
+    ASSERT_TRUE(executed.has_error() == false);
     ASSERT_EQ(executed.deleted_bytes(), 100);
     ASSERT_TRUE(executed.files_deleted());
     ASSERT_TRUE(executed.registry_updated());
@@ -562,7 +562,7 @@ int test_empty_storage_info() {
 
     runanywhere::v1::StorageInfoResult result;
     ASSERT_TRUE(parse_buffer(buffer, &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.info().device().total_bytes(), 0);
     ASSERT_EQ(result.info().device().free_bytes(), 0);
     ASSERT_EQ(result.info().device().used_bytes(), 0);
@@ -594,7 +594,7 @@ int test_invalid_request_publishes_typed_storage_error() {
 
     runanywhere::v1::StorageDeletePlan plan;
     ASSERT_TRUE(parse_buffer(buffer, &plan));
-    ASSERT_TRUE(!plan.error_message().empty());
+    ASSERT_TRUE(!plan.error().message().empty());
 
     runanywhere::v1::SDKEvent event;
     ASSERT_TRUE(poll_sdk_event(&event));

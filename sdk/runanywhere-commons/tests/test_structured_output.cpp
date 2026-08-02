@@ -166,7 +166,7 @@ int test_prepare_prompt_proto_uses_generated_contract() {
 
     runanywhere::v1::StructuredOutputPromptResult result;
     ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
-    ASSERT_EQ_INT(result.error_code(), RAC_SUCCESS);
+    ASSERT_EQ_INT(result.error().c_abi_code(), RAC_SUCCESS);
     ASSERT_SUBSTR(result.prepared_prompt().c_str(), "Return a status");
     ASSERT_SUBSTR(result.prepared_prompt().c_str(), "\"status\"");
     ASSERT_TRUE(result.has_system_prompt());
@@ -223,7 +223,7 @@ int test_validate_proto_uses_generated_contract() {
     ASSERT_TRUE(result.ParseFromArray(result_bytes.data, static_cast<int>(result_bytes.size)));
     ASSERT_EQ_INT(result.is_valid(), false);
     ASSERT_EQ_INT(result.contains_json(), false);
-    ASSERT_TRUE(result.has_error_message());
+    ASSERT_TRUE(result.has_error());
     ASSERT_TRUE(!result.has_extracted_json());
     rac_proto_buffer_free(&result_bytes);
     return 0;

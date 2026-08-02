@@ -169,7 +169,7 @@ int test_error_termination() {
                                         static_cast<int>(g_capture.events.back().size())));
     ASSERT_EQ(terminal.is_final(), true);
     ASSERT_EQ(terminal.finish_reason(), "error");
-    ASSERT_EQ(terminal.error_message(), "engine backend vanished");
+    ASSERT_EQ(terminal.error().message(), "engine backend vanished");
 
     rac_llm_unset_stream_proto_callback(fake_handle());
     return 0;

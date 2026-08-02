@@ -245,7 +245,7 @@ bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
     rac_result_t rc =
         rac_model_lifecycle_load_proto(g_registry, load_bytes.data(), load_bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
-    const bool ok = rc == RAC_SUCCESS && parse_buffer(out, &result) && result.success();
+    const bool ok = rc == RAC_SUCCESS && parse_buffer(out, &result) && !result.has_error();
     rac_proto_buffer_free(&out);
     return ok;
 }
@@ -446,13 +446,13 @@ runanywhere::v1::ToolCallingSessionCreateRequest make_request(const std::string&
                                                               uint32_t max_tool_calls = 0) {
     runanywhere::v1::ToolCallingSessionCreateRequest request;
     request.set_prompt(prompt);
-    request.mutable_generation()->set_max_output_tokens(64);
-    request.mutable_generation()->set_temperature(0.5f);
-    *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_weather_tool();
-    request.mutable_generation()->mutable_tool_calling()->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
-    request.mutable_generation()->mutable_tool_calling()->set_auto_execute(true);
+    request.set_max_tokens(64);
+    request.set_temperature(0.5f);
+    *request.add_tools() = make_weather_tool();
+    request.set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON);
+    request.set_auto_execute(true);
     if (max_tool_calls > 0)
-        request.mutable_generation()->mutable_tool_calling()->set_max_tool_calls(max_tool_calls);
+        request.set_max_tool_calls(max_tool_calls);
     return request;
 }
 
@@ -561,7 +561,7 @@ int test_max_tool_calls_allows_final_synthesis() {
 
     EventSink sink;
     auto request = make_request("weather everywhere", 2);
-    request.mutable_generation()->mutable_tool_calling()->set_keep_tools_available(true);
+    request.set_keep_tools_available(true);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -617,8 +617,8 @@ int test_forced_tool_name_only_promotes_session_to_specific() {
 
     EventSink sink;
     auto request = make_request("Use the selected tool.");
-    request.mutable_generation()->mutable_tool_calling()->set_forced_tool_name("get_weather");
-    *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_calculate_tool();
+    request.set_forced_tool_name("get_weather");
+    *request.add_tools() = make_calculate_tool();
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -654,8 +654,8 @@ int test_none_vetoes_forced_name_in_session() {
 
     EventSink sink;
     auto request = make_request("Answer directly without tools.");
-    request.mutable_generation()->mutable_tool_calling()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
-    request.mutable_generation()->mutable_tool_calling()->set_forced_tool_name("get_weather");
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    request.set_forced_tool_name("get_weather");
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
 
@@ -689,7 +689,7 @@ int test_none_blocks_session_call_when_validation_disabled() {
 
     EventSink sink;
     auto request = make_request("Answer directly without tools.");
-    request.mutable_generation()->mutable_tool_calling()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+    request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
     request.set_validate_calls(false);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
@@ -729,8 +729,8 @@ int test_forced_target_blocks_wrong_session_call_when_validation_disabled() {
 
     EventSink sink;
     auto request = make_request("Use calculate only.");
-    *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_calculate_tool();
-    request.mutable_generation()->mutable_tool_calling()->set_forced_tool_name("calculate");
+    *request.add_tools() = make_calculate_tool();
+    request.set_forced_tool_name("calculate");
     request.set_validate_calls(false);
     std::vector<uint8_t> bytes;
     serialize(request, &bytes);
@@ -781,12 +781,12 @@ int test_specific_session_target_must_be_nonempty_and_present() {
     };
 
     auto empty_target = make_request("Use a specific tool.");
-    empty_target.mutable_generation()->mutable_tool_calling()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    empty_target.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
     run_invalid_request(empty_target, "SPECIFIC session without target is rejected");
 
     auto missing_target = make_request("Use the missing tool.");
-    missing_target.mutable_generation()->mutable_tool_calling()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
-    missing_target.mutable_generation()->mutable_tool_calling()->set_forced_tool_name("missing_tool");
+    missing_target.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC);
+    missing_target.set_forced_tool_name("missing_tool");
     run_invalid_request(missing_target, "SPECIFIC session target absent from tools is rejected");
     CHECK(generate_calls() == 0, "invalid SPECIFIC sessions fail before generation");
 
@@ -803,9 +803,9 @@ int test_specific_and_required_sessions_reject_initial_no_call() {
         set_responses({"I decided not to call a tool."});
         EventSink sink;
         auto request = make_request("A tool call is mandatory.");
-        request.mutable_generation()->mutable_tool_calling()->set_tool_choice(mode);
+        request.set_tool_choice(mode);
         if (mode == runanywhere::v1::TOOL_CHOICE_MODE_SPECIFIC) {
-            request.mutable_generation()->mutable_tool_calling()->set_forced_tool_name("get_weather");
+            request.set_forced_tool_name("get_weather");
         }
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
@@ -1041,7 +1041,7 @@ int test_session_grammar_gated_on_framework() {
     {
         EventSink sink;
         auto request = make_request("What is the capital of France?");
-        *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_calculate_tool();  // tools: get_weather, calculate
+        *request.add_tools() = make_calculate_tool();  // tools: get_weather, calculate
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1064,7 +1064,7 @@ int test_session_grammar_gated_on_framework() {
     {
         EventSink sink;
         auto request = make_request("What is the capital of France?");
-        *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_calculate_tool();
+        *request.add_tools() = make_calculate_tool();
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1086,8 +1086,8 @@ int test_session_grammar_gated_on_framework() {
     {
         EventSink sink;
         auto request = make_request("Answer directly.");
-        *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_calculate_tool();
-        request.mutable_generation()->mutable_tool_calling()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        *request.add_tools() = make_calculate_tool();
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1156,7 +1156,7 @@ int test_session_decision_hint_on_auto_path() {
     {
         EventSink sink;
         auto request = make_request("What is the capital of France?");
-        *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_calculate_tool();
+        *request.add_tools() = make_calculate_tool();
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1179,8 +1179,8 @@ int test_session_decision_hint_on_auto_path() {
     {
         EventSink sink;
         auto request = make_request("What is the capital of France?");
-        *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_calculate_tool();
-        request.mutable_generation()->set_system_prompt("You are Halo, a concise assistant.");
+        *request.add_tools() = make_calculate_tool();
+        request.set_system_prompt("You are Halo, a concise assistant.");
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1206,8 +1206,8 @@ int test_session_decision_hint_on_auto_path() {
     {
         EventSink sink;
         auto request = make_request("Answer directly.");
-        *request.mutable_generation()->mutable_tool_calling()->add_tools() = make_calculate_tool();
-        request.mutable_generation()->mutable_tool_calling()->set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
+        *request.add_tools() = make_calculate_tool();
+        request.set_tool_choice(runanywhere::v1::TOOL_CHOICE_MODE_NONE);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;
@@ -1276,7 +1276,7 @@ int test_session_grammar_keep_tools_bare_pythonic() {
     {
         EventSink sink;
         auto request = make_request("Weather in Tokyo then Osaka?");
-        request.mutable_generation()->mutable_tool_calling()->set_keep_tools_available(true);
+        request.set_keep_tools_available(true);
         std::vector<uint8_t> bytes;
         serialize(request, &bytes);
         uint64_t handle = 0;

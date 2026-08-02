@@ -916,7 +916,7 @@ static TestResult test_proto_plan_invalid_url() {
     ASSERT_TRUE(make_plan("proto-model-invalid", "ftp://fake/model.gguf", 100, &plan),
                 "Invalid URL plan should still return a result proto");
     ASSERT_TRUE(!plan.can_start(), "Invalid URL should not be startable");
-    ASSERT_TRUE(plan.error_message().find("http") != std::string::npos,
+    ASSERT_TRUE(plan.error().message().find("http") != std::string::npos,
                 "Invalid URL should explain http(s) requirement");
 
     remove_dir(base_dir);
@@ -1211,7 +1211,7 @@ static TestResult test_proto_start_no_adapter() {
     rav1::DownloadStartResult start;
     ASSERT_TRUE(start_from_plan(plan, false, &start), "Start should return a result proto");
     ASSERT_TRUE(!start.accepted(), "Start should be rejected without HTTP adapter");
-    ASSERT_TRUE(start.error_message().find("HTTP transport") != std::string::npos,
+    ASSERT_TRUE(start.error().message().find("HTTP transport") != std::string::npos,
                 "Start should explain missing adapter");
 
     remove_dir(base_dir);
@@ -1533,7 +1533,7 @@ static TestResult test_proto_cancel_resume() {
                 "Cancel call should succeed");
     rav1::DownloadCancelResult cancel_result;
     ASSERT_TRUE(parse_cancel(cancel_buffer, &cancel_result), "Cancel result should parse");
-    ASSERT_TRUE(cancel_result.success(), "Cancel result should report success");
+    ASSERT_TRUE(cancel_result.has_error() == false, "Cancel result should report success");
     ASSERT_TRUE(cancel_result.was_running(), "Cancel should observe a running task");
     ASSERT_TRUE(cancel_result.partial_bytes_preserved(),
                 "Cancel without deletion should preserve partial bytes");

@@ -278,7 +278,7 @@ bool load_model(rac_model_registry_handle_t registry, const char* model_id) {
     const rac_result_t rc =
         rac_model_lifecycle_load_proto(registry, bytes.data(), bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
-    const bool ok = rc == RAC_SUCCESS && parse_buffer(out, &result) && result.success();
+    const bool ok = rc == RAC_SUCCESS && parse_buffer(out, &result) && result.has_error() == false;
     rac_proto_buffer_free(&out);
     return ok;
 }

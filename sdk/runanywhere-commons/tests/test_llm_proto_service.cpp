@@ -270,7 +270,7 @@ bool load_mock_model(rac_model_registry_handle_t registry) {
     const rac_result_t rc =
         rac_model_lifecycle_load_proto(registry, bytes.data(), bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
-    const bool ok = rc == RAC_SUCCESS && parse_buffer(out, &result) && result.success();
+    const bool ok = rc == RAC_SUCCESS && parse_buffer(out, &result) && result.has_error() == false;
     rac_proto_buffer_free(&out);
     return ok;
 }
@@ -504,7 +504,7 @@ int test_structured_generate_proto(rac_model_registry_handle_t registry) {
           "structured generate returns parsable StructuredOutputResult");
     CHECK(result.validation().is_valid(), "structured generate validates JSON");
     CHECK(result.parsed_json() == "{\"ok\":true}", "structured generate returns parsed JSON bytes");
-    CHECK(result.error_code() == RAC_SUCCESS, "structured generate reports success code");
+    CHECK(result.error().c_abi_code() == RAC_SUCCESS, "structured generate reports success code");
     rac_proto_buffer_free(&out);
     cleanup_environment();
     return 0;

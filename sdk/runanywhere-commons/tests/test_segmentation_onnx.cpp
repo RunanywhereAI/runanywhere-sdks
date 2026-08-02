@@ -354,7 +354,7 @@ int main() {
             load_rc == RAC_SUCCESS &&
             load_result.ParseFromArray(lifecycle_output.data,
                                        static_cast<int>(lifecycle_output.size)) &&
-            load_result.success() && load_result.model_id() == model.id();
+            !load_result.has_error() && load_result.model_id() == model.id();
         CHECK(lifecycle_loaded,
               "canonical model lifecycle loads the real ONNX segmentation fixture");
         rac_proto_buffer_free(&lifecycle_output);
@@ -393,7 +393,7 @@ int main() {
                       valid_fixture_result(in_flight_result, kWidth, kHeight, model.id().c_str()),
                   "admitted handle-free inference completes with the canonical model");
             CHECK(unload.wait_for(2s) == std::future_status::ready && unload.get() &&
-                      unload_rc == RAC_SUCCESS && unload_result.success() &&
+                      unload_rc == RAC_SUCCESS && !unload_result.has_error() &&
                       unload_result.unloaded_model_ids_size() == 1 &&
                       unload_result.unloaded_model_ids(0) == model.id(),
                   "canonical lifecycle unload completes after the global lease drains");

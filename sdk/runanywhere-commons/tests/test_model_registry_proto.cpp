@@ -636,14 +636,14 @@ int test_query_source_filter_and_sorting_proto() {
 
     query.Clear();
     query.set_sort_field(runanywhere::v1::MODEL_QUERY_SORT_FIELD_NAME);
-    query.set_sort_order(runanywhere::v1::MODEL_QUERY_SORT_ORDER_ASCENDING);
+    query.set_descending(false);
     ASSERT_TRUE(query_model_proto(registry, query, &list));
     ASSERT_EQ(list.models_size(), 3);
     ASSERT_EQ(list.models(0).id(), "zeta.local");
     ASSERT_EQ(list.models(1).id(), "beta.local");
     ASSERT_EQ(list.models(2).id(), "alpha.remote");
 
-    query.set_sort_order(runanywhere::v1::MODEL_QUERY_SORT_ORDER_DESCENDING);
+    query.set_descending(true);
     ASSERT_TRUE(query_model_proto(registry, query, &list));
     ASSERT_EQ(list.models_size(), 3);
     ASSERT_EQ(list.models(0).id(), "alpha.remote");
@@ -652,7 +652,7 @@ int test_query_source_filter_and_sorting_proto() {
 
     query.Clear();
     query.set_sort_field(runanywhere::v1::MODEL_QUERY_SORT_FIELD_DOWNLOAD_SIZE_BYTES);
-    query.set_sort_order(runanywhere::v1::MODEL_QUERY_SORT_ORDER_DESCENDING);
+    query.set_descending(true);
     ASSERT_TRUE(query_model_proto(registry, query, &list));
     ASSERT_EQ(list.models_size(), 3);
     ASSERT_EQ(list.models(0).id(), "alpha.remote");
@@ -707,7 +707,7 @@ int test_canonical_result_shapes_and_typed_errors() {
               RAC_SUCCESS);
     runanywhere::v1::ModelImportResult import_result;
     ASSERT_TRUE(parse_and_free_buffer(&import_buffer, &import_result));
-    ASSERT_TRUE(import_result.success());
+    ASSERT_TRUE(import_result.has_error() == false);
     ASSERT_TRUE(import_result.registered());
     ASSERT_EQ(import_result.local_path(), "/imports/import.test");
     ASSERT_EQ(import_result.imported_bytes(), 55);
@@ -732,7 +732,7 @@ int test_canonical_result_shapes_and_typed_errors() {
     list_request.mutable_query()->set_downloaded_only(true);
     runanywhere::v1::ModelListResult list_result;
     ASSERT_TRUE(call_list_models_result(registry, list_request, &list_result));
-    ASSERT_TRUE(list_result.success());
+    ASSERT_TRUE(list_result.has_error() == false);
     ASSERT_EQ(list_result.models().models_size(), 1);
     ASSERT_EQ(list_result.models().models(0).id(), "import.test");
     ASSERT_EQ(list_result.total_count(), 1);
@@ -752,7 +752,7 @@ int test_canonical_result_shapes_and_typed_errors() {
               RAC_SUCCESS);
     runanywhere::v1::ModelDiscoveryResult discovery_result;
     ASSERT_TRUE(parse_and_free_buffer(&discovery_buffer, &discovery_result));
-    ASSERT_TRUE(discovery_result.success());
+    ASSERT_TRUE(discovery_result.has_error() == false);
     ASSERT_EQ(discovery_result.discovered_models_size(), 1);
     ASSERT_EQ(discovery_result.discovered_models(0).model_id(), "import.test");
     ASSERT_TRUE(discovery_result.discovered_models(0).matched_registry());
@@ -770,7 +770,7 @@ int test_canonical_result_shapes_and_typed_errors() {
               RAC_SUCCESS);
     runanywhere::v1::ModelRegistryRefreshResult refresh_result;
     ASSERT_TRUE(parse_and_free_buffer(&refresh_buffer, &refresh_result));
-    ASSERT_TRUE(refresh_result.success());
+    ASSERT_TRUE(refresh_result.has_error() == false);
     ASSERT_EQ(refresh_result.models().models_size(), 1);
     ASSERT_EQ(refresh_result.downloaded_count(), 1);
     ASSERT_EQ(refresh_result.available_count(), 1);
@@ -781,7 +781,7 @@ int test_canonical_result_shapes_and_typed_errors() {
               RAC_SUCCESS);
     runanywhere::v1::ModelDeleteResult delete_result;
     ASSERT_TRUE(parse_and_free_buffer(&delete_buffer, &delete_result));
-    ASSERT_TRUE(delete_result.success());
+    ASSERT_TRUE(delete_result.has_error() == false);
     ASSERT_TRUE(delete_result.registry_updated());
     ASSERT_TRUE(!delete_result.files_deleted());
 

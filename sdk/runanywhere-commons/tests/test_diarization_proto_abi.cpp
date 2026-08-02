@@ -451,7 +451,7 @@ int main() {
         CHECK(load_rc == RAC_SUCCESS &&
                   load_result.ParseFromArray(lifecycle_output.data,
                                              static_cast<int>(lifecycle_output.size)) &&
-                  load_result.success() && load_result.model_id() == model.id(),
+                  load_result.has_error() == false && load_result.model_id() == model.id(),
               "canonical lifecycle loads the diarization model");
         rac_proto_buffer_free(&lifecycle_output);
 
@@ -499,7 +499,7 @@ int main() {
         CHECK(unload_rc == RAC_SUCCESS &&
                   unload_result.ParseFromArray(lifecycle_output.data,
                                                static_cast<int>(lifecycle_output.size)) &&
-                  unload_result.success() && unload_result.unloaded_model_ids_size() == 1 &&
+                  unload_result.has_error() == false && unload_result.unloaded_model_ids_size() == 1 &&
                   unload_result.unloaded_model_ids(0) == model.id(),
               "canonical lifecycle unloads the diarization model");
         rac_proto_buffer_free(&lifecycle_output);

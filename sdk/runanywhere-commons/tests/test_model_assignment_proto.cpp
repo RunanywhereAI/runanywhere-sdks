@@ -161,21 +161,21 @@ int test_cache_refresh_policy() {
 
     runanywhere::v1::ModelRegistryRefreshResult result;
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(true), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 1);
     ASSERT_EQ(result.models().models(0).name(), "Cache One");
     ASSERT_EQ(fake.call_count, 1);
     ASSERT_TRUE(fake.saw_requires_auth);
 
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(false), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 1);
     ASSERT_EQ(result.models().models(0).name(), "Cache One");
     ASSERT_EQ(fake.call_count, 1);
 
     rac_model_assignment_set_cache_timeout(0);
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(false), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 1);
     ASSERT_EQ(result.models().models(0).name(), "Cache Two");
     ASSERT_EQ(fake.call_count, 2);
@@ -215,7 +215,7 @@ int test_metadata_normalization_into_model_info() {
 
     runanywhere::v1::ModelRegistryRefreshResult result;
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(true), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 1);
 
     const auto& model = result.models().models(0);
@@ -261,7 +261,7 @@ int test_json_diarization_and_segmentation_categories() {
 
     runanywhere::v1::ModelRegistryRefreshResult result;
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(true), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 4);
     ASSERT_EQ(result.models().models(0).category(),
               runanywhere::v1::MODEL_CATEGORY_SPEAKER_DIARIZATION);
@@ -287,7 +287,7 @@ int test_no_config_no_transport_returns_empty_result() {
 
     runanywhere::v1::ModelRegistryRefreshResult result;
     ASSERT_TRUE(call_assignment_refresh(make_refresh_request(true), &result));
-    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(result.has_error() == false);
     ASSERT_EQ(result.models().models_size(), 0);
     ASSERT_TRUE(result.warnings_size() >= 1);
     ASSERT_TRUE(result.warnings(0).find("transport") != std::string::npos);

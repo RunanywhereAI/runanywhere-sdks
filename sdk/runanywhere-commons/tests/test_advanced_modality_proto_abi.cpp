@@ -542,7 +542,7 @@ int test_vlm_process_stream_events() {
                                         stream_load_bytes.size(), &out);
     runanywhere::v1::ModelLoadResult stream_load_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &stream_load_result) &&
-              stream_load_result.success(),
+              stream_load_result.has_error() == false,
           "VLM stream lifecycle load succeeds");
     rac_proto_buffer_free(&out);
 
@@ -692,7 +692,7 @@ int test_embeddings_mocked_result() {
 
 int test_embeddings_options_mapping() {
     runanywhere::v1::EmbeddingsOptions options;
-    options.set_normalize_mode(runanywhere::v1::EMBEDDINGS_NORMALIZE_MODE_L2);
+    options.set_normalize(true);
     options.set_pooling(runanywhere::v1::EMBEDDINGS_POOLING_STRATEGY_CLS);
     options.set_n_threads(6);
     options.set_truncate(false);
@@ -922,7 +922,7 @@ int test_rag_ingest_query_mocked_path() {
     rc = rac_embeddings_create_proto(embed_create_bytes.data(), embed_create_bytes.size(), &out);
     runanywhere::v1::EmbeddingsCreateResult embed_create_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &embed_create_result) &&
-              embed_create_result.error_code() == 0 && embed_create_result.handle() != 0,
+              embed_create_result.error().c_abi_code() == 0 && embed_create_result.handle() != 0,
           "RAG sink-cancel embeddings service creates");
     sink_embed_handle = reinterpret_cast<rac_handle_t>(embed_create_result.handle());
     rac_proto_buffer_free(&out);
@@ -1373,7 +1373,7 @@ bool lifecycle_load_lora_model(rac_model_registry_handle_t registry, const std::
         rac_model_lifecycle_load_proto(registry, bytes.data(), bytes.size(), &out);
     runanywhere::v1::ModelLoadResult result;
     const bool ok = rc == RAC_SUCCESS && out.status == RAC_SUCCESS &&
-                    result.ParseFromArray(out.data, static_cast<int>(out.size)) && result.success();
+                    result.ParseFromArray(out.data, static_cast<int>(out.size)) && result.has_error() == false;
     rac_proto_buffer_free(&out);
     return ok;
 }
@@ -1456,7 +1456,7 @@ int test_lora_register_compat_apply_remove_clear() {
     runanywhere::v1::LoRAApplyResult apply_result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
           "LoRA apply returns generated result");
-    CHECK(apply_result.success() && apply_result.adapters_size() == 1,
+    CHECK(apply_result.has_error() == false && apply_result.adapters_size() == 1,
           "LoRA apply succeeds through generated service ABI");
     CHECK(apply_result.adapters(0).applied() &&
               apply_result.adapters(0).adapter_path() == adapter_path.string(),
@@ -1492,7 +1492,7 @@ int test_lora_register_compat_apply_remove_clear() {
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &compat),
           "unsupported LoRA compatibility still returns generated result");
     CHECK(!compat.is_compatible() &&
-              compat.error_message().find("Backend does not support") != std::string::npos,
+              compat.error().message().find("Backend does not support") != std::string::npos,
           "unsupported LoRA reports typed incompatibility");
     rac_proto_buffer_free(&out);
 
