@@ -207,8 +207,8 @@ void llm_stream_callback(const uint8_t* event_bytes, size_t event_size, void* /*
             state->in_thought_block = false;
         }
         state->finish_reason = event.finish_reason();
-        if (!event.error_message().empty()) {
-            state->error = event.error_message();
+        if (!event.error().message().empty()) {
+            state->error = event.error().message();
         }
         state->done = true;
         state->cv.notify_all();
@@ -349,10 +349,10 @@ bool load_model(const GlobalOptions& options, const std::string& model_id,
         out::error_line("model load failed: " + error);
         return false;
     }
-    if (!result.success()) {
-        out::error_line("model load failed: " + (result.error_message().empty()
+    if (!result.has_error() == false) {
+        out::error_line("model load failed: " + (result.error().message().empty()
                                                      ? "unknown error"
-                                                     : result.error_message()));
+                                                     : result.error().message()));
         return false;
     }
     if (options.verbose) {
@@ -418,8 +418,8 @@ int run_vlm(const GlobalOptions& options, const std::string& model_id,
         out::error_line("vlm generation failed: " + error);
         return 1;
     }
-    if (!result.error_message().empty()) {
-        out::error_line("vlm generation failed: " + result.error_message());
+    if (!result.error().message().empty()) {
+        out::error_line("vlm generation failed: " + result.error().message());
         return 1;
     }
 

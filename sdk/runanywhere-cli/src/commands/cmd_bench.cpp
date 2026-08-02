@@ -248,8 +248,8 @@ double load_model_timed(const std::string& model_id, v1::ModelCategory category,
         *out_error = parse_err.empty() ? "load failed" : parse_err;
         return -1.0;
     }
-    if (!result.success()) {
-        *out_error = result.error_message().empty() ? "load failed" : result.error_message();
+    if (!result.has_error() == false) {
+        *out_error = result.error().message().empty() ? "load failed" : result.error().message();
         return -1.0;
     }
     return static_cast<double>(t1 - t0);

@@ -419,7 +419,7 @@ rac_result_t login(LoginSummary* out, std::string* error) {
         }
         return phase2_rc != RAC_SUCCESS ? phase2_rc : RAC_ERROR_INVALID_RESPONSE;
     }
-    if (!result.success()) {
+    if (!result.has_error() == false) {
         if (error != nullptr) {
             *error = "services init failed: " + result.error().message();
         }

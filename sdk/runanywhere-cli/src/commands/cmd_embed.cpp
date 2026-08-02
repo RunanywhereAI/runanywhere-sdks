@@ -110,10 +110,10 @@ bool load_embeddings_model(const GlobalOptions& options, const std::string& mode
         out::error_line("embedding model load failed: " + error);
         return false;
     }
-    if (!result.success()) {
+    if (!result.has_error() == false) {
         out::error_line("embedding model load failed: " +
-                        (result.error_message().empty() ? "unknown error"
-                                                        : result.error_message()));
+                        (result.error().message().empty() ? "unknown error"
+                                                        : result.error().message()));
         return false;
     }
     if (options.verbose) {
@@ -217,10 +217,10 @@ int run_embed(const GlobalOptions& options, const std::string& ref, const std::s
         return 1;
     }
 
-    if (result.error_code() != 0 || !result.error_message().empty()) {
+    if (result.error().c_abi_code() != 0 || !result.error().message().empty()) {
         out::error_line("embedding failed: " +
-                        (result.error_message().empty() ? std::to_string(result.error_code())
-                                                        : result.error_message()));
+                        (result.error().message().empty() ? std::to_string(result.error().c_abi_code())
+                                                        : result.error().message()));
         return 1;
     }
     if (options.json) {

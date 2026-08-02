@@ -66,8 +66,8 @@ int run_lora_import(const GlobalOptions &options, const std::string &file) {
     out::error_line("import failed: " + error);
     return 1;
   }
-  if (!result.success()) {
-    out::error_line("import failed: " + result.error_message());
+  if (!result.has_error() == false) {
+    out::error_line("import failed: " + result.error().message());
     return 1;
   }
 
@@ -111,9 +111,9 @@ int run_lora_catalog(const GlobalOptions &options) {
   v1::LoraAdapterCatalogListResult result;
   std::string error;
   if (!proto::parse_proto_buffer(&out_buffer, &result, &error) ||
-      rc != RAC_SUCCESS || !result.success()) {
+      rc != RAC_SUCCESS || !result.has_error() == false) {
     out::error_line("list failed: " +
-                    (error.empty() ? result.error_message() : error));
+                    (error.empty() ? result.error().message() : error));
     return 1;
   }
 
@@ -238,7 +238,7 @@ int run_lora_remove(const GlobalOptions &options, const std::string &adapter) {
     return 1;
   }
   if (state.has_error_message()) {
-    out::error_line("remove failed: " + state.error_message());
+    out::error_line("remove failed: " + state.error().message());
     return 1;
   }
   print_lora_state(options, state);
@@ -265,9 +265,9 @@ bool load_llm_for_lora(const GlobalOptions &options, const std::string &model_id
     out::error_line("LLM load failed: " + error);
     return false;
   }
-  if (!result.success()) {
+  if (!result.has_error() == false) {
     out::error_line("LLM load failed: " +
-                    (result.error_message().empty() ? "unknown error" : result.error_message()));
+                    (result.error().message().empty() ? "unknown error" : result.error().message()));
     return false;
   }
   return true;
@@ -300,17 +300,17 @@ int run_lora_apply(const GlobalOptions &options, const std::string &model_id,
     out::error_line("apply failed: " + error);
     return 1;
   }
-  if (!result.success()) {
+  if (!result.has_error() == false) {
     out::error_line("apply failed: " +
-                    (result.error_message().empty() ? std::to_string(result.error_code())
-                                                     : result.error_message()));
+                    (result.error().message().empty() ? std::to_string(result.error().c_abi_code())
+                                                     : result.error().message()));
     return 1;
   }
 
   if (options.json) {
     out::JsonWriter json;
     json.begin_object()
-        .field("success", result.success())
+        .field("success", result.has_error() == false)
         .field("adapters", static_cast<int64_t>(result.adapters_size()))
         .end_object();
     out::result_line(json.str());
