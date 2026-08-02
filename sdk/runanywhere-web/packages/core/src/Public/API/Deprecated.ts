@@ -9,6 +9,7 @@
 import type { ModelCategory, ModelInfo } from '@runanywhere/proto-ts/model_types';
 import type { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
 import { SDKCore } from '../SDKCore.js';
+import { Diffusion } from '../Extensions/RunAnywhere+Diffusion.js';
 import type { ToolExecutor } from '../Extensions/RunAnywhere+ToolCalling.js';
 import { AudioInput } from './Inputs.js';
 import type { AudioInput as AudioInputValue, ImageInput } from './Inputs.js';
@@ -27,6 +28,17 @@ async function* singleChunk(audio: AudioInputValue): AsyncGenerator<AudioInputVa
 }
 
 export const deprecatedForwarders = {
+  /** @deprecated Use `RunAnywhere.isReady`. */
+  get isInitialized(): boolean {
+    return SDKCore.isInitialized;
+  },
+
+  /**
+   * @deprecated Image generation is `RunAnywhere.images.*`; this namespace is
+   * kept for `diffusion.availability()` probes.
+   */
+  diffusion: Diffusion,
+
   /** @deprecated Use `RunAnywhere.llm.generate(prompt, options)`. */
   generate(options: LlmOptions & { prompt: string }): Promise<GenerationResult> {
     const { prompt, ...rest } = options;
