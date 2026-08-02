@@ -389,6 +389,7 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
     // before user_data is freed by a concurrent teardown thread.
     VadInFlightGuard in_flight_guard;
     CallbackSlot slot;
+    uint64_t seq = 0;
     std::string request_id;
     {
         std::lock_guard<std::mutex> lock(g_mu());
@@ -396,6 +397,7 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
         if (it == g_slots().end() || it->second.fn == nullptr)
             return;
         slot = it->second;
+        seq = ++(it->second.seq);
         // Prefer the explicit session_id over a handle-wide scan so
         // overlapping sessions on the same component handle don't
         // cross-attribute their request_ids.
@@ -420,6 +422,7 @@ void dispatch_vad_stream_event(rac_handle_t handle, runanywhere::v1::VADStreamEv
     thread_local std::vector<uint8_t> scratch;
 
     proto_event.Clear();
+    proto_event.set_seq(seq);
     proto_event.set_timestamp_us(now_us());
     if (!request_id.empty()) {
         proto_event.set_request_id(request_id);

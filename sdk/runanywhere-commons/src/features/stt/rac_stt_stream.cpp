@@ -1314,6 +1314,7 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
     // before destroy threads free user_data.
     rac::stream::InFlightGuard in_flight_guard(g_in_flight);
     rac::stream::CallbackSlot<rac_stt_stream_proto_callback_fn> slot;
+    uint64_t seq = 0;
     std::string request_id;
     uint64_t correlated_session_id = session_id;
     std::shared_ptr<StreamOperationState> operation_state;
@@ -1364,6 +1365,7 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
             ++operation_state->in_flight_dispatches;
         }
         slot = it->second;
+        seq = ++(it->second.seq);
     }
     DispatchOperationGuard dispatch_guard(correlated_session_id, operation_state);
 
@@ -1371,6 +1373,7 @@ void dispatch_stt_stream_event(rac_handle_t handle, runanywhere::v1::STTStreamEv
     thread_local std::vector<uint8_t> scratch;
 
     proto_event.Clear();
+    proto_event.set_seq(seq);
     proto_event.set_timestamp_us(now_us());
     if (!request_id.empty()) {
         proto_event.set_request_id(request_id);

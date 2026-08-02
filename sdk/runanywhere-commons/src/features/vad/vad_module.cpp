@@ -231,6 +231,7 @@ struct ProtoStreamSlot {
     rac_vad_proto_stream_event_callback_fn callback{nullptr};
     void* user_data{nullptr};
     std::string request_id;
+    uint64_t next_seq{1};
 };
 
 std::mutex& proto_stream_mutex() {
@@ -441,6 +442,7 @@ void flush_lifecycle_vad_end() {
 void proto_activity_trampoline(rac_speech_activity_t activity, void* user_data) {
     const rac_handle_t handle = reinterpret_cast<rac_handle_t>(user_data);
     ProtoStreamSlot slot;
+    uint64_t seq = 0;
     {
         std::lock_guard<std::mutex> lock(proto_stream_mutex());
         auto it = proto_stream_slots().find(handle);
@@ -448,9 +450,11 @@ void proto_activity_trampoline(rac_speech_activity_t activity, void* user_data) 
             return;
         }
         slot = it->second;
+        seq = it->second.next_seq++;
     }
 
     runanywhere::v1::VADStreamEvent event;
+    event.set_seq(seq);
     event.set_timestamp_us(current_time_us());
     event.set_request_id(slot.request_id);
     event.set_kind(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
@@ -1377,10 +1381,10 @@ extern "C" rac_result_t rac_vad_component_set_activity_proto_callback(
 
     {
         std::lock_guard<std::mutex> lock(proto_stream_mutex());
-        proto_stream_slots()[handle] = ProtoStreamSlot{
-            .callback = callback,
-            .user_data = user_data,
-            .request_id = make_vad_request_id(handle)};
+        proto_stream_slots()[handle] = ProtoStreamSlot{.callback = callback,
+                                                       .user_data = user_data,
+                                                       .request_id = make_vad_request_id(handle),
+                                                       .next_seq = 1};
     }
     return rac_vad_component_set_activity_callback(handle, proto_activity_trampoline, handle);
 #endif

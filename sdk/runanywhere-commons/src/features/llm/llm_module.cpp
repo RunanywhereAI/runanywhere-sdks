@@ -1771,6 +1771,7 @@ struct ProtoStreamContext {
     rac_llm_stream_proto_callback_fn callback = nullptr;
     void* user_data = nullptr;
     rac::llm::LifecycleLlmRef* ref = nullptr;
+    uint64_t seq = 0;
     bool terminal_sent = false;
     bool first_token_sent = false;
     bool inside_thinking = false;
@@ -1897,7 +1898,7 @@ void dispatch_stream_event(ProtoStreamContext* ctx, const char* token, bool is_f
     params.tool_call = tool_call;
 
     thread_local std::vector<uint8_t> scratch;
-    if (!rac::llm::serialize_llm_stream_event(params, scratch)) {
+    if (!rac::llm::serialize_llm_stream_event(++ctx->seq, params, scratch)) {
         return;
     }
     ctx->callback(scratch.empty() ? nullptr : scratch.data(), scratch.size(), ctx->user_data);

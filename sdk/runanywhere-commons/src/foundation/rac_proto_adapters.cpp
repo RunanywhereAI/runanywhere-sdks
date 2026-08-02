@@ -837,7 +837,11 @@ bool rac_embeddings_options_from_proto(const ::runanywhere::v1::EmbeddingsOption
         return false;
     *out = RAC_EMBEDDINGS_OPTIONS_DEFAULT;
 
-    out->normalize = in.normalize() ? RAC_EMBEDDINGS_NORMALIZE_L2 : RAC_EMBEDDINGS_NORMALIZE_NONE;
+    // EmbeddingsOptions.normalize is a plain proto3 bool with no unset sentinel;
+    // the backends default to L2 unit vectors (EmbeddingsConfiguration.normalize
+    // rac_default = true), so an explicit true and the proto default both resolve
+    // to L2 here. Disabling normalization is a component-configuration concern.
+    out->normalize = RAC_EMBEDDINGS_NORMALIZE_L2;
 
     switch (in.pooling()) {
         case ::runanywhere::v1::EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED:

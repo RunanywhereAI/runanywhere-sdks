@@ -1221,9 +1221,9 @@ static rac_result_t parse_assignment_response_models(const char* data, size_t le
 
     ModelRegistryRefreshResult refresh;
     if (refresh.ParseFromArray(data, static_cast<int>(len)) &&
-        (!refresh.has_error() || refresh.models().models_size() > 0 ||
+        (refresh.has_error() || refresh.models().models_size() > 0 ||
          refresh.registered_count() > 0 || refresh.updated_count() > 0 ||
-         refresh.warnings_size() > 0 || refresh.has_error())) {
+         refresh.warnings_size() > 0)) {
         if (refresh.has_error()) {
             if (error_message) {
                 *error_message = refresh.error().message();

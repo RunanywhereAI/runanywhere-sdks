@@ -1400,6 +1400,7 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
         (void)rac_sdk_event_publish_failure(rc, "STT model is not loaded", "stt",
                                             "transcribeStream", RAC_TRUE);
         runanywhere::v1::STTStreamEvent error;
+        error.set_seq(1);
         error.set_timestamp_us(current_time_us());
         error.set_request_id(request_id);
         error.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR);
@@ -1428,6 +1429,7 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
               .audio_size = audio_size};
 
     runanywhere::v1::STTStreamEvent started;
+    started.set_seq(context.next_seq++);
     started.set_timestamp_us(current_time_us());
     started.set_request_id(context.request_id);
     started.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED);
@@ -1436,6 +1438,7 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
     auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
         auto* ctx = static_cast<StreamContext*>(opaque);
         runanywhere::v1::STTStreamEvent event;
+        event.set_seq(ctx->next_seq++);
         event.set_timestamp_us(current_time_us());
         event.set_request_id(ctx->request_id);
         event.set_kind(is_final == RAC_TRUE ? runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL
@@ -1473,6 +1476,7 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
         (void)rac_sdk_event_publish_failure(rc, "STT streaming transcription failed", "stt",
                                             "transcribeStream", RAC_TRUE);
         runanywhere::v1::STTStreamEvent error;
+        error.set_seq(context.next_seq++);
         error.set_timestamp_us(current_time_us());
         error.set_request_id(context.request_id);
         error.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR);
@@ -1964,6 +1968,7 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     // their state machine (kind = STARTED, seq = 1).
     {
         runanywhere::v1::STTStreamEvent started;
+        started.set_seq(ctx.next_seq++);
         started.set_timestamp_us(rac_get_current_time_ms() * 1000);
         started.set_request_id(ctx.request_id);
         started.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED);
@@ -1973,6 +1978,7 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
         auto* c = static_cast<StreamCtx*>(opaque);
         runanywhere::v1::STTStreamEvent event;
+        event.set_seq(c->next_seq++);
         event.set_timestamp_us(rac_get_current_time_ms() * 1000);
         event.set_request_id(c->request_id);
         event.set_kind(is_final == RAC_TRUE ? runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL
@@ -2015,6 +2021,7 @@ rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     rc = rac_stt_transcribe_stream(&service, audio.data(), audio.size(), &options, bridge, &ctx);
     if (rc != RAC_SUCCESS) {
         runanywhere::v1::STTStreamEvent error_event;
+        error_event.set_seq(ctx.next_seq++);
         error_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
         error_event.set_request_id(ctx.request_id);
         error_event.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR);

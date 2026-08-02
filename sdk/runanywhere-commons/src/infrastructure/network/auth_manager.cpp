@@ -528,18 +528,6 @@ int rac_auth_load_stored_tokens(void) {
         return result;
     }
 
-    // An access token with no refresh token is unusable: expiry is unknown
-    // after a restore, needs_refresh() reports false without a refresh token,
-    // and the fast path in perform_authentication() would then trust the
-    // stale token forever (every JWT-gated request 401s with no recovery).
-    // Every authenticate response persists both tokens, so this state can
-    // only come from legacy storage — drop it and force a fresh authenticate.
-    if (loaded_refresh_token == nullptr) {
-        free_loaded();
-        (void)delete_stored_auth_locked();
-        return RAC_ERROR_FILE_NOT_FOUND;
-    }
-
     // Commit only after every read succeeds or cleanly misses. A transient
     // failure on one optional item must not replace an already-valid in-memory
     // auth state with a partially restored one.

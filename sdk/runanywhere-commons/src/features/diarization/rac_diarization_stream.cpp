@@ -162,6 +162,7 @@ struct StreamSession {
     bool cleanup_finished = false;
     size_t feeds_in_flight = 0;
     size_t provider_callbacks_in_flight = 0;
+    uint64_t next_seq = 0;
     rac_result_t callback_error = RAC_SUCCESS;
     runanywhere::v1::DiarizationResult last_snapshot;
     bool has_snapshot = false;
@@ -213,6 +214,7 @@ void dispatch_event(const std::shared_ptr<StreamSession>& session,
             return;
         }
         event.set_session_id(session->id);
+        event.set_seq(session->next_seq++);
     }
     event.set_timestamp_us(now_us());
     event.set_kind(kind);
