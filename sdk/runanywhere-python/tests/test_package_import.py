@@ -124,7 +124,6 @@ _EXPECTED = [
     "LoadOptions",
     "ToolChoice",
     "ToolChoiceMode",
-    "NormalizeMode",
     "PoolingMode",
     # results
     "GenerationResult",

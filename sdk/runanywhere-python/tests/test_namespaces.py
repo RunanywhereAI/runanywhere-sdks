@@ -24,7 +24,6 @@ from runanywhere import (  # noqa: E402
     ImageOptions,
     LlmOptions,
     ModelRef,
-    NormalizeMode,
     PoolingMode,
     SDKException,
     SegmentationOptions,
@@ -228,7 +227,7 @@ def test_aembed(sdk, sherpa_dir) -> None:
 
 @pytest.mark.parametrize(
     "options",
-    [EmbedOptions(normalize=NormalizeMode.NONE), EmbedOptions(pooling=PoolingMode.CLS)],
+    [EmbedOptions(normalize=False), EmbedOptions(pooling=PoolingMode.CLS)],
 )
 def test_unsupported_embed_options_raise(sdk, options) -> None:
     with pytest.raises(SDKException) as error:

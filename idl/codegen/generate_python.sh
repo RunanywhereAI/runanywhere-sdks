@@ -11,7 +11,8 @@
 #
 # Only the RAG surface is bound in Python today (the rest of the SDK uses the flat C ABI), so we
 # generate rag.proto plus its transitive imports (llm_options.proto pulls in model_types,
-# structured_output, thinking_tag_pattern, tool_calling, hardware_profile, storage_types).
+# structured_output, thinking_tag_pattern, tool_calling, hardware_profile, storage_types; several
+# of those now import errors.proto for the embedded SDKError payload).
 # protoc emits BARE `import x_pb2` lines, which only resolve if those modules are on sys.path —
 # the classic protobuf gotcha. We rewrite every one to a package-relative import so the vendored
 # files import each other correctly from inside the `runanywhere._proto` package.
@@ -43,6 +44,7 @@ fi
 PROTOS=(
   rag.proto
   rac_options.proto
+  errors.proto
   llm_options.proto
   model_types.proto
   hardware_profile.proto

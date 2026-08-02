@@ -73,11 +73,11 @@ class RagCore(FakeCore):
         self.last_query = query
         result = pb.RAGResult()
         if self._fail_query:
-            result.error_code = 130
-            result.error_message = "no context"
+            result.error.code = 130
+            result.error.message = "no context"
             return result.SerializeToString()
         result.answer = "Paris"
-        result.completion_tokens = 2
+        result.usage.output_tokens = 2
         result.generation_time_ms = 10
         result.retrieval_time_ms = 3
         result.retrieved_chunks.add(

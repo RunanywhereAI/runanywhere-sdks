@@ -29,7 +29,6 @@ from runanywhere.options import (
     Interruption,
     LlmOptions,
     LoadOptions,
-    NormalizeMode,
     PoolingMode,
     RagConfig,
     ReasoningMode,
@@ -126,7 +125,7 @@ def test_vad_option_defaults() -> None:
 
 def test_embed_option_defaults() -> None:
     options = EmbedOptions()
-    assert options.normalize == NormalizeMode.L2
+    assert options.normalize is True
     assert options.pooling == PoolingMode.MEAN
 
 
