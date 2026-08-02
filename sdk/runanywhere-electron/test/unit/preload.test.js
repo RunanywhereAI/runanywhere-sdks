@@ -353,7 +353,7 @@ test('generateStream yields token events then a final event with metrics', { ski
   await tick();
   const msg = port.last();
   assert.equal(msg.method, 'generate');
-  assert.deepEqual(msg.args, [3, 'hi', { maxTokens: 8 }]);
+  assert.deepEqual(msg.args, [3, 'hi', { maxOutputTokens: 8 }]);
   port.onmessage({ data: { id: msg.id, token: 'a' } });
   port.onmessage({ data: { id: msg.id, token: 'b' } });
   port.onmessage({ data: { id: msg.id, done: true } });
@@ -395,7 +395,7 @@ test('generate forwards a generation-options object before the callback', { skip
   await tick();
   const msg = port.last();
   assert.equal(msg.method, 'generate');
-  assert.deepEqual(msg.args, [3, 'hi', { maxTokens: 8, grammar: 'root ::= "x"' }]);
+  assert.deepEqual(msg.args, [3, 'hi', { maxOutputTokens: 8, grammar: 'root ::= "x"' }]);
   port.onmessage({ data: { id: msg.id, done: true } });
   await p;
 });
