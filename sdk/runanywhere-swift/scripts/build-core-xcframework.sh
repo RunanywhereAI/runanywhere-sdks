@@ -9,7 +9,7 @@
 #   sdk/runanywhere-swift/Binaries/RABackendLLAMACPP.xcframework
 #   sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework          (skipped if RAC_BACKEND_ONNX=OFF)
 #   sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework
-#   sdk/runanywhere-swift/Binaries/RABackendCoreML.xcframework        (Apple-only; CoreML Stable-Diffusion engine)
+#   sdk/runanywhere-swift/Binaries/RABackendNeuRT.xcframework        (Apple-only; NeuRT — ANE LLM + CoreML diffusion)
 #   sdk/runanywhere-swift/Binaries/RABackendMLX.xcframework           (Apple-only, skipped if RAC_BACKEND_MLX=OFF)
 #   sdk/runanywhere-swift/Binaries/RunAnywhereMLXRuntime.xcframework  (Apple-only, skipped if RAC_BACKEND_MLX=OFF)
 #   sdk/runanywhere-swift/Binaries/RunAnywhereMLXMetal.xcframework    (platform-selected Metal resource framework)
@@ -49,10 +49,10 @@ fi
 DRY_RUN="${DRY_RUN:-0}"
 RAC_BACKEND_ONNX="${RAC_BACKEND_ONNX:-ON}"
 RAC_BACKEND_SHERPA="${RAC_BACKEND_SHERPA:-ON}"
-RAC_BACKEND_COREML="${RAC_BACKEND_COREML:-ON}"
+RAC_BACKEND_NEURT="${RAC_BACKEND_NEURT:-ON}"
 RAC_BACKEND_MLX="${RAC_BACKEND_MLX:-ON}"
-if [ "${RAC_BACKEND_SHERPA}" != "ON" ] || [ "${RAC_BACKEND_COREML}" != "ON" ]; then
-    echo "error: the Swift package unconditionally requires Sherpa and CoreML binaries; RAC_BACKEND_SHERPA and RAC_BACKEND_COREML must be ON" >&2
+if [ "${RAC_BACKEND_SHERPA}" != "ON" ] || [ "${RAC_BACKEND_NEURT}" != "ON" ]; then
+    echo "error: the Swift package unconditionally requires Sherpa and NeuRT binaries; RAC_BACKEND_SHERPA and RAC_BACKEND_NEURT must be ON" >&2
     exit 1
 fi
 COMMONS_HEADERS="${REPO_ROOT}/sdk/runanywhere-commons/include"
@@ -784,21 +784,21 @@ merge_mlx_backend_macos_slice() {
     merge_static_archives "${output}" "${prepared[@]}"
 }
 
-# CoreML engine slice (Apple Stable-Diffusion pipeline). Fold in the
+# NeuRT engine slice (ANE LLM + Apple Stable-Diffusion pipeline). Fold in the
 # rac_runtime_coreml archive because the coreml engine links it (Pattern 3:
 # "engine IS our code on a device-runtime") and it is NOT folded into
 # rac_commons — mirrors how the ONNX slice folds in librac_runtime_onnxrt.a.
 # Both are first-party archives (system frameworks only, no third-party host
 # paths), so no path sanitization is required. This keeps
-# RABackendCoreML.xcframework self-contained.
-merge_coreml_backend_slice() {
+# RABackendNeuRT.xcframework self-contained.
+merge_neurt_backend_slice() {
     local build_root="$1"
     local slice_dir="$2"
     local output="$3"
     local arch="$4"
-    local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/coreml"
+    local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/neurt"
     local inputs=(
-        "${build_root}/engines/coreml/${slice_dir}/librac_backend_coreml.a"
+        "${build_root}/engines/neurt/${slice_dir}/librac_backend_neurt.a"
         "${build_root}/runtimes/coreml/${slice_dir}/librac_runtime_coreml.a"
     )
 
@@ -811,13 +811,13 @@ merge_coreml_backend_slice() {
     merge_static_archives "${output}" "${prepared[@]}"
 }
 
-merge_coreml_backend_macos_slice() {
+merge_neurt_backend_macos_slice() {
     local build_root="$1"
     local output="$2"
     local arch="$3"
-    local scratch_dir="${STAGING_DIR}/prepared/Release-macos/coreml"
+    local scratch_dir="${STAGING_DIR}/prepared/Release-macos/neurt"
     local inputs=(
-        "${build_root}/engines/coreml/librac_backend_coreml.a"
+        "${build_root}/engines/neurt/librac_backend_neurt.a"
         "${build_root}/runtimes/coreml/librac_runtime_coreml.a"
     )
 
@@ -943,8 +943,8 @@ cmake_extra=(
     "-DRAC_BACKEND_MLX=${RAC_BACKEND_MLX}"
 )
 ios_cmake_extra=(
-    "-DRAC_BACKEND_COREML=${RAC_BACKEND_COREML}"
-    "-DRAC_RUNTIME_COREML=${RAC_BACKEND_COREML}"
+    "-DRAC_BACKEND_NEURT=${RAC_BACKEND_NEURT}"
+    "-DRAC_RUNTIME_COREML=${RAC_BACKEND_NEURT}"
     "-DGGML_NATIVE=OFF"
     "-DCMAKE_OSX_DEPLOYMENT_TARGET=${IOS_DEPLOYMENT_TARGET}"
 )
@@ -958,11 +958,11 @@ fi
 if [ "${RAC_BACKEND_SHERPA}" = "ON" ]; then
     ios_build_targets+=(rac_backend_sherpa)
 fi
-# CoreML engine (Stable Diffusion) is Apple-only. Building rac_backend_coreml
+# The NeuRT engine is Apple-only. Building rac_backend_neurt
 # also transitively builds its rac_runtime_coreml dependency; both are folded
-# into RABackendCoreML.xcframework below.
-if [ "${RAC_BACKEND_COREML}" = "ON" ]; then
-    ios_build_targets+=(rac_backend_coreml)
+# into RABackendNeuRT.xcframework below.
+if [ "${RAC_BACKEND_NEURT}" = "ON" ]; then
+    ios_build_targets+=(rac_backend_neurt)
 fi
 if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
     ios_build_targets+=(rac_backend_mlx)
@@ -994,9 +994,9 @@ macos_cmake_args=(
     # Reset runtime state alongside its owning backend. A polluted reusable
     # cache can otherwise leave the runtime and engine in contradictory states.
     "-DRAC_RUNTIME_ONNXRT=${RAC_BACKEND_ONNX}"
-    "-DRAC_RUNTIME_COREML=${RAC_BACKEND_COREML}"
+    "-DRAC_RUNTIME_COREML=${RAC_BACKEND_NEURT}"
     "-DRAC_BACKEND_SHERPA=${RAC_BACKEND_SHERPA}"
-    "-DRAC_BACKEND_COREML=${RAC_BACKEND_COREML}"
+    "-DRAC_BACKEND_NEURT=${RAC_BACKEND_NEURT}"
     "-DRAC_BACKEND_MLX=${RAC_BACKEND_MLX}"
     "-DGGML_NATIVE=OFF"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
@@ -1018,8 +1018,8 @@ if [ "${RAC_BACKEND_SHERPA}" = "ON" ]; then
     macos_build_targets+=(rac_backend_sherpa)
 fi
 # CoreML engine (Stable Diffusion) pulls in rac_runtime_coreml transitively.
-if [ "${RAC_BACKEND_COREML}" = "ON" ]; then
-    macos_build_targets+=(rac_backend_coreml)
+if [ "${RAC_BACKEND_NEURT}" = "ON" ]; then
+    macos_build_targets+=(rac_backend_neurt)
 fi
 if [ "${RAC_BACKEND_MLX}" = "ON" ]; then
     macos_build_targets+=(rac_backend_mlx)
@@ -1667,34 +1667,34 @@ else
     echo "▶ Skipping RABackendSherpa.xcframework (RAC_BACKEND_SHERPA=OFF)"
 fi
 
-# RABackendCoreML.xcframework — the Apple-only CoreML Stable-Diffusion engine
+# RABackendNeuRT.xcframework — the Apple-only NeuRT engine (ANE LLM + diffusion)
 # (serves the DIFFUSION primitive at priority 100). Apple-only and always ON in
-# this build (RAC_BACKEND_COREML forced ON in ios_cmake_extra / macos_cmake_args
+# this build (RAC_BACKEND_NEURT forced ON in ios_cmake_extra / macos_cmake_args
 # above). The Swift ONNXRuntime target links this archive so the diffusion
 # vtable is present in the plugin registry; commons' RAC_STATIC_PLUGIN_REGISTER
-# (coreml) shim (compiled into rac_commons) references rac_plugin_entry_coreml,
+# (neurt) shim (compiled into rac_commons) references rac_plugin_entry_neurt,
 # pulling the archive at the final link. Folds in librac_runtime_coreml.a.
-if [ "${RAC_BACKEND_COREML}" = "ON" ]; then
-    COREML_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_coreml.a"
-    COREML_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_coreml.a"
-    COREML_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_coreml.a"
-    if [ "${DRY_RUN}" = "1" ] || [ -f "${DEV_BIN}/engines/coreml/Release-iphoneos/librac_backend_coreml.a" ]; then
-        merge_coreml_backend_slice "${DEV_BIN}" "Release-iphoneos" "${COREML_DEV_LIB}" "arm64"
-        merge_coreml_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${COREML_SIM_LIB}" "arm64"
-        merge_coreml_backend_macos_slice "${MAC_BIN}" "${COREML_MAC_LIB}" "arm64"
-        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${COREML_DEV_LIB}"
-        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${COREML_SIM_LIB}"
-        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${COREML_MAC_LIB}"
-        sanitize_and_validate_archive_host_paths "${COREML_DEV_LIB}" "ios-device RABackendCoreML"
-        sanitize_and_validate_archive_host_paths "${COREML_SIM_LIB}" "ios-simulator RABackendCoreML"
-        sanitize_and_validate_archive_host_paths "${COREML_MAC_LIB}" "macos RABackendCoreML"
-        build_xcframework_from_paths_with_macos "${COREML_DEV_LIB}" "${COREML_SIM_LIB}" "${COREML_MAC_LIB}" "RABackendCoreML.xcframework"
+if [ "${RAC_BACKEND_NEURT}" = "ON" ]; then
+    NEURT_DEV_LIB="${STAGING_DIR}/Release-iphoneos/librac_backend_neurt.a"
+    NEURT_SIM_LIB="${STAGING_DIR}/Release-iphonesimulator/librac_backend_neurt.a"
+    NEURT_MAC_LIB="${STAGING_DIR}/Release-macos/librac_backend_neurt.a"
+    if [ "${DRY_RUN}" = "1" ] || [ -f "${DEV_BIN}/engines/neurt/Release-iphoneos/librac_backend_neurt.a" ]; then
+        merge_neurt_backend_slice "${DEV_BIN}" "Release-iphoneos" "${NEURT_DEV_LIB}" "arm64"
+        merge_neurt_backend_slice "${SIM_BIN}" "Release-iphonesimulator" "${NEURT_SIM_LIB}" "arm64"
+        merge_neurt_backend_macos_slice "${MAC_BIN}" "${NEURT_MAC_LIB}" "arm64"
+        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${NEURT_DEV_LIB}"
+        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${NEURT_SIM_LIB}"
+        run python3 "${ARCHIVE_MEMBER_NORMALIZER}" "${NEURT_MAC_LIB}"
+        sanitize_and_validate_archive_host_paths "${NEURT_DEV_LIB}" "ios-device RABackendNeuRT"
+        sanitize_and_validate_archive_host_paths "${NEURT_SIM_LIB}" "ios-simulator RABackendNeuRT"
+        sanitize_and_validate_archive_host_paths "${NEURT_MAC_LIB}" "macos RABackendNeuRT"
+        build_xcframework_from_paths_with_macos "${NEURT_DEV_LIB}" "${NEURT_SIM_LIB}" "${NEURT_MAC_LIB}" "RABackendNeuRT.xcframework"
     else
-        echo "error: required CoreML backend archive was not built" >&2
+        echo "error: required NeuRT backend archive was not built" >&2
         exit 1
     fi
 else
-    echo "▶ Skipping RABackendCoreML.xcframework (RAC_BACKEND_COREML=OFF)"
+    echo "▶ Skipping RABackendNeuRT.xcframework (RAC_BACKEND_NEURT=OFF)"
 fi
 
 # RABackendMLX.xcframework provides the C++ callback-backed plugin shell. The
@@ -1861,13 +1861,13 @@ sync_flutter_frameworks() {
         run cp -R "${DEST}/RABackendSherpa.xcframework" "${flutter_onnx}/"
     fi
 
-    # CoreML Stable-Diffusion engine is co-linked with ONNX on Apple (commons
-    # references _rac_plugin_entry_coreml). Without a local Frameworks copy,
+    # The NeuRT engine is co-linked with ONNX on Apple (commons
+    # references _rac_plugin_entry_neurt). Without a local Frameworks copy,
     # Package.swift falls back to the release zip checksum and local Flutter
     # iOS builds fail after a fresh XCFramework rebuild.
-    if [ -d "${DEST}/RABackendCoreML.xcframework" ]; then
-        run rm -rf "${flutter_onnx}/RABackendCoreML.xcframework"
-        run cp -R "${DEST}/RABackendCoreML.xcframework" "${flutter_onnx}/"
+    if [ -d "${DEST}/RABackendNeuRT.xcframework" ]; then
+        run rm -rf "${flutter_onnx}/RABackendNeuRT.xcframework"
+        run cp -R "${DEST}/RABackendNeuRT.xcframework" "${flutter_onnx}/"
     fi
 
     run rm -rf \

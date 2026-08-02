@@ -414,9 +414,14 @@ int run_run(const GlobalOptions& options, const std::string& ref, const std::str
         return 1;
     }
 
-    const v1::InferenceFramework load_framework =
-        resolved.from_catalog ? v1::INFERENCE_FRAMEWORK_UNSPECIFIED : engine_hint.framework;
-    if (!load_model(options, resolved.model_id, load_framework, !image_path.empty())) {
+    // An explicit --engine is honoured whatever the ref resolved to. This used to
+    // read `resolved.from_catalog ? UNSPECIFIED : engine_hint.framework`, which
+    // silently DISCARDED the flag for anything that came out of the built-in
+    // catalog — `--engine <x>` on a catalog model did nothing at all, with no
+    // warning. When the flag is absent engine_hint.framework is UNSPECIFIED, so
+    // catalog entries still fall back to their own declared framework exactly as
+    // before; the only behaviour that changes is that asking now works.
+    if (!load_model(options, resolved.model_id, engine_hint.framework, !image_path.empty())) {
         return 1;
     }
 
@@ -461,7 +466,8 @@ void register_run(CLI::App& app, GlobalOptions& options) {
         ->check(CLI::ExistingFile);
     cmd->add_option("--system", params->system_prompt, "System prompt");
     cmd->add_option("--engine", params->engine,
-                    "Engine/framework hint for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
+                    "Engine hint (neurt|coreml|ane, mlx, llamacpp, onnx, sherpa). Honoured for "
+                    "catalog models too, not just URL/HF refs.");
     cmd->add_option("--temp,--temperature", params->temperature, "Sampling temperature");
     cmd->add_option("--max-tokens", params->max_tokens, "Max tokens to generate (default 1024)");
     cmd->add_flag("--no-think", params->no_think, "Disable the model's thinking phase");

@@ -107,7 +107,7 @@ declare_mapping() {
     echo "RABackendLlamaCPPBinary|RABackendLLAMACPP-ios"
     echo "RABackendONNXBinary|RABackendONNX-ios"
     echo "RABackendSherpaBinary|RABackendSherpa-ios"
-    echo "RABackendCoreMLBinary|RABackendCoreML-ios"
+    echo "RABackendNeuRTBinary|RABackendNeuRT-ios"
     echo "RABackendMLXBinary|RABackendMLX-ios"
 }
 

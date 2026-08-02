@@ -24,7 +24,7 @@
 
 #include "io/output.h"
 
-#if defined(RCLI_HAS_COREML)
+#if defined(RCLI_HAS_NEURT)
 #include <fstream>
 #include <ios>
 #include <sys/stat.h>
@@ -61,7 +61,7 @@ struct ImageParams {
     int64_t seed = -1;      // -1 = random
 };
 
-#if defined(RCLI_HAS_COREML)
+#if defined(RCLI_HAS_NEURT)
 
 namespace v1 = runanywhere::v1;
 
@@ -159,7 +159,7 @@ bool write_image(const v1::DiffusionResult& result, const std::string& out_path,
     return true;
 }
 
-#endif  // RCLI_HAS_COREML
+#endif  // RCLI_HAS_NEURT
 
 int run_image_generate(const GlobalOptions& options, const ImageParams& params) {
     Bootstrapped env;
@@ -167,7 +167,7 @@ int run_image_generate(const GlobalOptions& options, const ImageParams& params) 
         return 1;
     }
 
-#if !defined(RCLI_HAS_COREML)
+#if !defined(RCLI_HAS_NEURT)
     (void)params;
     out::error_line("image generation (diffusion) is only supported on Apple/CoreML platforms");
     return 1;

@@ -179,8 +179,17 @@ inline const char* plugin_hint_for_framework(rac_inference_framework_t framework
         case RAC_FRAMEWORK_SYSTEM_TTS:
             return RAC_ENGINE_ID_PLATFORM;
         case RAC_FRAMEWORK_COREML:
-            return primitive == RAC_PRIMITIVE_DIFFUSION ? RAC_ENGINE_ID_COREML
-                                                        : RAC_ENGINE_ID_PLATFORM;
+            // The neurt engine serves BOTH Core ML modalities: DIFFUSION over MLModel
+            // and GENERATE_TEXT on the Apple Neural Engine. It used to serve diffusion
+            // only, so everything else fell through to `platform` (Apple Foundation
+            // Models / System TTS) — which for a COREML-framework LLM meant pinning the
+            // wrong engine and quietly generating from Foundation Models instead of the
+            // ANE bundle the caller asked for.
+            if (primitive == RAC_PRIMITIVE_DIFFUSION ||
+                primitive == RAC_PRIMITIVE_GENERATE_TEXT) {
+                return RAC_ENGINE_ID_NEURT;
+            }
+            return RAC_ENGINE_ID_PLATFORM;
         case RAC_FRAMEWORK_QHEXRT:
             return RAC_ENGINE_ID_QHEXRT;
         case RAC_FRAMEWORK_FLUID_AUDIO:

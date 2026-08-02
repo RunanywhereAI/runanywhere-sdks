@@ -61,7 +61,7 @@ constexpr ModalitySpec kModalities[] = {
     {"tts", "tts.synthesis.completed", "probe-tts-piper", "sherpa"},
     {"vlm", "vlm.process.completed", "probe-vlm-llava-1.5", "llamacpp"},
     {"rag", "rag.query.completed", "probe-rag-minilm", "llamacpp"},
-    {"imagegen", "imagegen.generate.completed", "probe-imagegen-sd-turbo", "coreml"},
+    {"imagegen", "imagegen.generate.completed", "probe-imagegen-sd-turbo", "neurt"},
     {"embeddings", "embeddings.embed.completed", "probe-embed-minilm", "onnx"},
     {"vad", "vad.stopped", "probe-vad-silero", "onnx"},
     {"voice", "voice.turn.metrics", "probe-voice-pipeline", "llamacpp"},

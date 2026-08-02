@@ -153,11 +153,11 @@ endif()
 
 # Per-backend availability defines, mirroring tools/CMakeLists.txt's
 # if(TARGET ...) pattern so the CLI builds with any backend subset.
-# coreml is Apple-only (serves DIFFUSION); its target only exists on Apple, so
+# neurt is Apple-only (ANE LLM + CoreML diffusion); its target only exists on Apple, so
 # the if(TARGET ...) guard keeps this list cross-platform. Unlike the others it
-# has no rac_backend_coreml_register() fn — bootstrap.cpp registers its plugin
-# entry directly under RCLI_HAS_COREML.
-foreach(_rcli_backend llamacpp onnx sherpa mlx coreml)
+# has no rac_backend_neurt_register() fn — bootstrap.cpp registers its plugin
+# entry directly under RCLI_HAS_NEURT.
+foreach(_rcli_backend llamacpp onnx sherpa mlx neurt)
     if(TARGET rac_backend_${_rcli_backend})
         string(TOUPPER ${_rcli_backend} _rcli_backend_upper)
         target_compile_definitions(rcli_core PUBLIC RCLI_HAS_${_rcli_backend_upper}=1)

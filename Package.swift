@@ -336,7 +336,7 @@ let package = Package(
                 // links CoreML + Accelerate, so it is the natural home for the
                 // diffusion engine archive. The coreml plugin auto-wins the
                 // DIFFUSION slot (priority 100) once linked.
-                "RABackendCoreMLBinary",
+                "RABackendNeuRTBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime",
             exclude: ["include", "README.md"],
@@ -432,7 +432,7 @@ let package = Package(
                 "RADesktopHostAdapter",
                 "RABackendLlamaCPPBinary",
                 "RABackendMLXBinary",
-                "RABackendCoreMLBinary",
+                "RABackendNeuRTBinary",
             ],
             path: "sdk/runanywhere-cli",
             exclude: [
@@ -490,7 +490,7 @@ let package = Package(
                 .define("CLI11_HAS_CODECVT", to: "0"),
                 .define("RCLI_HAS_LLAMACPP", to: "1"),
                 .define("RCLI_HAS_MLX", to: "1"),
-                .define("RCLI_HAS_COREML", to: "1"),
+                .define("RCLI_HAS_NEURT", to: "1"),
                 .define("RCLI_VERSION", to: "\"\(sdkVersion)\""),
                 .headerSearchPath("include"),
                 .headerSearchPath("src"),
@@ -583,8 +583,8 @@ func binaryTargets() -> [Target] {
                 path: "sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework"
             ),
             .binaryTarget(
-                name: "RABackendCoreMLBinary",
-                path: "sdk/runanywhere-swift/Binaries/RABackendCoreML.xcframework"
+                name: "RABackendNeuRTBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendNeuRT.xcframework"
             ),
             .binaryTarget(
                 name: "RABackendMLXBinary",
@@ -646,11 +646,11 @@ func binaryTargets() -> [Target] {
             // Apple CoreML Stable-Diffusion engine. `ONNXRuntime` declares an
             // unconditional dependency on this, so the remote list must carry it.
             // PLACEHOLDER checksum — `scripts/sync-checksums.sh` overwrites this
-            // with the real SHA-256 of RABackendCoreML-ios-v<version>.zip before
+            // with the real SHA-256 of RABackendNeuRT-ios-v<version>.zip before
             // tagging (release choreography), exactly like the peers above.
             .binaryTarget(
-                name: "RABackendCoreMLBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendCoreML-ios-v\(sdkVersion).zip",
+                name: "RABackendNeuRTBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendNeuRT-ios-v\(sdkVersion).zip",
                 checksum: "c3dee3f17fd86c2b6e15e4373894efbfd39ec4e87b09511fa88f478ce4db752a"
             ),
             .binaryTarget(

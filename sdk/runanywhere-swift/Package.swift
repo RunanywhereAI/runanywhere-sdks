@@ -245,7 +245,7 @@ let package = Package(
         // ONNX Runtime Backend (STT/TTS/VAD)
         //
         // Also carries the Apple CoreML Stable-Diffusion engine
-        // (RABackendCoreMLBinary): `ONNX.register()` bundles the Apple
+        // (RABackendNeuRTBinary): `ONNX.register()` bundles the Apple
         // secondary backends, and this target already links CoreML + Accelerate,
         // so it is the natural home for the diffusion engine archive. The
         // coreml plugin auto-wins the DIFFUSION slot (priority 100) once linked.
@@ -257,7 +257,7 @@ let package = Package(
                 "ONNXBackend",
                 "RABackendONNXBinary",
                 "RABackendSherpaBinary",
-                "RABackendCoreMLBinary",
+                "RABackendNeuRTBinary",
             ],
             path: "Sources/ONNXRuntime",
             exclude: [
@@ -344,8 +344,8 @@ let package = Package(
             path: "Binaries/RABackendSherpa.xcframework"
         ),
         .binaryTarget(
-            name: "RABackendCoreMLBinary",
-            path: "Binaries/RABackendCoreML.xcframework"
+            name: "RABackendNeuRTBinary",
+            path: "Binaries/RABackendNeuRT.xcframework"
         ),
         .binaryTarget(
             name: "RABackendMLXBinary",
