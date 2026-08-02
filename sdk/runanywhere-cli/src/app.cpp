@@ -47,6 +47,7 @@ void configure_app(CLI::App& app, GlobalOptions& options) {
     // infrastructure commands — that is the order `--help` lists them in.
     commands::register_llm(app, options);
     commands::register_vlm(app, options);
+    commands::register_tool(app, options);  // must follow register_llm (extends the `llm` group)
     commands::register_stt(app, options);
     commands::register_tts(app, options);
     commands::register_vad(app, options);

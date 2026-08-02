@@ -33,6 +33,7 @@ namespace rcli::commands {
 // --- Feature namespaces (spec verb grammar) --------------------------------
 void register_llm(CLI::App& app, GlobalOptions& options);
 void register_vlm(CLI::App& app, GlobalOptions& options);
+void register_tool(CLI::App& app, GlobalOptions& options);  // llm tool-call (attaches to `llm`)
 void register_stt(CLI::App& app, GlobalOptions& options);
 void register_tts(CLI::App& app, GlobalOptions& options);
 void register_vad(CLI::App& app, GlobalOptions& options);

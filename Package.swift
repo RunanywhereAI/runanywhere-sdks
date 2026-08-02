@@ -453,6 +453,7 @@ let package = Package(
                 "src/commands/cmd_pull.cpp",
                 "src/commands/cmd_rm.cpp",
                 "src/commands/cmd_run.cpp",
+                "src/commands/cmd_tool.cpp",
                 "src/commands/cmd_serve.cpp",
                 "src/commands/cmd_show.cpp",
                 "src/commands/cmd_stt.cpp",
