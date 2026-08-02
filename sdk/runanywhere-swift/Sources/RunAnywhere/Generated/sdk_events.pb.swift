@@ -2723,6 +2723,12 @@ public nonisolated struct RAVoiceLifecycleEvent: @unchecked Sendable {
   }
 
   /// STT
+  public var realTimeFactor: Double {
+    get {_storage._realTimeFactor}
+    set {_uniqueStorage()._realTimeFactor = newValue}
+  }
+
+  /// STT
   public var language: String {
     get {_storage._language}
     set {_uniqueStorage()._language = newValue}
@@ -4946,7 +4952,7 @@ nonisolated extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._M
 
 nonisolated extension RAVoiceLifecycleEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VoiceLifecycleEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}text\0\u{1}confidence\0\u{3}response_text\0\u{3}audio_base64\0\u{3}duration_ms\0\u{3}audio_level\0\u{1}transcription\0\u{3}turn_response\0\u{3}turn_audio_base64\0\u{1}error\0\u{3}model_id\0\u{3}model_name\0\u{3}audio_length_ms\0\u{3}audio_size_bytes\0\u{3}word_count\0\u{2}\u{2}language\0\u{3}sample_rate\0\u{3}is_streaming\0\u{1}framework\0\u{3}character_count\0\u{3}audio_duration_ms\0\u{3}audio_size_bytes_tts\0\u{3}processing_duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}text\0\u{1}confidence\0\u{3}response_text\0\u{3}audio_base64\0\u{3}duration_ms\0\u{3}audio_level\0\u{1}transcription\0\u{3}turn_response\0\u{3}turn_audio_base64\0\u{1}error\0\u{3}model_id\0\u{3}model_name\0\u{3}audio_length_ms\0\u{3}audio_size_bytes\0\u{3}word_count\0\u{3}real_time_factor\0\u{1}language\0\u{3}sample_rate\0\u{3}is_streaming\0\u{1}framework\0\u{3}character_count\0\u{3}audio_duration_ms\0\u{3}audio_size_bytes_tts\0\u{3}processing_duration_ms\0")
 
   fileprivate class _StorageClass {
     var _kind: RAVoiceEventKind = .unspecified
@@ -4966,6 +4972,7 @@ nonisolated extension RAVoiceLifecycleEvent: SwiftProtobuf.Message, SwiftProtobu
     var _audioLengthMs: Int64 = 0
     var _audioSizeBytes: Int32 = 0
     var _wordCount: Int32 = 0
+    var _realTimeFactor: Double = 0
     var _language: String = String()
     var _sampleRate: Int32 = 0
     var _isStreaming: Bool = false
@@ -5001,6 +5008,7 @@ nonisolated extension RAVoiceLifecycleEvent: SwiftProtobuf.Message, SwiftProtobu
       _audioLengthMs = source._audioLengthMs
       _audioSizeBytes = source._audioSizeBytes
       _wordCount = source._wordCount
+      _realTimeFactor = source._realTimeFactor
       _language = source._language
       _sampleRate = source._sampleRate
       _isStreaming = source._isStreaming
@@ -5044,6 +5052,7 @@ nonisolated extension RAVoiceLifecycleEvent: SwiftProtobuf.Message, SwiftProtobu
         case 15: try { try decoder.decodeSingularInt64Field(value: &_storage._audioLengthMs) }()
         case 16: try { try decoder.decodeSingularInt32Field(value: &_storage._audioSizeBytes) }()
         case 17: try { try decoder.decodeSingularInt32Field(value: &_storage._wordCount) }()
+        case 18: try { try decoder.decodeSingularDoubleField(value: &_storage._realTimeFactor) }()
         case 19: try { try decoder.decodeSingularStringField(value: &_storage._language) }()
         case 20: try { try decoder.decodeSingularInt32Field(value: &_storage._sampleRate) }()
         case 21: try { try decoder.decodeSingularBoolField(value: &_storage._isStreaming) }()
@@ -5111,6 +5120,9 @@ nonisolated extension RAVoiceLifecycleEvent: SwiftProtobuf.Message, SwiftProtobu
       if _storage._wordCount != 0 {
         try visitor.visitSingularInt32Field(value: _storage._wordCount, fieldNumber: 17)
       }
+      if _storage._realTimeFactor.bitPattern != 0 {
+        try visitor.visitSingularDoubleField(value: _storage._realTimeFactor, fieldNumber: 18)
+      }
       if !_storage._language.isEmpty {
         try visitor.visitSingularStringField(value: _storage._language, fieldNumber: 19)
       }
@@ -5161,6 +5173,7 @@ nonisolated extension RAVoiceLifecycleEvent: SwiftProtobuf.Message, SwiftProtobu
         if _storage._audioLengthMs != rhs_storage._audioLengthMs {return false}
         if _storage._audioSizeBytes != rhs_storage._audioSizeBytes {return false}
         if _storage._wordCount != rhs_storage._wordCount {return false}
+        if _storage._realTimeFactor != rhs_storage._realTimeFactor {return false}
         if _storage._language != rhs_storage._language {return false}
         if _storage._sampleRate != rhs_storage._sampleRate {return false}
         if _storage._isStreaming != rhs_storage._isStreaming {return false}

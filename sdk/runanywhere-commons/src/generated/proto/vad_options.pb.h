@@ -2761,6 +2761,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStreamEvent final : public ::goo
     kActivityFieldNumber = 6,
     kStatisticsFieldNumber = 7,
     kErrorFieldNumber = 10,
+    kSeqFieldNumber = 1,
     kTimestampUsFieldNumber = 2,
     kKindFieldNumber = 4,
   };
@@ -2843,6 +2844,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStreamEvent final : public ::goo
   ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
 
   public:
+  // uint64 seq = 1;
+  void clear_seq() ;
+  [[nodiscard]] ::uint64_t seq() const;
+  void set_seq(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_seq() const;
+  void _internal_set_seq(::uint64_t value);
+
+  public:
   // int64 timestamp_us = 2;
   void clear_timestamp_us() ;
   [[nodiscard]] ::int64_t timestamp_us() const;
@@ -2867,8 +2878,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStreamEvent final : public ::goo
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 7,
-                          4, 48,
+      ::google::protobuf::internal::TcParseTable<4, 8,
+                          4, 56,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -2901,6 +2912,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADStreamEvent final : public ::goo
     ::runanywhere::v1::SpeechActivityEvent* PROTOBUF_NULLABLE activity_;
     ::runanywhere::v1::VADStatistics* PROTOBUF_NULLABLE statistics_;
     ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
+    ::uint64_t seq_;
     ::int64_t timestamp_us_;
     int kind_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -4818,11 +4830,35 @@ inline void SpeechActivityEvent::set_allocated_segment_id(::std::string* PROTOBU
 
 // VADStreamEvent
 
+// uint64 seq = 1;
+inline void VADStreamEvent::clear_seq() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.seq_ = ::uint64_t{0u};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+}
+inline ::uint64_t VADStreamEvent::seq() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VADStreamEvent.seq)
+  return _internal_seq();
+}
+inline void VADStreamEvent::set_seq(::uint64_t value) {
+  _internal_set_seq(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VADStreamEvent.seq)
+}
+inline ::uint64_t VADStreamEvent::_internal_seq() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.seq_;
+}
+inline void VADStreamEvent::_internal_set_seq(::uint64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.seq_ = value;
+}
+
 // int64 timestamp_us = 2;
 inline void VADStreamEvent::clear_timestamp_us() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_us_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::int64_t VADStreamEvent::timestamp_us() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADStreamEvent.timestamp_us)
@@ -4830,7 +4866,7 @@ inline ::int64_t VADStreamEvent::timestamp_us() const {
 }
 inline void VADStreamEvent::set_timestamp_us(::int64_t value) {
   _internal_set_timestamp_us(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADStreamEvent.timestamp_us)
 }
 inline ::int64_t VADStreamEvent::_internal_timestamp_us() const {
@@ -4910,7 +4946,7 @@ inline void VADStreamEvent::set_allocated_request_id(::std::string* PROTOBUF_NUL
 inline void VADStreamEvent::clear_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.kind_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
 }
 inline ::runanywhere::v1::VADStreamEventKind VADStreamEvent::kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VADStreamEvent.kind)
@@ -4918,7 +4954,7 @@ inline ::runanywhere::v1::VADStreamEventKind VADStreamEvent::kind() const {
 }
 inline void VADStreamEvent::set_kind(::runanywhere::v1::VADStreamEventKind value) {
   _internal_set_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VADStreamEvent.kind)
 }
 inline ::runanywhere::v1::VADStreamEventKind VADStreamEvent::_internal_kind() const {

@@ -4603,6 +4603,7 @@ function createBaseVoiceLifecycleEvent() {
         audioLengthMs: 0,
         audioSizeBytes: 0,
         wordCount: 0,
+        realTimeFactor: 0,
         language: "",
         sampleRate: 0,
         isStreaming: false,
@@ -4665,6 +4666,9 @@ exports.VoiceLifecycleEvent = {
         }
         if (message.wordCount !== 0) {
             writer.uint32(136).int32(message.wordCount);
+        }
+        if (message.realTimeFactor !== 0) {
+            writer.uint32(145).double(message.realTimeFactor);
         }
         if (message.language !== "") {
             writer.uint32(154).string(message.language);
@@ -4818,6 +4822,13 @@ exports.VoiceLifecycleEvent = {
                     message.wordCount = reader.int32();
                     continue;
                 }
+                case 18: {
+                    if (tag !== 145) {
+                        break;
+                    }
+                    message.realTimeFactor = reader.double();
+                    continue;
+                }
                 case 19: {
                     if (tag !== 154) {
                         break;
@@ -4949,6 +4960,11 @@ exports.VoiceLifecycleEvent = {
                 : isSet(object.word_count)
                     ? globalThis.Number(object.word_count)
                     : 0,
+            realTimeFactor: isSet(object.realTimeFactor)
+                ? globalThis.Number(object.realTimeFactor)
+                : isSet(object.real_time_factor)
+                    ? globalThis.Number(object.real_time_factor)
+                    : 0,
             language: isSet(object.language) ? globalThis.String(object.language) : "",
             sampleRate: isSet(object.sampleRate)
                 ? globalThis.Number(object.sampleRate)
@@ -5036,6 +5052,9 @@ exports.VoiceLifecycleEvent = {
         if (message.wordCount !== 0) {
             obj.wordCount = Math.round(message.wordCount);
         }
+        if (message.realTimeFactor !== 0) {
+            obj.realTimeFactor = message.realTimeFactor;
+        }
         if (message.language !== "") {
             obj.language = message.language;
         }
@@ -5084,6 +5103,7 @@ exports.VoiceLifecycleEvent = {
         message.audioLengthMs = object.audioLengthMs ?? 0;
         message.audioSizeBytes = object.audioSizeBytes ?? 0;
         message.wordCount = object.wordCount ?? 0;
+        message.realTimeFactor = object.realTimeFactor ?? 0;
         message.language = object.language ?? "";
         message.sampleRate = object.sampleRate ?? 0;
         message.isStreaming = object.isStreaming ?? false;

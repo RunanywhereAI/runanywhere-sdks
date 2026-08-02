@@ -138,6 +138,7 @@ export interface SpeechActivityEvent {
     segmentId?: string | undefined;
 }
 export interface VADStreamEvent {
+    seq: number;
     timestampUs: number;
     requestId: string;
     kind: VADStreamEventKind;

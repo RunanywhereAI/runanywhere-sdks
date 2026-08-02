@@ -256,6 +256,7 @@ export interface SpeechActivityEvent {
 }
 
 export interface VADStreamEvent {
+  seq: number;
   timestampUs: number;
   requestId: string;
   kind: VADStreamEventKind;
@@ -1692,6 +1693,7 @@ export const SpeechActivityEvent: MessageFns<SpeechActivityEvent> = {
 
 function createBaseVADStreamEvent(): VADStreamEvent {
   return {
+    seq: 0,
     timestampUs: 0,
     requestId: "",
     kind: 0,
@@ -1704,6 +1706,9 @@ function createBaseVADStreamEvent(): VADStreamEvent {
 
 export const VADStreamEvent: MessageFns<VADStreamEvent> = {
   encode(message: VADStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.seq !== 0) {
+      writer.uint32(8).uint64(message.seq);
+    }
     if (message.timestampUs !== 0) {
       writer.uint32(16).int64(message.timestampUs);
     }
@@ -1735,6 +1740,14 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.seq = longToNumber(reader.uint64());
+          continue;
+        }
         case 2: {
           if (tag !== 16) {
             break;
@@ -1802,6 +1815,7 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
 
   fromJSON(object: any): VADStreamEvent {
     return {
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -1822,6 +1836,9 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
 
   toJSON(message: VADStreamEvent): unknown {
     const obj: any = {};
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
+    }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
     }
@@ -1851,6 +1868,7 @@ export const VADStreamEvent: MessageFns<VADStreamEvent> = {
   },
   fromPartial<I extends Exact<DeepPartial<VADStreamEvent>, I>>(object: I): VADStreamEvent {
     const message = createBaseVADStreamEvent();
+    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.requestId = object.requestId ?? "";
     message.kind = object.kind ?? 0;

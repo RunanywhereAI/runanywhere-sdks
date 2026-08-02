@@ -31,11 +31,18 @@ import okio.ByteString
 
 public class VADStreamEvent(
   @field:WireField(
+    tag = 1,
+    adapter = "com.squareup.wire.ProtoAdapter#UINT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 0,
+  )
+  public val seq: Long = 0L,
+  @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
-    schemaIndex = 0,
+    schemaIndex = 1,
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
@@ -43,38 +50,38 @@ public class VADStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 1,
+    schemaIndex = 2,
   )
   public val request_id: String = "",
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.VADStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 3,
   )
   public val kind: VADStreamEventKind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.VADResult#ADAPTER",
-    schemaIndex = 3,
+    schemaIndex = 4,
   )
   public val result: VADResult? = null,
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.SpeechActivityEvent#ADAPTER",
-    schemaIndex = 4,
+    schemaIndex = 5,
   )
   public val activity: SpeechActivityEvent? = null,
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.VADStatistics#ADAPTER",
-    schemaIndex = 5,
+    schemaIndex = 6,
   )
   public val statistics: VADStatistics? = null,
   @field:WireField(
     tag = 10,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 6,
+    schemaIndex = 7,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -89,6 +96,7 @@ public class VADStreamEvent(
     if (other === this) return true
     if (other !is VADStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
+    if (seq != other.seq) return false
     if (timestamp_us != other.timestamp_us) return false
     if (request_id != other.request_id) return false
     if (kind != other.kind) return false
@@ -103,6 +111,7 @@ public class VADStreamEvent(
     var result_ = super.hashCode
     if (result_ == 0) {
       result_ = unknownFields.hashCode()
+      result_ = result_ * 37 + seq.hashCode()
       result_ = result_ * 37 + timestamp_us.hashCode()
       result_ = result_ * 37 + request_id.hashCode()
       result_ = result_ * 37 + kind.hashCode()
@@ -117,6 +126,7 @@ public class VADStreamEvent(
 
   override fun toString(): String {
     val result_ = mutableListOf<String>()
+    result_ += """seq=$seq"""
     result_ += """timestamp_us=$timestamp_us"""
     result_ += """request_id=${sanitize(request_id)}"""
     result_ += """kind=$kind"""
@@ -128,6 +138,7 @@ public class VADStreamEvent(
   }
 
   public fun copy(
+    seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
     request_id: String = this.request_id,
     kind: VADStreamEventKind = this.kind,
@@ -136,7 +147,7 @@ public class VADStreamEvent(
     statistics: VADStatistics? = this.statistics,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): VADStreamEvent = VADStreamEvent(timestamp_us, request_id, kind, result, activity, statistics, error, unknownFields)
+  ): VADStreamEvent = VADStreamEvent(seq, timestamp_us, request_id, kind, result, activity, statistics, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -150,6 +161,9 @@ public class VADStreamEvent(
     ) {
       override fun encodedSize(`value`: VADStreamEvent): Int {
         var size = value.unknownFields.size
+        if (value.seq != 0L) {
+          size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
+        }
         if (value.timestamp_us != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
         }
@@ -167,6 +181,9 @@ public class VADStreamEvent(
       }
 
       override fun encode(writer: ProtoWriter, `value`: VADStreamEvent) {
+        if (value.seq != 0L) {
+          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
+        }
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
@@ -198,9 +215,13 @@ public class VADStreamEvent(
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
+        if (value.seq != 0L) {
+          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
+        }
       }
 
       override fun decode(reader: ProtoReader): VADStreamEvent {
+        var seq: Long = 0L
         var timestamp_us: Long = 0L
         var request_id: String = ""
         var kind: VADStreamEventKind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED
@@ -210,6 +231,7 @@ public class VADStreamEvent(
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
+            1 -> seq = ProtoAdapter.UINT64.decode(reader)
             2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             3 -> request_id = ProtoAdapter.STRING.decode(reader)
             4 -> try {
@@ -225,6 +247,7 @@ public class VADStreamEvent(
           }
         }
         return VADStreamEvent(
+          seq = seq,
           timestamp_us = timestamp_us,
           request_id = request_id,
           kind = kind,

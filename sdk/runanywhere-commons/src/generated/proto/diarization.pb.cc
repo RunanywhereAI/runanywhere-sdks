@@ -746,9 +746,9 @@ constexpr DiarizationStreamEvent::ParseTableT_ DiarizationStreamEvent::InternalG
       0, // no _extensions_
       6, 56,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294967234,  // skipmap
+      4294967232,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      5,  // num_field_entries
+      6,  // num_field_entries
       2,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -763,14 +763,17 @@ constexpr DiarizationStreamEvent::ParseTableT_ DiarizationStreamEvent::InternalG
       {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiarizationStreamEvent, _impl_.session_id_), 2>(),
        {8, 2, 0,
         PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.session_id_)}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // uint64 seq = 2;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiarizationStreamEvent, _impl_.seq_), 3>(),
+       {16, 3, 0,
+        PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.seq_)}},
       // int64 timestamp_us = 3;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiarizationStreamEvent, _impl_.timestamp_us_), 3>(),
-       {24, 3, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(DiarizationStreamEvent, _impl_.timestamp_us_), 4>(),
+       {24, 4, 0,
         PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.timestamp_us_)}},
       // .runanywhere.v1.DiarizationStreamEventKind kind = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiarizationStreamEvent, _impl_.kind_), 4>(),
-       {32, 4, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(DiarizationStreamEvent, _impl_.kind_), 5>(),
+       {32, 5, 0,
         PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.kind_)}},
       // optional .runanywhere.v1.DiarizationResult result = 5;
       {::_pbi::TcParser::FastMtS1,
@@ -786,10 +789,12 @@ constexpr DiarizationStreamEvent::ParseTableT_ DiarizationStreamEvent::InternalG
     }}, {{
       // uint64 session_id = 1;
       {PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.session_id_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
+      // uint64 seq = 2;
+      {PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.seq_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
       // int64 timestamp_us = 3;
-      {PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // .runanywhere.v1.DiarizationStreamEventKind kind = 4;
-      {PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional .runanywhere.v1.DiarizationResult result = 5;
       {PROTOBUF_FIELD_OFFSET(DiarizationStreamEvent, _impl_.result_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // optional .runanywhere.v1.SDKError error = 6;
@@ -820,6 +825,7 @@ inline constexpr DiarizationStreamEvent::Impl_::Impl_(
         result_{nullptr},
         error_{nullptr},
         session_id_{::uint64_t{0u}},
+        seq_{::uint64_t{0u}},
         timestamp_us_{::int64_t{0}},
         kind_{static_cast< ::runanywhere::v1::DiarizationStreamEventKind >(0)} {}
 
@@ -972,8 +978,9 @@ const ::uint32_t
         1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationStreamEvent, _impl_._has_bits_),
-        8, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationStreamEvent, _impl_.session_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationStreamEvent, _impl_.seq_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationStreamEvent, _impl_.timestamp_us_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationStreamEvent, _impl_.kind_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::DiarizationStreamEvent, _impl_.result_),
@@ -981,6 +988,7 @@ const ::uint32_t
         2,
         3,
         4,
+        5,
         0,
         1,
 };
@@ -1023,24 +1031,24 @@ const char descriptor_table_protodef_diarization_2eproto[] ABSL_ATTRIBUTE_SECTIO
     "onResult\0224\n\010segments\030\001 \003(\0132\".runanywhere"
     ".v1.DiarizationSegment\022\025\n\rspeaker_count\030"
     "\002 \001(\005\022\031\n\021audio_duration_ms\030\003 \001(\003\022\032\n\022proc"
-    "essing_time_ms\030\004 \001(\003\022\020\n\010model_id\030\005 \001(\t\"\367"
-    "\001\n\026DiarizationStreamEvent\022\022\n\nsession_id\030"
-    "\001 \001(\004\022\024\n\014timestamp_us\030\003 \001(\003\0228\n\004kind\030\004 \001("
-    "\0162*.runanywhere.v1.DiarizationStreamEven"
-    "tKind\0226\n\006result\030\005 \001(\0132!.runanywhere.v1.D"
-    "iarizationResultH\000\210\001\001\022,\n\005error\030\006 \001(\0132\030.r"
-    "unanywhere.v1.SDKErrorH\001\210\001\001B\t\n\007_resultB\010"
-    "\n\006_error*\362\001\n\032DiarizationStreamEventKind\022"
-    "-\n)DIARIZATION_STREAM_EVENT_KIND_UNSPECI"
-    "FIED\020\000\022)\n%DIARIZATION_STREAM_EVENT_KIND_"
-    "STARTED\020\001\022(\n$DIARIZATION_STREAM_EVENT_KI"
-    "ND_UPDATE\020\002\022\'\n#DIARIZATION_STREAM_EVENT_"
-    "KIND_FINAL\020\003\022\'\n#DIARIZATION_STREAM_EVENT"
-    "_KIND_ERROR\020\004B\213\001\n\027ai.runanywhere.proto.v"
-    "1B\020DiarizationProtoP\001Z<github.com/runany"
-    "where/runanywhere-sdks/idl/v1;runanywher"
-    "ev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006pro"
-    "to3"
+    "essing_time_ms\030\004 \001(\003\022\020\n\010model_id\030\005 \001(\t\"\204"
+    "\002\n\026DiarizationStreamEvent\022\022\n\nsession_id\030"
+    "\001 \001(\004\022\013\n\003seq\030\002 \001(\004\022\024\n\014timestamp_us\030\003 \001(\003"
+    "\0228\n\004kind\030\004 \001(\0162*.runanywhere.v1.Diarizat"
+    "ionStreamEventKind\0226\n\006result\030\005 \001(\0132!.run"
+    "anywhere.v1.DiarizationResultH\000\210\001\001\022,\n\005er"
+    "ror\030\006 \001(\0132\030.runanywhere.v1.SDKErrorH\001\210\001\001"
+    "B\t\n\007_resultB\010\n\006_error*\362\001\n\032DiarizationStr"
+    "eamEventKind\022-\n)DIARIZATION_STREAM_EVENT"
+    "_KIND_UNSPECIFIED\020\000\022)\n%DIARIZATION_STREA"
+    "M_EVENT_KIND_STARTED\020\001\022(\n$DIARIZATION_ST"
+    "REAM_EVENT_KIND_UPDATE\020\002\022\'\n#DIARIZATION_"
+    "STREAM_EVENT_KIND_FINAL\020\003\022\'\n#DIARIZATION"
+    "_STREAM_EVENT_KIND_ERROR\020\004B\213\001\n\027ai.runany"
+    "where.proto.v1B\020DiarizationProtoP\001Z<gith"
+    "ub.com/runanywhere/runanywhere-sdks/idl/"
+    "v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere"
+    ".V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_diarization_2eproto_deps[3] = {
@@ -1052,7 +1060,7 @@ static ::absl::once_flag descriptor_table_diarization_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_diarization_2eproto = {
     false,
     false,
-    1483,
+    1496,
     descriptor_table_protodef_diarization_2eproto,
     "diarization.proto",
     &descriptor_table_diarization_2eproto_once,
@@ -2387,7 +2395,7 @@ PROTOBUF_NOINLINE void DiarizationStreamEvent::Clear() {
       _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001cU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003cU)) {
     ::memset(&_impl_.session_id_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.kind_) -
         reinterpret_cast<char*>(&_impl_.session_id_)) + sizeof(_impl_.kind_));
@@ -2424,8 +2432,17 @@ PROTOBUF_NOINLINE void DiarizationStreamEvent::Clear() {
     }
   }
 
-  // int64 timestamp_us = 3;
+  // uint64 seq = 2;
   if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_seq() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteUInt64ToArray(
+          2, this_._internal_seq(), target);
+    }
+  }
+
+  // int64 timestamp_us = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_timestamp_us() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
@@ -2434,7 +2451,7 @@ PROTOBUF_NOINLINE void DiarizationStreamEvent::Clear() {
   }
 
   // .runanywhere.v1.DiarizationStreamEventKind kind = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_kind() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -2481,7 +2498,7 @@ PROTOBUF_NOINLINE void DiarizationStreamEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     // optional .runanywhere.v1.DiarizationResult result = 5;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       total_size += 1 +
@@ -2499,15 +2516,22 @@ PROTOBUF_NOINLINE void DiarizationStreamEvent::Clear() {
             this_._internal_session_id());
       }
     }
-    // int64 timestamp_us = 3;
+    // uint64 seq = 2;
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_seq() != 0) {
+        total_size += ::_pbi::WireFormatLite::UInt64SizePlusOne(
+            this_._internal_seq());
+      }
+    }
+    // int64 timestamp_us = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_timestamp_us() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_us());
       }
     }
     // .runanywhere.v1.DiarizationStreamEventKind kind = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_kind() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_kind());
@@ -2532,7 +2556,7 @@ void DiarizationStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       ABSL_DCHECK(from._impl_.result_ != nullptr);
       if (_this->_impl_.result_ == nullptr) {
@@ -2555,11 +2579,16 @@ void DiarizationStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_seq() != 0) {
+        _this->_impl_.seq_ = from._impl_.seq_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_timestamp_us() != 0) {
         _this->_impl_.timestamp_us_ = from._impl_.timestamp_us_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_kind() != 0) {
         _this->_impl_.kind_ = from._impl_.kind_;
       }

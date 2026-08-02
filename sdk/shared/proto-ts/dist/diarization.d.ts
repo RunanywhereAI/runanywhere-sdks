@@ -48,6 +48,7 @@ export interface DiarizationResult {
  */
 export interface DiarizationStreamEvent {
     sessionId: number;
+    seq: number;
     timestampUs: number;
     kind: DiarizationStreamEventKind;
     result?: DiarizationResult | undefined;

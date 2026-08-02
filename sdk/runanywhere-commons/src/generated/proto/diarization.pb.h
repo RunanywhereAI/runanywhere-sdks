@@ -1315,6 +1315,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationStreamEvent final : publ
     kResultFieldNumber = 5,
     kErrorFieldNumber = 6,
     kSessionIdFieldNumber = 1,
+    kSeqFieldNumber = 2,
     kTimestampUsFieldNumber = 3,
     kKindFieldNumber = 4,
   };
@@ -1360,6 +1361,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationStreamEvent final : publ
   void _internal_set_session_id(::uint64_t value);
 
   public:
+  // uint64 seq = 2;
+  void clear_seq() ;
+  [[nodiscard]] ::uint64_t seq() const;
+  void set_seq(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_seq() const;
+  void _internal_set_seq(::uint64_t value);
+
+  public:
   // int64 timestamp_us = 3;
   void clear_timestamp_us() ;
   [[nodiscard]] ::int64_t timestamp_us() const;
@@ -1384,7 +1395,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationStreamEvent final : publ
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 5,
+      ::google::protobuf::internal::TcParseTable<3, 6,
                           2, 0,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -1416,6 +1427,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED DiarizationStreamEvent final : publ
     ::runanywhere::v1::DiarizationResult* PROTOBUF_NULLABLE result_;
     ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
     ::uint64_t session_id_;
+    ::uint64_t seq_;
     ::int64_t timestamp_us_;
     int kind_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -2129,11 +2141,35 @@ inline void DiarizationStreamEvent::_internal_set_session_id(::uint64_t value) {
   _impl_.session_id_ = value;
 }
 
+// uint64 seq = 2;
+inline void DiarizationStreamEvent::clear_seq() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.seq_ = ::uint64_t{0u};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+}
+inline ::uint64_t DiarizationStreamEvent::seq() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationStreamEvent.seq)
+  return _internal_seq();
+}
+inline void DiarizationStreamEvent::set_seq(::uint64_t value) {
+  _internal_set_seq(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationStreamEvent.seq)
+}
+inline ::uint64_t DiarizationStreamEvent::_internal_seq() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.seq_;
+}
+inline void DiarizationStreamEvent::_internal_set_seq(::uint64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.seq_ = value;
+}
+
 // int64 timestamp_us = 3;
 inline void DiarizationStreamEvent::clear_timestamp_us() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_us_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
 }
 inline ::int64_t DiarizationStreamEvent::timestamp_us() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationStreamEvent.timestamp_us)
@@ -2141,7 +2177,7 @@ inline ::int64_t DiarizationStreamEvent::timestamp_us() const {
 }
 inline void DiarizationStreamEvent::set_timestamp_us(::int64_t value) {
   _internal_set_timestamp_us(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationStreamEvent.timestamp_us)
 }
 inline ::int64_t DiarizationStreamEvent::_internal_timestamp_us() const {
@@ -2157,7 +2193,7 @@ inline void DiarizationStreamEvent::_internal_set_timestamp_us(::int64_t value) 
 inline void DiarizationStreamEvent::clear_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.kind_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::runanywhere::v1::DiarizationStreamEventKind DiarizationStreamEvent::kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.DiarizationStreamEvent.kind)
@@ -2165,7 +2201,7 @@ inline ::runanywhere::v1::DiarizationStreamEventKind DiarizationStreamEvent::kin
 }
 inline void DiarizationStreamEvent::set_kind(::runanywhere::v1::DiarizationStreamEventKind value) {
   _internal_set_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.DiarizationStreamEvent.kind)
 }
 inline ::runanywhere::v1::DiarizationStreamEventKind DiarizationStreamEvent::_internal_kind() const {

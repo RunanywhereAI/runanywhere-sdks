@@ -1730,6 +1730,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceLifecycleEvent final : public 
     kAudioLevelFieldNumber = 8,
     kAudioSizeBytesFieldNumber = 16,
     kAudioLengthMsFieldNumber = 15,
+    kRealTimeFactorFieldNumber = 18,
     kWordCountFieldNumber = 17,
     kSampleRateFieldNumber = 20,
     kIsStreamingFieldNumber = 21,
@@ -1964,6 +1965,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceLifecycleEvent final : public 
   void _internal_set_audio_length_ms(::int64_t value);
 
   public:
+  // double real_time_factor = 18;
+  void clear_real_time_factor() ;
+  [[nodiscard]] double real_time_factor() const;
+  void set_real_time_factor(double value);
+
+  private:
+  double _internal_real_time_factor() const;
+  void _internal_set_real_time_factor(double value);
+
+  public:
   // int32 word_count = 17;
   void clear_word_count() ;
   [[nodiscard]] ::int32_t word_count() const;
@@ -2048,7 +2059,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceLifecycleEvent final : public 
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<5, 25,
+      ::google::protobuf::internal::TcParseTable<5, 26,
                           0, 180,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -2094,6 +2105,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceLifecycleEvent final : public 
     float audio_level_;
     ::int32_t audio_size_bytes_;
     ::int64_t audio_length_ms_;
+    double real_time_factor_;
     ::int32_t word_count_;
     ::int32_t sample_rate_;
     bool is_streaming_;
@@ -16633,7 +16645,7 @@ inline void VoiceLifecycleEvent::_internal_set_audio_size_bytes(::int32_t value)
 inline void VoiceLifecycleEvent::clear_word_count() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.word_count_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00040000U);
 }
 inline ::int32_t VoiceLifecycleEvent::word_count() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceLifecycleEvent.word_count)
@@ -16641,7 +16653,7 @@ inline ::int32_t VoiceLifecycleEvent::word_count() const {
 }
 inline void VoiceLifecycleEvent::set_word_count(::int32_t value) {
   _internal_set_word_count(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00020000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00040000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceLifecycleEvent.word_count)
 }
 inline ::int32_t VoiceLifecycleEvent::_internal_word_count() const {
@@ -16651,6 +16663,30 @@ inline ::int32_t VoiceLifecycleEvent::_internal_word_count() const {
 inline void VoiceLifecycleEvent::_internal_set_word_count(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.word_count_ = value;
+}
+
+// double real_time_factor = 18;
+inline void VoiceLifecycleEvent::clear_real_time_factor() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.real_time_factor_ = 0;
+  ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
+}
+inline double VoiceLifecycleEvent::real_time_factor() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceLifecycleEvent.real_time_factor)
+  return _internal_real_time_factor();
+}
+inline void VoiceLifecycleEvent::set_real_time_factor(double value) {
+  _internal_set_real_time_factor(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00020000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceLifecycleEvent.real_time_factor)
+}
+inline double VoiceLifecycleEvent::_internal_real_time_factor() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.real_time_factor_;
+}
+inline void VoiceLifecycleEvent::_internal_set_real_time_factor(double value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.real_time_factor_ = value;
 }
 
 // string language = 19;
@@ -16721,7 +16757,7 @@ inline void VoiceLifecycleEvent::set_allocated_language(::std::string* PROTOBUF_
 inline void VoiceLifecycleEvent::clear_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.sample_rate_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00040000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00080000U);
 }
 inline ::int32_t VoiceLifecycleEvent::sample_rate() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceLifecycleEvent.sample_rate)
@@ -16729,7 +16765,7 @@ inline ::int32_t VoiceLifecycleEvent::sample_rate() const {
 }
 inline void VoiceLifecycleEvent::set_sample_rate(::int32_t value) {
   _internal_set_sample_rate(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00040000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00080000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceLifecycleEvent.sample_rate)
 }
 inline ::int32_t VoiceLifecycleEvent::_internal_sample_rate() const {
@@ -16745,7 +16781,7 @@ inline void VoiceLifecycleEvent::_internal_set_sample_rate(::int32_t value) {
 inline void VoiceLifecycleEvent::clear_is_streaming() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_streaming_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00080000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00100000U);
 }
 inline bool VoiceLifecycleEvent::is_streaming() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceLifecycleEvent.is_streaming)
@@ -16753,7 +16789,7 @@ inline bool VoiceLifecycleEvent::is_streaming() const {
 }
 inline void VoiceLifecycleEvent::set_is_streaming(bool value) {
   _internal_set_is_streaming(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00080000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00100000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceLifecycleEvent.is_streaming)
 }
 inline bool VoiceLifecycleEvent::_internal_is_streaming() const {
@@ -16769,7 +16805,7 @@ inline void VoiceLifecycleEvent::_internal_set_is_streaming(bool value) {
 inline void VoiceLifecycleEvent::clear_framework() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.framework_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00100000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00200000U);
 }
 inline ::int32_t VoiceLifecycleEvent::framework() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceLifecycleEvent.framework)
@@ -16777,7 +16813,7 @@ inline ::int32_t VoiceLifecycleEvent::framework() const {
 }
 inline void VoiceLifecycleEvent::set_framework(::int32_t value) {
   _internal_set_framework(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00100000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00200000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceLifecycleEvent.framework)
 }
 inline ::int32_t VoiceLifecycleEvent::_internal_framework() const {
@@ -16793,7 +16829,7 @@ inline void VoiceLifecycleEvent::_internal_set_framework(::int32_t value) {
 inline void VoiceLifecycleEvent::clear_character_count() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.character_count_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00400000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00800000U);
 }
 inline ::int32_t VoiceLifecycleEvent::character_count() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceLifecycleEvent.character_count)
@@ -16801,7 +16837,7 @@ inline ::int32_t VoiceLifecycleEvent::character_count() const {
 }
 inline void VoiceLifecycleEvent::set_character_count(::int32_t value) {
   _internal_set_character_count(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00400000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00800000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceLifecycleEvent.character_count)
 }
 inline ::int32_t VoiceLifecycleEvent::_internal_character_count() const {
@@ -16817,7 +16853,7 @@ inline void VoiceLifecycleEvent::_internal_set_character_count(::int32_t value) 
 inline void VoiceLifecycleEvent::clear_audio_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.audio_duration_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00200000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00400000U);
 }
 inline ::int64_t VoiceLifecycleEvent::audio_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceLifecycleEvent.audio_duration_ms)
@@ -16825,7 +16861,7 @@ inline ::int64_t VoiceLifecycleEvent::audio_duration_ms() const {
 }
 inline void VoiceLifecycleEvent::set_audio_duration_ms(::int64_t value) {
   _internal_set_audio_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00200000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00400000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceLifecycleEvent.audio_duration_ms)
 }
 inline ::int64_t VoiceLifecycleEvent::_internal_audio_duration_ms() const {
@@ -16841,7 +16877,7 @@ inline void VoiceLifecycleEvent::_internal_set_audio_duration_ms(::int64_t value
 inline void VoiceLifecycleEvent::clear_audio_size_bytes_tts() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.audio_size_bytes_tts_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00800000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x01000000U);
 }
 inline ::int32_t VoiceLifecycleEvent::audio_size_bytes_tts() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceLifecycleEvent.audio_size_bytes_tts)
@@ -16849,7 +16885,7 @@ inline ::int32_t VoiceLifecycleEvent::audio_size_bytes_tts() const {
 }
 inline void VoiceLifecycleEvent::set_audio_size_bytes_tts(::int32_t value) {
   _internal_set_audio_size_bytes_tts(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00800000U);
+  SetHasBit(_impl_._has_bits_[0], 0x01000000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceLifecycleEvent.audio_size_bytes_tts)
 }
 inline ::int32_t VoiceLifecycleEvent::_internal_audio_size_bytes_tts() const {
@@ -16865,7 +16901,7 @@ inline void VoiceLifecycleEvent::_internal_set_audio_size_bytes_tts(::int32_t va
 inline void VoiceLifecycleEvent::clear_processing_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.processing_duration_ms_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x01000000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x02000000U);
 }
 inline ::int64_t VoiceLifecycleEvent::processing_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceLifecycleEvent.processing_duration_ms)
@@ -16873,7 +16909,7 @@ inline ::int64_t VoiceLifecycleEvent::processing_duration_ms() const {
 }
 inline void VoiceLifecycleEvent::set_processing_duration_ms(::int64_t value) {
   _internal_set_processing_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x01000000U);
+  SetHasBit(_impl_._has_bits_[0], 0x02000000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceLifecycleEvent.processing_duration_ms)
 }
 inline ::int64_t VoiceLifecycleEvent::_internal_processing_duration_ms() const {

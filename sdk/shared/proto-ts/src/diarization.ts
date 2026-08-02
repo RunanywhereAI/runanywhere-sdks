@@ -104,6 +104,7 @@ export interface DiarizationResult {
  */
 export interface DiarizationStreamEvent {
   sessionId: number;
+  seq: number;
   timestampUs: number;
   kind: DiarizationStreamEventKind;
   result?: DiarizationResult | undefined;
@@ -618,13 +619,16 @@ export const DiarizationResult: MessageFns<DiarizationResult> = {
 };
 
 function createBaseDiarizationStreamEvent(): DiarizationStreamEvent {
-  return { sessionId: 0, timestampUs: 0, kind: 0, result: undefined, error: undefined };
+  return { sessionId: 0, seq: 0, timestampUs: 0, kind: 0, result: undefined, error: undefined };
 }
 
 export const DiarizationStreamEvent: MessageFns<DiarizationStreamEvent> = {
   encode(message: DiarizationStreamEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.sessionId !== 0) {
       writer.uint32(8).uint64(message.sessionId);
+    }
+    if (message.seq !== 0) {
+      writer.uint32(16).uint64(message.seq);
     }
     if (message.timestampUs !== 0) {
       writer.uint32(24).int64(message.timestampUs);
@@ -654,6 +658,14 @@ export const DiarizationStreamEvent: MessageFns<DiarizationStreamEvent> = {
           }
 
           message.sessionId = longToNumber(reader.uint64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.seq = longToNumber(reader.uint64());
           continue;
         }
         case 3: {
@@ -704,6 +716,7 @@ export const DiarizationStreamEvent: MessageFns<DiarizationStreamEvent> = {
         : isSet(object.session_id)
         ? globalThis.Number(object.session_id)
         : 0,
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
       timestampUs: isSet(object.timestampUs)
         ? globalThis.Number(object.timestampUs)
         : isSet(object.timestamp_us)
@@ -719,6 +732,9 @@ export const DiarizationStreamEvent: MessageFns<DiarizationStreamEvent> = {
     const obj: any = {};
     if (message.sessionId !== 0) {
       obj.sessionId = Math.round(message.sessionId);
+    }
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
     }
     if (message.timestampUs !== 0) {
       obj.timestampUs = Math.round(message.timestampUs);
@@ -741,6 +757,7 @@ export const DiarizationStreamEvent: MessageFns<DiarizationStreamEvent> = {
   fromPartial<I extends Exact<DeepPartial<DiarizationStreamEvent>, I>>(object: I): DiarizationStreamEvent {
     const message = createBaseDiarizationStreamEvent();
     message.sessionId = object.sessionId ?? 0;
+    message.seq = object.seq ?? 0;
     message.timestampUs = object.timestampUs ?? 0;
     message.kind = object.kind ?? 0;
     message.result = (object.result !== undefined && object.result !== null)

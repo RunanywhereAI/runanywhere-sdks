@@ -527,6 +527,7 @@ message VoiceLifecycleEvent {
     int64          audio_length_ms       = 15;   // STT input audio length
     int32          audio_size_bytes      = 16;
     int32          word_count            = 17;   // STT
+    double         real_time_factor      = 18;   // STT
     string         language              = 19;   // STT
     int32          sample_rate           = 20;   // STT + TTS
     bool           is_streaming          = 21;   // STT

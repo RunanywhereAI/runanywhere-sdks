@@ -475,6 +475,11 @@ public nonisolated struct RASTTStreamEvent: @unchecked Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  public var seq: UInt64 {
+    get {_storage._seq}
+    set {_uniqueStorage()._seq = newValue}
+  }
+
   public var timestampUs: Int64 {
     get {_storage._timestampUs}
     set {_uniqueStorage()._timestampUs = newValue}
@@ -1305,9 +1310,10 @@ nonisolated extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RASTTStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}partial\0\u{3}final_output\0\u{2}\u{3}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}partial\0\u{3}final_output\0\u{2}\u{3}error\0")
 
   fileprivate class _StorageClass {
+    var _seq: UInt64 = 0
     var _timestampUs: Int64 = 0
     var _requestID: String = String()
     var _kind: RASTTStreamEventKind = .unspecified
@@ -1324,6 +1330,7 @@ nonisolated extension RASTTStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
     private init() {}
 
     init(copying source: _StorageClass) {
+      _seq = source._seq
       _timestampUs = source._timestampUs
       _requestID = source._requestID
       _kind = source._kind
@@ -1348,6 +1355,7 @@ nonisolated extension RASTTStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
         // allocates stack space for every case branch when no optimizations are
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
+        case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._seq) }()
         case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
         case 3: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
         case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
@@ -1366,6 +1374,9 @@ nonisolated extension RASTTStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       // allocates stack space for every if/case branch local when no optimizations
       // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
       // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._seq != 0 {
+        try visitor.visitSingularUInt64Field(value: _storage._seq, fieldNumber: 1)
+      }
       if _storage._timestampUs != 0 {
         try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
       }
@@ -1393,6 +1404,7 @@ nonisolated extension RASTTStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._Me
       let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
         let _storage = _args.0
         let rhs_storage = _args.1
+        if _storage._seq != rhs_storage._seq {return false}
         if _storage._timestampUs != rhs_storage._timestampUs {return false}
         if _storage._requestID != rhs_storage._requestID {return false}
         if _storage._kind != rhs_storage._kind {return false}

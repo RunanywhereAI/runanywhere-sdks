@@ -31,11 +31,18 @@ import okio.ByteString
 
 public class STTStreamEvent(
   @field:WireField(
+    tag = 1,
+    adapter = "com.squareup.wire.ProtoAdapter#UINT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 0,
+  )
+  public val seq: Long = 0L,
+  @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "timestampUs",
-    schemaIndex = 0,
+    schemaIndex = 1,
   )
   public val timestamp_us: Long = 0L,
   @field:WireField(
@@ -43,33 +50,33 @@ public class STTStreamEvent(
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "requestId",
-    schemaIndex = 1,
+    schemaIndex = 2,
   )
   public val request_id: String = "",
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.STTStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 2,
+    schemaIndex = 3,
   )
   public val kind: STTStreamEventKind = STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
     tag = 5,
     adapter = "ai.runanywhere.proto.v1.STTPartialResult#ADAPTER",
-    schemaIndex = 3,
+    schemaIndex = 4,
   )
   public val partial: STTPartialResult? = null,
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.STTOutput#ADAPTER",
     jsonName = "finalOutput",
-    schemaIndex = 4,
+    schemaIndex = 5,
   )
   public val final_output: STTOutput? = null,
   @field:WireField(
     tag = 9,
     adapter = "ai.runanywhere.proto.v1.SDKError#ADAPTER",
-    schemaIndex = 5,
+    schemaIndex = 6,
   )
   public val error: SDKError? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -84,6 +91,7 @@ public class STTStreamEvent(
     if (other === this) return true
     if (other !is STTStreamEvent) return false
     if (unknownFields != other.unknownFields) return false
+    if (seq != other.seq) return false
     if (timestamp_us != other.timestamp_us) return false
     if (request_id != other.request_id) return false
     if (kind != other.kind) return false
@@ -97,6 +105,7 @@ public class STTStreamEvent(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
+      result = result * 37 + seq.hashCode()
       result = result * 37 + timestamp_us.hashCode()
       result = result * 37 + request_id.hashCode()
       result = result * 37 + kind.hashCode()
@@ -110,6 +119,7 @@ public class STTStreamEvent(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
+    result += """seq=$seq"""
     result += """timestamp_us=$timestamp_us"""
     result += """request_id=${sanitize(request_id)}"""
     result += """kind=$kind"""
@@ -120,6 +130,7 @@ public class STTStreamEvent(
   }
 
   public fun copy(
+    seq: Long = this.seq,
     timestamp_us: Long = this.timestamp_us,
     request_id: String = this.request_id,
     kind: STTStreamEventKind = this.kind,
@@ -127,7 +138,7 @@ public class STTStreamEvent(
     final_output: STTOutput? = this.final_output,
     error: SDKError? = this.error,
     unknownFields: ByteString = this.unknownFields,
-  ): STTStreamEvent = STTStreamEvent(timestamp_us, request_id, kind, partial, final_output, error, unknownFields)
+  ): STTStreamEvent = STTStreamEvent(seq, timestamp_us, request_id, kind, partial, final_output, error, unknownFields)
 
   public companion object {
     @JvmField
@@ -141,6 +152,9 @@ public class STTStreamEvent(
     ) {
       override fun encodedSize(`value`: STTStreamEvent): Int {
         var size = value.unknownFields.size
+        if (value.seq != 0L) {
+          size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
+        }
         if (value.timestamp_us != 0L) {
           size += ProtoAdapter.INT64.encodedSizeWithTag(2, value.timestamp_us)
         }
@@ -157,6 +171,9 @@ public class STTStreamEvent(
       }
 
       override fun encode(writer: ProtoWriter, `value`: STTStreamEvent) {
+        if (value.seq != 0L) {
+          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
+        }
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
@@ -186,9 +203,13 @@ public class STTStreamEvent(
         if (value.timestamp_us != 0L) {
           ProtoAdapter.INT64.encodeWithTag(writer, 2, value.timestamp_us)
         }
+        if (value.seq != 0L) {
+          ProtoAdapter.UINT64.encodeWithTag(writer, 1, value.seq)
+        }
       }
 
       override fun decode(reader: ProtoReader): STTStreamEvent {
+        var seq: Long = 0L
         var timestamp_us: Long = 0L
         var request_id: String = ""
         var kind: STTStreamEventKind = STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED
@@ -197,6 +218,7 @@ public class STTStreamEvent(
         var error: SDKError? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
+            1 -> seq = ProtoAdapter.UINT64.decode(reader)
             2 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             3 -> request_id = ProtoAdapter.STRING.decode(reader)
             4 -> try {
@@ -211,6 +233,7 @@ public class STTStreamEvent(
           }
         }
         return STTStreamEvent(
+          seq = seq,
           timestamp_us = timestamp_us,
           request_id = request_id,
           kind = kind,

@@ -1806,10 +1806,21 @@ exports.STTPartialResult = {
     },
 };
 function createBaseSTTStreamEvent() {
-    return { timestampUs: 0, requestId: "", kind: 0, partial: undefined, finalOutput: undefined, error: undefined };
+    return {
+        seq: 0,
+        timestampUs: 0,
+        requestId: "",
+        kind: 0,
+        partial: undefined,
+        finalOutput: undefined,
+        error: undefined,
+    };
 }
 exports.STTStreamEvent = {
     encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.seq !== 0) {
+            writer.uint32(8).uint64(message.seq);
+        }
         if (message.timestampUs !== 0) {
             writer.uint32(16).int64(message.timestampUs);
         }
@@ -1837,6 +1848,13 @@ exports.STTStreamEvent = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.seq = longToNumber(reader.uint64());
+                    continue;
+                }
                 case 2: {
                     if (tag !== 16) {
                         break;
@@ -1889,6 +1907,7 @@ exports.STTStreamEvent = {
     },
     fromJSON(object) {
         return {
+            seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
             timestampUs: isSet(object.timestampUs)
                 ? globalThis.Number(object.timestampUs)
                 : isSet(object.timestamp_us)
@@ -1911,6 +1930,9 @@ exports.STTStreamEvent = {
     },
     toJSON(message) {
         const obj = {};
+        if (message.seq !== 0) {
+            obj.seq = Math.round(message.seq);
+        }
         if (message.timestampUs !== 0) {
             obj.timestampUs = Math.round(message.timestampUs);
         }
@@ -1936,6 +1958,7 @@ exports.STTStreamEvent = {
     },
     fromPartial(object) {
         const message = createBaseSTTStreamEvent();
+        message.seq = object.seq ?? 0;
         message.timestampUs = object.timestampUs ?? 0;
         message.requestId = object.requestId ?? "";
         message.kind = object.kind ?? 0;

@@ -159,6 +159,7 @@ enum STTStreamEventKind {
 }
 
 message STTStreamEvent {
+    uint64 seq = 1;
     int64 timestamp_us = 2;
     string request_id = 3;
     STTStreamEventKind kind = 4;

@@ -1754,11 +1754,11 @@ constexpr VADStreamEvent::ParseTableT_ VADStreamEvent::InternalGenerateParseTabl
     {
       PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_._has_bits_),
       0, // no _extensions_
-      10, 56,  // max_field_number, fast_idx_mask
+      10, 120,  // max_field_number, fast_idx_mask
       offsetof(ParseTableT_, field_lookup_table),
-      4294966657,  // skipmap
+      4294966656,  // skipmap
       offsetof(ParseTableT_, field_entries),
-      7,  // num_field_entries
+      8,  // num_field_entries
       4,  // num_aux_entries
       offsetof(ParseTableT_, aux_entries),
       class_data,
@@ -1769,18 +1769,21 @@ constexpr VADStreamEvent::ParseTableT_ VADStreamEvent::InternalGenerateParseTabl
       #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
     }, {{
       {::_pbi::TcParser::MiniParse, {}},
-      {::_pbi::TcParser::MiniParse, {}},
+      // uint64 seq = 1;
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADStreamEvent, _impl_.seq_), 5>(),
+       {8, 5, 0,
+        PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.seq_)}},
       // int64 timestamp_us = 2;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADStreamEvent, _impl_.timestamp_us_), 5>(),
-       {16, 5, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VADStreamEvent, _impl_.timestamp_us_), 6>(),
+       {16, 6, 0,
         PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.timestamp_us_)}},
       // string request_id = 3;
       {::_pbi::TcParser::FastUS1,
        {26, 0, 0,
         PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.request_id_)}},
       // .runanywhere.v1.VADStreamEventKind kind = 4;
-      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADStreamEvent, _impl_.kind_), 6>(),
-       {32, 6, 0,
+      {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VADStreamEvent, _impl_.kind_), 7>(),
+       {32, 7, 0,
         PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.kind_)}},
       // optional .runanywhere.v1.VADResult result = 5;
       {::_pbi::TcParser::FastMtS1,
@@ -1794,15 +1797,28 @@ constexpr VADStreamEvent::ParseTableT_ VADStreamEvent::InternalGenerateParseTabl
       {::_pbi::TcParser::FastMtS1,
        {58, 3, 2,
         PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.statistics_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      // optional .runanywhere.v1.SDKError error = 10;
+      {::_pbi::TcParser::FastMtS1,
+       {82, 4, 3,
+        PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.error_)}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
+      {::_pbi::TcParser::MiniParse, {}},
     }}, {{
       65535, 65535
     }}, {{
+      // uint64 seq = 1;
+      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.seq_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
       // int64 timestamp_us = 2;
-      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
       // string request_id = 3;
       {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.request_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
       // .runanywhere.v1.VADStreamEventKind kind = 4;
-      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+      {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
       // optional .runanywhere.v1.VADResult result = 5;
       {PROTOBUF_FIELD_OFFSET(VADStreamEvent, _impl_.result_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
       // optional .runanywhere.v1.SpeechActivityEvent activity = 6;
@@ -1835,7 +1851,7 @@ constexpr VADStreamEvent::ParseTableT_ VADStreamEvent::InternalGenerateParseTabl
         #endif
     }},
     {{
-      "\35\0\12\0\0\0\0\0"
+      "\35\0\0\12\0\0\0\0\0\0\0\0\0\0\0\0"
       "runanywhere.v1.VADStreamEvent"
       "request_id"
     }},
@@ -1854,6 +1870,7 @@ inline constexpr VADStreamEvent::Impl_::Impl_(
         activity_{nullptr},
         statistics_{nullptr},
         error_{nullptr},
+        seq_{::uint64_t{0u}},
         timestamp_us_{::int64_t{0}},
         kind_{static_cast< ::runanywhere::v1::VADStreamEventKind >(0)} {}
 
@@ -2090,7 +2107,8 @@ const ::uint32_t
         0,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_._has_bits_),
-        10, // hasbit index offset
+        11, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.seq_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.timestamp_us_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.request_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.kind_),
@@ -2099,8 +2117,9 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.statistics_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADStreamEvent, _impl_.error_),
         5,
-        0,
         6,
+        0,
+        7,
         1,
         2,
         3,
@@ -2135,7 +2154,7 @@ static const ::_pbi::MigrationSchema
         {94, sizeof(::runanywhere::v1::VADStatistics)},
         {115, sizeof(::runanywhere::v1::SpeechActivityEvent)},
         {130, sizeof(::runanywhere::v1::VADStreamEvent)},
-        {147, sizeof(::runanywhere::v1::VADServiceState)},
+        {149, sizeof(::runanywhere::v1::VADServiceState)},
 };
 static const ::_pbi::MessageGlobalsBase* PROTOBUF_NONNULL const
     file_message_globals[] = {
@@ -2203,38 +2222,38 @@ const char descriptor_table_protodef_vad_5foptions_2eproto[] ABSL_ATTRIBUTE_SECT
     "\n\013duration_ms\030\003 \001(\005\022\022\n\nconfidence\030\004 \001(\002\022"
     ".\n\006result\030\005 \001(\0132\031.runanywhere.v1.VADResu"
     "ltH\000\210\001\001\022\027\n\nsegment_id\030\006 \001(\tH\001\210\001\001B\t\n\007_res"
-    "ultB\r\n\013_segment_id\"\357\002\n\016VADStreamEvent\022\024\n"
-    "\014timestamp_us\030\002 \001(\003\022\022\n\nrequest_id\030\003 \001(\t\022"
-    "0\n\004kind\030\004 \001(\0162\".runanywhere.v1.VADStream"
-    "EventKind\022.\n\006result\030\005 \001(\0132\031.runanywhere."
-    "v1.VADResultH\000\210\001\001\022:\n\010activity\030\006 \001(\0132#.ru"
-    "nanywhere.v1.SpeechActivityEventH\001\210\001\001\0226\n"
-    "\nstatistics\030\007 \001(\0132\035.runanywhere.v1.VADSt"
-    "atisticsH\002\210\001\001\022,\n\005error\030\n \001(\0132\030.runanywhe"
-    "re.v1.SDKErrorH\003\210\001\001B\t\n\007_resultB\013\n\t_activ"
-    "ityB\r\n\013_statisticsB\010\n\006_error\"\353\001\n\017VADServ"
-    "iceState\022\020\n\010is_ready\030\001 \001(\010\022\030\n\020is_speech_"
-    "active\030\002 \001(\010\022\030\n\020energy_threshold\030\003 \001(\002\022\023"
-    "\n\013sample_rate\030\004 \001(\005\022\027\n\017frame_length_ms\030\005"
-    " \001(\005\022\032\n\rcurrent_model\030\006 \001(\tH\000\210\001\001\022,\n\005erro"
-    "r\030\t \001(\0132\030.runanywhere.v1.SDKErrorH\001\210\001\001B\020"
-    "\n\016_current_modelB\010\n\006_error*\254\001\n\022SpeechAct"
-    "ivityKind\022$\n SPEECH_ACTIVITY_KIND_UNSPEC"
-    "IFIED\020\000\022\'\n#SPEECH_ACTIVITY_KIND_SPEECH_S"
-    "TARTED\020\001\022%\n!SPEECH_ACTIVITY_KIND_SPEECH_"
-    "ENDED\020\002\022 \n\034SPEECH_ACTIVITY_KIND_ONGOING\020"
-    "\003*\270\002\n\022VADStreamEventKind\022%\n!VAD_STREAM_E"
-    "VENT_KIND_UNSPECIFIED\020\000\022!\n\035VAD_STREAM_EV"
-    "ENT_KIND_STARTED\020\001\022\037\n\033VAD_STREAM_EVENT_K"
-    "IND_FRAME\020\002\022)\n%VAD_STREAM_EVENT_KIND_SPE"
-    "ECH_ACTIVITY\020\003\022$\n VAD_STREAM_EVENT_KIND_"
-    "STATISTICS\020\004\022!\n\035VAD_STREAM_EVENT_KIND_ST"
-    "OPPED\020\005\022\037\n\033VAD_STREAM_EVENT_KIND_ERROR\020\006"
-    "\022\"\n\036VAD_STREAM_EVENT_KIND_BARGE_IN\020\007B\212\001\n"
-    "\027ai.runanywhere.proto.v1B\017VadOptionsProt"
-    "oP\001Z<github.com/runanywhere/runanywhere-"
-    "sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Ru"
-    "nanywhere.V1\272\002\002RAb\006proto3"
+    "ultB\r\n\013_segment_id\"\374\002\n\016VADStreamEvent\022\013\n"
+    "\003seq\030\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003\022\022\n\nrequ"
+    "est_id\030\003 \001(\t\0220\n\004kind\030\004 \001(\0162\".runanywhere"
+    ".v1.VADStreamEventKind\022.\n\006result\030\005 \001(\0132\031"
+    ".runanywhere.v1.VADResultH\000\210\001\001\022:\n\010activi"
+    "ty\030\006 \001(\0132#.runanywhere.v1.SpeechActivity"
+    "EventH\001\210\001\001\0226\n\nstatistics\030\007 \001(\0132\035.runanyw"
+    "here.v1.VADStatisticsH\002\210\001\001\022,\n\005error\030\n \001("
+    "\0132\030.runanywhere.v1.SDKErrorH\003\210\001\001B\t\n\007_res"
+    "ultB\013\n\t_activityB\r\n\013_statisticsB\010\n\006_erro"
+    "r\"\353\001\n\017VADServiceState\022\020\n\010is_ready\030\001 \001(\010\022"
+    "\030\n\020is_speech_active\030\002 \001(\010\022\030\n\020energy_thre"
+    "shold\030\003 \001(\002\022\023\n\013sample_rate\030\004 \001(\005\022\027\n\017fram"
+    "e_length_ms\030\005 \001(\005\022\032\n\rcurrent_model\030\006 \001(\t"
+    "H\000\210\001\001\022,\n\005error\030\t \001(\0132\030.runanywhere.v1.SD"
+    "KErrorH\001\210\001\001B\020\n\016_current_modelB\010\n\006_error*"
+    "\254\001\n\022SpeechActivityKind\022$\n SPEECH_ACTIVIT"
+    "Y_KIND_UNSPECIFIED\020\000\022\'\n#SPEECH_ACTIVITY_"
+    "KIND_SPEECH_STARTED\020\001\022%\n!SPEECH_ACTIVITY"
+    "_KIND_SPEECH_ENDED\020\002\022 \n\034SPEECH_ACTIVITY_"
+    "KIND_ONGOING\020\003*\270\002\n\022VADStreamEventKind\022%\n"
+    "!VAD_STREAM_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035"
+    "VAD_STREAM_EVENT_KIND_STARTED\020\001\022\037\n\033VAD_S"
+    "TREAM_EVENT_KIND_FRAME\020\002\022)\n%VAD_STREAM_E"
+    "VENT_KIND_SPEECH_ACTIVITY\020\003\022$\n VAD_STREA"
+    "M_EVENT_KIND_STATISTICS\020\004\022!\n\035VAD_STREAM_"
+    "EVENT_KIND_STOPPED\020\005\022\037\n\033VAD_STREAM_EVENT"
+    "_KIND_ERROR\020\006\022\"\n\036VAD_STREAM_EVENT_KIND_B"
+    "ARGE_IN\020\007B\212\001\n\027ai.runanywhere.proto.v1B\017V"
+    "adOptionsProtoP\001Z<github.com/runanywhere"
+    "/runanywhere-sdks/idl/v1;runanywherev1\370\001"
+    "\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_vad_5foptions_2eproto_deps[3] = {
@@ -2246,7 +2265,7 @@ static ::absl::once_flag descriptor_table_vad_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_vad_5foptions_2eproto = {
     false,
     false,
-    3305,
+    3318,
     descriptor_table_protodef_vad_5foptions_2eproto,
     "vad_options.proto",
     &descriptor_table_vad_5foptions_2eproto_once,
@@ -4991,11 +5010,11 @@ VADStreamEvent::VADStreamEvent(
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.error_)
                 : nullptr;
   ::memcpy(reinterpret_cast<char*>(&_impl_) +
-               offsetof(Impl_, timestamp_us_),
+               offsetof(Impl_, seq_),
            reinterpret_cast<const char*>(&from._impl_) +
-               offsetof(Impl_, timestamp_us_),
+               offsetof(Impl_, seq_),
            offsetof(Impl_, kind_) -
-               offsetof(Impl_, timestamp_us_) +
+               offsetof(Impl_, seq_) +
                sizeof(Impl_::kind_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VADStreamEvent)
@@ -5089,10 +5108,10 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
       _impl_.error_->Clear();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000060U)) {
-    ::memset(&_impl_.timestamp_us_, 0, static_cast<::size_t>(
+  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
+    ::memset(&_impl_.seq_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.kind_) -
-        reinterpret_cast<char*>(&_impl_.timestamp_us_)) + sizeof(_impl_.kind_));
+        reinterpret_cast<char*>(&_impl_.seq_)) + sizeof(_impl_.kind_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -5117,8 +5136,17 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // int64 timestamp_us = 2;
+  // uint64 seq = 1;
   if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_seq() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteUInt64ToArray(
+          1, this_._internal_seq(), target);
+    }
+  }
+
+  // int64 timestamp_us = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_timestamp_us() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
@@ -5137,7 +5165,7 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
   }
 
   // .runanywhere.v1.VADStreamEventKind kind = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_kind() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -5198,7 +5226,7 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // string request_id = 3;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_request_id().empty()) {
@@ -5226,15 +5254,22 @@ PROTOBUF_NOINLINE void VADStreamEvent::Clear() {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.error_);
     }
-    // int64 timestamp_us = 2;
+    // uint64 seq = 1;
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_seq() != 0) {
+        total_size += ::_pbi::WireFormatLite::UInt64SizePlusOne(
+            this_._internal_seq());
+      }
+    }
+    // int64 timestamp_us = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_timestamp_us() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_us());
       }
     }
     // .runanywhere.v1.VADStreamEventKind kind = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_kind() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_kind());
@@ -5259,7 +5294,7 @@ void VADStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_request_id().empty()) {
         _this->_internal_set_request_id(from._internal_request_id());
@@ -5302,11 +5337,16 @@ void VADStreamEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_seq() != 0) {
+        _this->_impl_.seq_ = from._impl_.seq_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_timestamp_us() != 0) {
         _this->_impl_.timestamp_us_ = from._impl_.timestamp_us_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_kind() != 0) {
         _this->_impl_.kind_ = from._impl_.kind_;
       }

@@ -1258,6 +1258,7 @@ class STTPartialResult extends $pb.GeneratedMessage {
 
 class STTStreamEvent extends $pb.GeneratedMessage {
   factory STTStreamEvent({
+    $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
     $core.String? requestId,
     STTStreamEventKind? kind,
@@ -1266,6 +1267,7 @@ class STTStreamEvent extends $pb.GeneratedMessage {
     $0.SDKError? error,
   }) {
     final result = create();
+    if (seq != null) result.seq = seq;
     if (timestampUs != null) result.timestampUs = timestampUs;
     if (requestId != null) result.requestId = requestId;
     if (kind != null) result.kind = kind;
@@ -1288,6 +1290,8 @@ class STTStreamEvent extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'STTStreamEvent',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'),
       createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(3, _omitFieldNames ? '' : 'requestId')
     ..aE<STTStreamEventKind>(4, _omitFieldNames ? '' : 'kind',
@@ -1319,65 +1323,74 @@ class STTStreamEvent extends $pb.GeneratedMessage {
       $pb.GeneratedMessage.$_defaultFor<STTStreamEvent>(create);
   static STTStreamEvent? _defaultInstance;
 
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get seq => $_getI64(0);
+  @$pb.TagNumber(1)
+  set seq($fixnum.Int64 value) => $_setInt64(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasSeq() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeq() => $_clearField(1);
+
   @$pb.TagNumber(2)
-  $fixnum.Int64 get timestampUs => $_getI64(0);
+  $fixnum.Int64 get timestampUs => $_getI64(1);
   @$pb.TagNumber(2)
-  set timestampUs($fixnum.Int64 value) => $_setInt64(0, value);
+  set timestampUs($fixnum.Int64 value) => $_setInt64(1, value);
   @$pb.TagNumber(2)
-  $core.bool hasTimestampUs() => $_has(0);
+  $core.bool hasTimestampUs() => $_has(1);
   @$pb.TagNumber(2)
   void clearTimestampUs() => $_clearField(2);
 
   @$pb.TagNumber(3)
-  $core.String get requestId => $_getSZ(1);
+  $core.String get requestId => $_getSZ(2);
   @$pb.TagNumber(3)
-  set requestId($core.String value) => $_setString(1, value);
+  set requestId($core.String value) => $_setString(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasRequestId() => $_has(1);
+  $core.bool hasRequestId() => $_has(2);
   @$pb.TagNumber(3)
   void clearRequestId() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  STTStreamEventKind get kind => $_getN(2);
+  STTStreamEventKind get kind => $_getN(3);
   @$pb.TagNumber(4)
   set kind(STTStreamEventKind value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasKind() => $_has(2);
+  $core.bool hasKind() => $_has(3);
   @$pb.TagNumber(4)
   void clearKind() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  STTPartialResult get partial => $_getN(3);
+  STTPartialResult get partial => $_getN(4);
   @$pb.TagNumber(5)
   set partial(STTPartialResult value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasPartial() => $_has(3);
+  $core.bool hasPartial() => $_has(4);
   @$pb.TagNumber(5)
   void clearPartial() => $_clearField(5);
   @$pb.TagNumber(5)
-  STTPartialResult ensurePartial() => $_ensure(3);
+  STTPartialResult ensurePartial() => $_ensure(4);
 
   @$pb.TagNumber(6)
-  STTOutput get finalOutput => $_getN(4);
+  STTOutput get finalOutput => $_getN(5);
   @$pb.TagNumber(6)
   set finalOutput(STTOutput value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasFinalOutput() => $_has(4);
+  $core.bool hasFinalOutput() => $_has(5);
   @$pb.TagNumber(6)
   void clearFinalOutput() => $_clearField(6);
   @$pb.TagNumber(6)
-  STTOutput ensureFinalOutput() => $_ensure(4);
+  STTOutput ensureFinalOutput() => $_ensure(5);
 
   @$pb.TagNumber(9)
-  $0.SDKError get error => $_getN(5);
+  $0.SDKError get error => $_getN(6);
   @$pb.TagNumber(9)
   set error($0.SDKError value) => $_setField(9, value);
   @$pb.TagNumber(9)
-  $core.bool hasError() => $_has(5);
+  $core.bool hasError() => $_has(6);
   @$pb.TagNumber(9)
   void clearError() => $_clearField(9);
   @$pb.TagNumber(9)
-  $0.SDKError ensureError() => $_ensure(5);
+  $0.SDKError ensureError() => $_ensure(6);
 }
 
 class STTServiceState extends $pb.GeneratedMessage {

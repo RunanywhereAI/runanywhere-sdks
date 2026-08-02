@@ -122,6 +122,7 @@ export interface STTPartialResult {
     finalOutput?: STTOutput | undefined;
 }
 export interface STTStreamEvent {
+    seq: number;
     timestampUs: number;
     requestId: string;
     kind: STTStreamEventKind;

@@ -1735,6 +1735,7 @@ class VoiceLifecycleEvent extends $pb.GeneratedMessage {
     $fixnum.Int64? audioLengthMs,
     $core.int? audioSizeBytes,
     $core.int? wordCount,
+    $core.double? realTimeFactor,
     $core.String? language,
     $core.int? sampleRate,
     $core.bool? isStreaming,
@@ -1762,6 +1763,7 @@ class VoiceLifecycleEvent extends $pb.GeneratedMessage {
     if (audioLengthMs != null) result.audioLengthMs = audioLengthMs;
     if (audioSizeBytes != null) result.audioSizeBytes = audioSizeBytes;
     if (wordCount != null) result.wordCount = wordCount;
+    if (realTimeFactor != null) result.realTimeFactor = realTimeFactor;
     if (language != null) result.language = language;
     if (sampleRate != null) result.sampleRate = sampleRate;
     if (isStreaming != null) result.isStreaming = isStreaming;
@@ -1805,6 +1807,7 @@ class VoiceLifecycleEvent extends $pb.GeneratedMessage {
     ..aInt64(15, _omitFieldNames ? '' : 'audioLengthMs')
     ..aI(16, _omitFieldNames ? '' : 'audioSizeBytes')
     ..aI(17, _omitFieldNames ? '' : 'wordCount')
+    ..aD(18, _omitFieldNames ? '' : 'realTimeFactor')
     ..aOS(19, _omitFieldNames ? '' : 'language')
     ..aI(20, _omitFieldNames ? '' : 'sampleRate')
     ..aOB(21, _omitFieldNames ? '' : 'isStreaming')
@@ -2005,76 +2008,85 @@ class VoiceLifecycleEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(17)
   void clearWordCount() => $_clearField(17);
 
+  @$pb.TagNumber(18)
+  $core.double get realTimeFactor => $_getN(17);
+  @$pb.TagNumber(18)
+  set realTimeFactor($core.double value) => $_setDouble(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasRealTimeFactor() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearRealTimeFactor() => $_clearField(18);
+
   @$pb.TagNumber(19)
-  $core.String get language => $_getSZ(17);
+  $core.String get language => $_getSZ(18);
   @$pb.TagNumber(19)
-  set language($core.String value) => $_setString(17, value);
+  set language($core.String value) => $_setString(18, value);
   @$pb.TagNumber(19)
-  $core.bool hasLanguage() => $_has(17);
+  $core.bool hasLanguage() => $_has(18);
   @$pb.TagNumber(19)
   void clearLanguage() => $_clearField(19);
 
   @$pb.TagNumber(20)
-  $core.int get sampleRate => $_getIZ(18);
+  $core.int get sampleRate => $_getIZ(19);
   @$pb.TagNumber(20)
-  set sampleRate($core.int value) => $_setSignedInt32(18, value);
+  set sampleRate($core.int value) => $_setSignedInt32(19, value);
   @$pb.TagNumber(20)
-  $core.bool hasSampleRate() => $_has(18);
+  $core.bool hasSampleRate() => $_has(19);
   @$pb.TagNumber(20)
   void clearSampleRate() => $_clearField(20);
 
   @$pb.TagNumber(21)
-  $core.bool get isStreaming => $_getBF(19);
+  $core.bool get isStreaming => $_getBF(20);
   @$pb.TagNumber(21)
-  set isStreaming($core.bool value) => $_setBool(19, value);
+  set isStreaming($core.bool value) => $_setBool(20, value);
   @$pb.TagNumber(21)
-  $core.bool hasIsStreaming() => $_has(19);
+  $core.bool hasIsStreaming() => $_has(20);
   @$pb.TagNumber(21)
   void clearIsStreaming() => $_clearField(21);
 
   @$pb.TagNumber(22)
-  $core.int get framework => $_getIZ(20);
+  $core.int get framework => $_getIZ(21);
   @$pb.TagNumber(22)
-  set framework($core.int value) => $_setSignedInt32(20, value);
+  set framework($core.int value) => $_setSignedInt32(21, value);
   @$pb.TagNumber(22)
-  $core.bool hasFramework() => $_has(20);
+  $core.bool hasFramework() => $_has(21);
   @$pb.TagNumber(22)
   void clearFramework() => $_clearField(22);
 
   /// TTS synthesis metrics.
   @$pb.TagNumber(23)
-  $core.int get characterCount => $_getIZ(21);
+  $core.int get characterCount => $_getIZ(22);
   @$pb.TagNumber(23)
-  set characterCount($core.int value) => $_setSignedInt32(21, value);
+  set characterCount($core.int value) => $_setSignedInt32(22, value);
   @$pb.TagNumber(23)
-  $core.bool hasCharacterCount() => $_has(21);
+  $core.bool hasCharacterCount() => $_has(22);
   @$pb.TagNumber(23)
   void clearCharacterCount() => $_clearField(23);
 
   @$pb.TagNumber(24)
-  $fixnum.Int64 get audioDurationMs => $_getI64(22);
+  $fixnum.Int64 get audioDurationMs => $_getI64(23);
   @$pb.TagNumber(24)
-  set audioDurationMs($fixnum.Int64 value) => $_setInt64(22, value);
+  set audioDurationMs($fixnum.Int64 value) => $_setInt64(23, value);
   @$pb.TagNumber(24)
-  $core.bool hasAudioDurationMs() => $_has(22);
+  $core.bool hasAudioDurationMs() => $_has(23);
   @$pb.TagNumber(24)
   void clearAudioDurationMs() => $_clearField(24);
 
   @$pb.TagNumber(25)
-  $core.int get audioSizeBytesTts => $_getIZ(23);
+  $core.int get audioSizeBytesTts => $_getIZ(24);
   @$pb.TagNumber(25)
-  set audioSizeBytesTts($core.int value) => $_setSignedInt32(23, value);
+  set audioSizeBytesTts($core.int value) => $_setSignedInt32(24, value);
   @$pb.TagNumber(25)
-  $core.bool hasAudioSizeBytesTts() => $_has(23);
+  $core.bool hasAudioSizeBytesTts() => $_has(24);
   @$pb.TagNumber(25)
   void clearAudioSizeBytesTts() => $_clearField(25);
 
   @$pb.TagNumber(26)
-  $fixnum.Int64 get processingDurationMs => $_getI64(24);
+  $fixnum.Int64 get processingDurationMs => $_getI64(25);
   @$pb.TagNumber(26)
-  set processingDurationMs($fixnum.Int64 value) => $_setInt64(24, value);
+  set processingDurationMs($fixnum.Int64 value) => $_setInt64(25, value);
   @$pb.TagNumber(26)
-  $core.bool hasProcessingDurationMs() => $_has(24);
+  $core.bool hasProcessingDurationMs() => $_has(25);
   @$pb.TagNumber(26)
   void clearProcessingDurationMs() => $_clearField(26);
 }

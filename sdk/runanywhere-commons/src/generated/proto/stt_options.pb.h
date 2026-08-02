@@ -3493,6 +3493,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
     kPartialFieldNumber = 5,
     kFinalOutputFieldNumber = 6,
     kErrorFieldNumber = 9,
+    kSeqFieldNumber = 1,
     kTimestampUsFieldNumber = 2,
     kKindFieldNumber = 4,
   };
@@ -3559,6 +3560,16 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
   ::runanywhere::v1::SDKError* PROTOBUF_NONNULL _internal_mutable_error();
 
   public:
+  // uint64 seq = 1;
+  void clear_seq() ;
+  [[nodiscard]] ::uint64_t seq() const;
+  void set_seq(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_seq() const;
+  void _internal_set_seq(::uint64_t value);
+
+  public:
   // int64 timestamp_us = 2;
   void clear_timestamp_us() ;
   [[nodiscard]] ::int64_t timestamp_us() const;
@@ -3583,7 +3594,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<3, 6,
+      ::google::protobuf::internal::TcParseTable<3, 7,
                           3, 48,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
@@ -3616,6 +3627,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTStreamEvent final : public ::goo
     ::runanywhere::v1::STTPartialResult* PROTOBUF_NULLABLE partial_;
     ::runanywhere::v1::STTOutput* PROTOBUF_NULLABLE final_output_;
     ::runanywhere::v1::SDKError* PROTOBUF_NULLABLE error_;
+    ::uint64_t seq_;
     ::int64_t timestamp_us_;
     int kind_;
     PROTOBUF_TSAN_DECLARE_MEMBER
@@ -6716,11 +6728,35 @@ inline void STTPartialResult::set_allocated_final_output(::runanywhere::v1::STTO
 
 // STTStreamEvent
 
+// uint64 seq = 1;
+inline void STTStreamEvent::clear_seq() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.seq_ = ::uint64_t{0u};
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+}
+inline ::uint64_t STTStreamEvent::seq() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.seq)
+  return _internal_seq();
+}
+inline void STTStreamEvent::set_seq(::uint64_t value) {
+  _internal_set_seq(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.STTStreamEvent.seq)
+}
+inline ::uint64_t STTStreamEvent::_internal_seq() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.seq_;
+}
+inline void STTStreamEvent::_internal_set_seq(::uint64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.seq_ = value;
+}
+
 // int64 timestamp_us = 2;
 inline void STTStreamEvent::clear_timestamp_us() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_us_ = ::int64_t{0};
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
 }
 inline ::int64_t STTStreamEvent::timestamp_us() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.timestamp_us)
@@ -6728,7 +6764,7 @@ inline ::int64_t STTStreamEvent::timestamp_us() const {
 }
 inline void STTStreamEvent::set_timestamp_us(::int64_t value) {
   _internal_set_timestamp_us(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTStreamEvent.timestamp_us)
 }
 inline ::int64_t STTStreamEvent::_internal_timestamp_us() const {
@@ -6808,7 +6844,7 @@ inline void STTStreamEvent::set_allocated_request_id(::std::string* PROTOBUF_NUL
 inline void STTStreamEvent::clear_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.kind_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
 }
 inline ::runanywhere::v1::STTStreamEventKind STTStreamEvent::kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.STTStreamEvent.kind)
@@ -6816,7 +6852,7 @@ inline ::runanywhere::v1::STTStreamEventKind STTStreamEvent::kind() const {
 }
 inline void STTStreamEvent::set_kind(::runanywhere::v1::STTStreamEventKind value) {
   _internal_set_kind(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.STTStreamEvent.kind)
 }
 inline ::runanywhere::v1::STTStreamEventKind STTStreamEvent::_internal_kind() const {

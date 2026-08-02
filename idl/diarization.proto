@@ -80,6 +80,7 @@ enum DiarizationStreamEventKind {
 // session. Segments belonging to different speakers may overlap.
 message DiarizationStreamEvent {
     uint64 session_id = 1;
+    uint64 seq = 2;
     int64 timestamp_us = 3;
     DiarizationStreamEventKind kind = 4;
     optional DiarizationResult result = 5;

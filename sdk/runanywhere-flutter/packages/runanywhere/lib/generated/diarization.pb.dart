@@ -403,6 +403,7 @@ class DiarizationResult extends $pb.GeneratedMessage {
 class DiarizationStreamEvent extends $pb.GeneratedMessage {
   factory DiarizationStreamEvent({
     $fixnum.Int64? sessionId,
+    $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
     DiarizationStreamEventKind? kind,
     DiarizationResult? result,
@@ -410,6 +411,7 @@ class DiarizationStreamEvent extends $pb.GeneratedMessage {
   }) {
     final result$ = create();
     if (sessionId != null) result$.sessionId = sessionId;
+    if (seq != null) result$.seq = seq;
     if (timestampUs != null) result$.timestampUs = timestampUs;
     if (kind != null) result$.kind = kind;
     if (result != null) result$.result = result;
@@ -432,6 +434,8 @@ class DiarizationStreamEvent extends $pb.GeneratedMessage {
       createEmptyInstance: create)
     ..a<$fixnum.Int64>(
         1, _omitFieldNames ? '' : 'sessionId', $pb.PbFieldType.OU6,
+        defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$fixnum.Int64>(2, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6,
         defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(3, _omitFieldNames ? '' : 'timestampUs')
     ..aE<DiarizationStreamEventKind>(4, _omitFieldNames ? '' : 'kind',
@@ -471,45 +475,54 @@ class DiarizationStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   void clearSessionId() => $_clearField(1);
 
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get seq => $_getI64(1);
+  @$pb.TagNumber(2)
+  set seq($fixnum.Int64 value) => $_setInt64(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasSeq() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSeq() => $_clearField(2);
+
   @$pb.TagNumber(3)
-  $fixnum.Int64 get timestampUs => $_getI64(1);
+  $fixnum.Int64 get timestampUs => $_getI64(2);
   @$pb.TagNumber(3)
-  set timestampUs($fixnum.Int64 value) => $_setInt64(1, value);
+  set timestampUs($fixnum.Int64 value) => $_setInt64(2, value);
   @$pb.TagNumber(3)
-  $core.bool hasTimestampUs() => $_has(1);
+  $core.bool hasTimestampUs() => $_has(2);
   @$pb.TagNumber(3)
   void clearTimestampUs() => $_clearField(3);
 
   @$pb.TagNumber(4)
-  DiarizationStreamEventKind get kind => $_getN(2);
+  DiarizationStreamEventKind get kind => $_getN(3);
   @$pb.TagNumber(4)
   set kind(DiarizationStreamEventKind value) => $_setField(4, value);
   @$pb.TagNumber(4)
-  $core.bool hasKind() => $_has(2);
+  $core.bool hasKind() => $_has(3);
   @$pb.TagNumber(4)
   void clearKind() => $_clearField(4);
 
   @$pb.TagNumber(5)
-  DiarizationResult get result => $_getN(3);
+  DiarizationResult get result => $_getN(4);
   @$pb.TagNumber(5)
   set result(DiarizationResult value) => $_setField(5, value);
   @$pb.TagNumber(5)
-  $core.bool hasResult() => $_has(3);
+  $core.bool hasResult() => $_has(4);
   @$pb.TagNumber(5)
   void clearResult() => $_clearField(5);
   @$pb.TagNumber(5)
-  DiarizationResult ensureResult() => $_ensure(3);
+  DiarizationResult ensureResult() => $_ensure(4);
 
   @$pb.TagNumber(6)
-  $0.SDKError get error => $_getN(4);
+  $0.SDKError get error => $_getN(5);
   @$pb.TagNumber(6)
   set error($0.SDKError value) => $_setField(6, value);
   @$pb.TagNumber(6)
-  $core.bool hasError() => $_has(4);
+  $core.bool hasError() => $_has(5);
   @$pb.TagNumber(6)
   void clearError() => $_clearField(6);
   @$pb.TagNumber(6)
-  $0.SDKError ensureError() => $_ensure(4);
+  $0.SDKError ensureError() => $_ensure(5);
 }
 
 const $core.bool _omitFieldNames =

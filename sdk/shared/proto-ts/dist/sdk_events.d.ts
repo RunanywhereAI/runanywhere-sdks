@@ -762,6 +762,8 @@ export interface VoiceLifecycleEvent {
     /** STT */
     wordCount: number;
     /** STT */
+    realTimeFactor: number;
+    /** STT */
     language: string;
     /** STT + TTS */
     sampleRate: number;
