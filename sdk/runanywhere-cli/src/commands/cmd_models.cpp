@@ -173,10 +173,10 @@ int run_load(const GlobalOptions& options, const std::string& ref, const std::st
         out::error_line("model load failed: " + error);
         return 1;
     }
-    if (!result.success()) {
-        out::error_line("model load failed: " + (result.error_message().empty()
+    if (result.has_error()) {
+        out::error_line("model load failed: " + (result.error().message().empty()
                                                      ? "unknown error"
-                                                     : result.error_message()));
+                                                     : result.error().message()));
         return 1;
     }
 
@@ -228,10 +228,10 @@ int run_unload(const GlobalOptions& options, const std::string& category_name) {
     }
     // Freeing everything when nothing is resident is not a failure, even though
     // the lifecycle service reports "no loaded model matched".
-    if (!result.success() && !(request.unload_all() && result.unloaded_model_ids().empty())) {
-        out::error_line("unload failed: " + (result.error_message().empty()
+    if (result.has_error() && !(request.unload_all() && result.unloaded_model_ids().empty())) {
+        out::error_line("unload failed: " + (result.error().message().empty()
                                                 ? "unknown error"
-                                                : result.error_message()));
+                                                : result.error().message()));
         return 1;
     }
 

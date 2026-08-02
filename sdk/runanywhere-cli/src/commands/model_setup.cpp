@@ -32,9 +32,9 @@ bool resolve_paths(const std::string &model_id, ResolvedModelPaths *out,
       !proto::parse_proto_buffer(&out_buffer, &result, error)) {
     return false;
   }
-  if (!result.success()) {
+  if (result.has_error()) {
     if (error) {
-      *error = result.error_message();
+      *error = result.error().message();
     }
     return false;
   }

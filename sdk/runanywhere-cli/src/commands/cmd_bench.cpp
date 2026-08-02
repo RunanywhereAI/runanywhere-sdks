@@ -426,8 +426,13 @@ bool stt_trial(const TrialCtx& c, Metrics* m, std::string* err) {
     m->memory_delta_bytes = mem_before - available_ram_bytes();
     unload_category(c.category);
 
-    m->real_time_factor = r.has_metadata() && r.metadata().real_time_factor() > 0.0
-                              ? r.metadata().real_time_factor()
+    const double meta_rtf =
+        r.has_metadata() && r.metadata().audio_length_ms() > 0
+            ? static_cast<double>(r.metadata().processing_time_ms()) /
+                  static_cast<double>(r.metadata().audio_length_ms())
+            : 0.0;
+    m->real_time_factor = meta_rtf > 0.0
+                              ? meta_rtf
                               : (c.scenario.seconds > 0.0
                                      ? m->end_to_end_ms / (c.scenario.seconds * 1000.0)
                                      : 0.0);

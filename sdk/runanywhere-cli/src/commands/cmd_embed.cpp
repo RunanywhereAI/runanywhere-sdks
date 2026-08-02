@@ -122,13 +122,14 @@ bool load_embeddings_model(const GlobalOptions& options, const std::string& mode
     return true;
 }
 
-bool parse_normalize(const std::string& mode, v1::EmbeddingsNormalizeMode* out) {
+bool parse_normalize(const std::string& mode, bool* out, bool* has_value) {
+    *has_value = !mode.empty();
     if (mode.empty()) {
-        *out = v1::EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED;
+        *out = false;
     } else if (mode == "l2") {
-        *out = v1::EMBEDDINGS_NORMALIZE_MODE_L2;
+        *out = true;
     } else if (mode == "none") {
-        *out = v1::EMBEDDINGS_NORMALIZE_MODE_NONE;
+        *out = false;
     } else {
         return false;
     }
@@ -192,15 +193,16 @@ int run_embed(const GlobalOptions& options, const std::string& ref, const std::s
     for (const auto& text : texts) {
         request.add_texts(text);
     }
-    v1::EmbeddingsNormalizeMode normalize_mode;
+    bool normalize_value = false;
+    bool normalize_set = false;
     v1::EmbeddingsPoolingStrategy pooling_strategy;
-    if (!parse_normalize(normalize, &normalize_mode) ||
+    if (!parse_normalize(normalize, &normalize_value, &normalize_set) ||
         !parse_pooling(pooling, &pooling_strategy)) {
         out::error_line("--normalize expects l2|none and --pooling expects mean|cls|last");
         return 2;
     }
-    if (normalize_mode != v1::EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED) {
-        request.mutable_options()->set_normalize_mode(normalize_mode);
+    if (normalize_set) {
+        request.mutable_options()->set_normalize(normalize_value);
     }
     if (pooling_strategy != v1::EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED) {
         request.mutable_options()->set_pooling(pooling_strategy);

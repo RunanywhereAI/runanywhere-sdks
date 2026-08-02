@@ -237,7 +237,7 @@ int run_lora_remove(const GlobalOptions &options, const std::string &adapter) {
     out::error_line("remove failed: " + error);
     return 1;
   }
-  if (state.has_error_message()) {
+  if (state.has_error()) {
     out::error_line("remove failed: " + state.error().message());
     return 1;
   }

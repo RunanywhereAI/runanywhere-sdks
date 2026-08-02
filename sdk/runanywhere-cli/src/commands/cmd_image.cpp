@@ -116,10 +116,10 @@ bool load_diffusion_model(const GlobalOptions& options, const std::string& model
         out::error_line("diffusion model load failed: " + error);
         return false;
     }
-    if (!result.success()) {
+    if (result.has_error()) {
         out::error_line("diffusion model load failed: " +
-                        (result.error_message().empty() ? "unknown error"
-                                                         : result.error_message()));
+                        (result.error().message().empty() ? "unknown error"
+                                                          : result.error().message()));
         return false;
     }
     if (options.verbose) {
@@ -235,10 +235,11 @@ int run_image_generate(const GlobalOptions& options, const ImageParams& params) 
         out::error_line("image generation failed: " + error);
         return 1;
     }
-    if (result.error_code() != 0 || !result.error_message().empty()) {
+    if (result.has_error()) {
         out::error_line("image generation failed: " +
-                        (result.error_message().empty() ? std::to_string(result.error_code())
-                                                         : result.error_message()));
+                        (result.error().message().empty()
+                             ? std::to_string(result.error().c_abi_code())
+                             : result.error().message()));
         return 1;
     }
 

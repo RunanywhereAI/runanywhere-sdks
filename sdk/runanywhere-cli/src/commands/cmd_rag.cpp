@@ -201,10 +201,10 @@ int run_rag(const GlobalOptions& options, const RagParams& params,
         return 1;
     }
 
-    if (result.error_code() != 0 || result.has_error_message()) {
-        out::error_line("RAG query failed: " + (result.error_message().empty()
-                                                    ? std::to_string(result.error_code())
-                                                    : result.error_message()));
+    if (result.has_error()) {
+        out::error_line("RAG query failed: " + (result.error().message().empty()
+                                                    ? std::to_string(result.error().c_abi_code())
+                                                    : result.error().message()));
         rac_rag_session_destroy_proto(session);
         return 1;
     }

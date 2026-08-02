@@ -125,7 +125,7 @@ int pull_model_flow(const GlobalOptions &options, const std::string &model_id) {
   }
   if (!plan.can_start()) {
     const std::string reason =
-        plan.error_message().empty() ? "plan rejected" : plan.error_message();
+        plan.error().message().empty() ? "plan rejected" : plan.error().message();
     out::error_line("cannot pull " + resolved.model_id + ": " + reason);
     return 1;
   }
@@ -167,7 +167,7 @@ int pull_model_flow(const GlobalOptions &options, const std::string &model_id) {
   if (!start.accepted()) {
     rac_download_set_progress_proto_callback(nullptr, nullptr);
     g_state = nullptr;
-    out::error_line("download rejected: " + start.error_message());
+    out::error_line("download rejected: " + start.error().message());
     return 1;
   }
 
@@ -220,9 +220,9 @@ int pull_model_flow(const GlobalOptions &options, const std::string &model_id) {
     out::error_line("pull cancelled");
     return 130;
   default:
-    out::error_line("pull failed: " + (final_progress.error_message().empty()
+    out::error_line("pull failed: " + (final_progress.error().message().empty()
                                            ? "download error"
-                                           : final_progress.error_message()));
+                                           : final_progress.error().message()));
     return 1;
   }
 
