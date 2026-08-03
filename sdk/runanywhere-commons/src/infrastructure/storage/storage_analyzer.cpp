@@ -342,7 +342,12 @@ void add_model_candidate_from_info(rac_storage_analyzer_handle_t handle,
     }
 
     bool is_loaded = false;
-    bool has_loaded_state = known_loaded_state(handle, current->id, &is_loaded);
+    // Use the resolved id, not the raw one: `id` already falls back to
+    // `requested_id` when `current->id` is null or empty, and every other use
+    // below reads `id`. Passing the raw pointer makes known_loaded_state()
+    // return false for exactly that case, which leaves `is_loaded` false and
+    // silently skips the loaded-model guard.
+    bool has_loaded_state = known_loaded_state(handle, id.c_str(), &is_loaded);
     if (!has_loaded_state) {
         add_warning_once(plan, seen_warnings, kLoadedStateUnavailableWarning);
     }
