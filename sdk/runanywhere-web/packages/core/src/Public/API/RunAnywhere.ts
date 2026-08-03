@@ -11,6 +11,7 @@ import { EventBus } from '../../Foundation/EventBus.js';
 import { Runtime, type RuntimeAccelerationMode } from '../../Foundation/RuntimeConfig.js';
 import { SDKCore } from '../SDKCore.js';
 import { solutions } from '../Extensions/RunAnywhere+Solutions.js';
+import { CUA } from '../Extensions/RunAnywhere+CUA.js';
 import { setHfToken } from '../Extensions/RunAnywhere+HuggingFace.js';
 import { AudioInput, ImageInput, RagDocument } from './Inputs.js';
 import type { SdkEvent } from './Events.js';
@@ -269,6 +270,14 @@ export const RunAnywhere = {
    * because the Web SDK ships the Solutions catalog.
    */
   solutions,
+
+  /**
+   * Computer-use-agent scaffold. Stateless and model-agnostic: pair with
+   * `vlm.describe`/`processImage` for inference; the app owns screenshot
+   * capture, executing the returned action, and the agent loop. Mirrors
+   * Swift's `RunAnywhere.CUA`.
+   */
+  CUA,
 
   /** Set the Hugging Face token used for gated downloads, or clear it with `null`. */
   setHuggingFaceToken: setHfToken,

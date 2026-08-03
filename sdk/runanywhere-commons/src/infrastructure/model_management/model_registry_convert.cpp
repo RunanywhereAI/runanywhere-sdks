@@ -770,6 +770,9 @@ void preserve_absent_proto_fields(const ModelInfo& existing, ModelInfo* incoming
     if (!incoming->has_status_message() && existing.has_status_message()) {
         incoming->set_status_message(existing.status_message());
     }
+    if (!incoming->has_cua_profile() && existing.has_cua_profile()) {
+        incoming->set_cua_profile(existing.cua_profile());
+    }
 
     if (incoming->artifact_case() == ModelInfo::ARTIFACT_NOT_SET) {
         switch (existing.artifact_case()) {

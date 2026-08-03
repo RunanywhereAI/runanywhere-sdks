@@ -645,6 +645,46 @@ export interface EmscriptenRunanywhereModule {
   _rac_wasm_result_to_proto_error?(code: number, outBufferPtr: number): number;
 
   // -----------------------------------------------------------------------------
+  // Computer-Use Agent (CUA) — `rac/features/cua/rac_cua.h`
+  // -----------------------------------------------------------------------------
+  // Stateless, model-agnostic profile ABI (pairs with rac_vlm_*). `profileId`
+  // and `modelOutput` are NUL-terminated C strings the caller writes into the
+  // heap; the parse result crosses back as a serialized `runanywhere.v1.CuaAction`
+  // in a `rac_proto_buffer_t` (the shared proto-buffer helpers above) — the same
+  // proto-byte bridging every other modality uses.
+
+  /**
+   * `int rac_cua_system_prompt(const char* profile_id, uint32_t display_w,
+   *    uint32_t display_h, char* out, size_t out_size);`
+   *
+   * Returns the full length excluding NUL (>= out_size means truncated), or -1
+   * for an unknown profile. Pass `out=0, out_size=0` to size the buffer first.
+   */
+  _rac_cua_system_prompt?(
+    profileIdPtr: number,
+    displayW: number,
+    displayH: number,
+    outPtr: number,
+    outSize: number,
+  ): number;
+
+  /**
+   * `rac_result_t rac_cua_parse_action_proto(const char* profile_id,
+   *    const char* model_output, uint32_t viewport_w, uint32_t viewport_h,
+   *    rac_proto_buffer_t* out);`
+   *
+   * Serializes a `runanywhere.v1.CuaAction` into `out` (inspect the decoded
+   * `parseOk` field), or returns an error for an unknown profile / NULL args.
+   */
+  _rac_cua_parse_action_proto?(
+    profileIdPtr: number,
+    modelOutputPtr: number,
+    viewportW: number,
+    viewportH: number,
+    outBufferPtr: number,
+  ): number;
+
+  // -----------------------------------------------------------------------------
   // Storage analyzer proto-byte ABI
   // -----------------------------------------------------------------------------
   _rac_storage_analyzer_create?(callbacksPtr: number, outHandlePtr: number): number;

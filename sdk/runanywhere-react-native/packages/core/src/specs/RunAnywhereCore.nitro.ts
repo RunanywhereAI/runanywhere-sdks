@@ -33,6 +33,7 @@ import type { HybridObject } from 'react-native-nitro-modules';
  * - @runanywhere/mlx for Apple MLX inference
  * - @runanywhere/onnx for speech processing (STT, TTS, VAD)
  */
+
 export interface RunAnywhereCore extends HybridObject<{
   ios: 'c++';
   android: 'c++';
@@ -885,6 +886,44 @@ export interface RunAnywhereCore extends HybridObject<{
    * Cancel ongoing VLM generation through commons cancellation ABI.
    */
   vlmCancelProto(): Promise<ArrayBuffer>;
+
+  // ============================================================================
+  // Computer-Use Agent (CUA) — profile-driven prompt/parse scaffold.
+  // Stateless, I/O-free (no model handle): pairs with the VLM inference calls
+  // above. Backed by rac_cua_system_prompt / rac_cua_parse_action_proto. Pure
+  // CPU string work, so both are synchronous (mirrors Swift's sync
+  // RunAnywhere.CUA and the sync framework/model-role lookups above). "fara" is
+  // the only built-in profile today; adding models is a new commons profile,
+  // not new API.
+  // ============================================================================
+
+  /**
+   * Render `profileId`'s system prompt for a declared coordinate space
+   * (`displayWidth` x `displayHeight`). Returns the full prompt string, or an
+   * empty string when the profile is unknown. Backed by
+   * `rac_cua_system_prompt`.
+   */
+  cuaSystemPrompt(
+    profileId: string,
+    displayWidth: number,
+    displayHeight: number
+  ): string;
+
+  /**
+   * Parse a CUA model's raw output, rescaling coordinates from the profile's
+   * model space to `viewportWidth` x `viewportHeight`. Returns the serialized
+   * `runanywhere.v1.CuaAction` bytes (the TS facade decodes them — the same
+   * proto-byte bridging every other modality uses; inspect `parseOk` for
+   * whether a valid tool call was found). Throws for an unknown profile, which
+   * the TS facade maps to `null` (Swift returns nil). Backed by
+   * `rac_cua_parse_action_proto`.
+   */
+  cuaParseAction(
+    profileId: string,
+    modelOutput: string,
+    viewportWidth: number,
+    viewportHeight: number
+  ): ArrayBuffer;
 
   // ============================================================================
   // Diffusion Capability (Image Generation — Apple / CoreML only)

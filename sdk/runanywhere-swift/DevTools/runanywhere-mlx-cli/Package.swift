@@ -30,6 +30,13 @@ let package = Package(
                     [
                         "-Xlinker", "-force_load",
                         "-Xlinker", "../../Binaries/RACommons.xcframework/macos-arm64/librac_commons.a",
+                        // The SDK reaches the proto-byte ABI through dlsym, so the
+                        // linker sees no static reference and dead-strips those
+                        // symbols — every rac_*_proto call then fails at runtime
+                        // with "Native proto ABI is not exported". The app targets
+                        // solve this with an exported-symbols list; this CLI just
+                        // keeps the dynamic symbol table whole.
+                        "-Xlinker", "-export_dynamic",
                     ],
                     .when(platforms: [.macOS])
                 ),

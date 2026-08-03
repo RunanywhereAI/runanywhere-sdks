@@ -403,6 +403,13 @@ set(RAC_EXPORTED_FUNCTIONS_BASE
     "_rac_wasm_offsetof_proto_buffer_status"
     "_rac_wasm_offsetof_proto_buffer_error_message"
 
+    # Computer-Use Agent (CUA) — stateless profile-driven system-prompt +
+    # action-parse ABI (pairs with rac_vlm_*). The parse result crosses back as
+    # a serialized runanywhere.v1.CuaAction via the shared rac_proto_buffer_t
+    # helpers exported above — no struct sizeof/offset helpers needed.
+    "_rac_cua_system_prompt"
+    "_rac_cua_parse_action_proto"
+
     # Canonical rac_result_t -> SDKError proto mapping. Lets
     # SDKException route error construction through the shared commons helper
     # rac_result_to_proto_error instead of the local TypeScript category table.

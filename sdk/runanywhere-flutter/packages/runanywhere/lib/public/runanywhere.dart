@@ -33,6 +33,7 @@ import 'package:runanywhere/public/api/namespaces/vad.dart';
 import 'package:runanywhere/public/api/namespaces/vlm.dart';
 import 'package:runanywhere/public/api/namespaces/voice.dart';
 import 'package:runanywhere/public/api/types/events.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_cua.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_hybrid.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_solutions.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -177,6 +178,12 @@ abstract final class RunAnywhere {
 
   /// LoRA adapters applied on top of the loaded model.
   static LoraApi get lora => const LoraApi();
+
+  /// Computer-use-agent scaffold — stateless, model-agnostic `systemPrompt` +
+  /// `parseAction` over a model profile (Fara1.5 built in). Pair with [vlm]
+  /// for inference; the app owns screenshot capture, action execution, and the
+  /// agent loop.
+  static RunAnywhereCUA get cua => RunAnywhereCUA.shared;
 
   // --- Beyond the v3 spec --------------------------------------------------
   //

@@ -152,6 +152,20 @@ export {
 // PCM conversion helpers for apps that own their own audio capture UI.
 export { AudioConvert } from './Public/Extensions/Audio/RunAnywhere+AudioConvert';
 
+// Computer-Use Agent (CUA) — mirror Swift RunAnywhere+CUA.swift.
+export {
+  cua,
+  systemPrompt as cuaSystemPrompt,
+  parseAction as cuaParseAction,
+  CuaActionKind,
+  FARA_PROFILE,
+} from './Public/Extensions/CUA/RunAnywhere+CUA';
+export type {
+  CuaAction,
+  CuaCoordinate,
+  CuaDisplaySize,
+} from './Public/Extensions/CUA/RunAnywhere+CUA';
+
 // Embedding vector math helpers.
 export {
   cosineSimilarity,

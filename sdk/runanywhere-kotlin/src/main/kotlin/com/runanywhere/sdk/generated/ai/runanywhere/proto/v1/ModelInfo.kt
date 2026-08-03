@@ -346,6 +346,19 @@ public class ModelInfo(
     schemaIndex = 35,
   )
   public val status_message: String? = null,
+  /**
+   * Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
+   * this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
+   * models. Lets the catalog mark which models are drivable through
+   * RunAnywhere.CUA and with which profile, without hardcoding model ids.
+   */
+  @field:WireField(
+    tag = 38,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "cuaProfile",
+    schemaIndex = 36,
+  )
+  public val cua_profile: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelInfo, Nothing>(ADAPTER, unknownFields) {
   init {
@@ -400,6 +413,7 @@ public class ModelInfo(
     if (usage_count != other.usage_count) return false
     if (sync_pending != other.sync_pending) return false
     if (status_message != other.status_message) return false
+    if (cua_profile != other.cua_profile) return false
     return true
   }
 
@@ -443,6 +457,7 @@ public class ModelInfo(
       result = result * 37 + (usage_count?.hashCode() ?: 0)
       result = result * 37 + (sync_pending?.hashCode() ?: 0)
       result = result * 37 + (status_message?.hashCode() ?: 0)
+      result = result * 37 + (cua_profile?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -486,6 +501,7 @@ public class ModelInfo(
     if (usage_count != null) result += """usage_count=$usage_count"""
     if (sync_pending != null) result += """sync_pending=$sync_pending"""
     if (status_message != null) result += """status_message=${sanitize(status_message)}"""
+    if (cua_profile != null) result += """cua_profile=${sanitize(cua_profile)}"""
     return result.joinToString(prefix = "ModelInfo{", separator = ", ", postfix = "}")
   }
 
@@ -526,8 +542,9 @@ public class ModelInfo(
     usage_count: Int? = this.usage_count,
     sync_pending: Boolean? = this.sync_pending,
     status_message: String? = this.status_message,
+    cua_profile: String? = this.cua_profile,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelInfo = ModelInfo(id, name, category, format, framework, download_url, local_path, download_size_bytes, context_length, supports_thinking, supports_lora, source, created_at_unix_ms, updated_at_unix_ms, memory_required_bytes, checksum_sha256, thinking_pattern, metadata, single_file, archive, multi_file, custom_strategy_id, built_in, artifact_type, expected_files, acceleration_preference, routing_policy, compatibility, preferred_framework, registry_status, is_downloaded, is_available, last_used_at_unix_ms, usage_count, sync_pending, status_message, unknownFields)
+  ): ModelInfo = ModelInfo(id, name, category, format, framework, download_url, local_path, download_size_bytes, context_length, supports_thinking, supports_lora, source, created_at_unix_ms, updated_at_unix_ms, memory_required_bytes, checksum_sha256, thinking_pattern, metadata, single_file, archive, multi_file, custom_strategy_id, built_in, artifact_type, expected_files, acceleration_preference, routing_policy, compatibility, preferred_framework, registry_status, is_downloaded, is_available, last_used_at_unix_ms, usage_count, sync_pending, status_message, cua_profile, unknownFields)
 
   public companion object {
     @JvmField
@@ -605,6 +622,7 @@ public class ModelInfo(
         size += ProtoAdapter.INT32.encodedSizeWithTag(35, value.usage_count)
         size += ProtoAdapter.BOOL.encodedSizeWithTag(36, value.sync_pending)
         size += ProtoAdapter.STRING.encodedSizeWithTag(37, value.status_message)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(38, value.cua_profile)
         return size
       }
 
@@ -668,6 +686,7 @@ public class ModelInfo(
         ProtoAdapter.INT32.encodeWithTag(writer, 35, value.usage_count)
         ProtoAdapter.BOOL.encodeWithTag(writer, 36, value.sync_pending)
         ProtoAdapter.STRING.encodeWithTag(writer, 37, value.status_message)
+        ProtoAdapter.STRING.encodeWithTag(writer, 38, value.cua_profile)
         SingleFileArtifact.ADAPTER.encodeWithTag(writer, 20, value.single_file)
         ArchiveArtifact.ADAPTER.encodeWithTag(writer, 21, value.archive)
         MultiFileArtifact.ADAPTER.encodeWithTag(writer, 22, value.multi_file)
@@ -683,6 +702,7 @@ public class ModelInfo(
         MultiFileArtifact.ADAPTER.encodeWithTag(writer, 22, value.multi_file)
         ArchiveArtifact.ADAPTER.encodeWithTag(writer, 21, value.archive)
         SingleFileArtifact.ADAPTER.encodeWithTag(writer, 20, value.single_file)
+        ProtoAdapter.STRING.encodeWithTag(writer, 38, value.cua_profile)
         ProtoAdapter.STRING.encodeWithTag(writer, 37, value.status_message)
         ProtoAdapter.BOOL.encodeWithTag(writer, 36, value.sync_pending)
         ProtoAdapter.INT32.encodeWithTag(writer, 35, value.usage_count)
@@ -781,6 +801,7 @@ public class ModelInfo(
         var usage_count: Int? = null
         var sync_pending: Boolean? = null
         var status_message: String? = null
+        var cua_profile: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
@@ -855,6 +876,7 @@ public class ModelInfo(
             35 -> usage_count = ProtoAdapter.INT32.decode(reader)
             36 -> sync_pending = ProtoAdapter.BOOL.decode(reader)
             37 -> status_message = ProtoAdapter.STRING.decode(reader)
+            38 -> cua_profile = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -895,6 +917,7 @@ public class ModelInfo(
           usage_count = usage_count,
           sync_pending = sync_pending,
           status_message = status_message,
+          cua_profile = cua_profile,
           unknownFields = unknownFields
         )
       }

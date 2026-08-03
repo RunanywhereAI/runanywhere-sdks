@@ -76,6 +76,17 @@ struct ConsumerAdvancedHubView: View {
             }
             #endif
 
+            Section("Agents") {
+                NavigationLink(destination: ComputerUseAgentView()) {
+                    AdvancedFeatureRow(
+                        icon: "cursorarrow.rays",
+                        color: AppColors.primaryAccent,
+                        title: "Computer Use",
+                        subtitle: "Fara1.5 reads a screenshot and picks the next action"
+                    )
+                }
+            }
+
             Section {
                 NavigationLink(destination: BenchmarkDashboardView()) {
                     AdvancedFeatureRow(

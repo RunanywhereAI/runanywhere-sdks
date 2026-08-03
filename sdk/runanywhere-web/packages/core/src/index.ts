@@ -61,6 +61,15 @@ export type {
   VadOptions,
 } from './Public/API/Options.js';
 
+// Computer-Use Agent scaffold (cross-SDK parity with Swift RunAnywhere.CUA).
+// Stateless, model-agnostic profile ABI surfaced via `RunAnywhere.CUA.*`.
+export { CUA, CuaActionKind } from './Public/Extensions/RunAnywhere+CUA.js';
+export type {
+  CuaAction,
+  CuaCoordinate,
+  CuaDisplaySize,
+} from './Public/Extensions/RunAnywhere+CUA.js';
+
 // Results
 export type {
   AppliedAdapter,

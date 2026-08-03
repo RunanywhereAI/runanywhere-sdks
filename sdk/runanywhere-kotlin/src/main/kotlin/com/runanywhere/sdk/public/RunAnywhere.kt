@@ -59,6 +59,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.net.URL
+import com.runanywhere.sdk.public.extensions.CUA.CUA as CuaNamespace
 
 /** Linearizes synchronous initialization with asynchronous SDK reset. */
 internal class SDKLifetimeGate {
@@ -188,6 +189,13 @@ object RunAnywhere {
     )
 
     private val logger = SDKLogger("RunAnywhere")
+
+    /**
+     * Computer-use-agent scaffold namespace. Mirrors Swift's
+     * `RunAnywhere.CUA`. Stateless and model-agnostic — pair it with the VLM
+     * inference APIs. See [com.runanywhere.sdk.public.extensions.CUA.CUA].
+     */
+    val CUA = CuaNamespace
 
     /**
      * Persisted init params from the most recent [initialize] call. Mirrors

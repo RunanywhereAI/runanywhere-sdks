@@ -40,6 +40,7 @@ Every capability below runs fully on-device, behind one API that is identical on
 - **Structured output**: JSON constrained by a grammar compiled from your schema, so the result always parses
 - **Tool calling**: grammar-constrained tool calls, parallel calls, and an agent loop
 - **Vision (VLM)**: image understanding, live camera description, and photo Q&A
+- **Computer-use agent (CUA)**: drive a screen with Fara1.5 — the SDK renders the agent prompt and parses each action back with coordinates already scaled to your viewport
 - **Speech-to-Text**: Whisper and Moonshine transcription, streaming and batch
 - **Text-to-Speech**: neural voices from Piper, Kokoro, Kitten, MeloTTS, and Magpie
 - **Voice agents**: wake word, VAD, STT, LLM, and TTS in one pipeline, with sentence-streaming playback
@@ -430,6 +431,7 @@ All SDKs ship on one version line, currently **0.20.11**, from a single C++ core
 |---------|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | LLM generation + streaming | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Vision language models (VLM) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Computer-use agent (CUA) | Yes | Yes | Yes | Yes | API only | n/a | n/a | n/a |
 | Speech-to-Text | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Text-to-Speech | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Voice activity detection | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
@@ -461,6 +463,9 @@ Connect lets a **macOS Swift app** host a loaded language model on the local net
 - **Lifecycle:** the host app selects and loads the model, starts hosting, and supplies generation; stopping the host disconnects clients
 - **Threat model:** **trusted LAN only** — no TLS, pairing PIN, or mutual auth in this release. Do not expose Connect across untrusted networks. Future work may add TLS/pairing, Windows hosting, or a daemon; those change lifecycle and security and are out of scope here
 - **Electron note:** `RunAnywhereMain.connect()` is **local MessagePort / utility-process IPC** inside one Electron app. It is unrelated to LAN Connect
+
+CUA on Web is "API only": the prompt/parse scaffold ships, but the catalogued
+Fara1.5-4B does not fit the 4 GB WASM32 heap, so no CUA model is seeded there.
 
 ---
 

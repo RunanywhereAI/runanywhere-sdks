@@ -154,6 +154,17 @@ public class RegisterModelFromUrlRequest(
     schemaIndex = 12,
   )
   public val id: String? = null,
+  /**
+   * Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+   * registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+   */
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "cuaProfile",
+    schemaIndex = 13,
+  )
+  public val cua_profile: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RegisterModelFromUrlRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -179,6 +190,7 @@ public class RegisterModelFromUrlRequest(
     if (description != other.description) return false
     if (download_size_bytes != other.download_size_bytes) return false
     if (id != other.id) return false
+    if (cua_profile != other.cua_profile) return false
     return true
   }
 
@@ -199,6 +211,7 @@ public class RegisterModelFromUrlRequest(
       result = result * 37 + (description?.hashCode() ?: 0)
       result = result * 37 + (download_size_bytes?.hashCode() ?: 0)
       result = result * 37 + (id?.hashCode() ?: 0)
+      result = result * 37 + (cua_profile?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -219,6 +232,7 @@ public class RegisterModelFromUrlRequest(
     if (description != null) result += """description=${sanitize(description)}"""
     if (download_size_bytes != null) result += """download_size_bytes=$download_size_bytes"""
     if (id != null) result += """id=${sanitize(id)}"""
+    if (cua_profile != null) result += """cua_profile=${sanitize(cua_profile)}"""
     return result.joinToString(prefix = "RegisterModelFromUrlRequest{", separator = ", ", postfix = "}")
   }
 
@@ -236,8 +250,9 @@ public class RegisterModelFromUrlRequest(
     description: String? = this.description,
     download_size_bytes: Long? = this.download_size_bytes,
     id: String? = this.id,
+    cua_profile: String? = this.cua_profile,
     unknownFields: ByteString = this.unknownFields,
-  ): RegisterModelFromUrlRequest = RegisterModelFromUrlRequest(url, name, framework, category, source, memory_required_bytes, supports_thinking, supports_lora, artifact_type, context_length, description, download_size_bytes, id, unknownFields)
+  ): RegisterModelFromUrlRequest = RegisterModelFromUrlRequest(url, name, framework, category, source, memory_required_bytes, supports_thinking, supports_lora, artifact_type, context_length, description, download_size_bytes, id, cua_profile, unknownFields)
 
   public companion object {
     @JvmField
@@ -269,6 +284,7 @@ public class RegisterModelFromUrlRequest(
         size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.description)
         size += ProtoAdapter.INT64.encodedSizeWithTag(12, value.download_size_bytes)
         size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.id)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.cua_profile)
         return size
       }
 
@@ -290,11 +306,13 @@ public class RegisterModelFromUrlRequest(
         ProtoAdapter.STRING.encodeWithTag(writer, 11, value.description)
         ProtoAdapter.INT64.encodeWithTag(writer, 12, value.download_size_bytes)
         ProtoAdapter.STRING.encodeWithTag(writer, 13, value.id)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.cua_profile)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RegisterModelFromUrlRequest) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.cua_profile)
         ProtoAdapter.STRING.encodeWithTag(writer, 13, value.id)
         ProtoAdapter.INT64.encodeWithTag(writer, 12, value.download_size_bytes)
         ProtoAdapter.STRING.encodeWithTag(writer, 11, value.description)
@@ -328,6 +346,7 @@ public class RegisterModelFromUrlRequest(
         var description: String? = null
         var download_size_bytes: Long? = null
         var id: String? = null
+        var cua_profile: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> url = ProtoAdapter.STRING.decode(reader)
@@ -359,6 +378,7 @@ public class RegisterModelFromUrlRequest(
             11 -> description = ProtoAdapter.STRING.decode(reader)
             12 -> download_size_bytes = ProtoAdapter.INT64.decode(reader)
             13 -> id = ProtoAdapter.STRING.decode(reader)
+            14 -> cua_profile = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -376,6 +396,7 @@ public class RegisterModelFromUrlRequest(
           description = description,
           download_size_bytes = download_size_bytes,
           id = id,
+          cua_profile = cua_profile,
           unknownFields = unknownFields
         )
       }

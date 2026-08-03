@@ -319,6 +319,12 @@ message ModelInfo {
     optional int32               usage_count          = 35;
     optional bool                sync_pending         = 36;
     optional string              status_message       = 37;
+
+    // Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
+    // this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
+    // models. Lets the catalog mark which models are drivable through
+    // RunAnywhere.CUA and with which profile, without hardcoding model ids.
+    optional string              cua_profile          = 38;
 }
 
 // Repeated model registry responses use this wrapper because protobuf cannot
@@ -825,6 +831,9 @@ message RegisterModelFromUrlRequest {
     optional int64             download_size_bytes   = 12;
     // Explicit id override. Empty -> derived from URL/name.
     optional string            id                    = 13;
+    // Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+    // registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+    optional string            cua_profile           = 14;
 }
 
 // ---------------------------------------------------------------------------
@@ -846,4 +855,7 @@ message RegisterMultiFileModelRequest {
     optional bool                supports_lora         = 11;
     optional string              description           = 12;
     optional ModelSource         source                = 13;
+    // Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+    // registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+    optional string              cua_profile           = 14;
 }

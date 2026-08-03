@@ -1209,7 +1209,16 @@ export interface ModelInfo {
   lastUsedAtUnixMs?: number | undefined;
   usageCount?: number | undefined;
   syncPending?: boolean | undefined;
-  statusMessage?: string | undefined;
+  statusMessage?:
+    | string
+    | undefined;
+  /**
+   * Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
+   * this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
+   * models. Lets the catalog mark which models are drivable through
+   * RunAnywhere.CUA and with which profile, without hardcoding model ids.
+   */
+  cuaProfile?: string | undefined;
 }
 
 /**
@@ -1773,7 +1782,14 @@ export interface RegisterModelFromUrlRequest {
     | number
     | undefined;
   /** Explicit id override. Empty -> derived from URL/name. */
-  id?: string | undefined;
+  id?:
+    | string
+    | undefined;
+  /**
+   * Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+   * registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+   */
+  cuaProfile?: string | undefined;
 }
 
 /**
@@ -1796,7 +1812,14 @@ export interface RegisterMultiFileModelRequest {
   supportsThinking?: boolean | undefined;
   supportsLora?: boolean | undefined;
   description?: string | undefined;
-  source?: ModelSource | undefined;
+  source?:
+    | ModelSource
+    | undefined;
+  /**
+   * Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+   * registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+   */
+  cuaProfile?: string | undefined;
 }
 
 function createBaseModelInfoMetadata(): ModelInfoMetadata {
@@ -2069,6 +2092,7 @@ function createBaseModelInfo(): ModelInfo {
     usageCount: undefined,
     syncPending: undefined,
     statusMessage: undefined,
+    cuaProfile: undefined,
   };
 }
 
@@ -2181,6 +2205,9 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     }
     if (message.statusMessage !== undefined) {
       writer.uint32(298).string(message.statusMessage);
+    }
+    if (message.cuaProfile !== undefined) {
+      writer.uint32(306).string(message.cuaProfile);
     }
     return writer;
   },
@@ -2480,6 +2507,14 @@ export const ModelInfo: MessageFns<ModelInfo> = {
           message.statusMessage = reader.string();
           continue;
         }
+        case 38: {
+          if (tag !== 306) {
+            break;
+          }
+
+          message.cuaProfile = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2635,6 +2670,11 @@ export const ModelInfo: MessageFns<ModelInfo> = {
         : isSet(object.status_message)
         ? globalThis.String(object.status_message)
         : undefined,
+      cuaProfile: isSet(object.cuaProfile)
+        ? globalThis.String(object.cuaProfile)
+        : isSet(object.cua_profile)
+        ? globalThis.String(object.cua_profile)
+        : undefined,
     };
   },
 
@@ -2748,6 +2788,9 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     if (message.statusMessage !== undefined) {
       obj.statusMessage = message.statusMessage;
     }
+    if (message.cuaProfile !== undefined) {
+      obj.cuaProfile = message.cuaProfile;
+    }
     return obj;
   },
 
@@ -2806,6 +2849,7 @@ export const ModelInfo: MessageFns<ModelInfo> = {
     message.usageCount = object.usageCount ?? undefined;
     message.syncPending = object.syncPending ?? undefined;
     message.statusMessage = object.statusMessage ?? undefined;
+    message.cuaProfile = object.cuaProfile ?? undefined;
     return message;
   },
 };
@@ -7806,6 +7850,7 @@ function createBaseRegisterModelFromUrlRequest(): RegisterModelFromUrlRequest {
     description: undefined,
     downloadSizeBytes: undefined,
     id: undefined,
+    cuaProfile: undefined,
   };
 }
 
@@ -7849,6 +7894,9 @@ export const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest
     }
     if (message.id !== undefined) {
       writer.uint32(106).string(message.id);
+    }
+    if (message.cuaProfile !== undefined) {
+      writer.uint32(114).string(message.cuaProfile);
     }
     return writer;
   },
@@ -7964,6 +8012,14 @@ export const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest
           message.id = reader.string();
           continue;
         }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.cuaProfile = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -8012,6 +8068,11 @@ export const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest
         ? globalThis.Number(object.download_size_bytes)
         : undefined,
       id: isSet(object.id) ? globalThis.String(object.id) : undefined,
+      cuaProfile: isSet(object.cuaProfile)
+        ? globalThis.String(object.cuaProfile)
+        : isSet(object.cua_profile)
+        ? globalThis.String(object.cua_profile)
+        : undefined,
     };
   },
 
@@ -8056,6 +8117,9 @@ export const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest
     if (message.id !== undefined) {
       obj.id = message.id;
     }
+    if (message.cuaProfile !== undefined) {
+      obj.cuaProfile = message.cuaProfile;
+    }
     return obj;
   },
 
@@ -8077,6 +8141,7 @@ export const RegisterModelFromUrlRequest: MessageFns<RegisterModelFromUrlRequest
     message.description = object.description ?? undefined;
     message.downloadSizeBytes = object.downloadSizeBytes ?? undefined;
     message.id = object.id ?? undefined;
+    message.cuaProfile = object.cuaProfile ?? undefined;
     return message;
   },
 };
@@ -8096,6 +8161,7 @@ function createBaseRegisterMultiFileModelRequest(): RegisterMultiFileModelReques
     supportsLora: undefined,
     description: undefined,
     source: undefined,
+    cuaProfile: undefined,
   };
 }
 
@@ -8139,6 +8205,9 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
     }
     if (message.source !== undefined) {
       writer.uint32(104).int32(message.source);
+    }
+    if (message.cuaProfile !== undefined) {
+      writer.uint32(114).string(message.cuaProfile);
     }
     return writer;
   },
@@ -8254,6 +8323,14 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
           message.source = reader.int32() as any;
           continue;
         }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.cuaProfile = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -8300,6 +8377,11 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
         : undefined,
       description: isSet(object.description) ? globalThis.String(object.description) : undefined,
       source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
+      cuaProfile: isSet(object.cuaProfile)
+        ? globalThis.String(object.cuaProfile)
+        : isSet(object.cua_profile)
+        ? globalThis.String(object.cua_profile)
+        : undefined,
     };
   },
 
@@ -8344,6 +8426,9 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
     if (message.source !== undefined) {
       obj.source = modelSourceToJSON(message.source);
     }
+    if (message.cuaProfile !== undefined) {
+      obj.cuaProfile = message.cuaProfile;
+    }
     return obj;
   },
 
@@ -8367,6 +8452,7 @@ export const RegisterMultiFileModelRequest: MessageFns<RegisterMultiFileModelReq
     message.supportsLora = object.supportsLora ?? undefined;
     message.description = object.description ?? undefined;
     message.source = object.source ?? undefined;
+    message.cuaProfile = object.cuaProfile ?? undefined;
     return message;
   },
 };

@@ -8,6 +8,7 @@ import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/sdk_init.pb.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
+import 'package:runanywhere/native/dart_bridge_cua.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_embeddings.dart';
@@ -482,6 +483,9 @@ class DartBridge {
 
   /// Authentication bridge
   static DartBridgeAuth get auth => DartBridgeAuth.instance;
+
+  /// Computer-Use-Agent (CUA) scaffold bridge
+  static DartBridgeCua get cua => DartBridgeCua.shared;
 
   /// Device bridge
   static DartBridgeDevice get device => DartBridgeDevice.instance;

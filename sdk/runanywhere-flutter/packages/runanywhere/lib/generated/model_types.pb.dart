@@ -234,6 +234,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     $core.int? usageCount,
     $core.bool? syncPending,
     $core.String? statusMessage,
+    $core.String? cuaProfile,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -275,6 +276,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     if (usageCount != null) result.usageCount = usageCount;
     if (syncPending != null) result.syncPending = syncPending;
     if (statusMessage != null) result.statusMessage = statusMessage;
+    if (cuaProfile != null) result.cuaProfile = cuaProfile;
     return result;
   }
 
@@ -354,6 +356,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     ..aI(35, _omitFieldNames ? '' : 'usageCount')
     ..aOB(36, _omitFieldNames ? '' : 'syncPending')
     ..aOS(37, _omitFieldNames ? '' : 'statusMessage')
+    ..aOS(38, _omitFieldNames ? '' : 'cuaProfile')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -751,6 +754,19 @@ class ModelInfo extends $pb.GeneratedMessage {
   $core.bool hasStatusMessage() => $_has(35);
   @$pb.TagNumber(37)
   void clearStatusMessage() => $_clearField(37);
+
+  /// Computer-Use-Agent profile id (see idl/cua.proto / rac_cua.h) that drives
+  /// this model, e.g. "fara" for Fara1.5 / Qwen3.5-VL. Empty for non-CUA
+  /// models. Lets the catalog mark which models are drivable through
+  /// RunAnywhere.CUA and with which profile, without hardcoding model ids.
+  @$pb.TagNumber(38)
+  $core.String get cuaProfile => $_getSZ(36);
+  @$pb.TagNumber(38)
+  set cuaProfile($core.String value) => $_setString(36, value);
+  @$pb.TagNumber(38)
+  $core.bool hasCuaProfile() => $_has(36);
+  @$pb.TagNumber(38)
+  void clearCuaProfile() => $_clearField(38);
 }
 
 /// Repeated model registry responses use this wrapper because protobuf cannot
@@ -4496,6 +4512,7 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
     $core.String? description,
     $fixnum.Int64? downloadSizeBytes,
     $core.String? id,
+    $core.String? cuaProfile,
   }) {
     final result = create();
     if (url != null) result.url = url;
@@ -4512,6 +4529,7 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
     if (description != null) result.description = description;
     if (downloadSizeBytes != null) result.downloadSizeBytes = downloadSizeBytes;
     if (id != null) result.id = id;
+    if (cuaProfile != null) result.cuaProfile = cuaProfile;
     return result;
   }
 
@@ -4545,6 +4563,7 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
     ..aOS(11, _omitFieldNames ? '' : 'description')
     ..aInt64(12, _omitFieldNames ? '' : 'downloadSizeBytes')
     ..aOS(13, _omitFieldNames ? '' : 'id')
+    ..aOS(14, _omitFieldNames ? '' : 'cuaProfile')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4700,6 +4719,17 @@ class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
   $core.bool hasId() => $_has(12);
   @$pb.TagNumber(13)
   void clearId() => $_clearField(13);
+
+  /// Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+  /// registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+  @$pb.TagNumber(14)
+  $core.String get cuaProfile => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set cuaProfile($core.String value) => $_setString(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasCuaProfile() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearCuaProfile() => $_clearField(14);
 }
 
 /// ---------------------------------------------------------------------------
@@ -4722,6 +4752,7 @@ class RegisterMultiFileModelRequest extends $pb.GeneratedMessage {
     $core.bool? supportsLora,
     $core.String? description,
     ModelSource? source,
+    $core.String? cuaProfile,
   }) {
     final result = create();
     if (id != null) result.id = id;
@@ -4738,6 +4769,7 @@ class RegisterMultiFileModelRequest extends $pb.GeneratedMessage {
     if (supportsLora != null) result.supportsLora = supportsLora;
     if (description != null) result.description = description;
     if (source != null) result.source = source;
+    if (cuaProfile != null) result.cuaProfile = cuaProfile;
     return result;
   }
 
@@ -4772,6 +4804,7 @@ class RegisterMultiFileModelRequest extends $pb.GeneratedMessage {
     ..aOS(12, _omitFieldNames ? '' : 'description')
     ..aE<ModelSource>(13, _omitFieldNames ? '' : 'source',
         enumValues: ModelSource.values)
+    ..aOS(14, _omitFieldNames ? '' : 'cuaProfile')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -4906,6 +4939,17 @@ class RegisterMultiFileModelRequest extends $pb.GeneratedMessage {
   $core.bool hasSource() => $_has(12);
   @$pb.TagNumber(13)
   void clearSource() => $_clearField(13);
+
+  /// Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+  /// registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+  @$pb.TagNumber(14)
+  $core.String get cuaProfile => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set cuaProfile($core.String value) => $_setString(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasCuaProfile() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearCuaProfile() => $_clearField(14);
 }
 
 const $core.bool _omitFieldNames =

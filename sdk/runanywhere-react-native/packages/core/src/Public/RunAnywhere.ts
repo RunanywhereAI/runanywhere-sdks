@@ -47,6 +47,9 @@ import {
   SDKException,
 } from '../Foundation/Errors/SDKException';
 
+// Computer-Use Agent (CUA) capability — additive over the v3 namespaces.
+import { cua as CUACapability } from './Extensions/CUA/RunAnywhere+CUA';
+
 import { pluginLoader } from './Extensions/RunAnywhere+PluginLoader';
 import { solutions } from './Extensions/Solutions/RunAnywhere+Solutions';
 import { llm } from './Api/Llm';
@@ -511,6 +514,10 @@ export const RunAnywhere = {
   rag,
   models,
   lora,
+
+  // Computer-Use Agent (CUA) — stateless profile-driven prompt/parse scaffold
+  // that pairs with the vlm namespace. Matches Swift RunAnywhere+CUA.swift.
+  cua: CUACapability,
 
   // Platform services outside the modality spec.
   storage,

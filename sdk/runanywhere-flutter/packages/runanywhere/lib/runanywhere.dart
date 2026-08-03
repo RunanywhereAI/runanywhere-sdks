@@ -27,6 +27,8 @@ export 'public/api/types/inputs.dart';
 export 'public/api/types/model_registration.dart';
 export 'public/api/types/options.dart';
 export 'public/api/types/results.dart';
+export 'public/capabilities/runanywhere_cua.dart'
+    show CuaAction, CuaActionKind, RunAnywhereCUA;
 export 'public/capabilities/runanywhere_hybrid.dart' show RunAnywhereHybrid;
 export 'public/capabilities/runanywhere_solutions.dart'
     show RunAnywhereSolutions;

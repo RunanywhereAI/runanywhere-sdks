@@ -1,0 +1,62 @@
+// RunAnywhere IDL — Computer-Use-Agent (CUA) action types.
+//
+// Canonical wire type for the model-agnostic CUA scaffold in commons
+// (`rac/features/cua/rac_cua.h`). `rac_cua_parse_action_proto` serializes a
+// parsed action as `CuaAction` bytes so every SDK deserializes ONE generated
+// type instead of hand-mirroring the C struct `rac_cua_action_t` — the same
+// proto-byte bridging every other modality (LLM/STT/TTS/VLM/voice) already
+// uses. Coordinates are already scaled to the caller's viewport.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "CuaProto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// Model-agnostic action type parsed from a CUA model's output. Values match
+// the C enum `rac_cua_action_type_t` (rac_cua.h) one-for-one.
+enum CuaActionType {
+  CUA_ACTION_TYPE_UNSPECIFIED      = 0;  // RAC_CUA_ACTION_UNKNOWN
+  CUA_ACTION_TYPE_LEFT_CLICK       = 1;
+  CUA_ACTION_TYPE_RIGHT_CLICK      = 2;
+  CUA_ACTION_TYPE_DOUBLE_CLICK     = 3;
+  CUA_ACTION_TYPE_TRIPLE_CLICK     = 4;
+  CUA_ACTION_TYPE_MOUSE_MOVE       = 5;
+  CUA_ACTION_TYPE_LEFT_CLICK_DRAG  = 6;
+  CUA_ACTION_TYPE_TYPE             = 7;
+  CUA_ACTION_TYPE_KEY              = 8;
+  CUA_ACTION_TYPE_SCROLL           = 9;
+  CUA_ACTION_TYPE_HSCROLL          = 10;
+  CUA_ACTION_TYPE_VISIT_URL        = 11;
+  CUA_ACTION_TYPE_HISTORY_BACK     = 12;
+  CUA_ACTION_TYPE_WEB_SEARCH       = 13;
+  CUA_ACTION_TYPE_READ_PAGE_ANSWER = 14;
+  CUA_ACTION_TYPE_PAUSE_MEMORIZE   = 15;
+  CUA_ACTION_TYPE_ASK_USER         = 16;
+  CUA_ACTION_TYPE_WAIT             = 17;
+  CUA_ACTION_TYPE_TERMINATE        = 18;
+}
+
+// A single parsed CUA action. Coordinates are already scaled to the caller's
+// viewport. `text` is the action's primary string argument, keyed by `type`:
+// TYPE->text, VISIT_URL->url, WEB_SEARCH->query, TERMINATE->answer,
+// ASK_USER/READ_PAGE_ANSWER->question, PAUSE_MEMORIZE->fact, KEY->space-joined
+// keys. `reasoning` holds any chain-of-thought preceding the tool_call.
+message CuaAction {
+  CuaActionType type            = 1;
+  bool          coordinate_valid = 2;  // true if x/y are valid
+  int32         x               = 3;  // viewport-scaled pixels
+  int32         y              = 4;
+  int32         scroll_pixels  = 5;  // SCROLL/HSCROLL: +up / -down
+  double        wait_seconds   = 6;  // WAIT
+  string        text           = 7;  // primary string arg (see above)
+  string        reasoning      = 8;  // CoT before the tool_call, if any
+  bool          parse_ok       = 9;  // true if a valid tool_call was found
+}

@@ -1432,6 +1432,42 @@ object RunAnywhereBridge {
 
     @JvmStatic external fun racLoraAdapterImportProto(requestProto: ByteArray): ByteArray?
 
+    // COMPUTER-USE AGENT (CUA) SCAFFOLD (rac/features/cua/rac_cua.h)
+    //
+    // Stateless, profile-driven bridge that turns a VLM into a drivable
+    // computer-use agent without baking any single model into the SDK.
+    // Mirrors Swift's `RunAnywhere.CUA` facade (RunAnywhere+CUA.swift). The
+    // parse thunk serializes a `runanywhere.v1.CuaAction`; the public facade
+    // decodes it with Wire into the structured `CuaAction` value type — the
+    // same proto-byte bridging every other modality uses.
+
+    /**
+     * Render `profileId`'s system prompt for a declared coordinate space
+     * (`displayW` x `displayH`; pass the profile's native space, e.g.
+     * 1000x1000 for Fara). Forwards to `rac_cua_system_prompt`.
+     *
+     * @return the prompt string, or null for an unknown profile.
+     */
+    @JvmStatic
+    external fun racCuaSystemPrompt(profileId: String, displayW: Int, displayH: Int): String?
+
+    /**
+     * Parse a CUA model's raw output, rescaling coordinates from the profile's
+     * model space to the caller's viewport. Forwards to
+     * `rac_cua_parse_action_proto`.
+     *
+     * @return serialized `runanywhere.v1.CuaAction` bytes (inspect `parse_ok`
+     *         for whether a valid tool call was found), or null for an unknown
+     *         profile.
+     */
+    @JvmStatic
+    external fun racCuaParseAction(
+        profileId: String,
+        modelOutput: String,
+        viewportW: Int,
+        viewportH: Int,
+    ): ByteArray?
+
     // PLUGIN LOADER (rac/router/rac_plugin_loader.h)
     //
     // External thunks for the plugin loader.

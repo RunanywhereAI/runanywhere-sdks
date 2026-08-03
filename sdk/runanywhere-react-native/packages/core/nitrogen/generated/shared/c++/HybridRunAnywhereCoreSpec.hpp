@@ -162,6 +162,8 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmProcessProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<void>> vlmProcessStreamProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmCancelProto() = 0;
+      virtual std::string cuaSystemPrompt(const std::string& profileId, double displayWidth, double displayHeight) = 0;
+      virtual std::shared_ptr<ArrayBuffer> cuaParseAction(const std::string& profileId, const std::string& modelOutput, double viewportWidth, double viewportHeight) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> diffusionGenerateLifecycleProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> diarizationDiarizeLifecycleProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> segmentationSegmentLifecycleProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;

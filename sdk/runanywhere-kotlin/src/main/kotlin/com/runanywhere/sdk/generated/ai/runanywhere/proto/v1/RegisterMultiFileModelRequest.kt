@@ -121,6 +121,17 @@ public class RegisterMultiFileModelRequest(
     schemaIndex = 12,
   )
   public val source: ModelSource? = null,
+  /**
+   * Computer-Use-Agent profile id (see idl/cua.proto) copied onto the
+   * registered ModelInfo.cua_profile, e.g. "fara" for Fara1.5.
+   */
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "cuaProfile",
+    schemaIndex = 13,
+  )
+  public val cua_profile: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RegisterMultiFileModelRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -154,6 +165,7 @@ public class RegisterMultiFileModelRequest(
     if (supports_lora != other.supports_lora) return false
     if (description != other.description) return false
     if (source != other.source) return false
+    if (cua_profile != other.cua_profile) return false
     return true
   }
 
@@ -174,6 +186,7 @@ public class RegisterMultiFileModelRequest(
       result = result * 37 + (supports_lora?.hashCode() ?: 0)
       result = result * 37 + (description?.hashCode() ?: 0)
       result = result * 37 + (source?.hashCode() ?: 0)
+      result = result * 37 + (cua_profile?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -194,6 +207,7 @@ public class RegisterMultiFileModelRequest(
     if (supports_lora != null) result += """supports_lora=$supports_lora"""
     if (description != null) result += """description=${sanitize(description)}"""
     if (source != null) result += """source=$source"""
+    if (cua_profile != null) result += """cua_profile=${sanitize(cua_profile)}"""
     return result.joinToString(prefix = "RegisterMultiFileModelRequest{", separator = ", ", postfix = "}")
   }
 
@@ -211,8 +225,9 @@ public class RegisterMultiFileModelRequest(
     supports_lora: Boolean? = this.supports_lora,
     description: String? = this.description,
     source: ModelSource? = this.source,
+    cua_profile: String? = this.cua_profile,
     unknownFields: ByteString = this.unknownFields,
-  ): RegisterMultiFileModelRequest = RegisterMultiFileModelRequest(id, name, framework, files, category, format, memory_required_bytes, download_size_bytes, context_length, supports_thinking, supports_lora, description, source, unknownFields)
+  ): RegisterMultiFileModelRequest = RegisterMultiFileModelRequest(id, name, framework, files, category, format, memory_required_bytes, download_size_bytes, context_length, supports_thinking, supports_lora, description, source, cua_profile, unknownFields)
 
   public companion object {
     @JvmField
@@ -246,6 +261,7 @@ public class RegisterMultiFileModelRequest(
         size += ProtoAdapter.BOOL.encodedSizeWithTag(11, value.supports_lora)
         size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.description)
         size += ModelSource.ADAPTER.encodedSizeWithTag(13, value.source)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.cua_profile)
         return size
       }
 
@@ -269,11 +285,13 @@ public class RegisterMultiFileModelRequest(
         ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.supports_lora)
         ProtoAdapter.STRING.encodeWithTag(writer, 12, value.description)
         ModelSource.ADAPTER.encodeWithTag(writer, 13, value.source)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.cua_profile)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RegisterMultiFileModelRequest) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.cua_profile)
         ModelSource.ADAPTER.encodeWithTag(writer, 13, value.source)
         ProtoAdapter.STRING.encodeWithTag(writer, 12, value.description)
         ProtoAdapter.BOOL.encodeWithTag(writer, 11, value.supports_lora)
@@ -309,6 +327,7 @@ public class RegisterMultiFileModelRequest(
         var supports_lora: Boolean? = null
         var description: String? = null
         var source: ModelSource? = null
+        var cua_profile: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
@@ -340,6 +359,7 @@ public class RegisterMultiFileModelRequest(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            14 -> cua_profile = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -357,6 +377,7 @@ public class RegisterMultiFileModelRequest(
           supports_lora = supports_lora,
           description = description,
           source = source,
+          cua_profile = cua_profile,
           unknownFields = unknownFields
         )
       }

@@ -71,6 +71,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "rac/features/cua/rac_cua.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/llm/rac_llm_component.h"
@@ -8256,4 +8257,67 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racPlatformUnregister(J
         return static_cast<jint>(plugin_result);
     }
     return static_cast<jint>(backend_result);
+}
+
+// =============================================================================
+// JNI FUNCTIONS - Computer-Use Agent (CUA) scaffold (rac_cua.h)
+//
+// Stateless profile-driven bridge. Mirrors the iOS `RunAnywhere.CUA` facade
+// (RunAnywhere+CUA.swift), which calls `rac_cua_system_prompt` /
+// `rac_cua_parse_action` directly. The parse thunk marshals the flat
+// `rac_cua_action_t` struct into the Kotlin JNI DTO `RacCuaAction` (same
+// field-by-field pattern as RacDirectoryEntry, in reverse), which the
+// public facade maps into the structured `CuaAction` value type.
+// =============================================================================
+
+// Renders the profile system prompt for a declared coordinate space. Returns
+// the prompt string, or null for an unknown profile (rac returns -1).
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racCuaSystemPrompt(
+    JNIEnv* env, jclass clazz, jstring profileId, jint displayW, jint displayH) {
+    (void)clazz;
+    if (profileId == nullptr) {
+        return nullptr;
+    }
+    std::string profile = getCString(env, profileId);
+
+    // Capacity query: pass a NULL buffer to learn the full length (mirrors the
+    // Swift facade's two-call pattern).
+    int needed = rac_cua_system_prompt(profile.c_str(), static_cast<uint32_t>(displayW),
+                                       static_cast<uint32_t>(displayH), nullptr, 0);
+    if (needed <= 0) {
+        return nullptr;
+    }
+
+    std::vector<char> buffer(static_cast<size_t>(needed) + 1, '\0');
+    rac_cua_system_prompt(profile.c_str(), static_cast<uint32_t>(displayW),
+                          static_cast<uint32_t>(displayH), buffer.data(), buffer.size());
+    return env->NewStringUTF(buffer.data());
+}
+
+// Parses a CUA model's raw output into a serialized runanywhere.v1.CuaAction,
+// rescaling coordinates to the caller's viewport. Returns null for an unknown
+// profile; the decoded parse_ok flag distinguishes "no tool call found". The
+// Kotlin facade decodes the proto with Wire — no hand-mirrored struct DTO.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racCuaParseAction(
+    JNIEnv* env, jclass clazz, jstring profileId, jstring modelOutput, jint viewportW,
+    jint viewportH) {
+    (void)clazz;
+    if (profileId == nullptr || modelOutput == nullptr) {
+        return nullptr;
+    }
+    std::string profile = getCString(env, profileId);
+    std::string output = getCString(env, modelOutput);
+
+    rac_proto_buffer_t buffer = {};
+    rac_result_t rc = rac_cua_parse_action_proto(profile.c_str(), output.c_str(),
+                                                 static_cast<uint32_t>(viewportW),
+                                                 static_cast<uint32_t>(viewportH), &buffer);
+    if (RAC_FAILED(rc)) {
+        // Unknown profile — return null (Swift parity) rather than throwing.
+        rac_proto_buffer_free(&buffer);
+        return nullptr;
+    }
+    return makeProtoBufferByteArray(env, &buffer, "racCuaParseAction");
 }

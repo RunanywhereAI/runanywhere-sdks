@@ -157,6 +157,7 @@ class RunAnywhereModels {
     int? memoryRequirement,
     bool supportsThinking = false,
     bool supportsLora = false,
+    String? cuaProfile,
   }) => RunAnywhereStorage.registerModel(
     id: id,
     name: name,
@@ -167,6 +168,7 @@ class RunAnywhereModels {
     memoryRequirement: memoryRequirement,
     supportsThinking: supportsThinking,
     supportsLora: supportsLora,
+    cuaProfile: cuaProfile,
   );
 
   /// Register an archive-packaged model (tar.gz / tar.bz2 / tar.xz / zip)
@@ -185,6 +187,7 @@ class RunAnywhereModels {
     int? memoryRequirement,
     bool supportsThinking = false,
     bool supportsLora = false,
+    String? cuaProfile,
   }) => RunAnywhereStorage.registerArchiveModel(
     archiveUrl: archiveUrl,
     structure: structure,
@@ -196,6 +199,7 @@ class RunAnywhereModels {
     memoryRequirement: memoryRequirement,
     supportsThinking: supportsThinking,
     supportsLora: supportsLora,
+    cuaProfile: cuaProfile,
   );
 
   /// Register a multi-file model (e.g. embedding model.onnx + vocab.txt).
@@ -213,6 +217,7 @@ class RunAnywhereModels {
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? cuaProfile,
   }) => RunAnywhereStorage.registerMultiFileModel(
     files: files,
     id: id,
@@ -223,6 +228,7 @@ class RunAnywhereModels {
     contextLength: contextLength,
     supportsThinking: supportsThinking,
     source: source,
+    cuaProfile: cuaProfile,
   );
 
   /// Infer the canonical [ModelFileRole] for a single sidecar filename in a

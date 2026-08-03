@@ -15,6 +15,10 @@ extension RunAnywhere {
     /// id/name/format/artifact, resolves `hf.co/org/repo[:quant]` refs (quant
     /// selection, mmproj pairing, sharded GGUF sets, per-file checksums), and
     /// preserves prior download state when a catalog re-seeds on launch.
+    ///
+    /// Pass `cuaProfile` (e.g. `RunAnywhere.CUA.faraProfile`) for a computer-use
+    /// agent model; it lands on `RAModelInfo.cuaProfile` so callers can discover
+    /// which registered models are drivable through `RunAnywhere.CUA`.
     @discardableResult
     @available(*, deprecated, renamed: "models.register(_:)")
     public static func registerModel(
@@ -26,7 +30,8 @@ extension RunAnywhere {
         artifactType: RAModelArtifactType? = nil,
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false,
-        supportsLora: Bool = false
+        supportsLora: Bool = false,
+        cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         try await registerFromURL(
             id: id,
@@ -64,6 +69,9 @@ extension RunAnywhere {
         request.category = modality
         if let id {
             request.id = id
+        }
+        if let cuaProfile, !cuaProfile.isEmpty {
+            request.cuaProfile = cuaProfile
         }
         if let memoryRequirement {
             request.memoryRequiredBytes = memoryRequirement
@@ -104,7 +112,8 @@ extension RunAnywhere {
         archiveType: RAArchiveType? = nil,
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false,
-        supportsLora: Bool = false
+        supportsLora: Bool = false,
+        cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         try await registerArchive(
             url: url,
@@ -168,6 +177,9 @@ extension RunAnywhere {
         if supportsLora {
             model.supportsLora = true
         }
+        if let cuaProfile, !cuaProfile.isEmpty {
+            model.cuaProfile = cuaProfile
+        }
 
         try await CppBridge.ModelRegistry.shared.save(model)
         return model
@@ -189,7 +201,8 @@ extension RunAnywhere {
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
         source: RAModelSource = .remote,
-        downloadSize: Int64? = nil
+        downloadSize: Int64? = nil,
+        cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         try await registerMultiFile(
             descriptors: descriptors,
@@ -241,6 +254,9 @@ extension RunAnywhere {
         }
         if supportsThinking {
             request.supportsThinking = true
+        }
+        if let cuaProfile, !cuaProfile.isEmpty {
+            request.cuaProfile = cuaProfile
         }
 
         return try await CppBridge.ModelRegistry.shared.registerMultiFile(request)

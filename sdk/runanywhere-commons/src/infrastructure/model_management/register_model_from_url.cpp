@@ -109,6 +109,12 @@ rac_result_t register_from_hf_repo(const runanywhere::v1::RegisterModelFromUrlRe
     if (request.has_description()) {
         multi_file.set_description(request.description());
     }
+    // Computer-Use-Agent profile must survive the HF translation too — the MLX
+    // Fara row registers through this path, so dropping it here left the model
+    // in the registry without the profile that declares it CUA-drivable.
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        multi_file.set_cua_profile(request.cua_profile());
+    }
 
     bool first = true;
     for (const hf::ResolvedFile& resolved_file : resolved.files) {
@@ -274,6 +280,12 @@ rac_result_t register_from_hf_folder(const runanywhere::v1::RegisterModelFromUrl
     }
     if (request.has_description()) {
         multi_file.set_description(request.description());
+    }
+    // Computer-Use-Agent profile must survive the HF translation too — the MLX
+    // Fara row registers through this path, so dropping it here left the model
+    // in the registry without the profile that declares it CUA-drivable.
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        multi_file.set_cua_profile(request.cua_profile());
     }
 
     bool first = true;
@@ -468,6 +480,9 @@ extern "C" rac_result_t rac_register_model_from_url_proto(const uint8_t* in_requ
     if (request.has_download_size_bytes()) {
         made_model.set_download_size_bytes(request.download_size_bytes());
     }
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        made_model.set_cua_profile(request.cua_profile());
+    }
 
     // -------------------------------------------------------------------------
     // 2) Persist via the existing registry save path.
@@ -618,6 +633,9 @@ register_multi_file_model(const runanywhere::v1::RegisterMultiFileModelRequest& 
     }
     if (request.has_description()) {
         model.mutable_metadata()->set_description(request.description());
+    }
+    if (request.has_cua_profile() && !request.cua_profile().empty()) {
+        model.set_cua_profile(request.cua_profile());
     }
     *model.mutable_multi_file()->mutable_files() = request.files();
     model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);
