@@ -1611,6 +1611,14 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
 
         case RAC_TOOL_FORMAT_LFM2:
             parsed = parse_lfm2_format(llm_output, &tool_name, &args_json, &clean_text);
+            // Small LFM2 models often ignore the <|tool_call_start|> dialect and emit the
+            // more common JSON <tool_call> envelope instead. parse_lfm2_format nulls its
+            // outputs and bails without allocating when the LFM2 tag is absent, so a
+            // fall-through to the default parser recovers a well-formed call in that shape
+            // rather than silently dropping it.
+            if (!parsed) {
+                parsed = parse_default_format(llm_output, &tool_name, &args_json, &clean_text);
+            }
             break;
 
         case RAC_TOOL_FORMAT_PYTHONIC:
