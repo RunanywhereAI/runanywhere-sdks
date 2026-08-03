@@ -42,7 +42,8 @@ extension RunAnywhere {
             artifactType: artifactType,
             memoryRequirement: memoryRequirement,
             supportsThinking: supportsThinking,
-            supportsLora: supportsLora
+            supportsLora: supportsLora,
+            cuaProfile: cuaProfile
         )
     }
 
@@ -56,7 +57,8 @@ extension RunAnywhere {
         artifactType: RAModelArtifactType? = nil,
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false,
-        supportsLora: Bool = false
+        supportsLora: Bool = false,
+        cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
@@ -125,7 +127,8 @@ extension RunAnywhere {
             archiveType: archiveType,
             memoryRequirement: memoryRequirement,
             supportsThinking: supportsThinking,
-            supportsLora: supportsLora
+            supportsLora: supportsLora,
+            cuaProfile: cuaProfile
         )
     }
 
@@ -140,7 +143,8 @@ extension RunAnywhere {
         archiveType: RAArchiveType? = nil,
         memoryRequirement: Int64? = nil,
         supportsThinking: Bool = false,
-        supportsLora: Bool = false
+        supportsLora: Bool = false,
+        cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
@@ -214,7 +218,8 @@ extension RunAnywhere {
             contextLength: contextLength,
             supportsThinking: supportsThinking,
             source: source,
-            downloadSize: downloadSize
+            downloadSize: downloadSize,
+            cuaProfile: cuaProfile
         )
     }
 
@@ -229,7 +234,8 @@ extension RunAnywhere {
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
         source: RAModelSource = .remote,
-        downloadSize: Int64? = nil
+        downloadSize: Int64? = nil,
+        cuaProfile: String? = nil
     ) async throws -> RAModelInfo {
         guard isReady else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
