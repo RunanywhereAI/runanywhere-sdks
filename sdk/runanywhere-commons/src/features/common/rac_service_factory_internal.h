@@ -214,11 +214,15 @@ rac_result_t create_plugin_service(const PluginServiceCreateSpec<ServiceT, OpsT>
     if (engine_hint != nullptr) {
         vt = rac_plugin_find_for_engine(spec.primitive, engine_hint);
         if (vt == nullptr) {
-            RAC_LOG_WARNING(spec.log_cat, "plugin '%s' does not serve %s; falling back to priority",
-                            engine_hint, rac_primitive_name(spec.primitive));
+            // Framework pin missed: do NOT fall back to another engine. A Core ML
+            // ANE ASR folder handed to MLX produces a misleading "unsupported STT
+            // model / no architecture in config.json" error.
+            RAC_LOG_ERROR(spec.log_cat,
+                          "plugin '%s' does not serve %s; refusing priority fallback", engine_hint,
+                          rac_primitive_name(spec.primitive));
+            return RAC_ERROR_BACKEND_NOT_FOUND;
         }
-    }
-    if (vt == nullptr) {
+    } else {
         vt = rac_plugin_find(spec.primitive);
     }
     const OpsT* ops = (vt && spec.select_ops) ? spec.select_ops(vt) : nullptr;

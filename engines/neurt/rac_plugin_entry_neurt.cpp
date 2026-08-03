@@ -5,14 +5,16 @@
  * Apple-only engine, named for the RUNTIME THAT IMPLEMENTS IT (NeuRT, the Apple
  * half of the sibling `neurun` repo) rather than for a modality or for Apple's
  * framework — exactly like the `cloud` engine is named by its transport, not by
- * STT. It serves TWO modalities:
+ * STT. It serves THREE modalities:
  *
  *   * RAC_PRIMITIVE_DIFFUSION  via `g_coreml_diffusion_ops` — a Stable-Diffusion
  *     pipeline over CoreML MLModel components.
  *   * RAC_PRIMITIVE_GENERATE_TEXT via `g_neurt_llm_ops` — prebuilt Core ML LLM
  *     graphs executed on the Apple Neural Engine.
+ *   * RAC_PRIMITIVE_TRANSCRIBE via `g_neurt_stt_ops` — Parakeet TDT/RNNT ANE
+ *     (encoder + step); other ANE ASR families remain unwired.
  *
- * Both implementations live in neurun under `NeuRT/src/sdk/`; this file only
+ * Implementations live in neurun under `NeuRT/src/sdk/`; this file only
  * publishes them. Further modalities (VLM / embeddings) attach by filling more
  * vtable op-tables (see the engine vtable below).
  *
@@ -36,6 +38,7 @@
 // `rac_llm_service_ops_t` lives here; the vtable header forward-declares the slot but not the
 // type, so the entry file must include it to name the NeuRT op table.
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/stt/rac_stt_service.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(__APPLE__) && defined(RAC_NEURT_GENERATE_AVAILABLE) && \
@@ -154,6 +157,7 @@ static const rac_primitive_t k_neurt_primitives[] = {
     // NOTE: the text-generation primitive is RAC_PRIMITIVE_GENERATE_TEXT. There is no
     // RAC_PRIMITIVE_LLM — SDK_PATCH.md's diff names one and the enum has never had it.
     RAC_PRIMITIVE_GENERATE_TEXT,
+    RAC_PRIMITIVE_TRANSCRIBE,  // Parakeet TDT/RNNT ANE via g_neurt_stt_ops
 };
 #endif
 
@@ -248,23 +252,28 @@ static const rac_engine_manifest_t k_neurt_manifest = {
 // `extern` there the symbol is never emitted and this declaration fails to resolve at the first
 // real link (a static archive never resolves symbols, so the engine target alone builds green).
 extern "C" const rac_llm_service_ops_t g_neurt_llm_ops;
+extern "C" const rac_stt_service_ops_t g_neurt_stt_ops;
 
 static const rac_engine_vtable_t g_neurt_engine_vtable = {
     /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_neurt_manifest),
     /* capability_check */ neurt_capability_check,
     /* on_unload        */ nullptr,
 
-    // The two served modalities wire their op-tables into the llm_ops and
-    // diffusion_ops slots below. To add an Apple VLM/embeddings modality: fill
-    // `vlm_ops`/`embedding_ops` here (backed by that modality's impl) and add its
-    // primitive to k_neurt_manifest.primitives.
+    // Served modalities: llm_ops, stt_ops (Parakeet ANE), diffusion_ops.
+    // To add an Apple VLM/embeddings modality: fill `vlm_ops`/`embedding_ops`
+    // here and add its primitive to k_neurt_manifest.primitives.
 /* llm_ops          */
 #if RAC_NEURT_ROUTABLE
     &g_neurt_llm_ops,  // GENERATE_TEXT on the Apple Neural Engine, backed by NeuRT
 #else
     nullptr,
 #endif
-    /* stt_ops          */ nullptr,
+/* stt_ops          */
+#if RAC_NEURT_ROUTABLE
+    &g_neurt_stt_ops,  // TRANSCRIBE — Parakeet TDT/RNNT on the ANE
+#else
+    nullptr,
+#endif
     /* tts_ops          */ nullptr,
     /* vad_ops          */ nullptr,
     /* embedding_ops    */ nullptr,

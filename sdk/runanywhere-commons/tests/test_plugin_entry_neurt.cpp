@@ -147,9 +147,15 @@ int main() {
                          "not linked in (check that g_neurt_llm_ops is declared `extern`)\n");
             return 1;
         }
-        // Disjoint-slot invariant: DIFFUSION + GENERATE_TEXT only, today.
-        if (vt->stt_ops != nullptr || vt->tts_ops != nullptr || vt->vad_ops != nullptr ||
-            vt->vlm_ops != nullptr || vt->embedding_ops != nullptr) {
+        // Disjoint-slot invariant: DIFFUSION + GENERATE_TEXT + TRANSCRIBE today.
+        if (vt->stt_ops == nullptr) {
+            std::fprintf(stderr,
+                         "routable neurt engine has NULL stt_ops slot — Parakeet ANE op-table "
+                         "not linked (check g_neurt_stt_ops is declared extern)\n");
+            return 1;
+        }
+        if (vt->tts_ops != nullptr || vt->vad_ops != nullptr || vt->vlm_ops != nullptr ||
+            vt->embedding_ops != nullptr) {
             std::fprintf(stderr, "neurt engine advertised an unserved ops slot\n");
             return 1;
         }
@@ -178,9 +184,18 @@ int main() {
             rac_plugin_unregister(vt->metadata.name);
             return 1;
         }
+        if (rac_plugin_find_for_engine(RAC_PRIMITIVE_TRANSCRIBE, RAC_ENGINE_ID_NEURT) != vt) {
+            std::fprintf(stderr,
+                         "plugin_find_for_engine(TRANSCRIBE, \"%s\") did not pin the neurt "
+                         "engine\n",
+                         RAC_ENGINE_ID_NEURT);
+            rac_plugin_unregister(vt->metadata.name);
+            return 1;
+        }
         rac_plugin_unregister(vt->metadata.name);
         std::fprintf(stdout,
-                     "  ok: routable neurt engine serves DIFFUSION + GENERATE_TEXT and pins\n");
+                     "  ok: routable neurt engine serves DIFFUSION + GENERATE_TEXT + "
+                     "TRANSCRIBE and pins\n");
         return 0;
     }
 

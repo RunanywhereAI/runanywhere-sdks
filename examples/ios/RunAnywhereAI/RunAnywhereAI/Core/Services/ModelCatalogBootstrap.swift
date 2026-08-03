@@ -314,6 +314,76 @@ enum ModelCatalogBootstrap {
             memoryRequirement: 3_400_000_000
         )
         logger.info("ANE / NeuRT LLM models registered")
+
+        // --- NeuRT / ANE ASR (private runanywhere/*_ANE speech bundles) ------
+        // Catalog + download for Notes STT picker. NeuRT does not expose
+        // `stt_ops` yet — load fails closed with a NeuRT message (not MLX).
+        // Skip canary-1b-flash_ANE: repo has no root plan JSON for bundle policy.
+        await registerLLM(
+            id: "whisper-base-ane",
+            name: "Whisper Base (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/whisper-base_ANE",
+            framework: .coreml,
+            modality: .speechRecognition,
+            memoryRequirement: 145_078_612
+        )
+        await registerLLM(
+            id: "whisper-small-ane",
+            name: "Whisper Small (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/whisper-small_ANE",
+            framework: .coreml,
+            modality: .speechRecognition,
+            memoryRequirement: 565_600_618
+        )
+        await registerLLM(
+            id: "moonshine-tiny-ane",
+            name: "Moonshine Tiny (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/moonshine-tiny_ANE",
+            framework: .coreml,
+            modality: .speechRecognition,
+            memoryRequirement: 75_428_861
+        )
+        await registerLLM(
+            id: "moonshine-base-ane",
+            name: "Moonshine Base (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/moonshine-base_ANE",
+            framework: .coreml,
+            modality: .speechRecognition,
+            memoryRequirement: 152_781_768
+        )
+        await registerLLM(
+            id: "parakeet-tdt-0.6b-v2-ane",
+            name: "NVIDIA Parakeet TDT 0.6B v2 (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/parakeet-tdt-0.6b-v2_ANE",
+            framework: .coreml,
+            modality: .speechRecognition,
+            memoryRequirement: 1_236_566_694
+        )
+        await registerLLM(
+            id: "parakeet-tdt-0.6b-v3-ane",
+            name: "NVIDIA Parakeet TDT 0.6B v3 (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/parakeet-tdt-0.6b-v3_ANE",
+            framework: .coreml,
+            modality: .speechRecognition,
+            memoryRequirement: 1_256_069_906
+        )
+        await registerLLM(
+            id: "parakeet-ctc-1.1b-ane",
+            name: "NVIDIA Parakeet CTC 1.1B (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/parakeet-ctc-1.1b_ANE",
+            framework: .coreml,
+            modality: .speechRecognition,
+            memoryRequirement: 2_127_032_833
+        )
+        await registerLLM(
+            id: "parakeet-rnnt-1.1b-ane",
+            name: "NVIDIA Parakeet RNNT 1.1B (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/parakeet-rnnt-1.1b_ANE",
+            framework: .coreml,
+            modality: .speechRecognition,
+            memoryRequirement: 2_142_833_645
+        )
+        logger.info("ANE / NeuRT ASR models registered")
         #endif
 
         // --- MLX models (Apple Metal, Hugging Face repo-folder bundles) -------

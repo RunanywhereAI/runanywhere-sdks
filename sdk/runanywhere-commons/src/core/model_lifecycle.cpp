@@ -735,19 +735,33 @@ rac_result_t rac_model_lifecycle_load_proto(rac_model_registry_handle_t registry
     // Pin the engine the model was built for when its framework is known
     // (priority order alone cannot tell two backends serving the same primitive
     // apart — e.g. QHexRT at priority 150 would otherwise hijack every GGUF
-    // load meant for llamacpp). Fall back to plain priority selection when the
-    // framework is unspecified or its engine isn't registered.
+    // load meant for llamacpp). Fall back to plain priority selection ONLY when
+    // the framework is unspecified. When the framework pins an engine that does
+    // not serve this primitive (e.g. CoreML/ANE ASR → neurt with no stt_ops),
+    // fail closed — never hand a CoreML folder to MLX/Sherpa via priority.
     const char* engine_hint = detail::engine_name_for_framework(framework);
     const rac_engine_vtable_t* vt =
         engine_hint ? rac_plugin_find_for_engine(primitive, engine_hint) : nullptr;
     if (vt) {
         RAC_LOG_INFO("model_lifecycle", "Pinned engine '%s' for framework %s", engine_hint,
                      runanywhere::v1::InferenceFramework_Name(framework).c_str());
-    } else {
+    } else if (!engine_hint) {
         vt = rac_plugin_find(primitive);
+    } else {
+        RAC_LOG_ERROR("model_lifecycle",
+                      "Pinned engine '%s' (framework %s) does not serve %s — refusing priority "
+                      "fallback so a mismatched backend cannot open this artifact",
+                      engine_hint, runanywhere::v1::InferenceFramework_Name(framework).c_str(),
+                      rac_primitive_name(primitive));
     }
     if (!vt) {
-        std::string error = "no registered backend serves the requested primitive";
+        std::string error =
+            engine_hint
+                ? (std::string("engine '") + engine_hint + "' does not serve " +
+                   rac_primitive_name(primitive) + " for framework " +
+                   runanywhere::v1::InferenceFramework_Name(framework) +
+                   " (ANE/Core ML speech is not wired in NeuRT yet — use Sherpa or MLX ASR)")
+                : "no registered backend serves the requested primitive";
         ModelLoadResult result =
             detail::make_load_result(false, request.model_id(), category, framework, resolved_path,
                                      artifact_resolution.artifacts, 0, error);

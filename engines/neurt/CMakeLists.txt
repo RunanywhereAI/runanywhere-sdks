@@ -65,8 +65,12 @@ if(NOT DEFINED NEURT_ROOT AND DEFINED ENV{NEURT_ROOT})
 endif()
 if(NOT DEFINED NEURT_ROOT)
     get_filename_component(_rac_parent "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+    # Prefer `neurun` (canonical checkout name); also accept `QHexRT` (monorepo layout).
     if(EXISTS "${_rac_parent}/neurun/CMakeLists.txt" AND EXISTS "${_rac_parent}/neurun/Makefile")
         set(NEURT_ROOT "${_rac_parent}/neurun")
+    elseif(EXISTS "${_rac_parent}/QHexRT/CMakeLists.txt" AND
+           EXISTS "${_rac_parent}/QHexRT/NeuRT/src/sdk/rac_llm_ops_neurt.cpp")
+        set(NEURT_ROOT "${_rac_parent}/QHexRT")
     endif()
 endif()
 
@@ -172,6 +176,19 @@ set_target_properties(rac_neurt_llm_ops PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(rac_neurt_llm_ops PUBLIC rac_neurt_core)
 
 # ---------------------------------------------------------------------------
+# rac_neurt_stt_ops — Parakeet TDT/RNNT ANE STT op-table.
+# ---------------------------------------------------------------------------
+add_library(rac_neurt_stt_ops STATIC ${_neurt_sdk_dir}/rac_stt_ops_neurt.cpp)
+target_include_directories(rac_neurt_stt_ops PRIVATE
+    ${RAC_COMMONS_ROOT_DIR}/include
+    ${NEURT_ROOT}/NeuRT/include
+    ${NEURT_ROOT}/NeuRT/src)
+target_compile_definitions(rac_neurt_stt_ops PRIVATE NEURT_WITH_RAC_HEADERS=1)
+target_compile_features(rac_neurt_stt_ops PRIVATE cxx_std_17)
+set_target_properties(rac_neurt_stt_ops PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(rac_neurt_stt_ops PUBLIC rac_neurt_core)
+
+# ---------------------------------------------------------------------------
 # The engine plugin itself.
 #
 # rac_diffusion_coreml.mm keeps `coreml` in its name: it is the DIFFUSION
@@ -212,6 +229,7 @@ rac_add_engine_plugin(neurt
                         "-framework Accelerate"
                         rac_runtime_coreml
                         rac_neurt_llm_ops
+                        rac_neurt_stt_ops
 )
 
 # Self-registration carrier — installs the neurt engine vtable into the unified

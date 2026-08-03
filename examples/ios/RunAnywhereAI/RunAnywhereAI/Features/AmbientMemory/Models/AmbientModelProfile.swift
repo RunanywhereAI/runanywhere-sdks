@@ -100,6 +100,15 @@ struct AmbientModelProfile: Identifiable, Sendable, Equatable {
         asrCandidateIDs: [
             "sherpa-nemo-parakeet-tdt-0.6b-v3-int8",
             "sherpa-onnx-whisper-tiny.en",
+            // ANE / NeuRT ASR (Parakeet TDT via NeuRT stt_ops).
+            "parakeet-tdt-0.6b-v3-ane",
+            "parakeet-tdt-0.6b-v2-ane",
+            "whisper-small-ane",
+            "whisper-base-ane",
+            "moonshine-base-ane",
+            "moonshine-tiny-ane",
+            "parakeet-ctc-1.1b-ane",
+            "parakeet-rnnt-1.1b-ane",
         ],
         digestCandidateIDs: [
             "lfm2-350m-q4_k_m",
