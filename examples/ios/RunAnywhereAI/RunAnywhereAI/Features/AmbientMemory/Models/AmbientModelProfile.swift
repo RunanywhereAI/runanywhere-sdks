@@ -122,11 +122,17 @@ struct AmbientModelProfile: Identifiable, Sendable, Equatable {
         vadModelID: "silero-vad",
         asrCandidateIDs: AmbientModelProfile.quality.asrCandidateIDs,
         digestCandidateIDs: [
-            // Best meeting-note pick at phone size (MeetMemo 2026 A/B).
+            // ANE / NeuRT Instruct (chat/Notes). Needs HF token + NeuRT binary.
+            "nemotron-mini-4b-instruct-ane",
+            "phi-4-mini-instruct-ane",
+            // ANE Base (smoke / energy only — not chat-tuned).
+            "qwen3-0.6b-ane",
+            "llama-3.2-1b-ane",
+            // Best meeting-note pick at phone size (MeetMemo 2026 A/B) — GGUF.
             "qwen3-4b-instruct-2507-q4_k_m",
-            // Speed-first long notes.
+            // Speed-first long notes (GGUF).
             "lfm2.5-1.2b-instruct-q4_k_m",
-            // Quality A/Bs (llama.cpp only for long digests — avoid MLX).
+            // Quality A/Bs (llama.cpp — avoid MLX for long digests).
             "qwen3-4b-q4_k_m",
             "phi-4-mini-instruct-q4_k_m",
             "llama-3.2-3b-instruct-q4_k_m",

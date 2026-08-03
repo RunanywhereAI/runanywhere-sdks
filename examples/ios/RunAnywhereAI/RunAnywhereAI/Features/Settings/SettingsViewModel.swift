@@ -105,6 +105,34 @@ class SettingsViewModel: ObservableObject {
         return value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// One-shot dogfood import: if `Documents/.hf_token` exists, save it to the
+    /// keychain, apply to the SDK, then delete the file (never leave the token on disk).
+    @discardableResult
+    nonisolated static func importHfTokenFromDocumentsIfPresent() -> Bool {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        guard let fileURL = docs?.appendingPathComponent(".hf_token"),
+              let raw = try? String(contentsOf: fileURL, encoding: .utf8) else {
+            return false
+        }
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else {
+            try? FileManager.default.removeItem(at: fileURL)
+            return false
+        }
+        do {
+            try KeychainService.shared.save(key: "runanywhere_hf_token", data: data)
+            RunAnywhere.setHfToken(trimmed)
+            try? FileManager.default.removeItem(at: fileURL)
+            Task { @MainActor in
+                SettingsViewModel.shared.hfToken = trimmed
+                SettingsViewModel.shared.isHfTokenConfigured = true
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
     /// Check if custom configuration is set
     static var hasCustomConfiguration: Bool {
         getStoredApiKey() != nil && getStoredBaseURL() != nil

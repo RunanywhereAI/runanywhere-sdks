@@ -267,6 +267,55 @@ enum ModelCatalogBootstrap {
         logger.info("LLM models registered")
         #endif
 
+        // --- NeuRT / Apple Neural Engine (private runanywhere/*_ANE repos) ---
+        // Requires RABackendNeuRT + HF token (Settings → Hugging Face).
+        // Prefer Instruct rows for chat/Notes; Base rows are gate/smoke only.
+        #if canImport(ONNXRuntime)
+        await registerLLM(
+            id: "nemotron-mini-4b-instruct-ane",
+            name: "Nemotron Mini 4B Instruct (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/Nemotron-Mini-4B-Instruct_ANE",
+            framework: .coreml,
+            memoryRequirement: 8_400_000_000
+        )
+        await registerLLM(
+            id: "phi-4-mini-instruct-ane",
+            name: "Phi-4 Mini Instruct (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/Phi-4-mini-instruct_ANE",
+            framework: .coreml,
+            memoryRequirement: 9_000_000_000
+        )
+        await registerLLM(
+            id: "qwen3-0.6b-ane",
+            name: "Qwen3 0.6B Base (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/Qwen3-0.6B_ANE",
+            framework: .coreml,
+            memoryRequirement: 1_600_000_000
+        )
+        await registerLLM(
+            id: "qwen2.5-0.5b-ane",
+            name: "Qwen2.5 0.5B Base (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/Qwen2.5-0.5B_ANE",
+            framework: .coreml,
+            memoryRequirement: 1_300_000_000
+        )
+        await registerLLM(
+            id: "llama-3.2-1b-ane",
+            name: "Llama 3.2 1B Base (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/Llama-3.2-1B_ANE",
+            framework: .coreml,
+            memoryRequirement: 3_100_000_000
+        )
+        await registerLLM(
+            id: "qwen3.5-0.8b-ane",
+            name: "Qwen3.5 0.8B Base (ANE / NeuRT)",
+            url: "https://huggingface.co/runanywhere/Qwen3.5-0.8B_ANE",
+            framework: .coreml,
+            memoryRequirement: 3_400_000_000
+        )
+        logger.info("ANE / NeuRT LLM models registered")
+        #endif
+
         // --- MLX models (Apple Metal, Hugging Face repo-folder bundles) -------
         await registerLLM(
             id: "mlx-qwen3-0.6b-4bit",

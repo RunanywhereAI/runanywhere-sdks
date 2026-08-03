@@ -107,3 +107,9 @@ RunAnywhereAI/Resources/RunAnywhereLocalSecrets.plist
 .ambient-fixtures/
 .ambient-runs/
 .build-device/
+
+# Local ANE dogfood bundles (do not commit)
+.ambient-ane-models/
+
+# Local HF token seed (never commit)
+.hf_token

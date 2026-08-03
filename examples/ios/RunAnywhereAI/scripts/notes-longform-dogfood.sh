@@ -20,12 +20,16 @@
 #   AMBIENT_BUNDLE_ID      default com.runanywhere.RunAnywhere
 #   DOGFOOD_WAIT_MINUTES   how long to wait before pull (default 90)
 #   DIGEST_MODEL           digester id (default qwen3-4b-q4_k_m).
+#                          ANE / NeuRT:     nemotron-mini-4b-instruct-ane (chat/Notes)
+#                                           phi-4-mini-instruct-ane
+#                                           qwen3-0.6b-ane (base smoke only)
 #                          Best notes pick: qwen3-4b-instruct-2507-q4_k_m
 #                          Fast experiment: lfm2.5-1.2b-instruct-q4_k_m
 #                          Quality alts:    phi-4-mini-instruct-q4_k_m
 #                                           llama-3.2-3b-instruct-q4_k_m
 #                                           gemma-4-e4b-it-q4_k_m
 #                          Dense 8B-class:  bonsai-8b-q1_0
+#   ANE_MODEL_DIR          optional host dir to push into app Models/ (folder bundle)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -92,6 +96,39 @@ cmd_install() {
 
     log "Installing ${app_path}"
     xcrun devicectl device install app --device "${udid}" "${app_path}"
+}
+
+cmd_push_ane() {
+    # Push a pre-downloaded ANE folder bundle so dogfood can skip the on-device HF pull.
+    # Default: .ambient-ane-models/Qwen3-0.6B_ANE → Documents/RunAnywhere/Models/CoreML/qwen3-0.6b-ane/
+    local udid="${1:?usage: push-ane <device-udid> [host-dir]}"
+    local host_dir="${2:-${ANE_MODEL_DIR:-${APP_ROOT}/.ambient-ane-models/Qwen3-0.6B_ANE}}"
+    local model_id="${ANE_MODEL_ID:-qwen3-0.6b-ane}"
+    require_command xcrun
+    if [ ! -d "${host_dir}" ]; then
+        echo "error: ANE model dir missing: ${host_dir}" >&2
+        exit 1
+    fi
+    if [ ! -f "${host_dir}/qwen3-0-6b.json" ] && [ ! -f "${host_dir}/"*.json ]; then
+        echo "warn: no root plan JSON in ${host_dir}; NeuRT may fail to load" >&2
+    fi
+    local remote="Documents/RunAnywhere/Models/CoreML/${model_id}"
+    log "Pushing ANE bundle $(basename "${host_dir}") → ${remote}"
+    # Copy contents file-by-file (devicectl directory copy is uneven across Xcode versions).
+    while IFS= read -r -d '' f; do
+        local rel="${f#"${host_dir}/"}"
+        case "${rel}" in
+            .cache/*|*/.cache/*|.gitattributes) continue ;;
+        esac
+        xcrun devicectl device copy to \
+            --device "${udid}" \
+            --domain-type appDataContainer \
+            --domain-identifier "${BUNDLE_ID}" \
+            --source "${f}" \
+            --destination "${remote}/${rel}" \
+            || echo "warn: failed ${rel}" >&2
+    done < <(find "${host_dir}" -type f -print0)
+    log "ANE push done (model id ${model_id}). Set DIGEST_MODEL=${model_id} and paste HF token in Settings if download-path still used."
 }
 
 cmd_push() {
@@ -263,11 +300,12 @@ case "${1:-}" in
     prepare)  cmd_prepare ;;
     install)  shift; cmd_install "$@" ;;
     push)     shift; cmd_push "$@" ;;
+    push-ane) shift; cmd_push_ane "$@" ;;
     run)      shift; cmd_run "$@" ;;
     pull)     shift; cmd_pull "$@" ;;
     all)      shift; cmd_all "$@" ;;
     *)
-        echo "usage: $(basename "$0") {prepare|install|push|run|pull|all} [device-udid] [flags]" >&2
+        echo "usage: $(basename "$0") {prepare|install|push|push-ane|run|pull|all} [device-udid] [flags]" >&2
         exit 1
         ;;
 esac

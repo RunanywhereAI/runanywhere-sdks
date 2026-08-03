@@ -23,9 +23,21 @@
  *     the engine impl library linked into the carrier.
  */
 
+#include "neurt_bundle_policy.h"
+
+#include "rac/infrastructure/model_management/rac_bundle_policy.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_entry_neurt.h"
 
 #if defined(RAC_PLUGIN_MODE_STATIC) && RAC_PLUGIN_MODE_STATIC
 RAC_STATIC_PLUGIN_REGISTER(neurt);
+#endif
+
+// Folder-bundle policy for `runanywhere/*_ANE` HF repos (framework = COREML).
+// Registered at load so Swift `registerModel(..., framework: .coreml)` can
+// resolve private NeuRT trees the same way MLX resolves safetensors folders.
+#if defined(__APPLE__)
+__attribute__((constructor)) static void rac_neurt_register_bundle_policy(void) {
+    (void)rac_bundle_policy_register(neurt_bundle_policy());
+}
 #endif

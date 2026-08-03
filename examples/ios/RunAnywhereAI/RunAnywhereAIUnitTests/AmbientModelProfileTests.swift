@@ -50,7 +50,7 @@ final class AmbientModelProfileTests: XCTestCase {
         XCTAssertNil(resolver.resolve(profile: .quality, available: models).digestModelID)
         XCTAssertEqual(
             AmbientModelProfile.highEnd.digestCandidateIDs.first,
-            "qwen3-4b-q4_k_m"
+            "nemotron-mini-4b-instruct-ane"
         )
     }
 

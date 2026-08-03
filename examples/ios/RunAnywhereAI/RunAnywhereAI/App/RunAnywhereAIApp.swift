@@ -128,7 +128,10 @@ struct RunAnywhereAIApp: App {
             let startTime = Date()
             try runSDKInitialize()
             _ = HybridDeviceState.setProvider(AppleDeviceStateProvider())
-            if let hfToken = SettingsViewModel.getStoredHfToken() {
+            // Prefer keychain; otherwise one-shot import from Documents/.hf_token (dogfood seed).
+            if SettingsViewModel.importHfTokenFromDocumentsIfPresent() {
+                logger.info("Imported Hugging Face token from Documents/.hf_token")
+            } else if let hfToken = SettingsViewModel.getStoredHfToken() {
                 RunAnywhere.setHfToken(hfToken)
             }
 

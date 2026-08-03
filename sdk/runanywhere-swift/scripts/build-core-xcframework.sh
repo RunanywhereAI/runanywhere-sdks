@@ -797,8 +797,12 @@ merge_neurt_backend_slice() {
     local output="$3"
     local arch="$4"
     local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/neurt"
+    # Flatten NeuRT static deps: the plugin .a only holds entry+diffusion objs;
+    # llm_ops/core stay separate archives and must be folded for SPM consumers.
     local inputs=(
         "${build_root}/engines/neurt/${slice_dir}/librac_backend_neurt.a"
+        "${build_root}/engines/neurt/${slice_dir}/librac_neurt_llm_ops.a"
+        "${build_root}/engines/neurt/${slice_dir}/librac_neurt_core.a"
         "${build_root}/runtimes/coreml/${slice_dir}/librac_runtime_coreml.a"
     )
 
@@ -818,6 +822,8 @@ merge_neurt_backend_macos_slice() {
     local scratch_dir="${STAGING_DIR}/prepared/Release-macos/neurt"
     local inputs=(
         "${build_root}/engines/neurt/librac_backend_neurt.a"
+        "${build_root}/engines/neurt/librac_neurt_llm_ops.a"
+        "${build_root}/engines/neurt/librac_neurt_core.a"
         "${build_root}/runtimes/coreml/librac_runtime_coreml.a"
     )
 
