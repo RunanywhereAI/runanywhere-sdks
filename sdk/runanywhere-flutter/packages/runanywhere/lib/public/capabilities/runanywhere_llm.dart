@@ -308,6 +308,11 @@ class RunAnywhereLLM {
   Stream<LLMStreamEvent> _generateStreamProto(LLMGenerateRequest request) {
     final controller = StreamController<LLMStreamEvent>(sync: false);
 
+    // `run()` is started detached from `onListen`, so anything it throws is an
+    // unhandled async error rather than something the caller can catch. The
+    // whole body therefore has to funnel failures into the controller and
+    // close it on every path, or a consumer awaiting the stream hangs forever.
+    // Mirrors the STT capability's try/catch/finally.
     Future<void> run() async {
       try {
         // Phase-2 readiness gate, mirroring Swift's `try await
@@ -316,18 +321,19 @@ class RunAnywhereLLM {
         // HTTP setup not-applicable, so the guard no longer re-attempts a
         // remote round-trip (the old ~4s DNS stall) on every send.
         await DartBridge.ensureServicesReady();
+        final upstream = DartBridgeLLM.shared.generateStreamProto(request);
+        await controller.addStream(upstream);
       } catch (e) {
         if (!controller.isClosed) {
           controller.addError(
             e is SDKException ? e : SDKException.generationFailed('$e'),
           );
+        }
+      } finally {
+        if (!controller.isClosed) {
           await controller.close();
         }
-        return;
       }
-      final upstream = DartBridgeLLM.shared.generateStreamProto(request);
-      await controller.addStream(upstream);
-      await controller.close();
     }
 
     // Start the worker only once a listener attaches (canonical lazy pattern),
