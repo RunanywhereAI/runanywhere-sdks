@@ -79,8 +79,8 @@ final class ComputerUseAgentViewModel {
         loadRequest.modelID = model.id
         loadRequest.category = .multimodal
         let loadResult = await RunAnywhere.loadModel(loadRequest)
-        guard loadResult.success else {
-            error = loadResult.errorMessage.isEmpty ? "Model load failed." : loadResult.errorMessage
+        guard !loadResult.hasError else {
+            error = loadResult.error.message.isEmpty ? "Model load failed." : loadResult.error.message
             statusMessage = ""
             return
         }
@@ -130,7 +130,7 @@ final class ComputerUseAgentViewModel {
 
             var options = RAVLMGenerationOptions.defaults(prompt: task)
             options.systemPrompt = systemPrompt
-            options.maxTokens = Self.maxTokens
+            options.maxOutputTokens = Self.maxTokens
 
             let stream = try await RunAnywhere.processImageStream(image, options: options)
             for await event in stream {
@@ -140,9 +140,9 @@ final class ComputerUseAgentViewModel {
                 case .error:
                     throw NSError(
                         domain: "com.runanywhere.RunAnywhereAI",
-                        code: Int(event.errorCode),
+                        code: Int(event.error.cAbiCode),
                         userInfo: [NSLocalizedDescriptionKey:
-                            event.errorMessage.isEmpty ? "VLM stream failed" : event.errorMessage]
+                            event.error.message.isEmpty ? "VLM stream failed" : event.error.message]
                     )
                 default:
                     break
