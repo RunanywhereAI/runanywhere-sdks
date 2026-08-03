@@ -196,16 +196,23 @@ class LlmApi {
     Future<LLMGenerateRequest> Function() build,
   ) {
     final controller = StreamController<GenerationEvent>();
+    // onCancel also fires on normal completion (the consumer stops after the
+    // terminal event); only cancel a generation that is still running, so a
+    // finished stream doesn't emit a spurious cancellation event.
+    var completed = false;
     controller.onListen = () {
-      unawaited(_pump(controller, build));
+      unawaited(_pump(controller, build, () => completed = true));
     };
-    controller.onCancel = cancel;
+    controller.onCancel = () {
+      if (!completed) cancel();
+    };
     return controller.stream;
   }
 
   Future<void> _pump(
     StreamController<GenerationEvent> controller,
     Future<LLMGenerateRequest> Function() build,
+    void Function() markCompleted,
   ) async {
     try {
       final request = await build();
@@ -220,6 +227,7 @@ class LlmApi {
         for (final call in result.toolCalls) {
           controller.add(GenerationToolCall(call));
         }
+        markCompleted();
         controller.add(GenerationCompleted(result));
         return;
       }
@@ -270,8 +278,12 @@ class LlmApi {
       for (final call in result.toolCalls) {
         controller.add(GenerationToolCall(call));
       }
+      markCompleted();
       controller.add(GenerationCompleted(result));
     } catch (error, stack) {
+      // Terminal reached (native generation already ended); don't let the
+      // teardown cancel fire a spurious cancellation after the failure.
+      markCompleted();
       controller.addError(
         error is SDKException ? error : SDKException.generationFailed('$error'),
         stack,

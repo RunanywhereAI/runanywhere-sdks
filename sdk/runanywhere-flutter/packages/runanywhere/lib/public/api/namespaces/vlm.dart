@@ -51,10 +51,15 @@ class VlmApi {
     LlmOptions? options,
   }) {
     final controller = StreamController<GenerationEvent>();
+    // onCancel also fires on normal completion; only cancel a generation that is
+    // still running so a finished stream doesn't emit a spurious cancellation.
+    var completed = false;
     controller.onListen = () {
-      unawaited(_pump(controller, image, prompt, options));
+      unawaited(_pump(controller, image, prompt, options, () => completed = true));
     };
-    controller.onCancel = cancel;
+    controller.onCancel = () {
+      if (!completed) cancel();
+    };
     return controller.stream;
   }
 
@@ -69,6 +74,7 @@ class VlmApi {
     ImageInput image,
     String prompt,
     LlmOptions? options,
+    void Function() markCompleted,
   ) async {
     try {
       final request = await _request(image, prompt, options);
@@ -103,8 +109,11 @@ class VlmApi {
               requestId: request.requestId,
               model: request.modelId,
             );
+      markCompleted();
       controller.add(GenerationCompleted(result));
     } catch (error, stack) {
+      // Terminal reached; don't let teardown fire a spurious cancel after it.
+      markCompleted();
       controller.addError(
         error is SDKException
             ? error

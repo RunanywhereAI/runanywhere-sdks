@@ -126,9 +126,12 @@ class DartBridgeVLM {
       }),
     );
 
-    // Cancel sets the lifecycle cancel flag; the worker's blocking call returns
-    // shortly after and the rc sentinel closes the port.
-    controller.onCancel = cancel;
+    // Only cancel a still-running generation: onCancel also fires on normal
+    // completion, and an unconditional cancel there makes commons publish a
+    // spurious cancellation event after every finished stream.
+    controller.onCancel = () {
+      if (!sawTerminalEvent) cancel();
+    };
 
     return controller.stream;
   }

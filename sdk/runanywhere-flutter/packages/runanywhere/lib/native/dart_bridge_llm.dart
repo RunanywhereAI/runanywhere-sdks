@@ -262,11 +262,13 @@ class DartBridgeLLM {
       }),
     );
 
-    // Cancel sets the per-token lifecycle cancel flag; the worker's blocking
-    // call returns shortly after, emits a terminal "cancelled" event
-    // (dropped — the controller is closing) and the rc sentinel closes the
-    // port.
-    controller.onCancel = cancelProto;
+    // Only cancel a still-running generation: onCancel also fires on normal
+    // completion (the consumer stops after the terminal event), and an
+    // unconditional cancel there makes commons publish a spurious cancellation
+    // event after every finished stream.
+    controller.onCancel = () {
+      if (!sawTerminalEvent) cancelProto();
+    };
 
     return controller.stream;
   }

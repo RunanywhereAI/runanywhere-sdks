@@ -313,14 +313,16 @@ class DartBridgeTTS {
       // Best-effort: ask commons to stop lifecycle synthesis so native CPU
       // isn't burned for a Dart subscriber that has already gone away.
       // RunAnywhereTTS.stopSynthesis() routes through the same ABI; mirror its
-      // semantics here. The worker's blocking call returns shortly after, emits
-      // a terminal event (dropped — the controller is closing) and the rc
-      // sentinel closes the port. Errors are swallowed so cancellation stays
-      // best-effort.
-      try {
-        stopLifecycleProto();
-      } catch (e) {
-        _logger.debug('stopLifecycleProto on stream cancel failed: $e');
+      // semantics here. Skip the stop when the stream already finished — onCancel
+      // also fires on normal completion, and stopping then makes commons publish
+      // a spurious cancellation event after every synthesis. Errors are swallowed
+      // so cancellation stays best-effort.
+      if (!sawTerminalEvent) {
+        try {
+          stopLifecycleProto();
+        } catch (e) {
+          _logger.debug('stopLifecycleProto on stream cancel failed: $e');
+        }
       }
       teardown();
     };
@@ -376,6 +378,9 @@ class DartBridgeTTS {
     }
 
     controller.onCancel = () {
+      // Skip the stop on normal completion (onCancel also fires then); only stop
+      // a still-running synthesis.
+      if (sawTerminalEvent) return;
       try {
         final stopOverride = _stopLifecycleProtoForTesting;
         if (stopOverride != null) {

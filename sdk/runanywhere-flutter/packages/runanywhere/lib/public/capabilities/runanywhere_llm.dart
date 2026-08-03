@@ -288,6 +288,9 @@ class RunAnywhereLLM {
 
   Stream<LLMStreamEvent> _generateStreamProto(LLMGenerateRequest request) {
     final controller = StreamController<LLMStreamEvent>(sync: false);
+    // onCancel also fires on normal completion; only cancel a still-running
+    // generation so a finished stream doesn't emit a spurious cancellation.
+    var completed = false;
 
     Future<void> run() async {
       try {
@@ -298,6 +301,7 @@ class RunAnywhereLLM {
         // remote round-trip (the old ~4s DNS stall) on every send.
         await DartBridge.ensureServicesReady();
       } catch (e) {
+        completed = true;
         if (!controller.isClosed) {
           controller.addError(
             e is SDKException ? e : SDKException.generationFailed('$e'),
@@ -308,6 +312,7 @@ class RunAnywhereLLM {
       }
       final upstream = DartBridgeLLM.shared.generateStreamProto(request);
       await controller.addStream(upstream);
+      completed = true;
       await controller.close();
     }
 
@@ -315,7 +320,9 @@ class RunAnywhereLLM {
     // so generation can't begin — and tokens can't be produced — before the
     // subscriber is ready. Mirrors the VLM bridge's onListen deferral.
     controller.onListen = () => unawaited(run());
-    controller.onCancel = _cancelProto;
+    controller.onCancel = () {
+      if (!completed) _cancelProto();
+    };
     return controller.stream;
   }
 
