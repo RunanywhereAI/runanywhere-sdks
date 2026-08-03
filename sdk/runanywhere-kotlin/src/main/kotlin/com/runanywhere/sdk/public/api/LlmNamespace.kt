@@ -236,6 +236,9 @@ public class LlmNamespace internal constructor() {
             thinkingText = result.thinking_content?.takeIf { it.isNotEmpty() },
             toolCalls = result.tool_calls,
             toolResults = result.tool_results,
+            inputTokens = result.usage?.input_tokens ?: 0,
+            outputTokens = result.usage?.output_tokens ?: 0,
+            tokensPerSecond = result.usage?.tokens_per_second?.toFloat() ?: 0f,
             finishReason =
                 if (result.tool_calls.isNotEmpty() && !result.is_complete) {
                     FinishReason.TOOL_CALLS

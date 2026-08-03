@@ -16,6 +16,7 @@ exports.toolCallingStreamEventKindFromJSON = toolCallingStreamEventKindFromJSON;
 exports.toolCallingStreamEventKindToJSON = toolCallingStreamEventKindToJSON;
 /* eslint-disable */
 const wire_1 = require("@bufbuild/protobuf/wire");
+const token_usage_1 = require("./token_usage");
 exports.protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -1651,6 +1652,7 @@ function createBaseToolCallingResult() {
         errorCode: 0,
         rawText: "",
         thinkingContent: undefined,
+        usage: undefined,
     };
 }
 exports.ToolCallingResult = {
@@ -1684,6 +1686,9 @@ exports.ToolCallingResult = {
         }
         if (message.thinkingContent !== undefined) {
             writer.uint32(82).string(message.thinkingContent);
+        }
+        if (message.usage !== undefined) {
+            token_usage_1.TokenUsage.encode(message.usage, writer.uint32(90).fork()).join();
         }
         return writer;
     },
@@ -1764,6 +1769,13 @@ exports.ToolCallingResult = {
                     message.thinkingContent = reader.string();
                     continue;
                 }
+                case 11: {
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.usage = token_usage_1.TokenUsage.decode(reader, reader.uint32());
+                    continue;
+                }
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1820,6 +1832,7 @@ exports.ToolCallingResult = {
                 : isSet(object.thinking_content)
                     ? globalThis.String(object.thinking_content)
                     : undefined,
+            usage: isSet(object.usage) ? token_usage_1.TokenUsage.fromJSON(object.usage) : undefined,
         };
     },
     toJSON(message) {
@@ -1854,6 +1867,9 @@ exports.ToolCallingResult = {
         if (message.thinkingContent !== undefined) {
             obj.thinkingContent = message.thinkingContent;
         }
+        if (message.usage !== undefined) {
+            obj.usage = token_usage_1.TokenUsage.toJSON(message.usage);
+        }
         return obj;
     },
     create(base) {
@@ -1871,6 +1887,9 @@ exports.ToolCallingResult = {
         message.errorCode = object.errorCode ?? 0;
         message.rawText = object.rawText ?? "";
         message.thinkingContent = object.thinkingContent ?? undefined;
+        message.usage = (object.usage !== undefined && object.usage !== null)
+            ? token_usage_1.TokenUsage.fromPartial(object.usage)
+            : undefined;
         return message;
     },
 };

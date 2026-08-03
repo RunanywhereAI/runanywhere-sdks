@@ -6,6 +6,7 @@
 
 /* eslint-disable */
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { TokenUsage } from "./token_usage";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -460,7 +461,15 @@ export interface ToolCallingResult {
   errorCode: number;
   rawText: string;
   /** Optional thinking/reasoning content extracted from the final response. */
-  thinkingContent?: string | undefined;
+  thinkingContent?:
+    | string
+    | undefined;
+  /**
+   * Token usage aggregated across every LLM generation turn in the loop
+   * (including the final synthesis turn). Lets a plain generate() that routed
+   * through the tool loop report the same usage a non-tool generate would.
+   */
+  usage?: TokenUsage | undefined;
 }
 
 export interface ToolParseRequest {
@@ -2182,6 +2191,7 @@ function createBaseToolCallingResult(): ToolCallingResult {
     errorCode: 0,
     rawText: "",
     thinkingContent: undefined,
+    usage: undefined,
   };
 }
 
@@ -2216,6 +2226,9 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     }
     if (message.thinkingContent !== undefined) {
       writer.uint32(82).string(message.thinkingContent);
+    }
+    if (message.usage !== undefined) {
+      TokenUsage.encode(message.usage, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -2307,6 +2320,14 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
           message.thinkingContent = reader.string();
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.usage = TokenUsage.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2364,6 +2385,7 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
         : isSet(object.thinking_content)
         ? globalThis.String(object.thinking_content)
         : undefined,
+      usage: isSet(object.usage) ? TokenUsage.fromJSON(object.usage) : undefined,
     };
   },
 
@@ -2399,6 +2421,9 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     if (message.thinkingContent !== undefined) {
       obj.thinkingContent = message.thinkingContent;
     }
+    if (message.usage !== undefined) {
+      obj.usage = TokenUsage.toJSON(message.usage);
+    }
     return obj;
   },
 
@@ -2417,6 +2442,9 @@ export const ToolCallingResult: MessageFns<ToolCallingResult> = {
     message.errorCode = object.errorCode ?? 0;
     message.rawText = object.rawText ?? "";
     message.thinkingContent = object.thinkingContent ?? undefined;
+    message.usage = (object.usage !== undefined && object.usage !== null)
+      ? TokenUsage.fromPartial(object.usage)
+      : undefined;
     return message;
   },
 };

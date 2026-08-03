@@ -1,4 +1,5 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
+import { TokenUsage } from "./token_usage";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -262,6 +263,12 @@ export interface ToolCallingResult {
     rawText: string;
     /** Optional thinking/reasoning content extracted from the final response. */
     thinkingContent?: string | undefined;
+    /**
+     * Token usage aggregated across every LLM generation turn in the loop
+     * (including the final synthesis turn). Lets a plain generate() that routed
+     * through the tool loop report the same usage a non-tool generate would.
+     */
+    usage?: TokenUsage | undefined;
 }
 export interface ToolParseRequest {
     text: string;

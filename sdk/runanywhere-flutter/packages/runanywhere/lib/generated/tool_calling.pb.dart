@@ -16,6 +16,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'token_usage.pb.dart' as $0;
 import 'tool_calling.pbenum.dart';
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -1100,6 +1101,7 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     $core.int? errorCode,
     $core.String? rawText,
     $core.String? thinkingContent,
+    $0.TokenUsage? usage,
   }) {
     final result = create();
     if (text != null) result.text = text;
@@ -1112,6 +1114,7 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     if (errorCode != null) result.errorCode = errorCode;
     if (rawText != null) result.rawText = rawText;
     if (thinkingContent != null) result.thinkingContent = thinkingContent;
+    if (usage != null) result.usage = usage;
     return result;
   }
 
@@ -1140,6 +1143,8 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     ..aI(8, _omitFieldNames ? '' : 'errorCode')
     ..aOS(9, _omitFieldNames ? '' : 'rawText')
     ..aOS(10, _omitFieldNames ? '' : 'thinkingContent')
+    ..aOM<$0.TokenUsage>(11, _omitFieldNames ? '' : 'usage',
+        subBuilder: $0.TokenUsage.create)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1245,6 +1250,20 @@ class ToolCallingResult extends $pb.GeneratedMessage {
   $core.bool hasThinkingContent() => $_has(9);
   @$pb.TagNumber(10)
   void clearThinkingContent() => $_clearField(10);
+
+  /// Token usage aggregated across every LLM generation turn in the loop
+  /// (including the final synthesis turn). Lets a plain generate() that routed
+  /// through the tool loop report the same usage a non-tool generate would.
+  @$pb.TagNumber(11)
+  $0.TokenUsage get usage => $_getN(10);
+  @$pb.TagNumber(11)
+  set usage($0.TokenUsage value) => $_setField(11, value);
+  @$pb.TagNumber(11)
+  $core.bool hasUsage() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearUsage() => $_clearField(11);
+  @$pb.TagNumber(11)
+  $0.TokenUsage ensureUsage() => $_ensure(10);
 }
 
 class ToolParseRequest extends $pb.GeneratedMessage {

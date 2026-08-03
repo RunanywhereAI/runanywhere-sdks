@@ -35,6 +35,7 @@
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "token_usage.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -3738,6 +3739,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingResult final : public ::
     kErrorMessageFieldNumber = 7,
     kRawTextFieldNumber = 9,
     kThinkingContentFieldNumber = 10,
+    kUsageFieldNumber = 11,
     kIsCompleteFieldNumber = 4,
     kIterationsUsedFieldNumber = 6,
     kErrorCodeFieldNumber = 8,
@@ -3865,6 +3867,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingResult final : public ::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_thinking_content();
 
   public:
+  // .runanywhere.v1.TokenUsage usage = 11;
+  [[nodiscard]] bool has_usage()
+      const;
+  void clear_usage() ;
+  [[nodiscard]] const ::runanywhere::v1::TokenUsage& usage() const;
+  [[nodiscard]] ::runanywhere::v1::TokenUsage* PROTOBUF_NULLABLE release_usage();
+  ::runanywhere::v1::TokenUsage* PROTOBUF_NONNULL mutable_usage();
+  void set_allocated_usage(::runanywhere::v1::TokenUsage* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_usage(::runanywhere::v1::TokenUsage* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::TokenUsage* PROTOBUF_NULLABLE unsafe_arena_release_usage();
+
+  private:
+  const ::runanywhere::v1::TokenUsage& _internal_usage() const;
+  ::runanywhere::v1::TokenUsage* PROTOBUF_NONNULL _internal_mutable_usage();
+
+  public:
   // bool is_complete = 4;
   void clear_is_complete() ;
   [[nodiscard]] bool is_complete() const;
@@ -3899,8 +3917,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingResult final : public ::
  private:
   class _Internal;
   using ParseTableT_ =
-      ::google::protobuf::internal::TcParseTable<4, 10,
-                          2, 105,
+      ::google::protobuf::internal::TcParseTable<4, 11,
+                          3, 105,
                           2>;
   static constexpr ParseTableT_ InternalGenerateParseTable_(
       const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL class_data);
@@ -3935,6 +3953,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingResult final : public ::
     ::google::protobuf::internal::ArenaStringPtr error_message_;
     ::google::protobuf::internal::ArenaStringPtr raw_text_;
     ::google::protobuf::internal::ArenaStringPtr thinking_content_;
+    ::runanywhere::v1::TokenUsage* PROTOBUF_NULLABLE usage_;
     bool is_complete_;
     ::int32_t iterations_used_;
     ::int32_t error_code_;
@@ -9630,7 +9649,7 @@ ToolCallingResult::_internal_mutable_tool_results() {
 inline void ToolCallingResult::clear_is_complete() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.is_complete_ = false;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
 }
 inline bool ToolCallingResult::is_complete() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingResult.is_complete)
@@ -9638,7 +9657,7 @@ inline bool ToolCallingResult::is_complete() const {
 }
 inline void ToolCallingResult::set_is_complete(bool value) {
   _internal_set_is_complete(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingResult.is_complete)
 }
 inline bool ToolCallingResult::_internal_is_complete() const {
@@ -9722,7 +9741,7 @@ inline void ToolCallingResult::set_allocated_conversation_id(::std::string* PROT
 inline void ToolCallingResult::clear_iterations_used() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.iterations_used_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000100U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
 }
 inline ::int32_t ToolCallingResult::iterations_used() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingResult.iterations_used)
@@ -9730,7 +9749,7 @@ inline ::int32_t ToolCallingResult::iterations_used() const {
 }
 inline void ToolCallingResult::set_iterations_used(::int32_t value) {
   _internal_set_iterations_used(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingResult.iterations_used)
 }
 inline ::int32_t ToolCallingResult::_internal_iterations_used() const {
@@ -9814,7 +9833,7 @@ inline void ToolCallingResult::set_allocated_error_message(::std::string* PROTOB
 inline void ToolCallingResult::clear_error_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.error_code_ = 0;
-  ClearHasBit(_impl_._has_bits_[0], 0x00000200U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000400U);
 }
 inline ::int32_t ToolCallingResult::error_code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingResult.error_code)
@@ -9822,7 +9841,7 @@ inline ::int32_t ToolCallingResult::error_code() const {
 }
 inline void ToolCallingResult::set_error_code(::int32_t value) {
   _internal_set_error_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.ToolCallingResult.error_code)
 }
 inline ::int32_t ToolCallingResult::_internal_error_code() const {
@@ -9964,6 +9983,99 @@ inline void ToolCallingResult::set_allocated_thinking_content(::std::string* PRO
     _impl_.thinking_content_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ToolCallingResult.thinking_content)
+}
+
+// .runanywhere.v1.TokenUsage usage = 11;
+inline bool ToolCallingResult::has_usage() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
+  PROTOBUF_ASSUME(!value || _impl_.usage_ != nullptr);
+  return value;
+}
+inline const ::runanywhere::v1::TokenUsage& ToolCallingResult::_internal_usage() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::TokenUsage* p = _impl_.usage_;
+  return p != nullptr ? *p : *::google::protobuf::internal::MessageGlobalsBase::ToDefaultInstance<::runanywhere::v1::TokenUsage>(&::runanywhere::v1::TokenUsage_globals_);
+}
+inline const ::runanywhere::v1::TokenUsage& ToolCallingResult::usage() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ToolCallingResult.usage)
+  return _internal_usage();
+}
+inline void ToolCallingResult::unsafe_arena_set_allocated_usage(
+    ::runanywhere::v1::TokenUsage* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.usage_);
+  }
+  _impl_.usage_ = reinterpret_cast<::runanywhere::v1::TokenUsage*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.ToolCallingResult.usage)
+}
+inline ::runanywhere::v1::TokenUsage* PROTOBUF_NULLABLE ToolCallingResult::release_usage() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ::runanywhere::v1::TokenUsage* released = _impl_.usage_;
+  _impl_.usage_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::TokenUsage* PROTOBUF_NULLABLE ToolCallingResult::unsafe_arena_release_usage() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ToolCallingResult.usage)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ::runanywhere::v1::TokenUsage* temp = _impl_.usage_;
+  _impl_.usage_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::TokenUsage* PROTOBUF_NONNULL ToolCallingResult::_internal_mutable_usage() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.usage_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::TokenUsage>(GetArena());
+    _impl_.usage_ = reinterpret_cast<::runanywhere::v1::TokenUsage*>(p);
+  }
+  return _impl_.usage_;
+}
+inline ::runanywhere::v1::TokenUsage* PROTOBUF_NONNULL ToolCallingResult::mutable_usage()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  ::runanywhere::v1::TokenUsage* _msg = _internal_mutable_usage();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ToolCallingResult.usage)
+  return _msg;
+}
+inline void ToolCallingResult::set_allocated_usage(::runanywhere::v1::TokenUsage* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.usage_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = reinterpret_cast<::google::protobuf::Message*>(value)->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
+  }
+
+  _impl_.usage_ = reinterpret_cast<::runanywhere::v1::TokenUsage*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ToolCallingResult.usage)
 }
 
 // -------------------------------------------------------------------

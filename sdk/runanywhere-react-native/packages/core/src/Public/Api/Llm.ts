@@ -155,10 +155,10 @@ async function generateWithToolLoop(
     ...(result.thinkingContent ? { thinkingText: result.thinkingContent } : {}),
     toolCalls: result.toolCalls,
     finishReason: result.toolCalls.length > 0 ? 'toolCalls' : 'stop',
-    inputTokens: 0,
-    outputTokens: 0,
+    inputTokens: result.usage?.inputTokens ?? 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: 0,
-    tokensPerSecond: 0,
+    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
     requestId,
     model: options?.model ?? '',
   };

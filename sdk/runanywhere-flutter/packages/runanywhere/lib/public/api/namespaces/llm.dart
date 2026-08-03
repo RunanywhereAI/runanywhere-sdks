@@ -183,6 +183,9 @@ class LlmApi {
       finishReason: result.toolCalls.isEmpty
           ? FinishReason.stop
           : FinishReason.toolCalls,
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      tokensPerSecond: result.usage.tokensPerSecond,
       requestId: request.requestId,
       model:
           await ModelGate.currentId(ModelCategory.MODEL_CATEGORY_LANGUAGE) ?? '',

@@ -381,6 +381,7 @@ void emit_final_event(ToolCallingSession& session, bool is_complete) {
     }
     final_result->set_is_complete(is_complete);
     final_result->set_iterations_used(static_cast<int32_t>(session.iteration));
+    rac::llm::tool_calling::set_tool_result_usage(final_result, session.telemetry);
     rac::llm::tool_calling::ensure_web_search_attribution(final_result);
     emit_event(session, std::move(event));
 }

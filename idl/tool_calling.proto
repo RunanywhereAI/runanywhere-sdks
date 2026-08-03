@@ -22,6 +22,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "token_usage.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -256,6 +257,10 @@ message ToolCallingResult {
     string raw_text                  = 9;
     // Optional thinking/reasoning content extracted from the final response.
     optional string thinking_content = 10;
+    // Token usage aggregated across every LLM generation turn in the loop
+    // (including the final synthesis turn). Lets a plain generate() that routed
+    // through the tool loop report the same usage a non-tool generate would.
+    TokenUsage usage                 = 11;
 }
 
 message ToolParseRequest {

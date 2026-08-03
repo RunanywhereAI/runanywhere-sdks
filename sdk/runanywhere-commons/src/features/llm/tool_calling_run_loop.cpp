@@ -850,6 +850,7 @@ static rac_result_t run_loop_impl(const uint8_t* in_request_bytes, size_t in_siz
     rac::llm::tool_calling::ensure_web_search_attribution(&final_result);
     final_result.set_is_complete(is_complete);
     final_result.set_iterations_used(static_cast<int32_t>(iteration));
+    rac::llm::tool_calling::set_tool_result_usage(&final_result, loop_telemetry.agg);
 
     std::vector<uint8_t> bytes;
     if (!serialize(final_result, &bytes)) {

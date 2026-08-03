@@ -119,10 +119,10 @@ public struct GenerationResult: Sendable {
             thinkingText: proto.hasThinkingContent && !proto.thinkingContent.isEmpty ? proto.thinkingContent : nil,
             toolCalls: proto.toolCalls,
             finishReason: proto.toolCalls.isEmpty ? .stop : .toolCalls,
-            inputTokens: 0,
-            outputTokens: 0,
+            inputTokens: Int(proto.usage.inputTokens),
+            outputTokens: Int(proto.usage.outputTokens),
             timeToFirstTokenMs: 0,
-            tokensPerSecond: 0,
+            tokensPerSecond: Float(proto.usage.tokensPerSecond),
             requestId: requestId,
             model: model
         )
