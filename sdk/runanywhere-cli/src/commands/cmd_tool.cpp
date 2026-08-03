@@ -44,8 +44,25 @@ struct ToolCallParams {
     std::string prompt;
     std::string model;
     std::string engine;
+    std::string tool_choice;  // auto | required | none | specific (default auto)
+    std::string force_tool;   // name for tool_choice=specific
     int max_tool_calls = 3;
 };
+
+bool parse_tool_choice(const std::string& mode, v1::ToolChoiceMode* out) {
+    if (mode.empty() || mode == "auto") {
+        *out = v1::TOOL_CHOICE_MODE_AUTO;
+    } else if (mode == "required") {
+        *out = v1::TOOL_CHOICE_MODE_REQUIRED;
+    } else if (mode == "none") {
+        *out = v1::TOOL_CHOICE_MODE_NONE;
+    } else if (mode == "specific") {
+        *out = v1::TOOL_CHOICE_MODE_SPECIFIC;
+    } else {
+        return false;
+    }
+    return true;
+}
 
 // rac_tool_calling_run_loop_proto invokes this synchronously and unconditionally
 // (it is not null-checked), so a real no-op is required even when the CLI has no
@@ -169,6 +186,18 @@ int run_tool_call(const GlobalOptions& options, const ToolCallParams& params) {
     calc->set_description("Evaluate an arithmetic expression");
     add_string_param(calc, "expression", "Expression such as 45 * 12");
 
+    v1::ToolChoiceMode choice = v1::TOOL_CHOICE_MODE_AUTO;
+    if (!parse_tool_choice(params.tool_choice, &choice)) {
+        out::error_line("--tool-choice expects auto|required|none|specific");
+        return 2;
+    }
+    if (!params.force_tool.empty()) {
+        request.set_tool_choice(v1::TOOL_CHOICE_MODE_SPECIFIC);
+        request.set_forced_tool_name(params.force_tool);
+    } else if (choice != v1::TOOL_CHOICE_MODE_AUTO) {
+        request.set_tool_choice(choice);
+    }
+
     const std::string bytes = proto::serialize(request);
     rac_proto_buffer_t out_buffer;
     rac_proto_buffer_init(&out_buffer);
@@ -219,6 +248,10 @@ void configure_tool_call(CLI::App* cmd, GlobalOptions& options) {
     cmd->add_option("--model,-m", params->model, "Model to use for the tool-calling loop")
         ->default_val(kDefaultToolModel);
     cmd->add_option("--engine", params->engine, "Pin a specific inference engine");
+    cmd->add_option("--tool-choice", params->tool_choice,
+                    "How the model may call tools: auto|required|none|specific");
+    cmd->add_option("--force-tool", params->force_tool,
+                    "Force one tool by name (implies --tool-choice specific)");
     cmd->add_option("--max-tool-calls", params->max_tool_calls,
                     "Maximum host tool executions per turn");
     cmd->callback([&options, params]() {
