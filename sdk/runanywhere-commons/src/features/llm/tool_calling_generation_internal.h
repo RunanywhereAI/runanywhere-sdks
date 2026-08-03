@@ -220,12 +220,14 @@ inline void publish_tool_loop_telemetry(const GenerationTelemetryAgg& agg) {
 #endif
 }
 
+#if defined(RAC_HAVE_PROTOBUF)
 // Copies the loop's aggregated token counts onto the ToolCallingResult so a
 // generate() that routed through the tool loop reports the same usage a non-tool
-// generate would (the loop can span several LLM turns; agg sums them).
+// generate would (the loop can span several LLM turns; agg sums them). Guarded
+// by RAC_HAVE_PROTOBUF like the other ToolCallingResult writers here — the type
+// is unavailable on protobuf-less builds (Emscripten defaults it off).
 inline void set_tool_result_usage(runanywhere::v1::ToolCallingResult* result,
                                   const GenerationTelemetryAgg& agg) {
-#if defined(RAC_HAVE_PROTOBUF)
     if (!result || agg.generations == 0) {
         return;
     }
@@ -234,11 +236,8 @@ inline void set_tool_result_usage(runanywhere::v1::ToolCallingResult* result,
     usage->set_output_tokens(static_cast<int32_t>(agg.output_tokens));
     usage->set_total_tokens(static_cast<int32_t>(agg.input_tokens + agg.output_tokens));
     usage->set_tokens_per_second(agg.tokens_per_second);
-#else
-    (void)result;
-    (void)agg;
-#endif
 }
+#endif  // RAC_HAVE_PROTOBUF
 
 // Emits the aggregate on every loop exit path (success, tool failure, cancel).
 struct ToolLoopTelemetryScope {
