@@ -116,6 +116,16 @@ abstract final class QHexRTModelCatalog {
       contextLength: 2048,
     ),
     QHexRTCatalogModel(
+      id: 'lfm2_5_2_6b',
+      name: 'LFM2.5 2.6B (HNPU)',
+      url:
+          'https://huggingface.co/runanywhere/lfm2_5_2_6b_HNPU/lfm2-5-2.6b.json',
+      category: _language,
+      memoryBytes: 3259942826,
+      contextLength: 512,
+      supportsThinking: true,
+    ),
+    QHexRTCatalogModel(
       id: 'qwen3_5_0_8b',
       name: 'Qwen3.5 0.8B (HNPU)',
       url:
