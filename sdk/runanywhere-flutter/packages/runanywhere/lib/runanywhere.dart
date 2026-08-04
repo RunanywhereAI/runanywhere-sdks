@@ -32,6 +32,7 @@ export 'public/capabilities/runanywhere_cua.dart'
 export 'public/capabilities/runanywhere_hybrid.dart' show RunAnywhereHybrid;
 export 'public/capabilities/runanywhere_solutions.dart'
     show RunAnywhereSolutions;
+export 'public/capabilities/runanywhere_tools.dart' show RunAnywhereTools;
 export 'public/configuration/sdk_environment.dart';
 export 'public/extensions/format_framework.dart' show formatFramework;
 export 'public/extensions/model_category_extensions.dart'

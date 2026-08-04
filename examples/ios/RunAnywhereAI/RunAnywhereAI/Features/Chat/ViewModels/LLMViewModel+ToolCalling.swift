@@ -17,11 +17,25 @@ extension LLMViewModel {
         messageIndex: Int,
         generationID: UUID?
     ) async throws {
-        // Tool calling is automatic: leaving `options.tools` empty makes the SDK
-        // use the `llm.tools` registry, derive the format from the loaded model,
-        // and run the tool call → execute → respond loop internally.
-        let result = try await RunAnywhere.llm.generate(prompt: prompt, options: options)
-        let toolCallInfo = ToolCallInfo(from: result)
+        // Mirror the Android example: run the loop through generateWithTools with
+        // an explicit RAToolCallingOptions whose autoExecute=true actually runs
+        // the registered tools (the v3 llm.generate path leaves autoExecute
+        // false, so it only leaks the raw tool call), with the final-response cap
+        // kept separate from the tool decision.
+        let loop = try await RunAnywhere.generateWithTools(
+            prompt: prompt,
+            options: ToolCallingExecutionPolicy.generationOptions(from: options),
+            toolOptions: ToolCallingExecutionPolicy.toolOptions()
+        )
+        if loop.hasErrorMessage {
+            throw LLMError.custom(loop.errorMessage)
+        }
+        // A capable model returns a final answer here; guard against a blank
+        // bubble if a weak model finishes the loop without any prose.
+        let displayText = loop.text.isEmpty
+            ? "The model finished tool calling without a text answer."
+            : loop.text
+        let toolCallInfo = ToolCallInfo(from: loop)
 
         // Drop the write if this generation was superseded while awaiting.
         guard isCurrentGeneration(generationID) else { return }
@@ -29,8 +43,8 @@ extension LLMViewModel {
         // Update the message with the result
         await updateMessageWithToolResult(
             at: messageIndex,
-            text: result.text,
-            thinkingContent: result.thinkingText,
+            text: displayText,
+            thinkingContent: loop.thinkingContent.isEmpty ? nil : loop.thinkingContent,
             toolCallInfo: toolCallInfo
         )
     }

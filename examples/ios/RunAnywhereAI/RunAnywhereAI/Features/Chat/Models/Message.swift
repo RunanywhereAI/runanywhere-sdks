@@ -173,6 +173,32 @@ public struct ToolCallInfo: Codable, Sendable {
         )
     }
 
+    /// Same badge, built from the tool-calling loop result (`generateWithTools`).
+    public init?(from loop: RAToolCallingResult) {
+        guard !loop.toolCalls.isEmpty else {
+            return nil
+        }
+
+        let succeeded = !loop.hasErrorMessage
+
+        if loop.toolCalls.count == 1, let toolCall = loop.toolCalls.first {
+            self.init(
+                toolName: toolCall.name,
+                argumentsJSON: toolCall.argumentsJson,
+                resultJSON: nil,
+                success: succeeded
+            )
+            return
+        }
+
+        self.init(
+            toolName: "\(loop.toolCalls.count) tool calls",
+            argumentsJSON: ToolCallInfo.callsJSON(loop.toolCalls),
+            resultJSON: nil,
+            success: succeeded
+        )
+    }
+
     private static func callsJSON(_ calls: [ToolCall]) -> String {
         let payload = calls.map { call in
             [

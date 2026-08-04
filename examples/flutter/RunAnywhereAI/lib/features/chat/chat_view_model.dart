@@ -6,6 +6,7 @@ import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
+import 'package:runanywhere_ai/features/chat/tool_calling_policy.dart';
 import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -98,6 +99,7 @@ class ChatViewModel extends ChangeNotifier {
 
   // --- Model state synced from the SDK -------------------------------------
 
+  sdk.ModelInfo? _loadedModel;
   String? _loadedModelId;
   String? _loadedModelName;
   sdk.InferenceFramework? _loadedFramework;
@@ -172,6 +174,7 @@ class ChatViewModel extends ChangeNotifier {
   Future<void> syncModelState() async {
     final state = await sdk.RunAnywhere.models.state();
     final model = state.loaded[sdk.ModelCategory.MODEL_CATEGORY_LANGUAGE];
+    _loadedModel = model;
     _loadedModelId = model?.id;
     _loadedModelName = model?.name;
     _loadedFramework = model?.framework;
@@ -239,9 +242,9 @@ class ChatViewModel extends ChangeNotifier {
       );
 
       final toolSettings = ToolSettingsViewModel.shared;
-      final useToolCalling =
-          toolSettings.toolCallingEnabled &&
-          toolSettings.registeredTools.isNotEmpty;
+      final registeredTools = toolSettings.toolCallingEnabled
+          ? sdk.RunAnywhere.llm.tools.list()
+          : const <sdk.ToolDefinition>[];
 
       final options = sdk.LlmOptions(
         maxOutputTokens: maxTokens,
@@ -251,12 +254,29 @@ class ChatViewModel extends ChangeNotifier {
         maxToolCalls: 3,
       );
 
-      if (useToolCalling) {
-        await _generateWithToolCalling(userMessage, options);
-      } else if (_useStreaming) {
-        await _generateStreaming(userMessage, options);
-      } else {
-        await _generateNonStreaming(userMessage, options);
+      final preflight = ToolCallingModelPolicy.preflight(
+        toolsRequested: toolSettings.toolCallingEnabled,
+        registeredToolCount: registeredTools.length,
+        model: _loadedModel,
+      );
+      switch (preflight.route) {
+        case ToolCallingRoute.toolGeneration:
+          await _generateWithToolCalling(userMessage, options, registeredTools);
+        case ToolCallingRoute.blocked:
+          _errorMessage = preflight.availability.message ??
+              'Web & tools are unavailable for the current model.';
+          notifyListeners();
+          if (_useStreaming) {
+            await _generateStreaming(userMessage, options);
+          } else {
+            await _generateNonStreaming(userMessage, options);
+          }
+        case ToolCallingRoute.standardGeneration:
+          if (_useStreaming) {
+            await _generateStreaming(userMessage, options);
+          } else {
+            await _generateNonStreaming(userMessage, options);
+          }
       }
     } catch (e) {
       _errorMessage = 'Generation failed: $e';
@@ -321,17 +341,39 @@ class ChatViewModel extends ChangeNotifier {
   Future<void> _generateWithToolCalling(
     String prompt,
     sdk.LlmOptions options,
+    List<sdk.ToolDefinition> registeredTools,
   ) async {
     final modelName = _loadedModelName;
     final assistantMessage = _appendEmptyAssistantMessage();
     final messageIndex = _messages.length - 1;
+    _messages[messageIndex] = _messages[messageIndex].copyWith(
+      content: ToolCallingExecutionPolicy.progressMessage,
+    );
+    notifyListeners();
+
+    final plan = ToolCallingExecutionPolicy.plan(
+      options.toProto(),
+      registeredTools,
+    );
 
     try {
-      final result = await sdk.RunAnywhere.llm.generate(prompt, options: options);
+      final result = await sdk.RunAnywhereTools.shared
+          .generateWithTools(
+            prompt,
+            llmOptions: plan.generationOptions,
+            options: plan.toolOptions,
+          )
+          .timeout(
+            const Duration(
+              milliseconds: ToolCallingExecutionPolicy.timeoutMillis,
+            ),
+          );
 
-      final totalTime = _elapsedGenerationSeconds();
+      if (result.hasErrorMessage() && result.errorMessage.isNotEmpty) {
+        throw StateError(result.errorMessage);
+      }
 
-      // Create ToolCallInfo from the result if tools were called
+      // Create ToolCallInfo from the result if tools were called.
       ToolCallInfo? toolCallInfo;
       if (result.toolCalls.isNotEmpty) {
         final lastCall = result.toolCalls.last;
@@ -353,14 +395,33 @@ class ChatViewModel extends ChangeNotifier {
       final analytics = MessageAnalytics(
         messageId: assistantMessage.id,
         modelName: modelName,
-        totalGenerationTime: totalTime,
+        totalGenerationTime: _elapsedGenerationSeconds(),
+        outputTokens: result.usage.outputTokens,
+        tokensPerSecond: result.usage.tokensPerSecond,
       );
 
       final finalMessage = _messages[messageIndex].copyWith(
         content: result.text,
-        thinkingContent: result.thinkingText,
+        thinkingContent:
+            result.hasThinkingContent() && result.thinkingContent.isNotEmpty
+            ? result.thinkingContent
+            : null,
         analytics: analytics,
         toolCallInfo: toolCallInfo,
+      );
+      _messages[messageIndex] = finalMessage;
+      _isGenerating = false;
+      _persistMessage(finalMessage);
+      notifyListeners();
+    } on TimeoutException {
+      sdk.RunAnywhereTools.shared.cancelGeneration();
+      const timeoutSeconds = ToolCallingExecutionPolicy.timeoutMillis ~/ 1000;
+      final finalMessage = _messages[messageIndex].copyWith(
+        content:
+            '${modelName ?? 'The model'} did not finish the Web & tools '
+            'request within $timeoutSeconds seconds. Try a shorter request or '
+            'another model.',
+        thinkingContent: null,
       );
       _messages[messageIndex] = finalMessage;
       _isGenerating = false;

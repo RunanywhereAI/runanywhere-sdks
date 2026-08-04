@@ -9,6 +9,9 @@ import SwiftUI
 import Foundation
 import RunAnywhere
 import os
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Tool Settings View Model
 
@@ -201,6 +204,49 @@ class ToolSettingsViewModel: ObservableObject {
                         "error": RAToolValue("Could not evaluate expression: \(expression)"),
                         "expression": RAToolValue(expression)
                     ]
+                }
+            ),
+            // Device Info Tool - manufacturer, model and OS version.
+            (
+                definition: RAToolDefinition(
+                    name: "get_device_info",
+                    description: "Returns details about the device: manufacturer, model and OS version.",
+                    parameters: [],
+                    category: "Utility"
+                ),
+                executor: { _ in
+                    #if os(iOS)
+                    let model = UIDevice.current.model
+                    #elseif os(macOS)
+                    let model = "Mac"
+                    #endif
+                    return [
+                        "manufacturer": RAToolValue("Apple"),
+                        "model": RAToolValue(model),
+                        "os": RAToolValue(ProcessInfo.processInfo.operatingSystemVersionString)
+                    ]
+                }
+            ),
+            // Battery Level Tool - current charge as a percentage.
+            (
+                definition: RAToolDefinition(
+                    name: "get_battery_level",
+                    description: "Returns the current battery charge level as a percentage.",
+                    parameters: [],
+                    category: "Utility"
+                ),
+                executor: { _ in
+                    #if os(iOS)
+                    UIDevice.current.isBatteryMonitoringEnabled = true
+                    let level = UIDevice.current.batteryLevel
+                    return [
+                        "battery_percent": RAToolValue(
+                            level >= 0 ? "\(Int((level * 100).rounded()))%" : "unknown"
+                        )
+                    ]
+                    #else
+                    return ["battery_percent": RAToolValue("unknown")]
+                    #endif
                 }
             )
         ]

@@ -190,6 +190,7 @@ class LlmOptions {
     this.tools = const <ToolDefinition>[],
     this.toolChoice = ToolChoice.auto,
     int? maxToolCalls,
+    this.autoExecute = true,
   }) : _argMaxOutputTokens = maxOutputTokens,
        _argTemperature = temperature,
        _argTopP = topP,
@@ -253,6 +254,13 @@ class LlmOptions {
   /// Maximum tool-call round trips before the loop stops.
   int get maxToolCalls => _argMaxToolCalls ?? _tools.maxToolCalls;
 
+  /// Whether the SDK runs a requested tool call itself and feeds the result
+  /// back into the loop. False returns the parsed call to the caller instead
+  /// of invoking it — the same contract as the direct tool-calling API's
+  /// `autoExecute`, reachable from `generate`/`generateStream` with inline
+  /// tools. Mirrors Kotlin `LlmOptions.autoExecute`.
+  final bool autoExecute;
+
   /// Build the generated LLM generation options.
   LLMGenerationOptions toProto({List<ToolDefinition> registeredTools = const <ToolDefinition>[]}) {
     final proto = LLMGenerationOptions(
@@ -283,7 +291,7 @@ class LlmOptions {
         tools: effectiveTools,
         toolChoice: toolChoice.mode,
         maxToolCalls: maxToolCalls,
-        autoExecute: true,
+        autoExecute: autoExecute,
       );
       final forced = toolChoice.forcedName;
       if (forced != null) {

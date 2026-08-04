@@ -123,6 +123,11 @@ public struct LlmOptions: Sendable {
     public var toolChoice: ToolChoice = .auto
     public var maxToolCalls: Int = 5
 
+    /// Run matched tools automatically inside the generate call (the same flag
+    /// as the tool-calling API's `autoExecute`). Defaults true so `generate`
+    /// with registered tools executes them instead of leaking a raw tool call.
+    public var autoExecute: Bool = true
+
     /// Build generation options; every field defaults to the IDL value.
     public init(
         model: String? = nil,
@@ -187,6 +192,7 @@ public struct LlmOptions: Sendable {
         var options = RAToolCallingOptions()
         options.tools = tools
         options.maxToolCalls = Int32(maxToolCalls)
+        options.autoExecute = autoExecute
         switch toolChoice {
         case .auto:
             options.toolChoice = .auto

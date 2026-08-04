@@ -143,6 +143,16 @@ export { sdkComponentDisplayName } from './Public/Helpers/SDKComponent+DisplayNa
 // Framework display names sourced from the commons table.
 export { formatFramework } from './Public/Helpers/formatFramework';
 
+// Explicit tool-calling run loop — mirrors Swift/Kotlin generateWithTools for
+// hosts that need full control over the tool-loop budget (max calls, thinking,
+// parallel execution) beyond what llm.generate's inline tools expose.
+export { generateWithTools } from './Public/Extensions/LLM/RunAnywhere+ToolCalling';
+export type {
+  GenerateWithToolsOptions,
+  ToolCallingOptions,
+  ToolCallingResult,
+} from './Public/Extensions/LLM/RunAnywhere+ToolCalling';
+
 // Pushable audio stream — feeds microphone chunks into the streaming verbs.
 export {
   createPushableAudioStream,

@@ -441,16 +441,31 @@ final class LLMViewModel {
         messageIndex: Int,
         generationID: UUID?
     ) async throws {
-        // Check if tool calling is enabled and we have registered tools
+        // Check if tool calling is enabled and we have registered tools.
         let registeredTools = await RunAnywhere.llm.tools.list()
-        let shouldUseToolCalling = useToolCalling && !isUsingConnect && !registeredTools.isEmpty
+        let toolsRequested = useToolCalling && !isUsingConnect && !registeredTools.isEmpty
+        let pf = ToolCallingModelPolicy.preflight(
+            toolsRequested: toolsRequested,
+            registeredToolCount: registeredTools.count,
+            model: ModelListViewModel.shared.currentModel
+        )
 
-        if shouldUseToolCalling {
+        switch pf.route {
+        case .toolGeneration:
             logger.info("Using tool calling with \(registeredTools.count) registered tools")
             try await generateWithToolCalling(
-                prompt: prompt, options: options, messageIndex: messageIndex, generationID: generationID
+                prompt: prompt,
+                options: options,
+                messageIndex: messageIndex,
+                generationID: generationID
             )
             return
+        case .blocked:
+            // Tools were requested but the model can't support them; log why and
+            // fall through to standard generation so the user still gets a reply.
+            logger.info("Tool calling blocked: \(pf.availability.message ?? "model not compatible")")
+        case .standardGeneration:
+            break
         }
 
         // All LLM backends now handle streaming via the canonical generateStream

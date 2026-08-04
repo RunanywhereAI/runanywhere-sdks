@@ -65,12 +65,22 @@ import { APP_STORAGE_KEYS, GENERATION_SETTINGS_KEYS } from '../types/settings';
 import { getPrimaryFramework } from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
-import { RunAnywhere, formatFramework } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  formatFramework,
+  generateWithTools,
+} from '@runanywhere/core';
 import type {
   GenerationResult,
   LlmOptions,
   ReasoningOptions,
+  ToolCallingResult,
 } from '@runanywhere/core';
+import {
+  ToolCallingExecutionPolicy,
+  ToolCallingModelPolicy,
+  ToolCallingRoute,
+} from '../features/chat/ToolCallingModelPolicy';
 import {
   ModelCategory,
   type ModelInfo as SDKModelInfo,
@@ -90,16 +100,38 @@ interface GenerationSettings {
   thinkingModeEnabled: boolean;
 }
 
-// The v3 GenerationResult reports the calls the model made; per-call execution
-// results are no longer surfaced, so the detail sheet shows arguments only.
-function makeToolCallInfo(result: GenerationResult): ToolCallInfo | undefined {
+// The explicit tool-calling loop reports both the call and its execution
+// result, so the detail sheet can show arguments, output, and success.
+function makeToolCallInfo(result: ToolCallingResult): ToolCallInfo | undefined {
   const firstCall = result.toolCalls[0];
   if (!firstCall) return undefined;
-
+  const toolResult = result.toolResults.find((r) => r.name === firstCall.name);
   return {
     toolName: firstCall.name,
     arguments: firstCall.argumentsJson || '{}',
-    success: true,
+    ...(toolResult?.resultJson ? { result: toolResult.resultJson } : {}),
+    success: toolResult ? toolResult.success : true,
+    ...(toolResult?.error ? { error: toolResult.error } : {}),
+  };
+}
+
+// Map the explicit tool-loop result onto the GenerationResult the finalizer
+// already knows how to render.
+function toGenerationResult(
+  result: ToolCallingResult,
+  model: string
+): GenerationResult {
+  return {
+    text: result.text,
+    ...(result.thinkingContent ? { thinkingText: result.thinkingContent } : {}),
+    toolCalls: result.toolCalls,
+    finishReason: result.toolCalls.length > 0 ? 'toolCalls' : 'stop',
+    inputTokens: result.usage?.inputTokens ?? 0,
+    outputTokens: result.usage?.outputTokens ?? 0,
+    timeToFirstTokenMs: 0,
+    tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
+    requestId: '',
+    model,
   };
 }
 
@@ -393,7 +425,24 @@ export const ChatScreen: React.FC = () => {
         );
 
         const registeredTools = await RunAnywhere.llm.tools.list();
-        const shouldUseTools = toolsEnabled && registeredTools.length > 0;
+        // Route by the same tool/model gate the Android example uses: tool
+        // generation only when tools are on, registered, and the model has a
+        // large enough context window; otherwise standard generation, or a
+        // blocked notice that falls back to standard.
+        const toolPreflight = ToolCallingModelPolicy.preflight(
+          toolsEnabled,
+          registeredTools.length,
+          currentModel
+        );
+        const shouldUseTools =
+          toolPreflight.route === ToolCallingRoute.ToolGeneration;
+        if (toolPreflight.route === ToolCallingRoute.Blocked) {
+          Alert.alert(
+            'Web & tools unavailable',
+            toolPreflight.availability.message ??
+              'Web & tools are unavailable for the current model.'
+          );
+        }
         const supportsThinking = currentModel?.supportsThinking ?? false;
         const wasThinkingMode = supportsThinking && options.thinkingModeEnabled;
         // Thought tokens only surface when reasoning.includeInOutput is set,
@@ -444,13 +493,61 @@ export const ChatScreen: React.FC = () => {
         assistantMessageInserted = true;
 
         let result: GenerationResult | null = null;
+        let toolCallInfo: ToolCallInfo | undefined;
         let streamedText = '';
         let streamedThoughts = '';
 
         if (shouldUseTools) {
-          // The SDK runs the tool loop itself and reports what it called on the
-          // result, so there is nothing to sequence here.
-          result = await RunAnywhere.llm.generate(prompt, llmOptions);
+          // Explicit tool-calling API: the SDK owns the run loop; we bound it
+          // with the same execution budget as the Android example (max 2 calls,
+          // 96-token synthesis, greedy sampling, thinking off, parallel calls,
+          // 45s ceiling).
+          updateMessage(
+            {
+              id: assistantMessageId,
+              role: MessageRole.Assistant,
+              content: ToolCallingExecutionPolicy.PROGRESS_MESSAGE,
+              timestamp: new Date(),
+              isStreaming: true,
+              modelInfo: messageModelInfo,
+            },
+            currentConversation.id
+          );
+          const plan = ToolCallingExecutionPolicy.plan(
+            registeredTools,
+            options.maxTokens
+          );
+          const controller = new AbortController();
+          let timedOut = false;
+          const timer = setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+          }, ToolCallingExecutionPolicy.TIMEOUT_MILLIS);
+          try {
+            const toolResult = await generateWithTools(
+              prompt,
+              plan.toolOptions,
+              {
+                llmOptions: plan.llmOptions,
+                signal: controller.signal,
+              }
+            );
+            if (!timedOut) {
+              result = toGenerationResult(toolResult, currentModel?.id ?? '');
+              toolCallInfo = makeToolCallInfo(toolResult);
+            }
+          } catch (error) {
+            if (!timedOut) throw error;
+          } finally {
+            clearTimeout(timer);
+          }
+          if (timedOut) {
+            const timeoutSeconds =
+              ToolCallingExecutionPolicy.TIMEOUT_MILLIS / 1000;
+            streamedText =
+              `${currentModel?.name ?? 'The model'} did not finish the Web & tools ` +
+              `request within ${timeoutSeconds} seconds. Try a shorter request or another model.`;
+          }
         } else {
           // Hermes cannot `for await...of` a Nitro async iterable — drive the
           // iterator by hand and return() it to cancel the native work.
@@ -506,7 +603,7 @@ export const ChatScreen: React.FC = () => {
           ...(thinkingContent ? { thinkingContent } : {}),
           timestamp: new Date(),
           modelInfo: messageModelInfo,
-          ...(result ? { toolCallInfo: makeToolCallInfo(result) } : {}),
+          ...(toolCallInfo ? { toolCallInfo } : {}),
           analytics: {
             performance: {
               latencyMs: Date.now() - generationStartMs,

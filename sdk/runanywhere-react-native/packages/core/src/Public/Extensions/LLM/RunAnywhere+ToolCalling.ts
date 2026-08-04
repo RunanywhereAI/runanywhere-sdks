@@ -361,6 +361,8 @@ export async function generateWithTools(
       autoExecute: options?.autoExecute ?? true,
       replaceSystemPrompt: options?.replaceSystemPrompt ?? false,
       requireJsonArguments: options?.requireJsonArguments ?? false,
+      disableThinking: options?.disableThinking ?? false,
+      parallelToolCalls: options?.parallelToolCalls ?? false,
     }),
   });
   const toolCalling = generation.toolCalling;
