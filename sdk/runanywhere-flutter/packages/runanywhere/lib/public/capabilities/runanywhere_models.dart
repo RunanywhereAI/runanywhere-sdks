@@ -143,9 +143,8 @@ class RunAnywhereModels {
   ///
   /// Delegates to `rac_register_model_from_url_proto` via
   /// [RunAnywhereStorage.registerModel] and returns the fully-populated
-  /// [ModelInfo] proto. Mirrors Swift `RunAnywhere.registerModel(id:name:url:
-  /// framework:modality:artifactType:memoryRequirement:supportsThinking:
-  /// supportsLora:)` in both signature shape and return type.
+  /// [ModelInfo] proto. Optional artifact size, context length, source, and
+  /// description metadata are preserved in the registry entry.
   Future<ModelInfo> register({
     String? id,
     required String name,
@@ -154,6 +153,10 @@ class RunAnywhereModels {
     ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     ModelArtifactType? artifactType,
     int? memoryRequirement,
+    int? downloadSize,
+    int? contextLength,
+    ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? description,
     bool supportsThinking = false,
     bool supportsLora = false,
   }) => RunAnywhereStorage.registerModel(
@@ -164,6 +167,10 @@ class RunAnywhereModels {
     modality: modality,
     artifactType: artifactType,
     memoryRequirement: memoryRequirement,
+    downloadSize: downloadSize,
+    contextLength: contextLength,
+    source: source,
+    description: description,
     supportsThinking: supportsThinking,
     supportsLora: supportsLora,
   );
@@ -209,6 +216,7 @@ class RunAnywhereModels {
     // Mirrors Swift RunAnywhere+Storage.swift:135 (`modality: ModelCategory = .language`).
     ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     int? memoryRequirement,
+    int? downloadSize,
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
@@ -219,6 +227,7 @@ class RunAnywhereModels {
     framework: framework,
     modality: modality,
     memoryRequirement: memoryRequirement,
+    downloadSize: downloadSize,
     contextLength: contextLength,
     supportsThinking: supportsThinking,
     source: source,

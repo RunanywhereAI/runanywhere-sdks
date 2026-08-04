@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.ModelSource
 import com.runanywhere.runanywhereai.data.ModelCatalog
 import com.runanywhere.runanywhereai.data.MultiFileModel
 import com.runanywhere.runanywhereai.data.SingleFileModel
@@ -126,25 +125,6 @@ class ModelCatalogTest {
             assertTrue(model.url.startsWith("https://"))
             assertTrue(model.memoryBytes > 0)
             assertEquals(InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT, model.framework)
-        }
-    }
-
-    @Test
-    fun qhexrtRequestKeepsTheAppOwnedDefinition() {
-        ModelCatalog.npuCatalog.forEach { model ->
-            val request = model.toQHexRTRegistrationRequest()
-            assertEquals(model.id, request.id)
-            assertEquals(model.name, request.name)
-            assertEquals(model.url, request.url)
-            assertEquals(model.framework, request.framework)
-            assertEquals(model.category, request.category)
-            assertEquals(ModelSource.MODEL_SOURCE_REMOTE, request.source)
-            assertEquals(model.memoryBytes, request.memory_required_bytes)
-            assertEquals(model.memoryBytes, request.download_size_bytes)
-            assertEquals(model.contextLength, request.context_length)
-            assertEquals(model.supportsThinking, request.supports_thinking)
-            assertEquals(model.supportsLora, request.supports_lora)
-            assertEquals("Qualcomm Hexagon NPU model bundle.", request.description)
         }
     }
 

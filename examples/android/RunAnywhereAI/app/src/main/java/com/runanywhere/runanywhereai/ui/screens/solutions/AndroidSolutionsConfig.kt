@@ -23,8 +23,8 @@ internal data class ResolvedAndroidSolutions(
  * Adapts the cross-platform example YAMLs to Android's device-filtered QHexRT catalog.
  *
  * The canonical YAML remains shared by every platform. Android resolves each accelerated
- * role from the models native registration exposed for this device, preferring the app's
- * current recommendations and then any already-downloaded QHexRT model for that role.
+ * role from the app's explicitly registered QHexRT models, preferring the
+ * current recommendations and then any already-downloaded model for that role.
  */
 internal object AndroidSolutionsConfig {
     internal const val PREFERRED_LLM_ID = "qwen3_5_0_8b"

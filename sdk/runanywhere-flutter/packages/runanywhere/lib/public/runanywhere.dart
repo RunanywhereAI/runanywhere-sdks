@@ -1355,8 +1355,8 @@ abstract final class RunAnywhere {
 
   // --- Flat aliases: Storage / model registration -----------------------------
 
-  /// Flat alias — register a single-file remote model by URL.
-  /// Mirrors Swift `RunAnywhere.registerModel(id:name:url:framework:...)`.
+  /// Flat alias — register a single-file remote model by URL, including
+  /// optional artifact and catalog metadata.
   static Future<ModelInfo> registerModel({
     String? id,
     required String name,
@@ -1365,6 +1365,10 @@ abstract final class RunAnywhere {
     ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     ModelArtifactType? artifactType,
     int? memoryRequirement,
+    int? downloadSize,
+    int? contextLength,
+    ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? description,
     bool supportsThinking = false,
     bool supportsLora = false,
   }) => RunAnywhereStorage.registerModel(
@@ -1375,6 +1379,10 @@ abstract final class RunAnywhere {
     modality: modality,
     artifactType: artifactType,
     memoryRequirement: memoryRequirement,
+    downloadSize: downloadSize,
+    contextLength: contextLength,
+    source: source,
+    description: description,
     supportsThinking: supportsThinking,
     supportsLora: supportsLora,
   );
@@ -1414,6 +1422,7 @@ abstract final class RunAnywhere {
     required InferenceFramework framework,
     ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     int? memoryRequirement,
+    int? downloadSize,
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
@@ -1424,6 +1433,7 @@ abstract final class RunAnywhere {
     framework: framework,
     modality: modality,
     memoryRequirement: memoryRequirement,
+    downloadSize: downloadSize,
     contextLength: contextLength,
     supportsThinking: supportsThinking,
     source: source,

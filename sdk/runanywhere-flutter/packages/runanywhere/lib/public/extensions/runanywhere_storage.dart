@@ -30,7 +30,9 @@ class RunAnywhereStorage {
   /// the canonical id from the URL (`rac_model_generate_id`), defaults
   /// format/framework/category/context-length, infers the artifact type from
   /// the URL extension (archive vs single-file), overlays the caller-supplied
-  /// capability fields, and persists through the registry save path.
+  /// capability and catalog metadata fields, and persists through the registry
+  /// save path. [downloadSize] is the artifact size used for download
+  /// validation; it is intentionally separate from [memoryRequirement].
   ///
   /// Mirrors Swift `RunAnywhere.registerModel(id:name:url:framework:modality:
   /// artifactType:memoryRequirement:supportsThinking:supportsLora:)`, which
@@ -43,6 +45,10 @@ class RunAnywhereStorage {
     ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     ModelArtifactType? artifactType,
     int? memoryRequirement,
+    int? downloadSize,
+    int? contextLength,
+    ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? description,
     bool supportsThinking = false,
     bool supportsLora = false,
   }) async {
@@ -55,7 +61,7 @@ class RunAnywhereStorage {
       name: name,
       framework: framework,
       category: modality,
-      source: ModelSource.MODEL_SOURCE_REMOTE,
+      source: source,
       supportsThinking: supportsThinking,
       supportsLora: supportsLora,
     );
@@ -71,11 +77,16 @@ class RunAnywhereStorage {
     if (memoryRequirement != null) {
       request.memoryRequiredBytes = Int64(memoryRequirement);
     }
-    // Intentionally NOT setting downloadSizeBytes from memoryRequirement: that
-    // value gates the post-finalize download-size check, and the RAM estimate
-    // is usually a round placeholder (e.g. 500 MB for a real 397 MB file),
-    // which leaves is_downloaded=false forever. Leaving it unset lets commons
-    // validate against the actual transfer — matches Kotlin's catalog.
+    final resolvedDownloadSize = downloadSize ?? memoryRequirement;
+    if (resolvedDownloadSize != null) {
+      request.downloadSizeBytes = Int64(resolvedDownloadSize);
+    }
+    if (contextLength != null) {
+      request.contextLength = contextLength;
+    }
+    if (description != null) {
+      request.description = description;
+    }
 
     final model = await DartBridgeModelRegistry.instance.registerModelFromUrl(
       request,
@@ -185,6 +196,7 @@ class RunAnywhereStorage {
     required InferenceFramework framework,
     ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     int? memoryRequirement,
+    int? downloadSize,
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
@@ -208,17 +220,19 @@ class RunAnywhereStorage {
     if (memoryRequirement != null) {
       request.memoryRequiredBytes = Int64(memoryRequirement);
     }
-    // See registerModel: downloadSizeBytes is intentionally left unset so the
-    // post-finalize size guard validates against the actual transfer rather
-    // than the RAM-estimate placeholder.
+    final resolvedDownloadSize = downloadSize ?? memoryRequirement;
+    if (resolvedDownloadSize != null) {
+      request.downloadSizeBytes = Int64(resolvedDownloadSize);
+    }
     final resolvedContextLength =
         contextLength ?? (modality.requiresContextLength ? 2048 : null);
     if (resolvedContextLength != null) {
       request.contextLength = resolvedContextLength;
     }
 
-    final model =
-        await DartBridgeModelRegistry.instance.registerMultiFileModel(request);
+    final model = await DartBridgeModelRegistry.instance.registerMultiFileModel(
+      request,
+    );
     if (model == null) {
       throw SDKException.internalError(
         'rac_register_multi_file_model_proto failed for model "$name"',

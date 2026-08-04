@@ -15,11 +15,11 @@ object ModelBootstrap {
 
     private val npuCatalogState = NpuCatalogState()
 
-    /** QHexRT rows accepted by the native device-aware catalog facade this run. */
+    /** App-owned QHexRT rows successfully registered through the core SDK. */
     internal val registeredNpuModelIds: Set<String>
         get() = npuCatalogState.snapshots.value.registeredModelIds
 
-    /** Emits after every completed native catalog seed/refresh. */
+    /** Emits after every completed app catalog registration/refresh. */
     internal val npuCatalogSnapshots
         get() = npuCatalogState.snapshots
 

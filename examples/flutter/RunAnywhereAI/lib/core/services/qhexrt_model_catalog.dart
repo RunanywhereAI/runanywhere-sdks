@@ -528,11 +528,33 @@ abstract final class QHexRTModelCatalog {
     return !isQHexRT || registeredModelIds.contains(model.id);
   }
 
-  static Future<QHexRTCatalogSeedResult> registerForCurrentDevice() {
-    final eligible = Platform.isAndroid && QHexRT.isAvailable;
+  static Future<QHexRTCatalogSeedResult> registerForCurrentDevice() async {
+    var eligible = false;
+    if (Platform.isAndroid && QHexRT.isAvailable) {
+      try {
+        eligible = (await QHexRT.probeNpu()).qhexrtSupported;
+      } catch (error) {
+        debugPrint('QHexRT capability probe failed: $error');
+      }
+    }
     return registerWith(
       deviceEligible: eligible,
-      registrar: (request) => QHexRT.registerModelForDevice(request: request),
+      registrar: (request) => RunAnywhere.registerModel(
+        id: request.id,
+        name: request.name,
+        url: request.url,
+        framework: request.framework,
+        modality: request.category,
+        memoryRequirement: request.memoryRequiredBytes.toInt(),
+        downloadSize: request.downloadSizeBytes.toInt(),
+        contextLength: request.hasContextLength()
+            ? request.contextLength
+            : null,
+        source: request.source,
+        description: request.description,
+        supportsThinking: request.supportsThinking,
+        supportsLora: request.supportsLora,
+      ),
     );
   }
 

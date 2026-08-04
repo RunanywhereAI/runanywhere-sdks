@@ -50,7 +50,7 @@ void main() {
   });
 
   test(
-    'QHexRT requests preserve app-owned metadata for native registration',
+    'QHexRT definitions preserve app-owned explicit URL metadata',
     () {
       const rows = QHexRTModelCatalog.models;
 

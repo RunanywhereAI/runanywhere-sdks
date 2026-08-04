@@ -8,13 +8,9 @@ import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFileRole
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelSource
-import ai.runanywhere.proto.v1.RegisterModelFromUrlRequest
-import com.runanywhere.sdk.npu.qhexrt.QHexRT
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.registerModel
 
-private val QHEXRT = InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT
-private const val HNPU_DESCRIPTION = "Qualcomm Hexagon NPU model bundle."
 internal sealed interface CatalogModel {
     val id: String
     suspend fun register(): ModelInfo?
@@ -39,29 +35,8 @@ internal data class SingleFileModel(
     val supportsLora: Boolean = false,
     val supportsThinking: Boolean = false,
 ) : CatalogModel {
-    internal fun toQHexRTRegistrationRequest(): RegisterModelFromUrlRequest {
-        require(framework == QHEXRT) { "Only QHexRT catalog rows use device-aware registration" }
-        return RegisterModelFromUrlRequest(
-            id = id,
-            name = name,
-            url = url,
-            framework = framework,
-            category = category,
-            source = ModelSource.MODEL_SOURCE_REMOTE,
-            memory_required_bytes = memoryBytes,
-            download_size_bytes = memoryBytes,
-            context_length = contextLength,
-            supports_thinking = supportsThinking,
-            supports_lora = supportsLora,
-            description = HNPU_DESCRIPTION,
-        )
-    }
-
-    override suspend fun register(): ModelInfo? {
-        if (framework == QHEXRT) {
-            return QHexRT.registerModelForDevice(toQHexRTRegistrationRequest())
-        }
-        return RunAnywhere.registerModel(
+    override suspend fun register(): ModelInfo =
+        RunAnywhere.registerModel(
             id = id,
             name = name,
             url = url,
@@ -73,7 +48,6 @@ internal data class SingleFileModel(
             supportsThinking = supportsThinking,
             supportsLora = supportsLora,
         )
-    }
 }
 
 internal data class ArchiveModel(

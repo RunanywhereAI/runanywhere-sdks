@@ -1,13 +1,12 @@
 /**
  * RunAnywhereQHexRT Nitrogen Spec
  *
- * QHexRT (Qualcomm Hexagon NPU) backend registration, capability probe, and
- * device-aware catalog adapter.
+ * QHexRT (Qualcomm Hexagon NPU) backend registration and capability probe.
  *
  * Public lifecycle, generation, VLM, STT, and TTS APIs live in
  * @runanywhere/core and route through commons proto/lifecycle bridges. This
- * backend package registers the native provider and transports capability and
- * catalog calls into the engine-owned QHexRT policy facade.
+ * backend package registers the native provider and transports capability
+ * calls into the engine-owned QHexRT policy facade.
  *
  * NOTE: After editing this file, run `yarn qhexrt:nitrogen` (nitro-codegen) to
  * regenerate the bridge code under `nitrogen/generated/`. Those files are
@@ -60,17 +59,4 @@ export interface RunAnywhereQHexRT extends HybridObject<{
 
   /** True when `arch` is in QHexRT's native device-validated support set. */
   isArchitectureSupported(arch: number): boolean;
-
-  /** Match native product policy for `modelId` against `arch`. */
-  modelSupportsArchitecture(modelId: string, arch: number): boolean;
-
-  /** Whether native product policy marks `modelId` HF-authenticated. */
-  modelRequiresHfAuth(modelId: string): boolean;
-
-  /**
-   * Register a serialized `RegisterModelFromUrlRequest` only when native
-   * product policy allows it on this device. Returns serialized `ModelInfo`,
-   * or an empty buffer for a normal ineligible/private-without-token outcome.
-   */
-  catalogRegisterModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 }
