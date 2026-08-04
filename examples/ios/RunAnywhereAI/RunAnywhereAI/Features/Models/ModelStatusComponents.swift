@@ -177,129 +177,43 @@ struct ModelRequiredOverlay: View {
     @State private var circle1Offset: CGFloat = -100
     @State private var circle2Offset: CGFloat = 100
     @State private var circle3Offset: CGFloat = 0
+    @State private var haloScale: CGFloat = 0.9
+
+    private var heroGradient: LinearGradient {
+        LinearGradient(
+            colors: [modalityColor, modalityColor.opacity(0.65)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
 
     var body: some View {
         ZStack {
-            // Animated floating circles background
-            ZStack {
-                // Circle 1 - Top left
-                Circle()
-                    .fill(modalityColor.opacity(0.15))
-                    .blur(radius: 80)
-                    .frame(width: 300, height: 300)
-                    .offset(x: circle1Offset, y: -200)
+            floatingBackground
 
-                // Circle 2 - Bottom right
-                Circle()
-                    .fill(modalityColor.opacity(0.12))
-                    .blur(radius: 100)
-                    .frame(width: 250, height: 250)
-                    .offset(x: circle2Offset, y: 300)
+            VStack(spacing: 0) {
+                Spacer(minLength: AppSpacing.xLarge)
 
-                // Circle 3 - Center
-                Circle()
-                    .fill(modalityColor.opacity(0.08))
-                    .blur(radius: 90)
-                    .frame(width: 280, height: 280)
-                    .offset(x: -circle3Offset, y: circle3Offset)
-            }
-            .ignoresSafeArea()
-            .onAppear {
-                withAnimation(
-                    .easeInOut(duration: 8)
-                    .repeatForever(autoreverses: true)
-                ) {
-                    circle1Offset = 100
-                    circle2Offset = -100
-                    circle3Offset = 80
-                }
-            }
+                heroIcon
 
-            VStack(spacing: AppSpacing.xLarge) {
-                Spacer()
-
-                // Friendly icon with gradient background
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient(
-                            colors: [modalityColor.opacity(0.2), modalityColor.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ))
-                        .frame(width: 120, height: 120)
-
-                    Image(systemName: modalityIcon)
-                        .font(AppTypography.system48)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [modalityColor, modalityColor.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-
-                // Title
                 Text(modalityTitle)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .multilineTextAlignment(.center)
+                    .padding(.top, AppSpacing.xLarge)
 
-                // Description
                 Text(modalityDescription)
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, AppSpacing.xxxLarge)
+                    .padding(.top, AppSpacing.mediumLarge)
+
+                valuePropRow
+                    .padding(.top, AppSpacing.xLarge)
 
                 Spacer()
 
-                // Bottom section with glass effect button
-                VStack(spacing: AppSpacing.medium) {
-                    // Primary CTA with glass effect
-                    if #available(iOS 26.0, macOS 26.0, *) {
-                        Button(action: onSelectModel) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "sparkles")
-                                Text("Get Started")
-                            }
-                            .font(.headline)
-                            .foregroundColor(modalityColor)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(.thinMaterial)
-                                    .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16))
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, AppSpacing.xLarge)
-                    } else {
-                        Button(action: onSelectModel) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "sparkles")
-                                Text("Get Started")
-                            }
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(modalityColor)
-                        .padding(.horizontal, AppSpacing.xLarge)
-                    }
-
-                    // Privacy note
-                    HStack(spacing: 6) {
-                        Image(systemName: "lock.shield.fill")
-                            .font(.caption2)
-                        Text("100% Private • Runs on your device")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.secondary)
-                }
-                .padding(.bottom, AppSpacing.large)
+                bottomSection
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -308,6 +222,114 @@ struct ModelRequiredOverlay: View {
         #else
         .background(Color(NSColor.windowBackgroundColor))
         #endif
+    }
+
+    private var floatingBackground: some View {
+        ZStack {
+            Circle()
+                .fill(modalityColor.opacity(0.15))
+                .blur(radius: 80)
+                .frame(width: 300, height: 300)
+                .offset(x: circle1Offset, y: -200)
+
+            Circle()
+                .fill(modalityColor.opacity(0.12))
+                .blur(radius: 100)
+                .frame(width: 250, height: 250)
+                .offset(x: circle2Offset, y: 300)
+
+            Circle()
+                .fill(modalityColor.opacity(0.08))
+                .blur(radius: 90)
+                .frame(width: 280, height: 280)
+                .offset(x: -circle3Offset, y: circle3Offset)
+        }
+        .ignoresSafeArea()
+        .onAppear {
+            withAnimation(.easeInOut(duration: 8).repeatForever(autoreverses: true)) {
+                circle1Offset = 100
+                circle2Offset = -100
+                circle3Offset = 80
+            }
+            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
+                haloScale = 1.12
+            }
+        }
+    }
+
+    private var heroIcon: some View {
+        ZStack {
+            Circle()
+                .fill(modalityColor.opacity(0.22))
+                .frame(width: 132, height: 132)
+                .blur(radius: 24)
+                .scaleEffect(haloScale)
+
+            Circle()
+                .fill(.ultraThinMaterial)
+                .frame(width: 116, height: 116)
+                .shadow(color: modalityColor.opacity(0.28), radius: 22, x: 0, y: 12)
+
+            Image(systemName: modalityIcon)
+                .font(.system(size: 46, weight: .medium))
+                .foregroundStyle(heroGradient)
+        }
+    }
+
+    private var valuePropRow: some View {
+        HStack(spacing: AppSpacing.smallMedium) {
+            valueChip(icon: "lock.shield.fill", label: "Private")
+            valueChip(icon: "wifi.slash", label: "Offline")
+            valueChip(icon: "bolt.fill", label: "On-device")
+        }
+    }
+
+    private func valueChip(icon: String, label: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(modalityColor)
+        .padding(.horizontal, AppSpacing.mediumLarge)
+        .padding(.vertical, AppSpacing.smallMedium)
+        .background(Capsule().fill(modalityColor.opacity(0.12)))
+    }
+
+    private var bottomSection: some View {
+        VStack(spacing: AppSpacing.mediumLarge) {
+            Button(action: onSelectModel) {
+                ctaLabel
+                    .foregroundColor(.white)
+                    .background(
+                        RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusCard)
+                            .fill(modalityColor)
+                            .shadow(color: modalityColor.opacity(0.4), radius: 14, x: 0, y: 8)
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, AppSpacing.xLarge)
+
+            HStack(spacing: 6) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.caption2)
+                Text("Your data never leaves this device")
+                    .font(.caption)
+            }
+            .foregroundColor(.secondary)
+        }
+        .padding(.bottom, AppSpacing.xxLarge)
+    }
+
+    private var ctaLabel: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles")
+            Text("Get Started")
+        }
+        .font(.headline)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, AppSpacing.large)
     }
 
     private var modalityIcon: String {
