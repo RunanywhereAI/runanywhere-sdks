@@ -77,7 +77,6 @@ extension RunAnywhere {
         }
         if let memoryRequirement {
             request.memoryRequiredBytes = memoryRequirement
-            request.downloadSizeBytes = memoryRequirement
         }
         if modality.requiresContextLength {
             request.contextLength = Int32(RADefaults.Storage.contextLength)
@@ -171,7 +170,7 @@ extension RunAnywhere {
             framework: framework,
             downloadURL: downloadURL,
             artifact: .archive(archiveArtifact),
-            downloadSizeBytes: memoryRequirement,
+            downloadSizeBytes: nil,
             contextLength: modality.requiresContextLength ? 2048 : nil,
             supportsThinking: supportsThinking
         )
@@ -269,8 +268,9 @@ extension RunAnywhere {
     }
 
     /// Keeps runtime memory planning independent from the final download
-    /// footprint. A nil download size preserves the legacy behavior by using
-    /// the runtime memory requirement for both fields.
+    /// footprint. The RAM requirement never stands in for the download size:
+    /// a nil download size is left unset so commons resolves the real payload
+    /// size from the server (Content-Length) instead of trusting a RAM hint.
     internal static func applyMultiFileRegistrationSizes(
         memoryRequirement: Int64?,
         downloadSize: Int64?,
@@ -279,8 +279,8 @@ extension RunAnywhere {
         if let memoryRequirement {
             request.memoryRequiredBytes = memoryRequirement
         }
-        if let resolvedDownloadSize = downloadSize ?? memoryRequirement {
-            request.downloadSizeBytes = resolvedDownloadSize
+        if let downloadSize {
+            request.downloadSizeBytes = downloadSize
         }
     }
 

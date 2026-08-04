@@ -299,7 +299,7 @@ export function buildSingleFileModelInfo(
 ): ModelInfo {
   const now = Date.now();
   const id = options.id ?? deriveIdFromUrlFallback(url);
-  const downloadSize = options.downloadSizeBytes ?? options.memoryRequirement ?? 0;
+  const downloadSize = options.downloadSizeBytes ?? 0;
   const category = options.modality ?? ModelCategory.MODEL_CATEGORY_LANGUAGE;
   return {
     id,

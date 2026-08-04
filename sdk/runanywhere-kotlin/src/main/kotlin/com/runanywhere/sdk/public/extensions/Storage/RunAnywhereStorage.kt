@@ -69,7 +69,7 @@ suspend fun RunAnywhere.registerModel(
     memoryRequirement: Long? = null,
     supportsThinking: Boolean = false,
     supportsLora: Boolean = false,
-    downloadSize: Long? = memoryRequirement,
+    downloadSize: Long? = null,
     cuaProfile: String? = null,
 ): RAModelInfo {
     requireStorageInitialized(this)
@@ -87,10 +87,9 @@ suspend fun RunAnywhere.registerModel(
             source = ModelSource.MODEL_SOURCE_REMOTE,
             id = id,
             memory_required_bytes = memoryRequirement,
-            // Memory and transport size usually match in legacy catalogs, so
-            // downloadSize defaults to memoryRequirement. Exact large-model
-            // rows may provide both independently: compatibility needs runtime
-            // headroom while the download planner verifies exact artifact bytes.
+            // Download size comes only from a real transport-size argument. When
+            // the caller has none it stays unset so commons resolves it from the
+            // HEAD Content-Length probe; the RAM hint must never stand in here.
             download_size_bytes = downloadSize,
             supports_thinking = if (supportsThinking) true else null,
             supports_lora = if (supportsLora) true else null,
@@ -177,7 +176,7 @@ suspend fun RunAnywhere.registerModel(
     contextLength: Int? = null,
     supportsThinking: Boolean = false,
     source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
-    downloadSize: Long? = memoryRequirement,
+    downloadSize: Long? = null,
     cuaProfile: String? = null,
 ): RAModelInfo {
     requireStorageInitialized(this)
@@ -192,10 +191,9 @@ suspend fun RunAnywhere.registerModel(
             framework = framework,
             category = modality,
             memory_required_bytes = memoryRequirement,
-            // Runtime compatibility and storage planning are independent.
-            // Legacy callers retain the old behavior because downloadSize
-            // defaults to memoryRequirement, while exact catalogs can provide
-            // the aggregate final artifact size separately.
+            // Runtime compatibility and storage planning are independent: this is
+            // the aggregate artifact size only when a caller supplies it, else
+            // unset so commons probes the real bytes. Never seeded from RAM.
             download_size_bytes = downloadSize,
             context_length = contextLength,
             supports_thinking = if (supportsThinking) true else null,
