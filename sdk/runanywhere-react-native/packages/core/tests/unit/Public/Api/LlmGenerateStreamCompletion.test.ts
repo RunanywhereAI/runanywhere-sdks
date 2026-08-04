@@ -46,6 +46,7 @@ import { SdkInitResult } from '@runanywhere/proto-ts/sdk_init';
 import {
   LLMStreamEvent,
   type LLMStreamEvent as LLMStreamEventMessage,
+  type DeepPartial,
 } from '@runanywhere/proto-ts/llm_service';
 import { TokenKind } from '@runanywhere/proto-ts/voice_events';
 import {
@@ -67,7 +68,7 @@ function phase2Payload(): ArrayBuffer {
   return bytesToArrayBuffer(bytes);
 }
 
-function encodeEvent(partial: Partial<LLMStreamEventMessage>): ArrayBuffer {
+function encodeEvent(partial: DeepPartial<LLMStreamEventMessage>): ArrayBuffer {
   const bytes = LLMStreamEvent.encode(
     LLMStreamEvent.fromPartial(partial)
   ).finish();
