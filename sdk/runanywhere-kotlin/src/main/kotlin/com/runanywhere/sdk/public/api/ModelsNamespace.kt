@@ -23,6 +23,21 @@ import java.util.concurrent.atomic.AtomicBoolean
 private val modelsLogger = SDKLogger("Models")
 private val loadKnobsWarned = AtomicBoolean(false)
 
+/**
+ * [LoadOptions] fields the commons load ABI has no wire path for yet.
+ *
+ * `ModelLoadRequest` only carries a framework pin; `contextLength`, `threads`,
+ * and `useGpu` are accepted here for cross-SDK API parity but are silently
+ * dropped below commons until the native load ABI grows placement fields
+ * (tracked as a follow-up — see `pr605_review_fixes.md` issue 8).
+ */
+internal fun LoadOptions?.ignoredKnobs(): List<String> =
+    listOfNotNull(
+        "contextLength".takeIf { this?.contextLength != null },
+        "threads".takeIf { this?.threads != null },
+        "useGpu".takeIf { this?.useGpu != null },
+    )
+
 private val LOADABLE_CATEGORIES =
     listOf(
         ModelCategory.MODEL_CATEGORY_LANGUAGE,
@@ -119,7 +134,8 @@ public class ModelsNamespace internal constructor() {
      * Make [id] resident now, downloading it first when its bytes are absent.
      *
      * `contextLength`, `threads`, and `useGpu` on [options] are not carried by
-     * the commons load ABI yet and are ignored.
+     * the commons load ABI yet and are ignored; only `framework` reaches
+     * commons today.
      *
      * @throws SDKException when the model cannot be loaded.
      */
@@ -128,15 +144,10 @@ public class ModelsNamespace internal constructor() {
         val category =
             registered?.category?.takeIf { it != ModelCategory.MODEL_CATEGORY_UNSPECIFIED }
                 ?: ModelCategory.MODEL_CATEGORY_LANGUAGE
-        val ignoredKnobs =
-            buildList {
-                if (options?.contextLength != null) add("contextLength")
-                if (options?.threads != null) add("threads")
-                if (options?.useGpu != null) add("useGpu")
-            }
-        if (ignoredKnobs.isNotEmpty() && loadKnobsWarned.compareAndSet(false, true)) {
+        val ignored = options.ignoredKnobs()
+        if (ignored.isNotEmpty() && loadKnobsWarned.compareAndSet(false, true)) {
             modelsLogger.warn(
-                "LoadOptions ${ignoredKnobs.joinToString(", ")} ignored: " +
+                "LoadOptions ${ignored.joinToString(", ")} ignored: " +
                     "the commons load ABI does not carry them",
             )
         }

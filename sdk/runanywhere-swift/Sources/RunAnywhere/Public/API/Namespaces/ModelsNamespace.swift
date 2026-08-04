@@ -58,7 +58,8 @@ public extension RunAnywhere {
                     modality: registration.category,
                     memoryRequirement: registration.memoryRequirementBytes,
                     supportsThinking: registration.supportsThinking,
-                    supportsLora: registration.supportsLora
+                    supportsLora: registration.supportsLora,
+                    cuaProfile: registration.cuaProfile
                 )
             case .archive(let url, let structure, let type):
                 return try await RunAnywhere.registerArchive(
@@ -71,7 +72,8 @@ public extension RunAnywhere {
                     archiveType: type,
                     memoryRequirement: registration.memoryRequirementBytes,
                     supportsThinking: registration.supportsThinking,
-                    supportsLora: registration.supportsLora
+                    supportsLora: registration.supportsLora,
+                    cuaProfile: registration.cuaProfile
                 )
             case .multiFile(let files):
                 guard let id = registration.id else {
@@ -90,7 +92,8 @@ public extension RunAnywhere {
                     memoryRequirement: registration.memoryRequirementBytes,
                     contextLength: registration.contextLength,
                     supportsThinking: registration.supportsThinking,
-                    downloadSize: registration.downloadSizeBytes
+                    downloadSize: registration.downloadSizeBytes,
+                    cuaProfile: registration.cuaProfile
                 )
             }
         }
