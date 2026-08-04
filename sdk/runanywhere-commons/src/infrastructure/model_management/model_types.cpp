@@ -1233,34 +1233,61 @@ rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model) {
     copy->artifact_info.file_descriptor_count = 0;
     copy->artifact_info.strategy_id = nullptr;
 
+    const auto duplicate_artifact_string = [](const char* source, const char** destination) {
+        if (!source) {
+            *destination = nullptr;
+            return true;
+        }
+        *destination = rac_strdup(source);
+        return *destination != nullptr;
+    };
+
     // expected_files (required_patterns + optional_patterns + description)
     if (model->artifact_info.expected_files) {
         copy->artifact_info.expected_files = rac_expected_model_files_alloc();
-        if (copy->artifact_info.expected_files) {
-            const auto* src_ef = model->artifact_info.expected_files;
-            auto* dst_ef = copy->artifact_info.expected_files;
+        if (!copy->artifact_info.expected_files) {
+            rac_model_info_free(copy);
+            return nullptr;
+        }
 
-            if (src_ef->required_patterns && src_ef->required_pattern_count > 0) {
-                dst_ef->required_patterns =
-                    static_cast<const char**>(calloc(src_ef->required_pattern_count, sizeof(char*)));
-                if (dst_ef->required_patterns) {
-                    dst_ef->required_pattern_count = src_ef->required_pattern_count;
-                    for (size_t i = 0; i < src_ef->required_pattern_count; ++i) {
-                        dst_ef->required_patterns[i] = rac_strdup(src_ef->required_patterns[i]);
-                    }
+        const auto* src_ef = model->artifact_info.expected_files;
+        auto* dst_ef = copy->artifact_info.expected_files;
+
+        if (src_ef->required_patterns && src_ef->required_pattern_count > 0) {
+            dst_ef->required_patterns =
+                static_cast<const char**>(calloc(src_ef->required_pattern_count, sizeof(char*)));
+            if (!dst_ef->required_patterns) {
+                rac_model_info_free(copy);
+                return nullptr;
+            }
+            dst_ef->required_pattern_count = src_ef->required_pattern_count;
+            for (size_t i = 0; i < src_ef->required_pattern_count; ++i) {
+                if (!duplicate_artifact_string(src_ef->required_patterns[i],
+                                               &dst_ef->required_patterns[i])) {
+                    rac_model_info_free(copy);
+                    return nullptr;
                 }
             }
-            if (src_ef->optional_patterns && src_ef->optional_pattern_count > 0) {
-                dst_ef->optional_patterns =
-                    static_cast<const char**>(calloc(src_ef->optional_pattern_count, sizeof(char*)));
-                if (dst_ef->optional_patterns) {
-                    dst_ef->optional_pattern_count = src_ef->optional_pattern_count;
-                    for (size_t i = 0; i < src_ef->optional_pattern_count; ++i) {
-                        dst_ef->optional_patterns[i] = rac_strdup(src_ef->optional_patterns[i]);
-                    }
+        }
+        if (src_ef->optional_patterns && src_ef->optional_pattern_count > 0) {
+            dst_ef->optional_patterns =
+                static_cast<const char**>(calloc(src_ef->optional_pattern_count, sizeof(char*)));
+            if (!dst_ef->optional_patterns) {
+                rac_model_info_free(copy);
+                return nullptr;
+            }
+            dst_ef->optional_pattern_count = src_ef->optional_pattern_count;
+            for (size_t i = 0; i < src_ef->optional_pattern_count; ++i) {
+                if (!duplicate_artifact_string(src_ef->optional_patterns[i],
+                                               &dst_ef->optional_patterns[i])) {
+                    rac_model_info_free(copy);
+                    return nullptr;
                 }
             }
-            dst_ef->description = rac_strdup(src_ef->description);
+        }
+        if (!duplicate_artifact_string(src_ef->description, &dst_ef->description)) {
+            rac_model_info_free(copy);
+            return nullptr;
         }
     }
 
@@ -1269,27 +1296,32 @@ rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model) {
     if (model->artifact_info.file_descriptors && model->artifact_info.file_descriptor_count > 0) {
         copy->artifact_info.file_descriptors =
             rac_model_file_descriptors_alloc(model->artifact_info.file_descriptor_count);
-        if (copy->artifact_info.file_descriptors) {
-            copy->artifact_info.file_descriptor_count = model->artifact_info.file_descriptor_count;
-            for (size_t i = 0; i < model->artifact_info.file_descriptor_count; ++i) {
-                const auto& src_fd = model->artifact_info.file_descriptors[i];
-                auto& dst_fd = copy->artifact_info.file_descriptors[i];
-                dst_fd.relative_path = rac_strdup(src_fd.relative_path);
-                dst_fd.destination_path = rac_strdup(src_fd.destination_path);
-                dst_fd.url = rac_strdup(src_fd.url);
-                dst_fd.checksum_sha256 = rac_strdup(src_fd.checksum_sha256);
-                dst_fd.is_required = src_fd.is_required;
-                dst_fd.role = src_fd.role;
-                dst_fd.size_bytes = src_fd.size_bytes;
-            }
-        } else {
-            copy->artifact_info.file_descriptor_count = 0;
+        if (!copy->artifact_info.file_descriptors) {
+            rac_model_info_free(copy);
+            return nullptr;
         }
-    } else {
-        copy->artifact_info.file_descriptor_count = 0;
+        copy->artifact_info.file_descriptor_count = model->artifact_info.file_descriptor_count;
+        for (size_t i = 0; i < model->artifact_info.file_descriptor_count; ++i) {
+            const auto& src_fd = model->artifact_info.file_descriptors[i];
+            auto& dst_fd = copy->artifact_info.file_descriptors[i];
+            if (!duplicate_artifact_string(src_fd.relative_path, &dst_fd.relative_path) ||
+                !duplicate_artifact_string(src_fd.destination_path, &dst_fd.destination_path) ||
+                !duplicate_artifact_string(src_fd.url, &dst_fd.url) ||
+                !duplicate_artifact_string(src_fd.checksum_sha256, &dst_fd.checksum_sha256)) {
+                rac_model_info_free(copy);
+                return nullptr;
+            }
+            dst_fd.is_required = src_fd.is_required;
+            dst_fd.role = src_fd.role;
+            dst_fd.size_bytes = src_fd.size_bytes;
+        }
     }
 
-    copy->artifact_info.strategy_id = rac_strdup(model->artifact_info.strategy_id);
+    if (!duplicate_artifact_string(model->artifact_info.strategy_id,
+                                   &copy->artifact_info.strategy_id)) {
+        rac_model_info_free(copy);
+        return nullptr;
+    }
 
     // Copy tags
     if (model->tags && model->tag_count > 0) {
