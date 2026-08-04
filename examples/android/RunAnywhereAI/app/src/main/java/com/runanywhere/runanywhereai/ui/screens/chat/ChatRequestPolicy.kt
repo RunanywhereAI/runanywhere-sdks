@@ -32,6 +32,9 @@ internal object ChatRequestPolicy {
      * ESTIMATED and deliberately over-counted (≈3 chars/token + per-message role markers) plus a context
      * margin — better to trim a turn early than to overflow and crash. Large-context models (Qwen3.5 =
      * 1024) keep their full history for normal conversations; only long chats on tiny models get trimmed.
+     *
+     * Kept turns are a CONTIGUOUS chronological block. Trailing turns that cannot fit are skipped rather
+     * than aborting the scan, so one oversized reply costs you that reply, not the entire conversation.
      */
     fun windowHistory(
         turn: ChatTurnSnapshot,
@@ -51,7 +54,17 @@ internal object ChatRequestPolicy {
         val kept = ArrayDeque<ProtoChatMessage>()
         for (message in turn.history.asReversed()) { // keep the most RECENT turns that fit
             val cost = est(message.content)
-            if (cost > available) break
+            if (cost > available) {
+                // A single oversized message must not erase the whole history. A plain `break` here made
+                // trimming ALL-OR-NOTHING: one long assistant reply (a reasoning model easily emits 150-250
+                // tokens) exceeds the entire history budget on a 512-token model, so every older turn was
+                // discarded too — including the SHORT user turn that carried the facts, which would have fit
+                // with room to spare. The model then answers "I don't have information about your name"
+                // immediately after being told it. Skip trailing messages that cannot fit; once something
+                // HAS been kept, stop, so the result stays a contiguous chronological block.
+                if (kept.isEmpty()) continue
+                break
+            }
             available -= cost
             kept.addFirst(message)
         }
