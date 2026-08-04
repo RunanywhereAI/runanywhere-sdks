@@ -1342,6 +1342,39 @@ static TestResult test_archive_type_from_path() {
     ASSERT_EQ(rac_archive_type_from_path("model.gguf", &type), RAC_FALSE,
               "Should not detect archive from .gguf");
 
+    struct ArchivePathCase {
+        const char* path;
+        rac_archive_type_t expected_type;
+    };
+    static const ArchivePathCase archive_paths[] = {
+        {"MODEL.ZIP?download=1#fragment", RAC_ARCHIVE_TYPE_ZIP},
+        {"model.tar.gz?download=1", RAC_ARCHIVE_TYPE_TAR_GZ},
+        {"model.tgz#fragment", RAC_ARCHIVE_TYPE_TAR_GZ},
+        {"model.tar.bz2", RAC_ARCHIVE_TYPE_TAR_BZ2},
+        {"model.tbz2", RAC_ARCHIVE_TYPE_TAR_BZ2},
+        {"model.tar.xz", RAC_ARCHIVE_TYPE_TAR_XZ},
+        {"model.txz", RAC_ARCHIVE_TYPE_TAR_XZ},
+    };
+    for (const auto& archive_path : archive_paths) {
+        ASSERT_EQ(rac_archive_type_from_path(archive_path.path, &type), RAC_TRUE,
+                  "Should detect an archive from a terminal extension");
+        ASSERT_EQ(type, archive_path.expected_type, "Should detect the expected archive type");
+    }
+
+    static const char* non_archive_paths[] = {
+        "model.zip.backup",
+        "weights.zip.sha256",
+        "https://host/archive.zip/metadata.json",
+        "model.tar.gz.backup",
+        "model.tgz.sha256",
+        "model.tar.xz/metadata.json",
+        "model.tbz2.backup",
+    };
+    for (const char* path : non_archive_paths) {
+        ASSERT_EQ(rac_archive_type_from_path(path, &type), RAC_FALSE,
+                  "Should reject an archive extension before the path suffix");
+    }
+
     return TEST_PASS();
 }
 
