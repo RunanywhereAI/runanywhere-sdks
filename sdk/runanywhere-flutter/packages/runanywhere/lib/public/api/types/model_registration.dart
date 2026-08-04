@@ -43,6 +43,7 @@ class ModelRegistration {
     this.supportsThinking = false,
     this.supportsLora = false,
     this.source = ModelSource.MODEL_SOURCE_REMOTE,
+    this.cuaProfile,
   });
 
   /// Register one downloadable weight file.
@@ -56,6 +57,7 @@ class ModelRegistration {
     int? memoryRequirementBytes,
     bool supportsThinking = false,
     bool supportsLora = false,
+    String? cuaProfile,
   }) => ModelRegistration._(
     kind: ModelArtifactKind.singleFile,
     name: name,
@@ -67,6 +69,7 @@ class ModelRegistration {
     memoryRequirementBytes: memoryRequirementBytes,
     supportsThinking: supportsThinking,
     supportsLora: supportsLora,
+    cuaProfile: cuaProfile,
   );
 
   /// Register an archive that unpacks into a model directory.
@@ -81,6 +84,7 @@ class ModelRegistration {
     int? memoryRequirementBytes,
     bool supportsThinking = false,
     bool supportsLora = false,
+    String? cuaProfile,
   }) => ModelRegistration._(
     kind: ModelArtifactKind.archive,
     name: name,
@@ -93,6 +97,7 @@ class ModelRegistration {
     memoryRequirementBytes: memoryRequirementBytes,
     supportsThinking: supportsThinking,
     supportsLora: supportsLora,
+    cuaProfile: cuaProfile,
   );
 
   /// Register several files that together make up one model.
@@ -106,6 +111,7 @@ class ModelRegistration {
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
+    String? cuaProfile,
   }) => ModelRegistration._(
     kind: ModelArtifactKind.multiFile,
     name: name,
@@ -117,6 +123,7 @@ class ModelRegistration {
     contextLength: contextLength,
     supportsThinking: supportsThinking,
     source: source,
+    cuaProfile: cuaProfile,
   );
 
   /// Which registration shape this is.
@@ -163,6 +170,11 @@ class ModelRegistration {
 
   /// Where the model comes from.
   final ModelSource source;
+
+  /// Computer-Use-Agent profile id (e.g. `'fara'`) for a CUA-capable model.
+  /// Lands on `ModelInfo.cuaProfile` so callers can discover which
+  /// registered models are drivable through `RunAnywhere.cua`.
+  final String? cuaProfile;
 }
 
 /// Narrows `models.list` to a subset of the registry.

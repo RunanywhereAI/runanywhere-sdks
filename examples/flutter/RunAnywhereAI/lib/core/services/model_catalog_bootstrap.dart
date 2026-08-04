@@ -254,6 +254,30 @@ abstract final class ModelCatalogBootstrap {
       modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
       memoryRequirement: 600000000,
     );
+    // Fara1.5 — Computer-Use Agent profile model, mirrors the Android/iOS/RN
+    // catalog rows so `RunAnywhere.cua` has a drivable model on every
+    // platform. `cuaProfile` lands on `ModelInfo.cuaProfile`
+    // (PR #605 review issue 9).
+    await _registerMultiFile(
+      id: 'fara1.5-4b-q4_k_m',
+      name: 'Fara1.5 4B Computer-Use Agent Q4_K_M',
+      files: [
+        (
+          url:
+              'https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/Fara1.5-4B-Q4_K_M.gguf',
+          filename: 'Fara1.5-4B-Q4_K_M.gguf',
+        ),
+        (
+          url:
+              'https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/mmproj-Fara1.5-4B-f16.gguf',
+          filename: 'mmproj-Fara1.5-4B-f16.gguf',
+        ),
+      ],
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+      memoryRequirement: 3300000000,
+      cuaProfile: RunAnywhereCUA.faraProfile,
+    );
     debugPrint('VLM models registered');
 
     // --- STT models (Sherpa-ONNX) -----------------------------------------
@@ -604,6 +628,7 @@ abstract final class ModelCatalogBootstrap {
     required InferenceFramework framework,
     required ModelCategory modality,
     required int memoryRequirement,
+    String? cuaProfile,
   }) async {
     // File roles are left unset: the SDK fills them from the shared commons
     // classifier so the app never mirrors its filename conventions.
@@ -625,6 +650,7 @@ abstract final class ModelCatalogBootstrap {
           framework: framework,
           category: modality,
           memoryRequirementBytes: memoryRequirement,
+          cuaProfile: cuaProfile,
         ),
       );
     } catch (e) {

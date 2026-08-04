@@ -27,6 +27,7 @@ public class ModelRegistration private constructor(
     internal val archiveStructure: ArchiveStructure?,
     internal val files: List<ModelFileDescriptor>,
     internal val contextLength: Int?,
+    internal val cuaProfile: String?,
 ) {
     internal enum class Kind {
         URL,
@@ -46,6 +47,7 @@ public class ModelRegistration private constructor(
             downloadBytes: Long? = memoryBytes,
             supportsThinking: Boolean = false,
             supportsLora: Boolean = false,
+            cuaProfile: String? = null,
         ): ModelRegistration =
             ModelRegistration(
                 kind = Kind.URL,
@@ -62,6 +64,7 @@ public class ModelRegistration private constructor(
                 archiveStructure = null,
                 files = emptyList(),
                 contextLength = null,
+                cuaProfile = cuaProfile,
             )
 
         /** Register an archive whose inner layout is described by [structure]. */
@@ -76,6 +79,7 @@ public class ModelRegistration private constructor(
             memoryBytes: Long? = null,
             supportsThinking: Boolean = false,
             supportsLora: Boolean = false,
+            cuaProfile: String? = null,
         ): ModelRegistration =
             ModelRegistration(
                 kind = Kind.ARCHIVE,
@@ -92,6 +96,7 @@ public class ModelRegistration private constructor(
                 archiveStructure = structure,
                 files = emptyList(),
                 contextLength = null,
+                cuaProfile = cuaProfile,
             )
 
         /** Register a model whose weights span several files. */
@@ -105,6 +110,7 @@ public class ModelRegistration private constructor(
             downloadBytes: Long? = memoryBytes,
             contextLength: Int? = null,
             supportsThinking: Boolean = false,
+            cuaProfile: String? = null,
         ): ModelRegistration =
             ModelRegistration(
                 kind = Kind.MULTI_FILE,
@@ -121,6 +127,7 @@ public class ModelRegistration private constructor(
                 archiveStructure = null,
                 files = files,
                 contextLength = contextLength,
+                cuaProfile = cuaProfile,
             )
     }
 }

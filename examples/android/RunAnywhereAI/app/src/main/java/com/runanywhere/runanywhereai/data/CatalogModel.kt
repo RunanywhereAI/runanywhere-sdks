@@ -111,6 +111,8 @@ internal data class MultiFileModel(
     val memoryBytes: Long,
     val downloadBytes: Long = memoryBytes,
     val files: List<ModelFile>,
+    /** Computer-Use-Agent profile id (e.g. `"fara"`) for CUA-capable rows. */
+    val cuaProfile: String? = null,
 ) : CatalogModel {
     override suspend fun register(): ModelInfo =
         RunAnywhere.models.register(
@@ -122,6 +124,7 @@ internal data class MultiFileModel(
                 category = category,
                 memoryBytes = memoryBytes,
                 downloadBytes = downloadBytes,
+                cuaProfile = cuaProfile,
             ),
         )
 

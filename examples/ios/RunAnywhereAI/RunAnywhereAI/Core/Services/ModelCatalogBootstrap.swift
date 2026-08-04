@@ -603,6 +603,24 @@ enum ModelCatalogBootstrap {
             modality: .multimodal,
             memoryRequirement: 600_000_000
         )
+        // Fara1.5 — Computer-Use Agent profile model, mirrors the Android
+        // catalog row (`ModelCatalog.kt`) so `RunAnywhere.CUA` has a
+        // drivable model on both platforms. `cuaProfile` lands on
+        // `ModelInfo.cuaProfile` (PR #605 review issue 9).
+        await registerMultiFile(
+            id: "fara1.5-4b-q4_k_m",
+            name: "Fara1.5 4B Computer-Use Agent Q4_K_M",
+            files: [
+                ("https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/Fara1.5-4B-Q4_K_M.gguf",
+                 "Fara1.5-4B-Q4_K_M.gguf"),
+                ("https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/mmproj-Fara1.5-4B-f16.gguf",
+                 "mmproj-Fara1.5-4B-f16.gguf")
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 3_300_000_000,
+            cuaProfile: RunAnywhere.CUA.faraProfile
+        )
         logger.info("VLM models registered")
         #endif
 
@@ -1392,7 +1410,8 @@ enum ModelCatalogBootstrap {
         memoryRequirement: Int64,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
-        downloadSize: Int64? = nil
+        downloadSize: Int64? = nil,
+        cuaProfile: String? = nil
     ) async {
         await registerMultiFile(
             id: id,
@@ -1403,7 +1422,8 @@ enum ModelCatalogBootstrap {
             memoryRequirement: memoryRequirement,
             contextLength: contextLength,
             supportsThinking: supportsThinking,
-            downloadSize: downloadSize
+            downloadSize: downloadSize,
+            cuaProfile: cuaProfile
         )
     }
 
@@ -1416,7 +1436,8 @@ enum ModelCatalogBootstrap {
         memoryRequirement: Int64,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
-        downloadSize: Int64? = nil
+        downloadSize: Int64? = nil,
+        cuaProfile: String? = nil
     ) async {
         guard framework != .mlx || mlxCatalogEnabled else { return }
         let descriptors = files.compactMap { makeDescriptor(for: $0, modality: modality) }
@@ -1435,7 +1456,8 @@ enum ModelCatalogBootstrap {
                     memoryRequirementBytes: memoryRequirement,
                     downloadSizeBytes: downloadSize,
                     contextLength: contextLength,
-                    supportsThinking: supportsThinking
+                    supportsThinking: supportsThinking,
+                    cuaProfile: cuaProfile
                 )
             )
         } catch {
