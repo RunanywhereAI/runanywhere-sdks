@@ -1319,6 +1319,213 @@ int test_rag_missing_embedding_model_id_fails() {
     return 0;
 }
 
+// Retrieval-only rag.search must return chunks without invoking the session LLM,
+// support embed-only sessions, honor top_k / threshold / scope, and surface
+// structured errors for empty indexes and multi-query without an LLM.
+int test_rag_search_retrieval_only() {
+    g_dummy_embedding_output_dimension = 3;
+    g_dummy_embedding_reported_dimension = 0;
+    g_dummy_llm_last_max_tokens = -1;
+    g_dummy_llm_last_temperature = -1.0f;
+
+    rac_embeddings_service_ops_t embedding_ops = make_embedding_ops();
+    rac_llm_service_ops_t llm_ops = make_llm_ops(/*supports_lora=*/true);
+    rac_engine_vtable_t onnx = make_vtable("onnx", nullptr, &embedding_ops, nullptr);
+    rac_engine_vtable_t llamacpp = make_vtable("llamacpp", &llm_ops, nullptr, nullptr);
+    (void)rac_plugin_unregister("onnx");
+    (void)rac_plugin_unregister("llamacpp");
+    CHECK(rac_plugin_register(&onnx) == RAC_SUCCESS, "RAG search embeddings plugin registers");
+    CHECK(rac_plugin_register(&llamacpp) == RAC_SUCCESS, "RAG search LLM plugin registers");
+
+    auto root = temp_root("rag-search");
+    auto embedding_path = root / "mock-embeddings.onnx";
+    auto llm_path = root / "mock-llm.gguf";
+    write_file(embedding_path, "ONNXembed");
+    write_file(llm_path, "GGUFllm");
+    std::string embedding_path_str = embedding_path.string();
+    std::string llm_path_str = llm_path.string();
+
+    rac_model_info_t embedding_model{};
+    embedding_model.id = const_cast<char*>("rag.embedding.search");
+    embedding_model.name = const_cast<char*>("RAG Search Embedding");
+    embedding_model.category = RAC_MODEL_CATEGORY_EMBEDDING;
+    embedding_model.format = RAC_MODEL_FORMAT_ONNX;
+    embedding_model.framework = RAC_FRAMEWORK_ONNX;
+    embedding_model.local_path = const_cast<char*>(embedding_path_str.c_str());
+    CHECK(rac_register_model(&embedding_model) == RAC_SUCCESS,
+          "RAG search embedding model registers");
+
+    rac_model_info_t llm_model{};
+    llm_model.id = const_cast<char*>("rag.llm.search");
+    llm_model.name = const_cast<char*>("RAG Search LLM");
+    llm_model.category = RAC_MODEL_CATEGORY_LANGUAGE;
+    llm_model.format = RAC_MODEL_FORMAT_GGUF;
+    llm_model.framework = RAC_FRAMEWORK_LLAMACPP;
+    llm_model.local_path = const_cast<char*>(llm_path_str.c_str());
+    CHECK(rac_register_model(&llm_model) == RAC_SUCCESS, "RAG search LLM model registers");
+
+    // Embed-only session: search must work without an LLM.
+    runanywhere::v1::RAGConfiguration embed_only_config;
+    embed_only_config.set_embedding_model_id("rag.embedding.search");
+    embed_only_config.set_embedding_dimension(3);
+    embed_only_config.set_top_k(3);
+    embed_only_config.set_similarity_threshold(0.0f);
+    embed_only_config.set_chunk_size(256);
+    embed_only_config.set_chunk_overlap(0);
+    std::vector<uint8_t> embed_only_bytes;
+    CHECK(serialize(embed_only_config, &embed_only_bytes), "embed-only RAGConfiguration serializes");
+
+    rac_handle_t embed_session = nullptr;
+    CHECK(rac_rag_session_create_proto(embed_only_bytes.data(), embed_only_bytes.size(),
+                                       &embed_session) == RAC_SUCCESS &&
+              embed_session != nullptr,
+          "embed-only RAG session creates");
+
+    runanywhere::v1::RAGSearchRequest empty_index_req;
+    empty_index_req.set_question("anything");
+    std::vector<uint8_t> empty_index_bytes;
+    CHECK(serialize(empty_index_req, &empty_index_bytes), "empty-index RAGSearchRequest serializes");
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc =
+        rac_rag_search_proto(embed_session, empty_index_bytes.data(), empty_index_bytes.size(), &out);
+    runanywhere::v1::RAGSearchResponse empty_index_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &empty_index_result),
+          "search on empty index returns RAGSearchResponse");
+    CHECK(empty_index_result.chunks_size() == 0, "empty index search returns zero chunks");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::RAGSearchRequest empty_q;
+    std::vector<uint8_t> empty_q_bytes;
+    CHECK(serialize(empty_q, &empty_q_bytes), "empty-question RAGSearchRequest serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_search_proto(embed_session, empty_q_bytes.data(), empty_q_bytes.size(), &out);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT, "empty search question returns INVALID_ARGUMENT");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::RAGDocument doc_a;
+    doc_a.set_id("docs/alpha");
+    doc_a.set_text("Alpha document about retrieval-only RAG search.");
+    (*doc_a.mutable_metadata())["document_id"] = "docs/alpha";
+    std::vector<uint8_t> doc_a_bytes;
+    CHECK(serialize(doc_a, &doc_a_bytes), "search doc A serializes");
+    rac_proto_buffer_init(&out);
+    CHECK(rac_rag_ingest_proto(embed_session, doc_a_bytes.data(), doc_a_bytes.size(), &out) ==
+              RAC_SUCCESS,
+          "embed-only ingest A succeeds");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::RAGDocument doc_b;
+    doc_b.set_id("other/beta");
+    doc_b.set_text("Beta document outside the docs/ scope prefix.");
+    (*doc_b.mutable_metadata())["document_id"] = "other/beta";
+    std::vector<uint8_t> doc_b_bytes;
+    CHECK(serialize(doc_b, &doc_b_bytes), "search doc B serializes");
+    rac_proto_buffer_init(&out);
+    CHECK(rac_rag_ingest_proto(embed_session, doc_b_bytes.data(), doc_b_bytes.size(), &out) ==
+              RAC_SUCCESS,
+          "embed-only ingest B succeeds");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::RAGSearchRequest multi_q;
+    multi_q.set_question("retrieval-only");
+    multi_q.set_enable_multi_query(true);
+    std::vector<uint8_t> multi_q_bytes;
+    CHECK(serialize(multi_q, &multi_q_bytes), "multi-query RAGSearchRequest serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_search_proto(embed_session, multi_q_bytes.data(), multi_q_bytes.size(), &out);
+    CHECK(rc == RAC_ERROR_INVALID_STATE,
+          "multi-query search without session LLM returns INVALID_STATE");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::RAGSearchRequest search_req;
+    search_req.set_question("retrieval-only RAG search");
+    search_req.set_retrieval_top_k(1);
+    search_req.set_similarity_threshold(0.0f);
+    search_req.set_scope_prefix("docs/");
+    std::vector<uint8_t> search_bytes;
+    CHECK(serialize(search_req, &search_bytes), "RAGSearchRequest serializes");
+    rac_proto_buffer_init(&out);
+    rac_sdk_event_clear_queue();
+    g_dummy_llm_last_max_tokens = -1;
+    rc = rac_rag_search_proto(embed_session, search_bytes.data(), search_bytes.size(), &out);
+    runanywhere::v1::RAGSearchResponse search_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &search_result),
+          "embed-only search returns RAGSearchResponse");
+    CHECK(search_result.chunks_size() == 1, "search respects retrieval_top_k=1");
+    CHECK(search_result.chunks(0).text().find("Alpha") != std::string::npos,
+          "scope_prefix keeps docs/ chunks");
+    CHECK(!search_result.request_id().empty(), "search response includes request_id");
+    CHECK(g_dummy_llm_last_max_tokens == -1, "embed-only search never invokes the LLM");
+    rac_proto_buffer_free(&out);
+    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED),
+          "rag.search publishes query-started telemetry");
+    CHECK(poll_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED),
+          "rag.search publishes query-completed telemetry");
+
+    rac_rag_session_destroy_proto(embed_session);
+
+    // Session with LLM: search still must not generate.
+    runanywhere::v1::RAGConfiguration full_config;
+    full_config.set_embedding_model_id("rag.embedding.search");
+    full_config.set_llm_model_id("rag.llm.search");
+    full_config.set_embedding_dimension(3);
+    full_config.set_top_k(2);
+    full_config.set_similarity_threshold(0.0f);
+    full_config.set_chunk_size(256);
+    full_config.set_chunk_overlap(0);
+    std::vector<uint8_t> full_bytes;
+    CHECK(serialize(full_config, &full_bytes), "full RAGConfiguration serializes");
+    rac_handle_t full_session = nullptr;
+    CHECK(rac_rag_session_create_proto(full_bytes.data(), full_bytes.size(), &full_session) ==
+                  RAC_SUCCESS &&
+              full_session != nullptr,
+          "full RAG session creates");
+
+    rac_proto_buffer_init(&out);
+    CHECK(rac_rag_ingest_proto(full_session, doc_a_bytes.data(), doc_a_bytes.size(), &out) ==
+              RAC_SUCCESS,
+          "full-session ingest succeeds");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::RAGSearchRequest full_search;
+    full_search.set_question("Where does RAG live?");
+    full_search.set_retrieval_top_k(1);
+    std::vector<uint8_t> full_search_bytes;
+    CHECK(serialize(full_search, &full_search_bytes), "full-session RAGSearchRequest serializes");
+    rac_proto_buffer_init(&out);
+    g_dummy_llm_last_max_tokens = -1;
+    g_dummy_llm_last_temperature = -1.0f;
+    rc = rac_rag_search_proto(full_session, full_search_bytes.data(), full_search_bytes.size(), &out);
+    search_result.Clear();
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &search_result),
+          "full-session search returns RAGSearchResponse");
+    CHECK(search_result.chunks_size() >= 1, "full-session search returns chunks");
+    CHECK(g_dummy_llm_last_max_tokens == -1, "search does not invoke LLM generation");
+    CHECK(g_dummy_llm_last_temperature < 0.0f, "search does not touch LLM sampling options");
+    rac_proto_buffer_free(&out);
+
+    // Query path still generates (regression guard).
+    runanywhere::v1::RAGQueryOptions query;
+    query.set_question("Where does RAG live?");
+    query.mutable_generation()->set_max_output_tokens(16);
+    query.mutable_generation()->set_temperature(0.0f);
+    std::vector<uint8_t> query_bytes;
+    CHECK(serialize(query, &query_bytes), "RAGQueryOptions serializes after search");
+    rac_proto_buffer_init(&out);
+    rc = rac_rag_query_proto(full_session, query_bytes.data(), query_bytes.size(), &out);
+    runanywhere::v1::RAGResult query_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &query_result),
+          "rag.query still returns RAGResult after search landing");
+    CHECK(query_result.answer() == "mock answer", "rag.query still invokes the LLM");
+    rac_proto_buffer_free(&out);
+
+    rac_rag_session_destroy_proto(full_session);
+    (void)rac_plugin_unregister("onnx");
+    (void)rac_plugin_unregister("llamacpp");
+    return 0;
+}
+
 // Adapter file with valid GGUF magic so the lifecycle-aware
 // rac_lora_compatibility_proto + rac_lora_apply_proto headers see a
 // well-formed adapter on disk.
@@ -1520,6 +1727,7 @@ int main() {
         test_embeddings_options_mapping();
         test_diffusion_progress_cancel_and_unsupported();
         test_rag_ingest_query_mocked_path();
+        test_rag_search_retrieval_only();
         test_rag_auto_embedding_dimension(384, 384, "384-reported");
         test_rag_auto_embedding_dimension(768, 0, "768-runtime");
         test_rag_reported_embedding_dimension_mismatch_fails();

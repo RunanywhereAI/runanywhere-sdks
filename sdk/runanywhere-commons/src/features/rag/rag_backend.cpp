@@ -617,6 +617,94 @@ rac_result_t RAGBackend::query(const std::string& question, const rac_llm_option
     return RAC_SUCCESS;
 }
 
+rac_result_t RAGBackend::retrieve(const std::string& question,
+                                  std::vector<SearchResult>& out_sources, double* out_retrieval_ms,
+                                  const QueryOverrides* overrides) {
+    out_sources.clear();
+    if (out_retrieval_ms)
+        *out_retrieval_ms = 0.0;
+
+    auto request_cancel = std::make_shared<std::atomic<bool>>(false);
+    {
+        std::lock_guard<std::mutex> state_lock(query_state_mutex_);
+        if (active_query_cancel_) {
+            LOGE("A RAG query is already active for this session");
+            return RAC_ERROR_INVALID_STATE;
+        }
+        active_query_cancel_ = request_cancel;
+    }
+    std::unique_ptr<void, std::function<void(void*)>> request_scope(
+        reinterpret_cast<void*>(1), [this, request_cancel](void*) {
+            std::lock_guard<std::mutex> state_lock(query_state_mutex_);
+            if (active_query_cancel_.get() == request_cancel.get()) {
+                active_query_cancel_.reset();
+            }
+        });
+
+    RAGGraphInputs g_in;
+    bool wants_llm_features = false;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!initialized_ || !embeddings_service_) {
+            LOGE("Pipeline not initialized or embeddings service not available");
+            return RAC_ERROR_INVALID_STATE;
+        }
+        if (!vector_store_ || config_.embedding_dimension == 0) {
+            LOGE("RAG search requires at least one successfully embedded document");
+            return RAC_ERROR_INVALID_STATE;
+        }
+        g_in.llm_service = llm_service_;
+        g_in.embeddings_service = embeddings_service_;
+        g_in.vector_store = vector_store_.get();
+        g_in.bm25_index = bm25_index_.get();
+        g_in.embedding_dimension = config_.embedding_dimension;
+        g_in.top_k = config_.top_k;
+        g_in.similarity_threshold = config_.similarity_threshold;
+        g_in.max_context_tokens = config_.max_context_tokens;
+        g_in.prompt_template = config_.prompt_template;
+        g_in.rerank = config_.rerank;
+        wants_llm_features = config_.rerank;
+    }
+
+    if (overrides != nullptr) {
+        if (overrides->retrieval_top_k > 0) {
+            g_in.top_k = static_cast<size_t>(overrides->retrieval_top_k);
+        }
+        if (overrides->has_similarity_threshold) {
+            g_in.similarity_threshold = overrides->similarity_threshold;
+        }
+        g_in.enable_multi_query = overrides->enable_multi_query;
+        if (overrides->multi_query_count > 0) {
+            g_in.multi_query_count = static_cast<size_t>(overrides->multi_query_count);
+        }
+        g_in.scope_prefix = overrides->scope_prefix;
+        wants_llm_features = wants_llm_features || overrides->enable_multi_query;
+    }
+
+    if (wants_llm_features && !g_in.llm_service) {
+        LOGE("RAG search multi-query/rerank requires a session LLM");
+        return RAC_ERROR_INVALID_STATE;
+    }
+
+    g_in.question = question;
+    g_in.llm_options = RAC_LLM_OPTIONS_DEFAULT;
+    g_in.system_prompt = kSystemPrompt;
+    g_in.cancel_requested = request_cancel.get();
+
+    auto t_start = std::chrono::high_resolution_clock::now();
+    RAGGraphResult g_out;
+    rac_result_t status = run_rag_retrieve(g_in, g_out);
+    auto t_end = std::chrono::high_resolution_clock::now();
+    if (out_retrieval_ms) {
+        *out_retrieval_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
+    }
+    if (status != RAC_SUCCESS)
+        return status;
+
+    out_sources = std::move(g_out.sources);
+    return RAC_SUCCESS;
+}
+
 rac_result_t RAGBackend::cancel_query() {
     std::lock_guard<std::mutex> state_lock(query_state_mutex_);
     if (!active_query_cancel_) {

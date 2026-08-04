@@ -83,6 +83,9 @@
 // RAGQueryOptions (rag.proto)
 #define RAC_DEFAULT_RAG_QUERY_OPTIONS_MULTI_QUERY_COUNT 3
 
+// RAGSearchRequest (rag.proto)
+#define RAC_DEFAULT_RAG_SEARCH_REQUEST_MULTI_QUERY_COUNT 3
+
 // RerankOptions (rerank.proto)
 #define RAC_DEFAULT_RERANK_OPTIONS_TOP_N 0
 
@@ -170,5 +173,5 @@
 #define RAC_DEFAULT_VLM_GENERATION_OPTIONS_REPETITION_PENALTY 1.1f
 #define RAC_DEFAULT_VLM_GENERATION_OPTIONS_MIN_P              0.0f
 
-// 95 defaults across 31 messages.
+// 96 defaults across 32 messages.
 #endif  // RAC_DEFAULTS_GENERATED_H

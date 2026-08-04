@@ -416,6 +416,14 @@ modalities:
         context: rac_handle_t
         nonisolated: true
 
+      - swift_name: search
+        c_symbol: rac_rag_search_proto
+        request: RARAGSearchRequest
+        response: RARAGSearchResponse
+        kind: invoke
+        context: rac_handle_t
+        nonisolated: true
+
       - swift_name: clearProto
         c_symbol: rac_rag_clear_proto
         request: ~

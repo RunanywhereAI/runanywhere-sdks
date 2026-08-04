@@ -686,6 +686,32 @@ extension RAGQueryOptionsValidate on RAGQueryOptions {
   }
 }
 
+extension RAGSearchRequestConvenience on RAGSearchRequest {
+  static RAGSearchRequest defaults() {
+    final r = RAGSearchRequest();
+    r.multiQueryCount = 3;
+    return r;
+  }
+}
+
+extension RAGSearchRequestValidate on RAGSearchRequest {
+  void validate() {
+    if (question.isEmpty) {
+      throw SDKException.validationFailed(
+        'question is required',
+        fieldPath: 'RAGSearchRequest.question',
+      );
+    }
+    final effectiveMultiQueryCount = hasMultiQueryCount() ? multiQueryCount : 3;
+    if (effectiveMultiQueryCount < 1 || effectiveMultiQueryCount > 8) {
+      throw SDKException.validationFailed(
+        'multi_query_count must be in 1...8 (got $effectiveMultiQueryCount)',
+        fieldPath: 'RAGSearchRequest.multi_query_count',
+      );
+    }
+  }
+}
+
 extension RerankOptionsConvenience on RerankOptions {
   static RerankOptions defaults() {
     final r = RerankOptions();
