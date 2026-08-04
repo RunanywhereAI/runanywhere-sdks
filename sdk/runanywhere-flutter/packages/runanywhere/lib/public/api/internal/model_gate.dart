@@ -22,7 +22,7 @@ final SDKLogger _modelGateLogger = SDKLogger('ModelGate');
 /// path for yet. Only `framework` reaches commons at load time;
 /// `contextLength`, `threads`, and `useGpu` are accepted for cross-SDK API
 /// parity but are dropped below this call until the native load ABI grows
-/// placement fields (tracked as a follow-up — see `pr605_review_fixes.md`
+/// placement fields (tracked as a follow-up — see PR #605 review follow-up
 /// issue 8).
 ///
 /// Exposed (not private) so `model_gate_test.dart` can assert on it directly

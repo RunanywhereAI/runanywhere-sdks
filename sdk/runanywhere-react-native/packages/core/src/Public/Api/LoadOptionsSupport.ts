@@ -4,7 +4,7 @@
  * Only `framework` reaches commons at load time; `contextLength`, `threads`,
  * and `useGpu` are accepted on `LoadOptions` for cross-SDK API parity but are
  * dropped below `models.load()` until the native load ABI grows placement
- * fields (tracked as a follow-up — see `pr605_review_fixes.md` issue 8).
+ * fields (tracked as a follow-up — see PR #605 review follow-up issue 8).
  *
  * Kept in its own module (no native/Nitro imports) so it stays unit-testable
  * under the Node jest runner alongside the other pure-TS helpers.

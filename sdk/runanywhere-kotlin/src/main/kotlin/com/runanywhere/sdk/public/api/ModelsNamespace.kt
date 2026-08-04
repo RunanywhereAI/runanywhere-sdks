@@ -29,7 +29,7 @@ private val loadKnobsWarned = AtomicBoolean(false)
  * `ModelLoadRequest` only carries a framework pin; `contextLength`, `threads`,
  * and `useGpu` are accepted here for cross-SDK API parity but are silently
  * dropped below commons until the native load ABI grows placement fields
- * (tracked as a follow-up — see `pr605_review_fixes.md` issue 8).
+ * (tracked as a follow-up — see PR #605 review follow-up issue 8).
  */
 internal fun LoadOptions?.ignoredKnobs(): List<String> =
     listOfNotNull(

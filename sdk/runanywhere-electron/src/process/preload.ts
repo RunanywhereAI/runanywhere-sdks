@@ -15,7 +15,7 @@
 // (e.g. the `initialize` apiKey/baseUrl warning below `RunAnywhere.ts`) until it
 // is rewritten. That full rewrite — `createRunAnywhere(RpcBackend)` in the
 // renderer, matching the main-process shape — is tracked as a follow-up in
-// `pr605_review_fixes.md` (PR #605 review issue 11); it is too large for one fix
+// PR #605 review follow-up (issue 11); it is too large for one fix
 // in this pass.
 import { contextBridge, ipcRenderer } from 'electron';
 
