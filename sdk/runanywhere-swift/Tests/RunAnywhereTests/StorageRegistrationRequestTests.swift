@@ -41,7 +41,7 @@ final class StorageRegistrationRequestTests: XCTestCase {
         XCTAssertEqual(request.downloadSizeBytes, 1_110_024_519)
     }
 
-    func testMultiFileRegistrationDefaultsDownloadSizeToRuntimeMemory() {
+    func testMultiFileRegistrationLeavesDownloadSizeUnsetWithoutExplicitSize() {
         var request = RARegisterMultiFileModelRequest()
 
         RunAnywhere.applyMultiFileRegistrationSizes(
@@ -51,7 +51,8 @@ final class StorageRegistrationRequestTests: XCTestCase {
         )
 
         XCTAssertEqual(request.memoryRequiredBytes, 512_000_000)
-        XCTAssertEqual(request.downloadSizeBytes, 512_000_000)
+        XCTAssertFalse(request.hasDownloadSizeBytes)
+        XCTAssertEqual(request.downloadSizeBytes, 0)
     }
 
     func testMultiFileRegistrationCanSetDownloadSizeWithoutRuntimeMemory() {
