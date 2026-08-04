@@ -159,8 +159,9 @@ int test_native_catalog_owns_arch_and_auth_policy() {
                   v81.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
     }
 
-    const std::unordered_set<std::string> private_ids = {"kitten_nano_0_8_varlen"};
-    ASSERT_EQ(private_ids.size(), static_cast<size_t>(1));
+    const std::unordered_set<std::string> private_ids = {"kitten_nano_0_8_varlen",
+                                                        "lfm2_5_2_6b"};
+    ASSERT_EQ(private_ids.size(), static_cast<size_t>(2));
     for (const std::string& id : all) {
         ASSERT_EQ(rac_qhexrt_catalog_model_requires_hf_auth(id.c_str()),
                   private_ids.count(id) == 0 ? RAC_FALSE : RAC_TRUE);
