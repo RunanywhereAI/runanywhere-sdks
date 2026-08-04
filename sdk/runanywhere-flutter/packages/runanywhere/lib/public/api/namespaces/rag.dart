@@ -29,8 +29,13 @@ class RagApi {
   /// await s.ingest(const RagDocument('the sky is blue'));
   /// ```
   ///
-  /// Throws [SDKException] when a model cannot be loaded or the index cannot
-  /// be created.
+  /// The native RAG pipeline is process-wide (one pipeline, not a per-session
+  /// handle — matching RN/Web), so a second concurrent session is rejected
+  /// instead of silently replacing the first. Close the active session before
+  /// opening another.
+  ///
+  /// Throws [SDKException] when a session is already open, a model cannot be
+  /// loaded, or the index cannot be created.
   Future<RagSession> open({
     required ModelRef embeddingModel,
     ModelRef? llmModel,
@@ -38,6 +43,11 @@ class RagApi {
   }) async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
+    }
+    if (RagSession._active != null) {
+      throw SDKException.invalidState(
+        'A RAG session is already open; close it before opening another',
+      );
     }
     await DartBridge.ensureServicesReady();
     // The RAG backend registers itself here so callers never do backend wiring.
@@ -70,8 +80,9 @@ class RagApi {
 
 /// One RAG corpus with its index.
 ///
-/// The Flutter RAG bridge owns a single native session, so opening a new
-/// session supersedes any earlier one; calls on a superseded session throw.
+/// The Flutter RAG bridge owns a single native session (matching RN/Web), so
+/// [RagApi.open] rejects a second concurrent session instead of silently
+/// superseding the active one. Calls after [close] throw.
 class RagSession {
   RagSession._(this._config, {required this.generates}) {
     _active = this;
