@@ -18,6 +18,7 @@ import type {
   RAGDocument,
   RAGQueryOptions,
   RAGResult,
+  RAGSearchRequest,
   RAGSearchResult,
   RAGStatistics,
   RAGStreamEvent,
@@ -26,6 +27,7 @@ import type { EmbeddingVector } from '@runanywhere/proto-ts/embeddings_options';
 import {
   rAGConfigurationDefaults,
   rAGQueryOptionsDefaults,
+  rAGSearchRequestDefaults,
 } from '@runanywhere/proto-ts/convenience/rag_convenience';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import { getBackendWorkerOwner } from '../../runtime/BackendWorkerModelOwnership.js';
@@ -72,9 +74,8 @@ export interface RAGProvider {
   ragIngestDocument?(document: RAGDocument): Promise<RAGStatistics>;
   ragAddDocumentsBatch?(documents: Array<{ text: string; metadataJson?: string }>): Promise<void>;
   ragQuery(question: string, options?: RAGQueryOverrides): Promise<RAGResult>;
-  /** Retrieval without generation. Optional — commons exports no
-   * retrieval-only RAG ABI, so only the TypeScript-owned vector index
-   * implements it today. */
+  /** Retrieval without generation via `rac_rag_search_proto` (native) or the
+   * TypeScript-owned vector index (CrossWasm / Persistent). */
   ragSearch?(question: string, topK?: number): Promise<RAGSearchResult[]>;
   /** Streaming query — emits a RAGStreamEvent per token, then COMPLETED/ERROR.
    * Optional so providers without a streaming path stay compatible. */
@@ -405,6 +406,25 @@ class NativeRAGSessionProvider implements RAGProvider {
       );
     }
     return result;
+  }
+
+  async ragSearch(question: string, topK?: number): Promise<RAGSearchResult[]> {
+    const session = await this.ensureSession();
+    const response = await this.adapter.search(
+      session,
+      makeRAGSearchRequest(question, this.config, topK),
+    );
+    if (!response) {
+      throw SDKException.backendNotAvailable(
+        'RAG.search',
+        'rac_rag_search_proto is unavailable in this WASM module. '
+          + 'Rebuild against a commons binary that exports the retrieval-only ABI.',
+      );
+    }
+    if (response.error) {
+      throw new SDKException(response.error);
+    }
+    return response.chunks;
   }
 
   async *ragQueryStream(
@@ -1255,6 +1275,20 @@ function makeRAGQuery(
   };
 }
 
+function makeRAGSearchRequest(
+  question: string,
+  config: RAGConfiguration,
+  topK?: number,
+): RAGSearchRequest {
+  const defaults = rAGSearchRequestDefaults();
+  return {
+    ...defaults,
+    question,
+    retrievalTopK: topK ?? config.topK ?? 0,
+    similarityThreshold: config.similarityThreshold ?? defaults.similarityThreshold,
+  };
+}
+
 function makeRAGDocument(text: string, metadataJson?: string): RAGDocument {
   const parsed = parseMetadata(metadataJson);
   return {
@@ -1596,9 +1630,10 @@ export function ragStatisticsLastUpdated(statistics: RAGStatistics): Date | null
 }
 
 /**
- * Retrieve chunks for a query without generating an answer. Only the
- * TypeScript-owned vector index implements this; the native WASM RAG session
- * exports no retrieval-only ABI.
+ * Retrieve chunks for a query without generating an answer.
+ *
+ * Native WASM sessions use `rac_rag_search_proto`; CrossWasm / Persistent
+ * providers keep their TypeScript-owned retrieve path.
  */
 export async function ragSearch(
   question: string,
@@ -1608,8 +1643,8 @@ export async function ragSearch(
   if (!provider.ragSearch) {
     throw SDKException.backendNotAvailable(
       'RAG.search',
-      'The active RAG provider has no retrieval-only path. commons exports no '
-        + 'rac_rag_search_proto; use query() or install the persistent cross-WASM provider.',
+      'The active RAG provider has no retrieval-only path '
+        + '(rac_rag_search_proto unavailable).',
     );
   }
   return provider.ragSearch(question, topK);

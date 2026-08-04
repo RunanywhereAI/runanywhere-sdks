@@ -34,6 +34,7 @@ import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGQueryOptions
+import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RerankOptions
 import ai.runanywhere.proto.v1.RerankRequest
 import ai.runanywhere.proto.v1.SDKEnvironment
@@ -551,6 +552,28 @@ public fun RAGQueryOptions.validate() {
     if (multi_query_count != null && (multi_query_count < 1 || multi_query_count > 8)) {
         throw SDKException.validationFailed(
             fieldPath = "RAGQueryOptions.multi_query_count",
+            message = "multi_query_count must be in 1...8 (got ${multi_query_count})",
+        )
+    }
+}
+
+/** Generated from `(runanywhere.v1.rac_default)` annotations in idl/. */
+public fun RAGSearchRequest.Companion.defaults(): RAGSearchRequest =
+    RAGSearchRequest(
+        multi_query_count = 3,
+    )
+
+/** Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/. */
+public fun RAGSearchRequest.validate() {
+    if (question.isEmpty()) {
+        throw SDKException.validationFailed(
+            fieldPath = "RAGSearchRequest.question",
+            message = "question is required",
+        )
+    }
+    if (multi_query_count != null && (multi_query_count < 1 || multi_query_count > 8)) {
+        throw SDKException.validationFailed(
+            fieldPath = "RAGSearchRequest.multi_query_count",
             message = "multi_query_count must be in 1...8 (got ${multi_query_count})",
         )
     }

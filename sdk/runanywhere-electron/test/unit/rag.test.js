@@ -9,7 +9,15 @@ const {
   RagInferenceFramework,
 } = require('../../dist/rag');
 const { isSDKException, ErrorCode } = require('../../dist/errors');
-const { RAGConfiguration, RAGQueryOptions, RAGResult, RAGStatistics } = require('../../dist/proto/rag');
+const {
+  RAGConfiguration,
+  RAGQueryOptions,
+  RAGResult,
+  RAGSearchRequest,
+  RAGSearchResponse,
+  RAGStatistics,
+} = require('../../dist/proto/rag');
+const { createRagNamespace } = require('../../dist/api/data');
 
 // A fake of the low-level bridge (window.runanywhere.rag*), recording calls.
 function fakeBridge() {
@@ -122,6 +130,64 @@ test('vendored proto codec round-trips RAGQueryOptions + RAGResult', () => {
   assert.equal(r.answer, 'Paris.');
   assert.equal(r.retrievedChunks[0].chunkId, 'c1');
   assert.ok(Math.abs(r.retrievedChunks[0].similarityScore - 0.9) < 1e-6);
+});
+
+test('vendored proto codec round-trips RAGSearchRequest + RAGSearchResponse', () => {
+  const req = RAGSearchRequest.decode(
+    RAGSearchRequest.encode(
+      RAGSearchRequest.fromPartial({ question: 'capital?', retrievalTopK: 3 })
+    ).finish()
+  );
+  assert.equal(req.question, 'capital?');
+  assert.equal(req.retrievalTopK, 3);
+
+  const res = RAGSearchResponse.decode(
+    RAGSearchResponse.encode(
+      RAGSearchResponse.fromPartial({
+        chunks: [{ chunkId: 'c1', text: 'France…', similarityScore: 0.9 }],
+        retrievalTimeMs: 4,
+      })
+    ).finish()
+  );
+  assert.equal(res.chunks[0].chunkId, 'c1');
+  assert.equal(res.retrievalTimeMs, 4);
+});
+
+test('v3 RagSession.search uses ragSearch, not the query workaround', async () => {
+  const calls = [];
+  const backend = {
+    async resolveModel(id) {
+      return { id, primary: id === 'minilm' ? '/m/minilm.onnx' : `/m/${id}.gguf` };
+    },
+    async registerModel() {},
+    async ragOpen() {
+      return 'rag_1';
+    },
+    async ragSearch(session, bytes) {
+      calls.push(['search', session, RAGSearchRequest.decode(bytes)]);
+      return RAGSearchResponse.encode(
+        RAGSearchResponse.fromPartial({
+          chunks: [{ text: 'Paris is the capital of France.', similarityScore: 0.91, metadata: {} }],
+        })
+      ).finish();
+    },
+    async ragQuery() {
+      throw new Error('search must not fall back to ragQuery');
+    },
+    async ragClose() {},
+  };
+  const rag = createRagNamespace({
+    backend,
+    hub: { emit() {} },
+    requireReady() {},
+  });
+  const session = await rag.open({ id: 'minilm' }, undefined, { topK: 5 });
+  const matches = await session.search('capital', 2);
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].text, 'Paris is the capital of France.');
+  assert.equal(calls[0][0], 'search');
+  assert.equal(calls[0][2].question, 'capital');
+  assert.equal(calls[0][2].retrievalTopK, 2);
 });
 
 test('RAGStatistics round-trips through the codec', () => {

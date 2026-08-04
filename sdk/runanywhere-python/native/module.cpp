@@ -822,6 +822,21 @@ py::bytes rag_query(int32_t handle, const std::string& query_bytes) {
     return finish_proto_out(rc, &out, "rag_query");
 }
 
+py::bytes rag_search(int32_t handle, const std::string& request_bytes) {
+    rac_handle_t h = begin_op(g_rag_handles, handle);
+    if (!h) throw std::runtime_error("invalid rag handle");
+    OpScope op(handle);  // keep the session alive vs a concurrent destroy/shutdown
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rc = rac_rag_search_proto(h, reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                                  request_bytes.size(), &out);
+    }
+    return finish_proto_out(rc, &out, "rag_search");
+}
+
 // Streaming query: each serialized RAGStreamEvent is delivered to on_event(bytes),
 // which returns False to stop early. Same GIL discipline as the LLM stream.
 struct RagStreamCtx {
@@ -1288,6 +1303,8 @@ PYBIND11_MODULE(_core, m) {
           "Ingest one RAGDocument (bytes); returns RAGStatistics bytes.");
     m.def("rag_query", &rag_query, py::arg("handle"), py::arg("query_bytes"),
           "Query with RAGQueryOptions bytes; returns RAGResult bytes.");
+    m.def("rag_search", &rag_search, py::arg("handle"), py::arg("request_bytes"),
+          "Retrieval-only search with RAGSearchRequest bytes; returns RAGSearchResponse bytes.");
     m.def("rag_query_stream", &rag_query_stream, py::arg("handle"), py::arg("query_bytes"),
           py::arg("on_event"),
           "Stream a RAG query; on_event(RAGStreamEvent bytes) per event, may return False to stop.");

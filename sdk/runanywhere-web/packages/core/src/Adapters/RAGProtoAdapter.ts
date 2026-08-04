@@ -3,6 +3,8 @@ import {
   RAGDocument,
   RAGQueryOptions,
   RAGResult,
+  RAGSearchRequest,
+  RAGSearchResponse,
   RAGStatistics,
   RAGStreamEvent,
   RAGStreamEventKind,
@@ -10,6 +12,8 @@ import {
   type RAGDocument as ProtoRAGDocument,
   type RAGQueryOptions as ProtoRAGQueryOptions,
   type RAGResult as ProtoRAGResult,
+  type RAGSearchRequest as ProtoRAGSearchRequest,
+  type RAGSearchResponse as ProtoRAGSearchResponse,
   type RAGStatistics as ProtoRAGStatistics,
   type RAGStreamEvent as ProtoRAGStreamEvent,
 } from '@runanywhere/proto-ts/rag';
@@ -140,6 +144,35 @@ export class RAGProtoAdapter {
         this.module._rac_rag_query_proto!(session, queryPtr, querySize, outResult)
       ),
       'rac_rag_query_proto',
+    );
+  }
+
+  /**
+   * Retrieval-only search via `rac_rag_search_proto` — embed → retrieve without
+   * starting LLM generation. Returns null when the WASM module predates the
+   * export (callers must surface a clear feature-not-available error).
+   */
+  async search(
+    session: number,
+    request: ProtoRAGSearchRequest,
+  ): Promise<ProtoRAGSearchResponse | null> {
+    const host = this.workerHostForSession(session);
+    if (host) {
+      const response = await host.infer('rag.search', {
+        session,
+        requestBytes: RAGSearchRequest.encode(request).finish(),
+      }) as { resultBytes?: Uint8Array };
+      return response?.resultBytes ? RAGSearchResponse.decode(response.resultBytes) : null;
+    }
+    if (!ensureExports(this.module, 'rag.search', ['_rac_rag_search_proto'])) return null;
+    return this.bridge().withEncodedRequest(
+      request,
+      RAGSearchRequest,
+      RAGSearchResponse,
+      (requestPtr, requestSize, outResponse) => (
+        this.module._rac_rag_search_proto!(session, requestPtr, requestSize, outResponse)
+      ),
+      'rac_rag_search_proto',
     );
   }
 

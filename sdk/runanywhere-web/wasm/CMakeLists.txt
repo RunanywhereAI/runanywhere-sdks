@@ -1116,6 +1116,7 @@ set(RAC_EXPORTED_FUNCTIONS_RAG
     "_rac_rag_ingest_proto"
     "_rac_rag_query_proto"
     "_rac_rag_query_stream_proto"
+    "_rac_rag_search_proto"
     "_rac_rag_clear_proto"
     "_rac_rag_stats_proto"
 )

@@ -184,19 +184,40 @@ bool rac_auth_is_authenticated(void) {
     return is_authenticated_locked();
 }
 
-bool rac_auth_needs_refresh(void) {
-    std::lock_guard<std::mutex> lock(g_auth_mutex);
-    if (!g_auth_state.refresh_token || g_auth_state.refresh_token[0] == '\0') {
-        return false;  // Can't refresh without refresh token
-    }
-
+// Caller must hold g_auth_mutex. Shared by rac_auth_needs_refresh() and
+// rac_auth_get_valid_token() so the staleness rule cannot drift between the
+// two call sites the way it did before (#605 review): checking "no refresh
+// token" before "unknown expiry" let a restored access-only token (no
+// refresh_token, token_expires_at == 0 — the only state
+// rac_auth_load_stored_tokens() can produce for legacy/refresh-less storage)
+// bypass the unknown-expiry check entirely and report authenticated forever,
+// with no way to ever detect staleness or trigger recovery.
+//
+// Unknown expiry (token_expires_at <= 0, true for every token that just came
+// from storage) always needs revalidation, checked first regardless of
+// whether a refresh token exists: with one, the caller refreshes; without
+// one (access-only), rac_auth_build_refresh_request() has no refresh_token
+// to build a request from, so perform_authentication() fails that refresh
+// attempt closed and re-authenticates with the API key instead of trusting
+// a token whose staleness can never be known. Only once expiry is known (set
+// by an actual authenticate/refresh response, which always persists both
+// tokens together) does "no refresh token" become a legitimate no-op.
+static bool needs_refresh_locked() {
     if (g_auth_state.token_expires_at <= 0) {
         return true;  // Unknown expiry, assume needs refresh
+    }
+    if (!g_auth_state.refresh_token || g_auth_state.refresh_token[0] == '\0') {
+        return false;  // Known-fresh expiry with nothing to refresh toward.
     }
 
     // Check if token expires within 60 seconds
     int64_t now = current_time_seconds();
     return (g_auth_state.token_expires_at - now) < 60;
+}
+
+bool rac_auth_needs_refresh(void) {
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    return needs_refresh_locked();
 }
 
 // commons-005: getters copy under the lock into a thread_local buffer so the
@@ -435,9 +456,10 @@ int rac_auth_get_valid_token(const char** out_token, bool* out_needs_refresh) {
         return -1;
     }
 
-    if (g_auth_state.refresh_token && g_auth_state.refresh_token[0] != '\0' &&
-        (g_auth_state.token_expires_at <= 0 ||
-         (g_auth_state.token_expires_at - current_time_seconds()) < 60)) {
+    // Shared with rac_auth_needs_refresh() (see needs_refresh_locked()) so
+    // an access-only restored token (no refresh_token) cannot independently
+    // bypass the unknown-expiry check here and report itself valid forever.
+    if (needs_refresh_locked()) {
         *out_needs_refresh = true;
         return 1;  // Caller should refresh
     }

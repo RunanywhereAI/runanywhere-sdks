@@ -63,6 +63,28 @@ export interface RAGQueryOptions {
     /** Restrict retrieval to chunks whose source matches this prefix. */
     scopePrefix?: string | undefined;
 }
+/**
+ * Retrieval-only request for `rac_rag_search_proto` / SDK `rag.search()`.
+ * Intentionally omits generation options — that is `RAGQueryOptions` /
+ * `rac_rag_query_proto` / SDK `rag.query()`.
+ */
+export interface RAGSearchRequest {
+    question: string;
+    /**
+     * Retrieval depth for this call, overriding RAGConfiguration.top_k.
+     * Zero means "use the session default".
+     */
+    retrievalTopK: number;
+    similarityThreshold?: number | undefined;
+    /**
+     * Expand the question into several queries and merge the results.
+     * Requires a session LLM (same as RAGQueryOptions.enable_multi_query).
+     */
+    enableMultiQuery: boolean;
+    multiQueryCount?: number | undefined;
+    /** Restrict retrieval to chunks whose source matches this prefix. */
+    scopePrefix?: string | undefined;
+}
 export interface RAGSearchResult {
     chunkId: string;
     text: string;
@@ -80,6 +102,13 @@ export interface RAGSearchResult {
 export interface RAGSearchResult_MetadataEntry {
     key: string;
     value: string;
+}
+/** Retrieval-only response for `rac_rag_search_proto`. */
+export interface RAGSearchResponse {
+    chunks: RAGSearchResult[];
+    retrievalTimeMs: number;
+    requestId: string;
+    error?: SDKError | undefined;
 }
 export interface RAGResult {
     answer: string;
@@ -118,8 +147,10 @@ export declare const RAGConfiguration: MessageFns<RAGConfiguration>;
 export declare const RAGDocument: MessageFns<RAGDocument>;
 export declare const RAGDocument_MetadataEntry: MessageFns<RAGDocument_MetadataEntry>;
 export declare const RAGQueryOptions: MessageFns<RAGQueryOptions>;
+export declare const RAGSearchRequest: MessageFns<RAGSearchRequest>;
 export declare const RAGSearchResult: MessageFns<RAGSearchResult>;
 export declare const RAGSearchResult_MetadataEntry: MessageFns<RAGSearchResult_MetadataEntry>;
+export declare const RAGSearchResponse: MessageFns<RAGSearchResponse>;
 export declare const RAGResult: MessageFns<RAGResult>;
 export declare const RAGStatistics: MessageFns<RAGStatistics>;
 export declare const RAGStreamEvent: MessageFns<RAGStreamEvent>;

@@ -119,6 +119,7 @@ export const models = {
       contextLength: model.contextLength,
       supportsThinking: model.supportsThinking,
       supportsLora: model.supportsLora,
+      cuaProfile: model.cuaProfile,
     };
     if (model.files?.length) {
       return registerModelMultiFile({

@@ -5,6 +5,7 @@ import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.ModelCategory
+import com.runanywhere.sdk.public.extensions.CUA.CUA.FARA_PROFILE
 
 
 // Curated catalog, kept in lockstep with the iOS / Flutter / RN example apps.
@@ -425,6 +426,7 @@ internal object ModelCatalog {
                     "mmproj-Fara1.5-4B-f16.gguf"
                 ),
             ),
+            cuaProfile = FARA_PROFILE,
         ),
         MultiFileModel(
             "gemma-4-e2b-it-q8_0", "Gemma 4 E2B IT Q8_0 (Experimental)", LLAMA, MULTIMODAL, 3_000_000_000,

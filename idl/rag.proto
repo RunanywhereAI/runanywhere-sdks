@@ -96,6 +96,31 @@ message RAGQueryOptions {
     optional string scope_prefix = 13;
 }
 
+// Retrieval-only request for `rac_rag_search_proto` / SDK `rag.search()`.
+// Intentionally omits generation options — that is `RAGQueryOptions` /
+// `rac_rag_query_proto` / SDK `rag.query()`.
+message RAGSearchRequest {
+    string question              = 1 [(runanywhere.v1.rac_required) = true];
+
+    // Retrieval depth for this call, overriding RAGConfiguration.top_k.
+    // Zero means "use the session default".
+    int32 retrieval_top_k        = 2;
+
+    optional float similarity_threshold = 3;
+
+    // Expand the question into several queries and merge the results.
+    // Requires a session LLM (same as RAGQueryOptions.enable_multi_query).
+    bool  enable_multi_query     = 4;
+    optional int32 multi_query_count = 5 [
+        (runanywhere.v1.rac_default) = "3",
+        (runanywhere.v1.rac_min) = 1,
+        (runanywhere.v1.rac_max) = 8
+    ];
+
+    // Restrict retrieval to chunks whose source matches this prefix.
+    optional string scope_prefix = 6;
+}
+
 message RAGSearchResult {
     string chunk_id              = 1;
     string text                  = 2;
@@ -109,6 +134,14 @@ message RAGSearchResult {
     int32 end_offset = 9;
 
     int32 token_count = 10;
+}
+
+// Retrieval-only response for `rac_rag_search_proto`.
+message RAGSearchResponse {
+    repeated RAGSearchResult chunks = 1;
+    int64  retrieval_time_ms        = 2;
+    string request_id               = 3;
+    optional SDKError error         = 4;
 }
 
 message RAGResult {

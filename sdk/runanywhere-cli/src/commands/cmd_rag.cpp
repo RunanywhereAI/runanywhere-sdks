@@ -1,18 +1,19 @@
 /**
  * @file cmd_rag.cpp
- * @brief `rcli rag query` — retrieval-augmented generation via the commons
- *        RAG session ABI.
+ * @brief `rcli rag query` / `rcli rag search` — retrieval-augmented generation
+ *        via the commons RAG session ABI.
  *
  * Single-shot flow in one process (the CLI is stateless across invocations and
  * RAG indexes are in-memory only):
  *   rac_rag_session_create_proto(RAGConfiguration)   → session handle
  *     → rac_rag_ingest_proto(RAGDocument) per --doc / --file
  *     → rac_rag_query_proto(RAGQueryOptions)          → RAGResult
+ *       or rac_rag_search_proto(RAGSearchRequest)     → RAGSearchResponse
  *   rac_rag_session_destroy_proto(session)
  *
- * Commons resolves the embedding + LLM model ids to filesystem paths via the
- * model registry and owns the full embed → retrieve → generate pipeline; this
- * command only translates argv to the rac_rag_* C ABI and renders the result.
+ * Commons resolves the embedding (+ optional LLM) model ids to filesystem paths
+ * via the model registry and owns the pipeline; this command only translates
+ * argv to the rac_rag_* C ABI and renders the result.
  */
 
 #include "commands/commands.h"
@@ -79,53 +80,42 @@ struct RagParams {
     int max_output_tokens = 0;
     float temperature = -1.0f;
     float similarity_threshold = -1.0f;
+    bool require_llm = true;
 };
 
-// One session covers the whole invocation: open (embedding + LLM) → ingest
-// every document → ask. The CLI cannot split those verbs apart the way the SDK
-// spec does because commons keeps RAG indexes in memory only
-// (RAGConfiguration.index_path / persist_index are not honored) and
-// rac_rag_query_proto requires an LLM service, so there is no retrieval-only
-// call to expose as `rag search`.
-int run_rag(const GlobalOptions& options, const RagParams& params,
-            const std::string& question) {
-    Bootstrapped env;
-    if (bootstrap(options, &env) != RAC_SUCCESS) {
-        return 1;
-    }
-
-    if (question.empty()) {
-        out::error_line("a question is required (positional argument)");
-        return 2;
-    }
-    const std::string& llm_model = params.llm_model;
-    const std::string& embed_model = params.embed_model;
-    const std::vector<std::string>& docs = params.docs;
-    const std::vector<std::string>& files = params.files;
-    const int top_k = params.top_k;
-
-    std::vector<std::string> documents = docs;
-    for (const auto& path : files) {
+// One session covers the whole invocation: open → ingest every document → ask
+// or search. The CLI cannot split those verbs apart the way the SDK spec does
+// because commons keeps RAG indexes in memory only
+// (RAGConfiguration.index_path / persist_index are not honored).
+bool collect_documents(const RagParams& params, std::vector<std::string>* documents) {
+    *documents = params.docs;
+    for (const auto& path : params.files) {
         std::string content;
         std::string error;
         if (!read_text_file(path, &content, &error)) {
             out::error_line(error);
-            return 2;
+            return false;
         }
-        documents.push_back(content);
+        documents->push_back(content);
     }
-    if (documents.empty()) {
+    if (documents->empty()) {
         out::error_line("at least one document is required (--doc or --file)");
-        return 2;
+        return false;
     }
+    return true;
+}
 
-    // Both models must already be downloaded — the session resolves them from
-    // the registry. (Pull them first with `rcli models download <id>`.)
+bool open_and_ingest(const GlobalOptions& options, const RagParams& params,
+                     const std::vector<std::string>& documents, rac_handle_t* session) {
+    // Models must already be downloaded — the session resolves them from the
+    // registry. (Pull them first with `rcli models download <id>`.)
     v1::RAGConfiguration config;
-    config.set_embedding_model_id(embed_model);
-    config.set_llm_model_id(llm_model);
-    if (top_k > 0) {
-        config.set_top_k(top_k);
+    config.set_embedding_model_id(params.embed_model);
+    if (params.require_llm || !params.llm_model.empty()) {
+        config.set_llm_model_id(params.llm_model);
+    }
+    if (params.top_k > 0) {
+        config.set_top_k(params.top_k);
     }
     if (params.chunk_size > 0) {
         config.set_chunk_size(params.chunk_size);
@@ -138,16 +128,19 @@ int run_rag(const GlobalOptions& options, const RagParams& params,
     }
 
     const std::string config_bytes = proto::serialize(config);
-    rac_handle_t session = nullptr;
     if (rac_rag_session_create_proto(reinterpret_cast<const uint8_t*>(config_bytes.data()),
-                                     config_bytes.size(), &session) != RAC_SUCCESS ||
-        session == nullptr) {
-        out::error_line("RAG session create failed (check that '" + embed_model + "' and '" +
-                        llm_model + "' are downloaded)");
-        return 1;
+                                     config_bytes.size(), session) != RAC_SUCCESS ||
+        *session == nullptr) {
+        if (params.require_llm || !params.llm_model.empty()) {
+            out::error_line("RAG session create failed (check that '" + params.embed_model +
+                            "' and '" + params.llm_model + "' are downloaded)");
+        } else {
+            out::error_line("RAG session create failed (check that '" + params.embed_model +
+                            "' is downloaded)");
+        }
+        return false;
     }
 
-    // Ingest each document.
     std::string error;
     for (size_t i = 0; i < documents.size(); ++i) {
         v1::RAGDocument document;
@@ -157,20 +150,44 @@ int run_rag(const GlobalOptions& options, const RagParams& params,
         rac_proto_buffer_t stats_buffer;
         rac_proto_buffer_init(&stats_buffer);
         v1::RAGStatistics stats;
-        if (rac_rag_ingest_proto(session, reinterpret_cast<const uint8_t*>(doc_bytes.data()),
+        if (rac_rag_ingest_proto(*session, reinterpret_cast<const uint8_t*>(doc_bytes.data()),
                                  doc_bytes.size(), &stats_buffer) != RAC_SUCCESS ||
             !proto::parse_proto_buffer(&stats_buffer, &stats, &error)) {
             out::error_line("RAG ingest failed: " + error);
-            rac_rag_session_destroy_proto(session);
-            return 1;
+            rac_rag_session_destroy_proto(*session);
+            *session = nullptr;
+            return false;
         }
         if (options.verbose) {
             out::status_line("ingested doc-" + std::to_string(i) + " (" +
                              std::to_string(documents[i].size()) + " bytes)");
         }
     }
+    return true;
+}
 
-    // Query.
+int run_rag_query(const GlobalOptions& options, const RagParams& params,
+                  const std::string& question) {
+    Bootstrapped env;
+    if (bootstrap(options, &env) != RAC_SUCCESS) {
+        return 1;
+    }
+
+    if (question.empty()) {
+        out::error_line("a question is required (positional argument)");
+        return 2;
+    }
+
+    std::vector<std::string> documents;
+    if (!collect_documents(params, &documents)) {
+        return 2;
+    }
+
+    rac_handle_t session = nullptr;
+    if (!open_and_ingest(options, params, documents, &session)) {
+        return 1;
+    }
+
     v1::RAGQueryOptions query;
     query.set_question(question);
     if (params.max_output_tokens > 0) {
@@ -185,14 +202,15 @@ int run_rag(const GlobalOptions& options, const RagParams& params,
     if (params.similarity_threshold >= 0.0f) {
         query.set_similarity_threshold(params.similarity_threshold);
     }
-    if (top_k > 0) {
-        query.set_retrieval_top_k(top_k);
+    if (params.top_k > 0) {
+        query.set_retrieval_top_k(params.top_k);
     }
 
     const std::string query_bytes = proto::serialize(query);
     rac_proto_buffer_t result_buffer;
     rac_proto_buffer_init(&result_buffer);
     v1::RAGResult result;
+    std::string error;
     if (rac_rag_query_proto(session, reinterpret_cast<const uint8_t*>(query_bytes.data()),
                             query_bytes.size(), &result_buffer) != RAC_SUCCESS ||
         !proto::parse_proto_buffer(&result_buffer, &result, &error)) {
@@ -234,6 +252,87 @@ int run_rag(const GlobalOptions& options, const RagParams& params,
             out::status_line("chunks=" + std::to_string(result.retrieved_chunks_size()) +
                              " retrieval=" + std::to_string(result.retrieval_time_ms()) + "ms" +
                              " generation=" + std::to_string(result.generation_time_ms()) + "ms");
+        }
+    }
+
+    rac_rag_session_destroy_proto(session);
+    return 0;
+}
+
+int run_rag_search(const GlobalOptions& options, const RagParams& params,
+                   const std::string& question) {
+    Bootstrapped env;
+    if (bootstrap(options, &env) != RAC_SUCCESS) {
+        return 1;
+    }
+
+    if (question.empty()) {
+        out::error_line("a question is required (positional argument)");
+        return 2;
+    }
+
+    std::vector<std::string> documents;
+    if (!collect_documents(params, &documents)) {
+        return 2;
+    }
+
+    rac_handle_t session = nullptr;
+    if (!open_and_ingest(options, params, documents, &session)) {
+        return 1;
+    }
+
+    v1::RAGSearchRequest request;
+    request.set_question(question);
+    if (params.top_k > 0) {
+        request.set_retrieval_top_k(params.top_k);
+    }
+    if (params.similarity_threshold >= 0.0f) {
+        request.set_similarity_threshold(params.similarity_threshold);
+    }
+
+    const std::string request_bytes = proto::serialize(request);
+    rac_proto_buffer_t response_buffer;
+    rac_proto_buffer_init(&response_buffer);
+    v1::RAGSearchResponse response;
+    std::string error;
+    if (rac_rag_search_proto(session, reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                             request_bytes.size(), &response_buffer) != RAC_SUCCESS ||
+        !proto::parse_proto_buffer(&response_buffer, &response, &error)) {
+        out::error_line("RAG search failed: " + error);
+        rac_rag_session_destroy_proto(session);
+        return 1;
+    }
+
+    if (response.has_error()) {
+        out::error_line("RAG search failed: " + (response.error().message().empty()
+                                                     ? std::to_string(response.error().c_abi_code())
+                                                     : response.error().message()));
+        rac_rag_session_destroy_proto(session);
+        return 1;
+    }
+
+    if (options.json) {
+        out::JsonWriter json;
+        json.begin_object()
+            .field("retrieval_time_ms", static_cast<int64_t>(response.retrieval_time_ms()))
+            .field("request_id", response.request_id());
+        json.begin_array("matches");
+        for (const v1::RAGSearchResult& match : response.chunks()) {
+            json.begin_array_object()
+                .field("text", match.text())
+                .field("score", static_cast<double>(match.similarity_score()))
+                .field("source", match.source_document())
+                .end_object();
+        }
+        json.end_array();
+        out::result_line(json.end_object().str());
+    } else {
+        for (const v1::RAGSearchResult& match : response.chunks()) {
+            out::result_line(match.text());
+        }
+        if (options.verbose) {
+            out::status_line("chunks=" + std::to_string(response.chunks_size()) +
+                             " retrieval=" + std::to_string(response.retrieval_time_ms()) + "ms");
         }
     }
 
@@ -285,7 +384,26 @@ void register_rag(CLI::App& app, GlobalOptions& options) {
                           "Raise for more random sampling");
 
     query_cmd->callback([&options, question, params]() {
-        const int exit_code = run_rag(options, *params, *question);
+        const int exit_code = run_rag_query(options, *params, *question);
+        if (exit_code != 0) {
+            throw CLI::RuntimeError(exit_code);
+        }
+    });
+
+    CLI::App* search_cmd =
+        cmd->add_subcommand("search", "Retrieve matching chunks without generating an answer");
+    auto search_question = std::make_shared<std::string>();
+    auto search_params = std::make_shared<RagParams>();
+    search_params->llm_model.clear();  // retrieval-only unless --model/--llm is passed
+    search_params->require_llm = false;
+    search_cmd->add_option("question", *search_question, "Query to retrieve chunks for")
+        ->required();
+    add_corpus_options(search_cmd, search_params);
+    search_cmd->add_option("--model,--llm", search_params->llm_model,
+                           "Optional LLM (needed only for multi-query / session rerank)");
+
+    search_cmd->callback([&options, search_question, search_params]() {
+        const int exit_code = run_rag_search(options, *search_params, *search_question);
         if (exit_code != 0) {
             throw CLI::RuntimeError(exit_code);
         }

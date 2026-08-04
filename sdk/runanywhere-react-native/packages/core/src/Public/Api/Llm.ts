@@ -44,6 +44,7 @@ import { toChatMessages } from './Inputs';
 import { pushStream } from './Stream';
 import {
   emptyGenerationResult,
+  synthesizeStreamResult,
   toGenerationResult,
   toGenerationResultFromStream,
   toStructuredResult,
@@ -230,12 +231,19 @@ export const llm = {
         };
         controller.push({ type: 'started', requestId });
 
-        let receivedEvent = false;
+        let sawCompletion = false;
+        let sawAnyEvent = false;
+        let accumulatedText = '';
+        let accumulatedThinking = '';
+        let tokenCount = 0;
+        const startedAtMs = Date.now();
+        let firstTokenAtMs: number | null = null;
+
         void native
           .llmGenerateStreamProto(
             encode(request, LLMGenerateRequest),
             (eventBytes: ArrayBuffer) => {
-              receivedEvent = true;
+              sawAnyEvent = true;
               const event = decodeEvent(eventBytes, LLMStreamEvent);
               if (event.error) {
                 controller.fail(new SDKException(event.error));
@@ -245,13 +253,18 @@ export const llm = {
                 controller.push({ type: 'toolCall', toolCall: event.toolCall });
               }
               if (event.token.length > 0) {
-                controller.push({
-                  type: 'token',
-                  text: event.token,
-                  kind: tokenKind(event),
-                });
+                if (firstTokenAtMs === null) firstTokenAtMs = Date.now();
+                tokenCount += 1;
+                const kind = tokenKind(event);
+                if (kind === 'thought') {
+                  accumulatedThinking += event.token;
+                } else {
+                  accumulatedText += event.token;
+                }
+                controller.push({ type: 'token', text: event.token, kind });
               }
               if (event.isFinal) {
+                sawCompletion = true;
                 controller.push({
                   type: 'completed',
                   result: event.result
@@ -267,13 +280,17 @@ export const llm = {
             }
           )
           .then(() => {
-            // The stream ends in `completed` or a thrown error, never a silent
-            // finish (mirrors Swift's mapGenerationStream guard): a terminal
-            // event already closed the controller; a backend that dropped the
-            // stream without one still gets a synthesized `completed`, and one
-            // that produced nothing at all is a failure.
-            if (controller.closed) return;
-            if (!receivedEvent) {
+            if (sawCompletion) {
+              controller.finish();
+              return;
+            }
+            // The native call resolved without ever sending `isFinal`. A
+            // legitimate native boundary can end a started stream this way
+            // (mirrors Swift's `RunAnywhere.synthesizeResult`), so this is a
+            // synthesized completion from wall-clock metrics rather than a
+            // thrown error -- unless native never sent a single event, which
+            // means generation never actually ran.
+            if (!sawAnyEvent) {
               controller.fail(
                 SDKException.generationFailed(
                   'Generation ended before producing any output'
@@ -283,7 +300,15 @@ export const llm = {
             }
             controller.push({
               type: 'completed',
-              result: emptyGenerationResult(requestId, options?.model ?? ''),
+              result: synthesizeStreamResult(
+                requestId,
+                options?.model ?? '',
+                accumulatedText,
+                accumulatedThinking,
+                tokenCount,
+                startedAtMs,
+                firstTokenAtMs
+              ),
             });
             controller.finish();
           })

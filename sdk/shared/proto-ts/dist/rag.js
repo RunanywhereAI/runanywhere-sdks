@@ -5,7 +5,7 @@
 //   protoc               v7.35.1
 // source: rag.proto
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RAGStreamEvent = exports.RAGStatistics = exports.RAGResult = exports.RAGSearchResult_MetadataEntry = exports.RAGSearchResult = exports.RAGQueryOptions = exports.RAGDocument_MetadataEntry = exports.RAGDocument = exports.RAGConfiguration = exports.RAGStreamEventKind = exports.protobufPackage = void 0;
+exports.RAGStreamEvent = exports.RAGStatistics = exports.RAGResult = exports.RAGSearchResponse = exports.RAGSearchResult_MetadataEntry = exports.RAGSearchResult = exports.RAGSearchRequest = exports.RAGQueryOptions = exports.RAGDocument_MetadataEntry = exports.RAGDocument = exports.RAGConfiguration = exports.RAGStreamEventKind = exports.protobufPackage = void 0;
 exports.rAGStreamEventKindFromJSON = rAGStreamEventKindFromJSON;
 exports.rAGStreamEventKindToJSON = rAGStreamEventKindToJSON;
 /* eslint-disable */
@@ -857,6 +857,161 @@ exports.RAGQueryOptions = {
         return message;
     },
 };
+function createBaseRAGSearchRequest() {
+    return {
+        question: "",
+        retrievalTopK: 0,
+        similarityThreshold: undefined,
+        enableMultiQuery: false,
+        multiQueryCount: undefined,
+        scopePrefix: undefined,
+    };
+}
+exports.RAGSearchRequest = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        if (message.question !== "") {
+            writer.uint32(10).string(message.question);
+        }
+        if (message.retrievalTopK !== 0) {
+            writer.uint32(16).int32(message.retrievalTopK);
+        }
+        if (message.similarityThreshold !== undefined) {
+            writer.uint32(29).float(message.similarityThreshold);
+        }
+        if (message.enableMultiQuery !== false) {
+            writer.uint32(32).bool(message.enableMultiQuery);
+        }
+        if (message.multiQueryCount !== undefined) {
+            writer.uint32(40).int32(message.multiQueryCount);
+        }
+        if (message.scopePrefix !== undefined) {
+            writer.uint32(50).string(message.scopePrefix);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseRAGSearchRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.question = reader.string();
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.retrievalTopK = reader.int32();
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 29) {
+                        break;
+                    }
+                    message.similarityThreshold = reader.float();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.enableMultiQuery = reader.bool();
+                    continue;
+                }
+                case 5: {
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.multiQueryCount = reader.int32();
+                    continue;
+                }
+                case 6: {
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.scopePrefix = reader.string();
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            question: isSet(object.question) ? globalThis.String(object.question) : "",
+            retrievalTopK: isSet(object.retrievalTopK)
+                ? globalThis.Number(object.retrievalTopK)
+                : isSet(object.retrieval_top_k)
+                    ? globalThis.Number(object.retrieval_top_k)
+                    : 0,
+            similarityThreshold: isSet(object.similarityThreshold)
+                ? globalThis.Number(object.similarityThreshold)
+                : isSet(object.similarity_threshold)
+                    ? globalThis.Number(object.similarity_threshold)
+                    : undefined,
+            enableMultiQuery: isSet(object.enableMultiQuery)
+                ? globalThis.Boolean(object.enableMultiQuery)
+                : isSet(object.enable_multi_query)
+                    ? globalThis.Boolean(object.enable_multi_query)
+                    : false,
+            multiQueryCount: isSet(object.multiQueryCount)
+                ? globalThis.Number(object.multiQueryCount)
+                : isSet(object.multi_query_count)
+                    ? globalThis.Number(object.multi_query_count)
+                    : undefined,
+            scopePrefix: isSet(object.scopePrefix)
+                ? globalThis.String(object.scopePrefix)
+                : isSet(object.scope_prefix)
+                    ? globalThis.String(object.scope_prefix)
+                    : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.question !== "") {
+            obj.question = message.question;
+        }
+        if (message.retrievalTopK !== 0) {
+            obj.retrievalTopK = Math.round(message.retrievalTopK);
+        }
+        if (message.similarityThreshold !== undefined) {
+            obj.similarityThreshold = message.similarityThreshold;
+        }
+        if (message.enableMultiQuery !== false) {
+            obj.enableMultiQuery = message.enableMultiQuery;
+        }
+        if (message.multiQueryCount !== undefined) {
+            obj.multiQueryCount = Math.round(message.multiQueryCount);
+        }
+        if (message.scopePrefix !== undefined) {
+            obj.scopePrefix = message.scopePrefix;
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.RAGSearchRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseRAGSearchRequest();
+        message.question = object.question ?? "";
+        message.retrievalTopK = object.retrievalTopK ?? 0;
+        message.similarityThreshold = object.similarityThreshold ?? undefined;
+        message.enableMultiQuery = object.enableMultiQuery ?? false;
+        message.multiQueryCount = object.multiQueryCount ?? undefined;
+        message.scopePrefix = object.scopePrefix ?? undefined;
+        return message;
+    },
+};
 function createBaseRAGSearchResult() {
     return {
         chunkId: "",
@@ -1148,6 +1303,116 @@ exports.RAGSearchResult_MetadataEntry = {
         const message = createBaseRAGSearchResult_MetadataEntry();
         message.key = object.key ?? "";
         message.value = object.value ?? "";
+        return message;
+    },
+};
+function createBaseRAGSearchResponse() {
+    return { chunks: [], retrievalTimeMs: 0, requestId: "", error: undefined };
+}
+exports.RAGSearchResponse = {
+    encode(message, writer = new wire_1.BinaryWriter()) {
+        for (const v of message.chunks) {
+            exports.RAGSearchResult.encode(v, writer.uint32(10).fork()).join();
+        }
+        if (message.retrievalTimeMs !== 0) {
+            writer.uint32(16).int64(message.retrievalTimeMs);
+        }
+        if (message.requestId !== "") {
+            writer.uint32(26).string(message.requestId);
+        }
+        if (message.error !== undefined) {
+            errors_1.SDKError.encode(message.error, writer.uint32(34).fork()).join();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof wire_1.BinaryReader ? input : new wire_1.BinaryReader(input);
+        const end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseRAGSearchResponse();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1: {
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.chunks.push(exports.RAGSearchResult.decode(reader, reader.uint32()));
+                    continue;
+                }
+                case 2: {
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.retrievalTimeMs = longToNumber(reader.int64());
+                    continue;
+                }
+                case 3: {
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                }
+                case 4: {
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.error = errors_1.SDKError.decode(reader, reader.uint32());
+                    continue;
+                }
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skip(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            chunks: globalThis.Array.isArray(object?.chunks)
+                ? object.chunks.map((e) => exports.RAGSearchResult.fromJSON(e))
+                : [],
+            retrievalTimeMs: isSet(object.retrievalTimeMs)
+                ? globalThis.Number(object.retrievalTimeMs)
+                : isSet(object.retrieval_time_ms)
+                    ? globalThis.Number(object.retrieval_time_ms)
+                    : 0,
+            requestId: isSet(object.requestId)
+                ? globalThis.String(object.requestId)
+                : isSet(object.request_id)
+                    ? globalThis.String(object.request_id)
+                    : "",
+            error: isSet(object.error) ? errors_1.SDKError.fromJSON(object.error) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.chunks?.length) {
+            obj.chunks = message.chunks.map((e) => exports.RAGSearchResult.toJSON(e));
+        }
+        if (message.retrievalTimeMs !== 0) {
+            obj.retrievalTimeMs = Math.round(message.retrievalTimeMs);
+        }
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        if (message.error !== undefined) {
+            obj.error = errors_1.SDKError.toJSON(message.error);
+        }
+        return obj;
+    },
+    create(base) {
+        return exports.RAGSearchResponse.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseRAGSearchResponse();
+        message.chunks = object.chunks?.map((e) => exports.RAGSearchResult.fromPartial(e)) || [];
+        message.retrievalTimeMs = object.retrievalTimeMs ?? 0;
+        message.requestId = object.requestId ?? "";
+        message.error = (object.error !== undefined && object.error !== null)
+            ? errors_1.SDKError.fromPartial(object.error)
+            : undefined;
         return message;
     },
 };

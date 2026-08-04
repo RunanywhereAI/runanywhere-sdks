@@ -135,6 +135,33 @@ export interface RAGQueryOptions {
   scopePrefix?: string | undefined;
 }
 
+/**
+ * Retrieval-only request for `rac_rag_search_proto` / SDK `rag.search()`.
+ * Intentionally omits generation options — that is `RAGQueryOptions` /
+ * `rac_rag_query_proto` / SDK `rag.query()`.
+ */
+export interface RAGSearchRequest {
+  question: string;
+  /**
+   * Retrieval depth for this call, overriding RAGConfiguration.top_k.
+   * Zero means "use the session default".
+   */
+  retrievalTopK: number;
+  similarityThreshold?:
+    | number
+    | undefined;
+  /**
+   * Expand the question into several queries and merge the results.
+   * Requires a session LLM (same as RAGQueryOptions.enable_multi_query).
+   */
+  enableMultiQuery: boolean;
+  multiQueryCount?:
+    | number
+    | undefined;
+  /** Restrict retrieval to chunks whose source matches this prefix. */
+  scopePrefix?: string | undefined;
+}
+
 export interface RAGSearchResult {
   chunkId: string;
   text: string;
@@ -151,6 +178,14 @@ export interface RAGSearchResult {
 export interface RAGSearchResult_MetadataEntry {
   key: string;
   value: string;
+}
+
+/** Retrieval-only response for `rac_rag_search_proto`. */
+export interface RAGSearchResponse {
+  chunks: RAGSearchResult[];
+  retrievalTimeMs: number;
+  requestId: string;
+  error?: SDKError | undefined;
 }
 
 export interface RAGResult {
@@ -1033,6 +1068,173 @@ export const RAGQueryOptions: MessageFns<RAGQueryOptions> = {
   },
 };
 
+function createBaseRAGSearchRequest(): RAGSearchRequest {
+  return {
+    question: "",
+    retrievalTopK: 0,
+    similarityThreshold: undefined,
+    enableMultiQuery: false,
+    multiQueryCount: undefined,
+    scopePrefix: undefined,
+  };
+}
+
+export const RAGSearchRequest: MessageFns<RAGSearchRequest> = {
+  encode(message: RAGSearchRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.question !== "") {
+      writer.uint32(10).string(message.question);
+    }
+    if (message.retrievalTopK !== 0) {
+      writer.uint32(16).int32(message.retrievalTopK);
+    }
+    if (message.similarityThreshold !== undefined) {
+      writer.uint32(29).float(message.similarityThreshold);
+    }
+    if (message.enableMultiQuery !== false) {
+      writer.uint32(32).bool(message.enableMultiQuery);
+    }
+    if (message.multiQueryCount !== undefined) {
+      writer.uint32(40).int32(message.multiQueryCount);
+    }
+    if (message.scopePrefix !== undefined) {
+      writer.uint32(50).string(message.scopePrefix);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RAGSearchRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGSearchRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.question = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.retrievalTopK = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 29) {
+            break;
+          }
+
+          message.similarityThreshold = reader.float();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.enableMultiQuery = reader.bool();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.multiQueryCount = reader.int32();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.scopePrefix = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGSearchRequest {
+    return {
+      question: isSet(object.question) ? globalThis.String(object.question) : "",
+      retrievalTopK: isSet(object.retrievalTopK)
+        ? globalThis.Number(object.retrievalTopK)
+        : isSet(object.retrieval_top_k)
+        ? globalThis.Number(object.retrieval_top_k)
+        : 0,
+      similarityThreshold: isSet(object.similarityThreshold)
+        ? globalThis.Number(object.similarityThreshold)
+        : isSet(object.similarity_threshold)
+        ? globalThis.Number(object.similarity_threshold)
+        : undefined,
+      enableMultiQuery: isSet(object.enableMultiQuery)
+        ? globalThis.Boolean(object.enableMultiQuery)
+        : isSet(object.enable_multi_query)
+        ? globalThis.Boolean(object.enable_multi_query)
+        : false,
+      multiQueryCount: isSet(object.multiQueryCount)
+        ? globalThis.Number(object.multiQueryCount)
+        : isSet(object.multi_query_count)
+        ? globalThis.Number(object.multi_query_count)
+        : undefined,
+      scopePrefix: isSet(object.scopePrefix)
+        ? globalThis.String(object.scopePrefix)
+        : isSet(object.scope_prefix)
+        ? globalThis.String(object.scope_prefix)
+        : undefined,
+    };
+  },
+
+  toJSON(message: RAGSearchRequest): unknown {
+    const obj: any = {};
+    if (message.question !== "") {
+      obj.question = message.question;
+    }
+    if (message.retrievalTopK !== 0) {
+      obj.retrievalTopK = Math.round(message.retrievalTopK);
+    }
+    if (message.similarityThreshold !== undefined) {
+      obj.similarityThreshold = message.similarityThreshold;
+    }
+    if (message.enableMultiQuery !== false) {
+      obj.enableMultiQuery = message.enableMultiQuery;
+    }
+    if (message.multiQueryCount !== undefined) {
+      obj.multiQueryCount = Math.round(message.multiQueryCount);
+    }
+    if (message.scopePrefix !== undefined) {
+      obj.scopePrefix = message.scopePrefix;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGSearchRequest>, I>>(base?: I): RAGSearchRequest {
+    return RAGSearchRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGSearchRequest>, I>>(object: I): RAGSearchRequest {
+    const message = createBaseRAGSearchRequest();
+    message.question = object.question ?? "";
+    message.retrievalTopK = object.retrievalTopK ?? 0;
+    message.similarityThreshold = object.similarityThreshold ?? undefined;
+    message.enableMultiQuery = object.enableMultiQuery ?? false;
+    message.multiQueryCount = object.multiQueryCount ?? undefined;
+    message.scopePrefix = object.scopePrefix ?? undefined;
+    return message;
+  },
+};
+
 function createBaseRAGSearchResult(): RAGSearchResult {
   return {
     chunkId: "",
@@ -1354,6 +1556,126 @@ export const RAGSearchResult_MetadataEntry: MessageFns<RAGSearchResult_MetadataE
     const message = createBaseRAGSearchResult_MetadataEntry();
     message.key = object.key ?? "";
     message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseRAGSearchResponse(): RAGSearchResponse {
+  return { chunks: [], retrievalTimeMs: 0, requestId: "", error: undefined };
+}
+
+export const RAGSearchResponse: MessageFns<RAGSearchResponse> = {
+  encode(message: RAGSearchResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.chunks) {
+      RAGSearchResult.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.retrievalTimeMs !== 0) {
+      writer.uint32(16).int64(message.retrievalTimeMs);
+    }
+    if (message.requestId !== "") {
+      writer.uint32(26).string(message.requestId);
+    }
+    if (message.error !== undefined) {
+      SDKError.encode(message.error, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RAGSearchResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGSearchResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.chunks.push(RAGSearchResult.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.retrievalTimeMs = longToNumber(reader.int64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.error = SDKError.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGSearchResponse {
+    return {
+      chunks: globalThis.Array.isArray(object?.chunks)
+        ? object.chunks.map((e: any) => RAGSearchResult.fromJSON(e))
+        : [],
+      retrievalTimeMs: isSet(object.retrievalTimeMs)
+        ? globalThis.Number(object.retrievalTimeMs)
+        : isSet(object.retrieval_time_ms)
+        ? globalThis.Number(object.retrieval_time_ms)
+        : 0,
+      requestId: isSet(object.requestId)
+        ? globalThis.String(object.requestId)
+        : isSet(object.request_id)
+        ? globalThis.String(object.request_id)
+        : "",
+      error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+    };
+  },
+
+  toJSON(message: RAGSearchResponse): unknown {
+    const obj: any = {};
+    if (message.chunks?.length) {
+      obj.chunks = message.chunks.map((e) => RAGSearchResult.toJSON(e));
+    }
+    if (message.retrievalTimeMs !== 0) {
+      obj.retrievalTimeMs = Math.round(message.retrievalTimeMs);
+    }
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.error !== undefined) {
+      obj.error = SDKError.toJSON(message.error);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGSearchResponse>, I>>(base?: I): RAGSearchResponse {
+    return RAGSearchResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGSearchResponse>, I>>(object: I): RAGSearchResponse {
+    const message = createBaseRAGSearchResponse();
+    message.chunks = object.chunks?.map((e) => RAGSearchResult.fromPartial(e)) || [];
+    message.retrievalTimeMs = object.retrievalTimeMs ?? 0;
+    message.requestId = object.requestId ?? "";
+    message.error = (object.error !== undefined && object.error !== null)
+      ? SDKError.fromPartial(object.error)
+      : undefined;
     return message;
   },
 };

@@ -111,6 +111,22 @@ struct RAGGraphResult {
 using RAGTokenSink = std::function<bool(const std::string& token)>;
 
 /**
+ * @brief Retrieval-only phase shared by `run_rag_query` and search.
+ *
+ * Runs embed → retrieve (+ optional multi-query / LLM rerank). Does not
+ * assemble a prompt or call the LLM for answer generation.
+ *
+ * Requires `embeddings_service` and `vector_store`. `llm_service` is
+ * required only when `enable_multi_query` or `rerank` is set.
+ *
+ * On success, `out_result.sources` holds the retrieved chunks (may be
+ * empty). `answer` / `assembled_context` are left empty.
+ *
+ * @return RAC_SUCCESS on success; first failure status otherwise.
+ */
+rac_result_t run_rag_retrieve(const RAGGraphInputs& inputs, RAGGraphResult& out_result);
+
+/**
  * @brief Run a single RAG query through a GraphScheduler-driven DAG.
  *
  * Constructs nodes for embed / retrieve / context-assembly / LLM, wires

@@ -459,6 +459,7 @@ test('ALLOWED_RPC_METHODS covers core addon + host helper surface', () => {
     'ragCreateSession',
     'ragIngest',
     'ragQuery',
+    'ragSearch',
     'ragDestroySession',
     'registerModel',
   ]) {

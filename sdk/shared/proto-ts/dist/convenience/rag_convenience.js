@@ -13,7 +13,7 @@
 //   * `validate<MsgName>`            (rac_required / rac_min / rac_max /
 //                                     rac_min_float / rac_max_float)
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateRAGQueryOptions = exports.rAGQueryOptionsDefaults = exports.validateRAGConfiguration = exports.rAGConfigurationDefaults = void 0;
+exports.validateRAGSearchRequest = exports.rAGSearchRequestDefaults = exports.validateRAGQueryOptions = exports.rAGQueryOptionsDefaults = exports.validateRAGConfiguration = exports.rAGConfigurationDefaults = void 0;
 const _errors_1 = require("./_errors");
 const rAGConfigurationDefaults = () => ({
     embeddingModelId: '',
@@ -76,3 +76,25 @@ const validateRAGQueryOptions = (m) => {
     }
 };
 exports.validateRAGQueryOptions = validateRAGQueryOptions;
+const rAGSearchRequestDefaults = () => ({
+    question: '',
+    retrievalTopK: 0,
+    enableMultiQuery: false,
+    multiQueryCount: 3,
+});
+exports.rAGSearchRequestDefaults = rAGSearchRequestDefaults;
+const validateRAGSearchRequest = (m) => {
+    if (m.question === '') {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'RAGSearchRequest.question',
+            message: 'question is required',
+        });
+    }
+    if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1 || m.multiQueryCount > 8)) {
+        throw new _errors_1.ValidationError({
+            fieldPath: 'RAGSearchRequest.multi_query_count',
+            message: `multi_query_count must be in 1...8 (got ${m.multiQueryCount})`,
+        });
+    }
+};
+exports.validateRAGSearchRequest = validateRAGSearchRequest;

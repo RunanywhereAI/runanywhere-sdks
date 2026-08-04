@@ -113,6 +113,7 @@ internal suspend fun legacyRegisterFromUrl(model: ModelRegistration): ModelInfo 
         supportsThinking = model.supportsThinking,
         supportsLora = model.supportsLora,
         downloadSize = model.downloadBytes,
+        cuaProfile = model.cuaProfile,
     )
 
 internal suspend fun legacyRegisterArchive(model: ModelRegistration): ModelInfo =
@@ -127,6 +128,7 @@ internal suspend fun legacyRegisterArchive(model: ModelRegistration): ModelInfo 
         memoryRequirement = model.memoryBytes,
         supportsThinking = model.supportsThinking,
         supportsLora = model.supportsLora,
+        cuaProfile = model.cuaProfile,
     )
 
 internal suspend fun legacyRegisterMultiFile(model: ModelRegistration): ModelInfo =
@@ -140,6 +142,7 @@ internal suspend fun legacyRegisterMultiFile(model: ModelRegistration): ModelInf
         contextLength = model.contextLength,
         supportsThinking = model.supportsThinking,
         downloadSize = model.downloadBytes,
+        cuaProfile = model.cuaProfile,
     )
 
 // Speech

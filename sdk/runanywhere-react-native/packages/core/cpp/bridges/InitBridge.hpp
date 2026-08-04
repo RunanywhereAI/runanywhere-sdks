@@ -308,16 +308,23 @@ public:
      * Uses the shared native rac_http_client_* transport. Required by C++
      * rac_device_manager, whose callback API expects synchronous HTTP.
      *
+     * Split-header model (mirrors Kotlin's HTTPClientAdapter): `apiKey`
+     * always travels in the `apikey` header when non-empty; `accessToken`
+     * (a JWT) only becomes `Authorization: Bearer` when `requiresAuth` is
+     * true and the token is non-empty. The API key is never substituted as
+     * a bearer token.
+     *
      * @param url Full URL to POST to
      * @param jsonBody JSON body string
      * @param apiKey API key for the `apikey` header (empty for keyless)
-     * @param authToken Real JWT access token for Authorization: Bearer (empty
-     *                  when unauthenticated); never derived from apiKey
+     * @param accessToken JWT access token for `Authorization: Bearer` (empty if unauthenticated)
+     * @param requiresAuth Whether this request should carry `Authorization` at all
      * @return tuple<success, statusCode, responseBody, errorMessage>
      */
     std::tuple<bool, int, std::string, std::string>
     httpPostSync(const std::string &url, const std::string &jsonBody,
-                 const std::string &apiKey, const std::string &authToken);
+                 const std::string &apiKey, const std::string &accessToken,
+                 bool requiresAuth);
 
   private:
     InitBridge() = default;

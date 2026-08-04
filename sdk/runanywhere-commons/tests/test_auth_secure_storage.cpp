@@ -161,6 +161,88 @@ int main() {
     CHECK(rac_auth_clear() == RAC_SUCCESS, "logout succeeds after durable storage recovers");
     CHECK(fake.values.empty(), "successful logout removes all persisted auth state");
 
+    // -------------------------------------------------------------------
+    // PR #605 review issue #6: access-only storage cannot report
+    // authenticated forever. rac_auth_load_stored_tokens() always sets
+    // token_expires_at = 0 (expiry unknown after a restore) — the fix lives
+    // in the runtime staleness check (rac_auth_needs_refresh() /
+    // rac_auth_get_valid_token()), not at load time, so the pre-existing
+    // "optional clean misses do not block token restore" contract above
+    // must keep passing unchanged (it does: access-only restore still
+    // succeeds and authenticates).
+    // -------------------------------------------------------------------
+
+    // Access-only restore (57856ce / 22946cb regression path): no refresh
+    // token was ever persisted (legacy storage). is_authenticated() is
+    // true, but the token must be reported stale so callers do not trust it
+    // forever — get_valid_token must signal "needs refresh" rather than
+    // handing back the possibly-expired access token.
+    rac_auth_init(&storage);
+    fake.values.clear();
+    fake.values[RAC_KEY_ACCESS_TOKEN] = "legacy-access-only";
+    CHECK(rac_auth_load_stored_tokens() == RAC_SUCCESS,
+          "access-only restore still succeeds (no load-time regression)");
+    CHECK(rac_auth_is_authenticated(), "access-only restore authenticates state");
+    CHECK(rac_auth_needs_refresh(),
+          "access-only restore must report stale, not authenticated forever");
+    {
+        const char* token = nullptr;
+        bool needs_refresh = false;
+        CHECK(rac_auth_get_valid_token(&token, &needs_refresh) == 1,
+              "access-only restore signals refresh needed, not a valid token");
+        CHECK(needs_refresh, "access-only restore sets out_needs_refresh");
+        CHECK(token == nullptr, "access-only restore does not hand back the stale token");
+    }
+
+    // Valid refresh-pair restore: both tokens were persisted. Expiry is
+    // still unknown immediately after a restore (by design — the in-memory
+    // expiry timestamp is never persisted), so this also reports "needs
+    // refresh" once — but unlike the access-only case, a real refresh_token
+    // exists so the caller's refresh actually can succeed instead of
+    // failing closed into a full re-authenticate.
+    rac_auth_init(&storage);
+    fake.values.clear();
+    fake.values[RAC_KEY_ACCESS_TOKEN] = "restored-access";
+    fake.values[RAC_KEY_REFRESH_TOKEN] = "restored-refresh";
+    CHECK(rac_auth_load_stored_tokens() == RAC_SUCCESS, "valid refresh-pair restore succeeds");
+    CHECK(rac_auth_is_authenticated(), "valid refresh-pair restore authenticates state");
+    CHECK(rac_auth_needs_refresh(),
+          "valid refresh-pair restore also revalidates once (unknown expiry)");
+    {
+        const char* token = nullptr;
+        bool needs_refresh = false;
+        CHECK(rac_auth_get_valid_token(&token, &needs_refresh) == 1,
+              "valid refresh-pair restore signals refresh needed for the same reason");
+        CHECK(needs_refresh, "valid refresh-pair restore sets out_needs_refresh");
+    }
+    CHECK(std::strcmp(rac_auth_get_refresh_token(), "restored-refresh") == 0,
+          "valid refresh-pair restore retains the refresh token a real refresh needs");
+
+    // Previously regressed model-assignment/auth path (22946cb): a freshly
+    // *authenticated* (not restored) session has a known, far-future expiry
+    // and must NOT be treated as needing refresh — this is the fast path
+    // perform_authentication()/rac_sdk_retry_http_proto() share with phase-2
+    // model-assignment/registration, and the fix here must not make a
+    // healthy session look stale.
+    rac_auth_init(&storage);
+    fake.values.clear();
+    fake.failing_store_key.clear();
+    CHECK(rac_auth_handle_authenticate_response(kAuthResponse) == RAC_SUCCESS,
+          "fresh authenticate succeeds");
+    CHECK(!rac_auth_needs_refresh(),
+          "a freshly authenticated session with a healthy expiry is not stale");
+    {
+        const char* token = nullptr;
+        bool needs_refresh = false;
+        CHECK(rac_auth_get_valid_token(&token, &needs_refresh) == 0,
+              "a freshly authenticated session returns its valid token immediately");
+        CHECK(!needs_refresh, "a freshly authenticated session does not request a refresh");
+        CHECK(token != nullptr && std::strcmp(token, "access-1") == 0,
+              "a freshly authenticated session's valid token is the one just issued");
+    }
+
+    rac_auth_clear();
+
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
     return fail_count == 0 ? 0 : 1;
 }

@@ -6,7 +6,7 @@ import {
   type ModalityProtoModule,
 } from '../../../../src/Adapters/ModalityProtoAdapter';
 import { clearRunanywhereModule } from '../../../../src/runtime/EmscriptenModule';
-import type { RAGQueryOptions } from '@runanywhere/proto-ts/rag';
+import type { RAGQueryOptions, RAGSearchRequest } from '@runanywhere/proto-ts/rag';
 import type { RAGResult } from '@runanywhere/proto-ts/rag_service';
 import {
   RAG,
@@ -14,6 +14,7 @@ import {
   createDefaultRAGConfiguration,
   ragGetStatistics,
   ragQuery,
+  ragSearch,
   setRAGProvider,
   setRAGSessionHandle,
 } from '../../../../src/Public/Extensions/RunAnywhere+RAG';
@@ -173,6 +174,58 @@ describe('VoiceAgent and RAG provider-required facades', () => {
       enableMultiQuery: true,
       multiQueryCount: 5,
       scopePrefix: 'chat/session-7/',
+    });
+  });
+
+  it('routes ragSearch through rac_rag_search_proto without generation', async () => {
+    const adapter = new RAGProtoAdapter(fakeRAGModule());
+    let captured: RAGSearchRequest | undefined;
+    vi.spyOn(adapter, 'search').mockImplementation(async (session, request) => {
+      expect(session).toBe(7);
+      captured = request;
+      return {
+        chunks: [{
+          chunkId: 'c1',
+          text: 'indexed fact',
+          similarityScore: 0.88,
+          metadata: {},
+          rank: 1,
+          startOffset: 0,
+          endOffset: 12,
+          tokenCount: 2,
+        }],
+        retrievalTimeMs: 3,
+        requestId: 'search-1',
+      };
+    });
+    setRAGProvider(createRAGNativeProvider({
+      adapter,
+      session: 7,
+      config: { topK: 4, similarityThreshold: 0.2 },
+    }));
+
+    await expect(ragSearch('What is indexed?', 2)).resolves.toEqual([
+      expect.objectContaining({ text: 'indexed fact', similarityScore: 0.88 }),
+    ]);
+    expect(captured).toMatchObject({
+      question: 'What is indexed?',
+      retrievalTopK: 2,
+      similarityThreshold: 0.2,
+    });
+  });
+
+  it('surfaces a clear error when rac_rag_search_proto is missing', async () => {
+    const adapter = new RAGProtoAdapter(fakeRAGModule());
+    vi.spyOn(adapter, 'search').mockResolvedValue(null);
+    setRAGProvider(createRAGNativeProvider({
+      adapter,
+      session: 7,
+      config: { topK: 3 },
+    }));
+
+    await expect(ragSearch('What is indexed?')).rejects.toMatchObject({
+      code: ProtoErrorCode.ERROR_CODE_BACKEND_UNAVAILABLE,
+      proto: { nestedMessage: expect.stringContaining('rac_rag_search_proto') },
     });
   });
 

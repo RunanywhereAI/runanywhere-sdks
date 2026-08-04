@@ -82,6 +82,14 @@ public data class LlmOptions(
     val tools: List<ToolDefinition> = emptyList(),
     val toolChoice: ToolChoice = ToolChoice.Auto,
     val maxToolCalls: Int = DEFAULT_MAX_TOOL_CALLS,
+    /**
+     * Whether the SDK should run a requested tool call itself and feed the
+     * result back into the loop. `false` returns the parsed call to the
+     * caller instead of invoking it — same contract as the direct
+     * tool-calling API's `autoExecute`, just reachable from
+     * `llm.generate`/`llm.generateStream` with inline `tools`.
+     */
+    val autoExecute: Boolean = true,
 ) {
     /** Sampling and tool-loop defaults, as annotated in idl/. */
     public companion object {

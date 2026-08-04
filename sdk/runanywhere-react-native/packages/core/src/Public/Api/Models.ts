@@ -46,6 +46,7 @@ import type {
   ModelRegistration,
   ModelsState,
 } from './Types';
+import { ignoredLoadOptionKeys } from './LoadOptionsSupport';
 
 const logger = new SDKLogger('RunAnywhere.models');
 
@@ -204,6 +205,7 @@ export const models = {
       ...(model.supportsLora !== undefined
         ? { supportsLora: model.supportsLora }
         : {}),
+      ...(model.cuaProfile ? { cuaProfile: model.cuaProfile } : {}),
     };
 
     if (model.files && model.files.length > 0) {
@@ -293,17 +295,18 @@ export const models = {
   /**
    * Load a model now instead of paying for it on the first generation.
    *
+   * `options.contextLength`, `.threads`, and `.useGpu` are not carried by the
+   * commons load ABI yet and are ignored; only `options.framework` reaches
+   * commons today.
+   *
    * @throws SDKException when the model is unknown or the load fails.
    */
   async load(id: string, options?: LoadOptions): Promise<void> {
     const model = await requireModel(id);
-    if (
-      options?.contextLength !== undefined ||
-      options?.threads !== undefined ||
-      options?.useGpu !== undefined
-    ) {
+    const ignored = ignoredLoadOptionKeys(options);
+    if (ignored.length > 0) {
       logger.warning(
-        'commons ModelLoadRequest carries only a framework pin; contextLength, threads, and useGpu are not applied at load time'
+        `LoadOptions ${ignored.join(', ')} are not carried by the commons load ABI yet`
       );
     }
     const result = await loadModel(

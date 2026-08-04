@@ -56,6 +56,7 @@
 
 using runanywhere::rag::RAGBackend;
 using runanywhere::rag::RAGBackendConfig;
+using runanywhere::rag::SearchResult;
 
 namespace {
 
@@ -548,6 +549,108 @@ rac_result_t execute_rag_query(const std::shared_ptr<Session>& s,
     return RAC_SUCCESS;
 }
 
+void fill_search_result_proto(const SearchResult& result, int32_t rank,
+                              runanywhere::v1::RAGSearchResult* chunk) {
+    chunk->set_chunk_id(result.id);
+    chunk->set_text(result.text);
+    chunk->set_similarity_score(result.score);
+    chunk->set_rank(rank);
+    const std::string source_document = [&]() -> std::string {
+        for (const char* key : {"source_document", "source", "filename", "document_id"}) {
+            auto it = result.metadata.find(key);
+            if (it != result.metadata.end() && it->is_string()) {
+                return it->get<std::string>();
+            }
+        }
+        if (result.metadata.contains("source_text") && result.metadata["source_text"].is_string()) {
+            return result.metadata["source_text"].get<std::string>();
+        }
+        return {};
+    }();
+    if (!source_document.empty()) {
+        chunk->set_source_document(source_document);
+    }
+    if (result.metadata.is_object()) {
+        for (auto it = result.metadata.begin(); it != result.metadata.end(); ++it) {
+            if (it.value().is_string()) {
+                (*chunk->mutable_metadata())[it.key()] = it.value().get<std::string>();
+            }
+        }
+    }
+    if (result.metadata.contains("start_offset") && result.metadata["start_offset"].is_number_integer()) {
+        chunk->set_start_offset(result.metadata["start_offset"].get<int32_t>());
+    }
+    if (result.metadata.contains("end_offset") && result.metadata["end_offset"].is_number_integer()) {
+        chunk->set_end_offset(result.metadata["end_offset"].get<int32_t>());
+    }
+    if (result.metadata.contains("token_count") && result.metadata["token_count"].is_number_integer()) {
+        chunk->set_token_count(result.metadata["token_count"].get<int32_t>());
+    }
+}
+
+rac_result_t execute_rag_search(const std::shared_ptr<Session>& s,
+                                const runanywhere::v1::RAGSearchRequest& request_proto,
+                                runanywhere::v1::RAGSearchResponse* out_proto,
+                                std::string* out_error) {
+    const std::string question = request_proto.question();
+
+    RAGBackend::QueryOverrides overrides;
+    overrides.retrieval_top_k = request_proto.retrieval_top_k();
+    overrides.has_similarity_threshold = request_proto.has_similarity_threshold();
+    overrides.similarity_threshold = request_proto.similarity_threshold();
+    overrides.enable_multi_query = request_proto.enable_multi_query();
+    constexpr int32_t kMaxMultiQueryCount = 8;
+    if (request_proto.has_multi_query_count()) {
+        const int32_t n = request_proto.multi_query_count();
+        overrides.multi_query_count = n > kMaxMultiQueryCount ? kMaxMultiQueryCount : n;
+    } else {
+        overrides.multi_query_count = 0;
+    }
+    if (request_proto.has_scope_prefix())
+        overrides.scope_prefix = request_proto.scope_prefix();
+
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED,
+                       "rag.search", 0.0f, 1, 0, nullptr, 0.0, s->embedding_model_id.c_str());
+
+    std::vector<SearchResult> sources;
+    double retrieval_ms = 0.0;
+    rac_result_t status = RAC_SUCCESS;
+    try {
+        status = s->backend->retrieve(question, sources, &retrieval_ms, &overrides);
+    } catch (const std::exception& e) {
+        LOGE("rag.search exception: %s", e.what());
+        if (out_error)
+            *out_error = e.what();
+        publish_failure(RAC_ERROR_PROCESSING_FAILED, "rag.search", e.what());
+        return RAC_ERROR_PROCESSING_FAILED;
+    }
+
+    if (status != RAC_SUCCESS) {
+        if (out_error)
+            *out_error = rac_error_message(status);
+        publish_failure(status, "rag.search", rac_error_message(status));
+        return status;
+    }
+
+    runanywhere::v1::RAGSearchResponse& proto = *out_proto;
+    proto.set_request_id(event_id());
+    proto.set_retrieval_time_ms(static_cast<int64_t>(retrieval_ms));
+    int32_t rank = 1;
+    for (const auto& source : sources) {
+        fill_search_result_proto(source, rank++, proto.add_chunks());
+    }
+
+    const int64_t effective_top_k =
+        overrides.retrieval_top_k > 0 ? static_cast<int64_t>(overrides.retrieval_top_k)
+                                      : static_cast<int64_t>(s->retrieval_top_k);
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED,
+                       "rag.search", 1.0f, 1, proto.chunks_size(), nullptr, retrieval_ms,
+                       s->embedding_model_id.c_str(), effective_top_k, retrieval_ms,
+                       s->embedding_model_id.c_str(), /*error_code=*/RAC_SUCCESS,
+                       /*reranker_used=*/s->rerank ? 1 : 0);
+    return RAC_SUCCESS;
+}
+
 #endif  // RAC_HAVE_PROTOBUF
 
 #if !defined(RAC_HAVE_PROTOBUF)
@@ -862,6 +965,48 @@ rac_result_t rac_rag_query_proto(rac_handle_t session, const uint8_t* query_prot
             out_result, status, err_msg.empty() ? rac_error_message(status) : err_msg.c_str());
     }
     return copy_proto(proto, out_result);
+#endif
+}
+
+rac_result_t rac_rag_search_proto(rac_handle_t session, const uint8_t* request_proto_bytes,
+                                  size_t request_proto_size, rac_proto_buffer_t* out_response) {
+    if (!out_response)
+        return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)session;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable(out_response);
+#else
+    const auto s = acquire_session(session);
+    if (!s || !s->backend) {
+        publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "rag.search", "RAG session is not loaded");
+        return rac_proto_buffer_set_error(out_response, RAC_ERROR_COMPONENT_NOT_READY,
+                                          "RAG session is not loaded");
+    }
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return rac_proto_buffer_set_error(out_response, RAC_ERROR_DECODING_ERROR,
+                                          "RAGSearchRequest bytes are invalid");
+    }
+    runanywhere::v1::RAGSearchRequest request_proto;
+    if (!request_proto.ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                                      static_cast<int>(request_proto_size))) {
+        return rac_proto_buffer_set_error(out_response, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse RAGSearchRequest");
+    }
+    if (request_proto.question().empty()) {
+        return rac_proto_buffer_set_error(out_response, RAC_ERROR_INVALID_ARGUMENT,
+                                          "RAGSearchRequest.question is required");
+    }
+
+    runanywhere::v1::RAGSearchResponse proto;
+    std::string err_msg;
+    const rac_result_t status = execute_rag_search(s, request_proto, &proto, &err_msg);
+    if (status != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(
+            out_response, status, err_msg.empty() ? rac_error_message(status) : err_msg.c_str());
+    }
+    return copy_proto(proto, out_response);
 #endif
 }
 

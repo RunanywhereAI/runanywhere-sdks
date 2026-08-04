@@ -4,6 +4,7 @@
 // download or load a model by hand: naming a model in the options is enough.
 
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart'
     show DownloadState;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
@@ -14,6 +15,23 @@ import 'package:runanywhere/public/api/types/options.dart' show LoadOptions;
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
+
+final SDKLogger _modelGateLogger = SDKLogger('ModelGate');
+
+/// [LoadOptions] fields `ModelLoadRequest` (`model_types.proto`) has no wire
+/// path for yet. Only `framework` reaches commons at load time;
+/// `contextLength`, `threads`, and `useGpu` are accepted for cross-SDK API
+/// parity but are dropped below this call until the native load ABI grows
+/// placement fields (tracked as a follow-up — see PR #605 review follow-up
+/// issue 8).
+///
+/// Exposed (not private) so `model_gate_test.dart` can assert on it directly
+/// without driving the full native load path.
+List<String> ignoredLoadOptionKnobs(LoadOptions? options) => <String>[
+  if (options?.contextLength != null) 'contextLength',
+  if (options?.threads != null) 'threads',
+  if (options?.useGpu != null) 'useGpu',
+];
 
 /// Auto-load coordinator shared by every generation verb.
 abstract final class ModelGate {
@@ -69,8 +87,12 @@ abstract final class ModelGate {
     if (framework != null) {
       request.framework = framework;
     }
-    // ModelLoadRequest carries no context/thread/GPU fields (model_types.proto);
-    // those LoadOptions knobs have no commons load-time path yet.
+    final ignored = ignoredLoadOptionKnobs(options);
+    if (ignored.isNotEmpty) {
+      _modelGateLogger.warning(
+        'LoadOptions ${ignored.join(", ")} are not carried by the commons load ABI yet',
+      );
+    }
     final result = await RunAnywhereModelLifecycle.shared.load(request);
     if (result.hasError()) {
       throw SDKException.modelLoadFailed(

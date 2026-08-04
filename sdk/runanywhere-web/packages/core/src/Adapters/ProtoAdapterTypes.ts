@@ -272,6 +272,12 @@ export interface ModalityProtoModule extends ProtoWasmModule {
     querySize: number,
     outResult: number,
   ): number;
+  _rac_rag_search_proto?(
+    session: number,
+    requestBytes: number,
+    requestSize: number,
+    outResponse: number,
+  ): number;
   _rac_rag_query_stream_proto?(
     session: number,
     queryBytes: number,

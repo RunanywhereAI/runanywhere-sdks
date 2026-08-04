@@ -27,11 +27,14 @@ except Exception as exc:  # pragma: no cover - exercised only on a protobuf-free
 __all__ = [
     "build_config",
     "build_query",
+    "build_search",
     "parse_result",
+    "parse_search_response",
     "parse_stats",
     "parse_stream_event",
     "require_native",
     "require_proto",
+    "require_search",
 ]
 
 # runanywhere.v1.RAGStreamEventKind wire values, hardcoded so the event mapping does not
@@ -59,6 +62,16 @@ def require_native(core: Any) -> None:
             ErrorCode.SERVICE_NOT_AVAILABLE,
             "this runanywhere build was compiled without the RAG backend — reinstall the "
             "published wheel (or build with RAC_BACKEND_RAG=ON + RAC_ENABLE_PROTOBUF=ON)",
+        )
+
+
+def require_search(core: Any) -> None:
+    """Raise when the retrieval-only ``rac_rag_search_proto`` binding is missing."""
+    if not hasattr(core, "rag_search"):
+        raise SDKException.of(
+            ErrorCode.FEATURE_NOT_AVAILABLE,
+            "rag.search is unavailable in this build — rebuild/reinstall with a commons that "
+            "exports rac_rag_search_proto (no query workaround)",
         )
 
 
@@ -115,8 +128,29 @@ def build_query(
     return query.SerializeToString()
 
 
+def build_search(question: str, *, top_k: Optional[int] = None) -> bytes:
+    """Serialize a RAGSearchRequest for the retrieval-only ABI."""
+    request = _pb.RAGSearchRequest(question=question)
+    if top_k is not None:
+        request.retrieval_top_k = int(top_k)
+    return request.SerializeToString()
+
+
 def _match(pb: Any) -> Match:
     return Match(text=pb.text, score=pb.similarity_score, metadata=dict(pb.metadata))
+
+
+def parse_search_response(raw: bytes) -> List[Match]:
+    """Parse a RAGSearchResponse, raising when it carries an error.
+
+    Raises:
+        SDKException: the pipeline reported a failure.
+    """
+    pb = _pb.RAGSearchResponse()
+    pb.ParseFromString(raw)
+    if pb.HasField("error"):
+        raise SDKException.from_proto(pb.error)
+    return [_match(chunk) for chunk in pb.chunks]
 
 
 def parse_result(raw: bytes, model: str) -> RagResult:

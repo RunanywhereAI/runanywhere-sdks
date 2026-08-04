@@ -548,6 +548,11 @@ public struct ModelRegistration: Sendable {
     public var supportsThinking: Bool
     public var supportsLora: Bool
 
+    /// Computer-Use-Agent profile id (e.g. `RunAnywhere.CUA.faraProfile`) for a
+    /// CUA-capable model; lands on `RAModelInfo.cuaProfile` so callers can
+    /// discover which registered models are drivable through `RunAnywhere.CUA`.
+    public var cuaProfile: String?
+
     private init(
         payload: Payload,
         id: String?,
@@ -558,7 +563,8 @@ public struct ModelRegistration: Sendable {
         downloadSizeBytes: Int64?,
         contextLength: Int?,
         supportsThinking: Bool,
-        supportsLora: Bool
+        supportsLora: Bool,
+        cuaProfile: String? = nil
     ) {
         self.payload = payload
         self.id = id
@@ -570,6 +576,7 @@ public struct ModelRegistration: Sendable {
         self.contextLength = contextLength
         self.supportsThinking = supportsThinking
         self.supportsLora = supportsLora
+        self.cuaProfile = cuaProfile
     }
 
     /// Register a model served from a single download URL or `hf.co` reference.
@@ -581,7 +588,8 @@ public struct ModelRegistration: Sendable {
         id: String? = nil,
         memoryRequirementBytes: Int64? = nil,
         supportsThinking: Bool = false,
-        supportsLora: Bool = false
+        supportsLora: Bool = false,
+        cuaProfile: String? = nil
     ) -> ModelRegistration {
         ModelRegistration(
             payload: .url(url),
@@ -593,7 +601,8 @@ public struct ModelRegistration: Sendable {
             downloadSizeBytes: nil,
             contextLength: nil,
             supportsThinking: supportsThinking,
-            supportsLora: supportsLora
+            supportsLora: supportsLora,
+            cuaProfile: cuaProfile
         )
     }
 
@@ -608,7 +617,8 @@ public struct ModelRegistration: Sendable {
         id: String? = nil,
         memoryRequirementBytes: Int64? = nil,
         supportsThinking: Bool = false,
-        supportsLora: Bool = false
+        supportsLora: Bool = false,
+        cuaProfile: String? = nil
     ) -> ModelRegistration {
         ModelRegistration(
             payload: .archive(url: url, structure: structure, type: archiveType),
@@ -620,7 +630,8 @@ public struct ModelRegistration: Sendable {
             downloadSizeBytes: nil,
             contextLength: nil,
             supportsThinking: supportsThinking,
-            supportsLora: supportsLora
+            supportsLora: supportsLora,
+            cuaProfile: cuaProfile
         )
     }
 
@@ -634,7 +645,8 @@ public struct ModelRegistration: Sendable {
         memoryRequirementBytes: Int64? = nil,
         downloadSizeBytes: Int64? = nil,
         contextLength: Int? = nil,
-        supportsThinking: Bool = false
+        supportsThinking: Bool = false,
+        cuaProfile: String? = nil
     ) -> ModelRegistration {
         ModelRegistration(
             payload: .multiFile(files),
@@ -646,7 +658,8 @@ public struct ModelRegistration: Sendable {
             downloadSizeBytes: downloadSizeBytes,
             contextLength: contextLength,
             supportsThinking: supportsThinking,
-            supportsLora: false
+            supportsLora: false,
+            cuaProfile: cuaProfile
         )
     }
 }

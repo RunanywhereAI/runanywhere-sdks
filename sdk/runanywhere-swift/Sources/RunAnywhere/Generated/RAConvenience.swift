@@ -641,6 +641,34 @@ extension RARAGQueryOptions {
     }
 }
 
+extension RARAGSearchRequest {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RARAGSearchRequest {
+        var r = RARAGSearchRequest()
+        r.multiQueryCount = 3
+        return r
+    }
+}
+
+extension RARAGSearchRequest {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if question.isEmpty {
+            throw SDKException.validationFailed(
+                fieldPath: "RAGSearchRequest.question",
+                message: "question is required"
+            )
+        }
+        let effectiveMultiQueryCount = hasMultiQueryCount ? multiQueryCount : 3
+        if effectiveMultiQueryCount < 1 || effectiveMultiQueryCount > 8 {
+            throw SDKException.validationFailed(
+                fieldPath: "RAGSearchRequest.multi_query_count",
+                message: "multi_query_count must be in 1...8 (got \(effectiveMultiQueryCount))"
+            )
+        }
+    }
+}
+
 extension RARerankOptions {
     /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
     public static func defaults() -> RARerankOptions {

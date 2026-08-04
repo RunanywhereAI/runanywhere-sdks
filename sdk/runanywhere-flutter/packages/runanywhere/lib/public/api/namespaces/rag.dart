@@ -29,8 +29,13 @@ class RagApi {
   /// await s.ingest(const RagDocument('the sky is blue'));
   /// ```
   ///
-  /// Throws [SDKException] when a model cannot be loaded or the index cannot
-  /// be created.
+  /// The native RAG pipeline is process-wide (one pipeline, not a per-session
+  /// handle — matching RN/Web), so a second concurrent session is rejected
+  /// instead of silently replacing the first. Close the active session before
+  /// opening another.
+  ///
+  /// Throws [SDKException] when a session is already open, a model cannot be
+  /// loaded, or the index cannot be created.
   Future<RagSession> open({
     required ModelRef embeddingModel,
     ModelRef? llmModel,
@@ -38,6 +43,11 @@ class RagApi {
   }) async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
+    }
+    if (RagSession._active != null) {
+      throw SDKException.invalidState(
+        'A RAG session is already open; close it before opening another',
+      );
     }
     await DartBridge.ensureServicesReady();
     // The RAG backend registers itself here so callers never do backend wiring.
@@ -70,8 +80,9 @@ class RagApi {
 
 /// One RAG corpus with its index.
 ///
-/// The Flutter RAG bridge owns a single native session, so opening a new
-/// session supersedes any earlier one; calls on a superseded session throw.
+/// The Flutter RAG bridge owns a single native session (matching RN/Web), so
+/// [RagApi.open] rejects a second concurrent session instead of silently
+/// superseding the active one. Calls after [close] throw.
 class RagSession {
   RagSession._(this._config, {required this.generates}) {
     _active = this;
@@ -109,19 +120,26 @@ class RagSession {
 
   /// Retrieve the chunks closest to [query] without generating an answer.
   ///
-  /// Throws [SDKException] when the session is closed or retrieval fails.
+  /// Uses the commons retrieval-only ABI (`rac_rag_search_proto`); no LLM
+  /// generation is started.
+  ///
+  /// Throws [SDKException] when the session is closed, the native search
+  /// symbol is unavailable, or retrieval fails.
   Future<List<Match>> search(String query, {int? topK}) async {
     _requireLive();
-    // Commons publishes no retrieval-only verb: the query verb is asked for a
-    // single output token so the retrieval half is all that costs anything.
-    final result = await DartBridgeRAG.shared.queryAsync(
-      _queryOptions(query, LlmOptions(maxOutputTokens: 1), topK: topK),
+    if (!DartBridgeRAG.shared.isSearchAvailable) {
+      throw SDKException.featureNotAvailable(
+        'rag.search (rac_rag_search_proto)',
+      );
+    }
+    final response = await DartBridgeRAG.shared.searchAsync(
+      _searchRequest(query, topK: topK),
     );
-    if (result.hasError()) {
-      throw SDKException.processingFailed(result.error.message);
+    if (response.hasError()) {
+      throw SDKException.processingFailed(response.error.message);
     }
     return List<Match>.unmodifiable(
-      result.retrievedChunks.map(Match.fromProto),
+      response.chunks.map(Match.fromProto),
     );
   }
 
@@ -220,6 +238,16 @@ class RagSession {
     final threshold = _config.similarityThreshold;
     if (threshold != null) proto.similarityThreshold = threshold;
     if (options != null) proto.generation = options.toProto();
+    return proto;
+  }
+
+  rag_pb.RAGSearchRequest _searchRequest(String query, {int? topK}) {
+    final proto = rag_pb.RAGSearchRequest(
+      question: query,
+      retrievalTopK: topK ?? _config.topK,
+    );
+    final threshold = _config.similarityThreshold;
+    if (threshold != null) proto.similarityThreshold = threshold;
     return proto;
   }
 

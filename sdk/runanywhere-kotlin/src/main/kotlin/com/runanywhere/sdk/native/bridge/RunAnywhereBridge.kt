@@ -1381,6 +1381,16 @@ object RunAnywhereBridge {
     /** Request-scoped query wrapper used by cancellable Kotlin calls. */
     @JvmStatic external fun racRagQueryRequestProto(requestId: Long, handle: Long, queryProto: ByteArray): ByteArray?
 
+    /** Retrieval-only search; returns serialized RAGSearchResponse bytes. Null on error. */
+    @JvmStatic external fun racRagSearchProto(handle: Long, requestProto: ByteArray): ByteArray?
+
+    /** Request-scoped search wrapper used by cancellable Kotlin calls. */
+    @JvmStatic external fun racRagSearchRequestProto(
+        requestId: Long,
+        handle: Long,
+        requestProto: ByteArray,
+    ): ByteArray?
+
     /**
      * Request-scoped streaming query: blocks on the calling thread, invoking
      * [listener] with each serialized RAGStreamEvent (TOKEN…, then COMPLETED or

@@ -20,6 +20,7 @@ import com.runanywhere.sdk.public.extensions.losslessLLMStreamFlow
 import com.runanywhere.sdk.public.extensions.runCancellableNativeUnaryRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -179,41 +180,13 @@ public class LlmNamespace internal constructor() {
             val model = prepareGeneration(opts, ModelCategory.MODEL_CATEGORY_LANGUAGE)
             val requestId = newRequestId()
             val request = opts.toRequest(prompt, requestId, history)
-            val answer = StringBuilder()
-            val thinking = StringBuilder()
-            var startedEmitted = false
-
-            losslessLLMStreamFlow(
-                prepare = { RunAnywhere.ensureServicesReady() },
-                generate = { onEvent -> CppBridgeLLM.generateStream(request, onEvent) },
-                cancel = { CppBridgeLLM.cancelProto() },
-            ).collect { raw ->
-                if (!startedEmitted) {
-                    startedEmitted = true
-                    emit(GenerationEvent.Started(requestId))
-                }
-                raw.failureOrNull()?.let { throw it }
-                raw.tokenEventOrNull(answer, thinking)?.let { emit(it) }
-                raw.tool_call?.let { emit(GenerationEvent.ToolCallRequested(it)) }
-                if (raw.is_final) {
-                    emit(
-                        GenerationEvent.Completed(
-                            raw.result?.toGenerationResult(
-                                requestId = requestId,
-                                model = model,
-                                fallbackText = answer.toString(),
-                                fallbackThinking = thinking.toString().takeIf { it.isNotEmpty() },
-                            ) ?: GenerationResult(
-                                text = answer.toString(),
-                                thinkingText = thinking.toString().takeIf { it.isNotEmpty() },
-                                finishReason = finishReasonOf(raw.finish_reason),
-                                requestId = requestId,
-                                model = model,
-                            ),
-                        ),
-                    )
-                }
-            }
+            val rawEvents =
+                losslessLLMStreamFlow(
+                    prepare = { RunAnywhere.ensureServicesReady() },
+                    generate = { onEvent -> CppBridgeLLM.generateStream(request, onEvent) },
+                    cancel = { CppBridgeLLM.cancelProto() },
+                )
+            emitAll(mapLLMStreamEvents(requestId, model, rawEvents))
         }
 
     private suspend fun generateWithTools(
@@ -278,13 +251,18 @@ private fun LlmOptions.toRequest(
         history = history.map { it.toProto() },
     )
 
-private fun LlmOptions.toolCallingProtoForOrchestrator(): ai.runanywhere.proto.v1.ToolCallingOptions =
+/** Not `private` so tests can pin the `autoExecute` forwarding contract. */
+internal fun LlmOptions.toolCallingProtoForOrchestrator(): ai.runanywhere.proto.v1.ToolCallingOptions =
     ai.runanywhere.proto.v1.ToolCallingOptions(
         tools = tools,
         max_tool_calls = maxToolCalls,
         tool_choice = toolChoice.toProto(),
         forced_tool_name = (toolChoice as? ToolChoice.Forced)?.name,
-        auto_execute = true,
+        // Forwarded verbatim -- makeToolCallingRunLoopRequest reads this
+        // straight onto ToolCallingSessionCreateRequest.auto_execute, so an
+        // explicit caller `autoExecute = false` must survive this hop
+        // instead of being hardcoded away.
+        auto_execute = autoExecute,
     )
 
 private fun List<ChatMessage>.lastPrompt(): String =
@@ -319,6 +297,88 @@ private fun List<ChatMessage>.toAlternatingTurns(): List<String> {
     return turns
 }
 
+/**
+ * Fold raw native LLM stream events onto the public `started` / `token` /
+ * `toolCall` / `completed` grammar.
+ *
+ * Internal and injectable — [rawEvents] is any `Flow<LLMStreamEvent>`, not
+ * tied to [CppBridgeLLM], so unit tests can characterize the native-boundary
+ * contract (a stream that ends without `is_final`) without a JNI bridge.
+ * Mirrors Swift's `RunAnywhere.mapGenerationStream`
+ * (`LLMNamespace.swift`): a native stream that ends after producing at least
+ * one event but without a terminal `is_final` is a legitimate completion —
+ * synthesized from wall-clock metrics — not a thrown error. A stream that
+ * produced zero events is the actual failure.
+ */
+internal fun mapLLMStreamEvents(
+    requestId: String,
+    model: String,
+    rawEvents: Flow<LLMStreamEvent>,
+): Flow<GenerationEvent> =
+    flow {
+        val answer = StringBuilder()
+        val thinking = StringBuilder()
+        var startedEmitted = false
+        var sawCompletion = false
+        var sawAnyEvent = false
+        var tokenCount = 0
+        val startedAtMs = System.currentTimeMillis()
+        var firstTokenAtMs: Long? = null
+
+        rawEvents.collect { raw ->
+            sawAnyEvent = true
+            if (!startedEmitted) {
+                startedEmitted = true
+                emit(GenerationEvent.Started(requestId))
+            }
+            raw.failureOrNull()?.let { throw it }
+            if (raw.token.isNotEmpty()) {
+                tokenCount += 1
+                if (firstTokenAtMs == null) firstTokenAtMs = System.currentTimeMillis()
+            }
+            raw.tokenEventOrNull(answer, thinking)?.let { emit(it) }
+            raw.tool_call?.let { emit(GenerationEvent.ToolCallRequested(it)) }
+            if (raw.is_final) {
+                sawCompletion = true
+                emit(
+                    GenerationEvent.Completed(
+                        raw.result?.toGenerationResult(
+                            requestId = requestId,
+                            model = model,
+                            fallbackText = answer.toString(),
+                            fallbackThinking = thinking.toString().takeIf { it.isNotEmpty() },
+                        ) ?: GenerationResult(
+                            text = answer.toString(),
+                            thinkingText = thinking.toString().takeIf { it.isNotEmpty() },
+                            finishReason = finishReasonOf(raw.finish_reason),
+                            requestId = requestId,
+                            model = model,
+                        ),
+                    ),
+                )
+            }
+        }
+
+        if (!sawCompletion) {
+            if (!sawAnyEvent) {
+                throw SDKException.operation("Generation ended before producing any output")
+            }
+            emit(
+                GenerationEvent.Completed(
+                    synthesizeStreamResult(
+                        requestId = requestId,
+                        model = model,
+                        text = answer.toString(),
+                        thinking = thinking.toString(),
+                        tokenCount = tokenCount,
+                        startedAtMs = startedAtMs,
+                        firstTokenAtMs = firstTokenAtMs,
+                    ),
+                ),
+            )
+        }
+    }
+
 private fun LLMStreamEvent.failureOrNull(): SDKException? {
     val err = error ?: return null
     return SDKException(err)
@@ -340,4 +400,33 @@ private fun LLMStreamEvent.tokenEventOrNull(
             GenerationEvent.Token(token, TokenKind.TEXT)
         }
     }
+}
+
+/**
+ * Wall-clock [GenerationResult] for a stream whose native side ended
+ * without a terminal `is_final` event. Mirrors Swift's
+ * `RunAnywhere.synthesizeResult` (`LLMNamespace.swift`).
+ */
+private fun synthesizeStreamResult(
+    requestId: String,
+    model: String,
+    text: String,
+    thinking: String,
+    tokenCount: Int,
+    startedAtMs: Long,
+    firstTokenAtMs: Long?,
+): GenerationResult {
+    val totalSeconds = (System.currentTimeMillis() - startedAtMs) / 1_000.0
+    val ttftMs = firstTokenAtMs?.let { it - startedAtMs } ?: 0L
+    val tokensPerSecond = if (totalSeconds > 0) (tokenCount / totalSeconds).toFloat() else 0f
+    return GenerationResult(
+        text = text,
+        thinkingText = thinking.takeIf { it.isNotEmpty() },
+        finishReason = FinishReason.STOP,
+        outputTokens = tokenCount,
+        timeToFirstTokenMs = ttftMs,
+        tokensPerSecond = tokensPerSecond,
+        requestId = requestId,
+        model = model,
+    )
 }

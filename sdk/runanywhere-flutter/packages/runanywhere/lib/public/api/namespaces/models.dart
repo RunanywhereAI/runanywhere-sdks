@@ -93,6 +93,7 @@ class ModelsApi {
           memoryRequirement: model.memoryRequirementBytes,
           supportsThinking: model.supportsThinking,
           supportsLora: model.supportsLora,
+          cuaProfile: model.cuaProfile,
         );
       case ModelArtifactKind.archive:
         return RunAnywhereStorage.registerArchiveModel(
@@ -106,6 +107,7 @@ class ModelsApi {
           memoryRequirement: model.memoryRequirementBytes,
           supportsThinking: model.supportsThinking,
           supportsLora: model.supportsLora,
+          cuaProfile: model.cuaProfile,
         );
       case ModelArtifactKind.multiFile:
         return RunAnywhereStorage.registerMultiFileModel(
@@ -118,6 +120,7 @@ class ModelsApi {
           contextLength: model.contextLength,
           supportsThinking: model.supportsThinking,
           source: model.source,
+          cuaProfile: model.cuaProfile,
         );
     }
   }

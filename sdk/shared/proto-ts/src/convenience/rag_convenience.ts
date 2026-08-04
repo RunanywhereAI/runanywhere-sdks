@@ -14,7 +14,7 @@
 
 /* eslint-disable */
 
-import { RAGConfiguration, RAGQueryOptions } from '../rag';
+import { RAGConfiguration, RAGQueryOptions, RAGSearchRequest } from '../rag';
 import { ValidationError } from './_errors';
 
 export const rAGConfigurationDefaults = (): RAGConfiguration => ({
@@ -73,6 +73,28 @@ export const validateRAGQueryOptions = (m: RAGQueryOptions): void => {
   if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1 || m.multiQueryCount > 8)) {
     throw new ValidationError({
       fieldPath: 'RAGQueryOptions.multi_query_count',
+      message: `multi_query_count must be in 1...8 (got ${m.multiQueryCount})`,
+    });
+  }
+};
+
+export const rAGSearchRequestDefaults = (): RAGSearchRequest => ({
+  question: '',
+  retrievalTopK: 0,
+  enableMultiQuery: false,
+  multiQueryCount: 3,
+});
+
+export const validateRAGSearchRequest = (m: RAGSearchRequest): void => {
+  if (m.question === '') {
+    throw new ValidationError({
+      fieldPath: 'RAGSearchRequest.question',
+      message: 'question is required',
+    });
+  }
+  if (m.multiQueryCount !== undefined && (m.multiQueryCount < 1 || m.multiQueryCount > 8)) {
+    throw new ValidationError({
+      fieldPath: 'RAGSearchRequest.multi_query_count',
       message: `multi_query_count must be in 1...8 (got ${m.multiQueryCount})`,
     });
   }

@@ -175,6 +175,12 @@ export interface RegisterModelOptions {
   supportsThinking?: boolean;
   supportsLora?: boolean;
   source?: ModelSource;
+  /**
+   * Optional Computer-Use-Agent profile id (e.g. `'fara'`). Lands on
+   * `ModelInfo.cuaProfile` so callers can discover which registered models
+   * are drivable through `RunAnywhere.cua`.
+   */
+  cuaProfile?: string;
 }
 
 /**
@@ -206,6 +212,12 @@ export interface RegisterMultiFileOptions {
   supportsThinking?: boolean;
   supportsLora?: boolean;
   source?: ModelSource;
+  /**
+   * Optional Computer-Use-Agent profile id (e.g. `'fara'`). Lands on
+   * `ModelInfo.cuaProfile` so callers can discover which registered models
+   * are drivable through `RunAnywhere.cua`.
+   */
+  cuaProfile?: string;
 }
 
 /**
@@ -279,7 +291,7 @@ function toMultiFileArtifact(
  * (`ModelRegistry.registerModel` → `_rac_model_registry_register_proto`)
  * persists all of these fields, so one complete build + one save is enough.
  */
-function buildSingleFileModelInfo(
+export function buildSingleFileModelInfo(
   url: string,
   name: string,
   framework: InferenceFramework,
@@ -316,10 +328,11 @@ function buildSingleFileModelInfo(
     updatedAtUnixMs: now,
     memoryRequiredBytes: options.memoryRequirement,
     artifactType: options.artifactType ?? ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
+    ...(options.cuaProfile ? { cuaProfile: options.cuaProfile } : {}),
   };
 }
 
-function buildMultiFileModelInfo(options: RegisterMultiFileOptions): ModelInfo {
+export function buildMultiFileModelInfo(options: RegisterMultiFileOptions): ModelInfo {
   const now = Date.now();
   const { artifact, expected } = toMultiFileArtifact(options.files);
   expected.rootDirectory = options.id;
@@ -359,6 +372,7 @@ function buildMultiFileModelInfo(options: RegisterMultiFileOptions): ModelInfo {
     multiFile: artifact,
     artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE,
     expectedFiles: expected,
+    ...(options.cuaProfile ? { cuaProfile: options.cuaProfile } : {}),
   };
 }
 

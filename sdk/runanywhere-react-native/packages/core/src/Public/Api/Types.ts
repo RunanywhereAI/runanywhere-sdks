@@ -281,6 +281,12 @@ export interface ModelRegistration {
   archiveLayout?: ArchiveLayout;
   /** Multi-file bundle; requires `id`. */
   files?: ModelFile[];
+  /**
+   * Computer-Use-Agent profile id (e.g. `'fara'`) for a CUA-capable model.
+   * Lands on `ModelInfo.cuaProfile` so callers can discover which registered
+   * models are drivable through the CUA namespace.
+   */
+  cuaProfile?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -55,20 +55,17 @@ class RagSession:
         await loop.run_in_executor(None, lambda: self.ingest(documents))
 
     def search(self, query: str, top_k: Optional[int] = None) -> List[Match]:
-        """Retrieve the chunks most similar to ``query``.
+        """Retrieve the chunks most similar to ``query`` without generating an answer.
 
-        The C ABI has no retrieval-only entry point, so this runs the query pipeline and
-        keeps only its sources; on a session with an answer model, generation is capped at
-        one token to keep that cheap.
+        Uses the commons retrieval-only ABI (``rac_rag_search_proto``).
 
         Raises:
-            SDKException: the session is closed or retrieval fails.
+            SDKException: the session is closed, search is unavailable, or retrieval fails.
         """
         core = self._live()
-        options = LlmOptions(max_output_tokens=1) if self._model else None
-        payload = bridge.build_query(query, options, top_k=top_k)
-        raw = core.rag_query(self._handle, payload)
-        return bridge.parse_result(raw, self._model).sources
+        bridge.require_search(core)
+        payload = bridge.build_search(query, top_k=top_k)
+        return bridge.parse_search_response(core.rag_search(self._handle, payload))
 
     async def asearch(self, query: str, top_k: Optional[int] = None) -> List[Match]:
         """Async form of :meth:`search` (runs on the loop's default executor)."""

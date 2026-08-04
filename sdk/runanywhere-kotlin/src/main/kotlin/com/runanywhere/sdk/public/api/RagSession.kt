@@ -8,6 +8,7 @@
 package com.runanywhere.sdk.public.api
 
 import ai.runanywhere.proto.v1.RAGDocument
+import ai.runanywhere.proto.v1.RAGSearchRequest
 import ai.runanywhere.proto.v1.RAGStreamEventKind
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeRAG
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -77,46 +78,28 @@ public class RagSession internal constructor(
     /**
      * Retrieve the chunks most similar to [query] without generating an answer.
      *
-     * Commons has no retrieval-only verb, so this opens a streaming query and
-     * stops it as soon as the grounding chunks arrive — no answer tokens are
-     * produced.
+     * Uses commons `rac_rag_search_proto` (retrieval-only). Older native binaries
+     * without that symbol surface [SDKException] feature-not-available.
      *
      * @throws SDKException when the session is closed or retrieval fails.
      */
     public suspend fun search(query: String, topK: Int? = null): List<Match> {
         val live = requireHandle()
         val request =
-            CppBridgeRAG.prepareQuery(ragQueryOptions(query, config, null, topK, stream = true))
-        val matches = mutableListOf<Match>()
-        runCancellableNativeUnaryRequest(
-            coordinator = requests,
-            request = { requestId ->
-                CppBridgeRAG.queryStreamOn(live, requestId, request) { event ->
-                    when (event.kind) {
-                        RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED -> {
-                            event.chunk?.let { matches += it.toMatch() }
-                            true
-                        }
-                        RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY,
-                        RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN,
-                        -> false
-                        RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED -> {
-                            if (matches.isEmpty()) {
-                                event.result?.retrieved_chunks?.forEach { matches += it.toMatch() }
-                            }
-                            false
-                        }
-                        RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR ->
-                            throw SDKException.operation(
-                                event.error?.message?.takeIf { it.isNotBlank() } ?: "RAG search failed",
-                            )
-                        else -> true
-                    }
-                }
-            },
-            cancel = { requestId -> CppBridgeRAG.cancelRequestOn(live, requestId) },
-        )
-        return matches.take(topK ?: config.topK)
+            CppBridgeRAG.prepareSearch(
+                RAGSearchRequest(
+                    question = query,
+                    retrieval_top_k = topK ?: config.topK,
+                ),
+            )
+        val response =
+            runCancellableNativeUnaryRequest(
+                coordinator = requests,
+                request = { requestId -> CppBridgeRAG.searchOn(live, requestId, request) },
+                cancel = { requestId -> CppBridgeRAG.cancelRequestOn(live, requestId) },
+            )
+        response.error?.let { throw SDKException(it) }
+        return response.chunks.map { it.toMatch() }
     }
 
     /**

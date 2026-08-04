@@ -49,19 +49,19 @@ public actor RagSession {
 
     /// Retrieve the closest chunks to `query` without generating an answer.
     ///
-    /// - Throws: `SDKException` when the session is closed or retrieval fails.
+    /// Uses the commons retrieval-only ABI (`rac_rag_search_proto`); no LLM
+    /// generation is started.
+    ///
+    /// - Throws: `SDKException` when the session is closed, the native search
+    ///   symbol is unavailable, or retrieval fails.
     public func search(query: String, topK: Int? = nil) async throws -> [Match] {
         try requireOpen()
-        var options = RARAGQueryOptions.defaults(question: query)
-        options.retrievalTopK = Int32(topK ?? defaultTopK)
-        // Commons has no retrieval-only entry point, and 0 falls through to the
-        // 512-token default; cap at one token since search reads only the chunks.
-        var generation = RALLMGenerationOptions.defaults()
-        generation.maxOutputTokens = 1
-        options.generation = generation
-        let result = try CppBridge.RAG.shared.query(handle: handle, options)
-        try RagSession.throwIfFailed(result)
-        return result.retrievedChunks.map(Match.init(proto:))
+        var request = RARAGSearchRequest()
+        request.question = query
+        request.retrievalTopK = Int32(topK ?? defaultTopK)
+        let response = try CppBridge.RAG.shared.search(handle: handle, request)
+        try RagSession.throwIfFailed(response)
+        return response.chunks.map(Match.init(proto:))
     }
 
     /// Answer `question` from the indexed corpus.
@@ -212,5 +212,10 @@ public actor RagSession {
     private static func throwIfFailed(_ result: RARAGResult) throws {
         guard result.hasError else { return }
         throw SDKException(proto: result.error)
+    }
+
+    private static func throwIfFailed(_ response: RARAGSearchResponse) throws {
+        guard response.hasError else { return }
+        throw SDKException(proto: response.error)
     }
 }

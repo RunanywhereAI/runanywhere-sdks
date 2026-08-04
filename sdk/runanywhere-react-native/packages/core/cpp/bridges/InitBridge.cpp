@@ -750,24 +750,30 @@ int neuralEngineCoresForChip(const std::string& chipName) {
 
 } // anonymous namespace
 
+// Split-header model (mirrors Kotlin's HTTPClientAdapter.buildHeaders /
+// resolveToken): `apikey` always travels independently of `Authorization`.
+// `Authorization: Bearer` carries only a JWT access token, and only when the
+// caller actually asked for auth (`requiresAuth`) -- it never falls back to
+// the API key. Collapsing the two turns a missing/expired-token failure into
+// the backend's misleading "Invalid JWT token: Not enough segments", and
+// sends credentials on calls that never asked for them.
 static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     const std::string& url,
     const std::string& jsonBody,
     const std::string& apiKey,
-    const std::string& authToken
+    const std::string& accessToken,
+    bool requiresAuth
 ) {
     std::vector<rac_http_header_kv_t> headers = {
         {"Content-Type", "application/json"},
         {"Accept", "application/json"},
     };
-    std::string bearer;
     if (!apiKey.empty()) {
         headers.push_back({"apikey", apiKey.c_str()});
     }
-    // The API key is never a bearer substitute; it travels in the `apikey`
-    // header above. Authorization: Bearer carries only a real JWT access token.
-    if (!authToken.empty()) {
-        bearer = "Bearer " + authToken;
+    std::string bearer;
+    if (requiresAuth && !accessToken.empty()) {
+        bearer = "Bearer " + accessToken;
         headers.push_back({"Authorization", bearer.c_str()});
     }
 
@@ -1838,25 +1844,31 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
         const std::string& jsonBody,
         bool requiresAuth
     ) -> std::tuple<bool, int, std::string, std::string> {
-        (void)requiresAuth;
-
         // Effective config from commons state (baked OSS URL fills development when empty)
         // resolves the baked keyless base URL, dev/prod use whatever the app
         // passed. There is no direct-to-datastore path — the backend is always
         // reached through this base URL.
         std::string baseURL = config::trim(InitBridge::shared().getBaseURL());
-        std::string apiKey = config::trim(InitBridge::shared().getApiKey());
         std::string accessToken = AuthBridge::shared().getAccessToken();
-        std::string authToken =
-            config::isUsableSecret(accessToken) ? accessToken : std::string();
+        if (!config::isUsableSecret(accessToken)) {
+            accessToken.clear();
+        }
+        std::string apiKey = config::trim(InitBridge::shared().getApiKey());
+        if (!config::isUsableSecret(apiKey)) {
+            apiKey.clear();
+        }
+        // Split-header model: apikey and the JWT access token travel
+        // independently (see postJsonViaRacHttpClient). At least one usable
+        // credential must exist for an auth-requiring call.
+        bool hasUsableCredential = !accessToken.empty() || !apiKey.empty();
         if (!config::isUsableHttpUrl(baseURL) ||
-            (!config::isUsableSecret(apiKey) && authToken.empty())) {
+            (requiresAuth && !hasUsableCredential)) {
             LOGI("Skipping device registration: no usable external config");
             return {true, 204, "{}", ""};
         }
 
         std::string fullURL = config::appendEndpointPath(baseURL, endpoint);
-        return InitBridge::shared().httpPostSync(fullURL, jsonBody, apiKey, authToken);
+        return InitBridge::shared().httpPostSync(fullURL, jsonBody, apiKey, accessToken, requiresAuth);
     };
 
     DeviceBridge::shared().setPlatformCallbacks(callbacks);
@@ -2311,10 +2323,11 @@ std::tuple<bool, int, std::string, std::string> InitBridge::httpPostSync(
     const std::string& url,
     const std::string& jsonBody,
     const std::string& apiKey,
-    const std::string& authToken
+    const std::string& accessToken,
+    bool requiresAuth
 ) {
   LOGI("httpPostSync via rac_http_client_* starting");
-  auto result = postJsonViaRacHttpClient(url, jsonBody, apiKey, authToken);
+  auto result = postJsonViaRacHttpClient(url, jsonBody, apiKey, accessToken, requiresAuth);
   LOGI("httpPostSync result: success=%d statusCode=%d", std::get<0>(result),
        std::get<1>(result));
   return result;
