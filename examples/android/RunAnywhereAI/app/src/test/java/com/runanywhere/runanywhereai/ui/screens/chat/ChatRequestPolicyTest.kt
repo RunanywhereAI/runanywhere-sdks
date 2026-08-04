@@ -117,6 +117,32 @@ class ChatRequestPolicyTest {
     }
 
     @Test
+    fun `stray tool-call markup never reaches the chat bubble on the standard route`() {
+        // Verbatim from an LFM2.5-2.6B reply to a plain greeting, with no tools registered.
+        val raw = """<|tool_call_start|>[ask_user("What would you like to do today, Aman? """ +
+            """I'm here to help with any questions or tasks you have.")]<|tool_call_end|>"""
+
+        val visible = ChatToolResultNormalizer.stripStrayToolCall(raw)
+
+        assertFalse("tool markers must not survive", visible.contains("tool_call_start"))
+        assertFalse("tool markers must not survive", visible.contains("tool_call_end"))
+        // The call's string literal is the model's intended sentence — surface it rather than a blank bubble.
+        assertEquals(
+            "What would you like to do today, Aman? I'm here to help with any questions or tasks you have.",
+            visible,
+        )
+    }
+
+    @Test
+    fun `stray tool-call stripping keeps surrounding prose and leaves clean replies untouched`() {
+        val mixed = "Sure, here you go.<|tool_call_start|>[noop()]<|tool_call_end|>"
+        assertEquals("Sure, here you go.", ChatToolResultNormalizer.stripStrayToolCall(mixed))
+
+        val clean = "Your name is Aman. I have that from our conversation."
+        assertEquals(clean, ChatToolResultNormalizer.stripStrayToolCall(clean))
+    }
+
+    @Test
     fun `windowHistory keeps a short user turn even when the newest reply is too big to fit`() {
         // The LFM2.5-2.6B (512 ctx) failure: a reasoning model's reply alone exceeds the whole history
         // budget, so the old `break` discarded the short user turn behind it and the model answered
