@@ -58,6 +58,10 @@ struct ModelPolicy {
 constexpr ModelPolicy kModelPolicies[] = {
     {"lfm2_5_230m", kAllSupportedArches, false},
     {"lfm2_5_350m", kAllSupportedArches, false},
+    // Only v79 context binaries are published, and the repo is PRIVATE — the first row to set
+    // requires_hf_auth, which is exactly what that gate exists for: registration is skipped until a
+    // token is configured, driving the bring-your-own-token preflight instead of failing at download.
+    {"lfm2_5_2_6b", kV79, true},
     {"qwen3_5_0_8b", kAllSupportedArches, false},
     {"qwen3_5_2b", kAllSupportedArches, false},
     {"qwen3_5_4b", kV79V81, false},
