@@ -753,7 +753,8 @@ int neuralEngineCoresForChip(const std::string& chipName) {
 static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     const std::string& url,
     const std::string& jsonBody,
-    const std::string& apiKey
+    const std::string& apiKey,
+    const std::string& authToken
 ) {
     std::vector<rac_http_header_kv_t> headers = {
         {"Content-Type", "application/json"},
@@ -762,7 +763,11 @@ static std::tuple<bool, int, std::string, std::string> postJsonViaRacHttpClient(
     std::string bearer;
     if (!apiKey.empty()) {
         headers.push_back({"apikey", apiKey.c_str()});
-        bearer = "Bearer " + apiKey;
+    }
+    // The API key is never a bearer substitute; it travels in the `apikey`
+    // header above. Authorization: Bearer carries only a real JWT access token.
+    if (!authToken.empty()) {
+        bearer = "Bearer " + authToken;
         headers.push_back({"Authorization", bearer.c_str()});
     }
 
@@ -1840,17 +1845,18 @@ rac_result_t InitBridge::registerDeviceCallbacks() {
         // passed. There is no direct-to-datastore path — the backend is always
         // reached through this base URL.
         std::string baseURL = config::trim(InitBridge::shared().getBaseURL());
+        std::string apiKey = config::trim(InitBridge::shared().getApiKey());
         std::string accessToken = AuthBridge::shared().getAccessToken();
-        std::string token = config::isUsableSecret(accessToken)
-            ? accessToken
-            : config::trim(InitBridge::shared().getApiKey());
-        if (!config::isUsableHttpUrl(baseURL) || !config::isUsableSecret(token)) {
+        std::string authToken =
+            config::isUsableSecret(accessToken) ? accessToken : std::string();
+        if (!config::isUsableHttpUrl(baseURL) ||
+            (!config::isUsableSecret(apiKey) && authToken.empty())) {
             LOGI("Skipping device registration: no usable external config");
             return {true, 204, "{}", ""};
         }
 
         std::string fullURL = config::appendEndpointPath(baseURL, endpoint);
-        return InitBridge::shared().httpPostSync(fullURL, jsonBody, token);
+        return InitBridge::shared().httpPostSync(fullURL, jsonBody, apiKey, authToken);
     };
 
     DeviceBridge::shared().setPlatformCallbacks(callbacks);
@@ -2304,10 +2310,11 @@ bool InitBridge::getCoreSplit(int totalCores, int& perfCores, int& effCores) {
 std::tuple<bool, int, std::string, std::string> InitBridge::httpPostSync(
     const std::string& url,
     const std::string& jsonBody,
-    const std::string& apiKey
+    const std::string& apiKey,
+    const std::string& authToken
 ) {
   LOGI("httpPostSync via rac_http_client_* starting");
-  auto result = postJsonViaRacHttpClient(url, jsonBody, apiKey);
+  auto result = postJsonViaRacHttpClient(url, jsonBody, apiKey, authToken);
   LOGI("httpPostSync result: success=%d statusCode=%d", std::get<0>(result),
        std::get<1>(result));
   return result;

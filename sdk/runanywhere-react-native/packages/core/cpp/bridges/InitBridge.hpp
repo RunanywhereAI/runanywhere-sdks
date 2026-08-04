@@ -310,12 +310,14 @@ public:
      *
      * @param url Full URL to POST to
      * @param jsonBody JSON body string
-     * @param apiKey Authorization token for the request (empty for keyless)
+     * @param apiKey API key for the `apikey` header (empty for keyless)
+     * @param authToken Real JWT access token for Authorization: Bearer (empty
+     *                  when unauthenticated); never derived from apiKey
      * @return tuple<success, statusCode, responseBody, errorMessage>
      */
     std::tuple<bool, int, std::string, std::string>
     httpPostSync(const std::string &url, const std::string &jsonBody,
-                 const std::string &apiKey);
+                 const std::string &apiKey, const std::string &authToken);
 
   private:
     InitBridge() = default;

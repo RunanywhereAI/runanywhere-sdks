@@ -431,23 +431,21 @@ class HTTPClientAdapter {
 
     // Every environment reaches the backend through the effective base URL and
     // C++-owned auth — there is no dev-only direct-to-datastore credential path.
+    // The API key is never a bearer substitute; it already travels in the
+    // `apikey` header below. Authorization: Bearer carries only a real
+    // JWT/access token.
     if (requiresAuth && snapshot.tokenResolver != null) {
       try {
         final token = await snapshot.tokenResolver!.call(requiresAuth: true);
         if (token != null && token.isNotEmpty) {
           headers['Authorization'] = 'Bearer $token';
-        } else if (snapshot.apiKey.isNotEmpty) {
-          headers['Authorization'] = 'Bearer ${snapshot.apiKey}';
         }
       } catch (_) {
         _logger.debug('Token resolver failed');
-        if (snapshot.apiKey.isNotEmpty) {
-          headers['Authorization'] = 'Bearer ${snapshot.apiKey}';
-        }
       }
     } else {
-      final token = snapshot.accessToken ?? snapshot.apiKey;
-      if (token.isNotEmpty) {
+      final token = snapshot.accessToken;
+      if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
       }
     }

@@ -275,6 +275,16 @@ export const RunAnywhere: RunAnywhereApi & LegacySurface = {
    * @throws SDKException when the native runtime cannot start.
    */
   initialize(options: InitializeOptions & InitOptions = {}): Promise<void> {
+    if (options.apiKey || options.baseURL || options.baseUrl) {
+      // Never imply a control plane that is not wired: Electron does no auth,
+      // device registration, or telemetry. They are accepted for signature
+      // parity and dropped.
+      console.warn(
+        'RunAnywhere.initialize: apiKey/baseURL are accepted for signature ' +
+          'parity but Electron has no control plane, so no auth, device ' +
+          'registration, or telemetry is performed'
+      );
+    }
     const home = path.join(os.homedir(), '.runanywhere');
     const base = options.baseDir ?? home;
     return v3.initialize({

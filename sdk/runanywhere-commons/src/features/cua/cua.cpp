@@ -506,6 +506,10 @@ extern "C" int rac_cua_parse_action(const char* profile_id, const char* model_ou
         return 0;
     }
     out->type = action_from_string(action);
+    if (out->type == RAC_CUA_ACTION_UNKNOWN) {
+        out->parse_ok = 0;
+        return 0;
+    }
     out->parse_ok = 1;
 
     long mx = 0;

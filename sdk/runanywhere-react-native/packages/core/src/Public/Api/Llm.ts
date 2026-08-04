@@ -230,10 +230,12 @@ export const llm = {
         };
         controller.push({ type: 'started', requestId });
 
+        let receivedEvent = false;
         void native
           .llmGenerateStreamProto(
             encode(request, LLMGenerateRequest),
             (eventBytes: ArrayBuffer) => {
+              receivedEvent = true;
               const event = decodeEvent(eventBytes, LLMStreamEvent);
               if (event.error) {
                 controller.fail(new SDKException(event.error));
@@ -264,7 +266,27 @@ export const llm = {
               }
             }
           )
-          .then(() => controller.finish())
+          .then(() => {
+            // The stream ends in `completed` or a thrown error, never a silent
+            // finish (mirrors Swift's mapGenerationStream guard): a terminal
+            // event already closed the controller; a backend that dropped the
+            // stream without one still gets a synthesized `completed`, and one
+            // that produced nothing at all is a failure.
+            if (controller.closed) return;
+            if (!receivedEvent) {
+              controller.fail(
+                SDKException.generationFailed(
+                  'Generation ended before producing any output'
+                )
+              );
+              return;
+            }
+            controller.push({
+              type: 'completed',
+              result: emptyGenerationResult(requestId, options?.model ?? ''),
+            });
+            controller.finish();
+          })
           .catch((error: Error) => controller.fail(error));
       },
       async () => {

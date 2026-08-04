@@ -54,9 +54,10 @@ public actor RagSession {
         try requireOpen()
         var options = RARAGQueryOptions.defaults(question: query)
         options.retrievalTopK = Int32(topK ?? defaultTopK)
-        // Zero output tokens keeps this a pure retrieval pass.
+        // Commons has no retrieval-only entry point, and 0 falls through to the
+        // 512-token default; cap at one token since search reads only the chunks.
         var generation = RALLMGenerationOptions.defaults()
-        generation.maxOutputTokens = 0
+        generation.maxOutputTokens = 1
         options.generation = generation
         let result = try CppBridge.RAG.shared.query(handle: handle, options)
         try RagSession.throwIfFailed(result)

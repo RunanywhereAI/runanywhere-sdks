@@ -18,8 +18,10 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import java.util.concurrent.atomic.AtomicBoolean
 
 private val modelsLogger = SDKLogger("Models")
+private val loadKnobsWarned = AtomicBoolean(false)
 
 private val LOADABLE_CATEGORIES =
     listOf(
@@ -126,8 +128,17 @@ public class ModelsNamespace internal constructor() {
         val category =
             registered?.category?.takeIf { it != ModelCategory.MODEL_CATEGORY_UNSPECIFIED }
                 ?: ModelCategory.MODEL_CATEGORY_LANGUAGE
-        if (options?.contextLength != null || options?.threads != null || options?.useGpu != null) {
-            modelsLogger.debug("Load placement knobs are not carried by the commons load ABI yet")
+        val ignoredKnobs =
+            buildList {
+                if (options?.contextLength != null) add("contextLength")
+                if (options?.threads != null) add("threads")
+                if (options?.useGpu != null) add("useGpu")
+            }
+        if (ignoredKnobs.isNotEmpty() && loadKnobsWarned.compareAndSet(false, true)) {
+            modelsLogger.warn(
+                "LoadOptions ${ignoredKnobs.joinToString(", ")} ignored: " +
+                    "the commons load ABI does not carry them",
+            )
         }
         if (registered != null && registered.local_path.isEmpty()) {
             legacyDownloadModel(registered)

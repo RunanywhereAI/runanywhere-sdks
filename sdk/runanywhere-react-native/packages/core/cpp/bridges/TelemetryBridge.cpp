@@ -297,6 +297,7 @@ static void telemetryHttpCallback(void *userData, const char *endpoint,
   // Matches Swift HTTPService logic
   std::string baseURL;
   std::string apiKey;
+  std::string authToken;
 
   {
     // Effective config from commons state (baked OSS URL fills development when empty)
@@ -308,18 +309,19 @@ static void telemetryHttpCallback(void *userData, const char *endpoint,
                   ? config::trim(stateURL)
                   : config::trim(InitBridge::shared().getBaseURL());
 
-    // For production mode, prefer JWT access token (from authentication)
-    // over raw API key. This matches Swift/Kotlin behavior.
+    // Prefer a real JWT access token for Authorization: Bearer; the raw API
+    // key travels only in the `apikey` header, never as a bearer substitute.
+    // This matches Swift/Kotlin behavior.
     std::string accessToken = AuthBridge::shared().getAccessToken();
-    if (config::isUsableSecret(accessToken)) {
-      apiKey = accessToken; // Use JWT for Authorization header
+    authToken =
+        config::isUsableSecret(accessToken) ? accessToken : std::string();
+    const char *stateKey = rac_state_get_api_key();
+    apiKey = config::trim(stateKey != nullptr ? stateKey : "");
+    if (!authToken.empty()) {
       LOGD("Telemetry using JWT access token");
     } else {
-      // Fall back to the commons-state key. Staging clears it (keyless):
-      // the POST goes out with no Authorization header and the backend
-      // attributes it to the PUBLIC org — a stale app key would 401.
-      const char *stateKey = rac_state_get_api_key();
-      apiKey = config::trim(stateKey != nullptr ? stateKey : "");
+      // Staging leaves the key keyless: the POST goes out unauthenticated and
+      // the backend attributes it to the PUBLIC org; a stale app key 401s.
       LOGD("Telemetry using %s (not authenticated)",
            apiKey.empty() ? "keyless mode" : "API key");
     }
@@ -345,7 +347,7 @@ static void telemetryHttpCallback(void *userData, const char *endpoint,
 
   // Use shared native C++ HTTP transport (same as device registration).
   auto [success, statusCode, responseBody, errorMessage] =
-      InitBridge::shared().httpPostSync(fullURL, json, apiKey);
+      InitBridge::shared().httpPostSync(fullURL, json, apiKey, authToken);
   (void)errorMessage;
 
   if (success) {

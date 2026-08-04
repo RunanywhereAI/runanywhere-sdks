@@ -144,10 +144,7 @@ public actor HTTPClientAdapter {
             throw SDKException(code: .serviceNotAvailable, message: "HTTP adapter not configured", category: .network)
         }
         let urlString = Self.buildURL(base: configuration.baseURL, path: path).absoluteString
-        let token = try await resolveToken(
-            requiresAuth: requiresAuth,
-            fallbackAPIKey: configuration.apiKey
-        )
+        let token = try await resolveToken(requiresAuth: requiresAuth)
         guard configurationIsCurrent(generation: configuration.generation) else {
             throw SDKException(
                 code: .invalidState,
@@ -166,8 +163,8 @@ public actor HTTPClientAdapter {
         )
     }
 
-    private func resolveToken(requiresAuth: Bool, fallbackAPIKey: String?) async throws -> String {
-        if !requiresAuth { return fallbackAPIKey ?? "" }
+    private func resolveToken(requiresAuth: Bool) async throws -> String {
+        if !requiresAuth { return "" }
         // `rac_auth_get_valid_token` encodes the "valid → return / expired
         // → signal refresh" handshake in one call.
         var tokenPtr: UnsafePointer<CChar>?
@@ -178,9 +175,9 @@ public actor HTTPClientAdapter {
             status = rac_auth_get_valid_token(&tokenPtr, &needsRefresh)
         }
         if status == 0, let ptr = tokenPtr { return String(cString: ptr) }
-        // Keyless staging: no token and no key means the request goes out
-        // unauthenticated (the backend attributes it to the PUBLIC org)
-        return fallbackAPIKey ?? ""
+        // The API key is never a bearer substitute; it already travels in the
+        // `apikey` header. An empty return means no Authorization header is sent.
+        return ""
     }
 
     private func clearConfiguration() {
