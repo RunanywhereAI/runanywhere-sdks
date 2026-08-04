@@ -748,6 +748,17 @@ rac_result_t rac_storage_analyzer_get_model_metrics(rac_storage_analyzer_handle_
             out_metrics->local_path = strdup(path_buffer);
         }
     }
+    // Same contract the id/name copies above enforce: a failed duplication is
+    // reported, not silently returned as success with a null field. `path_to_use`
+    // is non-null exactly when a duplication was attempted, so this only fires on
+    // an allocation failure and never on the legitimate no-path case.
+    if (path_to_use && !out_metrics->local_path) {
+        free(const_cast<char*>(out_metrics->model_id));
+        free(const_cast<char*>(out_metrics->model_name));
+        memset(out_metrics, 0, sizeof(rac_model_storage_metrics_t));
+        rac_model_info_free(model);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
 
     // Calculate size
     if (path_to_use) {
