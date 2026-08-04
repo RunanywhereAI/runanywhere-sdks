@@ -80,6 +80,7 @@ int test_native_catalog_owns_arch_and_auth_policy() {
         "whisper_base",   "whisper_small", "moonshine_base",
         "moonshine_tiny", "melotts_en",    "embeddinggemma_300m",
         "siglip2_base",   "lama_dilated",
+        "lfm2_5_2_6b",
     };
     const std::unordered_set<std::string> v81 = {
         "qwen3_0_6b",
