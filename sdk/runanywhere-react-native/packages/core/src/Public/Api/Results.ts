@@ -150,6 +150,43 @@ export function emptyGenerationResult(
   };
 }
 
+/**
+ * Build a wall-clock generation result for a stream whose native side ended
+ * without a terminal `isFinal` event.
+ *
+ * Native backends may legitimately close the stream after tokens without
+ * emitting a final proto event (mirrors Swift's `RunAnywhere.synthesizeResult`,
+ * `runanywhere-swift/Sources/RunAnywhere/Public/API/Namespaces/LLMNamespace.swift`).
+ * That is not an error at the native boundary: the caller already received
+ * every token, so `llm.generateStream` reports a synthesized `completed`
+ * event instead of leaving the iterator to stop with no terminal event.
+ */
+export function synthesizeStreamResult(
+  requestId: string,
+  model: string,
+  text: string,
+  thinking: string,
+  tokenCount: number,
+  startedAtMs: number,
+  firstTokenAtMs: number | null
+): GenerationResult {
+  const totalSeconds = (Date.now() - startedAtMs) / 1000;
+  const ttft = firstTokenAtMs !== null ? Math.round(firstTokenAtMs - startedAtMs) : 0;
+  const tokensPerSecond = totalSeconds > 0 ? tokenCount / totalSeconds : 0;
+  return {
+    text,
+    ...(thinking ? { thinkingText: thinking } : {}),
+    toolCalls: [],
+    finishReason: toFinishReason('', 0),
+    inputTokens: 0,
+    outputTokens: tokenCount,
+    timeToFirstTokenMs: ttft,
+    tokensPerSecond,
+    requestId,
+    model,
+  };
+}
+
 /** Project a structured-output result onto the public structured result. */
 export function toStructuredResult<T>(
   result: StructuredOutputResult,
