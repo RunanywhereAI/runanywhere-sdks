@@ -216,6 +216,7 @@ class RunAnywhereModels {
     // Mirrors Swift RunAnywhere+Storage.swift:135 (`modality: ModelCategory = .language`).
     ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     int? memoryRequirement,
+    int? downloadSize,
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
@@ -226,6 +227,7 @@ class RunAnywhereModels {
     framework: framework,
     modality: modality,
     memoryRequirement: memoryRequirement,
+    downloadSize: downloadSize,
     contextLength: contextLength,
     supportsThinking: supportsThinking,
     source: source,

@@ -77,8 +77,9 @@ class RunAnywhereStorage {
     if (memoryRequirement != null) {
       request.memoryRequiredBytes = Int64(memoryRequirement);
     }
-    if (downloadSize != null) {
-      request.downloadSizeBytes = Int64(downloadSize);
+    final resolvedDownloadSize = downloadSize ?? memoryRequirement;
+    if (resolvedDownloadSize != null) {
+      request.downloadSizeBytes = Int64(resolvedDownloadSize);
     }
     if (contextLength != null) {
       request.contextLength = contextLength;
@@ -86,10 +87,6 @@ class RunAnywhereStorage {
     if (description != null) {
       request.description = description;
     }
-    // Do not derive downloadSizeBytes from memoryRequirement: that value gates
-    // the post-finalize download-size check, while the RAM estimate is usually
-    // a round placeholder (e.g. 500 MB for a real 397 MB file). Callers that
-    // know the artifact size can provide downloadSize explicitly.
 
     final model = await DartBridgeModelRegistry.instance.registerModelFromUrl(
       request,
@@ -199,6 +196,7 @@ class RunAnywhereStorage {
     required InferenceFramework framework,
     ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     int? memoryRequirement,
+    int? downloadSize,
     int? contextLength,
     bool supportsThinking = false,
     ModelSource source = ModelSource.MODEL_SOURCE_REMOTE,
@@ -222,17 +220,19 @@ class RunAnywhereStorage {
     if (memoryRequirement != null) {
       request.memoryRequiredBytes = Int64(memoryRequirement);
     }
-    // See registerModel: downloadSizeBytes is intentionally left unset so the
-    // post-finalize size guard validates against the actual transfer rather
-    // than the RAM-estimate placeholder.
+    final resolvedDownloadSize = downloadSize ?? memoryRequirement;
+    if (resolvedDownloadSize != null) {
+      request.downloadSizeBytes = Int64(resolvedDownloadSize);
+    }
     final resolvedContextLength =
         contextLength ?? (modality.requiresContextLength ? 2048 : null);
     if (resolvedContextLength != null) {
       request.contextLength = resolvedContextLength;
     }
 
-    final model =
-        await DartBridgeModelRegistry.instance.registerMultiFileModel(request);
+    final model = await DartBridgeModelRegistry.instance.registerMultiFileModel(
+      request,
+    );
     if (model == null) {
       throw SDKException.internalError(
         'rac_register_multi_file_model_proto failed for model "$name"',
