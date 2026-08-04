@@ -1,0 +1,1973 @@
+RUNANYWHERE SWIFT API NAMING PROPOSAL
+====================================
+
+Review snapshot
+---------------
+Repository: RunanywhereAI/runanywhere-sdks
+Swift SDK: sdk/runanywhere-swift
+Branch: siddhesh/flutter-sdk-testing
+Commit: 2ea354745be18bf691552b0d2a98236c57d56d28
+
+Goal
+----
+Make the public API easier to recognize without replacing the flat
+RunAnywhere.* facade.
+
+This proposal uses these decision tags:
+
+KEEP       Keep the name and behavior.
+RENAME     Change the public name or argument labels.
+MERGE      Move the behavior into another public operation.
+HIDE       Make implementation or testing plumbing non-public.
+ADVANCED   Keep public, but do not present it as a primary app API.
+
+Generated protobuf methods and CppBridge transport methods are outside this
+review. They are wire and implementation APIs, not the app-facing SDK.
+
+
+NAMING RULES
+------------
+
+1. Keep RunAnywhere as the main facade.
+
+   Preferred:
+     RunAnywhere.generate(...)
+     RunAnywhere.loadModel(...)
+     RunAnywhere.transcribe(...)
+
+   Rejected for this refactor:
+     client.responses.create(...)
+     client.local.models.load(...)
+
+2. Use verbs that describe the work:
+
+   list, retrieve, load, unload, download, import, delete, generate,
+   transcribe, synthesize, speak, query, register, subscribe.
+
+3. Remove "get" when a noun or a read verb is clearer.
+
+   getUserId()              -> currentUserID()
+   getStorageInfo()         -> storageInfo()
+   getRegisteredTools()     -> registeredTools()
+   getRAGStatistics()       -> ragStatistics()
+
+4. Capitalize initialisms in Swift names and labels:
+
+   modelId                  -> modelID
+   organizationId           -> organizationID
+   subscriptionId           -> subscriptionID
+   supportsLora             -> supportsLoRA
+   baseUrl                  -> baseURL
+
+5. Use one operation for one semantic job. Use overloads or request options
+   when only the input form changes.
+
+   One generate family should accept text, tools, a structured response
+   format, and images. OpenAI, Ollama, and Cactus follow this pattern.
+
+6. Keep separate operations when side effects differ.
+
+   downloadModel stores model files.
+   loadModel allocates an inference runtime.
+   synthesize returns audio.
+   speak synthesizes and plays audio.
+
+
+PRIMARY RECOMMENDATIONS
+-----------------------
+
+1. Keep these names:
+
+   RunAnywhere.initialize
+   RunAnywhere.generate
+   RunAnywhere.generateStream
+   RunAnywhere.loadModel
+   RunAnywhere.unloadModel
+   RunAnywhere.downloadModel
+   RunAnywhere.importModel
+   RunAnywhere.listModels
+   RunAnywhere.transcribe
+   RunAnywhere.transcribeStream
+   RunAnywhere.synthesize
+   RunAnywhere.synthesizeStream
+   RunAnywhere.speak
+   RunAnywhere.detectVoiceActivity
+
+2. Build one generation family:
+
+   RunAnywhere.generate(prompt:options:)
+   RunAnywhere.generate(_ request:)
+   RunAnywhere.generateStream(prompt:options:)
+   RunAnywhere.generateStream(_ request:)
+
+   Extend the request to support:
+
+   - messages
+   - tools and toolChoice
+   - structured response format / JSON schema
+   - images
+
+   Deprecate the parallel entry points after the unified request supports
+   their result and validation behavior:
+
+   - generateWithTools
+   - generateWithStructuredOutput
+   - processImage
+   - processImageStream
+
+   Keep generateStructured as a typed validation convenience. It does more
+   than request constrained output, so merging it without preserving its
+   validation result would remove behavior.
+
+3. Keep loadModel and unloadModel.
+
+   OpenAI has no device-model lifecycle API. It selects a hosted model in each
+   request. Cactus uses init/destroy on a model object. Ollama loads and unloads
+   through special generate requests. On the global RunAnywhere facade,
+   loadModel and unloadModel say exactly what happens.
+
+4. Keep downloadModel instead of copying Ollama pull.
+
+   Ollama pull is a strong local-model precedent. Cactus uses download. Mobile
+   developers will understand downloadModel without learning registry terms.
+
+
+PROPOSED CHANGE REFERENCE MATRIX
+================================
+
+Reference meaning
+-----------------
+
+DIRECT    The proposed public operation closely matches a documented API from
+          the named company.
+PATTERN   The proposal follows that company's API organization or terminology,
+          but is not a direct copy of its signature.
+SWIFT     The proposal follows Apple's Swift API Design Guidelines.
+INTERNAL  No reviewed company SDK has the same behavior. The proposal improves
+          RunAnywhere's own terminology or public boundary.
+
+Multiple references appear only when each one supports the same design choice.
+An INTERNAL label is intentional. It is more accurate than claiming that a
+company exposes an equivalent API when it does not.
+The matrix covers proposed renames, merges, and visibility changes. Unchanged
+KEEP decisions remain documented in the full mapping below.
+
+
+SDK LIFECYCLE AND IDENTITY
+--------------------------
+
+Current                              Proposed
+getUserId()                          currentUserID()
+Reference: Apple Swift, SWIFT
+Precedent: Use a noun for a read operation and apply Swift initialism casing.
+
+getOrganizationId()                  currentOrganizationID()
+Reference: Apple Swift, SWIFT
+Precedent: Use a noun for a read operation and apply Swift initialism casing.
+
+isDeviceRegistered()                 isDeviceRegistered property
+Reference: Apple Swift, SWIFT
+Precedent: A cheap Boolean read should read as an assertion and can be a
+property.
+
+reset()                              resetForTesting(), or make non-public
+Reference: RunAnywhere, INTERNAL
+Precedent: The implementation documents this as test support. OpenAI, Ollama,
+and Cactus do not justify exposing this SDK-wide reset as a production API.
+
+completeServicesInitialization()     waitUntilReady()
+Reference: RunAnywhere, INTERNAL
+Precedent: Name the caller-visible action. No reviewed company has the same
+two-phase SDK initialization contract.
+
+areServicesReady                     isReady
+Reference: Apple Swift, SWIFT
+Precedent: Boolean properties should read as assertions.
+
+deviceId                             deviceID
+Reference: Apple Swift, SWIFT
+Precedent: Apply Swift initialism casing.
+
+
+SDK EVENTS
+----------
+
+subscribeSDKEvents(...)              subscribeToEvents(...)
+unsubscribeSDKEvents(...)            unsubscribeFromEvents(...)
+publishSDKEvent(...)                 publishEvent(...)
+pollSDKEvent()                       pollEvent()
+Reference: Apple Swift, SWIFT; RunAnywhere, INTERNAL
+Precedent: Remove words already supplied by the RunAnywhere facade and use
+argument labels that make the call read clearly. These are not modeled on an
+OpenAI, Ollama, or Cactus event API.
+
+publishSDKFailure(...)               reportFailure(...)
+Reference: RunAnywhere, INTERNAL; Apple Swift, SWIFT
+Precedent: Describe the public action and replace the leaked C ABI error type
+with Swift SDK types.
+
+
+MODEL REGISTRY AND LIFECYCLE
+----------------------------
+
+queryModels(query)                   listModels(matching: query)
+Reference: OpenAI models.list, PATTERN; Ollama list, PATTERN;
+           Apple Swift, SWIFT
+Precedent: "list" is the established collection operation. A labeled overload
+expresses filtering without creating a second verb.
+
+getModel(request)                    retrieveModel(request)
+Reference: OpenAI models.retrieve, DIRECT
+Alternative reviewed: Ollama show.
+Precedent: "retrieve" distinguishes metadata lookup from local model loading.
+
+downloadedModels()                   listDownloadedModels()
+Reference: OpenAI models.list, PATTERN; Ollama list, PATTERN
+Precedent: Use "list" for a collection-returning model operation. The
+"downloaded" qualifier remains RunAnywhere-specific.
+
+modelInfoForCategory(category)       currentModel(for: category)
+Reference: Apple Swift, SWIFT; RunAnywhere, INTERNAL
+Precedent: Use an overload for the same current-model lookup and a role-based
+argument label.
+
+componentLifecycleSnapshot(...)      componentState(for: ...)
+Reference: Apple Swift, SWIFT; RunAnywhere, INTERNAL
+Precedent: Omit implementation-oriented wording and name the returned state.
+
+modality:                            category:
+Reference: RunAnywhere, INTERNAL
+Precedent: Match the SDK's RAModelCategory type and existing lifecycle APIs.
+
+supportsLora:                        supportsLoRA:
+Reference: Apple Swift, SWIFT
+Precedent: Apply consistent initialism casing.
+
+multiFile descriptors:               files descriptors:
+Reference: Apple Swift, SWIFT
+Precedent: Label the argument by its role and omit an implementation detail
+already represented by the array value.
+
+
+MODEL DOWNLOAD, IMPORT, AND STORAGE
+-----------------------------------
+
+downloadModelStream(model)           streamModelDownload(model)
+Reference: Apple Swift, SWIFT; RunAnywhere, INTERNAL
+Precedent: Keep the primary operation, "download", visible and distinguish the
+streaming variant. Cactus supports model download and Ollama calls it pull, but
+neither supplies this exact Swift stream name.
+
+getStorageInfo(request)              storageInfo(request)
+Reference: Apple Swift, SWIFT
+Precedent: A side-effect-free lookup should read as a noun phrase.
+
+modelId:                             modelID:
+Reference: Apple Swift, SWIFT
+Precedent: Apply consistent initialism casing.
+
+cleanTempFiles()                     clearTemporaryFiles()
+Reference: Apple Swift, SWIFT; RunAnywhere, INTERNAL
+Precedent: Use an imperative side-effecting verb and avoid the abbreviation
+"temp".
+
+
+GENERATION, STRUCTURED OUTPUT, AND TOOLS
+----------------------------------------
+
+aggregateStream(...)                 collectGenerationStream(...)
+Reference: RunAnywhere, INTERNAL
+Precedent: "collect" describes consuming a stream into one generation result.
+The reviewed company SDKs do not expose this helper.
+
+extractStructuredOutput(...)         parseStructuredOutput(...)
+Reference: RunAnywhere, INTERNAL
+Precedent: The function parses and validates existing text. It does not request
+new model output.
+
+generateWithStructuredOutput(...)    generate(..., responseFormat: ...)
+Reference: OpenAI responses.create response format, DIRECT;
+           Ollama chat/generate format, DIRECT
+Precedent: Structured output is an option on the main generation request, not a
+separate generation verb.
+
+getRegisteredTools()                 registeredTools()
+Reference: Apple Swift, SWIFT
+Precedent: A read operation should use a noun phrase.
+
+generateWithTools(...)               generate(..., tools:, toolChoice:, ...)
+Reference: OpenAI responses.create tools/tool_choice, DIRECT;
+           Ollama chat tools, DIRECT;
+           Cactus cactus_complete tools parameter, DIRECT
+Precedent: Tool calling belongs to the main generation operation.
+
+
+EMBEDDINGS
+----------
+
+RunAnywhere.embeddings.embed(...)    RunAnywhere.embed(...)
+Reference: Ollama embed, DIRECT; Cactus cactus_embed, DIRECT
+Precedent: Keep the familiar "embed" verb on the requested flat RunAnywhere
+facade. OpenAI uses embeddings.create rather than embed.
+
+embedBatch(request, ...)             embed([String], ...)
+Reference: OpenAI embeddings.create with one or many inputs, DIRECT;
+           Ollama embed with string or string array input, DIRECT;
+           Apple Swift overload guidance, SWIFT
+Precedent: Use one semantic operation for scalar and collection inputs.
+Cactus supports embed, but its current C API is scalar, so it is not the batch
+precedent.
+
+embeddings.unload()                  unloadModel(category: .embedding)
+Reference: RunAnywhere, INTERNAL
+Precedent: Reuse the SDK's model lifecycle if the behavior is identical.
+OpenAI has no local unload API. Cactus uses destroy on a model handle. Ollama
+uses keep_alive on generation requests rather than this signature.
+
+
+VISION-LANGUAGE GENERATION
+--------------------------
+
+processImage(...)                    generate(image: ...)
+processImageStream(...)              generateStream(image: ...)
+processImageStream(..., prompt:)     generateStream(prompt:, image:, ...)
+Reference: OpenAI responses.create with image input, DIRECT;
+           Ollama chat with images, DIRECT;
+           Cactus cactus_complete with images in messages, DIRECT
+Precedent: Multimodal input belongs to the main generation family.
+
+cancelVLMGeneration()                cancelGeneration(category: .visionLanguage)
+Reference: RunAnywhere, INTERNAL
+Precedent: Reuse one cancellation lifecycle only if its behavior is identical.
+The reviewed company SDKs do not define this local cancellation signature.
+
+
+VOICE AGENT
+-----------
+
+ensureDefaultVAD(...)                prepareDefaultVAD(...)
+initializeVoiceAgentWithLoadedModels initializeVoiceAgent(usingLoadedModels:)
+getVoiceAgentComponentStates()       voiceAgentComponentStates()
+streamVoiceAgent()                   voiceAgentEvents()
+cleanupVoiceAgent()                  shutdownVoiceAgent()
+Reference: Apple Swift, SWIFT; RunAnywhere, INTERNAL
+Precedent: These operations are RunAnywhere-specific. The changes describe
+side effects or returned values and remove "get". No reviewed OpenAI, Ollama,
+or Cactus SDK exposes an equivalent composed voice-agent lifecycle.
+
+
+RAG
+---
+
+ragResolvedConfiguration(...)        resolveRAGConfiguration(...)
+ragCreatePipeline(...)               createRAGPipeline(...)
+ragCreatePipeline(config:)           createRAGPipeline(configuration:)
+ragDestroyPipeline()                 destroyRAGPipeline()
+ragIngest(text:)                     addRAGDocument(text:)
+ragIngest(document)                  addRAGDocument(document)
+ragAddDocumentsBatch(...)            addRAGDocuments(...)
+ragGetDocumentCount()                ragDocumentCount()
+ragGetStatistics()                   ragStatistics()
+ragClearDocuments()                  clearRAGDocuments()
+ragQuery(...)                        queryRAG(...)
+Reference: Apple Swift, SWIFT; Cactus cactus_rag_query, PATTERN;
+           RunAnywhere, INTERNAL
+Precedent: Put the action first, use imperative verbs for mutations, use noun
+phrases for reads, and use overloads for the same operation. Cactus exposes
+cactus_rag_query, which supports retaining "RAG" and "query", but it does not
+support the pipeline-management names above.
+
+
+AUDIO UTILITIES
+---------------
+
+pcm16ToWav(...)                      pcm16ToWAV(...)
+Reference: Apple Swift, SWIFT
+Precedent: Apply Swift initialism casing.
+
+
+LORA
+----
+
+lora.list()                          lora.listApplied()
+Reference: OpenAI models.list, PATTERN; Ollama list, PATTERN;
+           RunAnywhere, INTERNAL
+Precedent: Keep the familiar collection verb while stating which adapter set
+is returned.
+
+lora.queryCatalog(query)             lora.listCatalog(matching: query)
+Reference: OpenAI models.list, PATTERN; Ollama list, PATTERN;
+           Apple Swift, SWIFT
+Precedent: Use one list operation and a labeled filtering overload.
+
+lora.getCatalogEntry(request)        lora.retrieveCatalogEntry(request)
+Reference: OpenAI models.retrieve, PATTERN
+Precedent: Use "retrieve" for one catalog record and avoid "get".
+
+lora.adaptersForModel(modelId)       lora.adapters(forModelID: modelID)
+Reference: Apple Swift, SWIFT
+Precedent: Use a fluent argument label and apply initialism casing.
+
+lora.allRegistered()                 lora.listRegistered()
+Reference: OpenAI models.list, PATTERN; Ollama list, PATTERN;
+           RunAnywhere, INTERNAL
+Precedent: Use the collection verb and state which adapter set is returned.
+
+
+SOLUTIONS, PLUGINS, AND EVENTS
+------------------------------
+
+SolutionHandle.destroy()             SolutionHandle.close(), conditionally
+Reference: Apple Swift, SWIFT; Cactus cactus_destroy, DIRECT alternative
+Precedent: Use "close" when the Swift handle remains inspectable after resource
+release. Keep "destroy" if the native resource contract is the public behavior;
+that choice matches Cactus.
+
+pluginLoader.registeredNames()       registeredPluginNames()
+pluginLoader.listLoaded()            listLoadedPlugins()
+Reference: Apple Swift, SWIFT; RunAnywhere, INTERNAL
+Precedent: Make the returned entity explicit at the call site.
+
+EventBus.on(handler)                 EventBus.subscribe(handler)
+EventBus.on(category, handler:)      EventBus.subscribe(to:handler:)
+Reference: RunAnywhere, INTERNAL; Apple Swift, SWIFT
+Precedent: Match the top-level subscription terminology and use a fluent
+argument label. This is not copied from an OpenAI, Ollama, or Cactus API.
+
+EventBus.start()/stop()              make non-public
+Reference: RunAnywhere, INTERNAL
+Precedent: RunAnywhere should own its internal event-loop lifecycle.
+
+
+HYBRID OFFLINE/CLOUD STT
+------------------------
+
+HybridModel.offlineSherpa(id)        HybridModel.offline(modelID)
+HybridModel.onlineCloud(id, ...)     HybridModel.cloud(modelID, ...)
+Reference: RunAnywhere, INTERNAL; Apple Swift, SWIFT
+Precedent: Hide backend details unless backend selection is part of the public
+contract and apply Swift initialism casing.
+
+HybridSTTRouter.setPair(...)         HybridSTTRouter.configure(...)
+Reference: RunAnywhere, INTERNAL
+Precedent: Name the routing action rather than its internal two-model storage.
+
+Cloud id:                           modelID:
+Cloud timeoutMs:                    timeoutMilliseconds:
+Cloud.lookup(id)                    model(forID:)
+Cloud.clear()                       clearModels()
+Cloud.registerProvider(_:_:)        registerProvider(named:handler:)
+Reference: Apple Swift, SWIFT; RunAnywhere, INTERNAL
+Precedent: Use clear argument roles, avoid ambiguous verbs, expand uncommon
+abbreviations, and apply initialism casing.
+
+HybridDeviceState.clear()           clearProvider()
+Reference: RunAnywhere, INTERNAL
+Precedent: State exactly what the method clears.
+
+isOnline()                          isOnline property
+batteryPercent()                    batteryPercentage property
+isThermalThrottled()                isThermallyThrottled property
+Reference: Apple Swift, SWIFT
+Precedent: Cheap state reads should be properties; Boolean names should read as
+assertions.
+
+
+PUBLIC IMAGE FACTORIES
+----------------------
+
+RAVLMImage.fromEncoded(...)          RAVLMImage.encoded(...)
+RAVLMImage.fromFilePath(...)         RAVLMImage.file(...)
+RAVLMImage.fromBase64(...)           RAVLMImage.base64(...)
+RAVLMImage.fromRawRGB(...)           RAVLMImage.rgb(...)
+RAVLMImage.fromRawRGBA(...)          RAVLMImage.rgba(...)
+Reference: Apple Swift, SWIFT
+Precedent: Omit needless factory words when the type and result are clear at
+the call site. This remains a low-priority alternative because "from" is clear
+across the other RunAnywhere language SDKs.
+
+
+PUBLIC IMPLEMENTATION SURFACE
+-----------------------------
+
+CppBridge transport methods         make non-public
+SDKLogger implementation controls   make non-public where facade APIs exist
+test-only lifecycle hooks           make non-public
+Reference: RunAnywhere, INTERNAL
+Precedent: These are visibility changes, not competitor naming changes. Keep C
+ABI, transport, logging implementation, and test plumbing behind the
+app-facing Swift facade.
+
+Id / Url / Lora / Ms labels          ID / URL / LoRA / Milliseconds
+Reference: Apple Swift, SWIFT
+Precedent: Apply Swift initialism casing and avoid unclear abbreviations in
+app-facing declarations. Wire and generated fields remain unchanged.
+
+
+REFERENCE SOURCES
+-----------------
+
+Apple Swift API Design Guidelines:
+  https://www.swift.org/documentation/api-design-guidelines/
+
+OpenAI Python SDK API reference:
+  https://github.com/openai/openai-python/blob/main/api.md
+
+OpenAI Responses API:
+  https://platform.openai.com/docs/api-reference/responses/create
+
+Ollama chat API:
+  https://docs.ollama.com/api/chat
+
+Ollama embeddings API:
+  https://docs.ollama.com/api/embed
+
+Ollama model download API:
+  https://docs.ollama.com/api/pull
+
+Cactus Engine API:
+  https://github.com/cactus-compute/cactus/blob/main/docs/cactus_engine.md
+
+Reference review date: 2026-07-28
+
+
+FULL RUNANYWHERE FACADE MAPPING
+==============================
+
+1. SDK LIFECYCLE AND IDENTITY
+-----------------------------
+
+Current:
+  RunAnywhere.getUserId() -> String?
+Proposed:
+  RunAnywhere.currentUserID() -> String?
+Decision: RENAME
+Reason: Removes "get" and fixes ID capitalization.
+
+Current:
+  RunAnywhere.getOrganizationId() -> String?
+Proposed:
+  RunAnywhere.currentOrganizationID() -> String?
+Decision: RENAME
+
+Current:
+  RunAnywhere.isDeviceRegistered() -> Bool
+Proposed:
+  RunAnywhere.isDeviceRegistered: Bool
+Decision: RENAME function to a read-only property in the next major version
+
+Current:
+  RunAnywhere.reset() async
+Proposed:
+  RunAnywhere.resetForTesting() async
+Decision: RENAME or HIDE
+Reason: Source documentation describes reset as test support. A public reset
+sounds safe for production use.
+
+Current:
+  RunAnywhere.initialize(
+      apiKey: String? = nil,
+      baseURL: String? = nil,
+      environment: SDKEnvironment = .development
+  ) throws
+Proposed: KEEP
+
+Current:
+  RunAnywhere.initialize(
+      apiKey: String,
+      baseURL: URL,
+      environment: SDKEnvironment = .production
+  ) throws
+Proposed: KEEP
+Follow-up: Give both overloads the same default environment. Development in one
+overload and production in the other will surprise callers.
+
+Current:
+  RunAnywhere.completeServicesInitialization() async throws
+Proposed:
+  RunAnywhere.waitUntilReady() async throws
+Decision: RENAME
+Reason: The caller waits for shared service setup. "Complete" sounds as if the
+caller must implement the second initialization phase.
+
+Existing public state properties:
+  RunAnywhere.isInitialized
+  RunAnywhere.areServicesReady
+  RunAnywhere.isActive
+  RunAnywhere.version
+  RunAnywhere.environment
+  RunAnywhere.deviceId
+  RunAnywhere.events
+  RunAnywhere.isAuthenticated
+
+Proposed property cleanup:
+  areServicesReady -> isReady
+  deviceId         -> deviceID
+
+
+2. LOGGING
+----------
+
+Current and proposed:
+  RunAnywhere.configureLogging(_ config: RALoggingConfiguration)
+  RunAnywhere.setLocalLoggingEnabled(_ enabled: Bool)
+  RunAnywhere.setLogLevel(_ level: RALogLevel)
+  RunAnywhere.setSentryLoggingEnabled(_ enabled: Bool)
+  RunAnywhere.addLogDestination(_ destination: LogDestination)
+  RunAnywhere.setDebugMode(_ enabled: Bool)
+  RunAnywhere.flushLogs()
+
+Decision: KEEP
+
+Follow-up:
+  Keep configureLogging as the main documented entry point. Retain the setters
+  as convenience calls until RALoggingConfiguration covers each option.
+
+
+3. SDK EVENTS
+-------------
+
+Current:
+  RunAnywhere.subscribeSDKEvents(
+      _ handler: @escaping (RASDKEvent) -> Void
+  ) -> UInt64
+Proposed:
+  RunAnywhere.subscribeToEvents(
+      _ handler: @escaping (RASDKEvent) -> Void
+  ) -> UInt64
+Decision: RENAME
+
+Current:
+  RunAnywhere.unsubscribeSDKEvents(_ subscriptionId: UInt64)
+Proposed:
+  RunAnywhere.unsubscribeFromEvents(_ subscriptionID: UInt64)
+Decision: RENAME
+
+Current:
+  RunAnywhere.publishSDKEvent(_ event: RASDKEvent) -> Bool
+Proposed:
+  RunAnywhere.publishEvent(_ event: RASDKEvent) -> Bool
+Decision: RENAME, ADVANCED
+
+Current:
+  RunAnywhere.pollSDKEvent() -> RASDKEvent?
+Proposed:
+  RunAnywhere.pollEvent() -> RASDKEvent?
+Decision: RENAME, ADVANCED
+
+Current:
+  RunAnywhere.publishSDKFailure(
+      errorCode: rac_result_t,
+      message: String,
+      component: String,
+      operation: String,
+      recoverable: Bool = false
+  ) -> Bool
+Proposed:
+  RunAnywhere.reportFailure(
+      _ error: RASDKError,
+      component: RASDKComponent,
+      operation: String,
+      recoverable: Bool = false
+  ) -> Bool
+Decision: RENAME and TYPE CLEANUP
+Reason: rac_result_t leaks the C ABI into an app-facing function.
+
+
+4. MODEL REGISTRY
+-----------------
+
+Current:
+  RunAnywhere.listModels(
+      _ request: RAModelListRequest = RAModelListRequest()
+  ) async -> RAModelListResult
+Proposed: KEEP
+
+Current:
+  RunAnywhere.queryModels(
+      _ query: RAModelQuery
+  ) async -> RAModelListResult
+Proposed:
+  RunAnywhere.listModels(
+      matching query: RAModelQuery
+  ) async -> RAModelListResult
+Decision: MERGE as an overload
+Reason: queryModels builds a list request and delegates to listModels.
+
+Current:
+  RunAnywhere.getModel(
+      _ request: RAModelGetRequest
+  ) async -> RAModelGetResult
+Proposed:
+  RunAnywhere.retrieveModel(
+      _ request: RAModelGetRequest
+  ) async -> RAModelGetResult
+Decision: RENAME
+Basis: OpenAI uses retrieve; Ollama uses show. Retrieve is clear on a flat
+facade and does not imply loading the model.
+
+Current:
+  RunAnywhere.downloadedModels() async -> RAModelListResult
+Proposed:
+  RunAnywhere.listDownloadedModels() async -> RAModelListResult
+Decision: RENAME
+
+Current:
+  RunAnywhere.refreshModelRegistry(
+      rescanLocal: Bool = true,
+      includeRemoteCatalog: Bool = false,
+      pruneOrphans: Bool = false
+  ) async
+Proposed: KEEP
+
+
+5. MODEL LIFECYCLE
+------------------
+
+Current:
+  RunAnywhere.loadModel(
+      _ request: RAModelLoadRequest
+  ) async -> RAModelLoadResult
+Proposed: KEEP
+
+Current:
+  RunAnywhere.unloadModel(
+      _ request: RAModelUnloadRequest
+  ) async -> RAModelUnloadResult
+Proposed: KEEP
+
+Current:
+  RunAnywhere.currentModel(
+      _ request: RACurrentModelRequest = RACurrentModelRequest()
+  ) -> RACurrentModelResult
+Proposed: KEEP
+
+Current:
+  RunAnywhere.modelInfoForCategory(
+      _ category: RAModelCategory
+  ) -> RAModelInfo?
+Proposed:
+  RunAnywhere.currentModel(
+      for category: RAModelCategory
+  ) -> RAModelInfo?
+Decision: MERGE as a convenience overload
+
+Current:
+  RunAnywhere.componentLifecycleSnapshot(
+      _ component: RASDKComponent
+  ) -> RAComponentLifecycleSnapshot?
+Proposed:
+  RunAnywhere.componentState(
+      for component: RASDKComponent
+  ) -> RAComponentLifecycleSnapshot?
+Decision: RENAME
+
+
+6. MODEL REGISTRATION
+---------------------
+
+Current:
+  RunAnywhere.registerModel(
+      id: String? = nil,
+      name: String,
+      url: String,
+      framework: InferenceFramework,
+      modality: ModelCategory = .language,
+      artifactType: RAModelArtifactType? = nil,
+      memoryRequirement: Int64? = nil,
+      supportsThinking: Bool = false,
+      supportsLora: Bool = false
+  ) async throws -> RAModelInfo
+Proposed:
+  RunAnywhere.registerModel(
+      id: String? = nil,
+      name: String,
+      url: String,
+      framework: InferenceFramework,
+      category: ModelCategory = .language,
+      artifactType: RAModelArtifactType? = nil,
+      memoryRequirement: Int64? = nil,
+      supportsThinking: Bool = false,
+      supportsLoRA: Bool = false
+  ) async throws -> RAModelInfo
+Decision: KEEP name, RENAME labels
+
+Current:
+  RunAnywhere.registerModel(
+      archive url: String,
+      structure: RAArchiveStructure,
+      id: String? = nil,
+      name: String,
+      framework: InferenceFramework,
+      modality: ModelCategory = .language,
+      archiveType: RAArchiveType? = nil,
+      memoryRequirement: Int64? = nil,
+      supportsThinking: Bool = false,
+      supportsLora: Bool = false
+  ) async throws -> RAModelInfo
+Proposed:
+  Keep the overload. Rename modality -> category and supportsLora -> supportsLoRA.
+Decision: KEEP name, RENAME labels
+Reason: Archive structure is required, so merging it with the single-file form
+would create invalid parameter combinations.
+
+Current:
+  RunAnywhere.registerModel(
+      multiFile descriptors: [RAModelFileDescriptor],
+      id: String,
+      name: String,
+      framework: InferenceFramework,
+      modality: ModelCategory = .language,
+      memoryRequirement: Int64? = nil,
+      contextLength: Int? = nil,
+      supportsThinking: Bool = false,
+      source: RAModelSource = .remote
+  ) async throws -> RAModelInfo
+Proposed:
+  RunAnywhere.registerModel(
+      files descriptors: [RAModelFileDescriptor],
+      id: String,
+      name: String,
+      framework: InferenceFramework,
+      category: ModelCategory = .language,
+      memoryRequirement: Int64? = nil,
+      contextLength: Int? = nil,
+      supportsThinking: Bool = false,
+      source: RAModelSource = .remote
+  ) async throws -> RAModelInfo
+Decision: KEEP name, RENAME labels
+
+
+7. MODEL DOWNLOAD, IMPORT, AND STORAGE
+--------------------------------------
+
+Current:
+  RunAnywhere.downloadModel(
+      _ model: RAModelInfo,
+      onProgress: ((RADownloadProgress) async -> Void)? = nil
+  ) async throws -> RADownloadProgress
+Proposed: KEEP
+Basis: Cactus uses download. Ollama uses pull. Download is clearer for mobile.
+
+Current:
+  RunAnywhere.downloadModelStream(
+      _ model: RAModelInfo
+  ) -> AsyncThrowingStream<RADownloadProgress, Error>
+Proposed:
+  RunAnywhere.streamModelDownload(
+      _ model: RAModelInfo
+  ) -> AsyncThrowingStream<RADownloadProgress, Error>
+Decision: RENAME
+
+Current:
+  RunAnywhere.importModel(
+      _ request: RAModelImportRequest
+  ) async throws -> RAModelImportResult
+Proposed: KEEP
+
+Current:
+  RunAnywhere.getStorageInfo(
+      _ request: RAStorageInfoRequest = RAStorageInfoRequest()
+  ) async -> RAStorageInfoResult
+Proposed:
+  RunAnywhere.storageInfo(
+      _ request: RAStorageInfoRequest = RAStorageInfoRequest()
+  ) async -> RAStorageInfoResult
+Decision: RENAME
+
+Current:
+  RunAnywhere.deleteStorage(
+      _ request: RAStorageDeleteRequest
+  ) async -> RAStorageDeleteResult
+Proposed: KEEP, ADVANCED
+Follow-up: Document dry-run behavior and exact deletion scope.
+
+Current:
+  RunAnywhere.deleteModel(
+      _ modelId: String
+  ) async -> RAStorageDeleteResult
+Proposed:
+  RunAnywhere.deleteModel(
+      _ modelID: String
+  ) async -> RAStorageDeleteResult
+Decision: KEEP name, RENAME label spelling
+Note: This deletes local model data. OpenAI models.delete has different remote
+fine-tuned-model semantics.
+
+Current:
+  RunAnywhere.clearCache() async throws
+Proposed: KEEP
+
+Current:
+  RunAnywhere.cleanTempFiles() async throws
+Proposed:
+  RunAnywhere.clearTemporaryFiles() async throws
+Decision: RENAME
+
+The following methods appeared in the earlier scrape but are private:
+
+  resolveModelForDownload
+  planDownload
+  generatedModelID
+  cancelNativeDownload
+  reportDownloadProgress
+
+Decision: EXCLUDE. They are not public API candidates.
+
+
+8. TEXT GENERATION
+------------------
+
+Current:
+  RunAnywhere.generate(
+      prompt: String,
+      options: RALLMGenerationOptions? = nil
+  ) async throws -> RALLMGenerationResult
+Proposed: KEEP
+
+Current:
+  RunAnywhere.generateStream(
+      prompt: String,
+      options: RALLMGenerationOptions? = nil
+  ) async throws -> AsyncStream<RALLMStreamEvent>
+Proposed: KEEP for Swift ergonomics
+Industry note: OpenAI, Ollama, and Cactus often use the same generation
+operation with a stream option or callback. Swift cannot overload only on return
+type, so a named stream method remains easier to use.
+
+Current:
+  RunAnywhere.generate(
+      _ request: RALLMGenerateRequest
+  ) async throws -> RALLMGenerationResult
+Proposed: KEEP. Make this the canonical extensible request API.
+
+Current:
+  RunAnywhere.generateStream(
+      _ request: RALLMGenerateRequest
+  ) async throws -> AsyncStream<RALLMStreamEvent>
+Proposed: KEEP
+
+Current:
+  RunAnywhere.cancelGeneration() async
+Proposed: KEEP
+
+Current:
+  RunAnywhere.aggregateStream(
+      prompt: String,
+      events: AsyncStream<RALLMStreamEvent>,
+      onToken: ((String) async -> Void)? = nil
+  ) async -> RALLMGenerationResult
+Proposed:
+  RunAnywhere.collectGenerationStream(
+      prompt: String,
+      events: AsyncStream<RALLMStreamEvent>,
+      onToken: ((String) async -> Void)? = nil
+  ) async -> RALLMGenerationResult
+Decision: RENAME, ADVANCED
+
+Current:
+  RunAnywhere.extractStructuredOutput(
+      text: String,
+      schema: RAJSONSchema
+  ) throws -> RAStructuredOutputResult
+Proposed:
+  RunAnywhere.parseStructuredOutput(
+      _ text: String,
+      schema: RAJSONSchema
+  ) throws -> RAStructuredOutputResult
+Decision: RENAME
+
+
+9. STRUCTURED OUTPUT
+--------------------
+
+Current:
+  RunAnywhere.generateStructured(
+      prompt: String,
+      schema: RAJSONSchema,
+      options: RALLMGenerationOptions? = nil
+  ) async throws -> RAStructuredOutputResult
+Proposed: KEEP as the typed, validated convenience API.
+
+Current:
+  RunAnywhere.generateStructuredStream(
+      prompt: String,
+      schema: RAJSONSchema,
+      options: RALLMGenerationOptions? = nil
+  ) throws -> AsyncThrowingStream<RAStructuredOutputStreamEvent, Error>
+Proposed: KEEP
+
+Current:
+  RunAnywhere.generateWithStructuredOutput(
+      prompt: String,
+      structuredOutput: RAStructuredOutputOptions,
+      options: RALLMGenerationOptions? = nil
+  ) async throws -> RALLMGenerationResult
+Proposed:
+  RunAnywhere.generate(
+      prompt: String,
+      responseFormat: RAStructuredOutputOptions,
+      options: RALLMGenerationOptions? = nil
+  ) async throws -> RALLMGenerationResult
+Decision: MERGE into generate
+Basis: OpenAI uses a response format on its main response call. Ollama uses a
+format option on generate/chat.
+
+
+10. TOOL CALLING
+----------------
+
+Current:
+  RunAnywhere.registerTool(
+      _ definition: RAToolDefinition,
+      executor: @escaping ToolExecutor
+  ) async
+Proposed: KEEP
+
+Current:
+  RunAnywhere.unregisterTool(_ toolName: String) async
+Proposed: KEEP
+
+Current:
+  RunAnywhere.getRegisteredTools() async -> [RAToolDefinition]
+Proposed:
+  RunAnywhere.registeredTools() async -> [RAToolDefinition]
+Decision: RENAME
+
+Current:
+  RunAnywhere.clearTools() async
+Proposed: KEEP
+
+Current:
+  RunAnywhere.executeTool(
+      _ toolCall: RAToolCall
+  ) async -> RAToolResult
+Proposed: KEEP, ADVANCED
+
+Current:
+  RunAnywhere.generateWithTools(
+      prompt: String,
+      options: RALLMGenerationOptions = .defaults(),
+      toolOptions: RAToolCallingOptions? = nil,
+      toolChoice: RAToolChoiceMode? = nil,
+      forcedToolName: String? = nil,
+      validateCalls: Bool? = nil
+  ) async throws -> RAToolCallingResult
+Proposed:
+  RunAnywhere.generate(
+      prompt: String,
+      tools: [RAToolDefinition],
+      toolChoice: RAToolChoiceMode? = nil,
+      options: RALLMGenerationOptions = .defaults()
+  ) async throws -> RAToolCallingResult
+Decision: MERGE into generate after preserving automatic execution behavior
+Basis: OpenAI passes tools/tool_choice to responses.create. Ollama passes tools
+to chat. Cactus passes tools to complete.
+
+
+11. EMBEDDINGS
+--------------
+
+Current:
+  RunAnywhere.embeddings.embed(
+      _ text: String,
+      modelID: String,
+      options: RAEmbeddingsOptions? = nil
+  ) async throws -> RAEmbeddingsResult
+Proposed:
+  RunAnywhere.embed(
+      _ text: String,
+      modelID: String,
+      options: RAEmbeddingsOptions? = nil
+  ) async throws -> RAEmbeddingsResult
+Decision: RENAME/MOVE to the flat facade
+
+Current:
+  RunAnywhere.embeddings.embedBatch(
+      _ request: RAEmbeddingsRequest,
+      modelID: String
+  ) async throws -> RAEmbeddingsResult
+Proposed:
+  RunAnywhere.embed(
+      _ inputs: [String],
+      modelID: String,
+      options: RAEmbeddingsOptions? = nil
+  ) async throws -> RAEmbeddingsResult
+Decision: MERGE as a collection overload
+Basis: OpenAI and Ollama accept one or many inputs through the same embedding
+operation. Cactus uses embed rather than embedBatch.
+
+Current:
+  RunAnywhere.embeddings.unload() async throws
+Proposed:
+  RunAnywhere.unloadModel(
+      category: .embedding
+  ) async
+Decision: MERGE into model lifecycle if it has the same behavior.
+Fallback name if separate behavior must remain:
+  RunAnywhere.unloadEmbeddingModel()
+
+
+12. SPEECH TO TEXT
+------------------
+
+Current:
+  RunAnywhere.transcribe(
+      audio audioData: Data,
+      options: RASTTOptions = .defaults()
+  ) async throws -> RASTTOutput
+Proposed: KEEP
+Basis: OpenAI and Cactus use transcribe/transcription.
+
+Current:
+  RunAnywhere.transcribeStream(
+      audio: AsyncStream<Data>,
+      options: RASTTOptions = .defaults()
+  ) -> AsyncStream<RASTTPartialResult>
+Proposed: KEEP
+
+Possible later session API:
+  RunAnywhere.startTranscription(...)
+  RunAnywhere.appendTranscriptionAudio(...)
+  RunAnywhere.finishTranscription()
+
+Add this only if callers need manual session control. Do not expose low-level
+start/process/stop steps as the only streaming API.
+
+
+13. TEXT TO SPEECH
+------------------
+
+Current and proposed:
+  RunAnywhere.synthesize(
+      _ text: String,
+      options: RATTSOptions = .defaults()
+  ) async throws -> RATTSOutput
+
+  RunAnywhere.synthesizeStream(
+      _ text: String,
+      options: RATTSOptions = .defaults()
+  ) -> AsyncStream<RATTSOutput>
+
+  RunAnywhere.stopSynthesis() async
+
+  RunAnywhere.speak(
+      _ text: String,
+      options: RATTSOptions = .defaults()
+  ) async throws -> RATTSSpeakResult
+
+  RunAnywhere.stopSpeaking() async
+
+Decision: KEEP
+Reason: Synthesize returns audio. Speak also plays it. The side effects differ.
+
+
+14. VOICE ACTIVITY DETECTION
+----------------------------
+
+Current and proposed:
+  RunAnywhere.detectVoiceActivity(
+      _ audioData: Data,
+      options: RAVADOptions? = nil
+  ) async throws -> RAVADResult
+
+  RunAnywhere.streamVAD(
+      audio: AsyncStream<Data>,
+      options: RAVADOptions? = nil
+  ) -> AsyncStream<RAVADResult>
+
+  RunAnywhere.resetVAD() async throws
+
+Decision: KEEP
+Reason: detectVoiceActivity is clearer than the bare Cactus v1.7 vad name.
+
+
+15. VISION-LANGUAGE GENERATION
+------------------------------
+
+Current:
+  RunAnywhere.processImage(
+      _ image: RAVLMImage,
+      options: RAVLMGenerationOptions
+  ) async throws -> RAVLMResult
+Proposed:
+  RunAnywhere.generate(
+      image: RAVLMImage,
+      options: RAVLMGenerationOptions
+  ) async throws -> RAVLMResult
+Decision: MERGE into generate
+
+Current:
+  RunAnywhere.processImageStream(
+      _ image: RAVLMImage,
+      options: RAVLMGenerationOptions
+  ) async throws -> AsyncStream<RAVLMStreamEvent>
+Proposed:
+  RunAnywhere.generateStream(
+      image: RAVLMImage,
+      options: RAVLMGenerationOptions
+  ) async throws -> AsyncStream<RAVLMStreamEvent>
+Decision: MERGE
+
+Current:
+  RunAnywhere.processImageStream(
+      _ image: RAVLMImage,
+      prompt: String,
+      options: RAVLMGenerationOptions = .defaults()
+  ) async throws -> AsyncStream<RAVLMStreamEvent>
+Proposed:
+  RunAnywhere.generateStream(
+      prompt: String,
+      image: RAVLMImage,
+      options: RAVLMGenerationOptions = .defaults()
+  ) async throws -> AsyncStream<RAVLMStreamEvent>
+Decision: MERGE
+
+Current:
+  RunAnywhere.cancelVLMGeneration() async
+Proposed:
+  RunAnywhere.cancelGeneration(category: .visionLanguage) async
+Decision: MERGE if cancellation uses the same lifecycle contract.
+
+Basis: OpenAI sends image inputs through responses.create. Ollama and current
+Cactus attach images to messages sent through chat/complete. None requires a
+separate processImage verb.
+
+
+16. VOICE AGENT
+---------------
+
+Current:
+  RunAnywhere.initializeVoiceAgent(
+      _ config: RAVoiceAgentComposeConfig
+  ) async throws
+Proposed: KEEP
+
+Current:
+  RunAnywhere.ensureDefaultVAD(
+      modelID: String? = nil
+  ) async -> Bool
+Proposed:
+  RunAnywhere.prepareDefaultVAD(
+      modelID: String? = nil
+  ) async -> Bool
+Decision: RENAME, ADVANCED
+Reason: "ensure" does not tell the caller whether the method downloads, loads,
+or validates the model. Documentation should state the side effects.
+
+Current:
+  RunAnywhere.initializeVoiceAgentWithLoadedModels(
+      ttsVoiceID: String? = nil,
+      ensureVAD: Bool = true
+  ) async throws
+Proposed:
+  RunAnywhere.initializeVoiceAgent(
+      usingLoadedModels: Bool,
+      ttsVoiceID: String? = nil,
+      prepareVAD: Bool = true
+  ) async throws
+Decision: MERGE as an overload
+
+Current:
+  RunAnywhere.getVoiceAgentComponentStates()
+      async throws -> RAVoiceAgentComponentStates
+Proposed:
+  RunAnywhere.voiceAgentComponentStates()
+      async throws -> RAVoiceAgentComponentStates
+Decision: RENAME
+
+Current:
+  RunAnywhere.processVoiceTurn(
+      _ audioData: Data
+  ) async throws -> RAVoiceAgentResult
+Proposed: KEEP
+
+Current:
+  RunAnywhere.streamVoiceAgent() -> AsyncStream<RAVoiceEvent>
+Proposed:
+  RunAnywhere.voiceAgentEvents() -> AsyncStream<RAVoiceEvent>
+Decision: RENAME
+Reason: The method returns events; it does not start a voice agent.
+
+Current:
+  RunAnywhere.cleanupVoiceAgent() async
+Proposed:
+  RunAnywhere.shutdownVoiceAgent() async
+Decision: RENAME
+
+
+17. RAG
+-------
+
+The current ragVerb order is hard to scan. Keep RAG in the name because the
+facade stays flat, but put the action first.
+
+Current:
+  RunAnywhere.ragResolvedConfiguration(
+      embeddingModel: RAModelInfo,
+      llmModel: RAModelInfo,
+      baseConfiguration: RARAGConfiguration = .defaults()
+  ) async throws -> RARAGConfiguration
+Proposed:
+  RunAnywhere.resolveRAGConfiguration(...)
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragCreatePipeline(
+      embeddingModel: RAModelInfo,
+      llmModel: RAModelInfo,
+      baseConfiguration: RARAGConfiguration = .defaults()
+  ) async throws
+Proposed:
+  RunAnywhere.createRAGPipeline(...)
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragCreatePipeline(
+      config: RARAGConfiguration
+  ) async throws
+Proposed:
+  RunAnywhere.createRAGPipeline(
+      configuration: RARAGConfiguration
+  ) async throws
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragDestroyPipeline() async
+Proposed:
+  RunAnywhere.destroyRAGPipeline() async
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragIngest(
+      text: String,
+      metadataJSON: String? = nil
+  ) async throws
+Proposed:
+  RunAnywhere.addRAGDocument(
+      text: String,
+      metadataJSON: String? = nil
+  ) async throws
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragIngest(
+      _ document: RARAGDocument
+  ) async throws -> RARAGStatistics
+Proposed:
+  RunAnywhere.addRAGDocument(
+      _ document: RARAGDocument
+  ) async throws -> RARAGStatistics
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragAddDocumentsBatch(
+      documents: [RARAGDocument]
+  ) async throws
+Proposed:
+  RunAnywhere.addRAGDocuments(
+      _ documents: [RARAGDocument]
+  ) async throws
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragGetDocumentCount() async -> Int
+Proposed:
+  RunAnywhere.ragDocumentCount() async -> Int
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragGetStatistics() async throws -> RARAGStatistics
+Proposed:
+  RunAnywhere.ragStatistics() async throws -> RARAGStatistics
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragClearDocuments() async throws
+Proposed:
+  RunAnywhere.clearRAGDocuments() async throws
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragQuery(
+      question: String,
+      options: RARAGQueryOptions? = nil
+  ) async throws -> RARAGResult
+Proposed:
+  RunAnywhere.queryRAG(
+      question: String,
+      options: RARAGQueryOptions? = nil
+  ) async throws -> RARAGResult
+Decision: RENAME
+
+Current:
+  RunAnywhere.ragQuery(
+      _ options: RARAGQueryOptions
+  ) async throws -> RARAGResult
+Proposed:
+  RunAnywhere.queryRAG(
+      _ options: RARAGQueryOptions
+  ) async throws -> RARAGResult
+Decision: RENAME
+
+The earlier inventory included loadRAGArtifactModel. It is in a private
+extension and must not appear in the public proposal.
+
+
+18. AUDIO CONVERSION
+--------------------
+
+Current and proposed:
+  RunAnywhere.pcm16ToFloat32(_ int16Data: Data) -> Data
+  RunAnywhere.pcm16ToFloat32Samples(_ int16Data: Data) -> [Float]
+  RunAnywhere.pcm16ToWav(_ int16Data: Data, sampleRate: Int) -> Data
+
+Decision: KEEP names, fix WAV capitalization if source compatibility allows:
+  pcm16ToWAV
+
+Alternative:
+  HIDE these as advanced utilities if the SDK accepts standard audio containers
+  at its main transcription boundary.
+
+
+NAMESPACED RUNANYWHERE CAPABILITIES
+==================================
+
+The following APIs already retain RunAnywhere as their root. Keep namespaces
+where they prevent a crowded flat facade.
+
+
+19. LoRA
+--------
+
+Current and proposed:
+  RunAnywhere.lora.apply(
+      _ request: RALoRAApplyRequest
+  ) async throws -> RALoRAApplyResult
+  Decision: KEEP
+
+  RunAnywhere.lora.remove(
+      _ request: RALoRARemoveRequest
+  ) async throws -> RALoRAState
+  Decision: KEEP
+
+  RunAnywhere.lora.list() async throws -> RALoRAState
+  Proposed: RunAnywhere.lora.listApplied()
+  Decision: RENAME. "list" does not say whether it lists applied or cataloged
+  adapters.
+
+  RunAnywhere.lora.state() async throws -> RALoRAState
+  Proposed: KEEP
+
+  RunAnywhere.lora.checkCompatibility(
+      _ config: RALoRAAdapterConfig
+  ) async -> RALoraCompatibilityResult
+  Proposed: KEEP
+
+  RunAnywhere.lora.register(
+      _ entry: RALoraAdapterCatalogEntry
+  ) async throws -> RALoraAdapterCatalogEntry
+  Proposed: KEEP
+
+  RunAnywhere.lora.listCatalog(
+      _ request: RALoraAdapterCatalogListRequest =
+          RALoraAdapterCatalogListRequest()
+  ) async throws -> RALoraAdapterCatalogListResult
+  Proposed: KEEP
+
+  RunAnywhere.lora.queryCatalog(
+      _ query: RALoraAdapterCatalogQuery
+  ) async throws -> RALoraAdapterCatalogListResult
+  Proposed:
+    RunAnywhere.lora.listCatalog(matching: query)
+  Decision: MERGE as an overload
+
+  RunAnywhere.lora.getCatalogEntry(
+      _ request: RALoraAdapterCatalogGetRequest
+  ) async throws -> RALoraAdapterCatalogGetResult
+  Proposed:
+    RunAnywhere.lora.retrieveCatalogEntry(_ request:)
+  Decision: RENAME
+
+  RunAnywhere.lora.markDownloadCompleted(
+      _ request: RALoraAdapterDownloadCompletedRequest
+  ) async throws -> RALoraAdapterDownloadCompletedResult
+  Decision: ADVANCED. Keep only if app-managed downloads must report state.
+
+  RunAnywhere.lora.markImportCompleted(
+      _ request: RALoraAdapterDownloadCompletedRequest
+  ) async throws -> RALoraAdapterDownloadCompletedResult
+  Decision: ADVANCED
+
+  RunAnywhere.lora.adaptersForModel(
+      _ modelId: String
+  ) async throws -> [RALoraAdapterCatalogEntry]
+  Proposed:
+    RunAnywhere.lora.adapters(forModelID modelID: String)
+  Decision: RENAME
+
+  RunAnywhere.lora.allRegistered()
+      async throws -> [RALoraAdapterCatalogEntry]
+  Proposed:
+    RunAnywhere.lora.listRegistered()
+  Decision: RENAME
+
+  RunAnywhere.lora.registerArtifact(
+      _ entry: RALoraAdapterCatalogEntry
+  ) async throws -> RAModelInfo
+  Proposed: KEEP, ADVANCED
+
+  RunAnywhere.lora.download(
+      _ entry: RALoraAdapterCatalogEntry,
+      onProgress: ((RADownloadProgress) async -> Void)? = nil
+  ) async throws -> String
+  Proposed: KEEP
+
+  RunAnywhere.lora.importAdapter(
+      from url: URL
+  ) async throws -> RALoraAdapterImportResult
+  Proposed: KEEP
+
+
+20. SOLUTIONS
+-------------
+
+Current and proposed:
+  RunAnywhere.solutions.run(configBytes: Data)
+      async throws -> SolutionHandle
+  RunAnywhere.solutions.run(config: RASolutionConfig)
+      async throws -> SolutionHandle
+  RunAnywhere.solutions.run(yaml: String)
+      async throws -> SolutionHandle
+
+Decision: KEEP
+
+Current SolutionHandle functions:
+  start() throws
+  stop() throws
+  cancel() throws
+  feed(_ item: String) throws
+  closeInput() throws
+  destroy()
+
+Proposed:
+  Keep start, stop, cancel, feed, and closeInput.
+  Rename destroy() -> close() if callers can still inspect a closed handle.
+  Keep destroy() if it maps to an explicit native resource contract and the
+  team wants to match Cactus/native terminology.
+
+
+21. PLUGIN LOADER
+-----------------
+
+Current and proposed:
+  RunAnywhere.pluginLoader.load(path: String) throws -> RAPluginInfo
+  RunAnywhere.pluginLoader.unload(name: String) throws
+  Decision: KEEP
+
+Current:
+  RunAnywhere.pluginLoader.registeredNames() -> [String]
+Proposed:
+  RunAnywhere.pluginLoader.registeredPluginNames() -> [String]
+Decision: RENAME
+
+Current:
+  RunAnywhere.pluginLoader.listLoaded() -> [RAPluginInfo]
+Proposed:
+  RunAnywhere.pluginLoader.listLoadedPlugins() -> [RAPluginInfo]
+Decision: RENAME
+
+
+OTHER APPLICATION-FACING PUBLIC TYPES
+=====================================
+
+These operations need public review, but forcing stateful objects into static
+RunAnywhere functions would make them harder to use.
+
+
+22. EVENT BUS
+-------------
+
+Current:
+  EventBus.start()
+  EventBus.stop()
+Decision: HIDE
+Reason: RunAnywhere should own SDK event-loop lifecycle.
+
+Current:
+  EventBus.publish(_ event: RASDKEvent)
+Decision: ADVANCED
+
+Current:
+  EventBus.events(
+      for category: RAEventCategory
+  ) -> AnyPublisher<RASDKEvent, Never>
+Decision: KEEP
+
+Current:
+  EventBus.on(
+      _ handler: @escaping (RASDKEvent) -> Void
+  ) -> AnyCancellable
+Proposed:
+  EventBus.subscribe(_ handler: ...) -> AnyCancellable
+Decision: RENAME
+
+Current:
+  EventBus.on(
+      _ category: RAEventCategory,
+      handler: @escaping (RASDKEvent) -> Void
+  ) -> AnyCancellable
+Proposed:
+  EventBus.subscribe(to: category, handler: handler)
+Decision: RENAME
+
+Choose one primary event subscription style in the documentation. The current
+top-level subscribeSDKEvents calls and EventBus.on methods duplicate each other.
+
+
+23. HYBRID OFFLINE/CLOUD STT
+----------------------------
+
+Current model factories:
+  HybridModel.offlineSherpa(_ id: String) -> HybridModel
+  HybridModel.onlineCloud(
+      _ id: String,
+      provider: String = Cloud.defaultProvider
+  ) -> HybridModel
+
+Proposed:
+  HybridModel.offline(_ modelID: String) -> HybridModel
+  HybridModel.cloud(
+      _ modelID: String,
+      provider: String = Cloud.defaultProvider
+  ) -> HybridModel
+Decision: RENAME
+Reason: Sherpa is an implementation detail unless callers must select that
+backend. Keep offlineSherpa if the backend choice is part of the contract.
+
+Current:
+  HybridSTTRouter.setPair(
+      offline: HybridModel,
+      online: HybridModel,
+      policy: HybridRoutingPolicy
+  ) throws
+Proposed:
+  HybridSTTRouter.configure(
+      offline: HybridModel,
+      online: HybridModel,
+      policy: HybridRoutingPolicy
+  ) throws
+Decision: RENAME
+
+Current and proposed:
+  HybridSTTRouter.transcribe(
+      _ audio: Data,
+      options: HybridTranscribeOptions = .init()
+  ) throws -> HybridTranscribeResult
+  HybridSTTRouter.cancel()
+  HybridSTTRouter.close()
+Decision: KEEP
+
+Current cloud registry:
+  Cloud.register()
+  Cloud.unregister()
+  Cloud.register(
+      id: String,
+      provider: String = defaultProvider,
+      model: String,
+      apiKey: String,
+      languageCode: String? = nil,
+      baseURL: String? = nil,
+      timeoutMs: Int? = nil
+  )
+  Cloud.lookup(_ id: String) -> ModelEntry?
+  Cloud.isRegistered(_ id: String) -> Bool
+  Cloud.unregisterModel(_ id: String) -> Bool
+  Cloud.clear()
+  Cloud.registerProvider(_ name: String, _ handler: SttProviderHandler) -> Bool
+  Cloud.unregisterProvider(_ name: String)
+
+Proposed label cleanup:
+  id        -> modelID
+  timeoutMs -> timeoutMilliseconds
+  lookup    -> model(forID:)
+  clear     -> clearModels
+  registerProvider(_:_:) -> registerProvider(named:handler:)
+
+Decision: KEEP type namespace, RENAME ambiguous names and labels.
+
+Current device-state functions:
+  HybridDeviceState.setProvider(_ provider: HybridDeviceStateProvider?) -> Bool
+  HybridDeviceState.clear() -> Bool
+Proposed:
+  HybridDeviceState.setProvider(_:)
+  HybridDeviceState.clearProvider()
+Decision: KEEP setProvider, RENAME clear
+
+Protocol requirements:
+  HybridDeviceStateProvider.isOnline() -> Bool
+  HybridDeviceStateProvider.batteryPercent() -> Int32
+  HybridDeviceStateProvider.isThermalThrottled() -> Bool
+
+Proposed:
+  Prefer read-only properties:
+    var isOnline: Bool { get }
+    var batteryPercentage: Int32 { get }
+    var isThermallyThrottled: Bool { get }
+Decision: RENAME signatures in the next major version.
+
+Current policy factories:
+  HybridRoutingPolicy.filter(_ filter: HybridFilter)
+  HybridRoutingPolicy.cascade(_ cascade: HybridCascade)
+  HybridRoutingPolicy.rank(_ rank: HybridRank)
+Decision: KEEP
+
+
+24. BACKEND REGISTRATION
+------------------------
+
+Current and proposed:
+  LlamaCPP.register(priority: Int = 100)
+  LlamaCPP.unregister()
+  ONNX.register(priority: Int = 100)
+  ONNX.unregister()
+
+Decision: KEEP, ADVANCED
+
+Do not flatten these into RunAnywhere.registerBackend until all backends share
+one typed registration contract.
+
+
+25. PUBLIC IMAGE FACTORIES
+--------------------------
+
+Current and proposed:
+  RAVLMImage.fromEncoded(_ data: Data, format: RAVLMImageFormat)
+  RAVLMImage.fromFilePath(_ path: String)
+  RAVLMImage.fromBase64(_ base64: String)
+  RAVLMImage.fromRawRGB(_ data: Data, width: Int, height: Int)
+  RAVLMImage.fromRawRGBA(_ data: Data, width: Int, height: Int)
+  RAVLMImage.fromCGImage(_ cgImage: CGImage)
+  RAVLMImage.fromUIImage(_ image: UIImage)
+  RAVLMImage.fromNSImage(_ image: NSImage)
+  RAVLMImage.fromPixelBuffer(_ buffer: CVPixelBuffer)
+
+Decision: KEEP
+
+Swift-native factory alternative for a later major version:
+  RAVLMImage.encoded(...)
+  RAVLMImage.file(...)
+  RAVLMImage.base64(...)
+  RAVLMImage.rgb(...)
+  RAVLMImage.rgba(...)
+
+The from... form has strong cross-language clarity, so this rename has low
+priority.
+
+
+26. APPLE AUDIO SERVICES
+------------------------
+
+Current AudioCaptureManager:
+  requestPermission() async -> Bool
+  startRecording(onAudioData: @escaping @Sendable (Data) -> Void) async throws
+  activateAudioSession() async throws
+  deactivateAudioSession()
+  stopRecording(deactivateSession: Bool = true)
+
+Decision: KEEP
+
+Current AudioPlaybackManager:
+  play(_ audioData: Data) async throws
+  play(_ audioData: Data, completion: @escaping (Bool) -> Void)
+  stop()
+  pause()
+  resume()
+
+Decision: KEEP
+
+AVAudioPlayer delegate callbacks remain protocol requirements. Do not present
+them as RunAnywhere SDK operations.
+
+
+27. PUBLIC ERROR, LOGGING, KEYCHAIN, AND BRIDGE UTILITIES
+---------------------------------------------------------
+
+The Swift module marks several implementation-oriented types public:
+
+  SDKLogger
+  SentryManager
+  SentryDestination
+  HTTPClientAdapter
+  KeychainManager
+  FileOperationsUtilities
+  HandleStreamAdapter
+  several CppBridge namespaces
+
+Decision:
+  HIDE or mark ADVANCED. Do not spend the main naming pass polishing these
+  before the team decides whether applications should depend on them.
+
+Keep public:
+  SDKException factories and conversion helpers that app code needs.
+
+Apply label cleanup:
+  Id -> ID
+  Url -> URL
+  Lora -> LoRA
+  Ms -> Milliseconds, except wire/generated fields
+
+
+COMPETITOR REFERENCES
+=====================
+
+OpenAI
+------
+
+Primary response call:
+  responses.create(model:, input:, tools:, text/response format:, stream:)
+
+Other relevant resources:
+  embeddings.create(input:, model:)
+  audio.transcriptions.create(...)
+  audio.speech.create(...)
+  models.list()
+  models.retrieve(model)
+  models.delete(model)
+
+Notes:
+  OpenAI does not expose local download/load/unload operations.
+  OpenAI model deletion applies to owned remote fine-tuned models.
+  OpenAI sends tools, structured formats, and images through its main response
+  operation.
+
+Official references:
+  https://github.com/openai/openai-python
+  https://github.com/openai/openai-python/blob/main/api.md
+  https://github.com/openai/openai-node
+  https://platform.openai.com/docs/api-reference/models/object
+  https://platform.openai.com/docs/api-reference/audio
+
+
+Ollama
+------
+
+Relevant names:
+  generate
+  chat
+  embed
+  list
+  show
+  pull
+  delete
+  ps
+
+Notes:
+  pull downloads a local model.
+  show returns model metadata.
+  ps lists loaded/running models.
+  Ollama sends tools, structured formats, and images through chat/generate.
+  Its REST API loads/unloads through special generate requests, so those names
+  should not replace RunAnywhere.loadModel/unloadModel.
+
+Official references:
+  https://docs.ollama.com/api/generate
+  https://docs.ollama.com/api/chat
+  https://docs.ollama.com/api/pull
+  https://docs.ollama.com/capabilities/embeddings
+  https://github.com/ollama/ollama/blob/main/docs/api.md
+
+
+Cactus
+------
+
+Current low-level names:
+  cactus_init
+  cactus_destroy
+  cactus_reset
+  cactus_stop
+  cactus_complete
+  cactus_embed
+  cactus_image_embed
+  cactus_audio_embed
+  cactus_transcribe
+  cactus_stream_transcribe_start/process/stop
+  cactus_rag_query
+
+Older v1.7 high-level names:
+  CactusLM.download()
+  CactusLM.init()
+  CactusLM.destroy()
+  CactusLM.complete(...)
+  CactusLM.embed(...)
+  CactusSTT.transcribe(...)
+
+Version warning:
+  The familiar v1.7 class API is not a universal current Cactus surface. Use it
+  as a design reference, not as proof of one cross-platform standard.
+
+Official/current project references:
+  https://github.com/cactus-compute/cactus/blob/main/docs/cactus_engine.md
+  https://github.com/cactus-compute/cactus/blob/main/python/README.md
+  https://github.com/cactus-compute/cactus/blob/main/bindings/react-native/index.ts
+
+Older high-level reference:
+  https://cactuscompute.com/docs/v1.7/api-reference
+
+
+MIGRATION PLAN
+==============
+
+Phase 1: Approve names
+  Review this file and mark each RENAME/MERGE/HIDE decision accepted or rejected.
+
+Phase 2: Add aliases
+  Add proposed APIs as thin wrappers over the existing implementations.
+  Do not change C++ or protobuf contracts for naming-only work.
+
+Phase 3: Test parity
+  Verify each old and new function produces the same request, result, event
+  order, cancellation behavior, and errors.
+
+Phase 4: Deprecate old names
+  Mark old Swift APIs deprecated with fix-it messages. Keep them through the
+  current major release.
+
+Phase 5: Port the approved semantic names
+  Implement matching Kotlin, Flutter, and React Native names with native async
+  and stream types. Match behavior and argument meaning; do not force identical
+  language syntax.
+
+Phase 6: Remove old names
+  Remove deprecated aliases only in a major release. Publish a migration table
+  and update all examples before that release.
+
+
+RECOMMENDED FIRST CHANGE SET
+============================
+
+Start with low-risk names and labels:
+
+  getUserId                      -> currentUserID
+  getOrganizationId             -> currentOrganizationID
+  completeServicesInitialization -> waitUntilReady
+  queryModels                    -> listModels(matching:)
+  getModel                       -> retrieveModel
+  downloadedModels               -> listDownloadedModels
+  componentLifecycleSnapshot     -> componentState
+  downloadModelStream            -> streamModelDownload
+  getStorageInfo                 -> storageInfo
+  cleanTempFiles                 -> clearTemporaryFiles
+  getRegisteredTools             -> registeredTools
+  aggregateStream                -> collectGenerationStream
+  extractStructuredOutput        -> parseStructuredOutput
+
+Then implement the generation merge:
+
+  generateWithTools              -> generate(... tools: ...)
+  generateWithStructuredOutput   -> generate(... responseFormat: ...)
+  processImage                   -> generate(... image: ...)
+  processImageStream             -> generateStream(... image: ...)
+
+The first set changes names without changing feature design. The generation
+merge needs request-model and result-type review before implementation.

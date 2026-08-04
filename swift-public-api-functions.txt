@@ -1,0 +1,517 @@
+RUNANYWHERE SWIFT SDK — PUBLIC FUNCTION INVENTORY
+=================================================
+
+Scope
+-----
+SDK: sdk/runanywhere-swift
+Branch: siddhesh/flutter-sdk-testing
+Commit: 2ea354745be18bf691552b0d2a98236c57d56d28
+
+This is the hand-written Swift-facing API surface. It includes functions
+declared explicitly public and functions inside public extensions. It excludes:
+
+- generated protobuf implementation methods
+- internal C/C++ bridge functions
+- tests and example-app helpers
+- public properties and initializers (this is a function list)
+
+The Kotlin, Flutter, and React Native SDKs implement largely the same capability
+groups, but their function signatures and platform helpers are not identical.
+
+
+1. SDK LIFECYCLE AND IDENTITY
+-----------------------------
+
+RunAnywhere.getUserId()
+RunAnywhere.getOrganizationId()
+RunAnywhere.isDeviceRegistered()
+RunAnywhere.reset()
+RunAnywhere.initialize(apiKey:baseURL:environment:)
+RunAnywhere.initialize(apiKey:baseURL:environment:)
+  - one overload accepts an optional String URL; the other accepts URL
+RunAnywhere.completeServicesInitialization()
+
+
+2. LOGGING
+----------
+
+RunAnywhere.configureLogging(_:)
+RunAnywhere.setLocalLoggingEnabled(_:)
+RunAnywhere.setLogLevel(_:)
+RunAnywhere.setSentryLoggingEnabled(_:)
+RunAnywhere.addLogDestination(_:)
+RunAnywhere.setDebugMode(_:)
+RunAnywhere.flushLogs()
+
+
+3. EVENTS
+---------
+
+EventBus.start()
+EventBus.stop()
+EventBus.publish(_:)
+EventBus.events(for:)
+EventBus.on(_:)
+EventBus.on(category:handler:)
+EventBus.modelLifecycleChange(from:)
+
+RunAnywhere.subscribeSDKEvents(_:)
+RunAnywhere.unsubscribeSDKEvents(_:)
+RunAnywhere.publishSDKEvent(_:)
+RunAnywhere.pollSDKEvent()
+RunAnywhere.publishSDKFailure(...)
+
+
+4. MODEL REGISTRY AND MODEL LIFECYCLE
+-------------------------------------
+
+RunAnywhere.listModels(_:)
+RunAnywhere.queryModels(_:)
+RunAnywhere.getModel(_:)
+RunAnywhere.downloadedModels()
+RunAnywhere.refreshModelRegistry(...)
+
+RunAnywhere.loadModel(_:)
+RunAnywhere.unloadModel(_:)
+RunAnywhere.currentModel(_:)
+RunAnywhere.modelInfoForCategory(_:)
+RunAnywhere.componentLifecycleSnapshot(...)
+
+RunAnywhere.inferModelFileRole(...)
+
+
+5. MODEL REGISTRATION, DOWNLOADS, IMPORTS, AND STORAGE
+------------------------------------------------------
+
+RunAnywhere.registerModel(...)
+  - single-file/model URL overload
+RunAnywhere.registerModel(...)
+  - multi-file overload
+RunAnywhere.registerModel(...)
+  - archive overload
+RunAnywhere.downloadModel(...)
+RunAnywhere.downloadModelStream(_:)
+RunAnywhere.importModel(_:)
+RunAnywhere.getStorageInfo(_:)
+RunAnywhere.deleteStorage(_:)
+RunAnywhere.deleteModel(_:)
+RunAnywhere.clearCache()
+RunAnywhere.cleanTempFiles()
+
+
+6. LLM TEXT GENERATION
+----------------------
+
+RunAnywhere.generate(prompt:options:)
+RunAnywhere.generateStream(prompt:options:)
+RunAnywhere.generate(_:)
+RunAnywhere.generateStream(_:)
+RunAnywhere.cancelGeneration()
+RunAnywhere.aggregateStream(...)
+RunAnywhere.extractStructuredOutput(...)
+
+
+7. STRUCTURED OUTPUT
+--------------------
+
+RunAnywhere.generateStructured(...)
+RunAnywhere.generateStructuredStream(...)
+RunAnywhere.generateWithStructuredOutput(...)
+
+RAStructuredOutputOptions.defaults(...)
+
+
+8. TOOL CALLING
+---------------
+
+RunAnywhere.registerTool(...)
+RunAnywhere.unregisterTool(_:)
+RunAnywhere.getRegisteredTools()
+RunAnywhere.clearTools()
+RunAnywhere.executeTool(_:)
+RunAnywhere.generateWithTools(...)
+
+RAToolValue.array(_:)
+RAToolValue.object(_:)
+RAToolValue.toJSONString(pretty:)
+RAToolValue.parseObjectJSON(_:)
+RAToolValue.jsonString(from:)
+RAToolCallingOptions.defaults()
+
+
+9. LoRA ADAPTERS
+----------------
+
+RunAnywhere.lora.apply(_:)
+RunAnywhere.lora.remove(_:)
+RunAnywhere.lora.list()
+RunAnywhere.lora.state()
+RunAnywhere.lora.checkCompatibility(_:)
+RunAnywhere.lora.register(_:)
+RunAnywhere.lora.listCatalog(_:)
+RunAnywhere.lora.queryCatalog(_:)
+RunAnywhere.lora.getCatalogEntry(_:)
+RunAnywhere.lora.markDownloadCompleted(_:)
+RunAnywhere.lora.markImportCompleted(_:)
+RunAnywhere.lora.adaptersForModel(_:)
+RunAnywhere.lora.allRegistered()
+RunAnywhere.lora.registerArtifact(_:)
+RunAnywhere.lora.download(...)
+RunAnywhere.lora.importAdapter(from:)
+
+RALoraAdapterCatalogEntry.toLoraArtifactModelInfo()
+
+
+10. SPEECH TO TEXT (STT)
+------------------------
+
+RunAnywhere.transcribe(...)
+RunAnywhere.transcribeStream(...)
+
+RASTTLanguage.fromBcp47(_:)
+
+
+11. TEXT TO SPEECH (TTS)
+------------------------
+
+RunAnywhere.synthesize(...)
+RunAnywhere.synthesizeStream(...)
+RunAnywhere.stopSynthesis()
+RunAnywhere.speak(...)
+RunAnywhere.stopSpeaking()
+
+
+12. VOICE ACTIVITY DETECTION (VAD)
+----------------------------------
+
+RunAnywhere.detectVoiceActivity(_:options:)
+RunAnywhere.streamVAD(audio:options:)
+RunAnywhere.resetVAD()
+
+
+13. VISION-LANGUAGE MODELS (VLM)
+--------------------------------
+
+RunAnywhere.processImage(...)
+RunAnywhere.processImageStream(...)
+  - encoded/image request overload
+RunAnywhere.processImageStream(...)
+  - alternate image input overload
+RunAnywhere.cancelVLMGeneration()
+
+RAVLMConfiguration.defaults(modelId:)
+RAVLMGenerationOptions.defaults(prompt:)
+RAVLMImage.fromEncoded(_:format:)
+RAVLMImage.fromFilePath(_:)
+RAVLMImage.fromBase64(_:)
+RAVLMImage.fromRawRGB(_:width:height:)
+RAVLMImage.fromRawRGBA(_:width:height:)
+RAVLMImage.fromCGImage(_:)
+RAVLMImage.fromUIImage(_:)
+RAVLMImage.fromNSImage(_:)
+RAVLMImage.fromPixelBuffer(_:)
+
+
+14. VOICE AGENT
+---------------
+
+RunAnywhere.initializeVoiceAgent(_:)
+RunAnywhere.ensureDefaultVAD(modelID:)
+RunAnywhere.initializeVoiceAgentWithLoadedModels(...)
+RunAnywhere.getVoiceAgentComponentStates()
+RunAnywhere.processVoiceTurn(_:)
+RunAnywhere.streamVoiceAgent()
+RunAnywhere.cleanupVoiceAgent()
+
+
+15. RAG
+-------
+
+RunAnywhere.ragResolvedConfiguration(...)
+RunAnywhere.ragCreatePipeline(...)
+RunAnywhere.ragCreatePipeline(config:)
+RunAnywhere.ragDestroyPipeline()
+RunAnywhere.ragIngest(text:metadataJSON:)
+RunAnywhere.ragIngest(_:)
+RunAnywhere.ragAddDocumentsBatch(documents:)
+RunAnywhere.ragGetDocumentCount()
+RunAnywhere.ragGetStatistics()
+RunAnywhere.ragClearDocuments()
+RunAnywhere.ragQuery(question:options:)
+RunAnywhere.ragQuery(_:)
+
+RARAGConfiguration.resolvingLifecycleArtifacts(...)
+RARAGQueryOptions.defaults(question:)
+
+
+16. EMBEDDINGS
+--------------
+
+RunAnywhere.embeddings.embed(...)
+RunAnywhere.embeddings.embedBatch(...)
+RunAnywhere.embeddings.unload()
+
+RAEmbeddingVector.cosineSimilarity(with:)
+RAEmbeddingVector.computeNorm()
+
+
+17. SOLUTIONS / PIPELINE RUNTIME
+--------------------------------
+
+RunAnywhere.solutions.run(configBytes:)
+RunAnywhere.solutions.run(config:)
+RunAnywhere.solutions.run(yaml:)
+
+SolutionHandle.start()
+SolutionHandle.stop()
+SolutionHandle.cancel()
+SolutionHandle.feed(_:)
+SolutionHandle.closeInput()
+SolutionHandle.destroy()
+
+
+18. PLUGIN LOADING
+------------------
+
+RunAnywhere.pluginLoader.load(path:)
+RunAnywhere.pluginLoader.unload(name:)
+RunAnywhere.pluginLoader.registeredNames()
+RunAnywhere.pluginLoader.listLoaded()
+
+
+19. AUDIO CONVERSION
+--------------------
+
+RunAnywhere.pcm16ToFloat32(_:)
+RunAnywhere.pcm16ToFloat32Samples(_:)
+RunAnywhere.pcm16ToWav(_:sampleRate:)
+
+
+20. HYBRID OFFLINE/CLOUD STT
+----------------------------
+
+HybridModel.offlineSherpa(_:)
+HybridModel.onlineCloud(...)
+
+HybridSTTRouter.setPair(...)
+HybridSTTRouter.transcribe(...)
+HybridSTTRouter.cancel()
+HybridSTTRouter.close()
+
+Cloud.register()
+Cloud.unregister()
+Cloud.register(...)
+Cloud.lookup(_:)
+Cloud.isRegistered(_:)
+Cloud.unregisterModel(_:)
+Cloud.clear()
+Cloud.registerProvider(_:_:)
+Cloud.unregisterProvider(_:)
+
+HybridDeviceState.setProvider(_:)
+HybridDeviceState.clear()
+
+HybridDeviceStateProvider.isOnline()
+HybridDeviceStateProvider.batteryPercent()
+HybridDeviceStateProvider.isThermalThrottled()
+
+AppleDeviceStateProvider.isOnline()
+AppleDeviceStateProvider.batteryPercent()
+AppleDeviceStateProvider.isThermalThrottled()
+
+HybridRoutingPolicy.filter(_:)
+HybridRoutingPolicy.cascade(_:)
+HybridRoutingPolicy.rank(_:)
+
+
+21. BACKEND REGISTRATION
+------------------------
+
+LlamaCPP.register(priority:)
+LlamaCPP.unregister()
+ONNX.register(priority:)
+ONNX.unregister()
+
+
+22. PUBLIC MODEL AND STORAGE HELPERS
+------------------------------------
+
+Collection<RAModelFileDescriptor>.resolvedModelFilePath(role:)
+RAModelLoadResult.resolvedModelFilePath(role:)
+RACurrentModelResult.resolvedModelFilePath(role:)
+RAModelInfo.make(...)
+RAModelInfo.inferredArtifact(from:format:)
+RAModelInfo.registryPathString(from:)
+RAModelInfo.registryURL(from:)
+
+RAModelFormat.fromWireString(_:)
+RAInferenceFramework.toCFramework()
+RAInferenceFramework.fromCFramework(_:)
+RAArchiveType.fromWireString(_:)
+RAArchiveType.from(url:)
+
+RAStorageAvailability.make(...)
+
+
+23. CODABLE CONFORMANCE METHODS
+-------------------------------
+
+The following public encode(to:) methods are compiler-facing Codable
+requirements. They are exported but are not normally called directly:
+
+SDKEnvironment.encode(to:)
+RAModelSource.encode(to:)
+RAModelFormat.encode(to:)
+RAModelCategory.encode(to:)
+RAInferenceFramework.encode(to:)
+RAThinkingTagPattern.encode(to:)
+RAArchiveType.encode(to:)
+RAArchiveStructure.encode(to:)
+
+
+24. APPLE AUDIO AND SYSTEM-MODEL SERVICES
+-----------------------------------------
+
+AudioCaptureManager.requestPermission()
+AudioCaptureManager.startRecording(onAudioData:)
+AudioCaptureManager.activateAudioSession()
+AudioCaptureManager.deactivateAudioSession()
+AudioCaptureManager.stopRecording(deactivateSession:)
+
+AudioPlaybackManager.play(_:)
+AudioPlaybackManager.play(_:completion:)
+AudioPlaybackManager.stop()
+AudioPlaybackManager.pause()
+AudioPlaybackManager.resume()
+AudioPlaybackManager.audioPlayerDidFinishPlaying(_:successfully:)
+AudioPlaybackManager.audioPlayerDecodeErrorDidOccur(_:error:)
+AudioPlaybackManager.audioPlayerBeginInterruption(_:)
+AudioPlaybackManager.audioPlayerEndInterruption(_:withOptions:)
+
+SystemFoundationModelsService.initialize(modelPath:)
+SystemFoundationModelsService.generate(prompt:options:)
+SystemFoundationModelsService.streamGenerate(...)
+SystemFoundationModelsService.cleanup()
+
+SystemTTSService.stop()
+
+
+25. HTTP TRANSPORT
+------------------
+
+URLSessionHttpTransport.register()
+URLSessionHttpTransport.unregister()
+URLSessionHttpTransport.register(streamingSession:)
+URLSessionHttpTransport.cancelAllStreams()
+
+HTTPClientAdapter.configure(baseURL:apiKey:)
+  - URL overload
+HTTPClientAdapter.configure(baseURL:apiKey:)
+  - String overload
+HTTPClientAdapter.postRaw(_:_:requiresAuth:)
+HTTPClientAdapter.getRaw(_:requiresAuth:)
+HTTPClientAdapter.post(_:json:requiresAuth:)
+HTTPClientAdapter.fetchURL(_:)
+
+
+26. ERROR HELPERS
+-----------------
+
+SDKException.==(_:_:)
+SDKException.hash(into:)
+SDKException.make(...)
+SDKException.modelNotFound(_:)
+SDKException.notInitialized(_:)
+SDKException.invalidConfiguration(_:)
+SDKException.validationFailed(_:)
+SDKException.validationFailed(...)
+SDKException.cancelled(_:)
+SDKException.notImplemented(_:)
+SDKException.timeout(_:)
+SDKException.networkError(_:)
+SDKException.from(_:category:)
+  - nonoptional Error overload
+SDKException.from(_:category:)
+  - optional Error overload
+SDKException.fromONNXCode(_:)
+SDKException.log(file:line:function:)
+
+RASDKError.make(...)
+RASDKError.from(rcResult:)
+RASDKError.throwAsException()
+SDKException.from(rcResult:)
+SDKException.throwIfError(_:)
+
+
+27. EXPORTED LOGGING TYPES
+--------------------------
+
+SentryDestination.write(_:)
+SentryDestination.flush()
+
+SentryManager.initialize(dsn:environment:)
+SentryManager.captureError(_:context:)
+SentryManager.setUser(userId:email:username:)
+SentryManager.clearUser()
+SentryManager.flush(timeout:)
+SentryManager.close()
+
+SDKLogger.configure(_:)
+SDKLogger.setLocalLoggingEnabled(_:)
+SDKLogger.setMinLogLevel(_:)
+SDKLogger.setIncludeDeviceMetadata(_:)
+SDKLogger.setSentryLoggingEnabled(_:)
+SDKLogger.log(...)
+SDKLogger.addDestination(_:)
+SDKLogger.removeDestination(_:)
+SDKLogger.flush()
+SDKLogger.applyEnvironmentConfiguration(_:)
+SDKLogger.debug(_:metadata:)
+SDKLogger.info(_:metadata:)
+SDKLogger.warning(_:metadata:)
+SDKLogger.error(_:metadata:)
+SDKLogger.fault(_:metadata:)
+SDKLogger.logError(...)
+
+
+28. EXPORTED FILE, KEYCHAIN, AND STREAM UTILITIES
+-------------------------------------------------
+
+FileOperationsUtilities.existsWithType(at:)
+FileOperationsUtilities.fileSize(at:)
+
+KeychainManager.storeDeviceUUID(_:)
+KeychainManager.retrieveDeviceUUID()
+KeychainManager.store(_:for:)
+  - String overload
+KeychainManager.store(_:for:)
+  - Data overload
+KeychainManager.retrieve(for:)
+KeychainManager.retrieveData(for:)
+KeychainManager.retrieveDataIfExists(for:)
+KeychainManager.retrieveIfExists(for:)
+KeychainManager.delete(for:)
+KeychainManager.exists(for:)
+
+HandleStreamAdapter.stream()
+HandleStreamAdapter.tearDown()
+
+
+NOTES
+-----
+
+1. Swift is the reference/canonical surface for parts of the cross-SDK API,
+   but the other SDKs use their own language conventions:
+
+   - Kotlin: suspend functions, Flow, ByteArray, Android Context/Bitmap
+   - Flutter: Future/Stream and capability objects such as RunAnywhere.llm
+   - React Native: Promise/AsyncIterable and TypeScript/proto-ts types
+
+2. Lower-level CppBridge namespaces are intentionally excluded even where an
+   implementation declaration is marked public. They are transport plumbing
+   behind the supported RunAnywhere facade, not the application-facing API.
+
+3. A compiler-generated symbol graph was attempted, but this checkout's local
+   RACommons/RABackend XCFramework directories do not contain usable binary
+   artifacts. Therefore this inventory was verified from the hand-written
+   source declarations rather than a successfully built symbol graph.

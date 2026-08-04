@@ -1,0 +1,3505 @@
+RUNANYWHERE SWIFT SDK: CURRENT PUBLIC API CATALOG
+================================================
+
+Repository: RunanywhereAI/runanywhere-sdks
+SDK: sdk/runanywhere-swift
+Branch: siddhesh/flutter-sdk-testing
+Commit: 2ea354745be18bf691552b0d2a98236c57d56d28
+
+Purpose
+-------
+This file records the current API before any rename or merge work.
+
+Each entry contains:
+
+  Name        Current Swift API name
+  Arguments   Current argument labels, types, and defaults
+  Returns     Current return type
+  Does        The work performed by the API
+
+Scope
+-----
+The main list covers application-facing operations reached through
+RunAnywhere.* and its public capability namespaces.
+
+The appendices cover related stateful public types such as EventBus,
+HybridSTTRouter, and SolutionHandle.
+
+The catalog excludes:
+
+  - generated protobuf support methods
+  - CppBridge transport methods
+  - private helpers
+  - protocol-conformance methods such as encode(to:)
+  - tests and example-app functions
+
+
+1. SDK LIFECYCLE AND IDENTITY
+=============================
+
+1.1 getUserId
+
+Name:
+  RunAnywhere.getUserId()
+
+Arguments:
+  None
+
+Returns:
+  String?
+
+Does:
+  Returns the authenticated user's ID. Returns nil when no user ID is stored.
+
+
+1.2 getOrganizationId
+
+Name:
+  RunAnywhere.getOrganizationId()
+
+Arguments:
+  None
+
+Returns:
+  String?
+
+Does:
+  Returns the authenticated organization ID. Returns nil when no organization
+  ID is stored.
+
+
+1.3 isDeviceRegistered
+
+Name:
+  RunAnywhere.isDeviceRegistered()
+
+Arguments:
+  None
+
+Returns:
+  Bool
+
+Does:
+  Reports whether the backend has registered this device.
+
+
+1.4 reset
+
+Name:
+  RunAnywhere.reset()
+
+Arguments:
+  None
+
+Returns:
+  async Void
+
+Does:
+  Cancels service setup, shuts down the C++ bridge, and clears SDK state.
+  Source comments mark this API for testing.
+
+
+1.5 initialize, String URL overload
+
+Name:
+  RunAnywhere.initialize(
+      apiKey: String? = nil,
+      baseURL: String? = nil,
+      environment: SDKEnvironment = .development
+  )
+
+Arguments:
+  apiKey       Optional backend API key.
+  baseURL      Optional backend URL as a String.
+  environment  SDK environment. Defaults to development.
+
+Returns:
+  throws Void
+
+Does:
+  Initializes the SDK core and starts service setup. Development mode can run
+  without backend credentials.
+
+
+1.6 initialize, URL overload
+
+Name:
+  RunAnywhere.initialize(
+      apiKey: String,
+      baseURL: URL,
+      environment: SDKEnvironment = .production
+  )
+
+Arguments:
+  apiKey       Backend API key.
+  baseURL      Backend URL as Foundation.URL.
+  environment  SDK environment. Defaults to production.
+
+Returns:
+  throws Void
+
+Does:
+  Initializes the SDK core with a typed URL and starts service setup.
+
+
+1.7 completeServicesInitialization
+
+Name:
+  RunAnywhere.completeServicesInitialization()
+
+Arguments:
+  None
+
+Returns:
+  async throws Void
+
+Does:
+  Waits for the SDK's second initialization phase and reports setup failures.
+
+
+Public state properties associated with these functions:
+
+  RunAnywhere.isInitialized: Bool
+  RunAnywhere.areServicesReady: Bool
+  RunAnywhere.isActive: Bool
+  RunAnywhere.version: String
+  RunAnywhere.environment: SDKEnvironment?
+  RunAnywhere.deviceId: String
+  RunAnywhere.events: EventBus
+  RunAnywhere.isAuthenticated: Bool
+
+
+2. LOGGING
+==========
+
+2.1 configureLogging
+
+Name:
+  RunAnywhere.configureLogging(_ config: RALoggingConfiguration)
+
+Arguments:
+  config  Full logging configuration.
+
+Returns:
+  Void
+
+Does:
+  Replaces the SDK logging configuration.
+
+
+2.2 setLocalLoggingEnabled
+
+Name:
+  RunAnywhere.setLocalLoggingEnabled(_ enabled: Bool)
+
+Arguments:
+  enabled  Enables or disables local log output.
+
+Returns:
+  Void
+
+Does:
+  Changes local SDK logging without replacing the rest of the configuration.
+
+
+2.3 setLogLevel
+
+Name:
+  RunAnywhere.setLogLevel(_ level: RALogLevel)
+
+Arguments:
+  level  Minimum log level.
+
+Returns:
+  Void
+
+Does:
+  Sets the minimum severity that the SDK records.
+
+
+2.4 setSentryLoggingEnabled
+
+Name:
+  RunAnywhere.setSentryLoggingEnabled(_ enabled: Bool)
+
+Arguments:
+  enabled  Enables or disables the Sentry log destination.
+
+Returns:
+  Void
+
+Does:
+  Controls whether the SDK sends supported log entries to Sentry.
+
+
+2.5 addLogDestination
+
+Name:
+  RunAnywhere.addLogDestination(_ destination: LogDestination)
+
+Arguments:
+  destination  A custom SDK log destination.
+
+Returns:
+  Void
+
+Does:
+  Adds a destination that receives SDK log entries.
+
+
+2.6 setDebugMode
+
+Name:
+  RunAnywhere.setDebugMode(_ enabled: Bool)
+
+Arguments:
+  enabled  Enables or disables debug mode.
+
+Returns:
+  Void
+
+Does:
+  Changes the SDK's debug logging behavior.
+
+
+2.7 flushLogs
+
+Name:
+  RunAnywhere.flushLogs()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Asks each configured destination to send or write pending log entries.
+
+
+3. SDK EVENTS
+=============
+
+3.1 subscribeSDKEvents
+
+Name:
+  RunAnywhere.subscribeSDKEvents(
+      _ handler: @escaping (RASDKEvent) -> Void
+  )
+
+Arguments:
+  handler  Closure called for each matching SDK event.
+
+Returns:
+  UInt64 subscription ID
+
+Does:
+  Registers a callback with the native SDK event stream.
+
+
+3.2 unsubscribeSDKEvents
+
+Name:
+  RunAnywhere.unsubscribeSDKEvents(_ subscriptionId: UInt64)
+
+Arguments:
+  subscriptionId  ID returned by subscribeSDKEvents.
+
+Returns:
+  Void
+
+Does:
+  Removes a native SDK event subscription.
+
+
+3.3 publishSDKEvent
+
+Name:
+  RunAnywhere.publishSDKEvent(_ event: RASDKEvent)
+
+Arguments:
+  event  Event to publish.
+
+Returns:
+  Bool
+
+Does:
+  Publishes an event to the native SDK event queue and reports whether the
+  publish succeeded.
+
+
+3.4 pollSDKEvent
+
+Name:
+  RunAnywhere.pollSDKEvent()
+
+Arguments:
+  None
+
+Returns:
+  RASDKEvent?
+
+Does:
+  Removes and returns the next queued SDK event. Returns nil when the queue is
+  empty.
+
+
+3.5 publishSDKFailure
+
+Name:
+  RunAnywhere.publishSDKFailure(
+      errorCode: rac_result_t,
+      message: String,
+      component: String,
+      operation: String,
+      recoverable: Bool = false
+  )
+
+Arguments:
+  errorCode   Native result code.
+  message     Human-readable error message.
+  component   Component that failed.
+  operation   Operation that failed.
+  recoverable Whether the caller can recover from the failure.
+
+Returns:
+  Bool
+
+Does:
+  Builds and publishes a failure event to the native event queue.
+
+
+4. MODEL REGISTRY
+=================
+
+4.1 listModels
+
+Name:
+  RunAnywhere.listModels(
+      _ request: RAModelListRequest = RAModelListRequest()
+  )
+
+Arguments:
+  request  Filters, sorting, and paging settings. Defaults to an empty request.
+
+Returns:
+  async RAModelListResult
+
+Does:
+  Lists models from the SDK model registry.
+
+
+4.2 queryModels
+
+Name:
+  RunAnywhere.queryModels(_ query: RAModelQuery)
+
+Arguments:
+  query  Model filters such as category, framework, or downloaded state.
+
+Returns:
+  async RAModelListResult
+
+Does:
+  Wraps the query in a list request and returns matching registry models.
+
+
+4.3 getModel
+
+Name:
+  RunAnywhere.getModel(_ request: RAModelGetRequest)
+
+Arguments:
+  request  Identifies the registry model to return.
+
+Returns:
+  async RAModelGetResult
+
+Does:
+  Retrieves one model record from the SDK registry.
+
+
+4.4 downloadedModels
+
+Name:
+  RunAnywhere.downloadedModels()
+
+Arguments:
+  None
+
+Returns:
+  async RAModelListResult
+
+Does:
+  Lists registry models whose files are marked as downloaded.
+
+
+4.5 refreshModelRegistry
+
+Name:
+  RunAnywhere.refreshModelRegistry(
+      rescanLocal: Bool = true,
+      includeRemoteCatalog: Bool = false,
+      pruneOrphans: Bool = false
+  )
+
+Arguments:
+  rescanLocal          Scans managed model directories.
+  includeRemoteCatalog Includes remote catalog data in the refresh.
+  pruneOrphans         Removes registry entries whose local files are missing.
+
+Returns:
+  async Void
+
+Does:
+  Reconciles the model registry with local storage and optional remote data.
+
+
+5. MODEL LIFECYCLE
+==================
+
+5.1 loadModel
+
+Name:
+  RunAnywhere.loadModel(_ request: RAModelLoadRequest)
+
+Arguments:
+  request  Model ID, category, framework, and load options.
+
+Returns:
+  async RAModelLoadResult
+
+Does:
+  Loads a registered model into the inference component for its category.
+  Loading allocates runtime resources; it does not download model files.
+
+
+5.2 unloadModel
+
+Name:
+  RunAnywhere.unloadModel(_ request: RAModelUnloadRequest)
+
+Arguments:
+  request  Identifies the model category or component to unload.
+
+Returns:
+  async RAModelUnloadResult
+
+Does:
+  Releases the loaded model and its inference resources.
+
+
+5.3 currentModel
+
+Name:
+  RunAnywhere.currentModel(
+      _ request: RACurrentModelRequest = RACurrentModelRequest()
+  )
+
+Arguments:
+  request  Category and metadata options. Defaults to an empty request.
+
+Returns:
+  RACurrentModelResult
+
+Does:
+  Returns the model currently loaded for the requested category.
+
+
+5.4 modelInfoForCategory
+
+Name:
+  RunAnywhere.modelInfoForCategory(_ category: RAModelCategory)
+
+Arguments:
+  category  Model category to inspect.
+
+Returns:
+  RAModelInfo?
+
+Does:
+  Returns full registry metadata for the model loaded in the category.
+
+
+5.5 componentLifecycleSnapshot
+
+Name:
+  RunAnywhere.componentLifecycleSnapshot(_ component: RASDKComponent)
+
+Arguments:
+  component  SDK component to inspect.
+
+Returns:
+  RAComponentLifecycleSnapshot?
+
+Does:
+  Returns the component's current lifecycle state from the native lifecycle
+  service.
+
+
+5.6 inferModelFileRole
+
+Name:
+  RunAnywhere.inferModelFileRole(
+      filename: String,
+      modality: ModelCategory
+  )
+
+Arguments:
+  filename  Model artifact file name.
+  modality  Model category used to interpret the file.
+
+Returns:
+  RAModelFileRole
+
+Does:
+  Infers whether a file is a primary model, tokenizer, configuration, or other
+  model artifact.
+
+
+6. MODEL REGISTRATION
+=====================
+
+6.1 registerModel, single-file or URL model
+
+Name:
+  RunAnywhere.registerModel(
+      id: String? = nil,
+      name: String,
+      url: String,
+      framework: InferenceFramework,
+      modality: ModelCategory = .language,
+      artifactType: RAModelArtifactType? = nil,
+      memoryRequirement: Int64? = nil,
+      supportsThinking: Bool = false,
+      supportsLora: Bool = false
+  )
+
+Arguments:
+  id                Optional model ID. The SDK generates one when omitted.
+  name              Display name.
+  url               Remote download URL or model URL.
+  framework         Inference backend.
+  modality          Model category. Defaults to language.
+  artifactType      Optional artifact layout.
+  memoryRequirement Optional required memory in bytes.
+  supportsThinking  Whether the model can emit thinking content.
+  supportsLora      Whether the model accepts LoRA adapters.
+
+Returns:
+  async throws RAModelInfo
+
+Does:
+  Creates and saves a registry entry for a model represented by one URL.
+
+
+6.2 registerModel, archive model
+
+Name:
+  RunAnywhere.registerModel(
+      archive url: String,
+      structure: RAArchiveStructure,
+      id: String? = nil,
+      name: String,
+      framework: InferenceFramework,
+      modality: ModelCategory = .language,
+      archiveType: RAArchiveType? = nil,
+      memoryRequirement: Int64? = nil,
+      supportsThinking: Bool = false,
+      supportsLora: Bool = false
+  )
+
+Arguments:
+  url               Archive download URL.
+  structure         Expected layout after extraction.
+  id                Optional model ID.
+  name              Display name.
+  framework         Inference backend.
+  modality          Model category.
+  archiveType       Optional archive format.
+  memoryRequirement Optional required memory in bytes.
+  supportsThinking  Whether the model can emit thinking content.
+  supportsLora      Whether the model accepts LoRA adapters.
+
+Returns:
+  async throws RAModelInfo
+
+Does:
+  Creates and saves a registry entry for a model distributed as an archive.
+
+
+6.3 registerModel, multi-file model
+
+Name:
+  RunAnywhere.registerModel(
+      multiFile descriptors: [RAModelFileDescriptor],
+      id: String,
+      name: String,
+      framework: InferenceFramework,
+      modality: ModelCategory = .language,
+      memoryRequirement: Int64? = nil,
+      contextLength: Int? = nil,
+      supportsThinking: Bool = false,
+      source: RAModelSource = .remote
+  )
+
+Arguments:
+  descriptors       Files and roles that make up the model.
+  id                Model ID.
+  name              Display name.
+  framework         Inference backend.
+  modality          Model category.
+  memoryRequirement Optional required memory in bytes.
+  contextLength     Optional model context length.
+  supportsThinking  Whether the model can emit thinking content.
+  source            Model source. Defaults to remote.
+
+Returns:
+  async throws RAModelInfo
+
+Does:
+  Creates and saves a registry entry for a model made from several artifacts.
+
+
+7. MODEL DOWNLOAD, IMPORT, AND STORAGE
+=====================================
+
+7.1 downloadModel
+
+Name:
+  RunAnywhere.downloadModel(
+      _ model: RAModelInfo,
+      onProgress: ((RADownloadProgress) async -> Void)? = nil
+  )
+
+Arguments:
+  model       Registry model to download.
+  onProgress  Optional callback for download progress updates.
+
+Returns:
+  async throws RADownloadProgress
+
+Does:
+  Plans the download, transfers the model artifacts, updates the registry, and
+  returns the final progress record.
+
+
+7.2 downloadModelStream
+
+Name:
+  RunAnywhere.downloadModelStream(_ model: RAModelInfo)
+
+Arguments:
+  model  Registry model to download.
+
+Returns:
+  AsyncThrowingStream<RADownloadProgress, Error>
+
+Does:
+  Downloads model artifacts and emits progress records as an async stream.
+
+
+7.3 importModel
+
+Name:
+  RunAnywhere.importModel(_ request: RAModelImportRequest)
+
+Arguments:
+  request  Source path, target model details, and import settings.
+
+Returns:
+  async throws RAModelImportResult
+
+Does:
+  Imports existing local model files into SDK-managed storage and updates the
+  registry.
+
+
+7.4 getStorageInfo
+
+Name:
+  RunAnywhere.getStorageInfo(
+      _ request: RAStorageInfoRequest = RAStorageInfoRequest()
+  )
+
+Arguments:
+  request  Storage scope and detail options.
+
+Returns:
+  async RAStorageInfoResult
+
+Does:
+  Returns device, application, cache, and model storage information.
+
+
+7.5 deleteStorage
+
+Name:
+  RunAnywhere.deleteStorage(_ request: RAStorageDeleteRequest)
+
+Arguments:
+  request  Storage category, target IDs, and dry-run settings.
+
+Returns:
+  async RAStorageDeleteResult
+
+Does:
+  Deletes or previews deletion of the storage selected by the request.
+
+
+7.6 deleteModel
+
+Name:
+  RunAnywhere.deleteModel(_ modelId: String)
+
+Arguments:
+  modelId  Registry model ID.
+
+Returns:
+  async RAStorageDeleteResult
+
+Does:
+  Deletes the model's local files and updates its downloaded state.
+
+
+7.7 clearCache
+
+Name:
+  RunAnywhere.clearCache()
+
+Arguments:
+  None
+
+Returns:
+  async throws Void
+
+Does:
+  Deletes SDK cache storage.
+
+
+7.8 cleanTempFiles
+
+Name:
+  RunAnywhere.cleanTempFiles()
+
+Arguments:
+  None
+
+Returns:
+  async throws Void
+
+Does:
+  Deletes temporary SDK files.
+
+
+8. TEXT GENERATION
+==================
+
+8.1 generate, prompt overload
+
+Name:
+  RunAnywhere.generate(
+      prompt: String,
+      options: RALLMGenerationOptions? = nil
+  )
+
+Arguments:
+  prompt   Text prompt.
+  options  Optional sampling, token, stop, and runtime settings.
+
+Returns:
+  async throws RALLMGenerationResult
+
+Does:
+  Generates one complete text result with the loaded language model.
+
+
+8.2 generateStream, prompt overload
+
+Name:
+  RunAnywhere.generateStream(
+      prompt: String,
+      options: RALLMGenerationOptions? = nil
+  )
+
+Arguments:
+  prompt   Text prompt.
+  options  Optional generation settings.
+
+Returns:
+  async throws AsyncStream<RALLMStreamEvent>
+
+Does:
+  Starts text generation and returns token, progress, completion, and error
+  events.
+
+
+8.3 generate, request overload
+
+Name:
+  RunAnywhere.generate(_ request: RALLMGenerateRequest)
+
+Arguments:
+  request  Generated request containing prompt, model ID, conversation ID, and
+           generation options.
+
+Returns:
+  async throws RALLMGenerationResult
+
+Does:
+  Generates one complete text result from the generated request type.
+
+
+8.4 generateStream, request overload
+
+Name:
+  RunAnywhere.generateStream(_ request: RALLMGenerateRequest)
+
+Arguments:
+  request  Generated generation request.
+
+Returns:
+  async throws AsyncStream<RALLMStreamEvent>
+
+Does:
+  Starts request-based text generation and returns its event stream.
+
+
+8.5 cancelGeneration
+
+Name:
+  RunAnywhere.cancelGeneration()
+
+Arguments:
+  None
+
+Returns:
+  async Void
+
+Does:
+  Cancels generation on the loaded language model.
+
+
+8.6 aggregateStream
+
+Name:
+  RunAnywhere.aggregateStream(
+      prompt: String,
+      events: AsyncStream<RALLMStreamEvent>,
+      onToken: ((String) async -> Void)? = nil
+  )
+
+Arguments:
+  prompt   Original prompt used for generation.
+  events   Stream returned by generateStream.
+  onToken  Optional callback for each text token.
+
+Returns:
+  async RALLMGenerationResult
+
+Does:
+  Consumes stream events and builds one final generation result with metrics
+  and finish information.
+
+
+8.7 extractStructuredOutput
+
+Name:
+  RunAnywhere.extractStructuredOutput(
+      text: String,
+      schema: RAJSONSchema
+  )
+
+Arguments:
+  text    Model output containing structured data.
+  schema  JSON schema used to parse and validate the output.
+
+Returns:
+  throws RAStructuredOutputResult
+
+Does:
+  Extracts JSON from model text and validates it against the schema.
+
+
+9. STRUCTURED OUTPUT
+====================
+
+9.1 generateStructured
+
+Name:
+  RunAnywhere.generateStructured(
+      prompt: String,
+      schema: RAJSONSchema,
+      options: RALLMGenerationOptions? = nil
+  )
+
+Arguments:
+  prompt   Text prompt.
+  schema   Required JSON schema.
+  options  Optional language-model generation settings.
+
+Returns:
+  async throws RAStructuredOutputResult
+
+Does:
+  Generates schema-constrained text, extracts the JSON, and returns validation
+  details.
+
+
+9.2 generateStructuredStream
+
+Name:
+  RunAnywhere.generateStructuredStream(
+      prompt: String,
+      schema: RAJSONSchema,
+      options: RALLMGenerationOptions? = nil
+  )
+
+Arguments:
+  prompt   Text prompt.
+  schema   Required JSON schema.
+  options  Optional generation settings.
+
+Returns:
+  AsyncThrowingStream<RAStructuredOutputStreamEvent, Error>
+
+Does:
+  Streams structured generation events and emits a validated final result.
+
+
+9.3 generateWithStructuredOutput
+
+Name:
+  RunAnywhere.generateWithStructuredOutput(
+      prompt: String,
+      structuredOutput: RAStructuredOutputOptions,
+      options: RALLMGenerationOptions? = nil
+  )
+
+Arguments:
+  prompt            Text prompt.
+  structuredOutput  Schema, prompt-injection, and strictness settings.
+  options           Optional generation settings.
+
+Returns:
+  async throws RALLMGenerationResult
+
+Does:
+  Adds structured-output instructions to a normal generation request and
+  returns the language-model result.
+
+
+10. TOOL CALLING
+================
+
+10.1 registerTool
+
+Name:
+  RunAnywhere.registerTool(
+      _ definition: RAToolDefinition,
+      executor: @escaping ToolExecutor
+  )
+
+Arguments:
+  definition  Tool name, description, and input schema.
+  executor    Closure that runs the tool.
+
+Returns:
+  async Void
+
+Does:
+  Adds a tool definition and its local executor to the SDK tool registry.
+
+
+10.2 unregisterTool
+
+Name:
+  RunAnywhere.unregisterTool(_ toolName: String)
+
+Arguments:
+  toolName  Registered tool name.
+
+Returns:
+  async Void
+
+Does:
+  Removes one tool and its executor from the SDK tool registry.
+
+
+10.3 getRegisteredTools
+
+Name:
+  RunAnywhere.getRegisteredTools()
+
+Arguments:
+  None
+
+Returns:
+  async [RAToolDefinition]
+
+Does:
+  Lists definitions for all registered tools.
+
+
+10.4 clearTools
+
+Name:
+  RunAnywhere.clearTools()
+
+Arguments:
+  None
+
+Returns:
+  async Void
+
+Does:
+  Removes all tool definitions and executors.
+
+
+10.5 executeTool
+
+Name:
+  RunAnywhere.executeTool(_ toolCall: RAToolCall)
+
+Arguments:
+  toolCall  Tool name, call ID, and JSON arguments generated by the model.
+
+Returns:
+  async RAToolResult
+
+Does:
+  Finds the registered executor, runs it, and returns its success or error
+  result.
+
+
+10.6 generateWithTools
+
+Name:
+  RunAnywhere.generateWithTools(
+      prompt: String,
+      options: RALLMGenerationOptions = .defaults(),
+      toolOptions: RAToolCallingOptions? = nil,
+      toolChoice: RAToolChoiceMode? = nil,
+      forcedToolName: String? = nil,
+      validateCalls: Bool? = nil
+  )
+
+Arguments:
+  prompt          User prompt.
+  options         Language-model generation settings.
+  toolOptions     Tool-loop settings.
+  toolChoice      Automatic, required, none, or forced tool selection.
+  forcedToolName  Tool to force when toolChoice requires one.
+  validateCalls   Whether to validate model tool arguments.
+
+Returns:
+  async throws RAToolCallingResult
+
+Does:
+  Generates a response with registered tools, executes requested tools, and
+  continues generation according to the tool-loop settings.
+
+
+11. EMBEDDINGS
+==============
+
+11.1 embed
+
+Name:
+  RunAnywhere.embeddings.embed(
+      _ text: String,
+      modelID: String,
+      options: RAEmbeddingsOptions? = nil
+  )
+
+Arguments:
+  text     Text to embed.
+  modelID  Embedding model ID.
+  options  Optional embedding settings.
+
+Returns:
+  async throws RAEmbeddingsResult
+
+Does:
+  Loads or resolves the embedding model and returns a vector for one string.
+
+
+11.2 embedBatch
+
+Name:
+  RunAnywhere.embeddings.embedBatch(
+      _ request: RAEmbeddingsRequest,
+      modelID: String
+  )
+
+Arguments:
+  request  One or more embedding inputs and options.
+  modelID  Embedding model ID.
+
+Returns:
+  async throws RAEmbeddingsResult
+
+Does:
+  Creates embeddings for each input in the request.
+
+
+11.3 unload
+
+Name:
+  RunAnywhere.embeddings.unload()
+
+Arguments:
+  None
+
+Returns:
+  async throws Void
+
+Does:
+  Unloads the active embedding model.
+
+
+12. LoRA ADAPTERS
+=================
+
+12.1 apply
+
+Name:
+  RunAnywhere.lora.apply(_ request: RALoRAApplyRequest)
+
+Arguments:
+  request  Adapter IDs, paths, scales, and apply settings.
+
+Returns:
+  async throws RALoRAApplyResult
+
+Does:
+  Applies one or more LoRA adapters to the loaded language model.
+
+
+12.2 remove
+
+Name:
+  RunAnywhere.lora.remove(_ request: RALoRARemoveRequest)
+
+Arguments:
+  request  Adapters to remove, or a flag to remove all adapters.
+
+Returns:
+  async throws RALoRAState
+
+Does:
+  Removes selected LoRA adapters and returns the remaining runtime state.
+
+
+12.3 list
+
+Name:
+  RunAnywhere.lora.list()
+
+Arguments:
+  None
+
+Returns:
+  async throws RALoRAState
+
+Does:
+  Lists LoRA adapters applied to the loaded language model.
+
+
+12.4 state
+
+Name:
+  RunAnywhere.lora.state()
+
+Arguments:
+  None
+
+Returns:
+  async throws RALoRAState
+
+Does:
+  Returns the native LoRA service state.
+
+
+12.5 checkCompatibility
+
+Name:
+  RunAnywhere.lora.checkCompatibility(_ config: RALoRAAdapterConfig)
+
+Arguments:
+  config  Adapter and base-model compatibility data.
+
+Returns:
+  async RALoraCompatibilityResult
+
+Does:
+  Checks whether the adapter can run with the current base model.
+
+
+12.6 register
+
+Name:
+  RunAnywhere.lora.register(_ entry: RALoraAdapterCatalogEntry)
+
+Arguments:
+  entry  LoRA catalog record.
+
+Returns:
+  async throws RALoraAdapterCatalogEntry
+
+Does:
+  Adds or updates a LoRA adapter in the native catalog.
+
+
+12.7 listCatalog
+
+Name:
+  RunAnywhere.lora.listCatalog(
+      _ request: RALoraAdapterCatalogListRequest =
+          RALoraAdapterCatalogListRequest()
+  )
+
+Arguments:
+  request  Catalog list and paging settings.
+
+Returns:
+  async throws RALoraAdapterCatalogListResult
+
+Does:
+  Lists LoRA adapter catalog entries.
+
+
+12.8 queryCatalog
+
+Name:
+  RunAnywhere.lora.queryCatalog(_ query: RALoraAdapterCatalogQuery)
+
+Arguments:
+  query  Catalog filters such as compatible model ID.
+
+Returns:
+  async throws RALoraAdapterCatalogListResult
+
+Does:
+  Returns LoRA catalog entries that match the query.
+
+
+12.9 getCatalogEntry
+
+Name:
+  RunAnywhere.lora.getCatalogEntry(
+      _ request: RALoraAdapterCatalogGetRequest
+  )
+
+Arguments:
+  request  Identifies one catalog entry.
+
+Returns:
+  async throws RALoraAdapterCatalogGetResult
+
+Does:
+  Retrieves one LoRA catalog entry.
+
+
+12.10 markDownloadCompleted
+
+Name:
+  RunAnywhere.lora.markDownloadCompleted(
+      _ request: RALoraAdapterDownloadCompletedRequest
+  )
+
+Arguments:
+  request  Adapter ID, local path, and download status.
+
+Returns:
+  async throws RALoraAdapterDownloadCompletedResult
+
+Does:
+  Records a completed app-managed adapter download in the native catalog.
+
+
+12.11 markImportCompleted
+
+Name:
+  RunAnywhere.lora.markImportCompleted(
+      _ request: RALoraAdapterDownloadCompletedRequest
+  )
+
+Arguments:
+  request  Adapter ID, local path, and import status.
+
+Returns:
+  async throws RALoraAdapterDownloadCompletedResult
+
+Does:
+  Records a completed adapter import in the native catalog.
+
+
+12.12 adaptersForModel
+
+Name:
+  RunAnywhere.lora.adaptersForModel(_ modelId: String)
+
+Arguments:
+  modelId  Base model ID.
+
+Returns:
+  async throws [RALoraAdapterCatalogEntry]
+
+Does:
+  Lists catalog adapters compatible with the base model.
+
+
+12.13 allRegistered
+
+Name:
+  RunAnywhere.lora.allRegistered()
+
+Arguments:
+  None
+
+Returns:
+  async throws [RALoraAdapterCatalogEntry]
+
+Does:
+  Lists all registered LoRA catalog entries.
+
+
+12.14 registerArtifact
+
+Name:
+  RunAnywhere.lora.registerArtifact(
+      _ entry: RALoraAdapterCatalogEntry
+  )
+
+Arguments:
+  entry  LoRA catalog entry with artifact information.
+
+Returns:
+  async throws RAModelInfo
+
+Does:
+  Registers the adapter artifact in the model registry and returns its model
+  record.
+
+
+12.15 download
+
+Name:
+  RunAnywhere.lora.download(
+      _ entry: RALoraAdapterCatalogEntry,
+      onProgress: ((RADownloadProgress) async -> Void)? = nil
+  )
+
+Arguments:
+  entry       LoRA catalog entry to download.
+  onProgress  Optional progress callback.
+
+Returns:
+  async throws String
+
+Does:
+  Downloads the adapter artifact, updates its catalog state, and returns the
+  stable local path.
+
+
+12.16 importAdapter
+
+Name:
+  RunAnywhere.lora.importAdapter(from url: URL)
+
+Arguments:
+  url  Local adapter file selected by the caller.
+
+Returns:
+  async throws RALoraAdapterImportResult
+
+Does:
+  Imports a local LoRA adapter into SDK-managed storage and records it in the
+  catalog.
+
+
+13. SPEECH TO TEXT
+==================
+
+13.1 transcribe
+
+Name:
+  RunAnywhere.transcribe(
+      audio audioData: Data,
+      options: RASTTOptions = .defaults()
+  )
+
+Arguments:
+  audioData  Complete audio buffer.
+  options    Language, timestamps, model, and transcription settings.
+
+Returns:
+  async throws RASTTOutput
+
+Does:
+  Transcribes a complete audio buffer with the loaded speech model.
+
+
+13.2 transcribeStream
+
+Name:
+  RunAnywhere.transcribeStream(
+      audio: AsyncStream<Data>,
+      options: RASTTOptions = .defaults()
+  )
+
+Arguments:
+  audio    Stream of audio chunks.
+  options  Streaming transcription settings.
+
+Returns:
+  AsyncStream<RASTTPartialResult>
+
+Does:
+  Consumes audio chunks and emits partial and final transcription results.
+
+
+14. TEXT TO SPEECH
+==================
+
+14.1 synthesize
+
+Name:
+  RunAnywhere.synthesize(
+      _ text: String,
+      options: RATTSOptions = .defaults()
+  )
+
+Arguments:
+  text     Text to synthesize.
+  options  Voice, speed, format, and model settings.
+
+Returns:
+  async throws RATTSOutput
+
+Does:
+  Converts text into one complete audio result.
+
+
+14.2 synthesizeStream
+
+Name:
+  RunAnywhere.synthesizeStream(
+      _ text: String,
+      options: RATTSOptions = .defaults()
+  )
+
+Arguments:
+  text     Text to synthesize.
+  options  Voice and synthesis settings.
+
+Returns:
+  AsyncStream<RATTSOutput>
+
+Does:
+  Converts text into a stream of audio chunks.
+
+
+14.3 stopSynthesis
+
+Name:
+  RunAnywhere.stopSynthesis()
+
+Arguments:
+  None
+
+Returns:
+  async Void
+
+Does:
+  Stops the active text-to-speech generation operation.
+
+
+14.4 speak
+
+Name:
+  RunAnywhere.speak(
+      _ text: String,
+      options: RATTSOptions = .defaults()
+  )
+
+Arguments:
+  text     Text to synthesize and play.
+  options  Voice and playback settings.
+
+Returns:
+  async throws RATTSSpeakResult
+
+Does:
+  Synthesizes the text and plays the resulting audio on the device.
+
+
+14.5 stopSpeaking
+
+Name:
+  RunAnywhere.stopSpeaking()
+
+Arguments:
+  None
+
+Returns:
+  async Void
+
+Does:
+  Stops active SDK-managed speech playback.
+
+
+15. VOICE ACTIVITY DETECTION
+============================
+
+15.1 detectVoiceActivity
+
+Name:
+  RunAnywhere.detectVoiceActivity(
+      _ audioData: Data,
+      options: RAVADOptions? = nil
+  )
+
+Arguments:
+  audioData  Audio buffer to inspect.
+  options    Optional voice activity thresholds and timing settings.
+
+Returns:
+  async throws RAVADResult
+
+Does:
+  Detects speech activity in one audio buffer.
+
+
+15.2 streamVAD
+
+Name:
+  RunAnywhere.streamVAD(
+      audio: AsyncStream<Data>,
+      options: RAVADOptions? = nil
+  )
+
+Arguments:
+  audio    Stream of audio chunks.
+  options  Optional detection settings.
+
+Returns:
+  AsyncStream<RAVADResult>
+
+Does:
+  Runs voice activity detection on an audio stream and emits detection results.
+
+
+15.3 resetVAD
+
+Name:
+  RunAnywhere.resetVAD()
+
+Arguments:
+  None
+
+Returns:
+  async throws Void
+
+Does:
+  Clears the active VAD session state without unloading its model.
+
+
+16. VISION-LANGUAGE GENERATION
+==============================
+
+16.1 processImage
+
+Name:
+  RunAnywhere.processImage(
+      _ image: RAVLMImage,
+      options: RAVLMGenerationOptions
+  )
+
+Arguments:
+  image    Encoded, file-backed, or raw image input.
+  options  Prompt, token, model, and runtime settings.
+
+Returns:
+  async throws RAVLMResult
+
+Does:
+  Generates one vision-language response for the image.
+
+
+16.2 processImageStream, options overload
+
+Name:
+  RunAnywhere.processImageStream(
+      _ image: RAVLMImage,
+      options: RAVLMGenerationOptions
+  )
+
+Arguments:
+  image    Image input.
+  options  Prompt and generation settings.
+
+Returns:
+  async throws AsyncStream<RAVLMStreamEvent>
+
+Does:
+  Starts vision-language generation and returns its event stream.
+
+
+16.3 processImageStream, prompt overload
+
+Name:
+  RunAnywhere.processImageStream(
+      _ image: RAVLMImage,
+      prompt: String,
+      options: RAVLMGenerationOptions = .defaults()
+  )
+
+Arguments:
+  image    Image input.
+  prompt   Question or instruction about the image.
+  options  Generation settings.
+
+Returns:
+  async throws AsyncStream<RAVLMStreamEvent>
+
+Does:
+  Adds the prompt to the options and streams a vision-language response.
+
+
+16.4 cancelVLMGeneration
+
+Name:
+  RunAnywhere.cancelVLMGeneration()
+
+Arguments:
+  None
+
+Returns:
+  async Void
+
+Does:
+  Cancels active vision-language generation.
+
+
+17. VOICE AGENT
+===============
+
+17.1 initializeVoiceAgent
+
+Name:
+  RunAnywhere.initializeVoiceAgent(
+      _ config: RAVoiceAgentComposeConfig
+  )
+
+Arguments:
+  config  STT, LLM, TTS, VAD, and session composition settings.
+
+Returns:
+  async throws Void
+
+Does:
+  Composes the voice-agent pipeline from the supplied configuration.
+
+
+17.2 ensureDefaultVAD
+
+Name:
+  RunAnywhere.ensureDefaultVAD(modelID: String? = nil)
+
+Arguments:
+  modelID  Optional VAD model ID. Defaults to the SDK's Silero VAD model.
+
+Returns:
+  async Bool
+
+Does:
+  Finds, downloads when needed, and loads the default VAD model for the voice
+  agent.
+
+
+17.3 initializeVoiceAgentWithLoadedModels
+
+Name:
+  RunAnywhere.initializeVoiceAgentWithLoadedModels(
+      ttsVoiceID: String? = nil,
+      ensureVAD: Bool = true
+  )
+
+Arguments:
+  ttsVoiceID  Optional voice ID for speech output.
+  ensureVAD   Prepares the default VAD model when true.
+
+Returns:
+  async throws Void
+
+Does:
+  Reads the loaded STT, LLM, and TTS models and composes a voice agent from
+  them.
+
+
+17.4 getVoiceAgentComponentStates
+
+Name:
+  RunAnywhere.getVoiceAgentComponentStates()
+
+Arguments:
+  None
+
+Returns:
+  async throws RAVoiceAgentComponentStates
+
+Does:
+  Returns readiness and lifecycle state for the voice agent's components.
+
+
+17.5 processVoiceTurn
+
+Name:
+  RunAnywhere.processVoiceTurn(_ audioData: Data)
+
+Arguments:
+  audioData  One user voice turn as audio data.
+
+Returns:
+  async throws RAVoiceAgentResult
+
+Does:
+  Runs speech recognition, language generation, and speech synthesis for one
+  turn.
+
+
+17.6 streamVoiceAgent
+
+Name:
+  RunAnywhere.streamVoiceAgent()
+
+Arguments:
+  None
+
+Returns:
+  AsyncStream<RAVoiceEvent>
+
+Does:
+  Returns the event stream for the active voice agent.
+
+
+17.7 cleanupVoiceAgent
+
+Name:
+  RunAnywhere.cleanupVoiceAgent()
+
+Arguments:
+  None
+
+Returns:
+  async Void
+
+Does:
+  Releases voice-agent resources and ends its active session.
+
+
+18. RETRIEVAL-AUGMENTED GENERATION
+==================================
+
+18.1 ragResolvedConfiguration
+
+Name:
+  RunAnywhere.ragResolvedConfiguration(
+      embeddingModel: RAModelInfo,
+      llmModel: RAModelInfo,
+      baseConfiguration: RARAGConfiguration = .defaults()
+  )
+
+Arguments:
+  embeddingModel     Registry embedding model.
+  llmModel           Registry language model.
+  baseConfiguration  RAG chunking, retrieval, and generation settings.
+
+Returns:
+  async throws RARAGConfiguration
+
+Does:
+  Loads the required model artifacts and returns a RAG configuration with
+  resolved local paths.
+
+
+18.2 ragCreatePipeline, model overload
+
+Name:
+  RunAnywhere.ragCreatePipeline(
+      embeddingModel: RAModelInfo,
+      llmModel: RAModelInfo,
+      baseConfiguration: RARAGConfiguration = .defaults()
+  )
+
+Arguments:
+  embeddingModel     Registry embedding model.
+  llmModel           Registry language model.
+  baseConfiguration  RAG settings.
+
+Returns:
+  async throws Void
+
+Does:
+  Resolves both models and creates the native RAG pipeline.
+
+
+18.3 ragCreatePipeline, configuration overload
+
+Name:
+  RunAnywhere.ragCreatePipeline(config: RARAGConfiguration)
+
+Arguments:
+  config  Fully resolved RAG pipeline configuration.
+
+Returns:
+  async throws Void
+
+Does:
+  Creates the native RAG pipeline from a configuration.
+
+
+18.4 ragDestroyPipeline
+
+Name:
+  RunAnywhere.ragDestroyPipeline()
+
+Arguments:
+  None
+
+Returns:
+  async Void
+
+Does:
+  Destroys the active RAG pipeline and releases its resources.
+
+
+18.5 ragIngest, text overload
+
+Name:
+  RunAnywhere.ragIngest(
+      text: String,
+      metadataJSON: String? = nil
+  )
+
+Arguments:
+  text          Document text.
+  metadataJSON  Optional JSON metadata stored with the document chunks.
+
+Returns:
+  async throws Void
+
+Does:
+  Splits, embeds, and indexes one text document.
+
+
+18.6 ragIngest, document overload
+
+Name:
+  RunAnywhere.ragIngest(_ document: RARAGDocument)
+
+Arguments:
+  document  Generated RAG document with text, ID, and metadata.
+
+Returns:
+  async throws RARAGStatistics
+
+Does:
+  Adds one generated document to the active RAG index and returns index stats.
+
+
+18.7 ragAddDocumentsBatch
+
+Name:
+  RunAnywhere.ragAddDocumentsBatch(
+      documents: [RARAGDocument]
+  )
+
+Arguments:
+  documents  Documents to ingest.
+
+Returns:
+  async throws Void
+
+Does:
+  Adds each document to the active RAG index.
+
+
+18.8 ragGetDocumentCount
+
+Name:
+  RunAnywhere.ragGetDocumentCount()
+
+Arguments:
+  None
+
+Returns:
+  async Int
+
+Does:
+  Returns the number of indexed chunks. Returns zero when no pipeline is ready.
+
+
+18.9 ragGetStatistics
+
+Name:
+  RunAnywhere.ragGetStatistics()
+
+Arguments:
+  None
+
+Returns:
+  async throws RARAGStatistics
+
+Does:
+  Returns indexed document, chunk, token, path, and update statistics.
+
+
+18.10 ragClearDocuments
+
+Name:
+  RunAnywhere.ragClearDocuments()
+
+Arguments:
+  None
+
+Returns:
+  async throws Void
+
+Does:
+  Removes all documents and chunks from the active RAG index.
+
+
+18.11 ragQuery, question overload
+
+Name:
+  RunAnywhere.ragQuery(
+      question: String,
+      options: RARAGQueryOptions? = nil
+  )
+
+Arguments:
+  question  User question.
+  options   Optional retrieval and generation settings.
+
+Returns:
+  async throws RARAGResult
+
+Does:
+  Retrieves relevant chunks and generates an answer grounded in those chunks.
+
+
+18.12 ragQuery, request overload
+
+Name:
+  RunAnywhere.ragQuery(_ options: RARAGQueryOptions)
+
+Arguments:
+  options  Question, retrieval limits, filters, and generation settings.
+
+Returns:
+  async throws RARAGResult
+
+Does:
+  Queries the active RAG pipeline with the generated request type.
+
+
+Associated property:
+  RunAnywhere.ragDocumentCount: Int
+
+
+19. AUDIO CONVERSION
+====================
+
+19.1 pcm16ToFloat32
+
+Name:
+  RunAnywhere.pcm16ToFloat32(_ int16Data: Data)
+
+Arguments:
+  int16Data  Little-endian signed PCM16 audio bytes.
+
+Returns:
+  Data
+
+Does:
+  Converts PCM16 samples to normalized Float32 sample bytes.
+
+
+19.2 pcm16ToFloat32Samples
+
+Name:
+  RunAnywhere.pcm16ToFloat32Samples(_ int16Data: Data)
+
+Arguments:
+  int16Data  Little-endian signed PCM16 audio bytes.
+
+Returns:
+  [Float]
+
+Does:
+  Converts PCM16 bytes to normalized Float32 sample values.
+
+
+19.3 pcm16ToWav
+
+Name:
+  RunAnywhere.pcm16ToWav(
+      _ int16Data: Data,
+      sampleRate: Int
+  )
+
+Arguments:
+  int16Data  Mono PCM16 sample bytes.
+  sampleRate Audio sample rate in hertz.
+
+Returns:
+  Data
+
+Does:
+  Adds a WAV header to mono PCM16 data.
+
+
+20. SOLUTIONS
+=============
+
+20.1 run, serialized configuration
+
+Name:
+  RunAnywhere.solutions.run(configBytes: Data)
+
+Arguments:
+  configBytes  Serialized RASolutionConfig or pipeline specification.
+
+Returns:
+  async throws SolutionHandle
+
+Does:
+  Creates a native solution graph and returns its lifecycle handle.
+
+
+20.2 run, typed configuration
+
+Name:
+  RunAnywhere.solutions.run(config: RASolutionConfig)
+
+Arguments:
+  config  Generated solution configuration.
+
+Returns:
+  async throws SolutionHandle
+
+Does:
+  Serializes the configuration, creates a native solution graph, and returns
+  its handle.
+
+
+20.3 run, YAML configuration
+
+Name:
+  RunAnywhere.solutions.run(yaml: String)
+
+Arguments:
+  yaml  Solution or pipeline configuration as YAML.
+
+Returns:
+  async throws SolutionHandle
+
+Does:
+  Creates a native solution graph from YAML and returns its lifecycle handle.
+
+
+21. PLUGIN LOADING
+==================
+
+21.1 load
+
+Name:
+  RunAnywhere.pluginLoader.load(path: String)
+
+Arguments:
+  path  File-system path to a dynamic plugin.
+
+Returns:
+  throws RAPluginInfo
+
+Does:
+  Loads the plugin and returns its registered metadata.
+
+
+21.2 unload
+
+Name:
+  RunAnywhere.pluginLoader.unload(name: String)
+
+Arguments:
+  name  Registered plugin name.
+
+Returns:
+  throws Void
+
+Does:
+  Unloads a dynamic plugin by name.
+
+
+21.3 registeredNames
+
+Name:
+  RunAnywhere.pluginLoader.registeredNames()
+
+Arguments:
+  None
+
+Returns:
+  [String]
+
+Does:
+  Lists plugin names registered with the native plugin API.
+
+
+21.4 listLoaded
+
+Name:
+  RunAnywhere.pluginLoader.listLoaded()
+
+Arguments:
+  None
+
+Returns:
+  [RAPluginInfo]
+
+Does:
+  Lists metadata for plugins loaded by this process.
+
+
+APPENDIX A. EVENTBUS FUNCTIONS
+==============================
+
+A.1 EventBus.start()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Starts forwarding native events into Combine publishers.
+
+
+A.2 EventBus.stop()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Stops native event forwarding and releases the subscription.
+
+
+A.3 EventBus.publish(_ event: RASDKEvent)
+
+Arguments:
+  event  Event to publish to local subscribers.
+
+Returns:
+  Void
+
+Does:
+  Sends an event through the local event subject.
+
+
+A.4 EventBus.events(for category: RAEventCategory)
+
+Arguments:
+  category  Event category to retain.
+
+Returns:
+  AnyPublisher<RASDKEvent, Never>
+
+Does:
+  Returns a Combine publisher filtered to one category.
+
+
+A.5 EventBus.on(_ handler: @escaping (RASDKEvent) -> Void)
+
+Arguments:
+  handler  Closure called for each event.
+
+Returns:
+  AnyCancellable
+
+Does:
+  Subscribes a closure to all local SDK events.
+
+
+A.6 EventBus.on(
+    _ category: RAEventCategory,
+    handler: @escaping (RASDKEvent) -> Void
+)
+
+Arguments:
+  category  Event category to retain.
+  handler   Closure called for matching events.
+
+Returns:
+  AnyCancellable
+
+Does:
+  Subscribes a closure to events in one category.
+
+
+A.7 EventBus.modelLifecycleChange
+
+Name:
+  EventBus.modelLifecycleChange(from event: RASDKEvent)
+
+Arguments:
+  event  SDK event that may contain a model lifecycle payload.
+
+Returns:
+  RAModelLifecycleChange?
+
+Does:
+  Extracts a typed model lifecycle change from an SDK event.
+
+
+APPENDIX B. SOLUTION HANDLE FUNCTIONS
+=====================================
+
+B.1 SolutionHandle.start()
+
+Arguments:
+  None
+
+Returns:
+  throws Void
+
+Does:
+  Starts the native solution scheduler.
+
+
+B.2 SolutionHandle.stop()
+
+Arguments:
+  None
+
+Returns:
+  throws Void
+
+Does:
+  Requests a graceful stop.
+
+
+B.3 SolutionHandle.cancel()
+
+Arguments:
+  None
+
+Returns:
+  throws Void
+
+Does:
+  Cancels the solution graph.
+
+
+B.4 SolutionHandle.feed(_ item: String)
+
+Arguments:
+  item  UTF-8 input sent to the graph's root input edge.
+
+Returns:
+  throws Void
+
+Does:
+  Feeds one input item into the running solution.
+
+
+B.5 SolutionHandle.closeInput()
+
+Arguments:
+  None
+
+Returns:
+  throws Void
+
+Does:
+  Marks the solution's root input stream complete.
+
+
+B.6 SolutionHandle.destroy()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Cancels, joins, and frees the native solution. The operation is idempotent.
+
+
+APPENDIX C. HYBRID OFFLINE/CLOUD STT
+====================================
+
+C.1 HybridModel.offlineSherpa(_ id: String)
+
+Arguments:
+  id  Offline Sherpa model ID.
+
+Returns:
+  HybridModel
+
+Does:
+  Creates a descriptor for an offline Sherpa speech model.
+
+
+C.2 HybridModel.onlineCloud(
+    _ id: String,
+    provider: String = Cloud.defaultProvider
+)
+
+Arguments:
+  id        Cloud model registry ID.
+  provider  Cloud provider name.
+
+Returns:
+  HybridModel
+
+Does:
+  Creates a descriptor for a cloud speech model.
+
+
+C.3 HybridSTTRouter.setPair(
+    offline: HybridModel,
+    online: HybridModel,
+    policy: HybridRoutingPolicy
+)
+
+Arguments:
+  offline  Offline speech model.
+  online   Cloud speech model.
+  policy   Filters, cascade, and ranking rules.
+
+Returns:
+  throws Void
+
+Does:
+  Configures the two speech backends and their routing policy.
+
+
+C.4 HybridSTTRouter.transcribe(
+    _ audio: Data,
+    options: HybridTranscribeOptions = .init()
+)
+
+Arguments:
+  audio    Audio to transcribe.
+  options  Hybrid transcription settings.
+
+Returns:
+  throws HybridTranscribeResult
+
+Does:
+  Routes the audio to an eligible backend and returns the transcript plus
+  routing metadata.
+
+
+C.5 HybridSTTRouter.cancel()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Cancels the router's active transcription.
+
+
+C.6 HybridSTTRouter.close()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Releases the router and its native resources.
+
+
+C.7 Cloud.register()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Registers the cloud STT backend with the native runtime.
+
+
+C.8 Cloud.unregister()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Unregisters the cloud STT backend.
+
+
+C.9 Cloud.register(
+    id: String,
+    provider: String = defaultProvider,
+    model: String,
+    apiKey: String,
+    languageCode: String? = nil,
+    baseURL: String? = nil,
+    timeoutMs: Int? = nil
+)
+
+Arguments:
+  id            Local registry ID.
+  provider      Cloud provider name.
+  model         Provider model name.
+  apiKey        Provider API key.
+  languageCode  Optional language code.
+  baseURL       Optional provider base URL.
+  timeoutMs     Optional request timeout in milliseconds.
+
+Returns:
+  Void
+
+Does:
+  Stores a cloud transcription model configuration.
+
+
+C.10 Cloud.lookup(_ id: String)
+
+Arguments:
+  id  Cloud model registry ID.
+
+Returns:
+  Cloud.ModelEntry?
+
+Does:
+  Returns a registered cloud model configuration.
+
+
+C.11 Cloud.isRegistered(_ id: String)
+
+Arguments:
+  id  Cloud model registry ID.
+
+Returns:
+  Bool
+
+Does:
+  Reports whether the cloud model ID is registered.
+
+
+C.12 Cloud.unregisterModel(_ id: String)
+
+Arguments:
+  id  Cloud model registry ID.
+
+Returns:
+  Bool
+
+Does:
+  Removes one cloud model configuration and reports whether it existed.
+
+
+C.13 Cloud.clear()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Removes all cloud model configurations.
+
+
+C.14 Cloud.registerProvider(
+    _ name: String,
+    _ handler: @escaping SttProviderHandler
+)
+
+Arguments:
+  name     Provider name.
+  handler  Closure that performs the cloud transcription request.
+
+Returns:
+  Bool
+
+Does:
+  Registers a custom cloud STT provider callback.
+
+
+C.15 Cloud.unregisterProvider(_ name: String)
+
+Arguments:
+  name  Provider name.
+
+Returns:
+  Void
+
+Does:
+  Removes a custom cloud STT provider callback.
+
+
+C.16 HybridDeviceState.setProvider(
+    _ provider: HybridDeviceStateProvider?
+)
+
+Arguments:
+  provider  Object that supplies connectivity, battery, and thermal state.
+
+Returns:
+  Bool
+
+Does:
+  Installs or clears the device-state provider used by hybrid routing.
+
+
+C.17 HybridDeviceState.clear()
+
+Arguments:
+  None
+
+Returns:
+  Bool
+
+Does:
+  Clears the hybrid device-state provider.
+
+
+C.18 HybridRoutingPolicy.filter(_ filter: HybridFilter)
+
+Arguments:
+  filter  Hard eligibility rule.
+
+Returns:
+  HybridRoutingPolicy
+
+Does:
+  Creates a policy containing one hard filter.
+
+
+C.19 HybridRoutingPolicy.cascade(_ cascade: HybridCascade)
+
+Arguments:
+  cascade  Ordered fallback rule.
+
+Returns:
+  HybridRoutingPolicy
+
+Does:
+  Creates a policy containing one cascade rule.
+
+
+C.20 HybridRoutingPolicy.rank(_ rank: HybridRank)
+
+Arguments:
+  rank  Backend ranking strategy.
+
+Returns:
+  HybridRoutingPolicy
+
+Does:
+  Creates a policy containing one ranking strategy.
+
+
+HybridDeviceStateProvider protocol requirements:
+
+  isOnline() -> Bool
+    Returns the device's network reachability state.
+
+  batteryPercent() -> Int32
+    Returns battery charge from 0 through 100.
+
+  isThermalThrottled() -> Bool
+    Reports whether thermal limits should affect routing.
+
+
+APPENDIX D. BACKEND REGISTRATION
+================================
+
+D.1 LlamaCPP.register(priority: Int = 100)
+
+Arguments:
+  priority  Backend selection priority.
+
+Returns:
+  Void
+
+Does:
+  Registers the llama.cpp runtime with the native backend registry.
+
+
+D.2 LlamaCPP.unregister()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Unregisters the llama.cpp runtime.
+
+
+D.3 ONNX.register(priority: Int = 100)
+
+Arguments:
+  priority  Backend selection priority.
+
+Returns:
+  Void
+
+Does:
+  Registers the ONNX runtime with the native backend registry.
+
+
+D.4 ONNX.unregister()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Unregisters the ONNX runtime.
+
+
+APPENDIX E. PUBLIC IMAGE FACTORIES
+==================================
+
+E.1 RAVLMConfiguration.defaults(modelId: String = "")
+
+Arguments:
+  modelId  Optional vision-language model ID.
+
+Returns:
+  RAVLMConfiguration
+
+Does:
+  Creates a vision-language configuration with SDK defaults.
+
+
+E.2 RAVLMGenerationOptions.defaults(prompt: String = "")
+
+Arguments:
+  prompt  Optional image prompt.
+
+Returns:
+  RAVLMGenerationOptions
+
+Does:
+  Creates vision-language generation options with SDK defaults.
+
+
+E.3 RAVLMImage.fromEncoded(
+    _ data: Data,
+    format: RAVLMImageFormat
+)
+
+Arguments:
+  data    Encoded image bytes.
+  format  Image encoding.
+
+Returns:
+  RAVLMImage
+
+Does:
+  Creates a vision-language image from encoded bytes.
+
+
+E.4 RAVLMImage.fromFilePath(_ path: String)
+
+Arguments:
+  path  Image file path.
+
+Returns:
+  RAVLMImage
+
+Does:
+  Creates a file-backed vision-language image.
+
+
+E.5 RAVLMImage.fromBase64(_ base64: String)
+
+Arguments:
+  base64  Base64-encoded image string.
+
+Returns:
+  RAVLMImage
+
+Does:
+  Creates a vision-language image from a Base64 string.
+
+
+E.6 RAVLMImage.fromRawRGB(
+    _ data: Data,
+    width: Int,
+    height: Int
+)
+
+Arguments:
+  data    Packed RGB bytes.
+  width   Image width in pixels.
+  height  Image height in pixels.
+
+Returns:
+  RAVLMImage
+
+Does:
+  Creates a vision-language image from raw RGB pixels.
+
+
+E.7 RAVLMImage.fromRawRGBA(
+    _ data: Data,
+    width: Int,
+    height: Int
+)
+
+Arguments:
+  data    Packed RGBA bytes.
+  width   Image width in pixels.
+  height  Image height in pixels.
+
+Returns:
+  RAVLMImage
+
+Does:
+  Creates a vision-language image from raw RGBA pixels.
+
+
+E.8 RAVLMImage.fromCGImage(_ cgImage: CGImage)
+
+Arguments:
+  cgImage  Core Graphics image.
+
+Returns:
+  RAVLMImage?
+
+Does:
+  Converts a CGImage into the SDK image format.
+
+
+E.9 RAVLMImage.fromUIImage(_ image: UIImage)
+
+Arguments:
+  image  UIKit image.
+
+Returns:
+  RAVLMImage?
+
+Does:
+  Converts a UIImage into the SDK image format.
+
+
+E.10 RAVLMImage.fromNSImage(_ image: NSImage)
+
+Arguments:
+  image  AppKit image.
+
+Returns:
+  RAVLMImage?
+
+Does:
+  Converts an NSImage into the SDK image format.
+
+
+E.11 RAVLMImage.fromPixelBuffer(_ buffer: CVPixelBuffer)
+
+Arguments:
+  buffer  Core Video pixel buffer.
+
+Returns:
+  RAVLMImage?
+
+Does:
+  Converts a pixel buffer into the SDK image format.
+
+
+APPENDIX F. APPLE AUDIO SERVICE FUNCTIONS
+=========================================
+
+F.1 AudioCaptureManager.requestPermission()
+
+Arguments:
+  None
+
+Returns:
+  async Bool
+
+Does:
+  Requests microphone permission and reports whether the app may record.
+
+
+F.2 AudioCaptureManager.startRecording(
+    onAudioData: @escaping @Sendable (Data) -> Void
+)
+
+Arguments:
+  onAudioData  Closure that receives recorded PCM audio chunks.
+
+Returns:
+  async throws Void
+
+Does:
+  Configures the audio engine and starts microphone capture.
+
+
+F.3 AudioCaptureManager.activateAudioSession()
+
+Arguments:
+  None
+
+Returns:
+  async throws Void
+
+Does:
+  Activates the Apple audio session used for capture.
+
+
+F.4 AudioCaptureManager.deactivateAudioSession()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Deactivates the Apple audio session.
+
+
+F.5 AudioCaptureManager.stopRecording(
+    deactivateSession: Bool = true
+)
+
+Arguments:
+  deactivateSession  Deactivates the audio session after capture when true.
+
+Returns:
+  Void
+
+Does:
+  Stops microphone capture and removes the audio tap.
+
+
+F.6 AudioPlaybackManager.play(_ audioData: Data)
+
+Arguments:
+  audioData  Encoded or WAV audio to play.
+
+Returns:
+  async throws Void
+
+Does:
+  Starts audio playback and waits for setup to succeed.
+
+
+F.7 AudioPlaybackManager.play(
+    _ audioData: Data,
+    completion: @escaping (Bool) -> Void
+)
+
+Arguments:
+  audioData  Audio to play.
+  completion Reports whether playback completed successfully.
+
+Returns:
+  Void
+
+Does:
+  Starts audio playback and reports completion through a closure.
+
+
+F.8 AudioPlaybackManager.stop()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Stops active playback.
+
+
+F.9 AudioPlaybackManager.pause()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Pauses active playback.
+
+
+F.10 AudioPlaybackManager.resume()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Resumes paused playback.
+
+
+APPENDIX G. PUBLIC VALUE AND REQUEST HELPERS
+============================================
+
+G.1 RASTTLanguage.fromBcp47(_ raw: String)
+
+Arguments:
+  raw  BCP-47 language tag such as en-US.
+
+Returns:
+  RASTTLanguage
+
+Does:
+  Maps a language tag to the SDK speech-language enum.
+
+
+G.2 RAStructuredOutputOptions.defaults(
+    schema: RAJSONSchema,
+    includeSchemaInPrompt: Bool = true,
+    strict: Bool = false
+)
+
+Arguments:
+  schema                 JSON schema to apply.
+  includeSchemaInPrompt  Adds the schema to the prompt when true.
+  strict                 Enables strict validation when true.
+
+Returns:
+  RAStructuredOutputOptions
+
+Does:
+  Creates structured-output options with SDK defaults.
+
+
+G.3 RAToolValue.array(_ values: [RAToolValue])
+
+Arguments:
+  values  Tool values stored in the array.
+
+Returns:
+  RAToolValue
+
+Does:
+  Creates a tool value containing an array.
+
+
+G.4 RAToolValue.object(_ fields: [String: RAToolValue])
+
+Arguments:
+  fields  Object field names and values.
+
+Returns:
+  RAToolValue
+
+Does:
+  Creates a tool value containing an object.
+
+
+G.5 RAToolValue.toJSONString(pretty: Bool = false)
+
+Arguments:
+  pretty  Adds indentation when true.
+
+Returns:
+  String?
+
+Does:
+  Serializes a tool value to JSON.
+
+
+G.6 RAToolValue.parseObjectJSON(_ json: String)
+
+Arguments:
+  json  JSON object text.
+
+Returns:
+  throws [String: RAToolValue]
+
+Does:
+  Parses a JSON object into SDK tool values.
+
+
+G.7 RAToolValue.jsonString(
+    from object: [String: RAToolValue]
+)
+
+Arguments:
+  object  Tool-value object to serialize.
+
+Returns:
+  String
+
+Does:
+  Serializes a tool-value object to compact JSON.
+
+
+G.8 RAToolCallingOptions.defaults()
+
+Arguments:
+  None
+
+Returns:
+  RAToolCallingOptions
+
+Does:
+  Creates tool-calling options with SDK defaults.
+
+
+G.9 RARAGConfiguration.resolvingLifecycleArtifacts(
+    embedding: RAModelLoadResult,
+    llm: RAModelLoadResult
+)
+
+Arguments:
+  embedding  Loaded embedding-model result.
+  llm        Loaded language-model result.
+
+Returns:
+  throws RARAGConfiguration
+
+Does:
+  Copies resolved model artifact paths into a RAG configuration.
+
+
+G.10 RARAGQueryOptions.defaults(question: String)
+
+Arguments:
+  question  Question to store in the request.
+
+Returns:
+  RARAGQueryOptions
+
+Does:
+  Creates RAG query options with SDK defaults.
+
+
+G.11 RAEmbeddingVector.cosineSimilarity(
+    with other: RAEmbeddingVector
+)
+
+Arguments:
+  other  Vector to compare.
+
+Returns:
+  Float
+
+Does:
+  Computes cosine similarity between two embedding vectors.
+
+
+G.12 RAEmbeddingVector.computeNorm()
+
+Arguments:
+  None
+
+Returns:
+  Float
+
+Does:
+  Computes the vector's L2 norm.
+
+
+G.13 Collection<RAModelFileDescriptor>.resolvedModelFilePath(
+    role: RAModelFileRole
+)
+
+Arguments:
+  role  Artifact role to locate.
+
+Returns:
+  String?
+
+Does:
+  Returns the first matching local artifact path in the collection.
+
+
+G.14 RAModelLoadResult.resolvedModelFilePath(
+    role: RAModelFileRole
+)
+
+Arguments:
+  role  Artifact role to locate.
+
+Returns:
+  String?
+
+Does:
+  Returns a matching artifact path from a model load result.
+
+
+G.15 RACurrentModelResult.resolvedModelFilePath(
+    role: RAModelFileRole
+)
+
+Arguments:
+  role  Artifact role to locate.
+
+Returns:
+  String?
+
+Does:
+  Returns a matching artifact path from the current model result.
+
+
+G.16 RAModelInfo.make(
+    id: String,
+    name: String,
+    category: ModelCategory,
+    format: ModelFormat,
+    framework: InferenceFramework,
+    downloadURL: URL? = nil,
+    localPath: URL? = nil,
+    artifact: RAModelInfo.OneOf_Artifact? = nil,
+    downloadSizeBytes: Int64? = nil,
+    contextLength: Int? = nil,
+    supportsThinking: Bool = false,
+    thinkingPattern: RAThinkingTagPattern? = nil,
+    description: String? = nil,
+    source: ModelSource = .remote,
+    createdAt: Date = Date(),
+    updatedAt: Date = Date()
+)
+
+Arguments:
+  id, name             Model identity.
+  category             Model category.
+  format               Model file format.
+  framework            Inference backend.
+  downloadURL          Optional remote URL.
+  localPath            Optional local path.
+  artifact             Optional typed artifact description.
+  downloadSizeBytes    Optional download size.
+  contextLength        Optional context length.
+  supportsThinking     Thinking-output support flag.
+  thinkingPattern      Optional thinking-tag pattern.
+  description          Optional model description.
+  source               Model source.
+  createdAt, updatedAt Registry timestamps.
+
+Returns:
+  RAModelInfo
+
+Does:
+  Creates a generated model record from Swift-friendly values.
+
+
+G.17 RAModelInfo.inferredArtifact(
+    from url: URL?,
+    format: ModelFormat
+)
+
+Arguments:
+  url     Optional model URL.
+  format  Model format.
+
+Returns:
+  RAModelInfo.OneOf_Artifact
+
+Does:
+  Infers the typed model artifact representation from a URL and format.
+
+
+G.18 RAModelInfo.registryPathString(from url: URL)
+
+Arguments:
+  url  File or directory URL.
+
+Returns:
+  String
+
+Does:
+  Converts a URL into the path string stored in the model registry.
+
+
+G.19 RAModelInfo.registryURL(from value: String)
+
+Arguments:
+  value  Registry path or URL string.
+
+Returns:
+  URL?
+
+Does:
+  Converts a stored registry string into a URL.
+
+
+G.20 RAModelFormat.fromWireString(_ raw: String)
+
+Arguments:
+  raw  Serialized model-format value.
+
+Returns:
+  RAModelFormat?
+
+Does:
+  Parses a wire-format model name.
+
+
+G.21 RAArchiveType.fromWireString(_ raw: String)
+
+Arguments:
+  raw  Serialized archive-type value.
+
+Returns:
+  RAArchiveType?
+
+Does:
+  Parses a wire-format archive type.
+
+
+G.22 RAArchiveType.from(url: URL)
+
+Arguments:
+  url  Archive file URL.
+
+Returns:
+  RAArchiveType?
+
+Does:
+  Infers the archive type from the file extension.
+
+
+G.23 RAStorageAvailability.make(
+    isAvailable: Bool,
+    requiredBytes: Int64,
+    availableBytes: Int64,
+    recommendation: String? = nil
+)
+
+Arguments:
+  isAvailable     Whether enough storage exists.
+  requiredBytes   Required storage in bytes.
+  availableBytes  Available storage in bytes.
+  recommendation  Optional user-facing recommendation.
+
+Returns:
+  RAStorageAvailability
+
+Does:
+  Creates a generated storage-availability value.
+
+
+G.24 RALoraAdapterCatalogEntry.toLoraArtifactModelInfo()
+
+Arguments:
+  None
+
+Returns:
+  RAModelInfo
+
+Does:
+  Converts a LoRA catalog entry into the model record used by the download and
+  storage APIs.
+
+
+G.25 RAInferenceFramework.toCFramework()
+
+Arguments:
+  None
+
+Returns:
+  rac_inference_framework_t
+
+Does:
+  Converts the generated Swift framework enum to the C ABI framework enum.
+
+
+G.26 RAInferenceFramework.fromCFramework(
+    _ cFramework: rac_inference_framework_t
+)
+
+Arguments:
+  cFramework  C ABI framework enum.
+
+Returns:
+  RAInferenceFramework
+
+Does:
+  Converts the C ABI framework enum to the generated Swift enum.
+
+
+APPENDIX H. APPLE SYSTEM MODEL SERVICES
+=======================================
+
+H.1 SystemFoundationModelsService.initialize(
+    modelPath: String?
+)
+
+Arguments:
+  modelPath  Ignored by the Apple system-model implementation.
+
+Returns:
+  async throws Void
+
+Does:
+  Checks Apple Foundation Models availability and prepares a system session.
+
+
+H.2 SystemFoundationModelsService.generate(
+    prompt: String,
+    options: RALLMGenerationOptions
+)
+
+Arguments:
+  prompt   Text prompt.
+  options  Generation settings supported by the system model.
+
+Returns:
+  async throws String
+
+Does:
+  Generates a complete response with Apple's on-device system model.
+
+
+H.3 SystemFoundationModelsService.streamGenerate(
+    prompt: String,
+    options: RALLMGenerationOptions,
+    onToken: @escaping (String) -> Void
+)
+
+Arguments:
+  prompt    Text prompt.
+  options   Generation settings supported by the system model.
+  onToken   Closure called with streamed text updates.
+
+Returns:
+  async throws Void
+
+Does:
+  Streams text updates from Apple's on-device system model through the
+  callback.
+
+
+H.4 SystemFoundationModelsService.cleanup()
+
+Arguments:
+  None
+
+Returns:
+  async Void
+
+Does:
+  Releases the active Foundation Models session.
+
+
+H.5 SystemTTSService.stop()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Stops speech generated through Apple's system speech synthesizer.
+
+
+Associated SystemFoundationModels properties:
+
+  SystemFoundationModels.isAvailable: Bool
+  SystemFoundationModels.unavailableReason: String?
+
+
+APPENDIX I. URLSESSION HTTP TRANSPORT
+=====================================
+
+I.1 URLSessionHttpTransport.register()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Registers Apple's URLSession as the HTTP transport used by the native core.
+
+
+I.2 URLSessionHttpTransport.unregister()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Removes the URLSession transport and restores the default native transport.
+
+
+I.3 URLSessionHttpTransport.register(
+    streamingSession session: URLSession?
+)
+
+Arguments:
+  session  Custom streaming session, or nil to restore per-call sessions.
+
+Returns:
+  Void
+
+Does:
+  Sets the URLSession used for streaming and resumable downloads.
+
+
+I.4 URLSessionHttpTransport.cancelAllStreams()
+
+Arguments:
+  None
+
+Returns:
+  Void
+
+Does:
+  Cancels all streaming HTTP tasks owned by the transport.
+
+
+SOURCE BOUNDARY CHECK
+=====================
+
+The following names were found by an earlier text scrape but are private:
+
+  RunAnywhere.resolveModelForDownload
+  RunAnywhere.planDownload
+  RunAnywhere.generatedModelID
+  RunAnywhere.cancelNativeDownload
+  RunAnywhere.reportDownloadProgress
+  RunAnywhere.loadRAGArtifactModel
+
+They do not belong in the current public API catalog.
+
+The module also marks implementation types such as CppBridge, SDKLogger,
+SentryManager, HTTPClientAdapter, KeychainManager, FileOperationsUtilities,
+ComponentActor, and HandleStreamAdapter public. This catalog treats those as
+implementation or advanced infrastructure rather than the application SDK
+surface. The naming review should decide whether to make them internal.
+
+Use swift-api-naming-proposal.txt only after the team approves this factual
+inventory.
