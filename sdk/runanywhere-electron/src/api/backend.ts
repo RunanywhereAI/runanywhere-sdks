@@ -236,6 +236,7 @@ export interface RaBackend {
   ragOpen(configBytes: Uint8Array): Promise<string>;
   ragIngest(session: string, documentBytes: Uint8Array): Promise<Uint8Array>;
   ragQuery(session: string, queryBytes: Uint8Array): Promise<Uint8Array>;
+  ragSearch(session: string, requestBytes: Uint8Array): Promise<Uint8Array>;
   ragQueryStream(
     session: string,
     queryBytes: Uint8Array,
@@ -305,6 +306,7 @@ export const BACKEND_METHODS: readonly string[] = [
   'ragOpen',
   'ragIngest',
   'ragQuery',
+  'ragSearch',
   'ragQueryStream',
   'ragStats',
   'ragClear',

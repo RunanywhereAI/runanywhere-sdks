@@ -5789,6 +5789,55 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryProto(JNIEnv
 }
 
 JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSearchProto(JNIEnv* env, jclass clazz,
+                                                                           jlong handle,
+                                                                           jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (handle == 0L || !request.ok)
+        return nullptr;
+    using Fn = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t, rac_proto_buffer_t*);
+    Fn searchRag = optionalNativeSymbol<Fn>("rac_rag_search_proto");
+    if (searchRag == nullptr)
+        return makeFeatureUnavailableResult(env, "racRagSearchProto");
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = searchRag(handleFromJLong(handle), request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racRagSearchProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagSearchRequestProto(
+    JNIEnv* env, jclass clazz, jlong requestId, jlong handle, jbyteArray requestProto) {
+    (void)clazz;
+    if (requestId <= 0L)
+        return nullptr;
+    const uint64_t request_id = static_cast<uint64_t>(requestId);
+    const auto start = g_rag_request_relay.start(request_id);
+    if (start != rac::jni::RequestCancellationRelay::StartResult::kRun) {
+        rac_proto_buffer_t result = {};
+        rac_proto_buffer_init(&result);
+        const rac_result_t rc = start == rac::jni::RequestCancellationRelay::StartResult::kCancelled
+                                    ? RAC_ERROR_CANCELLED
+                                    : RAC_ERROR_INVALID_STATE;
+        return makeProtoCallResult(env, rc, &result, "racRagSearchRequestProto");
+    }
+    rac::jni::RequestCompletionGuard completion(&g_rag_request_relay, request_id);
+
+    JByteArrayView request(env, requestProto);
+    if (handle == 0L || !request.ok)
+        return nullptr;
+    using Fn = rac_result_t (*)(rac_handle_t, const uint8_t*, size_t, rac_proto_buffer_t*);
+    Fn searchRag = optionalNativeSymbol<Fn>("rac_rag_search_proto");
+    if (searchRag == nullptr)
+        return makeFeatureUnavailableResult(env, "racRagSearchRequestProto");
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = searchRag(handleFromJLong(handle), request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racRagSearchRequestProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRagQueryRequestProto(
     JNIEnv* env, jclass clazz, jlong requestId, jlong handle, jbyteArray queryProto) {
     (void)clazz;

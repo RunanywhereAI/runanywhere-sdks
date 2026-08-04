@@ -159,6 +159,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("ragDestroyPipelineProto", &HybridRunAnywhereCoreSpec::ragDestroyPipelineProto);
       prototype.registerHybridMethod("ragIngestProto", &HybridRunAnywhereCoreSpec::ragIngestProto);
       prototype.registerHybridMethod("ragQueryProto", &HybridRunAnywhereCoreSpec::ragQueryProto);
+      prototype.registerHybridMethod("ragSearchProto", &HybridRunAnywhereCoreSpec::ragSearchProto);
       prototype.registerHybridMethod("ragQueryStreamProto", &HybridRunAnywhereCoreSpec::ragQueryStreamProto);
       prototype.registerHybridMethod("ragCancelProto", &HybridRunAnywhereCoreSpec::ragCancelProto);
       prototype.registerHybridMethod("ragClearProto", &HybridRunAnywhereCoreSpec::ragClearProto);

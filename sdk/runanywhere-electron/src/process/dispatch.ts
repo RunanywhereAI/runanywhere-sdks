@@ -79,6 +79,7 @@ export const ALLOWED_RPC_METHODS: ReadonlySet<string> = new Set([
   'ragCreateSession',
   'ragIngest',
   'ragQuery',
+  'ragSearch',
   'ragStats',
   'ragClear',
   'ragDestroySession',

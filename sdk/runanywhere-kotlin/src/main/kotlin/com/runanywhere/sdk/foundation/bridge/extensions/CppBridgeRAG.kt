@@ -11,6 +11,8 @@ import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
+import ai.runanywhere.proto.v1.RAGSearchRequest
+import ai.runanywhere.proto.v1.RAGSearchResponse
 import ai.runanywhere.proto.v1.RAGStatistics
 import ai.runanywhere.proto.v1.RAGStreamEvent
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -24,6 +26,10 @@ import com.squareup.wire.ProtoAdapter
 
 internal data class NativeRAGQueryRequest(
     val queryProto: ByteArray,
+)
+
+internal data class NativeRAGSearchRequest(
+    val requestProto: ByteArray,
 )
 
 object CppBridgeRAG {
@@ -64,6 +70,12 @@ object CppBridgeRAG {
     internal fun prepareQuery(options: RAGQueryOptions): NativeRAGQueryRequest =
         NativeRAGQueryRequest(
             queryProto = RAGQueryOptions.ADAPTER.encode(options),
+        )
+
+    /** Encode immutable retrieval-only search request before cancellable JNI admission. */
+    internal fun prepareSearch(request: RAGSearchRequest): NativeRAGSearchRequest =
+        NativeRAGSearchRequest(
+            requestProto = RAGSearchRequest.ADAPTER.encode(request),
         )
 
     internal fun queryRequest(
@@ -184,6 +196,17 @@ object CppBridgeRAG {
             RAGResult.ADAPTER,
             RunAnywhereBridge.racRagQueryRequestProto(requestId, handle, request.queryProto),
             "racRagQueryRequestProto",
+        )
+
+    internal fun searchOn(
+        handle: Long,
+        requestId: Long,
+        request: NativeRAGSearchRequest,
+    ): RAGSearchResponse =
+        decodeOrThrow(
+            RAGSearchResponse.ADAPTER,
+            RunAnywhereBridge.racRagSearchRequestProto(requestId, handle, request.requestProto),
+            "racRagSearchRequestProto",
         )
 
     internal fun queryStreamOn(

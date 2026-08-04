@@ -17,6 +17,8 @@ import type {
   RAGConfiguration,
   RAGQueryOptions,
   RAGResult,
+  RAGSearchRequest,
+  RAGSearchResponse,
   RAGStatistics,
   RAGStreamEvent as RAGStreamEventType,
 } from '@runanywhere/proto-ts/rag';
@@ -34,6 +36,8 @@ import {
   RAGDocument,
   RAGQueryOptions as RAGQueryOptionsMessage,
   RAGResult as RAGResultMessage,
+  RAGSearchRequest as RAGSearchRequestMessage,
+  RAGSearchResponse as RAGSearchResponseMessage,
   RAGStatistics as RAGStatisticsMessage,
   RAGStreamEvent as RAGStreamEventMessage,
   RAGStreamEventKind,
@@ -208,6 +212,38 @@ export async function ragQuery(
     encodeProtoMessage(queryOptions, RAGQueryOptionsMessage)
   );
   return decodeRequired(resultBytes, RAGResultMessage.decode, 'ragQueryProto');
+}
+
+/**
+ * Retrieval-only search via `rac_rag_search_proto` — no LLM generation.
+ *
+ * Matches Swift: `RagSession.search` / `CppBridge.RAG.search`.
+ *
+ * @throws SDKException.featureNotAvailable when the native module predates
+ *   `ragSearchProto` / `rac_rag_search_proto`.
+ */
+export async function ragSearch(
+  request: RAGSearchRequest
+): Promise<RAGSearchResponse> {
+  requireInitialized();
+  const native = ensureNative();
+  if (typeof native.ragSearchProto !== 'function') {
+    throw SDKException.featureNotAvailable(
+      'rag.search (rac_rag_search_proto)'
+    );
+  }
+  await ensureServicesReady();
+  const resultBytes = await native.ragSearchProto(
+    encodeProtoMessage(
+      RAGSearchRequestMessage.fromPartial(request),
+      RAGSearchRequestMessage
+    )
+  );
+  return decodeRequired(
+    resultBytes,
+    RAGSearchResponseMessage.decode,
+    'ragSearchProto'
+  );
 }
 
 /**

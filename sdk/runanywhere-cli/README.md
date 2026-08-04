@@ -183,7 +183,7 @@ bash sdk/runanywhere-commons/tests/scripts/run-cli-e2e-linux.sh
 - REPL turns are independent (no conversation memory yet).
 - `rcli voice` with thinking models may speak reasoning text — use a non-thinking LLM (`--llm lfm2`) until voice-agent thinking control lands.
 - macOS x86_64, Linux ARM64, and Windows ARM64 binaries are not published yet.
-- Four spec verbs have no command yet because the C core cannot back them: `tts speak` (commons synthesizes to a buffer and has no playback path), and `rag open` / `rag ingest` / `rag search` (RAG indexes are in-memory per process, and a query needs an LLM even for retrieval). `rcli rag query` opens, ingests and asks in one invocation instead.
+- Spec verbs with no standalone command yet: `tts speak` (commons synthesizes to a buffer and has no playback path), and `rag open` / `rag ingest` (RAG indexes are in-memory per process). `rcli rag query` and `rcli rag search` open, ingest, then ask or retrieve in one invocation instead.
 - `llm generate` and `llm stream` have no `--seed`: `LLMGenerationOptions` has no seed field. `vlm generate` and `image generate` do, and both take the flag.
 - `vlm generate` has no `--frequency-penalty` or `--presence-penalty`; `VLMGenerationOptions` stops at the repetition penalty. Passing them through the `run --image` alias prints a note instead of pretending.
 - `models load` takes `--engine` and `--category` only. `ModelLoadRequest` carries no context length, thread count or GPU switch; `rcli serve` has `--context`, `--threads` and `--gpu-layers` for the server it runs.

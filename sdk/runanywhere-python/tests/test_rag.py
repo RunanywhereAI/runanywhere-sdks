@@ -50,6 +50,7 @@ class RagCore(FakeCore):
         self.docs: list = []
         self.created_config = None
         self.last_query = None
+        self.last_search = None
         self.cancelled = False
         self.destroyed = False
         self._fail_query = fail_query
@@ -87,6 +88,20 @@ class RagCore(FakeCore):
             rank=0,
         )
         return result.SerializeToString()
+
+    def rag_search(self, handle, request_bytes):
+        request = pb.RAGSearchRequest()
+        request.ParseFromString(request_bytes)
+        self.last_search = request
+        response = pb.RAGSearchResponse()
+        response.retrieval_time_ms = 3
+        response.chunks.add(
+            chunk_id="c0",
+            text=(self.docs[0].text if self.docs else ""),
+            similarity_score=0.9,
+            rank=0,
+        )
+        return response.SerializeToString()
 
     def rag_query_stream(self, handle, query_bytes, on_event):
         chunk = pb.RAGStreamEvent(kind=pb.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED)
@@ -219,9 +234,18 @@ def test_search_returns_only_matches(rag_core) -> None:
     session.ingest(RagDocument("Paris is the capital of France."))
     matches = session.search("capital", top_k=2)
     assert [match.text for match in matches] == ["Paris is the capital of France."]
-    assert rag_core.last_query.retrieval_top_k == 2
-    # An answer model is loaded, so generation is capped rather than skipped.
-    assert rag_core.last_query.generation.max_output_tokens == 1
+    assert rag_core.last_search.question == "capital"
+    assert rag_core.last_search.retrieval_top_k == 2
+    assert rag_core.last_query is None
+
+
+def test_search_requires_retrieval_abi(rag_core, monkeypatch) -> None:
+    session = _open(rag_core)
+    monkeypatch.delattr(RagCore, "rag_search")
+    with pytest.raises(SDKException) as error:
+        session.search("capital")
+    assert error.value.code == ErrorCode.FEATURE_NOT_AVAILABLE
+    assert "rac_rag_search_proto" in str(error.value)
 
 
 def test_query_raises_on_a_pipeline_error(monkeypatch, tmp_path) -> None:

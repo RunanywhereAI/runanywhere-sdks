@@ -183,7 +183,7 @@ async function callRAGSessionCreate(
 
 async function callRAGWithRequest(
   module: WorkerOnnxModule,
-  exportName: 'rac_rag_ingest_proto' | 'rac_rag_query_proto',
+  exportName: 'rac_rag_ingest_proto' | 'rac_rag_query_proto' | 'rac_rag_search_proto',
   session: number,
   requestBytes: Uint8Array,
 ): Promise<Uint8Array> {
@@ -375,9 +375,13 @@ runBackendWorker(workerScope, {
         destroy(body.session);
         return { ok: true };
       }
-      if (kind === 'rag.ingest' || kind === 'rag.query') {
+      if (kind === 'rag.ingest' || kind === 'rag.query' || kind === 'rag.search') {
         if (!body.requestBytes) throw new Error(`${kind} requires requestBytes`);
-        const exportName = kind === 'rag.ingest' ? 'rac_rag_ingest_proto' : 'rac_rag_query_proto';
+        const exportName = kind === 'rag.ingest'
+          ? 'rac_rag_ingest_proto'
+          : kind === 'rag.search'
+            ? 'rac_rag_search_proto'
+            : 'rac_rag_query_proto';
         return { resultBytes: await callRAGWithRequest(module, exportName, body.session, body.requestBytes) };
       }
       if (kind === 'rag.clear' || kind === 'rag.stats') {

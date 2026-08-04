@@ -11,6 +11,8 @@ import {
   RAGDocument,
   RAGQueryOptions,
   RAGResult,
+  RAGSearchRequest,
+  RAGSearchResponse,
   RAGStatistics,
   RAGStreamEvent,
   RAGStreamEventKind,
@@ -315,13 +317,21 @@ export function createRagNamespace(deps: DataDeps): RagNamespace {
         },
         async search(query, topK) {
           assertOpen();
-          // Commons has no retrieval-only verb; a query returns its retrieved chunks
-          // regardless of whether an answer LLM is configured.
-          const bytes = await deps.backend.ragQuery(
+          const bytes = await deps.backend.ragSearch(
             handle,
-            queryBytes(query, { maxOutputTokens: 1 }, topK ?? defaultTopK, false)
+            RAGSearchRequest.encode(
+              RAGSearchRequest.fromPartial({
+                question: query,
+                retrievalTopK: topK ?? defaultTopK,
+                similarityThreshold: config.similarityThreshold,
+              })
+            ).finish()
           );
-          return RAGResult.decode(bytes).retrievedChunks.map(toMatch);
+          const response = RAGSearchResponse.decode(bytes);
+          if (response.error) {
+            throw SDKException.fromProto(response.error);
+          }
+          return response.chunks.map(toMatch);
         },
         async query(question, options = {}) {
           assertOpen();

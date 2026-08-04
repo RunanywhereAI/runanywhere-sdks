@@ -2481,6 +2481,11 @@ Napi::Value RagQuery(const Napi::CallbackInfo& info) {
     return rag_async_op(info, rac_rag_query_proto, "rag query");
 }
 
+// Async (worker-thread) — retrieval-only search (no LLM generation).
+Napi::Value RagSearch(const Napi::CallbackInfo& info) {
+    return rag_async_op(info, rac_rag_search_proto, "rag search");
+}
+
 // ragQueryStream(handleId, queryProtoBytes, onEvent) -> Promise<void>. onEvent
 // receives each serialized runanywhere.v1.RAGStreamEvent as a Buffer; the TS layer
 // decodes them into retrieved / token / completed events.
@@ -2665,6 +2670,7 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
     exports.Set("ragCreateSession", Napi::Function::New(env, RagCreateSession));
     exports.Set("ragIngest", Napi::Function::New(env, RagIngest));
     exports.Set("ragQuery", Napi::Function::New(env, RagQuery));
+    exports.Set("ragSearch", Napi::Function::New(env, RagSearch));
     exports.Set("ragQueryStream", Napi::Function::New(env, RagQueryStream));
     exports.Set("ragCancel", Napi::Function::New(env, RagCancel));
     exports.Set("ragClear", Napi::Function::New(env, RagClear));

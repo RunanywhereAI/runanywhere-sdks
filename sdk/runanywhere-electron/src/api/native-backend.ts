@@ -10,7 +10,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import type { NativeAddon } from '../bridge';
-import { SDKException } from '../errors';
+import { ErrorCode, SDKException } from '../errors';
 import {
   assertRemoteSupported,
   modelStatus as diskModelStatus,
@@ -398,6 +398,16 @@ export class NativeBackend implements RaBackend {
 
   ragQuery(session: string, queryBytes: Uint8Array): Promise<Uint8Array> {
     return this.addon.ragQuery(this.ragHandle(session), queryBytes);
+  }
+
+  ragSearch(session: string, requestBytes: Uint8Array): Promise<Uint8Array> {
+    if (typeof this.addon.ragSearch !== 'function') {
+      throw SDKException.of(
+        ErrorCode.FEATURE_NOT_AVAILABLE,
+        'rag.search is unavailable — rebuild the native addon against commons with rac_rag_search_proto'
+      );
+    }
+    return this.addon.ragSearch(this.ragHandle(session), requestBytes);
   }
 
   ragQueryStream(

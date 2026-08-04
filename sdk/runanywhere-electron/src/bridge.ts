@@ -160,6 +160,7 @@ export interface NativeAddon {
   ragCreateSession(configProtoBytes: Uint8Array): Promise<number>;
   ragIngest(handle: number, documentProtoBytes: Uint8Array): Promise<Uint8Array>;
   ragQuery(handle: number, queryProtoBytes: Uint8Array): Promise<Uint8Array>;
+  ragSearch(handle: number, requestProtoBytes: Uint8Array): Promise<Uint8Array>;
   // Resolves true when the stream ended because it was cancelled.
   ragQueryStream(
     handle: number,

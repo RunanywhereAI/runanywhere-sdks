@@ -309,6 +309,17 @@ export class SDKException extends Error {
     return SDKException.of(ErrorCodeProto.ERROR_CODE_NOT_IMPLEMENTED, message);
   }
 
+  /** Raised when a native ABI symbol or platform feature is absent. */
+  static featureNotAvailable(feature?: string): SDKException {
+    const message = feature
+      ? `Feature '${feature}' is not available.`
+      : 'Feature is not available.';
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_FEATURE_NOT_AVAILABLE,
+      message
+    );
+  }
+
   /**
    * Common shortcut: cancelled operation. Not logged (cancellation is expected).
    * Mirrors Swift `SDKException.cancelled` and Dart `SDKException.cancelled`.

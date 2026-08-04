@@ -7,6 +7,7 @@ import {
   RAGDocument,
   RAGQueryOptions,
   RAGResult,
+  RAGSearchRequest,
   RAGStreamEvent,
   RAGStreamEventKind,
 } from '@runanywhere/proto-ts/rag';
@@ -19,6 +20,7 @@ import {
   ragGetStatistics,
   ragIngest,
   ragQuery,
+  ragSearch,
 } from '../Extensions/RAG/RunAnywhere+RAG';
 import { decodeEvent, encode, preflight } from './Bridge';
 import { ensureModelLoaded } from './Models';
@@ -116,12 +118,16 @@ function createSession(config: RagConfig | undefined): RagSession {
 
     async search(query: string, topK?: number): Promise<Match[]> {
       requireOpen();
-      // commons exposes no retrieval-only proto verb, so retrieval rides the
-      // query path with generation clamped to a single token.
-      const result = await ragQuery(
-        buildQueryOptions(query, { maxOutputTokens: 1 }, topK ?? config?.topK)
+      const response = await ragSearch(
+        RAGSearchRequest.fromPartial({
+          question: query,
+          retrievalTopK: topK ?? config?.topK ?? 0,
+        })
       );
-      return result.retrievedChunks.map(toMatch);
+      if (response.error) {
+        throw new SDKException(response.error);
+      }
+      return response.chunks.map(toMatch);
     },
 
     async query(question: string, options?: LlmOptions): Promise<RagResult> {

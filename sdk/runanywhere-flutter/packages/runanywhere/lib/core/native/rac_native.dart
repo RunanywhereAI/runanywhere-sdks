@@ -1551,6 +1551,13 @@ class RacBindings {
               RacHandleBytesToProtoDart
             >('rac_rag_query_proto'),
       ),
+      rac_rag_search_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+        () =>
+            lib.lookupFunction<
+              RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart
+            >('rac_rag_search_proto'),
+      ),
       rac_rag_clear_proto = _lookupOptional<RacHandleOutProtoDart>(
         () =>
             lib.lookupFunction<RacHandleOutProtoNative, RacHandleOutProtoDart>(
@@ -2258,6 +2265,10 @@ class RacBindings {
   final RacHandleBytesToProtoDart? rac_rag_ingest_proto;
 
   final RacHandleBytesToProtoDart? rac_rag_query_proto;
+
+  /// Retrieval-only RAG search. Null on older commons binaries that predate
+  /// `rac_rag_search_proto`.
+  final RacHandleBytesToProtoDart? rac_rag_search_proto;
 
   final RacHandleOutProtoDart? rac_rag_clear_proto;
 

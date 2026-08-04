@@ -214,6 +214,9 @@ export class RpcBackend implements RaBackend {
   ragQuery(session: string, queryBytes: Uint8Array): Promise<Uint8Array> {
     return this.call('ragQuery', [session, queryBytes]);
   }
+  ragSearch(session: string, requestBytes: Uint8Array): Promise<Uint8Array> {
+    return this.call('ragSearch', [session, requestBytes]);
+  }
   ragQueryStream(
     session: string,
     queryBytes: Uint8Array,

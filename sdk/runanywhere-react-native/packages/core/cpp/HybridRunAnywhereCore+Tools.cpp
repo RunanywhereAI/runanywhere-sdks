@@ -8,7 +8,7 @@
  *     toolValidateProto, structuredOutputParseProto,
  *     structuredOutputPreparePromptProto, structuredOutputValidateProto,
  *     ragCreatePipelineProto, ragDestroyPipelineProto, ragIngestProto,
- *     ragQueryProto, ragClearProto, ragStatsProto,
+ *     ragQueryProto, ragSearchProto, ragClearProto, ragStatsProto,
  *     embeddingsEmbedBatchLifecycleProto (the commons embeddings lifecycle
  *     owns the component — no handle crosses the bridge; mirrors Swift
  *     CppBridge.EmbeddingsProto.embedBatchLifecycle).
@@ -557,6 +557,14 @@ HybridRunAnywhereCore::ragQueryProto(const std::shared_ptr<ArrayBuffer>& queryBy
     auto bytes = copyToolsArrayBufferBytes(queryBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         return callRagBufferProto(bytes, rac_rag_query_proto, "ragQueryProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::ragSearchProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callRagBufferProto(bytes, rac_rag_search_proto, "ragSearchProto");
     });
 }
 

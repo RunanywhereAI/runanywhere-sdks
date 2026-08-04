@@ -109,19 +109,26 @@ class RagSession {
 
   /// Retrieve the chunks closest to [query] without generating an answer.
   ///
-  /// Throws [SDKException] when the session is closed or retrieval fails.
+  /// Uses the commons retrieval-only ABI (`rac_rag_search_proto`); no LLM
+  /// generation is started.
+  ///
+  /// Throws [SDKException] when the session is closed, the native search
+  /// symbol is unavailable, or retrieval fails.
   Future<List<Match>> search(String query, {int? topK}) async {
     _requireLive();
-    // Commons publishes no retrieval-only verb: the query verb is asked for a
-    // single output token so the retrieval half is all that costs anything.
-    final result = await DartBridgeRAG.shared.queryAsync(
-      _queryOptions(query, LlmOptions(maxOutputTokens: 1), topK: topK),
+    if (!DartBridgeRAG.shared.isSearchAvailable) {
+      throw SDKException.featureNotAvailable(
+        'rag.search (rac_rag_search_proto)',
+      );
+    }
+    final response = await DartBridgeRAG.shared.searchAsync(
+      _searchRequest(query, topK: topK),
     );
-    if (result.hasError()) {
-      throw SDKException.processingFailed(result.error.message);
+    if (response.hasError()) {
+      throw SDKException.processingFailed(response.error.message);
     }
     return List<Match>.unmodifiable(
-      result.retrievedChunks.map(Match.fromProto),
+      response.chunks.map(Match.fromProto),
     );
   }
 
@@ -220,6 +227,16 @@ class RagSession {
     final threshold = _config.similarityThreshold;
     if (threshold != null) proto.similarityThreshold = threshold;
     if (options != null) proto.generation = options.toProto();
+    return proto;
+  }
+
+  rag_pb.RAGSearchRequest _searchRequest(String query, {int? topK}) {
+    final proto = rag_pb.RAGSearchRequest(
+      question: query,
+      retrievalTopK: topK ?? _config.topK,
+    );
+    final threshold = _config.similarityThreshold;
+    if (threshold != null) proto.similarityThreshold = threshold;
     return proto;
   }
 
