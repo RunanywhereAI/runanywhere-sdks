@@ -41,6 +41,15 @@ export const NPU_BUNDLES: readonly NpuBundle[] = [
     contextLength: 2_048,
   },
   {
+    id: 'lfm2_5_2_6b',
+    name: 'LFM2.5 2.6B (HNPU)',
+    url: 'https://huggingface.co/runanywhere/lfm2_5_2_6b_HNPU/lfm2-5-2.6b.json',
+    modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    estimatedSizeBytes: 3_259_942_826,
+    contextLength: 512,
+    supportsThinking: true,
+  },
+  {
     id: 'qwen3_5_0_8b',
     name: 'Qwen3.5 0.8B (HNPU)',
     url: 'https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json',
