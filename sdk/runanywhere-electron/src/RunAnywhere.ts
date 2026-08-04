@@ -30,7 +30,6 @@ import type { ToolSpec, ToolCall as LegacyToolCall, ToolRun } from './structured
 import { SDKException } from './errors';
 import { bus } from './events';
 import type { EventBus } from './events';
-import { warnIfControlPlaneOptionsIgnored } from './control-plane-warning';
 
 import { toNativeGenerateOptions as toLegacyNativeOptions } from './legacy-options';
 import type { GenerateOptions } from './legacy-options';
@@ -288,13 +287,11 @@ export const RunAnywhere: RunAnywhereApi & LegacySurface = {
     }
     const home = path.join(os.homedir(), '.runanywhere');
     const base = options.baseDir ?? home;
-    const baseUrl = options.baseUrl ?? options.baseURL;
-    warnIfControlPlaneOptionsIgnored({ apiKey: options.apiKey, baseUrl });
     return v3.initialize({
       ...options,
       baseDir: base,
       secureDir: options.secureDir ?? path.join(base, 'secure'),
-      baseUrl,
+      baseUrl: options.baseUrl ?? options.baseURL,
     });
   },
   reset: () => v3.reset(),

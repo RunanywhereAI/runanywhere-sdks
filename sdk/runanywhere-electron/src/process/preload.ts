@@ -5,18 +5,6 @@
 // contextBridge proxies back to the page. Runs with sandbox:false (it requires
 // SDK modules); a local event bus mirrors the facade's lifecycle/telemetry events
 // so a renderer can subscribe without the Node facade.
-//
-// PRE-V3 SURFACE: unlike `RunAnywhere.ts` (main process), this file predates the
-// `createRunAnywhere(RaBackend)` facade and its `RunAnywhereApi` shape — it hand-
-// rolls its own `window.runanywhere` method set (`loadLLM`/`generate`/... below,
-// not `llm.generate`) over a bespoke RPC protocol instead of an `RpcBackend`
-// passed to `createRunAnywhere`. It is NOT wired to the v3 namespaces
-// (`llm`/`vlm`/`rag`/`models`/...), so it will not gain new v3-only behavior
-// (e.g. the `initialize` apiKey/baseUrl warning below `RunAnywhere.ts`) until it
-// is rewritten. That full rewrite — `createRunAnywhere(RpcBackend)` in the
-// renderer, matching the main-process shape — is tracked as a follow-up in
-// PR #605 review follow-up (issue 11); it is too large for one fix
-// in this pass.
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { jsonSchemaToGrammar } from '../grammar';
@@ -147,11 +135,6 @@ function emitAfter<T>(p: Promise<T>, event: () => void): Promise<T> {
   });
 }
 
-// `window.runanywhere` — pre-v3 renderer surface (see the file-header note).
-// `initialize` here only forwards `secureDir`/`baseDir` to the utility host; it
-// has no `apiKey`/`baseUrl` parameters at all (unlike `RunAnywhere.initialize`
-// in the main process), so there is nothing to warn about here yet — that gap
-// closes with the v3 preload rewrite.
 contextBridge.exposeInMainWorld('runanywhere', {
   ready: (): Promise<void> => ready,
   version: () => send('version', []),
