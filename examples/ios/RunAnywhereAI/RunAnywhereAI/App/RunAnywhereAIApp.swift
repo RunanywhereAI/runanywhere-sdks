@@ -24,10 +24,25 @@ import os
 import AppKit
 #endif
 
+#if os(iOS)
+/// Forwards background URLSession relaunch events to the SDK so restored model
+/// downloads can finalize. No business logic lives here.
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        RunAnywhere.handleBackgroundURLSessionEvents(identifier: identifier, completionHandler: completionHandler)
+    }
+}
+#endif
+
 @main
 struct RunAnywhereAIApp: App {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
     #if os(iOS)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var flowSession = FlowSessionManager.shared
     @State private var showFlowActivation = false
     #endif
