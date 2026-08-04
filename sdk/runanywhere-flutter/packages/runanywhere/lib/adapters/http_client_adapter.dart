@@ -22,12 +22,57 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/ra_result_codes.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
+
+/// Split-header auth overlay, FFI-free so it can be unit-tested without a
+/// native library: `apikey` always travels independently of `Authorization`,
+/// and `Authorization: Bearer` carries only a JWT access token. A missing
+/// token omits the header entirely rather than falling back to the API key
+/// (matches Kotlin's `HTTPClientAdapter.buildHeaders`) — collapsing the two
+/// turns a missing/expired-token failure into the backend's misleading
+/// "Invalid JWT token: Not enough segments".
+@visibleForTesting
+Map<String, String> buildAuthHeaders({
+  required String apiKey,
+  String? accessToken,
+}) {
+  final headers = <String, String>{};
+  if (apiKey.isNotEmpty) {
+    headers['apikey'] = apiKey;
+  }
+  if (accessToken != null && accessToken.isNotEmpty) {
+    headers['Authorization'] = 'Bearer $accessToken';
+  }
+  return headers;
+}
+
+/// Resolve the bearer token for a request. Requests that do not require auth
+/// never attempt token resolution and never send `Authorization`. Exposed
+/// for testing — pure aside from the injected [tokenResolver] callback, so
+/// the API-key-only / JWT-only / keyless / expired-token /
+/// resolver-failure matrix can be characterized without FFI.
+@visibleForTesting
+Future<String?> resolveAccessToken({
+  required bool requiresAuth,
+  String? cachedAccessToken,
+  Future<String?> Function({required bool requiresAuth})? tokenResolver,
+  void Function(Object error)? onResolverError,
+}) async {
+  if (!requiresAuth) return null;
+  if (tokenResolver == null) return cachedAccessToken;
+  try {
+    return await tokenResolver(requiresAuth: true);
+  } catch (error) {
+    onResolverError?.call(error);
+    return null;
+  }
+}
 
 /// Minimal response container, platform-agnostic.
 class HttpClientResponse {
@@ -429,29 +474,15 @@ class HTTPClientAdapter {
     final headers = _commonsDefaultHeaders();
     headers['X-Platform'] = SDKConstants.platform;
 
-    // Every environment reaches the backend through the effective base URL and
-    // C++-owned auth — there is no dev-only direct-to-datastore credential path.
-    // The API key is never a bearer substitute; it already travels in the
-    // `apikey` header below. Authorization: Bearer carries only a real
-    // JWT/access token.
-    if (requiresAuth && snapshot.tokenResolver != null) {
-      try {
-        final token = await snapshot.tokenResolver!.call(requiresAuth: true);
-        if (token != null && token.isNotEmpty) {
-          headers['Authorization'] = 'Bearer $token';
-        }
-      } catch (_) {
-        _logger.debug('Token resolver failed');
-      }
-    } else {
-      final token = snapshot.accessToken;
-      if (token != null && token.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $token';
-      }
-    }
-    if (snapshot.apiKey.isNotEmpty) {
-      headers['apikey'] = snapshot.apiKey;
-    }
+    final token = await resolveAccessToken(
+      requiresAuth: requiresAuth,
+      cachedAccessToken: snapshot.accessToken,
+      tokenResolver: snapshot.tokenResolver,
+      onResolverError: (_) => _logger.debug('Token resolver failed'),
+    );
+    headers.addAll(
+      buildAuthHeaders(apiKey: snapshot.apiKey, accessToken: token),
+    );
 
     if (extra != null) headers.addAll(extra);
     return headers;
