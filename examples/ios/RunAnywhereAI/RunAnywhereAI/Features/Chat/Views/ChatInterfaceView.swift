@@ -66,6 +66,7 @@ struct ChatInterfaceView: View {
     @State private var loraScale: Float = 1.0
     @ObservedObject private var toolSettingsViewModel = ToolSettingsViewModel.shared
     @ObservedObject private var settingsViewModel = SettingsViewModel.shared
+    @ObservedObject private var modelListViewModel = ModelListViewModel.shared
     #if os(iOS)
     @ObservedObject private var connectController = ConnectClientController.shared
     #endif
@@ -391,7 +392,7 @@ extension ChatInterfaceView {
     }
 
     @ViewBuilder var modelRequiredOverlayIfNeeded: some View {
-        if !hasAssistantSurface && !viewModel.isGenerating {
+        if !hasAssistantSurface && !viewModel.isGenerating && !modelListViewModel.isLoadingModel {
             ModelRequiredOverlay(modality: .llm) { showingModelSelection = true }
         }
     }
@@ -401,18 +402,20 @@ extension ChatInterfaceView {
             showingModelSelection = true
         } label: {
             HStack(spacing: 6) {
-                if let modelName = viewModel.loadedModelName {
+                if isModelLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Loading model…")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                } else if let modelName = viewModel.loadedModelName {
                     Image(getModelLogo(for: modelName))
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 36, height: 36)
                         .cornerRadius(4)
-                } else {
-                    Image(systemName: "cube")
-                        .font(.system(size: 14))
-                }
 
-                if let modelName = viewModel.loadedModelName {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(modelName.shortModelName(maxLength: 13))
                             .font(.caption)
@@ -432,6 +435,8 @@ extension ChatInterfaceView {
                         .foregroundColor(viewModel.selectedFramework?.consumerBackendColor ?? AppColors.primaryAccent)
                     }
                 } else {
+                    Image(systemName: "cube")
+                        .font(.system(size: 14))
                     Text("Choose Model")
                         .font(AppTypography.caption)
                 }
@@ -441,6 +446,10 @@ extension ChatInterfaceView {
         .buttonStyle(.bordered)
         .tint(AppColors.primaryAccent)
         #endif
+    }
+
+    private var isModelLoading: Bool {
+        modelListViewModel.isLoadingModel && viewModel.loadedModelName == nil
     }
 }
 
@@ -478,31 +487,45 @@ extension ChatInterfaceView {
     }
 
     private var consumerTopBar: some View {
-        HStack(spacing: AppSpacing.mediumLarge) {
+        HStack(spacing: AppSpacing.smallMedium) {
             iconCircleButton(systemImage: "line.3.horizontal") {
                 showingConversationList = true
             }
             .accessibilityLabel("Chats")
 
-            Spacer()
+            Spacer(minLength: AppSpacing.smallMedium)
 
-            modelButton
+            modelChip
 
-            Spacer()
+            Spacer(minLength: AppSpacing.smallMedium)
 
             iconCircleButton(systemImage: "square.and.pencil") {
                 viewModel.createNewConversation()
             }
             .accessibilityLabel("New Chat")
-
-            iconCircleButton(systemImage: "gearshape") {
-                showingSettings = true
-            }
-            .accessibilityLabel("Settings")
         }
         .padding(.horizontal, AppSpacing.large)
-        .padding(.vertical, AppSpacing.mediumLarge)
-        .background(AppColors.backgroundPrimary.opacity(0.96))
+        .padding(.vertical, AppSpacing.medium)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(AppColors.separator)
+                .frame(height: AppSpacing.strokeThin)
+        }
+    }
+
+    // The shared modelButton, presented as a tappable pill so it reads as the
+    // primary control in the center of the bar.
+    private var modelChip: some View {
+        modelButton
+            .padding(.horizontal, AppSpacing.mediumLarge)
+            .frame(height: 42)
+            .background(
+                Capsule().fill(AppColors.backgroundSecondary)
+            )
+            .overlay(
+                Capsule().strokeBorder(AppColors.separator, lineWidth: AppSpacing.strokeRegular)
+            )
     }
 
     private func iconCircleButton(systemImage: String, action: @escaping () -> Void) -> some View {
@@ -510,9 +533,12 @@ extension ChatInterfaceView {
             Image(systemName: systemImage)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(AppColors.textPrimary)
-                .frame(width: 44, height: 44)
-                .background(AppColors.backgroundSecondary)
-                .clipShape(Circle())
+                .frame(width: 42, height: 42)
+                .background(
+                    Circle()
+                        .fill(AppColors.backgroundSecondary)
+                        .overlay(Circle().strokeBorder(AppColors.separator, lineWidth: AppSpacing.strokeThin))
+                )
         }
         .buttonStyle(.plain)
     }
@@ -536,13 +562,17 @@ extension ChatInterfaceView {
                         showingConversationList = false
                         showingSettings = true
                     },
+                    onOpenMore: {
+                        showingConversationList = false
+                        showingAdvancedHub = true
+                    },
                     onClose: {
                         showingConversationList = false
                     }
                 )
                 .frame(width: min(geometry.size.width * 0.86, DeviceFormFactor.current == .desktop ? 360 : 330))
                 .frame(maxHeight: .infinity)
-                .shadow(color: AppColors.shadowDark, radius: 18, x: 8, y: 0)
+                .shadow(color: AppColors.shadowMedium, radius: 12, x: 4, y: 0)
             }
         }
     }
