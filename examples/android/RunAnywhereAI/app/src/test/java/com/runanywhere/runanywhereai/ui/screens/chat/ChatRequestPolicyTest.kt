@@ -117,6 +117,25 @@ class ChatRequestPolicyTest {
     }
 
     @Test
+    fun `windowHistory keeps a short user turn even when the newest reply is too big to fit`() {
+        // The LFM2.5-2.6B (512 ctx) failure: a reasoning model's reply alone exceeds the whole history
+        // budget, so the old `break` discarded the short user turn behind it and the model answered
+        // "I don't have information about your name" one turn after being told it.
+        val fact = ChatMessage("My name is Aman and I love pizza", isUser = true)
+        val hugeReply = ChatMessage("word ".repeat(200), isUser = false) // ~1000 chars, far over budget
+        val turn = ChatRequestPolicy.snapshot("what is my name and which food do i love?", listOf(fact, hugeReply))
+
+        val windowed = ChatRequestPolicy.windowHistory(
+            turn, contextTokens = 512, outputTokens = 256, systemPrompt = "You are a helpful assistant.",
+        )
+
+        // history is the proto shape, so compare on role+content: the fact survives, only the reply is dropped.
+        assertEquals(1, windowed.history.size)
+        assertEquals("My name is Aman and I love pizza", windowed.history.single().content)
+        assertEquals(MessageRole.MESSAGE_ROLE_USER, windowed.history.single().role)
+    }
+
+    @Test
     fun `windowHistory drops all history when the current prompt alone fills the context`() {
         val hugePrompt = "word ".repeat(400) // ~2000 chars -> far exceeds a 512-token window on its own
         val turn = ChatRequestPolicy.snapshot(
