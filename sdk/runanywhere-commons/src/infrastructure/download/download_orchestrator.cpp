@@ -1885,12 +1885,17 @@ bool run_parallel_direct_download_worker(const std::shared_ptr<proto_download_ta
     const int64_t completed_bytes = total_expected > 0 ? total_expected : snapshot.bytes_downloaded;
     std::string completion_local_path =
         resolve_completion_local_path(task, task->files.back().destination_path);
+    // Relink the registry (set local_path) BEFORE publishing COMPLETED. A caller
+    // that observes completion immediately re-reads the registry; if the relink
+    // ran after the completion tick, that read races it and sees the model as
+    // not-yet-downloaded, so the UI reverts to "download" for a fully downloaded
+    // model. Relinking first makes the completed state and the registry consistent.
+    self_heal_registry(task, completion_local_path);
     set_task_progress(task, rav1::DOWNLOAD_STATE_COMPLETED, rav1::DOWNLOAD_STAGE_COMPLETED,
                       completed_bytes, total_expected, static_cast<int32_t>(task->files.size() - 1),
                       task->files.back().storage_key, completion_local_path, "");
     mark_task_stopped(task);
     emit_progress(task);
-    self_heal_registry(task, completion_local_path);
     return true;
 }
 
@@ -1966,14 +1971,15 @@ void run_proto_download_worker(const std::shared_ptr<proto_download_task>& task,
     }
 
     std::string completion_local_path = resolve_completion_local_path(task, final_path);
+    // Relink before publishing COMPLETED so an observer's registry re-read cannot
+    // race the relink (see the single-file completion path above).
+    self_heal_registry(task, completion_local_path);
     set_task_progress(task, rav1::DOWNLOAD_STATE_COMPLETED, rav1::DOWNLOAD_STAGE_COMPLETED,
                       completed_bytes, total_expected, static_cast<int32_t>(task->files.size() - 1),
                       task->files.empty() ? "" : task->files.back().storage_key,
                       completion_local_path, "");
     mark_task_stopped(task);
     emit_progress(task);
-
-    self_heal_registry(task, completion_local_path);
 }
 
 #ifdef __EMSCRIPTEN__
@@ -2288,13 +2294,15 @@ void web_download_finalize_all(web_download_driver* drv) {
     }
 
     std::string completion_local_path = resolve_completion_local_path(task, drv->final_path);
+    // Relink before publishing COMPLETED so an observer's registry re-read cannot
+    // race the relink (see the single-file completion path above).
+    self_heal_registry(task, completion_local_path);
     set_task_progress(
         task, rav1::DOWNLOAD_STATE_COMPLETED, rav1::DOWNLOAD_STAGE_COMPLETED, completed_bytes,
         drv->total_expected, static_cast<int32_t>(task->files.size() - 1),
         task->files.empty() ? "" : task->files.back().storage_key, completion_local_path, "");
     mark_task_stopped(task);
     emit_progress(task);
-    self_heal_registry(task, completion_local_path);
     web_download_finish(drv);
 }
 
@@ -3020,14 +3028,30 @@ extern "C" rac_result_t rac_download_plan_proto(const uint8_t* request_bytes, si
         descriptor.set_destination_path(destination);
 
         int64_t expected_bytes = model.download_size_bytes();
-        if (expected_bytes <= 0 && needs_extraction == RAC_FALSE) {
-            // Catalog carries no size — probe the server so the pre-flight
-            // storage gate can fire before any bytes land.
+        if (needs_extraction == RAC_FALSE) {
+            // For a direct (non-archive) file the server's Content-Length is the
+            // ground truth for both the pre-flight storage gate and the
+            // post-finalize size guard. The caller's download_size_bytes is
+            // frequently a stale catalog estimate — or a RAM/memory hint wrongly
+            // copied into the field — that can exceed the real file by more than
+            // the guard's 20% slack and trip it after an otherwise successful
+            // download. Probe HEAD and prefer a definitive Content-Length when it
+            // disagrees with the caller value beyond that slack (mirrors the
+            // multi-file resolver's "prefer the fresh total over a stale caller
+            // download_size_bytes" rule in register_model_from_url.cpp). When
+            // HEAD omits Content-Length (gzip/transfer-encoding, or a server that
+            // won't declare it) keep the caller value so legitimate size-unknown
+            // files still plan.
             int32_t head_status = 0;
             int64_t probed = http_head_content_length(url, &head_status);
             if (probed > 0) {
-                expected_bytes = probed;
-            } else if (head_status == 401 || head_status == 403) {
+                const bool disagrees_beyond_guard_slack =
+                    expected_bytes <= 0 || probed * 5 < expected_bytes * 4 ||
+                    expected_bytes * 5 < probed * 4;
+                if (disagrees_beyond_guard_slack) {
+                    expected_bytes = probed;
+                }
+            } else if (expected_bytes <= 0 && (head_status == 401 || head_status == 403)) {
                 head_auth_denied = true;
             }
         }
