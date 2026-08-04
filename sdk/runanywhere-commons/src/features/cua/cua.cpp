@@ -506,6 +506,9 @@ extern "C" int rac_cua_parse_action(const char* profile_id, const char* model_ou
         return 0;
     }
     out->type = action_from_string(action);
+    // Unknown action names are fail-closed: hosts that execute must not treat
+    // an unrecognized verb as a successfully parsed action (coords/text may
+    // still be present but must not imply parse success).
     if (out->type == RAC_CUA_ACTION_UNKNOWN) {
         out->parse_ok = 0;
         return 0;

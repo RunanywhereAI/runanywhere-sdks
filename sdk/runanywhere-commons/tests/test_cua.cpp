@@ -252,6 +252,21 @@ TestResult run_malformed_not_ok() {
     return TEST_PASS();
 }
 
+// Unknown action names must fail closed — hosts that execute must not treat
+// an unrecognized verb as a successful parse even if coordinates are present.
+TestResult run_unknown_action_not_ok() {
+    const char* out =
+        "<tool_call>{\"arguments\": {\"action\": \"teleport\", "
+        "\"coordinate\": [10, 20]}}</tool_call>";
+    rac_cua_action_t a;
+    int rc = rac_cua_parse_action(RAC_CUA_PROFILE_FARA, out, 100, 100, &a);
+    ASSERT_EQ(rc, 0, "recognized profile still returns 0");
+    ASSERT_EQ(static_cast<int>(a.parse_ok), 0, "unknown action -> parse_ok = 0");
+    ASSERT_EQ(static_cast<int>(a.type), static_cast<int>(RAC_CUA_ACTION_UNKNOWN),
+              "type is UNKNOWN");
+    return TEST_PASS();
+}
+
 // --- goldens captured from REAL Fara1.5 runs (see PR #590) ------------------
 //
 // Synthetic cases cover the edges, but they are written against what we THINK
@@ -382,6 +397,7 @@ int main(int argc, char** argv) {
     suite.add("type_action_text", run_type_action_text);
     suite.add("terminate_answer", run_terminate_answer);
     suite.add("malformed_not_ok", run_malformed_not_ok);
+    suite.add("unknown_action_not_ok", run_unknown_action_not_ok);
     suite.add("coordinate_null_does_not_borrow_other_array",
               run_coordinate_null_does_not_borrow_other_array);
     suite.add("single_element_coordinate_rejected", run_single_element_coordinate_rejected);
