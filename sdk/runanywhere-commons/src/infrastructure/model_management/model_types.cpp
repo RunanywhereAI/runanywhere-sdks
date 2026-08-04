@@ -1222,10 +1222,73 @@ rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model) {
     copy->local_path = rac_strdup(model->local_path);
     copy->description = rac_strdup(model->description);
 
-    // Copy artifact info (shallow for now - TODO: deep copy if needed)
+    // Deep-copy artifact info: the struct assignment copies scalars (kind,
+    // archive_type, archive_structure), then each owned pointer must be
+    // deep-copied so the copy owns its data independently of the source.
+    // Omitting this silently drops multi-file artifact metadata on every
+    // model-assignment round-trip through rac_model_info_copy.
     copy->artifact_info = model->artifact_info;
     copy->artifact_info.expected_files = nullptr;
     copy->artifact_info.file_descriptors = nullptr;
+    copy->artifact_info.file_descriptor_count = 0;
+    copy->artifact_info.strategy_id = nullptr;
+
+    // expected_files (required_patterns + optional_patterns + description)
+    if (model->artifact_info.expected_files) {
+        copy->artifact_info.expected_files = rac_expected_model_files_alloc();
+        if (copy->artifact_info.expected_files) {
+            const auto* src_ef = model->artifact_info.expected_files;
+            auto* dst_ef = copy->artifact_info.expected_files;
+
+            if (src_ef->required_patterns && src_ef->required_pattern_count > 0) {
+                dst_ef->required_patterns =
+                    static_cast<const char**>(calloc(src_ef->required_pattern_count, sizeof(char*)));
+                if (dst_ef->required_patterns) {
+                    dst_ef->required_pattern_count = src_ef->required_pattern_count;
+                    for (size_t i = 0; i < src_ef->required_pattern_count; ++i) {
+                        dst_ef->required_patterns[i] = rac_strdup(src_ef->required_patterns[i]);
+                    }
+                }
+            }
+            if (src_ef->optional_patterns && src_ef->optional_pattern_count > 0) {
+                dst_ef->optional_patterns =
+                    static_cast<const char**>(calloc(src_ef->optional_pattern_count, sizeof(char*)));
+                if (dst_ef->optional_patterns) {
+                    dst_ef->optional_pattern_count = src_ef->optional_pattern_count;
+                    for (size_t i = 0; i < src_ef->optional_pattern_count; ++i) {
+                        dst_ef->optional_patterns[i] = rac_strdup(src_ef->optional_patterns[i]);
+                    }
+                }
+            }
+            dst_ef->description = rac_strdup(src_ef->description);
+        }
+    }
+
+    // file_descriptors (per-file metadata: relative_path, destination_path, url,
+    // checksum_sha256, and scalars)
+    if (model->artifact_info.file_descriptors && model->artifact_info.file_descriptor_count > 0) {
+        copy->artifact_info.file_descriptors =
+            rac_model_file_descriptors_alloc(model->artifact_info.file_descriptor_count);
+        if (copy->artifact_info.file_descriptors) {
+            copy->artifact_info.file_descriptor_count = model->artifact_info.file_descriptor_count;
+            for (size_t i = 0; i < model->artifact_info.file_descriptor_count; ++i) {
+                const auto& src_fd = model->artifact_info.file_descriptors[i];
+                auto& dst_fd = copy->artifact_info.file_descriptors[i];
+                dst_fd.relative_path = rac_strdup(src_fd.relative_path);
+                dst_fd.destination_path = rac_strdup(src_fd.destination_path);
+                dst_fd.url = rac_strdup(src_fd.url);
+                dst_fd.checksum_sha256 = rac_strdup(src_fd.checksum_sha256);
+                dst_fd.is_required = src_fd.is_required;
+                dst_fd.role = src_fd.role;
+                dst_fd.size_bytes = src_fd.size_bytes;
+            }
+        } else {
+            copy->artifact_info.file_descriptor_count = 0;
+        }
+    } else {
+        copy->artifact_info.file_descriptor_count = 0;
+    }
+
     copy->artifact_info.strategy_id = rac_strdup(model->artifact_info.strategy_id);
 
     // Copy tags
