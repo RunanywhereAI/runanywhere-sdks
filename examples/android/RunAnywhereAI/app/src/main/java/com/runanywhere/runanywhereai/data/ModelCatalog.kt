@@ -42,6 +42,11 @@ internal object ModelCatalog {
     val npuCatalog: List<SingleFileModel> = listOf(
         SingleFileModel("lfm2_5_230m", "LFM2.5 230M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_230m_HNPU/lfm2-5-230m.json", QHEXRT, LANGUAGE, 538_771_163L, contextLength = 512),
         SingleFileModel("lfm2_5_350m", "LFM2.5 350M (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_350m_HNPU/lfm2-5-350m-2048.json", QHEXRT, LANGUAGE, 1_441_493_515L, contextLength = 2_048),
+        // contextLength MUST be 512: LFM2.5-2.6B has 32 query heads, and GQA-native attention is
+        // HTP-correct only at <=16, so the bundle ships materialized MHA capped at 512.
+        // supportsThinking: its chat template opens <think> unconditionally (no enable_thinking flag),
+        // so the manifest carries a no_think_prefill the runtime swaps in when thinking is turned off.
+        SingleFileModel("lfm2_5_2_6b", "LFM2.5 2.6B (HNPU)", "https://huggingface.co/runanywhere/lfm2_5_2_6b_HNPU/lfm2-5-2.6b.json", QHEXRT, LANGUAGE, 3_259_942_826L, contextLength = 512, supportsThinking = true),
         SingleFileModel("qwen3_5_0_8b", "Qwen3.5 0.8B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_0_8b_HNPU/qwen3.5-0.8b-1024.json", QHEXRT, LANGUAGE, 2_046_527_510L, contextLength = 1_024, supportsThinking = true),
         SingleFileModel("qwen3_5_2b", "Qwen3.5 2B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_2b_HNPU/qwen3.5-2b-1024.json", QHEXRT, LANGUAGE, 4_817_344_861L, contextLength = 1_024),
         SingleFileModel("qwen3_5_4b", "Qwen3.5 4B (HNPU)", "https://huggingface.co/runanywhere/qwen3_5_4b_HNPU/qwen3.5-4b-1024.json", QHEXRT, LANGUAGE, 6_177_585_629L, contextLength = 1_024),
