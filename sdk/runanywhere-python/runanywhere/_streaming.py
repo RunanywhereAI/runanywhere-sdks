@@ -208,11 +208,28 @@ class _AsyncBridge(_Bridge):
             return
         fut.set_result(None)
 
+    def _enqueue_sentinel(self, sentinel: object) -> None:
+        """Run on the loop thread: push a terminal sentinel, rescheduling while the queue
+        is full so it is never dropped.
+
+        A bare ``put_nowait`` raises :class:`asyncio.QueueFull` inside the loop callback,
+        where it is swallowed by the exception handler and the consumer waits on ``get()``
+        forever. ``_enqueue`` already reschedules tokens for the same reason, and the sync
+        bridge gets this for free from its blocking ``put``. Stop means the consumer is
+        gone, so there is nobody left to hand the sentinel to.
+        """
+        if self._stop.is_set():
+            return
+        try:
+            self._q.put_nowait(sentinel)
+        except asyncio.QueueFull:
+            self._loop.call_soon(self._enqueue_sentinel, sentinel)
+
     def _on_done(self) -> None:
-        self._loop.call_soon_threadsafe(self._q.put_nowait, _DONE)
+        self._loop.call_soon_threadsafe(self._enqueue_sentinel, _DONE)
 
     def _on_error(self) -> None:
-        self._loop.call_soon_threadsafe(self._q.put_nowait, _ERROR)
+        self._loop.call_soon_threadsafe(self._enqueue_sentinel, _ERROR)
 
     async def get(self) -> object:
         return await self._q.get()

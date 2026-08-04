@@ -8,7 +8,7 @@ from typing import Callable, List
 
 import pytest
 
-from runanywhere._streaming import aiter_tokens, iter_tokens
+from runanywhere._streaming import _DONE, _AsyncBridge, aiter_tokens, iter_tokens
 
 OnToken = Callable[[str], "bool | None"]
 
@@ -140,3 +140,29 @@ def test_aiter_tokens_reraises_worker_exception() -> None:
 
     with pytest.raises(RuntimeError, match="boom"):
         asyncio.run(run())
+
+
+def test_async_bridge_sentinel_survives_a_full_queue() -> None:
+    """The terminal sentinel must not be lost when the queue is saturated.
+
+    `_on_done` runs on the loop thread via `call_soon_threadsafe`. A bare `put_nowait`
+    there raises `QueueFull`, which the loop's exception handler swallows, so the
+    sentinel disappears and `aiter_tokens` waits on `get()` forever. `_enqueue` already
+    reschedules tokens for this reason and the sync bridge blocks in `put`, so the async
+    terminal path was the only one that could drop its message.
+    """
+
+    async def run() -> object:
+        loop = asyncio.get_running_loop()
+        bridge = _AsyncBridge(lambda cb: None, maxsize=1, loop=loop)
+        bridge._q.put_nowait("filler")  # saturate: maxsize is 1
+
+        bridge._on_done()  # schedules the sentinel while the queue is full
+        await asyncio.sleep(0)  # let that callback run and hit QueueFull
+
+        assert bridge._q.get_nowait() == "filler"  # drain, making room
+        for _ in range(10):  # give a rescheduled sentinel a chance to land
+            await asyncio.sleep(0)
+        return bridge._q.get_nowait()
+
+    assert asyncio.run(run()) is _DONE
