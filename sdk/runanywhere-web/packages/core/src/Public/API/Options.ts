@@ -72,6 +72,14 @@ export interface LlmOptions {
   tools?: ToolDefinition[];
   toolChoice?: ToolChoice;
   maxToolCalls?: number;
+  /**
+   * Whether the SDK should run a requested tool call itself and feed the
+   * result back into the loop. `false` returns the parsed call to the
+   * caller instead of invoking it. Defaults to `true` -- same contract as
+   * the direct `toolCalling.generateWithTools` API's `autoExecute`, just
+   * reachable from `llm.generate`/`llm.generateStream` with inline `tools`.
+   */
+  autoExecute?: boolean;
   /** Stable conversation id for backends that keep a prompt cache. */
   conversationId?: string;
 }
@@ -220,6 +228,12 @@ export interface ModelRegistration {
   contextLength?: number;
   supportsThinking?: boolean;
   supportsLora?: boolean;
+  /**
+   * Computer-Use-Agent profile id (e.g. `'fara'`) for a CUA-capable model.
+   * Lands on `ModelInfo.cuaProfile` so callers can discover which registered
+   * models are drivable through `RunAnywhere.cua`.
+   */
+  cuaProfile?: string;
 }
 
 /**

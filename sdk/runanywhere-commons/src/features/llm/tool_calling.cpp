@@ -1852,9 +1852,25 @@ tool_calling_options_from_proto(const runanywhere::v1::ToolCallingOptions& proto
     ProtoToolCallingOptions converted;
     converted.tools_json = tool_definitions_proto_to_json(proto);
 
-    if (proto.auto_execute()) {
-        converted.options.auto_execute = RAC_TRUE;
-    }
+    // PR #605 review issue #7: `converted.options` starts from
+    // RAC_TOOL_CALLING_OPTIONS_DEFAULT (auto_execute = true); the missing
+    // `else` here meant a caller's explicit `auto_execute = false` on the
+    // wire was silently discarded and this always resolved to true. Safe to
+    // fix unconditionally: `converted.options.auto_execute` is not read by
+    // anything downstream of this function today (only `tools_json`,
+    // `system_prompt`, and `format` feed the prompt-formatting callers of
+    // `tool_calling_options_from_proto`), so trusting the wire value
+    // directly changes no observed behavior while fixing the function's own
+    // contract for whenever this does get consumed.
+    //
+    // ToolCallingOptions.auto_execute is a plain (non-optional) proto3 bool
+    // with no wire presence, unlike the sibling
+    // ToolCallingSessionCreateRequest.auto_execute (`optional`, defaults to
+    // true only when *absent* -- see tool_calling_run_loop.cpp /
+    // tool_calling_session.cpp). "Explicitly false" and "field omitted" are
+    // therefore indistinguishable on this specific field; restoring real
+    // presence would need an IDL change, out of scope here.
+    converted.options.auto_execute = proto.auto_execute() ? RAC_TRUE : RAC_FALSE;
     if (proto.has_temperature()) {
         converted.options.temperature = proto.temperature();
     }

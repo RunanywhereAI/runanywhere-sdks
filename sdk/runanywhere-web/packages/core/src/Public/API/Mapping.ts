@@ -128,7 +128,11 @@ export function toProtoLlmOptions(options?: LlmOptions): LLMGenerationOptions {
       forcedToolName: options.toolChoice?.kind === 'forced' ? options.toolChoice.name : undefined,
       requireJsonArguments: false,
       maxToolCalls: options.maxToolCalls,
-      autoExecute: true,
+      // Forwarded verbatim -- generateWithToolLoop hands this straight to
+      // toolCalling.generateWithTools as its autoExecute override, so an
+      // explicit caller `autoExecute: false` must survive this hop instead
+      // of being hardcoded away.
+      autoExecute: options.autoExecute ?? true,
       parallelToolCalls: false,
     };
   }
