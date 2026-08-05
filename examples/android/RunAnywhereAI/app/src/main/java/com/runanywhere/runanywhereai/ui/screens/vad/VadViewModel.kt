@@ -115,7 +115,8 @@ class VadViewModel : ViewModel() {
                             isSpeechDetected = false
                             addLogEntry(VadActivity.SPEECH_ENDED)
                         }
-                        is VadEvent.Frame -> isSpeechDetected = event.result.isSpeech
+                        is VadEvent.Activity -> isSpeechDetected = event.isSpeech
+                        else -> Unit
                     }
                 }
             } catch (e: CancellationException) {

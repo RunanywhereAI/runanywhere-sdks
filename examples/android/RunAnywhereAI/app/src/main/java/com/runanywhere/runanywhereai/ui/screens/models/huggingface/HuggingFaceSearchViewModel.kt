@@ -139,10 +139,10 @@ class HuggingFaceSearchViewModel : ViewModel() {
                             if (event.bytesTotal > 0) {
                                 (event.bytesDone * 100 / event.bytesTotal).toInt()
                             } else {
-                                (event.percent.coerceIn(0f, 1f) * 100).toInt()
+                                null
                             }
-                        DownloadEvent.Extracting -> null
                         is DownloadEvent.Completed -> 100
+                        else -> null
                     }
                     if (pct != null) _state.update { it.copy(downloadProgress = pct) }
                 }

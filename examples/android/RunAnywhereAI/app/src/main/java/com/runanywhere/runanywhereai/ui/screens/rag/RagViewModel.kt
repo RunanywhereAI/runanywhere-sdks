@@ -15,6 +15,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.api.ModelRef
 import com.runanywhere.sdk.public.api.RagConfig
 import com.runanywhere.sdk.public.api.RagDocument
+import com.runanywhere.sdk.public.api.RagQueryOptions
 import com.runanywhere.sdk.public.api.RagEvent
 import com.runanywhere.sdk.public.api.RagSession
 import com.runanywhere.sdk.public.api.rag
@@ -182,13 +183,13 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
                 val active = session ?: error("Choose document models and add a document first.")
                 val startedAt = System.currentTimeMillis()
                 val options = RagGenerationPolicy.options()
-                active.queryStream(q, options).collect { event ->
+                active.queryStream(q, RagQueryOptions(generation = options)).collect { event ->
                     currentCoroutineContext().ensureActive()
                     if (!requestVersion.isCurrent(queryGeneration, corpusGeneration)) {
                         return@collect
                     }
                     when (event) {
-                        is RagEvent.Token -> {
+                        is RagEvent.TextDelta -> {
                             streamed.append(event.text)
                             messages[answerIndex] = RagMessage(
                                 text = RagAnswerNormalizer.visibleAnswer(streamed.toString()),
@@ -209,7 +210,7 @@ class RagViewModel(application: Application) : AndroidViewModel(application) {
                             )
                             finalized = true
                         }
-                        is RagEvent.Retrieved -> Unit
+                        else -> Unit
                     }
                 }
             } catch (e: CancellationException) {

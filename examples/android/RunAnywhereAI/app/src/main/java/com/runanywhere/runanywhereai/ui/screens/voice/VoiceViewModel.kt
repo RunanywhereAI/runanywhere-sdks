@@ -208,7 +208,7 @@ class VoiceViewModel : ViewModel() {
             }
         }
         RunAnywhere.llm.generateStream(prompt, voiceGenOptions()).collect { ev ->
-            if (ev is GenerationEvent.Token && ev.kind == TokenKind.TEXT && ev.text.isNotEmpty()) {
+            if (ev is GenerationEvent.TextDelta && ev.text.isNotEmpty()) {
                 appendAssistantToken(ev.text)
                 buf.append(ev.text)
                 emit(VoiceTtsChunkPolicy.drainSentences(buf, flush = false))
@@ -224,7 +224,7 @@ class VoiceViewModel : ViewModel() {
     private suspend fun bufferedTurn(prompt: String, tts: RAModelInfo?) {
         val sb = StringBuilder()
         RunAnywhere.llm.generateStream(prompt, voiceGenOptions()).collect { ev ->
-            if (ev is GenerationEvent.Token && ev.kind == TokenKind.TEXT && ev.text.isNotEmpty()) {
+            if (ev is GenerationEvent.TextDelta && ev.text.isNotEmpty()) {
                 sb.append(ev.text)
                 appendAssistantToken(ev.text)
             }
@@ -317,8 +317,8 @@ class VoiceViewModel : ViewModel() {
                 state = VoiceState.THINKING
                 appendAssistantToken(event.text)
             }
-            VoiceEvent.SpeechStarted -> state = VoiceState.LISTENING
-            VoiceEvent.SpeechEnded -> state = VoiceState.TRANSCRIBING
+            is VoiceEvent.SpeechStarted -> state = VoiceState.LISTENING
+            is VoiceEvent.SpeechEnded -> state = VoiceState.TRANSCRIBING
             is VoiceEvent.Error -> {
                 error = event.message
                 if (!event.recoverable) state = VoiceState.IDLE

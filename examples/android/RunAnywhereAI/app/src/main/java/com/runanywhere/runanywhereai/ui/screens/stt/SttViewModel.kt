@@ -208,15 +208,15 @@ class SttViewModel : ViewModel() {
     private fun onLiveEvent(event: TranscriptionEvent) {
         when (event) {
             is TranscriptionEvent.Partial -> {
-                val text = event.text.trim()
+                val text = event.alternatives.firstOrNull()?.text?.trim().orEmpty()
                 if (text.isNotEmpty()) transcript = join(committed, text)
             }
-            is TranscriptionEvent.Final -> {
-                val text = event.transcription.text.trim()
+            is TranscriptionEvent.TranscriptFinal -> {
+                val text = event.segment.text.trim()
                 if (text.isNotEmpty()) committed = join(committed, text)
                 transcript = committed
             }
-            TranscriptionEvent.Started -> Unit
+            else -> Unit
         }
     }
 
