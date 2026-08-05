@@ -90,8 +90,8 @@ void setToolRunLoopError(rac_proto_buffer_t* out,
 }
 
 bool waitForToolExecutorOuterPromise(
-    const std::shared_ptr<Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>& promise,
-    std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>* outInnerPromise) {
+    const std::shared_ptr<Promise<std::shared_ptr<Promise<std::string>>>>& promise,
+    std::shared_ptr<Promise<std::string>>* outInnerPromise) {
     if (!promise || !outInnerPromise) {
         return false;
     }
@@ -104,8 +104,8 @@ bool waitForToolExecutorOuterPromise(
 }
 
 bool waitForToolExecutorResult(
-    const std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>& promise,
-    std::shared_ptr<ArrayBuffer>* outResult) {
+    const std::shared_ptr<Promise<std::string>>& promise,
+    std::string* outResult) {
     if (!promise || !outResult) {
         return false;
     }
@@ -114,7 +114,7 @@ bool waitForToolExecutorResult(
         return false;
     }
     *outResult = future.get();
-    return *outResult != nullptr;
+    return true;
 }
 
 rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
@@ -139,7 +139,7 @@ rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
         }
 
         auto outerPromise = state->onExecuteToolBytes(toolCallBuffer);
-        std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> innerPromise;
+        std::shared_ptr<Promise<std::string>> innerPromise;
         if (!waitForToolExecutorOuterPromise(outerPromise, &innerPromise)) {
             setToolRunLoopError(
                 outToolResultBytes,
@@ -148,8 +148,8 @@ rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
             return RAC_ERROR_TIMEOUT;
         }
 
-        std::shared_ptr<ArrayBuffer> toolResultBuffer;
-        if (!waitForToolExecutorResult(innerPromise, &toolResultBuffer)) {
+        std::string toolResultBase64;
+        if (!waitForToolExecutorResult(innerPromise, &toolResultBase64)) {
             setToolRunLoopError(
                 outToolResultBytes,
                 RAC_ERROR_TIMEOUT,
@@ -157,9 +157,12 @@ rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
             return RAC_ERROR_TIMEOUT;
         }
 
-        uint8_t* resultData = toolResultBuffer->data();
-        size_t resultSize = toolResultBuffer->size();
-        if (!resultData || resultSize == 0) {
+        // The executor returns base64 (value-copied across the JSI bridge), so
+        // decoding on this background thread never touches JS-thread-affine
+        // ArrayBuffer memory.
+        std::vector<uint8_t> resultBytes = base64Decode(toolResultBase64);
+        size_t resultSize = resultBytes.size();
+        if (resultSize == 0) {
             setToolRunLoopError(
                 outToolResultBytes,
                 RAC_ERROR_INVALID_ARGUMENT,
@@ -176,7 +179,7 @@ rac_result_t toolRunLoopExecuteCallback(const uint8_t* inToolCallBytes,
                 "tool run-loop failed to allocate ToolResult buffer");
             return RAC_ERROR_INTERNAL;
         }
-        std::memcpy(outToolResultBytes->data, resultData, resultSize);
+        std::memcpy(outToolResultBytes->data, resultBytes.data(), resultSize);
         outToolResultBytes->size = resultSize;
         outToolResultBytes->status = RAC_SUCCESS;
         outToolResultBytes->error_message = nullptr;

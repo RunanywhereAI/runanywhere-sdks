@@ -55,7 +55,7 @@ namespace margelo::nitro::runanywhere {
 class HybridRunAnywhereCore : public HybridRunAnywhereCoreSpec {
 public:
   using ToolRunLoopExecuteCallback = std::function<std::shared_ptr<
-      Promise<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>>(
+      Promise<std::shared_ptr<Promise<std::string>>>>(
       const std::shared_ptr<ArrayBuffer> &)>;
   using ToolRunLoopHandleCallback = std::function<void(double)>;
 

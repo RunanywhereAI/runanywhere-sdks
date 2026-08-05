@@ -38,6 +38,7 @@ import {
   unregisterTool,
 } from '../Extensions/LLM/RunAnywhere+ToolCalling';
 import { decode, decodeEvent, encode, nextRequestId, preflight } from './Bridge';
+import { arrayBufferToBytes, bytesToBase64 } from '../../services/ProtoBytes';
 import { ensureModelLoaded } from './Models';
 import { toLlmOptions, toToolCallingOptions } from './Options';
 import { toChatMessages } from './Inputs';
@@ -140,10 +141,12 @@ async function generateWithToolLoop(
 
   const resultBytes = await native.toolRunLoopProtoWithHandle(
     encode(request, ToolCallingSessionCreateRequest),
-    async (toolCallBytes: ArrayBuffer) => {
+    async (toolCallBytes: ArrayBuffer): Promise<string> => {
       const call = decodeEvent(toolCallBytes, ToolCall);
       const outcome = await executeTool(call);
-      return encode(outcome, ToolResult);
+      // base64: the native run loop reads this off the JS thread, where a JS
+      // ArrayBuffer's data() is unreadable.
+      return bytesToBase64(arrayBufferToBytes(encode(outcome, ToolResult)));
     },
     () => undefined
   );
