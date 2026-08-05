@@ -234,25 +234,25 @@ export async function registerAll(
       }),
       // Fara1.5-4B - Microsoft Qwen3.5-VL computer-use agent VLM (~3300MB total)
       // Uses multi-file download: main model + mmproj vision projector.
-      registerMultiFileModel({
+      registerModel({
         id: 'fara1.5-4b-q4_k_m',
         name: 'Fara1.5 4B Computer-Use Agent Q4_K_M',
         files: [
           {
             url: 'https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/Fara1.5-4B-Q4_K_M.gguf',
             filename: 'Fara1.5-4B-Q4_K_M.gguf',
-            isRequired: true,
+            required: true,
           },
           {
             url: 'https://huggingface.co/runanywhere/Fara1.5-4B-GGUF/resolve/main/mmproj-Fara1.5-4B-f16.gguf',
             filename: 'mmproj-Fara1.5-4B-f16.gguf',
-            isRequired: true,
+            required: true,
           },
         ],
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-        modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        category: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
         // Approximate total: primary Q4_K_M text model + f16 mmproj projector.
-        memoryRequirement: 3_300_000_000,
+        memoryRequirementBytes: 3_300_000_000,
         // Declares the model drivable through `RunAnywhere.cua`.
         cuaProfile: RunAnywhere.cua.faraProfile,
       }),
