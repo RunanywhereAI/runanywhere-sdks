@@ -282,7 +282,11 @@ public final class ConnectSession: ObservableObject {
                         "Timed out connecting to \(hostDisplayName)."
                     )
                 }
-                let value = try await group.next()!
+                guard let value = try await group.next() else {
+                    throw ConnectTransportError.network(
+                        "Connecting to \(hostDisplayName) finished without a response."
+                    )
+                }
                 group.cancelAll()
                 return value
             }

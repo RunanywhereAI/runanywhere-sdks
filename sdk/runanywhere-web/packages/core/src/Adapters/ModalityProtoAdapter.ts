@@ -66,6 +66,39 @@ const MODALITY_CAPABILITIES: ReadonlySet<string> = new Set<ModalityCapabilityNam
   'voice-agent',
 ]);
 
+/**
+ * Slot preference used to pick the aggregate `defaultModule`. `llm` is the
+ * historical anchor; the rest are fallbacks so `tryDefault()` keeps returning
+ * a usable module while any modality slot is still occupied. Shared by
+ * register and unregister so the two cannot drift apart.
+ */
+const DEFAULT_MODULE_PRIORITY: readonly ModalityCapabilityName[] = [
+  'llm',
+  'vlm',
+  'stt',
+  'tts',
+  'vad',
+  'embedding',
+  'segmentation',
+  'rag',
+  'diffusion',
+  'structured-output',
+  'tool-calling',
+  'lora',
+  'voice-agent',
+];
+
+function recomputeDefaultModule(): void {
+  for (const slot of DEFAULT_MODULE_PRIORITY) {
+    const claimed = adapterState.modalitySlots[slot];
+    if (claimed) {
+      adapterState.defaultModule = claimed;
+      return;
+    }
+  }
+  adapterState.defaultModule = null;
+}
+
 export { DiarizationProtoAdapter } from './DiarizationProtoAdapter.js';
 export { RerankProtoAdapter } from './RerankProtoAdapter.js';
 export { DiffusionProtoAdapter } from './DiffusionProtoAdapter.js';
@@ -107,21 +140,7 @@ export class ModalityProtoAdapter {
     // Keep the aggregate `defaultModule` non-null so `tryDefault()` returns
     // something usable — prefer the LLM-owning module (the historical
     // anchor) then fall back to any non-null slot.
-    adapterState.defaultModule =
-      adapterState.modalitySlots.llm
-      ?? adapterState.modalitySlots.vlm
-      ?? adapterState.modalitySlots.stt
-      ?? adapterState.modalitySlots.tts
-      ?? adapterState.modalitySlots.vad
-      ?? adapterState.modalitySlots.embedding
-      ?? adapterState.modalitySlots.segmentation
-      ?? adapterState.modalitySlots.rag
-      ?? adapterState.modalitySlots.diffusion
-      ?? adapterState.modalitySlots['structured-output']
-      ?? adapterState.modalitySlots['tool-calling']
-      ?? adapterState.modalitySlots.lora
-      ?? adapterState.modalitySlots['voice-agent']
-      ?? null;
+    recomputeDefaultModule();
   }
 
   /**
@@ -151,14 +170,7 @@ export class ModalityProtoAdapter {
       }
     }
     if (adapterState.defaultModule === module) {
-      adapterState.defaultModule =
-        adapterState.modalitySlots.llm
-        ?? adapterState.modalitySlots.vlm
-        ?? adapterState.modalitySlots.stt
-        ?? adapterState.modalitySlots.tts
-        ?? adapterState.modalitySlots.vad
-        ?? adapterState.modalitySlots.segmentation
-        ?? null;
+      recomputeDefaultModule();
     }
   }
 
