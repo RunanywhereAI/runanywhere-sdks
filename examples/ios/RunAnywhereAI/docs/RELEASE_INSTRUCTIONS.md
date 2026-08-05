@@ -272,10 +272,29 @@ rg -No '"(rac|ra_mlx)_[A-Za-z0-9_]+"' "${SRC_DIRS[@]}" --glob '*.swift' \
   | perl -ne 'while (/"((?:rac|ra_mlx)_[A-Za-z0-9_]+)"/g) { print "$1\n" }' \
   | sort -u > /tmp/runanywhere_expected_swift_native_symbols.from_strings
 
+# Symbols declared ONLY inside a build-configuration guard the archive does not
+# compile. The rg pass above is a plain text scan and does not evaluate `#if`, so
+# without this filter it reports a symbol that is CORRECTLY absent and the gate
+# fails on every good archive.
+#
+#   ra_mlx_metal_resource_anchor — MLXRuntime/MLX.swift, inside
+#   `#if RUNANYWHERE_MLX_DISTRIBUTION`. That flag is set only for the CocoaPods
+#   distribution build (Package.swift keys it off
+#   RUNANYWHERE_BUILD_MLX_DISTRIBUTION_FRAMEWORK); a normal SwiftPM archive uses
+#   mlx-swift's own resource bundle and never compiles the declaration.
+#
+# Add to this list only for a symbol you have confirmed is guarded out of THIS
+# archive's configuration — never to silence a genuinely missing export.
+PACKAGING_ONLY_SYMBOLS=(
+  ra_mlx_metal_resource_anchor
+)
+
 {
   cat /tmp/runanywhere_expected_swift_native_symbols.from_strings
   printf '%s\n' "${REQUIRED_SYMBOLS[@]}"
-} | sort -u > /tmp/runanywhere_expected_swift_native_symbols.txt
+} | sort -u \
+  | grep -vxF "$(printf '%s\n' "${PACKAGING_ONLY_SYMBOLS[@]}")" \
+  > /tmp/runanywhere_expected_swift_native_symbols.txt
 
 comm -23 \
   /tmp/runanywhere_expected_swift_native_symbols.txt \
