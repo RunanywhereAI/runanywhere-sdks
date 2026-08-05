@@ -585,6 +585,23 @@ rac_result_t rac_inference_framework_from_string(const char* s, rac_inference_fr
         }
     }
 
+    // LEGACY DISPLAY-NAME ALIASES. This function resolves a framework from any of its three
+    // representations, so a value that was parseable yesterday must stay parseable today —
+    // otherwise renaming a DISPLAY string silently breaks reading back persisted records.
+    //
+    // `RAC_FRAMEWORK_COREML`'s display name became "NeuRT" when the Apple engine was renamed
+    // (the engine is NeuRT; COREML remains the wire value and Apple's framework name). "Core ML"
+    // is what older stored model entries and API payloads still carry, and it matches none of the
+    // three current spellings — the wire string is `INFERENCE_FRAMEWORK_COREML` and the analytics
+    // key is `coreml`, neither of which has the space. Without this it returns NOT_FOUND.
+    //
+    // `coreml` (no space) already matches the analytics key case-insensitively, so only the
+    // spaced form needs an alias here.
+    if (equals_case_insensitive(input, "Core ML")) {
+        *out = RAC_FRAMEWORK_COREML;
+        return RAC_SUCCESS;
+    }
+
     return RAC_ERROR_NOT_FOUND;
 }
 
