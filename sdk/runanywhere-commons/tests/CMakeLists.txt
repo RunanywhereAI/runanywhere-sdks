@@ -1571,6 +1571,8 @@ add_test(NAME hf_resolver_folder_tests COMMAND test_hf_resolver_folder)
 # generic folder resolver without any private runtime headers or binaries.
 get_filename_component(QHEXRT_ENGINE_DIR
     "${CMAKE_CURRENT_LIST_DIR}/../../../engines/qhexrt" ABSOLUTE)
+get_filename_component(NEURT_ENGINE_DIR
+    "${CMAKE_CURRENT_LIST_DIR}/../../../engines/neurt" ABSOLUTE)
 add_executable(test_bundle_policy
     test_bundle_policy.cpp
     ${QHEXRT_ENGINE_DIR}/qhexrt_device_capability.cpp
@@ -1580,6 +1582,10 @@ target_include_directories(test_bundle_policy PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${QHEXRT_ENGINE_DIR}
     ${QHEXRT_ENGINE_DIR}/include
+    # The NeuRT policy is header-only for the same reason QHexRT's is: it can be
+    # included here with no engine target and no Apple SDK, so the predicate is
+    # gated on every runner rather than only on a Mac.
+    ${NEURT_ENGINE_DIR}
 )
 target_link_libraries(test_bundle_policy PRIVATE rac_commons)
 rac_link_archive_deps(test_bundle_policy)

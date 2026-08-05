@@ -30,6 +30,8 @@
 
 #include "rac_diffusion_coreml.h"
 
+#include "neurt_bundle_policy.h"
+#include "rac/core/rac_logger.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
 #include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
@@ -290,6 +292,22 @@ static const rac_engine_vtable_t g_neurt_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(neurt) {
+    // Bundle policy FIRST, and unconditionally. It is inert metadata that teaches commons how to
+    // resolve an ANE folder bundle (which top-level .json is the manifest, which format to stamp),
+    // which is what makes a one-line `registerModel(url: "hf.co/org/<m>_ANE/<precision>")` work at
+    // all — exactly as the QHexRT engine does for HNPU bundles.
+    //
+    // MEASURED before this existed: a bare folder ref failed with "cannot choose a primary file",
+    // and naming the manifest explicitly registered a 160-byte SINGLE FILE with the framework
+    // unset. So the Apple catalog could not register a bundle by URL in either form.
+    //
+    // Registering it here rather than in a `rac_backend_neurt_register()` is deliberate: this
+    // engine has no other bring-up and deliberately has no such carrier (see engines/AGENTS.md),
+    // and on iOS the static shim calls this entry directly.
+    const rac_result_t policy_rc = rac_bundle_policy_register(neurt_bundle_policy());
+    if (policy_rc != RAC_SUCCESS) {
+        RAC_LOG_WARNING("NeuRT", "NeuRT bundle policy registration failed: %d", policy_rc);
+    }
     return rac_engine_entry_with_manifest(&k_neurt_manifest, &g_neurt_engine_vtable);
 }
 

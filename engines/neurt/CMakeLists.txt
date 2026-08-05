@@ -154,6 +154,26 @@ if(_neurt_core_objcxx)
 endif()
 
 # ---------------------------------------------------------------------------
+# Canonicalize NEURT_ROOT out of embedded paths.
+#
+# These sources compile from the SIBLING neurun checkout, which is OUTSIDE this
+# repo — so the -ffile-prefix-map=${REPO_ROOT} that build-core-xcframework.sh
+# applies globally via CMAKE_<LANG>_FLAGS cannot reach them, and the objects keep
+# an absolute /Users/... string from __FILE__ / debug info. The packaging step's
+# sanitize_and_validate_archive_host_paths then REFUSES the archive with
+# "still contains unreviewed host path marker(s): /Users/", which fails the whole
+# xcframework build at the very last step. Mapping NEURT_ROOT the same way the
+# SDK maps its own root makes this slice byte-reproducible from any checkout
+# location, rather than papering over it with a fixed-length string replacement
+# in the packaging script (which would break the moment neurun moves).
+# ---------------------------------------------------------------------------
+set(_neurt_prefix_maps
+    "-ffile-prefix-map=${NEURT_ROOT}=/neurun"
+    "-fmacro-prefix-map=${NEURT_ROOT}=/neurun"
+    "-fdebug-prefix-map=${NEURT_ROOT}=/neurun")
+target_compile_options(rac_neurt_core PRIVATE ${_neurt_prefix_maps})
+
+# ---------------------------------------------------------------------------
 # rac_neurt_llm_ops — the LLM modality's op-table adapter.
 #
 # Supplies `g_neurt_llm_ops`, which rac_plugin_entry_neurt.cpp wires into the
@@ -168,6 +188,7 @@ target_include_directories(rac_neurt_llm_ops PRIVATE
     ${NEURT_ROOT}/NeuRT/include)
 target_compile_definitions(rac_neurt_llm_ops PRIVATE NEURT_WITH_RAC_HEADERS=1)
 target_compile_features(rac_neurt_llm_ops PRIVATE cxx_std_17)
+target_compile_options(rac_neurt_llm_ops PRIVATE ${_neurt_prefix_maps})
 set_target_properties(rac_neurt_llm_ops PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(rac_neurt_llm_ops PUBLIC rac_neurt_core)
 
@@ -213,6 +234,13 @@ rac_add_engine_plugin(neurt
                         rac_runtime_coreml
                         rac_neurt_llm_ops
 )
+
+# NEURT_SOURCES pulls rac_diffusion_coreml.mm straight out of NEURT_ROOT, so this
+# target — not just the rac_neurt_* libs above — is the one whose objects carry an
+# absolute host path. It is the object that actually lands in the packaged
+# librac_backend_neurt.a, so without this the xcframework build fails its
+# host-path audit at the final step. See the _neurt_prefix_maps comment above.
+target_compile_options(rac_backend_neurt PRIVATE ${_neurt_prefix_maps})
 
 # Self-registration carrier — installs the neurt engine vtable into the unified
 # plugin registry. Without this, neither static iOS hosts nor dynamic dlopen

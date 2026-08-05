@@ -797,8 +797,17 @@ merge_neurt_backend_slice() {
     local output="$3"
     local arch="$4"
     local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/neurt"
+    # rac_neurt_llm_ops (g_neurt_llm_ops) and rac_neurt_core (neurt::Generator)
+    # are SEPARATE CMake targets, so their objects are NOT inside
+    # librac_backend_neurt.a. Omitting them ships an archive whose
+    # rac_plugin_entry_neurt.o carries `U _g_neurt_llm_ops` — the engine still
+    # registers, but the ANE GENERATE_TEXT vtable slot cannot resolve at the
+    # consumer's link. Nothing in this build reports it: every CMake target
+    # compiles, the xcframework packages, and only an executable link fails.
     local inputs=(
         "${build_root}/engines/neurt/${slice_dir}/librac_backend_neurt.a"
+        "${build_root}/engines/neurt/${slice_dir}/librac_neurt_llm_ops.a"
+        "${build_root}/engines/neurt/${slice_dir}/librac_neurt_core.a"
         "${build_root}/runtimes/coreml/${slice_dir}/librac_runtime_coreml.a"
     )
 
@@ -816,8 +825,11 @@ merge_neurt_backend_macos_slice() {
     local output="$2"
     local arch="$3"
     local scratch_dir="${STAGING_DIR}/prepared/Release-macos/neurt"
+    # Same four-archive merge as the iOS slices — see merge_neurt_backend_slice.
     local inputs=(
         "${build_root}/engines/neurt/librac_backend_neurt.a"
+        "${build_root}/engines/neurt/librac_neurt_llm_ops.a"
+        "${build_root}/engines/neurt/librac_neurt_core.a"
         "${build_root}/runtimes/coreml/librac_runtime_coreml.a"
     )
 
