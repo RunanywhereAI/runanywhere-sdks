@@ -5,6 +5,11 @@
 // carries raw PCM in that format. Mirrors Swift's `SttStream`/`VadStream`
 // and Web's `SttStream`/`VadStream`.
 
+// prefer_initializing_formals cannot apply: the fields are private and set via
+// named parameters, and Dart forbids named initializing formals that start with
+// an underscore, so the lint's suggested `this._field` form is illegal here.
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 
 import 'package:runanywhere/public/api/types/events.dart';

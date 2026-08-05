@@ -4,6 +4,11 @@
 // generated proto the commons ABI returns, so field names stay spec-shaped
 // while the wire contract stays canonical.
 
+// prefer_initializing_formals cannot apply to LoadedModel/SpeechHandle: their
+// handler fields are private and set via named parameters, and Dart forbids
+// named initializing formals that start with an underscore.
+// ignore_for_file: prefer_initializing_formals
+
 import 'dart:async';
 import 'dart:typed_data';
 
