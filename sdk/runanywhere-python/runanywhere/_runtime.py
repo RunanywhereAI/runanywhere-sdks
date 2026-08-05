@@ -62,6 +62,36 @@ def _os_platform() -> str:
     return "linux"
 
 
+def _http_post(
+    method: str,
+    url: str,
+    headers: list,
+    body: bytes,
+    timeout_ms: int,
+) -> Optional[Tuple[int, list, bytes]]:
+    """stdlib-urllib HTTP transport backing the control plane (auth + telemetry).
+
+    Returns ``(status, [(name, value), ...], body_bytes)`` for any HTTP response —
+    including 4xx/5xx, which are real responses the caller inspects. Returns
+    ``None`` on a connect/DNS/TLS/timeout failure so commons maps it to a network
+    error. No third-party client: urllib only, matching the SDK's HTTP rule.
+    """
+    import urllib.error
+    import urllib.request
+
+    request = urllib.request.Request(url, data=bytes(body) if body else None, method=method or "GET")
+    for name, value in headers:
+        request.add_header(name, value)
+    timeout = (timeout_ms / 1000.0) if timeout_ms and timeout_ms > 0 else None
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310 — configured backend URL
+            return (resp.status, list(resp.headers.items()), resp.read())
+    except urllib.error.HTTPError as e:
+        return (e.code, list(e.headers.items()) if e.headers else [], e.read() or b"")
+    except Exception:  # noqa: BLE001 — URLError/timeout/TLS = transport failure
+        return None
+
+
 # Catalog model types → the category the registry and ModelsState report.
 _CATEGORY_FOR_TYPE = {
     "llm": ModelCategory.LANGUAGE,
@@ -195,6 +225,7 @@ class Runtime:
         )
         try:
             core.configure_control_plane(  # type: ignore[attr-defined]
+                _http_post,
                 env_int,
                 api_key or "",
                 eff_base,

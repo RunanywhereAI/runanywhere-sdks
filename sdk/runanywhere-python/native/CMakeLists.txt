@@ -85,17 +85,15 @@ else()
                    "${RAC_PROTOBUF_RUNTIME_ENABLED})")
 endif()
 
-# Desktop control plane (telemetry + auth). When the desktop adapter is built
-# into commons (RAC_DESKTOP_ADAPTER=ON), it carries the libcurl HTTP transport
-# that auth/model-assignments/telemetry POST through; commons links CURL::libcurl
-# PUBLIC, so our PRIVATE link on rac_commons inherits it. Tell module.cpp the
-# rac_desktop_* + two-phase-init surface is available.
-if(RAC_DESKTOP_ADAPTER)
-    target_compile_definitions(runanywhere_core PRIVATE RAC_PY_HAVE_DESKTOP)
-    message(STATUS "runanywhere-python: desktop control plane enabled (telemetry + auth)")
+# Control plane (telemetry + auth). The two-phase init is proto-driven, so it needs
+# the protobuf runtime; HTTP goes through a Python urllib transport module.cpp
+# registers (no libcurl / no desktop adapter — keeps the wheel dependency-free and
+# honors this SDK's stdlib-only HTTP rule).
+if(RAC_PROTOBUF_RUNTIME_ENABLED)
+    target_compile_definitions(runanywhere_core PRIVATE RAC_PY_CONTROL_PLANE)
+    message(STATUS "runanywhere-python: control plane enabled (telemetry + auth, urllib transport)")
 else()
-    message(STATUS "runanywhere-python: desktop control plane OFF "
-                   "(pass -DRAC_DESKTOP_ADAPTER=ON to enable telemetry/auth)")
+    message(STATUS "runanywhere-python: control plane OFF (protobuf runtime disabled)")
 endif()
 
 if(MSVC)

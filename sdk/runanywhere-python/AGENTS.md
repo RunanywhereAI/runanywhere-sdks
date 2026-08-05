@@ -169,13 +169,13 @@ bring-up, and `reset()` the whole teardown; `is_ready()`, `version()`, `device_i
 no second init phase. The namespaces (`runanywhere.llm`, `.rag`, `.models`, …) are singletons
 created at import time; they hold no native state, so importing them costs nothing.
 
-`api_key` and `base_url` drive the control plane on a desktop-adapter build
-(`RAC_DESKTOP_ADAPTER=ON`, the default for the wheel): `initialize` runs the two-phase
-handshake — authenticate, then flush telemetry — through the bundled libcurl transport
-(`configure_control_plane` in `native/module.cpp`, mirroring rcli's bootstrap). Keyless, or on
-a build without the desktop adapter, `initialize` does no network work and warns when a key is
-passed with no usable transport. The telemetry HTTP callback is pure C++ over `rac_http_client`
-— it never touches the GIL.
+`api_key` and `base_url` drive the control plane: with both set, `initialize` runs the
+two-phase handshake — authenticate, then flush telemetry — via `configure_control_plane` in
+`native/module.cpp` (mirroring rcli's bootstrap). HTTP goes through a **stdlib-`urllib`
+transport** the module registers with commons (`rac_http_transport_register`), so there is no
+libcurl / third-party client in the wheel — the same pattern Swift (URLSession) and Kotlin
+(OkHttp) use to supply their own transport. Keyless, `initialize` does no network work. The
+transport/telemetry callbacks re-acquire the GIL to call the `urllib` poster.
 
 ### The process-wide runtime
 
@@ -417,11 +417,10 @@ every change; they are the bar for review.
 - Document what is actually true today. Do not claim encryption, remote auth, or NPU
   support that is not wired.
   - Secure store: DPAPI on Windows; **plaintext mode-0600 files on POSIX**.
-  - `initialize` runs the control plane only with credentials on a desktop-adapter build:
-    authenticate + telemetry flush over the bundled libcurl transport. Keyless, or on a build
-    without the adapter, it does no network work; `api_key`/`base_url` map to that handshake.
-    The HTTP server's optional Bearer `api_key` is a separate thing, configured on
-    `serve()` / the CLI.
+  - `initialize` runs the control plane only with credentials: authenticate + telemetry flush
+    over a stdlib-`urllib` transport (no libcurl). Keyless, it does no network work;
+    `api_key`/`base_url` map to that handshake. The HTTP server's optional Bearer `api_key`
+    is a separate thing, configured on `serve()` / the CLI.
   - Desktop wheels report CPU backends (llamacpp/onnx/sherpa). QHexRT/Windows Snapdragon
     HNPU is not available until packaging and runtime exist.
 - A verb the bridge cannot serve raises `not_implemented` naming the exact missing `rac_*`

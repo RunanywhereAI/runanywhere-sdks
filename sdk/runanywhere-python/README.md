@@ -194,9 +194,9 @@ raises rather than being silently ignored.
 - One model per category is resident; asking for a different id in the same category swaps it.
 - Prompts, responses, audio, and images never leave the host during inference.
 - Pass `api_key` + `base_url` (production) and `initialize` runs the two-phase control-plane
-  handshake — authenticate, then flush telemetry — over the bundled libcurl transport. With no
-  credentials it does no network work. A wheel built without the desktop adapter
-  (`RAC_DESKTOP_ADAPTER=OFF`) has no control plane and ignores both, warning if a key is passed.
+  handshake — authenticate, then flush telemetry. HTTP uses a stdlib-`urllib` transport (no
+  libcurl / third-party client), so the wheel stays dependency-free. With no credentials
+  `initialize` does no network work.
 
 ## Support
 

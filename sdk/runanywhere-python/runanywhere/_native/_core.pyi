@@ -20,15 +20,19 @@ def backends() -> list[str]: ...
 def initialize(secure_dir: str, base_dir: str | None = ...) -> None: ...
 def shutdown() -> None: ...
 
-# Desktop control plane (telemetry + auth). Present only on a build with the
-# desktop libcurl transport linked (RAC_DESKTOP_ADAPTER=ON); ``has_control_plane``
-# is the capability flag. ``environment`` is a rac_environment_t (0=dev, 2=prod);
-# ``phase1_bytes`` / ``phase2_bytes`` are serialized SdkInit{Phase1,Phase2}Request;
+# Control plane (telemetry + auth). Present when the protobuf runtime is built
+# (RAC_PY_CONTROL_PLANE); ``has_control_plane`` is the capability flag. HTTP is
+# performed by ``http_poster`` — a Python callable
+# ``(method, url, [(k, v), ...], body: bytes, timeout_ms: int) ->
+# (status: int, [(k, v), ...], body: bytes) | None`` — registered as the transport
+# (None => network error). ``environment`` is a rac_environment_t (0=dev, 2=prod);
+# ``phase1_bytes``/``phase2_bytes`` are serialized SdkInit{Phase1,Phase2}Request;
 # the return is a serialized SdkInitResult (empty on a phase failure).
 has_control_plane: bool
 def device_persistent_id() -> str: ...
 def dev_staging_base_url() -> str: ...
 def configure_control_plane(
+    http_poster: Callable[[str, str, list, bytes, int], "tuple | None"],
     environment: int,
     api_key: str,
     base_url: str,

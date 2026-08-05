@@ -69,11 +69,6 @@ cmake.args = [
     # so the wheel stays self-contained — no extra sidecar to repair.
     "-DRAC_BACKEND_RAG=ON",
     "-DRAC_ENABLE_PROTOBUF=ON",
-    # Desktop control plane: build the desktop adapter's libcurl HTTP transport
-    # into commons so telemetry + auth (two-phase init) work. Adds a libcurl link
-    # dependency, vendored into the wheel by delocate/auditwheel/delvewheel at
-    # repair time. Turn OFF for a pure inference-only, network-free build.
-    "-DRAC_DESKTOP_ADAPTER=ON",
 ]
 # Optional accelerator/engine backends are additive build-flag opt-ins (native/CMakeLists.txt
 # links + registers whatever rac_backend_<x> targets a build produces). Enable per build via

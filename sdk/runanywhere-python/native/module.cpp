@@ -62,12 +62,13 @@
 #include "rac/features/diffusion/rac_diffusion_types.h"
 #endif
 #include "rac/infrastructure/model_management/rac_model_paths.h"
-// Desktop control plane (telemetry + auth). Compiled only when the desktop
-// adapter — which carries the libcurl HTTP transport — is linked into commons
-// (RAC_PY_HAVE_DESKTOP, set by native/CMakeLists.txt when RAC_DESKTOP_ADAPTER=ON).
-#ifdef RAC_PY_HAVE_DESKTOP
+// Control plane (telemetry + auth). Compiled when the protobuf runtime is present
+// (RAC_PY_CONTROL_PLANE, set by native/CMakeLists.txt) since the two-phase init is
+// proto-driven. HTTP goes through a Python urllib-backed transport we register —
+// no libcurl / no third-party client, per this SDK's stdlib-HTTP rule; this mirrors
+// how Swift (URLSession) and Kotlin (OkHttp) supply their own transport to commons.
+#ifdef RAC_PY_CONTROL_PLANE
 #include "rac/core/rac_sdk_state.h"
-#include "rac/desktop/rac_desktop.h"
 #include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
@@ -139,11 +140,15 @@ namespace {
 rac_platform_adapter_t g_adapter;
 std::atomic<bool> g_initialized{false};
 
-#ifdef RAC_PY_HAVE_DESKTOP
+#ifdef RAC_PY_CONTROL_PLANE
 // Owns the telemetry manager for the process lifetime so the terminal flush in
 // rac_shutdown() can deliver through our HTTP callback before teardown. Guarded
 // by g_handles_mutex on create/destroy.
 rac_telemetry_manager_t* g_telemetry_manager = nullptr;
+
+// The Python urllib poster backing the registered HTTP transport. Held by value;
+// its refcount is touched only under the GIL. Set once at control-plane bring-up.
+py::object g_http_poster;
 #endif
 
 // Handles are exposed to Python as small integer ids. Each component family
@@ -411,20 +416,80 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
     g_initialized.store(true);
 }
 
-#ifdef RAC_PY_HAVE_DESKTOP
+#ifdef RAC_PY_CONTROL_PLANE
 // =============================================================================
-// Desktop control plane: telemetry + auth over the libcurl HTTP transport.
-//
-// A behavioral port of rcli's bootstrap (sdk/runanywhere-cli/src/bootstrap.cpp:
-// initialize_sdk_metadata + initialize_telemetry_auth). The desktop adapter
-// linked into commons provides the libcurl transport, so telemetry HTTP is
-// delivered entirely in C++ (rac_http_client_* over the registered transport) —
-// no Python callback, no GIL involvement on the telemetry thread. Phase-1/2
-// proto requests are built in Python (runanywhere/_proto/sdk_init_pb2) and
-// handed in as serialized bytes.
+// Control plane: telemetry + auth. Ports rcli's bootstrap (sdk/runanywhere-cli/
+// src/bootstrap.cpp: initialize_sdk_metadata + initialize_telemetry_auth), but
+// registers a Python urllib-backed HTTP transport instead of commons' libcurl one
+// (no third-party client, per this SDK's stdlib-HTTP rule). Auth, model
+// assignments, and telemetry all POST through rac_http_client over that transport.
+// Phase-1/2 proto requests are built in Python (runanywhere/_proto/sdk_init_pb2)
+// and handed in as serialized bytes.
 // =============================================================================
 
-// Delivers a queued telemetry batch over the desktop HTTP transport. Wired via
+// Malloc a NUL-terminated copy for rac_http_response_t fields (freed by
+// rac_http_response_free with free(); the module shares commons' CRT heap).
+char* http_dup(const std::string& s) {
+    char* p = static_cast<char*>(std::malloc(s.size() + 1));
+    if (!p) return nullptr;
+    std::memcpy(p, s.c_str(), s.size() + 1);
+    return p;
+}
+
+// rac_http_transport_ops_t::request_send — the one HTTP primitive commons routes
+// every request through. Marshals to the Python urllib poster:
+//   poster(method, url, [(k,v)...], body: bytes, timeout_ms) ->
+//       (status: int, [(k,v)...], body: bytes)  |  None on a network/connect error
+// Per the transport contract, ANY HTTP response (incl. 4xx/5xx) is RAC_SUCCESS with
+// out->status set; only connect/DNS/TLS/timeout failures return an error code.
+rac_result_t py_http_request_send(void* /*ud*/, const rac_http_request_t* req,
+                                  rac_http_response_t* out) {
+    std::memset(out, 0, sizeof(*out));
+    py::gil_scoped_acquire gil;
+    if (!g_http_poster || g_http_poster.is_none()) return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    try {
+        py::list headers;
+        for (size_t i = 0; i < req->header_count; ++i) {
+            headers.append(py::make_tuple(req->headers[i].name ? req->headers[i].name : "",
+                                          req->headers[i].value ? req->headers[i].value : ""));
+        }
+        py::bytes body(reinterpret_cast<const char*>(req->body_bytes ? req->body_bytes
+                                                                     : (const uint8_t*)""),
+                       req->body_len);
+        py::object r = g_http_poster(std::string(req->method ? req->method : "GET"),
+                                     std::string(req->url ? req->url : ""), headers, body,
+                                     req->timeout_ms);
+        if (r.is_none()) return RAC_ERROR_NETWORK_ERROR;  // connect/DNS/TLS/timeout
+        py::tuple t = r.cast<py::tuple>();
+        out->status = t[0].cast<int32_t>();
+        std::string rb = t[2].cast<py::bytes>();
+        if (!rb.empty()) {
+            out->body_bytes = reinterpret_cast<uint8_t*>(http_dup(rb));
+            out->body_len = rb.size();
+        }
+        py::list rh = t[1].cast<py::list>();
+        size_t hc = rh.size();
+        if (hc) {
+            out->headers = static_cast<rac_http_header_kv_t*>(
+                std::malloc(hc * sizeof(rac_http_header_kv_t)));
+            out->header_count = hc;
+            for (size_t i = 0; i < hc; ++i) {
+                py::tuple kv = rh[i].cast<py::tuple>();
+                out->headers[i].name = http_dup(kv[0].cast<std::string>());
+                out->headers[i].value = http_dup(kv[1].cast<std::string>());
+            }
+        }
+        return RAC_SUCCESS;
+    } catch (...) {
+        return RAC_ERROR_INTERNAL;
+    }
+}
+
+// Static ops table — must outlive the registration (commons borrows the pointer).
+rac_http_transport_ops_t g_py_transport_ops = {py_http_request_send, nullptr, nullptr, nullptr,
+                                               nullptr};
+
+// Delivers a queued telemetry batch over the registered HTTP transport. Wired via
 // rac_telemetry_manager_set_http_callback (user_data = the manager); reports the
 // outcome back through rac_telemetry_manager_http_complete. Runs on commons'
 // telemetry thread — pure C++, never touches Python state or the GIL.
@@ -520,20 +585,19 @@ std::string dev_staging_base_url() {
 // Returns the serialized SdkInitResult from phase 2 (empty on a phase failure).
 // Best-effort: HTTP/auth failures are non-fatal (the SDK stays usable offline),
 // matching commons' Phase-2 contract.
-py::bytes configure_control_plane(int32_t environment, const std::string& api_key,
-                                  const std::string& base_url, const std::string& device_id,
-                                  const std::string& platform, const std::string& sdk_version,
-                                  const std::string& sdk_binding,
+py::bytes configure_control_plane(py::function http_poster, int32_t environment,
+                                  const std::string& api_key, const std::string& base_url,
+                                  const std::string& device_id, const std::string& platform,
+                                  const std::string& sdk_version, const std::string& sdk_binding,
                                   const std::string& app_identifier, const std::string& app_name,
                                   const std::string& app_version, const std::string& phase1_bytes,
                                   const std::string& phase2_bytes) {
     if (!g_initialized.load()) throw std::runtime_error("not initialized");
     const auto env = static_cast<rac_environment_t>(environment);
 
-    {
-        py::gil_scoped_release release;
-        rac_desktop_http_transport_register();
-    }
+    // Install the urllib poster + register our transport before any HTTP runs.
+    g_http_poster = http_poster;
+    rac_http_transport_register(&g_py_transport_ops, nullptr);
 
     // Runtime state first (the auth/device/telemetry paths read env + creds from
     // rac_state), then the copied SDK configuration + client info.
@@ -616,8 +680,11 @@ void telemetry_teardown() {
         rac_events_set_telemetry_sink(nullptr);
         rac_telemetry_manager_destroy(mgr);
     }
+    // Unregister our transport and drop the Python poster (GIL held here).
+    rac_http_transport_register(nullptr, nullptr);
+    g_http_poster = py::none();
 }
-#endif  // RAC_PY_HAVE_DESKTOP
+#endif  // RAC_PY_CONTROL_PLANE
 
 // =============================================================================
 // Streaming core — shared by LLM generate + VLM generate_vlm.
@@ -1990,7 +2057,7 @@ void shutdown() {
 #endif
             g_inflight.clear();
         }
-#ifdef RAC_PY_HAVE_DESKTOP
+#ifdef RAC_PY_CONTROL_PLANE
         // Flush queued telemetry while the HTTP transport is still registered:
         // rac_shutdown() tears the transport down before its own terminal flush,
         // which would otherwise drop the last batch ("transport unavailable").
@@ -2000,7 +2067,7 @@ void shutdown() {
         }
 #endif
         rac_shutdown();
-#ifdef RAC_PY_HAVE_DESKTOP
+#ifdef RAC_PY_CONTROL_PLANE
         // Detach + destroy the telemetry manager after the runtime is down.
         telemetry_teardown();
 #endif
@@ -2090,7 +2157,7 @@ PYBIND11_MODULE(_core, m) {
           "call rac_init, and register backends once.");
     m.def("shutdown", &shutdown, "Destroy all live handles and shut the runtime down.");
 
-#ifdef RAC_PY_HAVE_DESKTOP
+#ifdef RAC_PY_CONTROL_PLANE
     // Desktop control plane (telemetry + auth). Present only when the desktop
     // libcurl transport is linked into commons (RAC_DESKTOP_ADAPTER=ON).
     m.attr("has_control_plane") = true;
@@ -2098,13 +2165,13 @@ PYBIND11_MODULE(_core, m) {
           "The persistent per-device UUID commons mints.");
     m.def("dev_staging_base_url", &dev_staging_base_url,
           "Baked staging backend URL for keyless development (empty when none).");
-    m.def("configure_control_plane", &configure_control_plane, py::arg("environment"),
-          py::arg("api_key"), py::arg("base_url"), py::arg("device_id"), py::arg("platform"),
-          py::arg("sdk_version"), py::arg("sdk_binding"), py::arg("app_identifier"),
-          py::arg("app_name"), py::arg("app_version"), py::arg("phase1_bytes"),
-          py::arg("phase2_bytes"),
-          "Register the libcurl transport, seed state, and run two-phase init "
-          "(telemetry + auth). Returns serialized SdkInitResult bytes.");
+    m.def("configure_control_plane", &configure_control_plane, py::arg("http_poster"),
+          py::arg("environment"), py::arg("api_key"), py::arg("base_url"), py::arg("device_id"),
+          py::arg("platform"), py::arg("sdk_version"), py::arg("sdk_binding"),
+          py::arg("app_identifier"), py::arg("app_name"), py::arg("app_version"),
+          py::arg("phase1_bytes"), py::arg("phase2_bytes"),
+          "Register the urllib HTTP transport (http_poster), seed state, and run the "
+          "two-phase init (telemetry + auth). Returns serialized SdkInitResult bytes.");
 #else
     m.attr("has_control_plane") = false;
 #endif
