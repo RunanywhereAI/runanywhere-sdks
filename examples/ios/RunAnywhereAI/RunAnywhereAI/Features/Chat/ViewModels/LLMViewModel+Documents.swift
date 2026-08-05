@@ -60,17 +60,39 @@ extension LLMViewModel {
                     reasoning.mode = .off
                 }
                 reasoning.includeInOutput = settings.thinkingModeEnabled
-                var options = LlmOptions()
-                options.reasoning = reasoning
+                var generation = LlmOptions()
+                generation.reasoning = reasoning
 
-                let result = try await session.query(question: prompt, options: options)
-                if isCurrentGeneration(generationID) {
-                    updateDocumentMessage(
-                        at: messageIndex,
-                        answer: result.answer,
-                        thinkingContent: nil,
-                        answerModel: answerModel
-                    )
+                // Stream the answer: the one-shot query resolves with an empty
+                // answer under the v4 RAG pipeline, so accumulate tokens live and
+                // fall back to the completed result.
+                var answer = ""
+                let events = try await session.queryStream(
+                    question: prompt,
+                    options: RagQueryOptions(generation: generation)
+                )
+                for try await event in events {
+                    guard isCurrentGeneration(generationID) else { break }
+                    switch event {
+                    case .token(let text, _):
+                        answer += text
+                        updateDocumentMessage(
+                            at: messageIndex,
+                            answer: answer,
+                            thinkingContent: nil,
+                            answerModel: answerModel
+                        )
+                    case .completed(let result):
+                        let finalAnswer = result.answer.isEmpty ? answer : result.answer
+                        updateDocumentMessage(
+                            at: messageIndex,
+                            answer: finalAnswer,
+                            thinkingContent: nil,
+                            answerModel: answerModel
+                        )
+                    case .retrieved:
+                        break
+                    }
                 }
             } catch {
                 if isCurrentGeneration(generationID) {
