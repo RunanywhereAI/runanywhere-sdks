@@ -127,38 +127,69 @@ class ModelsApi {
 
   /// Fetch [id] to disk, reporting progress until it is registered.
   ///
-  /// Throws [SDKException] into the consumer when the transfer fails or is
-  /// cancelled.
+  /// Emits a terminal [DownloadFailed]/[DownloadCancelled] event when the
+  /// transfer fails or is cancelled; never fabricates a [DownloadCompleted]
+  /// afterward.
   Stream<DownloadEvent> download(String id) async* {
+    final operationId = id;
+    var sequence = 0;
+    yield DownloadStarted(operationId, sequence: sequence++);
+
     var extracting = false;
+    var verifying = false;
     await for (final progress in RunAnywhereDownloads.shared.start(id)) {
       switch (progress.state) {
         case DownloadState.DOWNLOAD_STATE_FAILED:
-          throw SDKException.downloadFailed(
-            id,
-            progress.hasError() ? progress.error.message : null,
+          yield DownloadFailed(
+            operationId,
+            progress.hasError()
+                ? SDKException.downloadFailed(id, progress.error.message)
+                : SDKException.downloadFailed(id),
+            sequence: sequence++,
           );
+          return;
         case DownloadState.DOWNLOAD_STATE_CANCELLED:
-          throw SDKException.cancelled('Download cancelled for $id');
+          yield DownloadCancelled(operationId, sequence: sequence++);
+          return;
         case DownloadState.DOWNLOAD_STATE_COMPLETED:
           final model = await get(id);
           if (model == null) {
-            throw SDKException.modelNotFound(id);
+            yield DownloadFailed(
+              operationId,
+              SDKException.modelNotFound(id),
+              sequence: sequence++,
+            );
+            return;
           }
-          yield DownloadCompleted(model);
+          yield DownloadCompleted(operationId, model, sequence: sequence++);
+          return;
         default:
-          if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
+          if (progress.stage == DownloadStage.DOWNLOAD_STAGE_VALIDATING) {
+            if (!verifying) {
+              verifying = true;
+              yield DownloadVerifying(operationId, sequence: sequence++);
+            }
+          } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
             if (!extracting) {
               extracting = true;
-              yield const DownloadExtracting();
+              yield DownloadExtracting(
+                operationId,
+                sequence: sequence++,
+                percent: progress.stageProgress > 0
+                    ? progress.stageProgress
+                    : null,
+              );
             }
           } else {
             yield DownloadProgressEvent(
+              operationId: operationId,
               bytesDone: progress.bytesDownloaded.toInt(),
               bytesTotal: progress.totalBytes.toInt(),
-              percent: progress.overallProgress > 0
-                  ? progress.overallProgress
-                  : progress.stageProgress,
+              sequence: sequence++,
+              file: progress.hasCurrentFileName() &&
+                      progress.currentFileName.isNotEmpty
+                  ? progress.currentFileName
+                  : null,
             );
           }
       }
@@ -181,8 +212,12 @@ class ModelsApi {
 
   /// Make [id] resident, paying the load cost now rather than on first use.
   ///
+  /// Only [LoadOptions.backendPreferences]'s first entry (equivalently the
+  /// deprecated `framework`) reaches commons today; other placement knobs
+  /// are not yet carried by the native load ABI.
+  ///
   /// Throws [SDKException] when the model is unknown or fails to load.
-  Future<void> load(String id, {LoadOptions? options}) async {
+  Future<LoadedModel> load(String id, {LoadOptions? options}) async {
     final model = await get(id);
     if (model == null) {
       throw SDKException.modelNotFound(id);
@@ -192,12 +227,36 @@ class ModelsApi {
       category: model.category,
       options: options,
     );
+    final preferences = options?.resolvedBackendPreferences ?? const [];
+    final requestedBackend = preferences.isEmpty ? null : preferences.first;
+    return LoadedModel(
+      id: id,
+      category: model.category,
+      requestedBackend: requestedBackend,
+      actualBackend: requestedBackend?.backend ?? model.framework,
+      closeHandler: unload,
+    );
   }
 
-  /// Unload the model resident under [category], or everything when null.
+  /// Release one resident model by [id]. Idempotent — a no-op when [id] is
+  /// not loaded.
+  ///
+  /// Throws [SDKException] when the unload fails.
+  Future<void> unload(String id) async {
+    final model = await get(id);
+    final category = model?.category;
+    if (category == null) return;
+    final currentId = await ModelGate.currentId(category);
+    if (currentId != id) return;
+    await ModelGate.unload(category);
+  }
+
+  /// Unload the model resident under [category], or every resident model
+  /// when null. This is the only category/global unload; [unload] releases
+  /// exactly one model by id.
   ///
   /// Throws [SDKException] when an unload fails.
-  Future<void> unload([ModelCategory? category]) async {
+  Future<void> unloadAll([ModelCategory? category]) async {
     if (category != null) {
       await ModelGate.unload(category);
       return;
@@ -205,6 +264,36 @@ class ModelsApi {
     for (final each in _loadableCategories) {
       await ModelGate.unload(each);
     }
+  }
+
+  /// Remove [id] from the registry. Registration metadata only — [id] must
+  /// already be unloaded and have no local artifacts.
+  ///
+  /// Throws [SDKException] when [id] is unknown, still loaded, or still has
+  /// local artifacts; call [unload]/[delete] first.
+  Future<void> unregister(String id) async {
+    final model = await get(id);
+    if (model == null) {
+      throw SDKException.modelNotFound(id);
+    }
+    for (final category in _loadableCategories) {
+      final currentId = await ModelGate.currentId(category);
+      if (currentId == id) {
+        throw SDKException.invalidState(
+          "Model '$id' is currently loaded. Call models.unload('$id') before unregister.",
+        );
+      }
+    }
+    final hasArtifacts = model.hasIsDownloaded()
+        ? model.isDownloaded
+        : model.localPath.isNotEmpty;
+    if (hasArtifacts) {
+      throw SDKException.invalidState(
+        "Model '$id' still has local artifacts. Call models.delete('$id') before unregister.",
+      );
+    }
+    _registryDirty = true;
+    await RunAnywhereModels.shared.remove(id);
   }
 
   /// Fill any descriptor whose role is unset using the commons classifier, so
@@ -295,17 +384,37 @@ class LoraApi {
     }
   }
 
-  /// Remove [adapterId], or every applied adapter when null.
+  /// Remove [adapterId].
+  ///
+  /// Deprecated v3 adapter: a null (or omitted) [adapterId] forwards to
+  /// [removeAll].
   ///
   /// Throws [SDKException] when the removal fails.
   Future<void> remove([String? adapterId]) async {
+    if (adapterId == null) {
+      return removeAll();
+    }
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    final request = adapterId == null
-        ? LoRARemoveRequest(clearAll: true)
-        : LoRARemoveRequest(adapterIds: [adapterId]);
-    final state = await RunAnywhereLoRACapability.shared.remove(request);
+    final state = await RunAnywhereLoRACapability.shared.remove(
+      LoRARemoveRequest(adapterIds: [adapterId]),
+    );
+    if (state.hasError()) {
+      throw SDKException.invalidState(state.error.message);
+    }
+  }
+
+  /// Remove every applied adapter.
+  ///
+  /// Throws [SDKException] when the removal fails.
+  Future<void> removeAll() async {
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    final state = await RunAnywhereLoRACapability.shared.remove(
+      LoRARemoveRequest(clearAll: true),
+    );
     if (state.hasError()) {
       throw SDKException.invalidState(state.error.message);
     }

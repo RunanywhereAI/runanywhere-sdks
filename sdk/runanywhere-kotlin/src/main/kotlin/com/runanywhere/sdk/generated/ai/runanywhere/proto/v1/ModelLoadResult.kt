@@ -48,6 +48,9 @@ public class ModelLoadResult(
     schemaIndex = 1,
   )
   public val category: ModelCategory = ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
+  /**
+   * Actual backend that executed the load (not the catalog/request pin).
+   */
   @field:WireField(
     tag = 4,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
@@ -87,6 +90,61 @@ public class ModelLoadResult(
     schemaIndex = 8,
   )
   public val error: SDKError? = null,
+  /**
+   * v4 placement truth.
+   */
+  @field:WireField(
+    tag = 12,
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
+    jsonName = "requestedBackend",
+    schemaIndex = 9,
+  )
+  public val requested_backend: InferenceFramework? = null,
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "actualDeviceId",
+    schemaIndex = 10,
+  )
+  public val actual_device_id: String? = null,
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "actualDeviceName",
+    schemaIndex = 11,
+  )
+  public val actual_device_name: String? = null,
+  /**
+   * cpu | gpu | npu | metal | webgpu | unknown
+   */
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "actualDeviceKind",
+    schemaIndex = 12,
+  )
+  public val actual_device_kind: String? = null,
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "runtimeVersion",
+    schemaIndex = 13,
+  )
+  public val runtime_version: String? = null,
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "abiVersion",
+    schemaIndex = 14,
+  )
+  public val abi_version: String? = null,
+  @field:WireField(
+    tag = 18,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "fallbackReason",
+    schemaIndex = 15,
+  )
+  public val fallback_reason: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelLoadResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -131,6 +189,13 @@ public class ModelLoadResult(
     if (already_loaded != other.already_loaded) return false
     if (resolved_artifacts != other.resolved_artifacts) return false
     if (error != other.error) return false
+    if (requested_backend != other.requested_backend) return false
+    if (actual_device_id != other.actual_device_id) return false
+    if (actual_device_name != other.actual_device_name) return false
+    if (actual_device_kind != other.actual_device_kind) return false
+    if (runtime_version != other.runtime_version) return false
+    if (abi_version != other.abi_version) return false
+    if (fallback_reason != other.fallback_reason) return false
     return true
   }
 
@@ -147,6 +212,13 @@ public class ModelLoadResult(
       result = result * 37 + already_loaded.hashCode()
       result = result * 37 + resolved_artifacts.hashCode()
       result = result * 37 + (error?.hashCode() ?: 0)
+      result = result * 37 + (requested_backend?.hashCode() ?: 0)
+      result = result * 37 + (actual_device_id?.hashCode() ?: 0)
+      result = result * 37 + (actual_device_name?.hashCode() ?: 0)
+      result = result * 37 + (actual_device_kind?.hashCode() ?: 0)
+      result = result * 37 + (runtime_version?.hashCode() ?: 0)
+      result = result * 37 + (abi_version?.hashCode() ?: 0)
+      result = result * 37 + (fallback_reason?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -163,6 +235,13 @@ public class ModelLoadResult(
     result += """already_loaded=$already_loaded"""
     if (resolved_artifacts.isNotEmpty()) result += """resolved_artifacts=$resolved_artifacts"""
     if (error != null) result += """error=$error"""
+    if (requested_backend != null) result += """requested_backend=$requested_backend"""
+    if (actual_device_id != null) result += """actual_device_id=${sanitize(actual_device_id)}"""
+    if (actual_device_name != null) result += """actual_device_name=${sanitize(actual_device_name)}"""
+    if (actual_device_kind != null) result += """actual_device_kind=${sanitize(actual_device_kind)}"""
+    if (runtime_version != null) result += """runtime_version=${sanitize(runtime_version)}"""
+    if (abi_version != null) result += """abi_version=${sanitize(abi_version)}"""
+    if (fallback_reason != null) result += """fallback_reason=${sanitize(fallback_reason)}"""
     return result.joinToString(prefix = "ModelLoadResult{", separator = ", ", postfix = "}")
   }
 
@@ -176,8 +255,15 @@ public class ModelLoadResult(
     already_loaded: Boolean = this.already_loaded,
     resolved_artifacts: List<ModelFileDescriptor> = this.resolved_artifacts,
     error: SDKError? = this.error,
+    requested_backend: InferenceFramework? = this.requested_backend,
+    actual_device_id: String? = this.actual_device_id,
+    actual_device_name: String? = this.actual_device_name,
+    actual_device_kind: String? = this.actual_device_kind,
+    runtime_version: String? = this.runtime_version,
+    abi_version: String? = this.abi_version,
+    fallback_reason: String? = this.fallback_reason,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelLoadResult = ModelLoadResult(model_id, category, framework, resolved_path, loaded_at_unix_ms, warnings, already_loaded, resolved_artifacts, error, unknownFields)
+  ): ModelLoadResult = ModelLoadResult(model_id, category, framework, resolved_path, loaded_at_unix_ms, warnings, already_loaded, resolved_artifacts, error, requested_backend, actual_device_id, actual_device_name, actual_device_kind, runtime_version, abi_version, fallback_reason, unknownFields)
 
   public companion object {
     @JvmField
@@ -212,6 +298,13 @@ public class ModelLoadResult(
         }
         size += ModelFileDescriptor.ADAPTER.asRepeated().encodedSizeWithTag(10, value.resolved_artifacts)
         size += SDKError.ADAPTER.encodedSizeWithTag(11, value.error)
+        size += InferenceFramework.ADAPTER.encodedSizeWithTag(12, value.requested_backend)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(13, value.actual_device_id)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.actual_device_name)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(15, value.actual_device_kind)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(16, value.runtime_version)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.abi_version)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.fallback_reason)
         return size
       }
 
@@ -237,11 +330,25 @@ public class ModelLoadResult(
         }
         ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 10, value.resolved_artifacts)
         SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 12, value.requested_backend)
+        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.actual_device_id)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.actual_device_name)
+        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.actual_device_kind)
+        ProtoAdapter.STRING.encodeWithTag(writer, 16, value.runtime_version)
+        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.abi_version)
+        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.fallback_reason)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelLoadResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.fallback_reason)
+        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.abi_version)
+        ProtoAdapter.STRING.encodeWithTag(writer, 16, value.runtime_version)
+        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.actual_device_kind)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.actual_device_name)
+        ProtoAdapter.STRING.encodeWithTag(writer, 13, value.actual_device_id)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 12, value.requested_backend)
         SDKError.ADAPTER.encodeWithTag(writer, 11, value.error)
         ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 10, value.resolved_artifacts)
         if (value.already_loaded != false) {
@@ -275,6 +382,13 @@ public class ModelLoadResult(
         var already_loaded: Boolean = false
         val resolved_artifacts = mutableListOf<ModelFileDescriptor>()
         var error: SDKError? = null
+        var requested_backend: InferenceFramework? = null
+        var actual_device_id: String? = null
+        var actual_device_name: String? = null
+        var actual_device_kind: String? = null
+        var runtime_version: String? = null
+        var abi_version: String? = null
+        var fallback_reason: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             2 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -294,6 +408,17 @@ public class ModelLoadResult(
             9 -> already_loaded = ProtoAdapter.BOOL.decode(reader)
             10 -> resolved_artifacts.add(ModelFileDescriptor.ADAPTER.decode(reader))
             11 -> error = SDKError.ADAPTER.decode(reader)
+            12 -> try {
+              requested_backend = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            13 -> actual_device_id = ProtoAdapter.STRING.decode(reader)
+            14 -> actual_device_name = ProtoAdapter.STRING.decode(reader)
+            15 -> actual_device_kind = ProtoAdapter.STRING.decode(reader)
+            16 -> runtime_version = ProtoAdapter.STRING.decode(reader)
+            17 -> abi_version = ProtoAdapter.STRING.decode(reader)
+            18 -> fallback_reason = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -307,6 +432,13 @@ public class ModelLoadResult(
           already_loaded = already_loaded,
           resolved_artifacts = resolved_artifacts,
           error = error,
+          requested_backend = requested_backend,
+          actual_device_id = actual_device_id,
+          actual_device_name = actual_device_name,
+          actual_device_kind = actual_device_kind,
+          runtime_version = runtime_version,
+          abi_version = abi_version,
+          fallback_reason = fallback_reason,
           unknownFields = unknownFields
         )
       }

@@ -19,6 +19,7 @@
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
+#include "rac/plugin/rac_engine_ids.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -138,8 +139,29 @@ const uint32_t g_formats[] = {static_cast<uint32_t>(runanywhere::v1::MODEL_FORMA
 rac_engine_vtable_t g_mock_vtable = [] {
     rac_engine_vtable_t v{};
     v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
-    v.metadata.name = "llamacpp";
+    v.metadata.name = RAC_ENGINE_ID_LLAMACPP;
     v.metadata.display_name = "mock llama.cpp";
+    v.metadata.engine_version = "0.0.0";
+    v.metadata.priority = 100;
+    v.metadata.formats = g_formats;
+    v.metadata.formats_count = 1;
+    v.llm_ops = &g_mock_ops;
+    return v;
+}();
+
+// Same mock ops under the QHexRT engine id, so a model registered with
+// framework=QHEXRT actually loads through an engine NAMED "qhexrt" (as
+// rac_model_lifecycle_load_proto's engine_name_for_framework()/
+// framework_for_engine_name() round-trip expects) instead of silently
+// falling back to the plain-llamacpp mock by priority. Lifecycle now reports
+// ModelLoadResult.framework as the ACTUALLY selected engine, not the
+// catalog/request pin, so exercising the QHexRT-only grammar path needs a
+// real (mock) engine registered under that name.
+rac_engine_vtable_t g_mock_vtable_qhexrt = [] {
+    rac_engine_vtable_t v{};
+    v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
+    v.metadata.name = RAC_ENGINE_ID_QHEXRT;
+    v.metadata.display_name = "mock QHexRT";
     v.metadata.engine_version = "0.0.0";
     v.metadata.priority = 100;
     v.metadata.formats = g_formats;
@@ -212,14 +234,23 @@ rac_model_registry_handle_t g_registry = nullptr;
 void cleanup_environment() {
     rac_model_lifecycle_reset();
     rac_sdk_event_clear_queue();
-    (void)rac_plugin_unregister("llamacpp");
+    (void)rac_plugin_unregister(RAC_ENGINE_ID_LLAMACPP);
+    (void)rac_plugin_unregister(RAC_ENGINE_ID_QHEXRT);
     set_responses({});
 }
 
 bool load_mock_llm(runanywhere::v1::InferenceFramework framework =
                        runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP) {
     cleanup_environment();
-    if (rac_plugin_register(&g_mock_vtable) != RAC_SUCCESS)
+    // Register the mock engine under the id that actually matches the
+    // requested framework so rac_model_lifecycle_load_proto's engine pin
+    // (and its now-truthful ModelLoadResult.framework) resolves to a REAL
+    // registered engine of that framework, not a priority-order fallback to
+    // a differently-named one.
+    const rac_engine_vtable_t* vtable_for_framework =
+        framework == runanywhere::v1::INFERENCE_FRAMEWORK_QHEXRT ? &g_mock_vtable_qhexrt
+                                                                 : &g_mock_vtable;
+    if (rac_plugin_register(vtable_for_framework) != RAC_SUCCESS)
         return false;
 
     if (!g_registry && (rac_model_registry_create(&g_registry) != RAC_SUCCESS || !g_registry)) {

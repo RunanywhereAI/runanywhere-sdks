@@ -61,6 +61,18 @@ public data class StructuredOutput(
     val strict: Boolean = true,
 )
 
+/** Enforcement level `llm.generateStructured` applies to its schema. */
+public enum class StructuredOutputMode {
+    /** Engine-constrained decoding; fails preflight until a constrained-decoding engine is wired in. */
+    CONSTRAINED,
+
+    /** Generate freely, then validate against the schema. */
+    VALIDATION_ONLY,
+
+    /** Validate, then retry once with a repair instruction when invalid. */
+    REPAIR,
+}
+
 /** Sampling and tool-calling knobs for one text or vision generation. */
 public data class LlmOptions(
     /** Model slug; an absent model auto-loads, downloading if needed. */
@@ -77,7 +89,8 @@ public data class LlmOptions(
     val stopSequences: List<String> = emptyList(),
     val systemPrompt: String? = null,
     val reasoning: ReasoningOptions? = null,
-    val structuredOutput: StructuredOutput? = null,
+    // No structured-output schema field: `llm.generateStructured` owns
+    // schema configuration through its own `schema`/`mode` parameters.
     /** Empty uses the tools registered through `llm.tools`. */
     val tools: List<ToolDefinition> = emptyList(),
     val toolChoice: ToolChoice = ToolChoice.Auto,
@@ -245,6 +258,18 @@ public data class TurnHandlingOptions(
     val interruption: Interruption = Interruption(),
 )
 
+/** Per-query retrieval overrides for `RagSession.query`/`queryStream`. */
+public data class RagRetrievalOptions(
+    val topK: Int? = null,
+    val similarityThreshold: Float? = null,
+)
+
+/** Per-query knobs for `RagSession.query`/`queryStream`. */
+public data class RagQueryOptions(
+    val retrieval: RagRetrievalOptions? = null,
+    val generation: LlmOptions? = null,
+)
+
 /** Chunking and retrieval knobs for a RAG session. */
 public data class RagConfig(
     val topK: Int = DEFAULT_TOP_K,
@@ -267,14 +292,43 @@ public data class RagConfig(
     }
 }
 
+/** Hardware class [LoadOptions.accelerator] requests. */
+public enum class AcceleratorPolicy {
+    AUTO,
+    CPU,
+    GPU,
+    NPU,
+}
+
+/** One ranked backend choice for [LoadOptions.backendPreferences]. */
+public data class BackendPreference(
+    val backend: Backend,
+    /** `true` fails the load instead of falling back past this entry. */
+    val required: Boolean = false,
+)
+
 /** Placement knobs applied when a model is loaded. */
 public data class LoadOptions(
-    /** Pin the engine for this load; null lets the registry choose. */
-    val framework: InferenceFramework? = null,
+    /** Ranked backend choices; the first entry the platform can honor wins. */
+    val backendPreferences: List<BackendPreference> = emptyList(),
+    /** Hardware class to run on. */
+    val accelerator: AcceleratorPolicy? = null,
     val contextLength: Int? = null,
     val threads: Int? = null,
+    val forceReload: Boolean = false,
+    /** @deprecated Use [backendPreferences]; kept as a thin adapter for one release. */
+    val framework: InferenceFramework? = null,
+    /** @deprecated Use [accelerator]; kept as a thin adapter for one release. */
     val useGpu: Boolean? = null,
-)
+) {
+    /** [backendPreferences], folding in the deprecated [framework] alias when it is the only pin given. */
+    internal val resolvedBackendPreferences: List<BackendPreference>
+        get() = backendPreferences.ifEmpty { framework?.let { listOf(BackendPreference(it)) } ?: emptyList() }
+
+    /** [accelerator], folding in the deprecated [useGpu] alias when [accelerator] is unset. */
+    internal val resolvedAccelerator: AcceleratorPolicy?
+        get() = accelerator ?: useGpu?.let { if (it) AcceleratorPolicy.GPU else AcceleratorPolicy.CPU }
+}
 
 /** Narrows a model listing. */
 public data class ModelFilter(

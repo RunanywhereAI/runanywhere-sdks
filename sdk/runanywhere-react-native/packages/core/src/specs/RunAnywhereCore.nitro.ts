@@ -1148,7 +1148,11 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   toolRunLoopProtoWithHandle(
     requestBytes: ArrayBuffer,
-    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>,
+    // The executor returns the ToolResult bytes as base64. A JS-created
+    // ArrayBuffer is thread-affine (its data() is JS-thread-only), but the
+    // native run loop reads the result on a background thread; a base64 string
+    // is value-copied across the bridge, so it is safe to decode off-thread.
+    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<string>,
     onHandle: (runLoopHandle: number) => void
   ): Promise<ArrayBuffer>;
 

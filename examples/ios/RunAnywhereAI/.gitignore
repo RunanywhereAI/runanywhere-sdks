@@ -48,6 +48,10 @@ playground.xcworkspace
 # .swiftpm
 
 .build/
+.build-*/
+
+# Local Ambient / on-device experiment caches (models, fixtures, run artifacts)
+.ambient-*/
 
 # CocoaPods
 #

@@ -62,15 +62,26 @@ public class VoiceSession internal constructor(
     }
 
     /**
-     * Speak [text] now, outside the turn loop.
-     *
-     * @throws SDKException when no voice is loaded or playback fails.
+     * Speak [text] now, outside the turn loop, returning immediately with a
+     * handle to the in-flight utterance.
      */
-    public suspend fun say(text: String) {
-        legacySpeak(text, TtsOptions(voice = ttsVoice).toProto())
+    public fun say(text: String): SpeechHandle {
+        val handle = SpeechHandle(interruptHandler = { legacyStopSpeaking() })
+        scope.launch(Dispatchers.IO) {
+            try {
+                legacySpeak(text, TtsOptions(voice = ttsVoice).toProto())
+                handle.complete()
+            } catch (error: SDKException) {
+                handle.complete(error)
+            }
+        }
+        return handle
     }
 
-    /** Stop the agent mid-utterance. */
+    /**
+     * Stop the agent mid-utterance. Awaitable: suspends until the interrupted
+     * response, its tools, and its playout have all settled.
+     */
     public suspend fun interrupt() {
         legacyStopSpeaking()
     }
@@ -185,12 +196,12 @@ private fun ProtoVoiceEvent.toVoiceEvent(): VoiceEvent? {
             return VoiceEvent.AgentResponse(token.text)
         }
     }
-    turn_lifecycle?.let { turn ->
+        turn_lifecycle?.let { turn ->
         when (turn.kind) {
             TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED ->
-                return VoiceEvent.SpeechStarted
+                return VoiceEvent.SpeechStarted()
             TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED ->
-                return VoiceEvent.SpeechEnded
+                return VoiceEvent.SpeechEnded()
             TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_TRANSCRIPTION_FINAL ->
                 return VoiceEvent.UserTranscribed(turn.transcript, isFinal = true)
             TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED ->
@@ -203,15 +214,15 @@ private fun ProtoVoiceEvent.toVoiceEvent(): VoiceEvent? {
     speech_turn_detection?.let { detection ->
         when (detection.kind) {
             SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED ->
-                return VoiceEvent.SpeechStarted
+                return VoiceEvent.SpeechStarted()
             SpeechTurnDetectionEventKind.SPEECH_TURN_DETECTION_EVENT_KIND_TURN_ENDED ->
-                return VoiceEvent.SpeechEnded
+                return VoiceEvent.SpeechEnded()
             else -> Unit
         }
     }
     vad?.let { detector ->
         if (detector.type == VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY) {
-            return if (detector.is_speech) VoiceEvent.SpeechStarted else VoiceEvent.SpeechEnded
+            return if (detector.is_speech) VoiceEvent.SpeechStarted() else VoiceEvent.SpeechEnded()
         }
     }
     state?.current?.toAgentState()?.let { return VoiceEvent.AgentStateChanged(it) }

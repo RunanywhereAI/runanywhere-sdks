@@ -307,6 +307,7 @@ export const RunAnywhere: RunAnywhereApi & LegacySurface = {
   get environment() {
     return v3.environment;
   },
+  capabilities: () => v3.capabilities(),
   get events() {
     return v3.events;
   },

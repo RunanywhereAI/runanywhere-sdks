@@ -1,10 +1,10 @@
 /**
- * Translation between the v3 public option/result shapes and the generated
+ * Translation between the v4 public option/result shapes and the generated
  * proto messages the C++ core speaks. Internal — never exported from the
  * package root.
  */
 
-import { AudioFormat, type ModelCategory } from '@runanywhere/proto-ts/model_types';
+import { AudioFormat, InferenceFramework, type ModelCategory } from '@runanywhere/proto-ts/model_types';
 import {
   LLMGenerationOptions as LLMGenerationOptionsMessage,
   type LLMGenerationOptions,
@@ -12,7 +12,7 @@ import {
 } from '@runanywhere/proto-ts/llm_options';
 import { ReasoningMode } from '@runanywhere/proto-ts/thinking_tag_pattern';
 import { ToolChoiceMode } from '@runanywhere/proto-ts/tool_calling';
-import { StructuredOutputMode, type StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';
+import { StructuredOutputMode as ProtoStructuredOutputMode, type StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';
 import type { STTOptions, STTOutput } from '@runanywhere/proto-ts/stt_options';
 import type { TTSOptions, TTSOutput, TTSVoiceInfo } from '@runanywhere/proto-ts/tts_options';
 import type { VADOptions, VADResult as ProtoVadResult } from '@runanywhere/proto-ts/vad_options';
@@ -33,11 +33,14 @@ import type { RAGResult, RAGSearchResult, RAGStatistics } from '@runanywhere/pro
 import type { VLMResult } from '@runanywhere/proto-ts/vlm_options';
 import type { LLMStreamFinalResult } from '@runanywhere/proto-ts/llm_service';
 import type { LoRAState } from '@runanywhere/proto-ts/lora_options';
+import { Runtime } from '../../Foundation/RuntimeConfig.js';
 import type {
+  Backend,
   DiarizationOptions,
   EmbedOptions,
   ImageOptions,
   LlmOptions,
+  StructuredOutputMode,
   SttOptions,
   TtsOptions,
   VadOptions,
@@ -65,6 +68,50 @@ import type {
 import type { ChatMessage } from './Inputs.js';
 import { ChatMessage as ProtoChatMessageMessage, MessageRole } from '@runanywhere/proto-ts/chat';
 import type { ChatMessage as ProtoChatMessage } from '@runanywhere/proto-ts/chat';
+
+/** Map the cross-SDK `Backend` name back to the proto `InferenceFramework` it selects. */
+const BACKEND_TO_FRAMEWORK: Record<Backend, InferenceFramework> = {
+  onnx: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+  llamaCpp: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+  mlx: InferenceFramework.INFERENCE_FRAMEWORK_MLX,
+  coreml: InferenceFramework.INFERENCE_FRAMEWORK_COREML,
+  foundationModels: InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS,
+  sherpa: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  qhexrt: InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT,
+  systemTts: InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
+  builtIn: InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN,
+  unknown: InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN,
+};
+
+/** Map a proto `InferenceFramework` to the cross-SDK `Backend` name it represents. */
+export function frameworkToBackend(framework?: InferenceFramework | null): Backend {
+  switch (framework) {
+    case InferenceFramework.INFERENCE_FRAMEWORK_ONNX: return 'onnx';
+    case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP: return 'llamaCpp';
+    case InferenceFramework.INFERENCE_FRAMEWORK_MLX: return 'mlx';
+    case InferenceFramework.INFERENCE_FRAMEWORK_COREML: return 'coreml';
+    case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS: return 'foundationModels';
+    case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA: return 'sherpa';
+    case InferenceFramework.INFERENCE_FRAMEWORK_QHEXRT: return 'qhexrt';
+    case InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS: return 'systemTts';
+    case InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN: return 'builtIn';
+    default: return 'unknown';
+  }
+}
+
+/** Map the cross-SDK `Backend` name to the proto `InferenceFramework` it selects. */
+export function backendToFramework(backend: Backend): InferenceFramework {
+  return BACKEND_TO_FRAMEWORK[backend] ?? InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
+}
+
+/**
+ * Honest device placement for the currently active runtime. Web only ever
+ * resolves to `'cpu'` or `'gpu'` (WebGPU) — there is no NPU/ANE access from
+ * the browser.
+ */
+export function currentDevicePlacement(): string {
+  return Runtime.active === 'webgpu' ? 'gpu' : 'cpu';
+}
 
 function reasoningMode(mode: 'on' | 'off' | undefined): ReasoningMode {
   if (mode === 'off') return ReasoningMode.REASONING_MODE_OFF;
@@ -108,17 +155,6 @@ export function toProtoLlmOptions(options?: LlmOptions): LLMGenerationOptions {
     };
   }
 
-  if (options?.structuredOutput) {
-    partial.structuredOutput = {
-      includeSchemaInPrompt: true,
-      jsonSchema: options.structuredOutput.schema.json,
-      strictMode: options.structuredOutput.strict ?? true,
-      mode: StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
-      repairJson: false,
-      maxRetries: 0,
-    };
-  }
-
   if (options?.tools?.length || options?.toolChoice || options?.maxToolCalls !== undefined) {
     partial.toolCalling = {
       tools: options.tools ?? [],
@@ -159,10 +195,13 @@ export function toProtoHistory(messages: readonly ChatMessage[]): ProtoChatMessa
 function finishReasonFrom(raw: string | undefined, cancelled: boolean): FinishReason {
   if (cancelled) return 'cancelled';
   const value = (raw ?? '').toLowerCase();
+  if (!value) return 'stop';
   if (value.includes('tool')) return 'toolCalls';
   if (value.includes('length') || value.includes('max')) return 'length';
   if (value.includes('cancel')) return 'cancelled';
-  return 'stop';
+  if (value.includes('filter') || value.includes('safety')) return 'contentFilter';
+  if (value.includes('stop') || value.includes('eos') || value.includes('end')) return 'stop';
+  return 'unknown';
 }
 
 function metricsFrom(result: LLMGenerationResult, requestId: string): GenerationMetrics {
@@ -188,6 +227,8 @@ export function toGenerationResult(
     thinkingText: result.thinkingContent,
     toolCalls: result.toolCalls,
     finishReason: finishReasonFrom(result.finishReason, cancelled),
+    rawFinishReason: result.finishReason || undefined,
+    actualDevice: currentDevicePlacement(),
   };
 }
 
@@ -204,12 +245,14 @@ export function streamFinalToGenerationResult(
     thinkingText: final.thinkingContent || fallback.thinkingText || undefined,
     toolCalls: final.toolCalls,
     finishReason: finishReasonFrom(final.finishReason, false),
+    rawFinishReason: final.finishReason || undefined,
     inputTokens: final.usage?.inputTokens ?? 0,
     outputTokens,
     timeToFirstTokenMs: Math.round(final.timeToFirstTokenMs || fallback.ttftMs),
     tokensPerSecond: (final.usage?.tokensPerSecond ?? 0) || fallback.tokensPerSecond,
     requestId,
     model,
+    actualDevice: currentDevicePlacement(),
   };
 }
 
@@ -220,12 +263,41 @@ export function vlmToGenerationResult(result: VLMResult, requestId = ''): Genera
     thinkingText: undefined,
     toolCalls: [],
     finishReason: finishReasonFrom(result.finishReason, false),
+    rawFinishReason: result.finishReason || undefined,
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
     timeToFirstTokenMs: Math.round(result.timeToFirstTokenMs),
     tokensPerSecond: result.usage?.tokensPerSecond ?? 0,
     requestId,
     model: '',
+    actualDevice: currentDevicePlacement(),
+  };
+}
+
+/**
+ * Build the proto structured-output request options for one
+ * `llm.generateStructured` call. `CONSTRAINED` is not wired on Web (no
+ * grammar-constrained decoding hook) — callers must preflight-reject it
+ * before reaching this helper.
+ */
+export function toProtoStructuredOutputOptions(
+  json: string,
+  mode: Exclude<StructuredOutputMode, 'constrained'>,
+): {
+  includeSchemaInPrompt: boolean;
+  jsonSchema: string;
+  strictMode: boolean;
+  mode: ProtoStructuredOutputMode;
+  repairJson: boolean;
+  maxRetries: number;
+} {
+  return {
+    includeSchemaInPrompt: true,
+    jsonSchema: json,
+    strictMode: mode === 'validationOnly',
+    mode: ProtoStructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
+    repairJson: mode === 'repair',
+    maxRetries: mode === 'repair' ? 1 : 0,
   };
 }
 
@@ -233,6 +305,7 @@ export function vlmToGenerationResult(result: VLMResult, requestId = ''): Genera
 export function toStructuredResult(
   parsed: StructuredOutputResult,
   generation: GenerationResult,
+  mode: StructuredOutputMode,
   parse?: (text: string) => unknown,
 ): StructuredResult {
   const raw = parsed.rawText ?? generation.text;
@@ -247,6 +320,7 @@ export function toStructuredResult(
     value,
     raw,
     valid: parsed.validation?.isValid ?? value !== undefined,
+    mode,
     inputTokens: generation.inputTokens,
     outputTokens: generation.outputTokens,
     timeToFirstTokenMs: generation.timeToFirstTokenMs,

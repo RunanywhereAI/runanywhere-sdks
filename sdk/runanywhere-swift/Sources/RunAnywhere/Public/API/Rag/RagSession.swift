@@ -68,7 +68,7 @@ public actor RagSession {
     ///
     /// - Throws: `SDKException` when the session has no LLM, is closed, or the
     ///   query fails.
-    public func query(question: String, options: LlmOptions? = nil) async throws -> RagResult {
+    public func query(question: String, options: RagQueryOptions? = nil) async throws -> RagResult {
         try requireOpen()
         try requireGenerationModel()
         let result = try CppBridge.RAG.shared.query(
@@ -79,13 +79,19 @@ public actor RagSession {
         return RagResult(proto: result, model: llmModelId)
     }
 
+    /// Deprecated: forwards `options` into `RagQueryOptions(generation:)`.
+    @available(*, deprecated, message: "Use query(question:options: RagQueryOptions?)")
+    public func query(question: String, options: LlmOptions?) async throws -> RagResult {
+        try await query(question: question, options: RagQueryOptions(generation: options))
+    }
+
     /// Answer `question`, streaming retrieval and tokens as they arrive.
     ///
     /// - Throws: `SDKException` from this call when the session has no LLM or is
     ///   closed, and into the returned stream when the query fails.
     public func queryStream(
         question: String,
-        options: LlmOptions? = nil
+        options: RagQueryOptions? = nil
     ) async throws -> AsyncThrowingStream<RagEvent, Error> {
         try requireOpen()
         try requireGenerationModel()
@@ -155,6 +161,15 @@ public actor RagSession {
         }
     }
 
+    /// Deprecated: forwards `options` into `RagQueryOptions(generation:)`.
+    @available(*, deprecated, message: "Use queryStream(question:options: RagQueryOptions?)")
+    public func queryStream(
+        question: String,
+        options: LlmOptions?
+    ) async throws -> AsyncThrowingStream<RagEvent, Error> {
+        try await queryStream(question: question, options: RagQueryOptions(generation: options))
+    }
+
     /// Report how much this session currently holds.
     ///
     /// - Throws: `SDKException` when the session is closed.
@@ -180,11 +195,14 @@ public actor RagSession {
 
     // MARK: - Private
 
-    private func queryOptions(question: String, options: LlmOptions?) -> RARAGQueryOptions {
+    private func queryOptions(question: String, options: RagQueryOptions?) -> RARAGQueryOptions {
         var queryOptions = RARAGQueryOptions.defaults(question: question)
-        queryOptions.retrievalTopK = Int32(defaultTopK)
-        if let options {
-            queryOptions.generation = options.toProto()
+        queryOptions.retrievalTopK = Int32(options?.retrievalTopK ?? defaultTopK)
+        if let similarityThreshold = options?.similarityThreshold {
+            queryOptions.similarityThreshold = similarityThreshold
+        }
+        if let generation = options?.generation {
+            queryOptions.generation = generation.toProto()
         }
         return queryOptions
     }

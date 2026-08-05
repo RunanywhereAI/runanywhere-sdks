@@ -814,6 +814,24 @@ constexpr CatalogEntry kCatalog[] = {
      "silero_vad.onnx",
      nullptr, 0, 2327524, 0, false},
 
+    // --- Speaker diarization (ONNX Runtime) ---
+    {"diar-streaming-sortformer-4spk-v2.1", "sortformer",
+     "NVIDIA Streaming Sortformer 4-Speaker v2.1",
+     v1::MODEL_CATEGORY_SPEAKER_DIARIZATION, v1::INFERENCE_FRAMEWORK_ONNX,
+     v1::MODEL_FORMAT_ONNX,
+     "https://huggingface.co/cgus/diar_streaming_sortformer_4spk-v2.1-onnx/"
+     "resolve/main/diar_streaming_sortformer_4spk-v2.1.onnx",
+     nullptr, 0, 492242946LL, 0, false},
+
+    // --- Semantic segmentation (ONNX Runtime) ---
+    {"segformer-b0-ade-512", "segformer",
+     "SegFormer B0 ADE20K 512 (Semantic Segmentation)",
+     v1::MODEL_CATEGORY_SEMANTIC_SEGMENTATION, v1::INFERENCE_FRAMEWORK_ONNX,
+     v1::MODEL_FORMAT_ONNX,
+     "https://huggingface.co/Xenova/segformer-b0-finetuned-ade-512-512/"
+     "resolve/main/onnx/model.onnx",
+     nullptr, 0, 15335446LL, 0, false},
+
     // --- Embeddings ---
     {"nemotron-3-embed-1b-q4_k_m", "nemotron-3-embed",
      "NVIDIA Nemotron 3 Embed 1B Q4_K_M", v1::MODEL_CATEGORY_EMBEDDING,
@@ -841,6 +859,14 @@ constexpr CatalogEntry kCatalog[] = {
     {"all-minilm-l6-v2", "minilm", "All-MiniLM-L6-v2 (Embeddings)",
      v1::MODEL_CATEGORY_EMBEDDING, v1::INFERENCE_FRAMEWORK_ONNX,
      v1::MODEL_FORMAT_ONNX, nullptr, kMiniLmFiles, 2, 90 * MB, 0, false},
+
+    // --- Reranking (llama.cpp cross-encoder; `rcli rerank -m <id>`) ---
+    {"bge-reranker-v2-m3-q4_k_m", "bge-reranker",
+     "BGE Reranker v2-m3 Q4_K_M (Reranking)", v1::MODEL_CATEGORY_EMBEDDING,
+     v1::INFERENCE_FRAMEWORK_LLAMA_CPP, v1::MODEL_FORMAT_GGUF,
+     "https://huggingface.co/gpustack/bge-reranker-v2-m3-GGUF/resolve/main/"
+     "bge-reranker-v2-m3-Q4_K_M.gguf",
+     nullptr, 0, 438376864LL, 0, false},
 
     // --- Image generation (CoreML diffusion; Apple only) ---
     // Apple-optimized Stable Diffusion 1.5. Id matches the built-in diffusion

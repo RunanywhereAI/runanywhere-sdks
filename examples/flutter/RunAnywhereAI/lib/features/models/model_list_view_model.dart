@@ -135,14 +135,28 @@ class ModelListViewModel extends ChangeNotifier {
 
       await for (final event in sdk.RunAnywhere.models.download(model.id)) {
         switch (event) {
-          case sdk.DownloadProgressEvent(:final percent):
+          case sdk.DownloadProgressEvent(
+            :final bytesDone,
+            :final bytesTotal,
+          ):
+            final percent = bytesTotal > 0 ? bytesDone / bytesTotal : 0.0;
             _downloadProgress[model.id] = percent;
             progressHandler(percent);
             notifyListeners();
+          case sdk.DownloadVerifying():
+            debugPrint('Verifying model: ${model.name}');
           case sdk.DownloadExtracting():
             debugPrint('Extracting model: ${model.name}');
           case sdk.DownloadCompleted():
             debugPrint('Download completed for model: ${model.name}');
+          case sdk.DownloadFailed(:final error):
+            throw error;
+          case sdk.DownloadCancelled():
+            throw sdk.SDKException.cancelled(
+              'Download cancelled for ${model.name}',
+            );
+          case sdk.DownloadStarted():
+            break;
         }
       }
 

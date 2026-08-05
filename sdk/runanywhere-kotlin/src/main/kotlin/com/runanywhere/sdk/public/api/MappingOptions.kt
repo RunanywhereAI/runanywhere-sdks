@@ -40,7 +40,11 @@ private val NEUTRAL_REPETITION_PENALTY = LLMGenerationOptions.defaults().repetit
 
 internal fun LlmOptions?.orDefault(): LlmOptions = this ?: LlmOptions()
 
-internal fun LlmOptions.toProto(): LLMGenerationOptions =
+/**
+ * [structuredOutput] is never populated from a public [LlmOptions] field —
+ * only `llm.generateStructured` supplies it, through its own internal call path.
+ */
+internal fun LlmOptions.toProto(structuredOutput: StructuredOutput? = null): LLMGenerationOptions =
     LLMGenerationOptions(
         max_output_tokens = maxOutputTokens,
         temperature = temperature,
@@ -219,18 +223,17 @@ internal fun RagConfig.toProto(embeddingModelId: String, llmModelId: String): RA
         rerank_results = rerank,
     )
 
-internal fun ragQueryOptions(
+internal fun ragQueryProto(
     question: String,
     config: RagConfig,
-    options: LlmOptions?,
-    topK: Int?,
+    options: RagQueryOptions?,
     stream: Boolean,
 ): RAGQueryOptions =
     RAGQueryOptions(
         question = question,
-        generation = options?.toProto(),
-        retrieval_top_k = topK ?: config.topK,
-        similarity_threshold = config.similarityThreshold,
+        generation = options?.generation?.toProto(),
+        retrieval_top_k = options?.retrieval?.topK ?: config.topK,
+        similarity_threshold = options?.retrieval?.similarityThreshold ?: config.similarityThreshold,
         stream = stream,
         enable_multi_query = config.multiQuery,
     )

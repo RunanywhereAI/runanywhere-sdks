@@ -102,20 +102,54 @@ export const AgentState = {
 } as const;
 export type AgentState = (typeof AgentState)[keyof typeof AgentState];
 
+/**
+ * Hardware class a loaded model is actually resident on. Cheap self-reported
+ * placement — the addon does not yet return this per load, so `models.load`
+ * derives it from `LoadOptions.useGpu` rather than an observed value.
+ */
+export const DevicePlacement = { CPU: 'CPU', GPU: 'GPU', NPU: 'NPU' } as const;
+export type DevicePlacement = (typeof DevicePlacement)[keyof typeof DevicePlacement];
+
 // ---------------------------------------------------------------------------
 // Inputs
 // ---------------------------------------------------------------------------
 
-/** Sample layout of a raw audio buffer. */
+/**
+ * Sample encoding of an {@link AudioFormatSpec}. `CONTAINER` needs a decoder
+ * (WAV today) and is batch-only; live streams (`stt.openStream`/`vad.openStream`)
+ * reject it at preflight.
+ */
+export const AudioEncoding = {
+  PCM_S16_LE: 'PCM_S16_LE',
+  PCM_F32_LE: 'PCM_F32_LE',
+  CONTAINER: 'CONTAINER',
+} as const;
+export type AudioEncoding = (typeof AudioEncoding)[keyof typeof AudioEncoding];
+
+/**
+ * Wire description of an audio payload — established once for a live stream,
+ * or carried alongside the bytes of a batch {@link AudioInput}.
+ */
 export interface AudioFormatSpec {
-  encoding: AudioFormat;
+  encoding: AudioEncoding;
   sampleRate: number;
-  channels: number;
+  /** Defaults to 1 (mono) when unset. */
+  channels?: number;
+  /** The container format; required when `encoding` is `CONTAINER`. */
+  container?: AudioFormat;
+}
+
+/** One chunk of PCM samples pushed into an open {@link SttStream}/{@link VadStream}. */
+export interface AudioFrame {
+  /** PCM bytes in the stream's established format — never a container. */
+  samples: Uint8Array;
+  sampleCount: number;
+  timestampMs?: number;
 }
 
 /** Audio handed to stt, vad, or diarization. Build one with {@link audio}. */
 export interface AudioInput {
-  /** PCM16 little-endian bytes, or the encoded file's bytes for WAV. */
+  /** PCM bytes matching `format.encoding`, or the encoded file's bytes for a container. */
   bytes?: Uint8Array;
   /** Float32 samples in [-1, 1]; takes precedence over `bytes` when present. */
   samples?: Float32Array;
@@ -128,19 +162,25 @@ export interface AudioInput {
 export const audio = {
   /** Wrap little-endian PCM16 bytes. */
   pcm16(bytes: Uint8Array, sampleRate = 16000, channels = 1): AudioInput {
-    return { bytes, format: { encoding: AudioFormat.PCM, sampleRate, channels } };
+    return { bytes, format: { encoding: AudioEncoding.PCM_S16_LE, sampleRate, channels } };
   },
   /** Wrap float32 samples in [-1, 1]. */
   float32(samples: Float32Array, sampleRate = 16000): AudioInput {
-    return { samples, format: { encoding: AudioFormat.PCM, sampleRate, channels: 1 } };
+    return { samples, format: { encoding: AudioEncoding.PCM_F32_LE, sampleRate, channels: 1 } };
   },
   /** Wrap the bytes of a RIFF/WAVE file. */
   wav(bytes: Uint8Array): AudioInput {
-    return { bytes, format: { encoding: AudioFormat.WAV, sampleRate: 0, channels: 1 } };
+    return {
+      bytes,
+      format: { encoding: AudioEncoding.CONTAINER, sampleRate: 0, channels: 1, container: AudioFormat.WAV },
+    };
   },
   /** Reference an audio file on disk. */
   file(path: string): AudioInput {
-    return { path, format: { encoding: AudioFormat.WAV, sampleRate: 0, channels: 1 } };
+    return {
+      path,
+      format: { encoding: AudioEncoding.CONTAINER, sampleRate: 0, channels: 1, container: AudioFormat.WAV },
+    };
   },
 };
 
@@ -447,6 +487,120 @@ export interface RagStats {
   indexSizeBytes: number;
 }
 
+/**
+ * Ownership handle for one resident model, returned by `models.load`.
+ *
+ * `close()` and `models.unload(id)` release the same residency; calling
+ * either after the other is a no-op.
+ */
+export interface LoadedModel {
+  readonly id: string;
+  readonly category: ModelCategory;
+  /**
+   * The engine that is actually running the model, and the one that was
+   * requested via `LoadOptions.framework`, when one was given. Cheap
+   * placement: the addon does not report this per load today, so
+   * `actualBackend` falls back to the requested framework, then to the
+   * catalog's known engine for built-in ids.
+   */
+  readonly requestedBackend?: InferenceFramework;
+  readonly actualBackend?: InferenceFramework;
+  readonly actualDevice?: DevicePlacement;
+  /** Release this model's residency. Idempotent. */
+  close(): Promise<void>;
+}
+
+/**
+ * Handle to one in-flight or completed `tts.speak`/`VoiceSession.say` utterance.
+ */
+export interface SpeechHandle {
+  readonly id: string;
+  readonly interrupted: boolean;
+  readonly error?: SDKException;
+  /** Stop playback and any in-flight synthesis. Resolves once stopped. */
+  interrupt(): Promise<void>;
+  /** Resolve once playback finishes, is interrupted, or fails. */
+  waitForPlayout(): Promise<void>;
+}
+
+/**
+ * Live speech-to-text session opened by `stt.openStream`. Establishes its
+ * audio format once; every pushed frame carries PCM samples in that format.
+ */
+export interface SttStream {
+  readonly events: AsyncIterable<TranscriptionEvent>;
+  /** Push one frame of PCM audio in the stream's established format. */
+  pushFrame(frame: AudioFrame): void;
+  /** Request the backend surface partials for audio pushed so far. */
+  flush(): void;
+  /** Signal that no more audio is coming; the backend finalizes the transcript. */
+  finish(): void;
+  /** Release the stream's resources. Idempotent. */
+  close(): Promise<void>;
+}
+
+/**
+ * Live voice-activity session opened by `vad.openStream`. Establishes its
+ * audio format once; every pushed frame carries PCM samples in that format.
+ */
+export interface VadStream {
+  readonly events: AsyncIterable<VadEvent>;
+  /** Push one frame of PCM audio in the stream's established format. */
+  pushFrame(frame: AudioFrame): void;
+  /** No-op on Electron: there is no partial-result buffer to flush. */
+  flush(): void;
+  /** Signal that no more audio is coming; completes the event stream. */
+  finish(): void;
+  /** Release the stream's resources. Idempotent. */
+  close(): Promise<void>;
+}
+
+/** Whether a modality/backend/feature is honestly available right now. */
+export interface UnavailableCapability {
+  name: string;
+  reason: string;
+}
+
+/** Per-modality streaming support, keyed by namespace name. */
+export interface StreamingCapabilities {
+  llm: boolean;
+  vlm: boolean;
+  stt: boolean;
+  tts: boolean;
+  vad: boolean;
+  rag: boolean;
+  images: boolean;
+}
+
+/** Tool-calling support of the currently registered backends. */
+export interface ToolCapabilities {
+  registry: boolean;
+  parallel: boolean;
+  cancellation: boolean;
+}
+
+/** RAG-session support of the currently registered backends. */
+export interface RagCapabilities {
+  multiSession: boolean;
+  persistent: boolean;
+}
+
+/**
+ * Installed, packaged, and executable surface of this SDK build, generated
+ * from packaging and runtime probes rather than from namespace presence
+ * alone. `capabilities()` is the source of truth apps should consult before
+ * calling into a modality that might not ship on this platform.
+ */
+export interface SDKCapabilities {
+  modalities: string[];
+  backends: InferenceFramework[];
+  audioFormats: AudioFormat[];
+  streaming: StreamingCapabilities;
+  tools: ToolCapabilities;
+  rag: RagCapabilities;
+  unavailable: UnavailableCapability[];
+}
+
 /** Narrows which models {@link ModelsNamespace.list} returns. */
 export interface ModelFilter {
   category?: ModelCategory;
@@ -479,11 +633,26 @@ export type GenerationEvent =
   | { type: 'toolCall'; toolCall: ToolCall }
   | { type: 'completed'; result: GenerationResult };
 
-/** One step of a streamed transcription. */
+/**
+ * One step of a streamed transcription (`stt.openStream`, and the deprecated
+ * `stt.transcribeStream` adapter over it).
+ */
 export type TranscriptionEvent =
-  | { type: 'started' }
-  | { type: 'partial'; text: string }
-  | { type: 'final'; transcription: Transcription };
+  | { type: 'started'; requestId: string }
+  | { type: 'speechStarted'; requestId: string; sequence: number; timestampMs?: number }
+  | {
+      type: 'partial';
+      requestId: string;
+      sequence: number;
+      segmentId: string;
+      revision: number;
+      alternatives: Array<{ text: string; confidence?: number }>;
+    }
+  | { type: 'transcriptFinal'; requestId: string; sequence: number; segment: Transcription }
+  | { type: 'speechEnded'; requestId: string; sequence: number; timestampMs?: number }
+  | { type: 'completed'; requestId: string }
+  | { type: 'failed'; requestId: string; error: SDKException }
+  | { type: 'cancelled'; requestId: string };
 
 /** One step of a voice conversation. */
 export type VoiceEvent =
@@ -515,15 +684,17 @@ export type DownloadEvent =
 /** A lifecycle, model, or error breadcrumb from the SDK itself. */
 export type SdkEvent =
   | { type: 'ready' }
-  | { type: 'modelLoaded'; id: string; category: ModelCategory }
+  | { type: 'modelLoaded'; id: string; category: ModelCategory; actualBackend?: InferenceFramework }
   | { type: 'modelUnloaded'; id: string }
   | { type: 'error'; message: string; recoverable: boolean };
 
-/** One frame of a streamed VAD pass. */
+/** Speech-detection deltas over a chunk stream (`vad.openStream`, and `vad.detectStream` over it). */
 export type VadEvent =
-  | { type: 'speechStarted'; atMs: number }
-  | { type: 'speechEnded'; atMs: number; segment: Segment }
-  | { type: 'frame'; isSpeech: boolean; probability: number; atMs: number };
+  | { type: 'speechStarted'; timestampMs?: number }
+  | { type: 'speechEnded'; timestampMs?: number }
+  | { type: 'activity'; isSpeech: boolean; probability: number; timestampMs?: number }
+  | { type: 'failed'; error: SDKException }
+  | { type: 'completed' };
 
 // ---------------------------------------------------------------------------
 // Shared helpers

@@ -68,7 +68,8 @@ import { models } from './Api/Models';
 import { lora } from './Api/Lora';
 import { sdkEvents } from './Api/Events';
 import { auth, logging, storage } from './Api/Platform';
-import type { InitializeOptions, SdkEvent } from './Api/Types';
+import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
+import type { InitializeOptions, SDKCapabilities, SdkEvent } from './Api/Types';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -498,6 +499,55 @@ export const RunAnywhere = {
   /** Lifecycle, model, and error breadcrumbs. */
   get events(): AsyncIterable<SdkEvent> {
     return sdkEvents();
+  },
+
+  /**
+   * Installed, packaged, and executable surface of this SDK build.
+   *
+   * Every v4 namespace ships on React Native except the namespaces the v4
+   * contract explicitly excludes from every SDK (`agents`, `wakeword`,
+   * `realtime`). This is a static per-build manifest, not yet a live
+   * per-modality runtime probe.
+   */
+  capabilities(): SDKCapabilities {
+    return {
+      modalities: [
+        'llm', 'vlm', 'stt', 'tts', 'vad', 'embeddings', 'rerank', 'images',
+        'diarization', 'segmentation', 'voice', 'rag', 'models', 'lora', 'cua',
+      ],
+      backends: [
+        InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      ],
+      audioFormats: ['pcm', 'wav'],
+      streaming: {
+        llm: true,
+        vlm: true,
+        stt: true,
+        tts: true,
+        vad: true,
+        rag: true,
+        images: true,
+      },
+      tools: { registry: true, parallel: false, cancellation: true },
+      rag: { multiSession: false, persistent: false },
+      unavailable: [
+        {
+          name: 'agents',
+          reason: 'RunAnywhere.agents is not part of the v4 public API surface.',
+        },
+        {
+          name: 'wakeword',
+          reason: 'RunAnywhere.wakeword is not part of the v4 public API surface.',
+        },
+        {
+          name: 'realtime',
+          reason:
+            'RunAnywhere.realtime is not part of the v4 public API surface ' +
+            '(no WebRTC/SIP/S2S transport namespace).',
+        },
+      ],
+    };
   },
 
   llm,

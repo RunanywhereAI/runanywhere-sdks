@@ -8,13 +8,19 @@
 import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import { SDKEnvironment, ModelCategory } from '@runanywhere/proto-ts/model_types';
 import { EventBus } from '../../Foundation/EventBus.js';
-import { Runtime, type RuntimeAccelerationMode } from '../../Foundation/RuntimeConfig.js';
+import {
+  Runtime,
+  type ModalityRuntimeId,
+  type RuntimeAccelerationMode,
+} from '../../Foundation/RuntimeConfig.js';
 import { SDKCore } from '../SDKCore.js';
 import { solutions } from '../Extensions/RunAnywhere+Solutions.js';
 import { CUA } from '../Extensions/RunAnywhere+CUA.js';
 import { setHfToken } from '../Extensions/RunAnywhere+HuggingFace.js';
 import { AudioInput, ImageInput, RagDocument } from './Inputs.js';
 import type { SdkEvent } from './Events.js';
+import type { Backend } from './Options.js';
+import type { SDKCapabilities, UnavailableCapability } from './Results.js';
 import { llm } from './Namespaces/llm.js';
 import { vlm } from './Namespaces/vlm.js';
 import { stt } from './Namespaces/stt.js';
@@ -66,15 +72,101 @@ function toSdkEvent(type: string, data: unknown): SdkEvent | null {
     case 'model.unloaded':
       return { type: 'modelUnloaded', id: String(payload.modelId ?? payload.id ?? '') };
     case 'sdk.initializationFailed':
+      return {
+        type: 'error',
+        message: String(payload.error ?? payload.message ?? 'Unknown SDK error'),
+        recoverable: false,
+        source: 'sdk',
+      };
     case 'model.loadFailed':
       return {
         type: 'error',
         message: String(payload.error ?? payload.message ?? 'Unknown SDK error'),
-        recoverable: type !== 'sdk.initializationFailed',
+        recoverable: true,
+        source: 'model',
       };
     default:
       return null;
   }
+}
+
+/** Modality ids not part of the v4 public API surface on any platform. */
+const EXPLICITLY_ABSENT_CAPABILITIES: UnavailableCapability[] = [
+  { name: 'agents', reason: 'RunAnywhere.agents is not part of the v4 public API surface.' },
+  { name: 'wakeword', reason: 'RunAnywhere.wakeword is not part of the v4 public API surface.' },
+  {
+    name: 'realtime',
+    reason: 'RunAnywhere.realtime is not part of the v4 public API surface (no WebRTC/SIP/S2S transport namespace).',
+  },
+];
+
+/** Backend id used by the Web SDK's per-modality runtime snapshot. */
+function toBackend(backend: 'llamacpp' | 'onnx' | null): Backend | null {
+  if (backend === 'llamacpp') return 'llamaCpp';
+  if (backend === 'onnx') return 'onnx';
+  return null;
+}
+
+/**
+ * Honest snapshot of what this Web build can actually reach, generated from
+ * `Runtime.modalities` (a live probe of registered backends) rather than
+ * from which namespaces merely exist in this module.
+ */
+function capabilitiesSnapshot(): SDKCapabilities {
+  const modalities = Runtime.modalities;
+  const entries = Object.entries(modalities) as [ModalityRuntimeId, typeof modalities[ModalityRuntimeId]][];
+
+  const availableModalities = entries
+    .filter(([, entry]) => entry.status !== 'unavailable')
+    .map(([id]) => id);
+
+  const unavailable: UnavailableCapability[] = [
+    ...entries
+      .filter(([, entry]) => entry.status === 'unavailable')
+      .map(([id, entry]) => ({
+        name: id,
+        reason: entry.note ?? `${entry.label} has no browser engine registered on this build.`,
+      })),
+    ...EXPLICITLY_ABSENT_CAPABILITIES,
+  ];
+
+  const backends = Array.from(new Set(
+    entries
+      .filter(([, entry]) => entry.status !== 'unavailable')
+      .map(([, entry]) => toBackend(entry.backend))
+      .filter((backend): backend is Backend => backend !== null),
+  ));
+
+  const streamable = (id: ModalityRuntimeId): boolean => modalities[id]?.status !== 'unavailable';
+
+  return {
+    modalities: availableModalities,
+    backends,
+    // Only formats the Web SDK can actually round-trip: raw PCM for live
+    // streams, plus WAV via the browser's own container decoder.
+    audioFormats: ['pcmS16Le', 'pcmF32Le', 'wav'],
+    streaming: {
+      llm: streamable('llm'),
+      vlm: streamable('vlm'),
+      stt: streamable('stt'),
+      tts: streamable('tts'),
+      vad: streamable('vad'),
+      rag: streamable('rag'),
+      images: streamable('diffusion'),
+    },
+    tools: {
+      registry: true,
+      // The tool loop runs one call at a time; no parallel dispatch yet.
+      parallel: false,
+      cancellation: true,
+    },
+    rag: {
+      // The Web RAG index is a process-wide singleton (see Namespaces/rag.ts).
+      multiSession: false,
+      persistent: true,
+    },
+    unavailable,
+  };
 }
 
 /** Lifecycle, download, and error breadcrumbs of the whole SDK. */
@@ -233,6 +325,16 @@ export const RunAnywhere = {
   /** Stable per-browser device identifier. */
   get deviceId(): string {
     return SDKCore.deviceId;
+  },
+
+  /**
+   * Installed, packaged, and executable surface of this build. Generated
+   * from live backend/runtime probes, never from namespace presence alone
+   * — an unavailable modality is reported honestly in `unavailable` instead
+   * of failing with a generic error the first time it is used.
+   */
+  capabilities(): Promise<SDKCapabilities> {
+    return Promise.resolve(capabilitiesSnapshot());
   },
 
   /** Lifecycle, download, and error breadcrumbs. */

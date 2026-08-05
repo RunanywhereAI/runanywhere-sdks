@@ -745,18 +745,52 @@ class RagConfig {
   }
 }
 
+/// Hardware class [LoadOptions.accelerator] requests.
+enum AcceleratorPolicy {
+  /// Let the platform choose.
+  auto,
+
+  /// Force CPU execution.
+  cpu,
+
+  /// Force GPU execution.
+  gpu,
+
+  /// Force NPU execution.
+  npu,
+}
+
+/// One ranked backend choice for [LoadOptions.backendPreferences].
+class BackendPreference {
+  /// Build a backend preference.
+  const BackendPreference(this.backend, {this.required = false});
+
+  /// Engine this preference names.
+  final InferenceFramework backend;
+
+  /// True fails the load instead of falling back past this entry.
+  final bool required;
+}
+
 /// Placement knobs applied when a model is loaded.
 class LoadOptions {
   /// Pin an engine or override runtime sizing for one load.
   const LoadOptions({
-    this.framework,
+    this.backendPreferences = const <BackendPreference>[],
+    this.accelerator,
     this.contextLength,
     this.threads,
+    this.forceReload = false,
+    // Deprecated aliases; kept as thin adapters for one release.
+    this.framework,
     this.useGpu,
   });
 
-  /// Engine to load with. Null lets the registry choose by priority.
-  final InferenceFramework? framework;
+  /// Ranked backend choices; the first entry the platform can honor wins.
+  final List<BackendPreference> backendPreferences;
+
+  /// Hardware class to run on.
+  final AcceleratorPolicy? accelerator;
 
   /// Context window in tokens.
   final int? contextLength;
@@ -764,6 +798,64 @@ class LoadOptions {
   /// CPU threads the engine may use.
   final int? threads;
 
-  /// True forces GPU offload, false forbids it, null lets the engine decide.
+  /// Reload even when the model is already resident.
+  final bool forceReload;
+
+  /// Deprecated: use [backendPreferences]. Engine to load with.
+  final InferenceFramework? framework;
+
+  /// Deprecated: use [accelerator]. True forces GPU offload, false forbids
+  /// it, null lets the engine decide.
   final bool? useGpu;
+
+  /// [backendPreferences], folding in the deprecated [framework] alias.
+  List<BackendPreference> get resolvedBackendPreferences =>
+      backendPreferences.isNotEmpty
+      ? backendPreferences
+      : (framework != null
+            ? <BackendPreference>[BackendPreference(framework!)]
+            : const <BackendPreference>[]);
+
+  /// [accelerator], folding in the deprecated [useGpu] alias.
+  AcceleratorPolicy? get resolvedAccelerator =>
+      accelerator ??
+      (useGpu != null
+          ? (useGpu! ? AcceleratorPolicy.gpu : AcceleratorPolicy.cpu)
+          : null);
+}
+
+/// Enforcement level `llm.generateStructured` applies to its schema.
+enum StructuredOutputMode {
+  /// Engine-constrained decoding; fails preflight until wired in.
+  constrained,
+
+  /// Generate freely, then validate against the schema.
+  validationOnly,
+
+  /// Validate, then retry once with a repair instruction when invalid.
+  repair,
+}
+
+/// Per-query retrieval overrides for `RagSession.query`/`queryStream`.
+class RagRetrievalOptions {
+  /// Override the session's retrieval defaults for one query.
+  const RagRetrievalOptions({this.topK, this.similarityThreshold});
+
+  /// Chunks retrieved for this query. Null uses the session default.
+  final int? topK;
+
+  /// Minimum similarity a chunk needs to be returned this query.
+  final double? similarityThreshold;
+}
+
+/// Per-query knobs for `RagSession.query`/`queryStream`.
+class RagQueryOptions {
+  /// Override retrieval and/or generation for one query.
+  const RagQueryOptions({this.retrieval, this.generation});
+
+  /// Retrieval overrides for this query.
+  final RagRetrievalOptions? retrieval;
+
+  /// Generation knobs for this query's answer.
+  final LlmOptions? generation;
 }

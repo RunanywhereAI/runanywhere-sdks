@@ -2,6 +2,7 @@
 //
 // `RunAnywhere.tts` — text to speech, including device playback.
 
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:runanywhere/features/tts/services/audio_playback_manager.dart';
@@ -61,32 +62,53 @@ class TtsApi {
     }
   }
 
-  /// Synthesize [text] and play it through the device speaker.
+  /// Synthesize [text] and play it through the device speaker, returning
+  /// immediately with a handle to the in-flight utterance.
   ///
-  /// Returns the buffer that was played, so callers can show its duration and
-  /// size without synthesizing twice — an addition to the v3 spec, which
-  /// specifies no return value.
+  /// There is no global `tts.stop()`; interrupt playback through the
+  /// returned handle.
   ///
-  /// Throws [SDKException] when synthesis or playback fails.
-  Future<Audio> speak(String text, {TtsOptions? options}) async {
-    final audio = await synthesize(text, options: options);
-    final sampleRate = audio.sampleRate > 0
-        ? audio.sampleRate
-        : (options?.sampleRate ?? RADefaultsAudioCapture.ttsSampleRateHz);
-    final wav = DartBridgeAudio.float32ToWav(
-      Uint8List.fromList(audio.data),
-      sampleRate,
-    );
-    if (wav == null || wav.isEmpty) {
-      throw SDKException.processingFailed(
-        'TTS audio conversion produced no WAV data',
-      );
-    }
-    await _playback.play(wav);
-    return audio;
+  /// Throws [SDKException] never directly — synthesis/playback failure
+  /// surfaces on [SpeechHandle.error].
+  SpeechHandle speak(String text, {TtsOptions? options}) {
+    final handle = SpeechHandle(interruptHandler: stop);
+    _latestHandle = handle;
+    unawaited(() async {
+      try {
+        final audio = await synthesize(text, options: options);
+        final sampleRate = audio.sampleRate > 0
+            ? audio.sampleRate
+            : (options?.sampleRate ?? RADefaultsAudioCapture.ttsSampleRateHz);
+        final wav = DartBridgeAudio.float32ToWav(
+          Uint8List.fromList(audio.data),
+          sampleRate,
+        );
+        if (wav == null || wav.isEmpty) {
+          throw SDKException.processingFailed(
+            'TTS audio conversion produced no WAV data',
+          );
+        }
+        await _playback.play(wav);
+        handle.complete();
+      } catch (error) {
+        handle.complete(
+          error is SDKException
+              ? error
+              : SDKException.processingFailed('$error'),
+        );
+      } finally {
+        if (identical(_latestHandle, handle)) _latestHandle = null;
+      }
+    }());
+    return handle;
   }
 
+  SpeechHandle? _latestHandle;
+
   /// Stop playback and any in-flight synthesis.
+  ///
+  /// Deprecated: use the [SpeechHandle] returned by [speak]. Interrupts the
+  /// most recently created handle when one is still active.
   Future<void> stop() async {
     await _playback.stop();
     if (DartBridge.isInitialized) {

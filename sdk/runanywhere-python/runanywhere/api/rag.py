@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import warnings
 from typing import Any, AsyncIterator, Iterator, List, Optional, Sequence, Union
 
 from .. import _rag_bridge as bridge
@@ -11,12 +12,30 @@ from .._streaming import aiter_tokens, iter_tokens
 from ..errors import SDKException
 from ..events import RagEvent, RagEventKind
 from ..inputs import ModelCategory, ModelRef, RagDocument
-from ..options import LlmOptions, RagConfig
+from ..options import LlmOptions, RagConfig, RagQueryOptions
 from ..results import Match, RagResult, RagStats
 
 __all__ = ["RagSession", "rag"]
 
 Documents = Union[RagDocument, Sequence[RagDocument]]
+QueryOptions = Union[RagQueryOptions, LlmOptions]
+
+
+def _coerce_query_options(options: Optional[QueryOptions]) -> Optional[RagQueryOptions]:
+    """Fold the deprecated bare-``LlmOptions`` overload into ``RagQueryOptions``.
+
+    ``RagSession.query(question, LlmOptions(...))`` still works but now forwards into
+    ``RagQueryOptions(generation=LlmOptions(...))``, per the v4 deprecation table.
+    """
+    if options is None or isinstance(options, RagQueryOptions):
+        return options
+    warnings.warn(
+        "RagSession.query(question, LlmOptions(...)) is deprecated; pass "
+        "RagQueryOptions(generation=LlmOptions(...)) instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+    return RagQueryOptions(generation=options)
 
 
 class RagSession:
@@ -72,23 +91,27 @@ class RagSession:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: self.search(query, top_k))
 
-    def query(self, question: str, options: Optional[LlmOptions] = None) -> RagResult:
+    def query(self, question: str, options: Optional[QueryOptions] = None) -> RagResult:
         """Answer ``question`` from the indexed documents.
+
+        ``options`` takes a :class:`RagQueryOptions` (retrieval overrides plus generation
+        knobs). Passing a bare :class:`LlmOptions` still works as a deprecated forwarder
+        equivalent to ``RagQueryOptions(generation=options)``.
 
         Raises:
             SDKException: the session is closed or generation fails.
         """
         core = self._live()
-        payload = bridge.build_query(question, options)
+        payload = bridge.build_query(question, _coerce_query_options(options))
         return bridge.parse_result(core.rag_query(self._handle, payload), self._model)
 
-    async def aquery(self, question: str, options: Optional[LlmOptions] = None) -> RagResult:
+    async def aquery(self, question: str, options: Optional[QueryOptions] = None) -> RagResult:
         """Async form of :meth:`query` (runs on the loop's default executor)."""
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: self.query(question, options))
 
     def query_stream(
-        self, question: str, options: Optional[LlmOptions] = None
+        self, question: str, options: Optional[QueryOptions] = None
     ) -> Iterator[RagEvent]:
         """Stream retrieved chunks, then answer tokens, then the terminal result.
 
@@ -98,11 +121,13 @@ class RagSession:
         streamed ``RAGResult`` also leaves ``prompt_tokens``/``completion_tokens`` at 0, so
         the terminal result's token counts read 0 — :meth:`query` reports them.
 
+        See :meth:`query` for the ``options`` overload rules.
+
         Raises:
             SDKException: the session is closed or generation fails.
         """
         core = self._live()
-        payload = bridge.build_query(question, options, stream=True)
+        payload = bridge.build_query(question, _coerce_query_options(options), stream=True)
         handle = self._handle
 
         def native_call(on_event) -> None:
@@ -114,11 +139,11 @@ class RagSession:
                 yield event
 
     async def aquery_stream(
-        self, question: str, options: Optional[LlmOptions] = None
+        self, question: str, options: Optional[QueryOptions] = None
     ) -> AsyncIterator[RagEvent]:
         """Async form of :meth:`query_stream`."""
         core = self._live()
-        payload = bridge.build_query(question, options, stream=True)
+        payload = bridge.build_query(question, _coerce_query_options(options), stream=True)
         handle = self._handle
 
         def native_call(on_event) -> None:

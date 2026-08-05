@@ -32,7 +32,7 @@ class Rerank:
         Raises:
             SDKException: always — the bridge exposes no rerank entry point.
         """
-        raise SDKException.not_implemented(_GAP)
+        raise SDKException.unsupported_capability("rerank.rerank", _GAP)
 
 
 #: The ``rerank`` namespace.

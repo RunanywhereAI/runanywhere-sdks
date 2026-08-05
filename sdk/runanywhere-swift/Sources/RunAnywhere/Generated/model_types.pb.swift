@@ -2132,6 +2132,8 @@ public nonisolated struct RAModelLoadRequest: Sendable {
   /// Clears the value of `category`. Subsequent reads from it will return its default value.
   public mutating func clearCategory() {self._category = nil}
 
+  /// Preferred backend pin. Retained for wire compatibility; new callers
+  /// should prefer backend_preferences + accelerator.
   public var framework: RAInferenceFramework {
     get {_framework ?? .unspecified}
     set {_framework = newValue}
@@ -2145,12 +2147,58 @@ public nonisolated struct RAModelLoadRequest: Sendable {
 
   public var validateAvailability: Bool = false
 
+  /// v4 placement knobs (honored end-to-end; never silently dropped).
+  public var contextLength: Int32 {
+    get {_contextLength ?? 0}
+    set {_contextLength = newValue}
+  }
+  /// Returns true if `contextLength` has been explicitly set.
+  public var hasContextLength: Bool {self._contextLength != nil}
+  /// Clears the value of `contextLength`. Subsequent reads from it will return its default value.
+  public mutating func clearContextLength() {self._contextLength = nil}
+
+  public var threads: Int32 {
+    get {_threads ?? 0}
+    set {_threads = newValue}
+  }
+  /// Returns true if `threads` has been explicitly set.
+  public var hasThreads: Bool {self._threads != nil}
+  /// Clears the value of `threads`. Subsequent reads from it will return its default value.
+  public mutating func clearThreads() {self._threads = nil}
+
+  /// deprecated adapter; maps to accelerator
+  public var useGpu: Bool {
+    get {_useGpu ?? false}
+    set {_useGpu = newValue}
+  }
+  /// Returns true if `useGpu` has been explicitly set.
+  public var hasUseGpu: Bool {self._useGpu != nil}
+  /// Clears the value of `useGpu`. Subsequent reads from it will return its default value.
+  public mutating func clearUseGpu() {self._useGpu = nil}
+
+  public var backendPreferences: [RAInferenceFramework] = []
+
+  /// AcceleratorPolicy values live in public_api_v4.proto; stored as int32
+  /// here to avoid a circular import with LoadedModelInfo helpers.
+  public var acceleratorPolicy: Int32 {
+    get {_acceleratorPolicy ?? 0}
+    set {_acceleratorPolicy = newValue}
+  }
+  /// Returns true if `acceleratorPolicy` has been explicitly set.
+  public var hasAcceleratorPolicy: Bool {self._acceleratorPolicy != nil}
+  /// Clears the value of `acceleratorPolicy`. Subsequent reads from it will return its default value.
+  public mutating func clearAcceleratorPolicy() {self._acceleratorPolicy = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _category: RAModelCategory? = nil
   fileprivate var _framework: RAInferenceFramework? = nil
+  fileprivate var _contextLength: Int32? = nil
+  fileprivate var _threads: Int32? = nil
+  fileprivate var _useGpu: Bool? = nil
+  fileprivate var _acceleratorPolicy: Int32? = nil
 }
 
 public nonisolated struct RAModelLoadResult: @unchecked Sendable {
@@ -2168,6 +2216,7 @@ public nonisolated struct RAModelLoadResult: @unchecked Sendable {
     set {_uniqueStorage()._category = newValue}
   }
 
+  /// Actual backend that executed the load (not the catalog/request pin).
   public var framework: RAInferenceFramework {
     get {_storage._framework}
     set {_uniqueStorage()._framework = newValue}
@@ -2209,6 +2258,71 @@ public nonisolated struct RAModelLoadResult: @unchecked Sendable {
   public var hasError: Bool {_storage._error != nil}
   /// Clears the value of `error`. Subsequent reads from it will return its default value.
   public mutating func clearError() {_uniqueStorage()._error = nil}
+
+  /// v4 placement truth.
+  public var requestedBackend: RAInferenceFramework {
+    get {_storage._requestedBackend ?? .unspecified}
+    set {_uniqueStorage()._requestedBackend = newValue}
+  }
+  /// Returns true if `requestedBackend` has been explicitly set.
+  public var hasRequestedBackend: Bool {_storage._requestedBackend != nil}
+  /// Clears the value of `requestedBackend`. Subsequent reads from it will return its default value.
+  public mutating func clearRequestedBackend() {_uniqueStorage()._requestedBackend = nil}
+
+  public var actualDeviceID: String {
+    get {_storage._actualDeviceID ?? String()}
+    set {_uniqueStorage()._actualDeviceID = newValue}
+  }
+  /// Returns true if `actualDeviceID` has been explicitly set.
+  public var hasActualDeviceID: Bool {_storage._actualDeviceID != nil}
+  /// Clears the value of `actualDeviceID`. Subsequent reads from it will return its default value.
+  public mutating func clearActualDeviceID() {_uniqueStorage()._actualDeviceID = nil}
+
+  public var actualDeviceName: String {
+    get {_storage._actualDeviceName ?? String()}
+    set {_uniqueStorage()._actualDeviceName = newValue}
+  }
+  /// Returns true if `actualDeviceName` has been explicitly set.
+  public var hasActualDeviceName: Bool {_storage._actualDeviceName != nil}
+  /// Clears the value of `actualDeviceName`. Subsequent reads from it will return its default value.
+  public mutating func clearActualDeviceName() {_uniqueStorage()._actualDeviceName = nil}
+
+  /// cpu | gpu | npu | metal | webgpu | unknown
+  public var actualDeviceKind: String {
+    get {_storage._actualDeviceKind ?? String()}
+    set {_uniqueStorage()._actualDeviceKind = newValue}
+  }
+  /// Returns true if `actualDeviceKind` has been explicitly set.
+  public var hasActualDeviceKind: Bool {_storage._actualDeviceKind != nil}
+  /// Clears the value of `actualDeviceKind`. Subsequent reads from it will return its default value.
+  public mutating func clearActualDeviceKind() {_uniqueStorage()._actualDeviceKind = nil}
+
+  public var runtimeVersion: String {
+    get {_storage._runtimeVersion ?? String()}
+    set {_uniqueStorage()._runtimeVersion = newValue}
+  }
+  /// Returns true if `runtimeVersion` has been explicitly set.
+  public var hasRuntimeVersion: Bool {_storage._runtimeVersion != nil}
+  /// Clears the value of `runtimeVersion`. Subsequent reads from it will return its default value.
+  public mutating func clearRuntimeVersion() {_uniqueStorage()._runtimeVersion = nil}
+
+  public var abiVersion: String {
+    get {_storage._abiVersion ?? String()}
+    set {_uniqueStorage()._abiVersion = newValue}
+  }
+  /// Returns true if `abiVersion` has been explicitly set.
+  public var hasAbiVersion: Bool {_storage._abiVersion != nil}
+  /// Clears the value of `abiVersion`. Subsequent reads from it will return its default value.
+  public mutating func clearAbiVersion() {_uniqueStorage()._abiVersion = nil}
+
+  public var fallbackReason: String {
+    get {_storage._fallbackReason ?? String()}
+    set {_uniqueStorage()._fallbackReason = newValue}
+  }
+  /// Returns true if `fallbackReason` has been explicitly set.
+  public var hasFallbackReason: Bool {_storage._fallbackReason != nil}
+  /// Clears the value of `fallbackReason`. Subsequent reads from it will return its default value.
+  public mutating func clearFallbackReason() {_uniqueStorage()._fallbackReason = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -4952,7 +5066,7 @@ nonisolated extension RAModelDiscoveryResult: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelLoadRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}category\0\u{1}framework\0\u{3}force_reload\0\u{3}validate_availability\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}category\0\u{1}framework\0\u{3}force_reload\0\u{3}validate_availability\0\u{3}context_length\0\u{1}threads\0\u{3}use_gpu\0\u{3}backend_preferences\0\u{3}accelerator_policy\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -4965,6 +5079,11 @@ nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._
       case 3: try { try decoder.decodeSingularEnumField(value: &self._framework) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.forceReload) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.validateAvailability) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self._contextLength) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self._threads) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self._useGpu) }()
+      case 9: try { try decoder.decodeRepeatedEnumField(value: &self.backendPreferences) }()
+      case 10: try { try decoder.decodeSingularInt32Field(value: &self._acceleratorPolicy) }()
       default: break
       }
     }
@@ -4990,6 +5109,21 @@ nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._
     if self.validateAvailability != false {
       try visitor.visitSingularBoolField(value: self.validateAvailability, fieldNumber: 5)
     }
+    try { if let v = self._contextLength {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._threads {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._useGpu {
+      try visitor.visitSingularBoolField(value: v, fieldNumber: 8)
+    } }()
+    if !self.backendPreferences.isEmpty {
+      try visitor.visitPackedEnumField(value: self.backendPreferences, fieldNumber: 9)
+    }
+    try { if let v = self._acceleratorPolicy {
+      try visitor.visitSingularInt32Field(value: v, fieldNumber: 10)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4999,6 +5133,11 @@ nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs._framework != rhs._framework {return false}
     if lhs.forceReload != rhs.forceReload {return false}
     if lhs.validateAvailability != rhs.validateAvailability {return false}
+    if lhs._contextLength != rhs._contextLength {return false}
+    if lhs._threads != rhs._threads {return false}
+    if lhs._useGpu != rhs._useGpu {return false}
+    if lhs.backendPreferences != rhs.backendPreferences {return false}
+    if lhs._acceleratorPolicy != rhs._acceleratorPolicy {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5006,7 +5145,7 @@ nonisolated extension RAModelLoadRequest: SwiftProtobuf.Message, SwiftProtobuf._
 
 nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelLoadResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}model_id\0\u{1}category\0\u{1}framework\0\u{3}resolved_path\0\u{3}loaded_at_unix_ms\0\u{2}\u{2}warnings\0\u{3}already_loaded\0\u{3}resolved_artifacts\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{4}\u{2}model_id\0\u{1}category\0\u{1}framework\0\u{3}resolved_path\0\u{3}loaded_at_unix_ms\0\u{2}\u{2}warnings\0\u{3}already_loaded\0\u{3}resolved_artifacts\0\u{1}error\0\u{3}requested_backend\0\u{3}actual_device_id\0\u{3}actual_device_name\0\u{3}actual_device_kind\0\u{3}runtime_version\0\u{3}abi_version\0\u{3}fallback_reason\0")
 
   fileprivate class _StorageClass {
     var _modelID: String = String()
@@ -5018,6 +5157,13 @@ nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._M
     var _alreadyLoaded: Bool = false
     var _resolvedArtifacts: [RAModelFileDescriptor] = []
     var _error: RASDKError? = nil
+    var _requestedBackend: RAInferenceFramework? = nil
+    var _actualDeviceID: String? = nil
+    var _actualDeviceName: String? = nil
+    var _actualDeviceKind: String? = nil
+    var _runtimeVersion: String? = nil
+    var _abiVersion: String? = nil
+    var _fallbackReason: String? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -5037,6 +5183,13 @@ nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._M
       _alreadyLoaded = source._alreadyLoaded
       _resolvedArtifacts = source._resolvedArtifacts
       _error = source._error
+      _requestedBackend = source._requestedBackend
+      _actualDeviceID = source._actualDeviceID
+      _actualDeviceName = source._actualDeviceName
+      _actualDeviceKind = source._actualDeviceKind
+      _runtimeVersion = source._runtimeVersion
+      _abiVersion = source._abiVersion
+      _fallbackReason = source._fallbackReason
     }
   }
 
@@ -5064,6 +5217,13 @@ nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._M
         case 9: try { try decoder.decodeSingularBoolField(value: &_storage._alreadyLoaded) }()
         case 10: try { try decoder.decodeRepeatedMessageField(value: &_storage._resolvedArtifacts) }()
         case 11: try { try decoder.decodeSingularMessageField(value: &_storage._error) }()
+        case 12: try { try decoder.decodeSingularEnumField(value: &_storage._requestedBackend) }()
+        case 13: try { try decoder.decodeSingularStringField(value: &_storage._actualDeviceID) }()
+        case 14: try { try decoder.decodeSingularStringField(value: &_storage._actualDeviceName) }()
+        case 15: try { try decoder.decodeSingularStringField(value: &_storage._actualDeviceKind) }()
+        case 16: try { try decoder.decodeSingularStringField(value: &_storage._runtimeVersion) }()
+        case 17: try { try decoder.decodeSingularStringField(value: &_storage._abiVersion) }()
+        case 18: try { try decoder.decodeSingularStringField(value: &_storage._fallbackReason) }()
         default: break
         }
       }
@@ -5103,6 +5263,27 @@ nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._M
       try { if let v = _storage._error {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
       } }()
+      try { if let v = _storage._requestedBackend {
+        try visitor.visitSingularEnumField(value: v, fieldNumber: 12)
+      } }()
+      try { if let v = _storage._actualDeviceID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 13)
+      } }()
+      try { if let v = _storage._actualDeviceName {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 14)
+      } }()
+      try { if let v = _storage._actualDeviceKind {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 15)
+      } }()
+      try { if let v = _storage._runtimeVersion {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 16)
+      } }()
+      try { if let v = _storage._abiVersion {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 17)
+      } }()
+      try { if let v = _storage._fallbackReason {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 18)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5121,6 +5302,13 @@ nonisolated extension RAModelLoadResult: SwiftProtobuf.Message, SwiftProtobuf._M
         if _storage._alreadyLoaded != rhs_storage._alreadyLoaded {return false}
         if _storage._resolvedArtifacts != rhs_storage._resolvedArtifacts {return false}
         if _storage._error != rhs_storage._error {return false}
+        if _storage._requestedBackend != rhs_storage._requestedBackend {return false}
+        if _storage._actualDeviceID != rhs_storage._actualDeviceID {return false}
+        if _storage._actualDeviceName != rhs_storage._actualDeviceName {return false}
+        if _storage._actualDeviceKind != rhs_storage._actualDeviceKind {return false}
+        if _storage._runtimeVersion != rhs_storage._runtimeVersion {return false}
+        if _storage._abiVersion != rhs_storage._abiVersion {return false}
+        if _storage._fallbackReason != rhs_storage._fallbackReason {return false}
         return true
       }
       if !storagesAreEqual {return false}

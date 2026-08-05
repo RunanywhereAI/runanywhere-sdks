@@ -28,7 +28,7 @@ import { ToolCallingSessionCreateRequest } from '@runanywhere/proto-ts/tool_call
 import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import { LLMGenerationOptions as LLMGenerationOptionsMessage } from '@runanywhere/proto-ts/llm_options';
 import { lLMGenerationOptionsDefaults } from '@runanywhere/proto-ts/convenience/llm_options_convenience';
-import { arrayBufferToBytes } from '../../../services/ProtoBytes';
+import { arrayBufferToBytes, bytesToBase64 } from '../../../services/ProtoBytes';
 import { ensureServicesReady } from '../../../Foundation/Initialization/ServicesReadyGuard';
 import { requireInitialized } from '../../../Foundation/Initialization/InitializedGuard';
 import { encodeProtoMessage } from '../../../services/ProtoWire';
@@ -329,7 +329,7 @@ export async function generateWithTools(
   const native = requireNativeModule();
   const runLoopWithHandle = (
     requestBytes: ArrayBuffer,
-    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<ArrayBuffer>,
+    onExecuteToolBytes: (toolCallBytes: ArrayBuffer) => Promise<string>,
     onHandle: (runLoopHandle: number) => void
   ) =>
     native.toolRunLoopProtoWithHandle(
@@ -399,10 +399,12 @@ export async function generateWithTools(
     request,
     ToolCallingSessionCreateRequest
   );
-  const onExecute = async (toolCallBytes: ArrayBuffer) => {
+  const onExecute = async (toolCallBytes: ArrayBuffer): Promise<string> => {
     const toolCall = ToolCall.decode(arrayBufferToBytes(toolCallBytes));
     const result = await executeTool(toolCall);
-    return encodeProtoMessage(result, ToolResult);
+    // Return base64 rather than an ArrayBuffer: the native run loop reads the
+    // result off the JS thread, where a JS ArrayBuffer's data() is unreadable.
+    return bytesToBase64(arrayBufferToBytes(encodeProtoMessage(result, ToolResult)));
   };
 
   const signal = extra?.signal;

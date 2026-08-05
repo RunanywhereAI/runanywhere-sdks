@@ -28,12 +28,12 @@ import { toLlmOptions, toRagConfiguration } from './Options';
 import { toMatch, toRagResult, toRagStats } from './Results';
 import { pushStream } from './Stream';
 import type {
-  LlmOptions,
   Match,
   ModelRef,
   RagConfig,
   RagDocument,
   RagEvent,
+  RagQueryOptions,
   RagResult,
   RagSession,
   RagStats,
@@ -84,13 +84,17 @@ async function toRagDocument(document: RagDocument): Promise<RAGDocument> {
 
 function buildQueryOptions(
   question: string,
-  options: LlmOptions | undefined,
-  topK?: number
+  options: RagQueryOptions | undefined,
+  config: RagConfig | undefined
 ): RAGQueryOptions {
+  const topK = options?.retrieval?.topK ?? config?.topK;
+  const similarityThreshold =
+    options?.retrieval?.similarityThreshold ?? config?.similarityThreshold;
   return RAGQueryOptions.fromPartial({
     question,
-    generation: toLlmOptions(options),
+    generation: toLlmOptions(options?.generation),
     ...(topK !== undefined ? { retrievalTopK: topK } : {}),
+    ...(similarityThreshold !== undefined ? { similarityThreshold } : {}),
   });
 }
 
@@ -130,12 +134,14 @@ function createSession(config: RagConfig | undefined): RagSession {
       return response.chunks.map(toMatch);
     },
 
-    async query(question: string, options?: LlmOptions): Promise<RagResult> {
+    async query(question: string, options?: RagQueryOptions): Promise<RagResult> {
       requireOpen();
-      return toRagResult(await ragQuery(buildQueryOptions(question, options)));
+      return toRagResult(
+        await ragQuery(buildQueryOptions(question, options, config))
+      );
     },
 
-    queryStream(question: string, options?: LlmOptions): AsyncIterable<RagEvent> {
+    queryStream(question: string, options?: RagQueryOptions): AsyncIterable<RagEvent> {
       requireOpen();
       const retrieved: Match[] = [];
       let cancel: (() => Promise<void>) | null = null;
@@ -147,7 +153,7 @@ function createSession(config: RagConfig | undefined): RagSession {
             await native.ragCancelProto().catch(() => undefined);
           };
           const requestBytes = encode(
-            buildQueryOptions(question, options),
+            buildQueryOptions(question, options, config),
             RAGQueryOptions
           );
           void native
@@ -163,7 +169,7 @@ function createSession(config: RagConfig | undefined): RagSession {
                 case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN:
                   if (event.token.length > 0) {
                     controller.push({
-                      type: 'token',
+                      type: 'textDelta',
                       text: event.token,
                       kind: 'text',
                     });

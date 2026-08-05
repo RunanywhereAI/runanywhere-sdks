@@ -16,7 +16,52 @@ import { decode, decodeEvent, decodeOptional, encode, nextRequestId, preflight }
 import { toTtsOptions } from './Options';
 import { toAudio, toAudioChunk, toVoice } from './Results';
 import { pushStream } from './Stream';
-import type { Audio, AudioChunk, TtsOptions, Voice } from './Types';
+import type { Audio, AudioChunk, SpeechHandle, TtsOptions, Voice } from './Types';
+
+let speechSequence = 0;
+function nextSpeechId(): string {
+  speechSequence += 1;
+  return `speech-${Date.now()}-${speechSequence}`;
+}
+
+/** The most recently created `speak()` handle, for the deprecated `stop()` adapter. */
+let latestHandle: MutableSpeechHandle | null = null;
+
+interface MutableSpeechHandle extends SpeechHandle {
+  interrupted: boolean;
+  error?: Error;
+}
+
+function createSpeechHandle(text: string, options?: TtsOptions): MutableSpeechHandle {
+  let settle!: () => void;
+  const settled = new Promise<void>((resolve) => {
+    settle = resolve;
+  });
+  const handle: MutableSpeechHandle = {
+    id: nextSpeechId(),
+    interrupted: false,
+    error: undefined,
+    async interrupt(): Promise<void> {
+      handle.interrupted = true;
+      await stopSpeaking().catch(() => undefined);
+      settle();
+    },
+    async waitForPlayout(): Promise<void> {
+      await settled;
+    },
+  };
+
+  void speakAndPlay(text, toTtsOptions(options))
+    .catch((error: unknown) => {
+      handle.error = error instanceof Error ? error : new Error(String(error));
+    })
+    .finally(() => {
+      settle();
+      if (latestHandle === handle) latestHandle = null;
+    });
+
+  return handle;
+}
 
 function buildRequest(text: string, options?: TtsOptions): ArrayBuffer {
   return encode(
@@ -97,16 +142,30 @@ export const tts = {
   },
 
   /**
-   * Synthesize `text` and play it through the device output.
+   * Synthesize `text` and play it through the device output, returning
+   * immediately with a handle to the in-flight utterance.
    *
-   * @throws SDKException when no voice is loaded or synthesis fails.
+   * There is no global `tts.stop()`; interrupt playback through the
+   * returned handle.
+   *
+   * @throws SDKException never directly — synthesis/playback failure
+   * surfaces on `handle.error`.
    */
-  async speak(text: string, options?: TtsOptions): Promise<void> {
-    await speakAndPlay(text, toTtsOptions(options));
+  speak(text: string, options?: TtsOptions): SpeechHandle {
+    const handle = createSpeechHandle(text, options);
+    latestHandle = handle;
+    return handle;
   },
 
-  /** Stop playback and any in-flight synthesis. */
+  /**
+   * @deprecated Use the `SpeechHandle` returned by `speak()`. Interrupts the
+   * most recently created handle when one is still active.
+   */
   async stop(): Promise<void> {
+    if (latestHandle) {
+      await latestHandle.interrupt();
+      return;
+    }
     await stopSpeaking();
   },
 

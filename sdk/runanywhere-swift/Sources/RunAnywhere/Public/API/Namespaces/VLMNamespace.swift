@@ -63,63 +63,83 @@ public extension RunAnywhere {
                 options: effective.toVLMProto(prompt: prompt)
             )
 
+            let textItemId = UUID().uuidString
             return AsyncThrowingStream { continuation in
                 let task = Task {
+                    var sawStart = false
                     var accumulated = ""
-                    var tokenCount = 0
-                    let startedAt = Date()
-                    var firstTokenAt: Date?
                     var requestId = ""
-                    var sawCompletion = false
+                    var sawTerminal = false
+                    var sequence: Int64 = 0
+                    func nextSequence() -> Int64 {
+                        sequence += 1
+                        return sequence
+                    }
 
                     for await event in events {
                         if Task.isCancelled { break }
                         if !event.requestID.isEmpty { requestId = event.requestID }
                         switch event.kind {
                         case .started:
+                            sawStart = true
                             continuation.yield(.started(requestId: event.requestID))
                         case .token:
                             if !event.token.isEmpty {
-                                if firstTokenAt == nil { firstTokenAt = Date() }
-                                tokenCount += 1
                                 accumulated += event.token
-                                continuation.yield(.token(text: event.token, kind: .text))
+                                continuation.yield(.textDelta(
+                                    requestId: requestId,
+                                    sequence: nextSequence(),
+                                    itemId: textItemId,
+                                    index: 0,
+                                    text: event.token
+                                ))
                             }
                         case .completed:
                             let result = event.hasResult ? event.result : RAVLMResult()
                             continuation.yield(.completed(
-                                GenerationResult(proto: result, requestId: event.requestID, model: model)
+                                requestId: requestId,
+                                result: GenerationResult(proto: result, requestId: event.requestID, model: model)
                             ))
-                            sawCompletion = true
+                            sawTerminal = true
                         case .error:
-                            continuation.finish(throwing: SDKException(proto: event.error))
-                            return
+                            continuation.yield(.failed(
+                                requestId: requestId,
+                                partial: accumulated.isEmpty ? nil : accumulated,
+                                error: SDKException(proto: event.error)
+                            ))
+                            sawTerminal = true
                         default:
                             break
                         }
                     }
 
-                    // Same grammar as `llm.generateStream`: end in `completed`
-                    // or throw, never a silent finish.
-                    if !sawCompletion, !Task.isCancelled {
-                        guard tokenCount > 0 else {
-                            continuation.finish(throwing: SDKException(
-                                code: .generationFailed,
-                                message: "VLM generation ended before producing any output",
-                                category: .component
+                    // Same grammar as `llm.generateStream`: end in `completed`,
+                    // `failed`, or `cancelled` — never a fabricated `completed`
+                    // when the producer never reported one.
+                    if !sawTerminal {
+                        if Task.isCancelled {
+                            continuation.yield(.cancelled(requestId: requestId, partial: accumulated.isEmpty ? nil : accumulated))
+                        } else if sawStart {
+                            continuation.yield(.failed(
+                                requestId: requestId,
+                                partial: accumulated.isEmpty ? nil : accumulated,
+                                error: SDKException(
+                                    code: .generationFailed,
+                                    message: "VLM generation stream ended before a terminal event",
+                                    category: .component
+                                )
                             ))
-                            return
+                        } else {
+                            continuation.yield(.failed(
+                                requestId: requestId,
+                                partial: nil,
+                                error: SDKException(
+                                    code: .generationFailed,
+                                    message: "VLM generation ended before producing any output",
+                                    category: .component
+                                )
+                            ))
                         }
-                        continuation.yield(.completed(RunAnywhere.synthesizeResult(
-                            text: accumulated,
-                            thinking: "",
-                            tokenCount: tokenCount,
-                            startedAt: startedAt,
-                            firstTokenAt: firstTokenAt,
-                            finishReason: "",
-                            requestId: requestId,
-                            model: model
-                        )))
                     }
                     continuation.finish()
                 }

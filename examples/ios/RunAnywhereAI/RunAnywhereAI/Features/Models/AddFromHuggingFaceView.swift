@@ -45,7 +45,7 @@ final class HuggingFaceDownloadModel: ObservableObject {
                 )
             )
             for try await event in try await RunAnywhere.models.download(id: model.id) {
-                guard case .progress(_, _, let percent) = event else { continue }
+                guard case .progress(_, _, _, _, let percent, _) = event else { continue }
                 // `DownloadEvent.percent` is 0–100; the phase carries a fraction.
                 phases[key] = .downloading(Double(percent) / 100)
             }

@@ -16,7 +16,18 @@ import uuid
 from typing import Callable, Dict, Optional, Tuple
 
 from . import _native
-from ._handles import Embedder, LLMModel, STTModel, TTSVoice, Vad, VLMModel
+from ._handles import (
+    DiarizationModel,
+    DiffusionModel,
+    Embedder,
+    LLMModel,
+    STTModel,
+    SegmentationModel,
+    TTSVoice,
+    Vad,
+    VLMModel,
+    VoiceAgent,
+)
 from .catalog import CATALOG, is_catalog_id
 from .download import assert_remote_supported, model_status, models_root, resolve_model
 from .errors import SDKException
@@ -53,6 +64,9 @@ _FRAMEWORK_FOR_CATEGORY = {
     ModelCategory.SPEECH_RECOGNITION: InferenceFramework.SHERPA,
     ModelCategory.SPEECH_SYNTHESIS: InferenceFramework.SHERPA,
     ModelCategory.VOICE_ACTIVITY_DETECTION: InferenceFramework.BUILTIN,
+    ModelCategory.SPEAKER_DIARIZATION: InferenceFramework.ONNX,
+    ModelCategory.SEMANTIC_SEGMENTATION: InferenceFramework.ONNX,
+    ModelCategory.IMAGE_GENERATION: InferenceFramework.COREML,
 }
 
 
@@ -283,16 +297,32 @@ class Runtime:
     def check_load_options(self, options: Optional[LoadOptions]) -> None:
         """Reject placement knobs the bridge cannot carry.
 
+        Only a single ``backend_preferences`` entry (equivalently the deprecated
+        ``framework``) is even meaningful here, and the bridge's
+        ``load_model(path, id, name)`` has no placement parameters for it either — so any
+        of ``backend_preferences``, ``accelerator``, ``context_length``, or ``threads`` fails
+        preflight rather than being silently dropped.
+
         Raises:
             SDKException: a LoadOptions field is set.
         """
         if options is None:
             return
-        for field in ("framework", "context_length", "threads", "use_gpu"):
+        if options.resolved_backend_preferences:
+            raise SDKException.unsupported_capability(
+                "LoadOptions.backend_preferences",
+                "the bridge's load_model(path, id, name) has no placement parameters",
+            )
+        if options.resolved_accelerator is not None:
+            raise SDKException.unsupported_capability(
+                "LoadOptions.accelerator",
+                "the bridge's load_model(path, id, name) has no placement parameters",
+            )
+        for field in ("context_length", "threads"):
             if getattr(options, field) is not None:
-                raise SDKException.not_implemented(
-                    f"LoadOptions.{field}: the bridge's load_model(path, id, name) has no "
-                    "placement parameters"
+                raise SDKException.unsupported_capability(
+                    f"LoadOptions.{field}",
+                    "the bridge's load_model(path, id, name) has no placement parameters",
                 )
 
     # -- per-modality loaders ------------------------------------------------
@@ -392,6 +422,123 @@ class Runtime:
             self._put(ModelCategory.VOICE_ACTIVITY_DETECTION, key, detector)
             return detector
 
+    def diarization(
+        self, model_id: Optional[str] = None, *, verb: str = "diarizing"
+    ) -> DiarizationModel:
+        """The resident diarization model, loading ``model_id`` when needed."""
+        with self._lock:
+            handle = self._reuse(ModelCategory.SPEAKER_DIARIZATION, model_id)
+            if handle is not None:
+                return handle  # type: ignore[return-value]
+            if model_id is None:
+                self._missing(ModelCategory.SPEAKER_DIARIZATION, verb)
+            core = self.core()
+            if not hasattr(core, "load_diarization_model"):
+                raise SDKException.unsupported_capability(
+                    "diarization.diarize",
+                    "this native/_core build predates the diarization bindings "
+                    "(load_diarization_model / diarize are not exported by native/module.cpp) "
+                    "— rebuild the native extension",
+                )
+            self.unload(ModelCategory.SPEAKER_DIARIZATION)
+            resolved = self.resolve_for_load(model_id)
+            handle_id = core.load_diarization_model(resolved.primary, model_id)
+            model = DiarizationModel(core, handle_id)
+            self._put(ModelCategory.SPEAKER_DIARIZATION, model_id, model)
+            return model
+
+    def segmentation(
+        self, model_id: Optional[str] = None, *, verb: str = "segmenting"
+    ) -> SegmentationModel:
+        """The resident segmentation model, loading ``model_id`` when needed."""
+        with self._lock:
+            handle = self._reuse(ModelCategory.SEMANTIC_SEGMENTATION, model_id)
+            if handle is not None:
+                return handle  # type: ignore[return-value]
+            if model_id is None:
+                self._missing(ModelCategory.SEMANTIC_SEGMENTATION, verb)
+            core = self.core()
+            if not hasattr(core, "load_segmentation_model"):
+                raise SDKException.unsupported_capability(
+                    "segmentation.segment",
+                    "this native/_core build predates the segmentation bindings "
+                    "(load_segmentation_model / segment are not exported by native/module.cpp) "
+                    "— rebuild the native extension",
+                )
+            self.unload(ModelCategory.SEMANTIC_SEGMENTATION)
+            resolved = self.resolve_for_load(model_id)
+            handle_id = core.load_segmentation_model(resolved.primary, model_id)
+            model = SegmentationModel(core, handle_id)
+            self._put(ModelCategory.SEMANTIC_SEGMENTATION, model_id, model)
+            return model
+
+    def diffusion(
+        self, model_id: Optional[str] = None, *, verb: str = "generating an image"
+    ) -> DiffusionModel:
+        """The resident diffusion model, loading ``model_id`` when needed."""
+        with self._lock:
+            handle = self._reuse(ModelCategory.IMAGE_GENERATION, model_id)
+            if handle is not None:
+                return handle  # type: ignore[return-value]
+            if model_id is None:
+                self._missing(ModelCategory.IMAGE_GENERATION, verb)
+            core = self.core()
+            if not hasattr(core, "load_diffusion_model"):
+                raise SDKException.unsupported_capability(
+                    "images.generate",
+                    "this native/_core build has no diffusion bindings "
+                    "(load_diffusion_model / generate_image are only exported when "
+                    "RAC_HAVE_BACKEND_COREML is set at compile time) — rebuild with the "
+                    "CoreML backend, or use a wheel that includes it",
+                )
+            self.unload(ModelCategory.IMAGE_GENERATION)
+            resolved = self.resolve_for_load(model_id)
+            handle_id = core.load_diffusion_model(resolved.primary, model_id)
+            model = DiffusionModel(core, handle_id)
+            self._put(ModelCategory.IMAGE_GENERATION, model_id, model)
+            return model
+
+    def create_voice_agent(
+        self,
+        stt_id: str,
+        llm_id: str,
+        tts_id: str,
+    ) -> VoiceAgent:
+        """Create and initialize a voice agent from STT/LLM/TTS model refs."""
+        with self._lock:
+            core = self.core()
+            if not hasattr(core, "create_voice_agent"):
+                raise SDKException.unsupported_capability(
+                    "voice.create_session",
+                    "this native/_core build predates the voice-agent bindings "
+                    "(create_voice_agent / initialize_voice_agent / process_voice_turn "
+                    "are not exported by native/module.cpp) — rebuild the native extension",
+                )
+            stt = self.resolve_for_load(stt_id)
+            llm = self.resolve_for_load(llm_id)
+            tts = self.resolve_for_load(tts_id)
+            handle_id = core.create_voice_agent()
+            try:
+                # Same path shape load_stt_model / load_tts_voice / load_model use.
+                core.initialize_voice_agent(
+                    handle_id,
+                    stt.primary,
+                    llm.primary,
+                    tts.primary,
+                    stt_id=stt_id,
+                    llm_id=llm_id,
+                    tts_id=tts_id,
+                )
+            except Exception:
+                core.destroy_voice_agent(handle_id)
+                raise
+            return VoiceAgent(core, handle_id)
+
+    def llm_if_resident(self) -> Optional[LLMModel]:
+        """The resident LLM, or ``None`` — never loads one (used by ``lora.list``)."""
+        entry = self._resident.get(ModelCategory.LANGUAGE)
+        return entry[1] if entry else None  # type: ignore[return-value]
+
     def load(self, model_id: str, options: Optional[LoadOptions] = None) -> ModelCategory:
         """Load ``model_id`` into its category and return that category."""
         self.check_load_options(options)
@@ -403,6 +550,9 @@ class Runtime:
             ModelCategory.SPEECH_RECOGNITION: self.stt,
             ModelCategory.SPEECH_SYNTHESIS: self.tts,
             ModelCategory.VOICE_ACTIVITY_DETECTION: self.vad,
+            ModelCategory.SPEAKER_DIARIZATION: self.diarization,
+            ModelCategory.SEMANTIC_SEGMENTATION: self.segmentation,
+            ModelCategory.IMAGE_GENERATION: self.diffusion,
         }
         loader = loaders.get(category)
         if loader is None:

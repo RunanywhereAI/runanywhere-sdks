@@ -54,27 +54,33 @@ public class VlmNamespace internal constructor() {
             val model = prepareVlm(opts)
             val requestId = UUID.randomUUID().toString()
             val answer = StringBuilder()
+            val textItemId = UUID.randomUUID().toString()
             var startedEmitted = false
+            var sawTerminal = false
+            var sequence = 0L
+
+            suspend fun announceStarted() {
+                if (!startedEmitted) {
+                    startedEmitted = true
+                    emit(GenerationEvent.Started(requestId))
+                }
+            }
 
             legacyProcessImageStream(image.toVlmImage(), opts.toVlmProto(prompt)).collect { event ->
                 when (event.kind) {
-                    VLMStreamEventKind.VLM_STREAM_EVENT_KIND_STARTED -> {
-                        startedEmitted = true
-                        emit(GenerationEvent.Started(requestId))
-                    }
+                    VLMStreamEventKind.VLM_STREAM_EVENT_KIND_STARTED -> announceStarted()
                     VLMStreamEventKind.VLM_STREAM_EVENT_KIND_TOKEN -> {
-                        if (!startedEmitted) {
-                            startedEmitted = true
-                            emit(GenerationEvent.Started(requestId))
-                        }
+                        announceStarted()
                         if (event.token.isNotEmpty()) {
                             answer.append(event.token)
-                            emit(GenerationEvent.Token(event.token, TokenKind.TEXT))
+                            emit(GenerationEvent.TextDelta(requestId, sequence++, textItemId, 0, event.token))
                         }
                     }
                     VLMStreamEventKind.VLM_STREAM_EVENT_KIND_COMPLETED -> {
+                        sawTerminal = true
                         emit(
                             GenerationEvent.Completed(
+                                requestId,
                                 event.result?.toGenerationResult(requestId, model)
                                     ?: GenerationResult(
                                         text = answer.toString(),
@@ -86,6 +92,16 @@ public class VlmNamespace internal constructor() {
                     }
                     else -> Unit
                 }
+            }
+
+            if (!sawTerminal) {
+                emit(
+                    GenerationEvent.Failed(
+                        requestId,
+                        answer.toString().takeIf { it.isNotEmpty() },
+                        SDKException.operation("Generation stream ended before a terminal event"),
+                    ),
+                )
             }
         }
 

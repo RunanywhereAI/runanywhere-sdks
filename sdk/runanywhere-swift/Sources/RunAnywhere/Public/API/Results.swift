@@ -137,6 +137,7 @@ public struct StructuredResult: Sendable {
     public let value: Data
     public let raw: String
     public let valid: Bool
+    public let mode: StructuredEnforcementMode
 
     public let inputTokens: Int
     public let outputTokens: Int
@@ -145,10 +146,15 @@ public struct StructuredResult: Sendable {
     public let requestId: String
     public let model: String
 
-    init(proto: RAStructuredOutputResult, generation: GenerationResult) {
+    init(
+        proto: RAStructuredOutputResult,
+        generation: GenerationResult,
+        mode: StructuredEnforcementMode = .validationOnly
+    ) {
         self.value = proto.parsedJson
         self.raw = proto.hasRawText ? proto.rawText : generation.text
         self.valid = proto.hasValidation ? proto.validation.isValid : false
+        self.mode = mode
         self.inputTokens = generation.inputTokens
         self.outputTokens = generation.outputTokens
         self.timeToFirstTokenMs = generation.timeToFirstTokenMs

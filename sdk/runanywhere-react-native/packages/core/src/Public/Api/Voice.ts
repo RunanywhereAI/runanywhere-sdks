@@ -32,6 +32,7 @@ import type {
   AgentState,
   LlmOptions,
   ModelRef,
+  SpeechHandle,
   TurnHandlingOptions,
   VadOptions,
   VoiceEvent,
@@ -213,22 +214,48 @@ export const voice = {
         await mic.start();
       },
 
-      async say(text: string): Promise<void> {
+      say(text: string): Promise<SpeechHandle> {
         if (closed) {
           throw SDKException.invalidState('This voice session is closed');
         }
-        const outputBytes = await native.voiceAgentSynthesizeSpeechProto(text);
-        const output = decodeOptional(outputBytes, TTSOutput);
-        if (!output || output.audioData.byteLength === 0) {
-          throw output?.error
-            ? new SDKException(output.error)
-            : SDKException.processingFailed(
-                'Voice session could not synthesize speech'
-              );
-        }
-        const copy = new Uint8Array(output.audioData.byteLength);
-        copy.set(output.audioData);
-        await playback.playWav(copy.buffer);
+        let settle!: () => void;
+        const settled = new Promise<void>((resolve) => {
+          settle = resolve;
+        });
+        const handle: SpeechHandle & { interrupted: boolean; error?: Error } = {
+          id: `speech-${Date.now()}`,
+          interrupted: false,
+          error: undefined,
+          async interrupt(): Promise<void> {
+            handle.interrupted = true;
+            playback.stop();
+            settle();
+          },
+          async waitForPlayout(): Promise<void> {
+            await settled;
+          },
+        };
+        void (async () => {
+          try {
+            const outputBytes = await native.voiceAgentSynthesizeSpeechProto(text);
+            const output = decodeOptional(outputBytes, TTSOutput);
+            if (!output || output.audioData.byteLength === 0) {
+              throw output?.error
+                ? new SDKException(output.error)
+                : SDKException.processingFailed(
+                    'Voice session could not synthesize speech'
+                  );
+            }
+            const copy = new Uint8Array(output.audioData.byteLength);
+            copy.set(output.audioData);
+            await playback.playWav(copy.buffer);
+          } catch (error) {
+            handle.error = error instanceof Error ? error : new Error(String(error));
+          } finally {
+            settle();
+          }
+        })();
+        return Promise.resolve(handle);
       },
 
       async interrupt(): Promise<void> {

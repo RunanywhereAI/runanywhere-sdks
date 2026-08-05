@@ -63,6 +63,7 @@ import {
 } from '../components/model';
 import { APP_STORAGE_KEYS, GENERATION_SETTINGS_KEYS } from '../types/settings';
 import { getPrimaryFramework } from '../utils/modelDisplay';
+import { registerDemoTools } from '../utils/chatSampleTools';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import {
@@ -361,21 +362,47 @@ export const ChatScreen: React.FC = () => {
   // Tool-calling toggle (mirrors Android viewModel.toolsEnabled). Persisted so
   // it survives navigation; the input bar's tool button flips it.
   useEffect(() => {
-    AsyncStorage.getItem(APP_STORAGE_KEYS.TOOL_CALLING_ENABLED).then((v) =>
-      setToolsEnabled(v === 'true')
-    );
+    void (async () => {
+      const enabled =
+        (await AsyncStorage.getItem(APP_STORAGE_KEYS.TOOL_CALLING_ENABLED)) ===
+        'true';
+      setToolsEnabled(enabled);
+      // The native tool registry is per-session, so a persisted "on" flag has
+      // no tools after a relaunch. Re-register the demo tools when enabled but
+      // the registry is empty, matching iOS ToolSettingsViewModel's
+      // enable-on-init behavior; without this the chat routes to standard
+      // generation and tool calling silently never runs.
+      if (enabled) {
+        const existing = await RunAnywhere.llm.tools.list();
+        if (existing.length === 0) {
+          await registerDemoTools();
+        }
+        setRegisteredToolCount((await RunAnywhere.llm.tools.list()).length);
+      }
+    })();
   }, []);
 
-  const handleToggleTools = useCallback(() => {
-    setToolsEnabled((prev) => {
-      const next = !prev;
-      void AsyncStorage.setItem(
-        APP_STORAGE_KEYS.TOOL_CALLING_ENABLED,
-        next ? 'true' : 'false'
-      );
-      return next;
-    });
-  }, []);
+  const handleToggleTools = useCallback(async () => {
+    const next = !toolsEnabled;
+    setToolsEnabled(next);
+    await AsyncStorage.setItem(
+      APP_STORAGE_KEYS.TOOL_CALLING_ENABLED,
+      next ? 'true' : 'false'
+    );
+    try {
+      // The chat toggle must own registration too — flipping only the flag
+      // leaves the registry empty, so preflight routes to standard generation
+      // and tools never run. Mirror SettingsScreen: register on, clear off.
+      if (next) {
+        await registerDemoTools();
+      } else {
+        await RunAnywhere.llm.tools.clear();
+      }
+      setRegisteredToolCount((await RunAnywhere.llm.tools.list()).length);
+    } catch (error) {
+      console.error('[ChatScreen] Failed to update tool registration:', error);
+    }
+  }, [toolsEnabled]);
 
   /**
    * Send a message and stream the response token-by-token.

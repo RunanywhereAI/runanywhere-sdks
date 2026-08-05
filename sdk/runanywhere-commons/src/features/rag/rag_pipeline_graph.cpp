@@ -149,9 +149,17 @@ struct LLMStreamCtx {
     std::atomic<bool>* consumer_stop_requested;
 };
 
-rac_bool_t llm_stream_trampoline(const char* token, void* user_data) {
+rac_bool_t llm_stream_trampoline(const char* token, rac_bool_t is_final,
+                                 const char* /*finish_reason*/, void* user_data) {
     auto* ctx = static_cast<LLMStreamCtx*>(user_data);
-    if (!token || !ctx)
+    if (!ctx)
+        return RAC_TRUE;
+
+    // Ignore empty finals / terminal signals — only accumulate non-final tokens.
+    if (is_final) {
+        return RAC_TRUE;
+    }
+    if (!token)
         return RAC_TRUE;
 
     if (ctx->cancel_requested && ctx->cancel_requested->load(std::memory_order_acquire)) {

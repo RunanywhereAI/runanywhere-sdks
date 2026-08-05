@@ -698,10 +698,18 @@ private final class MLXSession: @unchecked Sendable {
     ) async throws -> MLXGenerationMetrics {
         let params = generateParameters(from: options)
         let input = llmUserInput(prompt: prompt, options: options)
-        return try await stream(input: input, parameters: params) { token in
+        let metrics = try await stream(input: input, parameters: params) { token in
             guard let callback else { return false }
-            return token.withCString { callback($0, userData.rawValue) == RAC_TRUE }
+            return token.withCString { callback($0, RAC_FALSE, nil, userData.rawValue) == RAC_TRUE }
         }
+        if let callback {
+            _ = "stop".withCString { reason in
+                "".withCString { empty in
+                    callback(empty, RAC_TRUE, reason, userData.rawValue)
+                }
+            }
+        }
+        return metrics
     }
 
     func process(

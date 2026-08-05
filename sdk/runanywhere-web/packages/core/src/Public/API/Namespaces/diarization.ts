@@ -24,11 +24,11 @@ export const diarization = {
   async diarize(audio: AudioInput, options?: DiarizationOptions): Promise<DiarizationResult> {
     await ensureReady();
     await ensureModelForCategory(ModelCategory.MODEL_CATEGORY_SPEAKER_DIARIZATION);
-    const samples = audioInputToFloat32(audio);
+    const samples = await audioInputToFloat32(audio);
     const protoOptions = toProtoDiarizationOptions(options);
     const result = await diarize({
       audioData: new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
-      options: { ...protoOptions, sampleRate: audio.format.sampleRate, channels: audio.format.channels },
+      options: { ...protoOptions, sampleRate: audio.format.sampleRate, channels: audio.format.channels ?? 1 },
     });
     return toDiarizationResult(result);
   },

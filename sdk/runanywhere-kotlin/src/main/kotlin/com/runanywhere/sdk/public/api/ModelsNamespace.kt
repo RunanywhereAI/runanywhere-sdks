@@ -2,7 +2,7 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * Public v3 surface: `RunAnywhere.models`.
+ * Public v4 surface: `RunAnywhere.models`.
  */
 
 package com.runanywhere.sdk.public.api
@@ -15,27 +15,27 @@ import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.StorageInfoRequest
 import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import java.util.concurrent.atomic.AtomicBoolean
-
-private val modelsLogger = SDKLogger("Models")
-private val loadKnobsWarned = AtomicBoolean(false)
 
 /**
  * [LoadOptions] fields the commons load ABI has no wire path for yet.
  *
  * `ModelLoadRequest` only carries a framework pin; `contextLength`, `threads`,
- * and `useGpu` are accepted here for cross-SDK API parity but are silently
- * dropped below commons until the native load ABI grows placement fields
- * (tracked as a follow-up — see PR #605 review follow-up issue 8).
+ * and `accelerator` are accepted here for cross-SDK API parity but cannot be
+ * honored until the native load ABI grows placement fields (tracked as a
+ * follow-up — see PR #605 review follow-up issue 8). Per the v4 contract,
+ * "every accepted field is implemented end to end or fails preflight" —
+ * silently dropping them is forbidden, so [ModelsNamespace.load] throws
+ * instead of warning.
  */
-internal fun LoadOptions?.ignoredKnobs(): List<String> =
+internal fun LoadOptions?.unsupportedLoadKnobs(): List<String> =
     listOfNotNull(
         "contextLength".takeIf { this?.contextLength != null },
         "threads".takeIf { this?.threads != null },
-        "useGpu".takeIf { this?.useGpu != null },
+        "accelerator".takeIf { this?.resolvedAccelerator != null },
+        "backendPreferences (only the first preference reaches commons; ordered fallback is not carried)"
+            .takeIf { (this?.resolvedBackendPreferences?.size ?: 0) > 1 },
     )
 
 private val LOADABLE_CATEGORIES =
@@ -52,12 +52,19 @@ private val LOADABLE_CATEGORIES =
         ModelCategory.MODEL_CATEGORY_SEMANTIC_SEGMENTATION,
     )
 
+/** True when [id] is resident under any tracked category right now. */
+private suspend fun isModelResident(id: String): Boolean =
+    LOADABLE_CATEGORIES.any { category ->
+        val current = legacyCurrentModel(CurrentModelRequest(category = category))
+        current.found && current.model_id == id
+    }
+
 /**
- * The model catalog and its residency.
+ * The model catalog and everything that governs residency.
  *
  * ```kotlin
  * RunAnywhere.models.download("qwen3-0.6b").collect { event -> report(event) }
- * RunAnywhere.models.load("qwen3-0.6b")
+ * val loaded = RunAnywhere.models.load("qwen3-0.6b")
  * ```
  */
 public class ModelsNamespace internal constructor() {
@@ -91,37 +98,71 @@ public class ModelsNamespace internal constructor() {
         }
 
     /**
+     * Remove [id] from the registry. Registration metadata only — [id] must
+     * already be unloaded and have no local artifacts.
+     *
+     * @throws SDKException when [id] is unknown, still loaded, or still has
+     *   local artifacts; call [unload]/[delete] first.
+     */
+    public suspend fun unregister(id: String) {
+        val model = get(id) ?: throw SDKException.modelNotFound(id)
+        if (isModelResident(id)) {
+            throw SDKException.invalidState(
+                "Model '$id' is currently loaded. Call models.unload('$id') before unregister.",
+            )
+        }
+        if (model.local_path.isNotEmpty()) {
+            throw SDKException.invalidState(
+                "Model '$id' still has local artifacts. Call models.delete('$id') before unregister.",
+            )
+        }
+        legacyUnregisterModel(id)
+    }
+
+    /**
      * Fetch [id]'s bytes, reporting progress until the model is on disk.
      *
-     * Cancelling the flow stops the transfer and preserves resume bytes.
+     * Cancelling the flow stops the transfer and preserves resume bytes. The
+     * stream ends in [DownloadEvent.Completed]/[DownloadEvent.Failed] — never
+     * a fabricated success.
      *
-     * @throws SDKException when the model is unknown or the transfer fails.
+     * @throws SDKException when the model is unknown.
      */
     public fun download(id: String): Flow<DownloadEvent> =
         flow {
+            val operationId = id
+            var sequence = 0L
             val model = get(id) ?: throw SDKException.modelNotFound(id)
+            emit(DownloadEvent.Started(operationId, sequence++))
             var extractingEmitted = false
-            legacyDownloadModel(model) { progress ->
-                if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
-                    if (!extractingEmitted) {
-                        extractingEmitted = true
-                        emit(DownloadEvent.Extracting)
+            try {
+                legacyDownloadModel(model) { progress ->
+                    if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
+                        if (!extractingEmitted) {
+                            extractingEmitted = true
+                            emit(DownloadEvent.Extracting(operationId, sequence++))
+                        }
+                    } else {
+                        emit(
+                            DownloadEvent.Progress(
+                                operationId = operationId,
+                                sequence = sequence++,
+                                bytesDone = progress.bytes_downloaded,
+                                bytesTotal = progress.total_bytes,
+                            ),
+                        )
                     }
-                } else {
-                    emit(
-                        DownloadEvent.Progress(
-                            bytesDone = progress.bytes_downloaded,
-                            bytesTotal = progress.total_bytes,
-                            percent = progress.overall_progress,
-                        ),
-                    )
                 }
+            } catch (error: SDKException) {
+                emit(DownloadEvent.Failed(operationId, sequence++, error))
+                return@flow
             }
-            emit(DownloadEvent.Completed(get(id) ?: model))
+            emit(DownloadEvent.Completed(operationId, sequence++, get(id) ?: model))
         }
 
     /**
      * Remove [id]'s files and return it to registered-not-downloaded.
+     * Registration metadata is retained, so the same id can be downloaded again.
      *
      * @throws SDKException when deletion fails.
      */
@@ -133,45 +174,72 @@ public class ModelsNamespace internal constructor() {
     /**
      * Make [id] resident now, downloading it first when its bytes are absent.
      *
-     * `contextLength`, `threads`, and `useGpu` on [options] are not carried by
-     * the commons load ABI yet and are ignored; only `framework` reaches
-     * commons today.
+     * Only [LoadOptions.backendPreferences]'s first entry (equivalently the
+     * deprecated `framework`) reaches commons today. `contextLength`,
+     * `threads`, and a real `accelerator` choice are not yet carried by the
+     * native load ABI, so passing them throws rather than being silently dropped.
      *
-     * @throws SDKException when the model cannot be loaded.
+     * @throws SDKException when the model cannot be loaded, or when [options]
+     *   sets a placement knob the load ABI cannot honor yet.
      */
-    public suspend fun load(id: String, options: LoadOptions? = null) {
-        val registered = get(id)
-        val category =
-            registered?.category?.takeIf { it != ModelCategory.MODEL_CATEGORY_UNSPECIFIED }
-                ?: ModelCategory.MODEL_CATEGORY_LANGUAGE
-        val ignored = options.ignoredKnobs()
-        if (ignored.isNotEmpty() && loadKnobsWarned.compareAndSet(false, true)) {
-            modelsLogger.warn(
-                "LoadOptions ${ignored.joinToString(", ")} ignored: " +
-                    "the commons load ABI does not carry them",
+    public suspend fun load(id: String, options: LoadOptions? = null): LoadedModel {
+        val unsupported = options.unsupportedLoadKnobs()
+        if (unsupported.isNotEmpty()) {
+            throw SDKException.invalidConfiguration(
+                "LoadOptions.${unsupported.joinToString(", ")} cannot be carried by the native load ABI yet",
             )
         }
-        if (registered != null && registered.local_path.isEmpty()) {
+        val registered = get(id) ?: throw SDKException.modelNotFound(id)
+        val category =
+            registered.category.takeIf { it != ModelCategory.MODEL_CATEGORY_UNSPECIFIED }
+                ?: ModelCategory.MODEL_CATEGORY_LANGUAGE
+        if (registered.local_path.isEmpty()) {
             legacyDownloadModel(registered)
         }
+        val requestedBackend = options?.resolvedBackendPreferences?.firstOrNull()
         val result =
             legacyLoadModel(
                 ModelLoadRequest(
                     model_id = id,
                     category = category,
-                    framework = options?.framework ?: registered?.framework?.takeIf { it.value != 0 },
+                    framework = requestedBackend?.backend ?: registered.framework.takeIf { it.value != 0 },
+                    force_reload = options?.forceReload ?: false,
                     validate_availability = true,
                 ),
+            )
+        result.error?.let { throw SDKException(it) }
+        val refreshed = get(id)
+        return LoadedModel(
+            id = id,
+            category = category,
+            requestedBackend = requestedBackend,
+            actualBackend = requestedBackend?.backend ?: refreshed?.framework ?: registered.framework,
+            closeHandler = { modelId -> unload(modelId) },
+        )
+    }
+
+    /**
+     * Release one resident model by [id]. Idempotent — a no-op when [id] is not loaded.
+     *
+     * @throws SDKException when the unload is rejected.
+     */
+    public suspend fun unload(id: String) {
+        val model = get(id)
+        val result =
+            legacyUnloadModel(
+                ModelUnloadRequest(model_id = id, category = model?.category, unload_all = false),
             )
         result.error?.let { throw SDKException(it) }
     }
 
     /**
-     * Release the model resident under [category], or every model when null.
+     * Release the model resident under [category], or every resident model
+     * when [category] is null. This is the only category/global unload;
+     * [unload] releases exactly one model by id.
      *
      * @throws SDKException when the unload fails.
      */
-    public suspend fun unload(category: ModelCategory? = null) {
+    public suspend fun unloadAll(category: ModelCategory? = null) {
         val request =
             if (category == null) {
                 ModelUnloadRequest(unload_all = true)
@@ -180,6 +248,15 @@ public class ModelsNamespace internal constructor() {
             }
         val result = legacyUnloadModel(request)
         result.error?.let { throw SDKException(it) }
+    }
+
+    /**
+     * @deprecated Use [unloadAll]. Release the model resident under [category],
+     *   or every model when null.
+     */
+    @Deprecated("Use unloadAll(category).", ReplaceWith("unloadAll(category)"))
+    public suspend fun unload(category: ModelCategory? = null) {
+        unloadAll(category)
     }
 
     /** What is resident right now, and how much storage is used and free. */

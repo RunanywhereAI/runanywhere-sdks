@@ -113,34 +113,58 @@ class LlmApi {
 
   /// Generate a completion constrained to [schema].
   ///
-  /// Throws [SDKException] when generation fails or the output cannot be
-  /// parsed against the schema.
+  /// [mode] picks how the schema is enforced:
+  /// - [StructuredOutputMode.validationOnly] (default): generate freely, then validate.
+  /// - [StructuredOutputMode.repair]: validate, then retry once with a repair instruction if invalid.
+  /// - [StructuredOutputMode.constrained]: engine-constrained decoding — fails
+  ///   preflight until a constrained-decoding engine is wired in.
+  ///
+  /// Throws [SDKException] when [mode] cannot be honored, generation fails,
+  /// or the output cannot be parsed against the schema.
   Future<StructuredResult> generateStructured(
     String prompt,
     JSONSchema schema, {
+    StructuredOutputMode mode = StructuredOutputMode.validationOnly,
     LlmOptions? options,
   }) async {
+    if (mode == StructuredOutputMode.constrained) {
+      throw SDKException.featureNotAvailable(
+        'llm.generateStructured(mode: constrained) needs engine-level '
+        'constrained decoding, which is not wired in yet; use validationOnly or repair',
+      );
+    }
     await ModelGate.ensureLoaded(
       modelId: options?.model,
       category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
     );
     final effective = options ?? LlmOptions();
-    final proto = await RunAnywhereStructuredOutput.generateStructured(
+    final model =
+        await ModelGate.currentId(ModelCategory.MODEL_CATEGORY_LANGUAGE) ?? '';
+    var proto = await RunAnywhereStructuredOutput.generateStructured(
       prompt: prompt,
       schema: schema,
       options: effective.toProto(
         registeredTools: RunAnywhereTools.shared.getRegisteredTools(),
       ),
     );
+    if (mode == StructuredOutputMode.repair && !proto.validation.isValid) {
+      final repairPrompt =
+          '$prompt\n\n'
+          'Your previous answer did not match the required JSON schema. '
+          'Reply again with ONLY JSON that satisfies this schema.\n\n'
+          'Previous invalid answer: '
+          '${proto.hasRawText() ? proto.rawText : ''}';
+      proto = await RunAnywhereStructuredOutput.generateStructured(
+        prompt: repairPrompt,
+        schema: schema,
+        options: effective.toProto(
+          registeredTools: RunAnywhereTools.shared.getRegisteredTools(),
+        ),
+      );
+    }
     return StructuredResult.fromProto(
       proto,
-      GenerationResult(
-        text: proto.hasRawText() ? proto.rawText : '',
-        model: await ModelGate.currentId(
-              ModelCategory.MODEL_CATEGORY_LANGUAGE,
-            ) ??
-            '',
-      ),
+      GenerationResult(text: proto.hasRawText() ? proto.rawText : '', model: model),
     );
   }
 
@@ -200,11 +224,17 @@ class LlmApi {
     // terminal event); only cancel a generation that is still running, so a
     // finished stream doesn't emit a spurious cancellation event.
     var completed = false;
+    var cancelled = false;
     controller.onListen = () {
-      unawaited(_pump(controller, build, () => completed = true));
+      unawaited(
+        _pump(controller, build, () => completed = true, () => cancelled),
+      );
     };
     controller.onCancel = () {
-      if (!completed) cancel();
+      if (!completed) {
+        cancelled = true;
+        cancel();
+      }
     };
     return controller.stream;
   }
@@ -213,22 +243,34 @@ class LlmApi {
     StreamController<GenerationEvent> controller,
     Future<LLMGenerateRequest> Function() build,
     void Function() markCompleted,
+    bool Function() isCancelled,
   ) async {
+    var started = false;
+    var requestId = '';
     try {
       final request = await build();
-      controller.add(GenerationStarted(request.requestId));
+      requestId = request.requestId;
+      controller.add(GenerationStarted(requestId));
+      started = true;
       if (_usesTools(request)) {
         // The tool-execution loop lives behind the session ABI, which has no
         // token stream: the turn is delivered as one chunk once tools resolve.
         final result = await _generateWithTools(request.prompt, request);
         if (result.text.isNotEmpty) {
-          controller.add(GenerationToken(result.text));
+          controller.add(GenerationTextDelta(result.text, requestId: requestId));
         }
         for (final call in result.toolCalls) {
-          controller.add(GenerationToolCall(call));
+          controller.add(GenerationToolCallAdded(call, requestId: requestId));
         }
+        controller.add(
+          GenerationUsage(
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+            requestId: requestId,
+          ),
+        );
         markCompleted();
-        controller.add(GenerationCompleted(result));
+        controller.add(GenerationCompleted(result, requestId: requestId));
         return;
       }
       final model =
@@ -246,10 +288,20 @@ class LlmApi {
               : TokenKind.text;
           if (kind == TokenKind.thought) {
             thinking.write(event.token);
+            controller.add(
+              GenerationReasoningDelta(event.token, requestId: requestId),
+            );
           } else {
             buffer.write(event.token);
+            controller.add(
+              GenerationTextDelta(event.token, requestId: requestId),
+            );
           }
-          controller.add(GenerationToken(event.token, kind: kind));
+        }
+        if (event.hasToolCall()) {
+          controller.add(
+            GenerationToolCallAdded(event.toolCall, requestId: requestId),
+          );
         }
         if (event.isFinal) {
           terminal = event;
@@ -258,13 +310,35 @@ class LlmApi {
       }
 
       if (terminal != null && terminal.hasError()) {
-        throw SDKException.generationFailed(terminal.error.message);
+        markCompleted();
+        controller.add(
+          GenerationFailed(
+            SDKException.generationFailed(terminal.error.message),
+            partial: buffer.isEmpty ? null : buffer.toString(),
+            requestId: requestId,
+          ),
+        );
+        return;
+      }
+
+      if (terminal == null && isCancelled()) {
+        // The consumer broke the iterator (or called cancel()) before the
+        // native stream produced a terminal event; don't fabricate a
+        // successful completion for a generation that never finished.
+        markCompleted();
+        controller.add(
+          GenerationCancelled(
+            partial: buffer.isEmpty ? null : buffer.toString(),
+            requestId: requestId,
+          ),
+        );
+        return;
       }
 
       final result = terminal != null && terminal.hasResult()
           ? GenerationResult.fromStreamFinal(
               terminal.result,
-              requestId: request.requestId,
+              requestId: requestId,
               model: model,
             )
           : GenerationResult(
@@ -272,22 +346,34 @@ class LlmApi {
               thinkingText: thinking.isEmpty ? null : thinking.toString(),
               finishReason: _finish(terminal?.finishReason),
               outputTokens: 0,
-              requestId: request.requestId,
+              requestId: requestId,
               model: model,
             );
-      for (final call in result.toolCalls) {
-        controller.add(GenerationToolCall(call));
-      }
+      controller.add(
+        GenerationUsage(
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+          requestId: requestId,
+        ),
+      );
       markCompleted();
-      controller.add(GenerationCompleted(result));
+      controller.add(GenerationCompleted(result, requestId: requestId));
     } catch (error, stack) {
       // Terminal reached (native generation already ended); don't let the
       // teardown cancel fire a spurious cancellation after the failure.
       markCompleted();
-      controller.addError(
-        error is SDKException ? error : SDKException.generationFailed('$error'),
-        stack,
-      );
+      final sdkError = error is SDKException
+          ? error
+          : SDKException.generationFailed('$error');
+      if (started) {
+        // A `started` event already reached the consumer, so the failure is
+        // in-flight: emit the typed terminal event rather than throwing.
+        controller.add(GenerationFailed(sdkError, requestId: requestId));
+      } else {
+        // Preflight failure (e.g. no loadable model) — nothing has been
+        // emitted yet, so throw into the consumer.
+        controller.addError(sdkError, stack);
+      }
     } finally {
       await controller.close();
     }

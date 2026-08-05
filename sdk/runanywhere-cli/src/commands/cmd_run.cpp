@@ -35,7 +35,9 @@
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_stream.h"
+#include "rac/features/lora/rac_lora_service.h"
 #include "rac/features/vlm/rac_vlm_service.h"
+#include "lora_options.pb.h"
 #include "vlm_options.pb.h"
 
 #include "catalog/model_ref.h"
@@ -62,6 +64,8 @@ struct RunParams {
     std::string image;
     std::string system_prompt;
     std::string engine;
+    std::string lora;            // optional LoRA adapter (.gguf) to attach before generating
+    float lora_scale = 1.0f;     // how strongly the adapter applies
     std::string reasoning = "on";  // on | off
     bool show_thinking = true;     // reasoning.include_in_output
     float temperature = 0.0f;      // 0 = engine default
@@ -534,6 +538,33 @@ std::string read_piped_prompt() {
     return piped;
 }
 
+// Attach a LoRA adapter to the already-loaded LLM in this same process, so the
+// following generation actually uses it (adapter state is session-scoped).
+bool apply_lora_adapter(const std::string& adapter_path, float scale) {
+    v1::LoRAApplyRequest request;
+    request.set_replace_existing(true);
+    v1::LoRAAdapterConfig* adapter = request.add_adapters();
+    adapter->set_adapter_path(adapter_path);
+    adapter->set_scale(scale);
+
+    const std::string request_bytes = proto::serialize(request);
+    rac_proto_buffer_t out_buffer;
+    rac_proto_buffer_init(&out_buffer);
+    const rac_result_t rc = rac_lora_apply_proto(
+        reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(), &out_buffer);
+    v1::LoRAApplyResult result;
+    std::string error;
+    const bool parsed = proto::parse_proto_buffer(&out_buffer, &result, &error);
+    if (!parsed || rc != RAC_SUCCESS || result.has_error()) {
+        out::error_line("lora apply failed: " +
+                        (result.has_error() && !result.error().message().empty()
+                             ? result.error().message()
+                             : (error.empty() ? std::to_string(rc) : error)));
+        return false;
+    }
+    return true;
+}
+
 int run_llm(const GlobalOptions& options, LlmVerb verb, const std::string& prompt,
             const RunParams& params) {
     Bootstrapped env;
@@ -569,6 +600,9 @@ int run_llm(const GlobalOptions& options, LlmVerb verb, const std::string& promp
     const v1::InferenceFramework load_framework =
         resolved.from_catalog ? v1::INFERENCE_FRAMEWORK_UNSPECIFIED : engine_hint.framework;
     if (!load_model(options, resolved.model_id, load_framework, is_vlm)) {
+        return 1;
+    }
+    if (!params.lora.empty() && !apply_lora_adapter(params.lora, params.lora_scale)) {
         return 1;
     }
 
@@ -608,6 +642,10 @@ void add_generation_options(CLI::App* cmd, const std::shared_ptr<RunParams>& par
     }
     cmd->add_option("--system-prompt,--system", params->system_prompt,
                     "Steer the model with a system instruction");
+    cmd->add_option("--lora", params->lora,
+                    "Attach a LoRA adapter (.gguf) before generating");
+    cmd->add_option("--lora-scale", params->lora_scale,
+                    "How strongly the LoRA applies (default 1.0)");
     cmd->add_option("--engine", params->engine,
                     "Pin the inference engine for URL or HF refs (mlx, llamacpp, onnx, sherpa)");
     cmd->add_option("--temperature,--temp", params->temperature,

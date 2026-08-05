@@ -8,10 +8,11 @@ from typing import Iterable, Iterator, List, Optional
 import numpy as np
 
 from .._runtime import runtime
+from ..errors import SDKException
 from ..events import VadEvent, VadEventKind
-from ..inputs import STT_SAMPLE_RATE, AudioInput
+from ..inputs import AudioEncoding, AudioFormatSpec, STT_SAMPLE_RATE, AudioInput
 from ..options import VadOptions
-from ..results import Segment, VadResult
+from ..results import AudioFrame, Segment, VadResult, VadStream
 
 __all__ = ["vad"]
 
@@ -75,6 +76,80 @@ def _frames(samples: np.ndarray) -> Iterator[np.ndarray]:
         yield samples[start : start + _FRAME]
 
 
+def _frame_to_float32(frame: AudioFrame, format: AudioFormatSpec) -> np.ndarray:
+    if format.encoding == AudioEncoding.PCM16:
+        from ..audio import pcm16_to_float32
+
+        return pcm16_to_float32(np.frombuffer(frame.samples, dtype="<i2"))
+    return np.frombuffer(frame.samples, dtype="<f4")
+
+
+class _PythonVadStream(VadStream):
+    """Live push stream backing ``vad.open_stream``.
+
+    Each pushed frame is processed immediately against one persistent detector, so speech
+    transitions are reported as soon as :meth:`push_frame` returns; :meth:`events` just drains
+    whatever has accumulated since the last call.
+    """
+
+    def __init__(self, format: AudioFormatSpec, options: Optional[VadOptions]) -> None:
+        self._format = format
+        opts = options or VadOptions()
+        self._detector = runtime.vad(opts.model, opts.activation_threshold)
+        self._detector.reset()
+        self._segmenter = _Segmenter(opts)
+        self._at_ms = 0
+        self._queue: List[VadEvent] = []
+        self._finished = False
+        self._closed = False
+
+    def _drain_segmenter(self) -> None:
+        while self._segmenter.events:
+            self._queue.append(self._segmenter.events.pop(0))
+
+    def push_frame(self, frame: AudioFrame) -> None:
+        if self._closed or self._finished:
+            return
+        try:
+            samples = _frame_to_float32(frame, self._format)
+            for start in range(0, max(0, len(samples) - _FRAME + 1), _FRAME):
+                chunk = samples[start : start + _FRAME]
+                is_speech = self._detector.process(chunk)
+                self._segmenter.push(is_speech, self._at_ms)
+                self._at_ms += _FRAME_MS
+                self._drain_segmenter()
+                self._queue.append(
+                    VadEvent(
+                        kind=VadEventKind.ACTIVITY,
+                        timestamp_ms=self._at_ms,
+                        is_speech=is_speech,
+                        probability=1.0 if is_speech else 0.0,
+                    )
+                )
+        except Exception as error:  # noqa: BLE001
+            self._queue.append(VadEvent(kind=VadEventKind.FAILED, error=error))
+            self._finished = True
+
+    def flush(self) -> None:
+        """No-op: every pushed frame is already processed as it arrives."""
+
+    def finish(self) -> None:
+        if self._finished:
+            return
+        self._finished = True
+        self._segmenter.finish(self._at_ms)
+        self._drain_segmenter()
+        self._queue.append(VadEvent(kind=VadEventKind.COMPLETED))
+
+    def events(self) -> Iterator[VadEvent]:
+        """Drain the events accumulated since the last call."""
+        while self._queue:
+            yield self._queue.pop(0)
+
+    def close(self) -> None:
+        self._closed = True
+
+
 class Vad:
     """Voice-activity detection over the resident detector."""
 
@@ -112,6 +187,30 @@ class Vad:
         """Async form of :meth:`detect` (runs on the loop's default executor)."""
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: self.detect(audio, options))
+
+    def open_stream(
+        self, format: AudioFormatSpec, options: Optional[VadOptions] = None
+    ) -> VadStream:
+        """Open a live voice-activity stream with one audio format established up front.
+
+        Raises:
+            SDKException: ``format`` uses a container encoding — live streams take raw
+                PCM only; use :meth:`detect` for containers.
+
+        Example:
+            >>> stream = runanywhere.vad.open_stream(
+            ...     AudioFormatSpec(AudioEncoding.PCM16, sample_rate=16000))
+            >>> stream.push_frame(AudioFrame(samples=pcm16, sample_count=len(pcm16) // 2))
+            >>> stream.finish()
+            >>> for event in stream.events():
+            ...     print(event.kind)
+        """
+        if format.encoding == AudioEncoding.WAV:
+            raise SDKException.invalid_input(
+                "vad.open_stream needs raw PCM audio; container formats are batch-only "
+                "— use vad.detect."
+            )
+        return _PythonVadStream(format, options)
 
     def detect_stream(
         self, audio: Iterable[AudioInput], options: Optional[VadOptions] = None

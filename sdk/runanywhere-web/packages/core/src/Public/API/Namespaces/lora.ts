@@ -45,14 +45,33 @@ export const lora = {
     }
   },
 
-  /** Remove one adapter, or every applied adapter when the id is omitted. */
-  async remove(adapterId?: string): Promise<void> {
+  /**
+   * Remove one applied adapter.
+   *
+   * @deprecated Passing `null` to remove every adapter; use `removeAll()` instead.
+   */
+  async remove(adapterId: string | null): Promise<void> {
+    await ensureReady();
+    if (adapterId === null) {
+      await lora.removeAll();
+      return;
+    }
+    await removeLoraAdapters({
+      requestId: '',
+      adapterIds: [adapterId],
+      adapterPaths: [],
+      clearAll: false,
+    });
+  },
+
+  /** Remove every applied adapter. */
+  async removeAll(): Promise<void> {
     await ensureReady();
     await removeLoraAdapters({
       requestId: '',
-      adapterIds: adapterId ? [adapterId] : [],
+      adapterIds: [],
       adapterPaths: [],
-      clearAll: adapterId === undefined,
+      clearAll: true,
     });
   },
 

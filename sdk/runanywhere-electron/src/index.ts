@@ -11,7 +11,7 @@ export { RpcBackend } from './api/rpc-backend';
 export type { RpcSend } from './api/rpc-backend';
 export { BACKEND_METHODS, BACKEND_STREAMING_METHODS, rpcMethodFor } from './api/backend';
 export type { RaBackend, LoadSlot } from './api/backend';
-export { bridgeStream, collect, streamOf } from './api/iter';
+export { AsyncQueue, bridgeStream, collect, streamOf } from './api/iter';
 export type { StreamSink } from './api/iter';
 export { SdkEventHub } from './api/hub';
 export {
@@ -19,7 +19,9 @@ export {
   image,
   ragDocument,
   AgentState,
+  AudioEncoding,
   AudioFormat,
+  DevicePlacement,
   Environment,
   FinishReason,
   ImageMode,
@@ -38,6 +40,7 @@ export type {
   Audio,
   AudioChunk,
   AudioFormatSpec,
+  AudioFrame,
   AudioInput,
   ChatMessage,
   ClassInfo,
@@ -51,6 +54,7 @@ export type {
   ImageEvent,
   ImageInput,
   ImageResult,
+  LoadedModel,
   LoraState,
   Match,
   ModelFilter,
@@ -58,24 +62,32 @@ export type {
   ModelRef,
   ModelRegistration,
   ModelsState,
+  RagCapabilities,
   RagDocument,
   RagEvent,
   RagResult,
   RagStats,
   RankedResult,
+  SDKCapabilities,
   SdkEvent,
   Segment,
   SegmentationResult,
   SpeakerSegment,
+  SpeechHandle,
+  StreamingCapabilities,
   SttState,
+  SttStream,
   StructuredResult,
   ToolCall,
+  ToolCapabilities,
   ToolDefinition,
   ToolExecutor,
   Transcription,
   TranscriptionEvent,
+  UnavailableCapability,
   VadEvent,
   VadResult,
+  VadStream,
   Voice,
   VoiceEvent,
   Word,

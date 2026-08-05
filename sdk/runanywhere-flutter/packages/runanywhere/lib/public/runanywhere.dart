@@ -9,9 +9,12 @@
 import 'dart:async';
 
 import 'package:runanywhere/adapters/http_client_adapter.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show AudioFormat, InferenceFramework;
 import 'package:runanywhere/generated/ra_defaults_pool.dart';
 import 'package:runanywhere/generated/sdk_init.pb.dart' show SdkInitResult;
 import 'package:runanywhere/native/dart_bridge.dart';
@@ -33,6 +36,7 @@ import 'package:runanywhere/public/api/namespaces/vad.dart';
 import 'package:runanywhere/public/api/namespaces/vlm.dart';
 import 'package:runanywhere/public/api/namespaces/voice.dart';
 import 'package:runanywhere/public/api/types/events.dart';
+import 'package:runanywhere/public/api/types/results.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_cua.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_hybrid.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_solutions.dart';
@@ -134,6 +138,93 @@ abstract final class RunAnywhere {
       .map(SdkEventMapper.map)
       .where((event) => event != null)
       .cast<SdkEvent>();
+
+  /// Installed, packaged, and executable surface of this SDK build.
+  ///
+  /// Every v4 namespace ships on Flutter except the namespaces the v4
+  /// contract explicitly excludes from every SDK (`agents`, `wakeword`,
+  /// `realtime`). `diarization`, `segmentation`, `images`, and `rerank`
+  /// each call one `_lookupOptional` commons ABI symbol
+  /// (`rac_native.dart`); when this build's commons binary predates that
+  /// symbol, the modality is removed from [SDKCapabilities.modalities] and
+  /// reported in [SDKCapabilities.unavailable] with the missing symbol
+  /// name, rather than claimed as installed-but-untested.
+  static SDKCapabilities capabilities() {
+    final modalities = <String>{
+      'llm', 'vlm', 'stt', 'tts', 'vad', 'embeddings', 'rerank', 'images',
+      'diarization', 'segmentation', 'voice', 'rag', 'models', 'lora', 'cua',
+    };
+    final unavailable = <UnavailableCapability>[
+      const UnavailableCapability(
+        name: 'agents',
+        reason: 'RunAnywhere.agents is not part of the v4 public API surface.',
+      ),
+      const UnavailableCapability(
+        name: 'wakeword',
+        reason: 'RunAnywhere.wakeword is not part of the v4 public API surface.',
+      ),
+      const UnavailableCapability(
+        name: 'realtime',
+        reason:
+            'RunAnywhere.realtime is not part of the v4 public API surface '
+            '(no WebRTC/SIP/S2S transport namespace).',
+      ),
+    ];
+
+    if (DartBridge.isInitialized) {
+      final bindings = RacNative.bindings;
+      void probe(String modality, bool available, String symbol) {
+        if (available) return;
+        modalities.remove(modality);
+        unavailable.add(
+          UnavailableCapability(
+            name: modality,
+            reason:
+                "This build's commons binary does not export $symbol, so "
+                '$modality fails preflight with unsupportedCapability.',
+          ),
+        );
+      }
+
+      probe(
+        'diarization',
+        bindings.rac_diarization_diarize_lifecycle_proto != null,
+        'rac_diarization_diarize_lifecycle_proto',
+      );
+      probe(
+        'segmentation',
+        bindings.rac_segmentation_segment_lifecycle_proto != null,
+        'rac_segmentation_segment_lifecycle_proto',
+      );
+      probe(
+        'images',
+        bindings.rac_diffusion_generate_lifecycle_proto != null,
+        'rac_diffusion_generate_lifecycle_proto',
+      );
+      probe(
+        'rerank',
+        bindings.rac_rerank_component_create != null,
+        'rac_rerank_component_create',
+      );
+    }
+
+    return SDKCapabilities(
+      modalities: modalities,
+      backends: const {
+        InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      },
+      audioFormats: const {
+        AudioFormat.AUDIO_FORMAT_PCM,
+        AudioFormat.AUDIO_FORMAT_WAV,
+        AudioFormat.AUDIO_FORMAT_PCM_S16LE,
+      },
+      streaming: const StreamingCapabilities(),
+      tools: const ToolCapabilities(),
+      rag: const RagCapabilities(multiSession: false, persistent: true),
+      unavailable: unavailable,
+    );
+  }
 
   // --- Capability namespaces ----------------------------------------------
 

@@ -452,7 +452,7 @@ class ChatViewModel extends ChangeNotifier {
         options: options,
       )) {
         switch (event) {
-          case sdk.GenerationToken(:final text, :final kind):
+          case sdk.GenerationTextDelta(:final text):
             if (_timeToFirstToken == null && _generationStartTime != null) {
               _timeToFirstToken =
                   DateTime.now()
@@ -460,11 +460,21 @@ class ChatViewModel extends ChangeNotifier {
                       .inMilliseconds /
                   1000.0;
             }
-            if (kind == sdk.TokenKind.thought) {
-              thoughts.write(text);
-            } else {
-              answer.write(text);
+            answer.write(text);
+            _messages[messageIndex] = _messages[messageIndex].copyWith(
+              content: answer.toString(),
+              thinkingContent: thoughts.isEmpty ? null : thoughts.toString(),
+            );
+            notifyListeners();
+          case sdk.GenerationReasoningDelta(:final text):
+            if (_timeToFirstToken == null && _generationStartTime != null) {
+              _timeToFirstToken =
+                  DateTime.now()
+                      .difference(_generationStartTime!)
+                      .inMilliseconds /
+                  1000.0;
             }
+            thoughts.write(text);
             _messages[messageIndex] = _messages[messageIndex].copyWith(
               content: answer.toString(),
               thinkingContent: thoughts.isEmpty ? null : thoughts.toString(),
@@ -472,7 +482,16 @@ class ChatViewModel extends ChangeNotifier {
             notifyListeners();
           case sdk.GenerationCompleted(result: final completed):
             result = completed;
+          case sdk.GenerationFailed(error: final error):
+            throw error;
           case sdk.GenerationStarted():
+          case sdk.GenerationToolCallAdded():
+          case sdk.GenerationUsage():
+          case sdk.GenerationCancelled():
+          // Deprecated v3 shapes — no longer emitted by generateStream.
+          // ignore: deprecated_member_use
+          case sdk.GenerationToken():
+          // ignore: deprecated_member_use
           case sdk.GenerationToolCall():
             break;
         }

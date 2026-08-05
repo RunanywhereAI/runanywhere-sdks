@@ -74,9 +74,9 @@ export const deprecatedForwarders = {
     return tts.synthesize(text, options);
   },
 
-  /** @deprecated Use `RunAnywhere.tts.speak(text, options)`. */
-  speak(text: string, options?: TtsOptions): Promise<void> {
-    return tts.speak(text, options);
+  /** @deprecated Use `RunAnywhere.tts.speak(text, options)`, which returns a `SpeechHandle`. */
+  async speak(text: string, options?: TtsOptions): Promise<void> {
+    await tts.speak(text, options);
   },
 
   /** @deprecated Use `RunAnywhere.tts.stop()`. */
@@ -109,14 +109,14 @@ export const deprecatedForwarders = {
     return models.get(id);
   },
 
-  /** @deprecated Use `RunAnywhere.models.load(id, options)`. */
-  loadModel(id: string): Promise<void> {
-    return models.load(id);
+  /** @deprecated Use `RunAnywhere.models.load(id, options)`, which returns a `LoadedModel`. */
+  async loadModel(id: string): Promise<void> {
+    await models.load(id);
   },
 
-  /** @deprecated Use `RunAnywhere.models.unload(category)`. */
+  /** @deprecated Use `RunAnywhere.models.unloadAll(category)`. */
   unloadModel(category?: ModelCategory): Promise<void> {
-    return models.unload(category);
+    return models.unloadAll(category);
   },
 
   /** @deprecated Use `RunAnywhere.models.delete(id)`. */

@@ -100,7 +100,13 @@ static rac_result_t platform_llm_vtable_generate_stream(void* impl, const char* 
     rac_result_t result = rac_llm_platform_generate(handle, prompt, &platform_options, &response);
 
     if (result == RAC_SUCCESS && response) {
-        callback(response, user_data);
+        // One-shot Foundation Models path: emit the full response as a
+        // non-final token, then a terminal with finish_reason="stop".
+        if (callback(response, RAC_FALSE, nullptr, user_data) == RAC_FALSE) {
+            free(response);
+            return RAC_ERROR_CANCELLED;
+        }
+        callback("", RAC_TRUE, "stop", user_data);
         free(response);
     }
 

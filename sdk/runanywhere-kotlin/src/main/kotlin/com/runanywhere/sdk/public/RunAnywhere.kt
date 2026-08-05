@@ -36,7 +36,9 @@ import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.api.Environment
+import com.runanywhere.sdk.public.api.SDKCapabilities
 import com.runanywhere.sdk.public.api.SdkEvent
+import com.runanywhere.sdk.public.api.sdkCapabilitiesSnapshot
 import com.runanywhere.sdk.public.api.toSdkEvents
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.SDKInitParams
@@ -311,6 +313,19 @@ object RunAnywhere {
      */
     val eventBus: EventBus
         get() = EventBus
+
+    /**
+     * Installed, packaged, and executable surface of this SDK build.
+     *
+     * Every v4 namespace ships on Android except the namespaces the v4
+     * contract explicitly excludes from every SDK (`agents`, `wakeword`,
+     * `realtime`). This is a static per-build manifest; it does not yet
+     * probe engine registration the way [com.runanywhere.sdk.public.api.ModelsNamespace.state]
+     * probes residency, so a namespace listed here can still fail an
+     * individual call with `unsupportedCapability` when the specific option
+     * it was given cannot be honored by the resolved engine.
+     */
+    fun capabilities(): SDKCapabilities = sdkCapabilitiesSnapshot()
 
     // Authentication info (production/staging only)
 

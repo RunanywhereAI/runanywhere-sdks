@@ -15,10 +15,11 @@ from .stt import stt
 from .tts import tts
 from .vad import vad
 from .vlm import vlm
-from .voice import voice
+from .voice import VoiceSession, voice
 
 __all__ = [
     "RagSession",
+    "VoiceSession",
     "diarization",
     "embeddings",
     "images",

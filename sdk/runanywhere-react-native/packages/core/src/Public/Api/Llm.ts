@@ -38,13 +38,13 @@ import {
   unregisterTool,
 } from '../Extensions/LLM/RunAnywhere+ToolCalling';
 import { decode, decodeEvent, encode, nextRequestId, preflight } from './Bridge';
+import { arrayBufferToBytes, bytesToBase64 } from '../../services/ProtoBytes';
 import { ensureModelLoaded } from './Models';
 import { toLlmOptions, toToolCallingOptions } from './Options';
 import { toChatMessages } from './Inputs';
 import { pushStream } from './Stream';
 import {
   emptyGenerationResult,
-  synthesizeStreamResult,
   toGenerationResult,
   toGenerationResultFromStream,
   toStructuredResult,
@@ -55,6 +55,7 @@ import type {
   GenerationResult,
   JsonSchema,
   LlmOptions,
+  StructuredOutputMode,
   StructuredResult,
   ToolExecutor,
 } from './Types';
@@ -140,10 +141,12 @@ async function generateWithToolLoop(
 
   const resultBytes = await native.toolRunLoopProtoWithHandle(
     encode(request, ToolCallingSessionCreateRequest),
-    async (toolCallBytes: ArrayBuffer) => {
+    async (toolCallBytes: ArrayBuffer): Promise<string> => {
       const call = decodeEvent(toolCallBytes, ToolCall);
       const outcome = await executeTool(call);
-      return encode(outcome, ToolResult);
+      // base64: the native run loop reads this off the JS thread, where a JS
+      // ArrayBuffer's data() is unreadable.
+      return bytesToBase64(arrayBufferToBytes(encode(outcome, ToolResult)));
     },
     () => undefined
   );
@@ -235,9 +238,6 @@ export const llm = {
         let sawAnyEvent = false;
         let accumulatedText = '';
         let accumulatedThinking = '';
-        let tokenCount = 0;
-        const startedAtMs = Date.now();
-        let firstTokenAtMs: number | null = null;
 
         void native
           .llmGenerateStreamProto(
@@ -246,15 +246,20 @@ export const llm = {
               sawAnyEvent = true;
               const event = decodeEvent(eventBytes, LLMStreamEvent);
               if (event.error) {
-                controller.fail(new SDKException(event.error));
+                sawCompletion = true;
+                controller.push({
+                  type: 'failed',
+                  requestId,
+                  partial: accumulatedText || undefined,
+                  error: new SDKException(event.error),
+                });
+                controller.finish();
                 return;
               }
               if (event.toolCall) {
                 controller.push({ type: 'toolCall', toolCall: event.toolCall });
               }
               if (event.token.length > 0) {
-                if (firstTokenAtMs === null) firstTokenAtMs = Date.now();
-                tokenCount += 1;
                 const kind = tokenKind(event);
                 if (kind === 'thought') {
                   accumulatedThinking += event.token;
@@ -267,6 +272,7 @@ export const llm = {
                 sawCompletion = true;
                 controller.push({
                   type: 'completed',
+                  requestId,
                   result: event.result
                     ? toGenerationResultFromStream(
                         event.result,
@@ -284,12 +290,10 @@ export const llm = {
               controller.finish();
               return;
             }
-            // The native call resolved without ever sending `isFinal`. A
-            // legitimate native boundary can end a started stream this way
-            // (mirrors Swift's `RunAnywhere.synthesizeResult`), so this is a
-            // synthesized completion from wall-clock metrics rather than a
-            // thrown error -- unless native never sent a single event, which
-            // means generation never actually ran.
+            // The native call resolved without ever sending `isFinal`. Never
+            // fabricate a successful `completed` — the stream ends `failed`
+            // instead, unless it never produced a single event, which is
+            // reported the same way.
             if (!sawAnyEvent) {
               controller.fail(
                 SDKException.generationFailed(
@@ -299,15 +303,11 @@ export const llm = {
               return;
             }
             controller.push({
-              type: 'completed',
-              result: synthesizeStreamResult(
-                requestId,
-                options?.model ?? '',
-                accumulatedText,
-                accumulatedThinking,
-                tokenCount,
-                startedAtMs,
-                firstTokenAtMs
+              type: 'failed',
+              requestId,
+              partial: accumulatedText || undefined,
+              error: SDKException.generationFailed(
+                'Generation stream ended before a terminal event'
               ),
             });
             controller.finish();
@@ -324,17 +324,31 @@ export const llm = {
   /**
    * Generate a value that conforms to `schema`.
    *
+   * `mode` picks how the schema is enforced:
+   * - `'validationOnly'` (default): generate freely, then validate.
+   * - `'repair'`: validate, then retry once with a repair instruction if invalid.
+   * - `'constrained'`: engine-constrained decoding — fails preflight until a
+   *   constrained-decoding engine is wired in.
+   *
    * Sampling knobs in `options` are not forwarded: commons'
    * `StructuredOutputRequest` carries no generation submessage, so the
    * structured pipeline applies its own defaults. `options.model` is honoured.
    *
-   * @throws SDKException when generation fails or the output cannot be parsed.
+   * @throws SDKException when `mode` cannot be honored, generation fails, or
+   * the output cannot be parsed.
    */
   async generateStructured<T = unknown>(
     prompt: string,
     schema: JsonSchema,
-    options?: LlmOptions
+    options?: LlmOptions,
+    mode: StructuredOutputMode = 'validationOnly'
   ): Promise<StructuredResult<T>> {
+    if (mode === 'constrained') {
+      throw SDKException.notImplemented(
+        "llm.generateStructured(mode: 'constrained') needs engine-level constrained decoding, " +
+          "which is not wired in yet; use 'validationOnly' or 'repair'"
+      );
+    }
     const native = await preflight();
     const requestId = nextRequestId('structured');
     if (options?.model) {
@@ -343,26 +357,34 @@ export const llm = {
         ModelCategory.MODEL_CATEGORY_LANGUAGE
       );
     }
-    const request = StructuredOutputRequest.fromPartial({
-      requestId,
-      prompt,
-      options: StructuredOutputOptions.fromPartial({
-        schema,
-        strictMode: options?.structuredOutput?.strict ?? true,
-        includeSchemaInPrompt: true,
-      }),
-    });
-    const resultBytes = await native.structuredOutputGenerateProto(
-      encode(request, StructuredOutputRequest)
-    );
-    const result = decode(
-      resultBytes,
-      StructuredOutputResult,
-      'structuredOutputGenerate'
-    );
+    const runOnce = async (text: string): Promise<StructuredOutputResult> => {
+      const request = StructuredOutputRequest.fromPartial({
+        requestId,
+        prompt: text,
+        options: StructuredOutputOptions.fromPartial({
+          schema,
+          strictMode: options?.structuredOutput?.strict ?? true,
+          includeSchemaInPrompt: true,
+        }),
+      });
+      const resultBytes = await native.structuredOutputGenerateProto(
+        encode(request, StructuredOutputRequest)
+      );
+      return decode(resultBytes, StructuredOutputResult, 'structuredOutputGenerate');
+    };
+
+    let result = await runOnce(prompt);
+    if (mode === 'repair' && !(result.validation?.isValid ?? true)) {
+      const repairPrompt =
+        `${prompt}\n\nYour previous answer did not match the required JSON schema. ` +
+        'Reply again with ONLY JSON that satisfies this schema.\n\n' +
+        `Previous invalid answer: ${result.rawText ?? ''}`;
+      result = await runOnce(repairPrompt);
+    }
     return toStructuredResult<T>(
       result,
-      emptyGenerationResult(requestId, options?.model ?? '')
+      emptyGenerationResult(requestId, options?.model ?? ''),
+      mode
     );
   },
 

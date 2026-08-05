@@ -200,7 +200,7 @@ def test_initialize_and_loads_publish_breadcrumbs(fake_core, monkeypatch, tmp_pa
     ra.initialize()
     try:
         ra.models.load(gguf)
-        ra.models.unload(ModelCategory.LANGUAGE)
+        ra.models.unload_all(ModelCategory.LANGUAGE)
     finally:
         ra.reset()
     kinds = [event.kind for event in seen]

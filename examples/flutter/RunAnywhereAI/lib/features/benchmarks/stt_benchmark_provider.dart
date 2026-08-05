@@ -73,7 +73,7 @@ class STTBenchmarkProvider implements BenchmarkScenarioProvider {
       return metrics;
     } finally {
       try {
-        await sdk.RunAnywhere.models.unload(
+        await sdk.RunAnywhere.models.unloadAll(
           sdk.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
         );
       } catch (_) {

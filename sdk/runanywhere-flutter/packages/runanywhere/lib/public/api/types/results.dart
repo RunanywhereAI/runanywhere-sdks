@@ -4,8 +4,10 @@
 // generated proto the commons ABI returns, so field names stay spec-shaped
 // while the wire contract stays canonical.
 
+import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/diarization.pb.dart' as diar_pb;
 import 'package:runanywhere/generated/diffusion_options.pb.dart' as diff_pb;
 import 'package:runanywhere/generated/embeddings_options.pb.dart' as embed_pb;
@@ -16,7 +18,7 @@ import 'package:runanywhere/generated/llm_service.pb.dart'
 import 'package:runanywhere/generated/lora_options.pb.dart' as lora_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show AudioFormat, ModelCategory;
+    show AudioFormat, InferenceFramework, ModelCategory;
 import 'package:runanywhere/generated/rag.pb.dart' as rag_pb;
 import 'package:runanywhere/generated/rerank.pb.dart' as rerank_pb;
 import 'package:runanywhere/generated/segmentation.pb.dart' as seg_pb;
@@ -29,6 +31,8 @@ import 'package:runanywhere/generated/tool_calling.pb.dart'
 import 'package:runanywhere/generated/tts_options.pb.dart' as tts_pb;
 import 'package:runanywhere/generated/vad_options.pb.dart' as vad_pb;
 import 'package:runanywhere/generated/vlm_options.pb.dart' as vlm_pb;
+import 'package:runanywhere/public/api/types/options.dart'
+    show BackendPreference;
 
 /// Why a generation stopped.
 enum FinishReason {
@@ -805,6 +809,214 @@ class LoraState {
 
   /// Applied adapters, in application order.
   final List<AppliedAdapter> applied;
+}
+
+/// Resident-model ownership handle returned by `models.load`.
+///
+/// [close] and `models.unload(id)` release the same residency; calling
+/// either after the other is a no-op.
+class LoadedModel {
+  /// Internal — build through `models.load`.
+  LoadedModel({
+    required this.id,
+    required this.category,
+    this.requestedBackend,
+    required this.actualBackend,
+    this.actualDevice = 'unknown',
+    this.runtimeVersion,
+    this.abiVersion,
+    this.fallbackReason,
+    required Future<void> Function(String id) closeHandler,
+  }) : _closeHandler = closeHandler;
+
+  /// Model id.
+  final String id;
+
+  /// Category this model was loaded under.
+  final ModelCategory category;
+
+  /// Backend preference that was requested, when one was given.
+  final BackendPreference? requestedBackend;
+
+  /// Backend the load actually resolved to.
+  final InferenceFramework actualBackend;
+
+  /// Where the model actually runs.
+  final String actualDevice;
+
+  /// Native runtime version, when the backend reports one.
+  final String? runtimeVersion;
+
+  /// Native ABI version, when the backend reports one.
+  final String? abiVersion;
+
+  /// Set when the requested backend/accelerator could not be honored.
+  final String? fallbackReason;
+
+  final Future<void> Function(String id) _closeHandler;
+  bool _closed = false;
+
+  /// Release this model's residency. Idempotent.
+  Future<void> close() async {
+    if (_closed) return;
+    _closed = true;
+    await _closeHandler(id);
+  }
+}
+
+/// Handle to one in-flight or completed `tts.speak`/`VoiceSession.say` utterance.
+class SpeechHandle {
+  /// Internal — build through `tts.speak`/`VoiceSession.say`.
+  SpeechHandle({String? id, required Future<void> Function() interruptHandler})
+    : id = id ?? 'speech-${DateTime.now().microsecondsSinceEpoch}',
+      _interruptHandler = interruptHandler;
+
+  /// Handle id, stable for the lifetime of this utterance.
+  final String id;
+
+  final Future<void> Function() _interruptHandler;
+  final Completer<void> _done = Completer<void>();
+  bool _interrupted = false;
+
+  /// True once [interrupt] has been called.
+  bool get interrupted => _interrupted;
+
+  /// Set when synthesis or playback failed.
+  SDKException? error;
+
+  /// Stop playback and any in-flight synthesis. Resolves once stopped.
+  Future<void> interrupt() async {
+    _interrupted = true;
+    await _interruptHandler();
+    complete();
+  }
+
+  /// Resolve once playback finishes, is interrupted, or fails.
+  Future<void> waitForPlayout() => _done.future;
+
+  /// Internal — mark this utterance settled.
+  void complete([SDKException? failure]) {
+    if (failure != null) error = failure;
+    if (!_done.isCompleted) _done.complete();
+  }
+}
+
+/// Whether a modality/backend/feature is honestly available right now.
+class UnavailableCapability {
+  /// Build an unavailable-capability entry.
+  const UnavailableCapability({required this.name, required this.reason});
+
+  /// Namespace or feature name.
+  final String name;
+
+  /// Why it is unavailable right now.
+  final String reason;
+}
+
+/// Per-modality streaming support, keyed by namespace name.
+class StreamingCapabilities {
+  /// Build a streaming-support snapshot.
+  const StreamingCapabilities({
+    this.llm = true,
+    this.vlm = true,
+    this.stt = true,
+    this.tts = true,
+    this.vad = true,
+    this.rag = true,
+    this.images = true,
+  });
+
+  /// `llm.generateStream` support.
+  final bool llm;
+
+  /// `vlm.generateStream` support.
+  final bool vlm;
+
+  /// `stt.openStream` support.
+  final bool stt;
+
+  /// `tts.synthesizeStream` support.
+  final bool tts;
+
+  /// `vad.openStream` support.
+  final bool vad;
+
+  /// `RagSession.queryStream` support.
+  final bool rag;
+
+  /// `images.generateStream` support.
+  final bool images;
+}
+
+/// Tool-calling support of the currently registered backends.
+class ToolCapabilities {
+  /// Build a tool-capability snapshot.
+  const ToolCapabilities({
+    this.registry = true,
+    this.parallel = false,
+    this.cancellation = true,
+  });
+
+  /// A tool registry is available.
+  final bool registry;
+
+  /// Multiple tool calls can run concurrently.
+  final bool parallel;
+
+  /// A tool call can be cancelled mid-flight.
+  final bool cancellation;
+}
+
+/// RAG-session support of the currently registered backends.
+class RagCapabilities {
+  /// Build a RAG-capability snapshot.
+  const RagCapabilities({this.multiSession = true, this.persistent = false});
+
+  /// More than one concurrent session is supported.
+  final bool multiSession;
+
+  /// Sessions can persist their index to disk.
+  final bool persistent;
+}
+
+/// Installed, packaged, and executable surface of this SDK build.
+///
+/// Generated from packaging and runtime probes, never from IDL enum
+/// presence alone. `RunAnywhere.capabilities()` is the source of truth apps
+/// should consult before calling into a modality that might not ship on
+/// this platform.
+class SDKCapabilities {
+  /// Build a capabilities snapshot.
+  const SDKCapabilities({
+    required this.modalities,
+    required this.backends,
+    required this.audioFormats,
+    required this.streaming,
+    required this.tools,
+    required this.rag,
+    required this.unavailable,
+  });
+
+  /// Namespace ids present on this build.
+  final Set<String> modalities;
+
+  /// Inference backends this build links against.
+  final Set<InferenceFramework> backends;
+
+  /// Audio formats this build can round-trip.
+  final Set<AudioFormat> audioFormats;
+
+  /// Per-modality streaming support.
+  final StreamingCapabilities streaming;
+
+  /// Tool-calling support.
+  final ToolCapabilities tools;
+
+  /// RAG-session support.
+  final RagCapabilities rag;
+
+  /// Modalities/features honestly unavailable on this build.
+  final List<UnavailableCapability> unavailable;
 }
 
 /// Size of a RAG session's index.

@@ -48,7 +48,7 @@ final class ModelDownloadTracker {
         let task = Task { [weak self] in
             do {
                 for try await event in try await RunAnywhere.models.download(id: modelID) {
-                    guard case .progress(_, _, let percent) = event else { continue }
+                    guard case .progress(_, _, _, _, let percent, _) = event else { continue }
                     // `DownloadEvent.percent` is 0–100; the UI wants a fraction.
                     self?.active[modelID]?.progress = Double(percent) / 100
                 }

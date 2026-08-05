@@ -19,6 +19,7 @@ import 'package:runanywhere/public/api/namespaces/tts.dart';
 import 'package:runanywhere/public/api/types/events.dart';
 import 'package:runanywhere/public/api/types/inputs.dart';
 import 'package:runanywhere/public/api/types/options.dart';
+import 'package:runanywhere/public/api/types/results.dart' show SpeechHandle;
 
 /// Speech-to-speech agent sessions.
 class VoiceApi {
@@ -143,19 +144,28 @@ class VoiceSession {
     _events.add(const VoiceAgentStateChanged(AgentState.listening));
   }
 
-  /// Speak [text] now, outside the turn loop.
+  /// Speak [text] now, outside the turn loop, returning immediately with a
+  /// handle to the in-flight utterance.
   ///
-  /// Throws [SDKException] when synthesis or playback fails.
-  Future<void> say(String text) async {
+  /// Throws [SDKException] when the session is closed.
+  SpeechHandle say(String text) {
     if (_closed) {
       throw SDKException.invalidState('Voice session is closed');
     }
     _events.add(const VoiceAgentStateChanged(AgentState.speaking));
-    await _tts.speak(text);
-    _events.add(const VoiceAgentStateChanged(AgentState.listening));
+    final handle = _tts.speak(text);
+    unawaited(
+      handle.waitForPlayout().then((_) {
+        if (!_events.isClosed) {
+          _events.add(const VoiceAgentStateChanged(AgentState.listening));
+        }
+      }),
+    );
+    return handle;
   }
 
-  /// Stop the agent mid-utterance.
+  /// Stop the agent mid-utterance. Awaitable: resolves once the interrupted
+  /// response, its tools, and its playout have all settled.
   Future<void> interrupt() async {
     await _tts.stop();
     _events.add(const VoiceAgentStateChanged(AgentState.listening));

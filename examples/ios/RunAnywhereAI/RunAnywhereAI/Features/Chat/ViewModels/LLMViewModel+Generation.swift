@@ -29,23 +29,21 @@ extension LLMViewModel {
 
         for try await event in stream {
             switch event {
-            case .token(let text, let kind):
-                switch kind {
-                case .thought:
-                    thinking += text
-                    // Drop thoughts from a superseded generation (user navigated away).
-                    guard isCurrentGeneration(generationID) else { continue }
-                    updateMessageThinking(at: messageIndex, content: thinking)
-                case .text:
-                    answer += text
-                    // Drop tokens from a superseded generation (user navigated away).
-                    guard isCurrentGeneration(generationID) else { continue }
-                    // `@Observable` publishes the message mutation; the chat view
-                    // auto-scrolls via `.onChange(of: messages.last?.content)`.
-                    updateMessageContent(at: messageIndex, content: answer)
-                }
+            case .reasoningDelta(_, _, _, _, let text):
+                thinking += text
+                // Drop thoughts from a superseded generation (user navigated away).
+                guard isCurrentGeneration(generationID) else { continue }
+                updateMessageThinking(at: messageIndex, content: thinking)
 
-            case .completed(let result):
+            case .textDelta(_, _, _, _, let text):
+                answer += text
+                // Drop tokens from a superseded generation (user navigated away).
+                guard isCurrentGeneration(generationID) else { continue }
+                // `@Observable` publishes the message mutation; the chat view
+                // auto-scrolls via `.onChange(of: messages.last?.content)`.
+                updateMessageContent(at: messageIndex, content: answer)
+
+            case .completed(_, let result):
                 guard isCurrentGeneration(generationID) else { return }
                 await updateMessageWithResult(
                     at: messageIndex,
@@ -55,7 +53,7 @@ extension LLMViewModel {
                     wasInterrupted: false
                 )
 
-            case .started, .toolCall:
+            default:
                 break
             }
         }

@@ -106,7 +106,10 @@ class VLMViewModel extends ChangeNotifier {
 
       final buffer = StringBuffer();
       await for (final event in events) {
-        if (event is! sdk.GenerationToken || event.text.isEmpty) continue;
+        if (event case sdk.GenerationFailed(:final error)) {
+          throw error;
+        }
+        if (event is! sdk.GenerationTextDelta || event.text.isEmpty) continue;
         buffer.write(event.text);
         _currentDescription = buffer.toString();
         notifyListeners();

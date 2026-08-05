@@ -606,8 +606,13 @@ public nonisolated struct RAToolCallingOptions: Sendable {
   /// When true, one model turn may emit multiple tool-call envelopes;
   /// commons parses and executes all of them before building a single
   /// follow-up prompt. Default false preserves the historical
-  /// one-call-per-turn behavior. (Reclaims the field number that
-  /// originally carried this flag before it was reserved.)
+  /// one-call-per-turn behavior.
+  ///
+  /// Wire history: field 15 originally carried this same bool flag, was
+  /// briefly reserved during a cleanup pass, then restored with identical
+  /// type and meaning. Do not reuse 15 for any other type. Schema-skew
+  /// fixtures under idl/codegen/tests cover old-writer/new-reader for this
+  /// field.
   public var parallelToolCalls: Bool = false
 
   /// Maximum tool calls in one conversation turn. Unset/0 = SDK default

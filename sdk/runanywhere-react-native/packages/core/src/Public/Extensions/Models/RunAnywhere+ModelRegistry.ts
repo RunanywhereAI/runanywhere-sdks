@@ -499,6 +499,19 @@ export async function downloadedModels(): Promise<ModelListResult> {
 }
 
 /**
+ * Remove a model's catalog record. Callers must already have unloaded and
+ * deleted its local artifacts.
+ */
+export async function removeModel(modelId: string): Promise<boolean> {
+  requireInitialized();
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  const native = requireNativeModule();
+  return native.removeModelProto(modelId);
+}
+
+/**
  * Import a stable, platform-normalized local model path into the native
  * registry. Mirrors Swift's `RunAnywhere.importModel(_:)`.
  */

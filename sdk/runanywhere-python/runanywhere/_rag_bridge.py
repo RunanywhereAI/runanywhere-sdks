@@ -13,7 +13,7 @@ from typing import Any, List, Optional
 
 from .errors import ErrorCode, SDKException
 from .events import RagEvent, RagEventKind
-from .options import LlmOptions, RagConfig, ReasoningMode
+from .options import RagConfig, RagQueryOptions, ReasoningMode
 from .results import Match, RagResult, RagStats, TokenKind
 
 try:
@@ -104,26 +104,33 @@ def build_document(text: str, doc_id: str, metadata: Optional[dict]) -> bytes:
 
 def build_query(
     question: str,
-    options: Optional[LlmOptions],
+    options: Optional[RagQueryOptions],
     *,
-    top_k: Optional[int] = None,
     stream: bool = False,
 ) -> bytes:
-    """Serialize a RAGQueryOptions from a question plus generation options."""
+    """Serialize a RAGQueryOptions from a question plus retrieval/generation overrides."""
     query = _pb.RAGQueryOptions(question=question)
     if options is not None:
-        query.generation.max_output_tokens = options.max_output_tokens
-        query.generation.temperature = options.temperature
-        query.generation.top_p = options.top_p
-        if options.top_k is not None:
-            query.generation.top_k = options.top_k
-        if options.system_prompt is not None:
-            query.generation.system_prompt = options.system_prompt
-        if options.reasoning is not None:
-            query.generation.reasoning.mode = int(options.reasoning.mode)
-            query.generation.reasoning.include_in_output = options.reasoning.include_in_output
-    if top_k is not None:
-        query.retrieval_top_k = int(top_k)
+        retrieval = options.retrieval
+        if retrieval is not None:
+            if retrieval.top_k is not None:
+                query.retrieval_top_k = int(retrieval.top_k)
+            if retrieval.similarity_threshold is not None:
+                query.similarity_threshold = retrieval.similarity_threshold
+        generation = options.generation
+        if generation is not None:
+            query.generation.max_output_tokens = generation.max_output_tokens
+            query.generation.temperature = generation.temperature
+            query.generation.top_p = generation.top_p
+            if generation.top_k is not None:
+                query.generation.top_k = generation.top_k
+            if generation.system_prompt is not None:
+                query.generation.system_prompt = generation.system_prompt
+            if generation.reasoning is not None:
+                query.generation.reasoning.mode = int(generation.reasoning.mode)
+                query.generation.reasoning.include_in_output = (
+                    generation.reasoning.include_in_output
+                )
     query.stream = stream
     return query.SerializeToString()
 
@@ -222,6 +229,7 @@ def matches(result: RagResult) -> List[Match]:
     return list(result.sources)
 
 
-def thinking_suppressed(options: Optional[LlmOptions]) -> bool:
+def thinking_suppressed(options: Optional[RagQueryOptions]) -> bool:
     """True when the caller asked for no thinking on this query."""
-    return bool(options and options.reasoning and options.reasoning.mode == ReasoningMode.OFF)
+    generation = options.generation if options is not None else None
+    return bool(generation and generation.reasoning and generation.reasoning.mode == ReasoningMode.OFF)

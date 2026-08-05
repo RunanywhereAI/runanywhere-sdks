@@ -4,7 +4,7 @@
 
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import { audioCaptureDefaults } from '@runanywhere/proto-ts/defaults/pool';
-import { SDKException } from '../../../Foundation/SDKException.js';
+import { SDKException, type ProtoSDKError } from '../../../Foundation/SDKException.js';
 import { SDKLogger } from '../../../Foundation/SDKLogger.js';
 import { TTSProtoAdapter } from '../../../Adapters/ModalityProtoAdapter.js';
 import {
@@ -13,7 +13,7 @@ import {
   stopTTSPlayback,
 } from '../../Extensions/RunAnywhere+TTS.js';
 import type { TtsOptions } from '../Options.js';
-import type { Audio, AudioChunk, Voice } from '../Results.js';
+import type { Audio, AudioChunk, SpeechHandle, Voice } from '../Results.js';
 import { toAudio, toProtoTtsOptions, toVoice } from '../Mapping.js';
 import { ensureModelForCategory, ensureReady } from '../Runtime/Prerequisites.js';
 
@@ -54,6 +54,65 @@ function toPlaybackSamples(audio: Audio): Float32Array | null {
 async function ensureVoiceModel(): Promise<void> {
   await ensureReady();
   await ensureModelForCategory(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS);
+}
+
+let speechSequence = 0;
+function nextSpeechId(): string {
+  speechSequence += 1;
+  return `speech-${Date.now()}-${speechSequence}`;
+}
+
+/** The most recently created `speak()` handle, for the deprecated `stop()` adapter. */
+let latestHandle: SpeechHandle | null = null;
+
+function createSpeechHandle(text: string, options?: TtsOptions): SpeechHandle {
+  const id = nextSpeechId();
+  let interrupted = false;
+  let error: ProtoSDKError | undefined;
+  let settle!: () => void;
+  const settled = new Promise<void>((resolve) => { settle = resolve; });
+
+  const handle: SpeechHandle = {
+    id,
+    get interrupted(): boolean {
+      return interrupted;
+    },
+    get error(): ProtoSDKError | undefined {
+      return error;
+    },
+    async interrupt(): Promise<void> {
+      interrupted = true;
+      stopTTSPlayback();
+      TTSCapability.stopLoaded();
+      await settled;
+    },
+    async waitForPlayout(): Promise<void> {
+      await settled;
+    },
+  };
+
+  void (async () => {
+    try {
+      const audio = await tts.synthesize(text, options);
+      const samples = toPlaybackSamples(audio);
+      if (!samples || samples.length === 0) {
+        logger.warning(`speak(): cannot play ${audio.format} audio without a container decoder`);
+        return;
+      }
+      await sharedTTSPlayback().play(
+        samples,
+        audio.sampleRate > 0 ? audio.sampleRate : audioCaptureDefaults.ttsSampleRateHz,
+      );
+    } catch (caught) {
+      error = SDKException.fromUnknown(caught).proto;
+      logger.warning(`speak(): failed: ${error.message}`);
+    } finally {
+      settle();
+      if (latestHandle === handle) latestHandle = null;
+    }
+  })();
+
+  return handle;
 }
 
 /** Speech synthesis against the resident voice model. */
@@ -103,31 +162,22 @@ export const tts = {
   /**
    * Synthesize text and play it through the device speakers.
    *
-   * @throws SDKException when synthesis fails; playback failure is logged, not thrown.
+   * There is no global `tts.stop()`; interrupt playback through the returned handle.
+   *
+   * @throws SDKException never — synthesis/playback failure surfaces on `handle.error`.
    */
-  async speak(text: string, options?: TtsOptions): Promise<void> {
-    const audio = await tts.synthesize(text, options);
-    const samples = toPlaybackSamples(audio);
-    if (!samples || samples.length === 0) {
-      logger.warning(`speak(): cannot play ${audio.format} audio without a container decoder`);
-      return;
-    }
-    try {
-      await sharedTTSPlayback().play(
-        samples,
-        audio.sampleRate > 0 ? audio.sampleRate : audioCaptureDefaults.ttsSampleRateHz,
-      );
-    } catch (error) {
-      logger.warning(
-        `speak(): playback failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+  async speak(text: string, options?: TtsOptions): Promise<SpeechHandle> {
+    const handle = createSpeechHandle(text, options);
+    latestHandle = handle;
+    return handle;
   },
 
-  /** Stop playback and any in-flight synthesis. */
+  /**
+   * @deprecated Use the `SpeechHandle` returned by `speak()`. Interrupts the
+   *   most recently created handle when one is still active.
+   */
   stop(): void {
-    stopTTSPlayback();
-    TTSCapability.stopLoaded();
+    void latestHandle?.interrupt();
   },
 
   /** Voices the loaded synthesis model can render. */

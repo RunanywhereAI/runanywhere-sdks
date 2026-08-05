@@ -8,9 +8,9 @@ from .._options_bridge import check_stt_options
 from .._runtime import runtime
 from ..errors import SDKException
 from ..events import TranscriptionEvent
-from ..inputs import STT_SAMPLE_RATE, AudioInput, ModelCategory
+from ..inputs import STT_SAMPLE_RATE, AudioFormatSpec, AudioInput, ModelCategory
 from ..options import SttOptions
-from ..results import SttState, Transcription
+from ..results import SttState, SttStream, Transcription
 
 __all__ = ["stt"]
 
@@ -65,10 +65,27 @@ class Stt:
         Raises:
             SDKException: always — the bridge binds no streaming STT entry point.
         """
-        raise SDKException.not_implemented(
-            "stt.transcribe_stream: native/module.cpp binds no streaming STT "
+        raise SDKException.unsupported_capability(
+            "stt.transcribe_stream",
+            "native/module.cpp binds no streaming STT "
             "(rac_stt_component_transcribe_stream_proto / rac_stt_stream_start_proto are "
-            "not exposed to Python)"
+            "not exposed to Python)",
+        )
+
+    def open_stream(
+        self, format: AudioFormatSpec, options: Optional[SttOptions] = None
+    ) -> SttStream:
+        """Not available in this SDK.
+
+        Raises:
+            SDKException: always — the bridge binds no streaming STT entry point; use
+                :meth:`transcribe` for one-shot audio.
+        """
+        raise SDKException.unsupported_capability(
+            "stt.open_stream",
+            "native/module.cpp binds no streaming STT "
+            "(rac_stt_component_transcribe_stream_proto / rac_stt_stream_start_proto are "
+            "not exposed to Python); use stt.transcribe for one-shot audio",
         )
 
     def state(self) -> SttState:

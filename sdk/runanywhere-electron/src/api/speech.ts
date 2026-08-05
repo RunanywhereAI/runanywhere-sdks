@@ -7,10 +7,10 @@
 import * as fs from 'fs';
 
 import { decodeWav, downsample, pcm16Bytes, pcm16ToFloat32 } from '../audio';
-import { SDKException } from '../errors';
+import { SDKException, asSDKException } from '../errors';
 import type { LoadSlot, RaBackend } from './backend';
 import type { SdkEventHub } from './hub';
-import { bridgeStream } from './iter';
+import { AsyncQueue, bridgeStream } from './iter';
 import {
   STT_DEFAULTS,
   TTS_DEFAULTS,
@@ -29,19 +29,24 @@ import type {
   TurnHandlingOptions,
   VadOptions,
 } from './options';
-import { AgentState, AudioFormat, ModelCategory, TokenKind } from './types';
+import { AgentState, AudioEncoding, AudioFormat, ModelCategory, TokenKind, newRequestId } from './types';
 import type {
   Audio,
   AudioChunk,
+  AudioFormatSpec,
+  AudioFrame,
   AudioInput,
   DiarizationResult,
   ModelRef,
   Segment,
+  SpeechHandle,
   SttState,
+  SttStream,
   Transcription,
   TranscriptionEvent,
   VadEvent,
   VadResult,
+  VadStream,
   Voice,
   VoiceEvent,
   Word,
@@ -63,6 +68,21 @@ const VAD_FRAME_SAMPLES = 480;
 // Audio normalization
 // ---------------------------------------------------------------------------
 
+/** Little-endian float32 bytes decoded back to a Float32Array. */
+function bytesToFloat32(bytes: Uint8Array): Float32Array {
+  const count = Math.floor(bytes.byteLength / 4);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, count * 4);
+  const out = new Float32Array(count);
+  for (let i = 0; i < count; i++) out[i] = view.getFloat32(i * 4, true);
+  return out;
+}
+
+/** PCM16 little-endian bytes decoded to float32 in [-1, 1]. */
+function pcm16BytesToFloat32(bytes: Uint8Array): Float32Array {
+  const pcm = new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2));
+  return pcm16ToFloat32(pcm);
+}
+
 /** Float32 mono samples at 16 kHz, whichever shape the caller supplied. */
 function toMono16k(input: AudioInput): Float32Array {
   if (input.samples) {
@@ -77,19 +97,19 @@ function toMono16k(input: AudioInput): Float32Array {
       message: 'audio needs bytes, samples, or a path',
     });
   }
-  if (input.format.encoding === AudioFormat.WAV) {
+  if (input.format.encoding === AudioEncoding.CONTAINER) {
+    if (input.format.container && input.format.container !== AudioFormat.WAV) {
+      throw SDKException.notImplemented(
+        `decoding ${input.format.container} audio (supply PCM16, float32, or WAV)`
+      );
+    }
     const decoded = decodeWav(bytes);
     return decoded.sampleRate === STT_SAMPLE_RATE
       ? decoded.samples
       : downsample(decoded.samples, decoded.sampleRate, STT_SAMPLE_RATE);
   }
-  if (input.format.encoding !== AudioFormat.PCM) {
-    throw SDKException.notImplemented(
-      `decoding ${input.format.encoding} audio (supply PCM16, float32, or WAV)`
-    );
-  }
-  const pcm = new Int16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.byteLength / 2));
-  const samples = pcm16ToFloat32(pcm);
+  const samples =
+    input.format.encoding === AudioEncoding.PCM_F32_LE ? bytesToFloat32(bytes) : pcm16BytesToFloat32(bytes);
   const rate = input.format.sampleRate || STT_SAMPLE_RATE;
   return rate === STT_SAMPLE_RATE ? samples : downsample(samples, rate, STT_SAMPLE_RATE);
 }
@@ -100,7 +120,7 @@ function toPcm16At16k(input: AudioInput): Uint8Array {
   if (
     input.bytes &&
     !input.samples &&
-    input.format.encoding === AudioFormat.PCM &&
+    input.format.encoding === AudioEncoding.PCM_S16_LE &&
     (input.format.sampleRate || STT_SAMPLE_RATE) === STT_SAMPLE_RATE
   ) {
     return input.bytes;
@@ -110,6 +130,41 @@ function toPcm16At16k(input: AudioInput): Uint8Array {
 
 function durationMsOf(samples: number, sampleRate = STT_SAMPLE_RATE): number {
   return sampleRate > 0 ? Math.round((samples / sampleRate) * 1000) : 0;
+}
+
+/** Float32 samples of one pushed {@link AudioFrame}, in the stream's established encoding. */
+function frameToFloat32(frame: AudioFrame, format: AudioFormatSpec): Float32Array {
+  return format.encoding === AudioEncoding.PCM_F32_LE
+    ? bytesToFloat32(frame.samples)
+    : pcm16BytesToFloat32(frame.samples);
+}
+
+/** Adapt one {@link AudioInput} chunk into an {@link AudioFrame} matching `format`. */
+function frameOfAudioInput(input: AudioInput, format: AudioFormatSpec): AudioFrame {
+  if (format.encoding === AudioEncoding.PCM_F32_LE) {
+    const samples = input.samples ?? (input.bytes ? pcm16BytesToFloat32(input.bytes) : undefined);
+    if (!samples) {
+      throw SDKException.validationFailed({ fieldPath: 'audio', message: 'audio needs bytes or samples' });
+    }
+    return {
+      samples: new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
+      sampleCount: samples.length,
+    };
+  }
+  const bytes = input.bytes ?? (input.samples ? pcm16Bytes(input.samples) : undefined);
+  if (!bytes) {
+    throw SDKException.validationFailed({ fieldPath: 'audio', message: 'audio needs bytes or samples' });
+  }
+  return { samples: bytes, sampleCount: Math.floor(bytes.byteLength / 2) };
+}
+
+/** Reject a live-stream format spec that names a container encoding. */
+function rejectContainerFormat(format: AudioFormatSpec, verb: string, batchVerb: string): void {
+  if (format.encoding !== AudioEncoding.CONTAINER) return;
+  throw SDKException.validationFailed({
+    fieldPath: 'format.encoding',
+    message: `${verb} needs raw PCM audio; container formats are batch-only — use ${batchVerb}.`,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -127,13 +182,156 @@ export interface SttNamespace {
    * console.log(t.text);
    */
   transcribe(input: AudioInput, options?: SttOptions): Promise<Transcription>;
-  /** Transcribe a stream of audio chunks, emitting partials then a final transcript. */
+  /**
+   * Open a live transcription stream with one audio format established up front.
+   *
+   * @throws SDKException on preflight failure — no speech model loaded, or
+   *   `format.encoding === 'CONTAINER'` (live streams take raw PCM only).
+   * @example
+   * const stream = await RunAnywhere.stt.openStream({ encoding: 'PCM_S16_LE', sampleRate: 16000 });
+   * stream.pushFrame({ samples: pcm, sampleCount: pcm.length / 2 });
+   * stream.finish();
+   * for await (const event of stream.events) console.log(event);
+   */
+  openStream(format: AudioFormatSpec, options?: SttOptions): Promise<SttStream>;
+  /**
+   * Transcribe a stream of audio chunks, emitting `started`, `partial`, and
+   * `transcriptFinal`/`completed`.
+   *
+   * @deprecated Use {@link openStream}. This forwards into an `SttStream` when
+   *   every chunk shares one format; mixed formats throw.
+   * @throws SDKException on preflight failure, or when chunks carry mixed formats.
+   */
   transcribeStream(
     input: AsyncIterable<AudioInput>,
     options?: SttOptions
   ): AsyncIterableIterator<TranscriptionEvent>;
   /** Readiness, model id, and supported languages of the loaded speech model. */
   state(): Promise<SttState>;
+}
+
+/** Shape a native transcription result into the public grammar. */
+function buildTranscription(
+  native: Awaited<ReturnType<RaBackend['sttTranscribe']>>,
+  durationMs: number
+): Transcription {
+  return {
+    text: native.text,
+    language: native.language,
+    confidence: native.confidence,
+    words: native.words.map(
+      (w): Word => ({
+        text: w.text,
+        startMs: w.startMs,
+        endMs: w.endMs,
+        confidence: w.confidence,
+      })
+    ),
+    durationMs,
+  };
+}
+
+/**
+ * Live STT push stream backing `stt.openStream`.
+ *
+ * The addon exposes no incremental push ABI: frames are buffered as they are
+ * pushed, and the native streaming pass runs once against the buffered audio
+ * when `finish()` is called — the same buffer-then-run shape the deprecated
+ * `transcribeStream` adapter already used. Partial/final events come from
+ * that native pass; nothing here fabricates a successful `completed`.
+ */
+function createSttStream(deps: SpeechDeps, format: AudioFormatSpec, options: SttOptions = {}): SttStream {
+  const requestId = newRequestId('stt');
+  const events = new AsyncQueue<TranscriptionEvent>();
+  const chunks: Float32Array[] = [];
+  let announced = false;
+  let finished = false;
+  let closed = false;
+  let sequence = 0;
+
+  function announce(): void {
+    if (announced) return;
+    announced = true;
+    events.push({ type: 'started', requestId });
+  }
+
+  function frameToMono(frame: AudioFrame): Float32Array {
+    const floats = frameToFloat32(frame, format);
+    const rate = format.sampleRate || STT_SAMPLE_RATE;
+    return rate === STT_SAMPLE_RATE ? floats : downsample(floats, rate, STT_SAMPLE_RATE);
+  }
+
+  async function runNativePass(): Promise<void> {
+    try {
+      let total = 0;
+      for (const c of chunks) total += c.length;
+      if (!total) {
+        events.push({ type: 'completed', requestId });
+        return;
+      }
+      const merged = new Float32Array(total);
+      let offset = 0;
+      for (const c of chunks) {
+        merged.set(c, offset);
+        offset += c.length;
+      }
+      const pcm = pcm16Bytes(merged);
+      const nativeOptions = toNativeSttOptions(options, STT_SAMPLE_RATE);
+      let lastPartial = '';
+      await deps.backend.sttTranscribeStream(pcm, nativeOptions, (p) => {
+        if (closed || p.isFinal || p.text === lastPartial) return;
+        lastPartial = p.text;
+        sequence += 1;
+        events.push({
+          type: 'partial',
+          requestId,
+          sequence,
+          segmentId: '0',
+          revision: sequence,
+          alternatives: [{ text: p.text }],
+        });
+      });
+      if (closed) return;
+      // The streaming callback carries text only, so the final transcript (with word
+      // timings) comes from one non-streaming pass over the same buffer.
+      const native = await deps.backend.sttTranscribe(pcm, nativeOptions);
+      sequence += 1;
+      events.push({
+        type: 'transcriptFinal',
+        requestId,
+        sequence,
+        segment: buildTranscription(native, durationMsOf(merged.length)),
+      });
+      events.push({ type: 'completed', requestId });
+    } catch (e) {
+      events.push({ type: 'failed', requestId, error: asSDKException(e) });
+    } finally {
+      events.complete();
+    }
+  }
+
+  return {
+    events,
+    pushFrame(frame) {
+      if (closed || finished) return;
+      announce();
+      chunks.push(frameToMono(frame));
+    },
+    flush() {
+      // No incremental partial buffer on Electron: nothing buffered client-side to flush early.
+    },
+    finish() {
+      if (finished || closed) return;
+      finished = true;
+      announce();
+      void runNativePass();
+    },
+    async close() {
+      if (closed) return;
+      closed = true;
+      events.complete();
+    },
+  };
 }
 
 function parseLanguages(json?: string): string[] {
@@ -167,24 +365,6 @@ async function requireSlot(
 
 /** Build the `stt` namespace over a backend. */
 export function createSttNamespace(deps: SpeechDeps): SttNamespace {
-  const buildTranscription = (
-    native: Awaited<ReturnType<RaBackend['sttTranscribe']>>,
-    durationMs: number
-  ): Transcription => ({
-    text: native.text,
-    language: native.language,
-    confidence: native.confidence,
-    words: native.words.map(
-      (w): Word => ({
-        text: w.text,
-        startMs: w.startMs,
-        endMs: w.endMs,
-        confidence: w.confidence,
-      })
-    ),
-    durationMs,
-  });
-
   async function transcribe(input: AudioInput, options: SttOptions = {}): Promise<Transcription> {
     deps.requireReady();
     if (options.translateToEnglish) {
@@ -202,42 +382,41 @@ export function createSttNamespace(deps: SpeechDeps): SttNamespace {
     return buildTranscription(native, durationMsOf(pcm.byteLength / 2));
   }
 
+  async function openStream(format: AudioFormatSpec, options: SttOptions = {}): Promise<SttStream> {
+    deps.requireReady();
+    rejectContainerFormat(format, 'stt.openStream', 'stt.transcribe');
+    await requireSlot(deps, 'stt', ModelCategory.SPEECH_TO_TEXT, undefined);
+    return createSttStream(deps, format, options);
+  }
+
   function transcribeStream(
     input: AsyncIterable<AudioInput>,
     options: SttOptions = {}
   ): AsyncIterableIterator<TranscriptionEvent> {
     deps.requireReady();
     return bridgeStream<TranscriptionEvent>(async (sink) => {
-      await requireSlot(deps, 'stt', ModelCategory.SPEECH_TO_TEXT, undefined);
-      sink.push({ type: 'started' });
-      // Chunks accumulate into one utterance because commons' streaming transcribe
-      // takes the whole buffer; partials come from the engine as it decodes it.
-      const chunks: Float32Array[] = [];
-      for await (const chunk of input) chunks.push(toMono16k(chunk));
-      let total = 0;
-      for (const c of chunks) total += c.length;
-      const merged = new Float32Array(total);
-      let offset = 0;
-      for (const c of chunks) {
-        merged.set(c, offset);
-        offset += c.length;
-      }
-      const pcm = pcm16Bytes(merged);
-      const nativeOptions = toNativeSttOptions(options, STT_SAMPLE_RATE);
-      let lastPartial = '';
-      await deps.backend.sttTranscribeStream(pcm, nativeOptions, (p) => {
-        if (!p.isFinal && p.text !== lastPartial) {
-          lastPartial = p.text;
-          sink.push({ type: 'partial', text: p.text });
+      let stream: SttStream | null = null;
+      let format: AudioFormatSpec | null = null;
+      for await (const chunk of input) {
+        if (!format) {
+          format = chunk.format;
+          rejectContainerFormat(format, 'stt.transcribeStream', 'stt.transcribe');
+          stream = await openStream(format, options);
+        } else if (
+          chunk.format.encoding !== format.encoding ||
+          chunk.format.sampleRate !== format.sampleRate ||
+          (chunk.format.channels ?? 1) !== (format.channels ?? 1)
+        ) {
+          throw SDKException.validationFailed({
+            fieldPath: 'audio',
+            message: 'stt.transcribeStream requires every chunk to share one audio format.',
+          });
         }
-      });
-      // The streaming callback carries text only, so the final transcript (with word
-      // timings) comes from one non-streaming pass over the same buffer.
-      const native = await deps.backend.sttTranscribe(pcm, nativeOptions);
-      sink.push({
-        type: 'final',
-        transcription: buildTranscription(native, durationMsOf(merged.length)),
-      });
+        stream!.pushFrame(frameOfAudioInput(chunk, format));
+      }
+      if (!stream) return;
+      stream.finish();
+      for await (const event of stream.events) sink.push(event);
     });
   }
 
@@ -251,7 +430,7 @@ export function createSttNamespace(deps: SpeechDeps): SttNamespace {
     };
   }
 
-  return { transcribe, transcribeStream, state };
+  return { transcribe, openStream, transcribeStream, state };
 }
 
 // ---------------------------------------------------------------------------
@@ -330,9 +509,22 @@ export interface TtsNamespace {
   synthesize(text: string, options?: TtsOptions): Promise<Audio>;
   /** Synthesize incrementally, yielding chunks as the engine produces them. */
   synthesizeStream(text: string, options?: TtsOptions): AsyncIterableIterator<AudioChunk>;
-  /** Synthesize and play through the device (renderer only). */
-  speak(text: string, options?: TtsOptions): Promise<void>;
-  /** Stop playback and any in-flight synthesis. */
+  /**
+   * Synthesize and play through the device (renderer only), returning a
+   * handle to interrupt or await playout.
+   *
+   * There is no global `tts.stop()`; callers interrupt through the handle.
+   *
+   * @throws SDKException never — synthesis/playback failure surfaces on `handle.error`.
+   * @example
+   * const speech = await RunAnywhere.tts.speak('Hello there.');
+   * await speech.waitForPlayout();
+   */
+  speak(text: string, options?: TtsOptions): Promise<SpeechHandle>;
+  /**
+   * @deprecated Use the `SpeechHandle` returned by {@link speak}. Interrupts
+   *   the most recently created handle when one is still active.
+   */
   stop(): Promise<void>;
   /** Voices the loaded model can speak with. */
   voices(): Promise<Voice[]>;
@@ -341,6 +533,8 @@ export interface TtsNamespace {
 /** Build the `tts` namespace over a backend. */
 export function createTtsNamespace(deps: SpeechDeps): TtsNamespace {
   const playback = new Playback();
+  // The most recently created `speak()` handle, for the deprecated `stop()` adapter.
+  let latestHandle: SpeechHandle | null = null;
 
   async function synthesize(text: string, options: TtsOptions = {}): Promise<Audio> {
     deps.requireReady();
@@ -372,12 +566,60 @@ export function createTtsNamespace(deps: SpeechDeps): TtsNamespace {
     );
   }
 
-  async function speak(text: string, options: TtsOptions = {}): Promise<void> {
-    const a = await synthesize(text, options);
-    await playback.play(a.data, a.sampleRate);
+  function createSpeechHandle(text: string, options: TtsOptions): SpeechHandle {
+    const id = newRequestId('speech');
+    let interrupted = false;
+    let error: SDKException | undefined;
+    let settle!: () => void;
+    const settled = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+
+    const handle: SpeechHandle = {
+      id,
+      get interrupted() {
+        return interrupted;
+      },
+      get error() {
+        return error;
+      },
+      async interrupt() {
+        interrupted = true;
+        playback.stop();
+        await deps.backend.ttsStop();
+        await settled;
+      },
+      async waitForPlayout() {
+        await settled;
+      },
+    };
+
+    void (async () => {
+      try {
+        const a = await synthesize(text, options);
+        await playback.play(a.data, a.sampleRate);
+      } catch (e) {
+        error = asSDKException(e);
+      } finally {
+        settle();
+        if (latestHandle === handle) latestHandle = null;
+      }
+    })();
+
+    return handle;
+  }
+
+  async function speak(text: string, options: TtsOptions = {}): Promise<SpeechHandle> {
+    const handle = createSpeechHandle(text, options);
+    latestHandle = handle;
+    return handle;
   }
 
   async function stop(): Promise<void> {
+    if (latestHandle && !latestHandle.interrupted) {
+      await latestHandle.interrupt();
+      return;
+    }
     playback.stop();
     await deps.backend.ttsStop();
   }
@@ -412,7 +654,22 @@ export interface VadNamespace {
    * console.log(r.isSpeech, r.segments);
    */
   detect(input: AudioInput, options?: VadOptions): Promise<VadResult>;
-  /** Run detection over a stream of chunks, emitting speech start/end as they occur. */
+  /**
+   * Open a live voice-activity stream with one audio format established up front.
+   *
+   * @throws SDKException on preflight failure — `format.encoding === 'CONTAINER'`
+   *   (live streams take raw PCM only).
+   * @example
+   * const stream = await RunAnywhere.vad.openStream({ encoding: 'PCM_F32_LE', sampleRate: 16000 });
+   * for await (const event of stream.events) console.log(event);
+   */
+  openStream(format: AudioFormatSpec, options?: VadOptions): Promise<VadStream>;
+  /**
+   * Run detection over a stream of chunks, emitting speech start/end as they occur.
+   *
+   * @deprecated Use {@link openStream}. This forwards into a `VadStream` when
+   *   every chunk shares one format; mixed formats throw.
+   */
   detectStream(
     input: AsyncIterable<AudioInput>,
     options?: VadOptions
@@ -497,6 +754,84 @@ function* frames(samples: Float32Array, size: number): Generator<Float32Array> {
   }
 }
 
+/**
+ * Live VAD push stream backing `vad.openStream`.
+ *
+ * Pushed frames are converted to mono float32 at 16 kHz and buffered until
+ * there is enough audio for one fixed-size `VAD_FRAME_SAMPLES` window — the
+ * same rebinning `vad.detect`/`detectStream` already do — then run through
+ * the persistent native detector in push order.
+ */
+function createVadStream(deps: SpeechDeps, format: AudioFormatSpec, options: VadOptions = {}): VadStream {
+  const events = new AsyncQueue<VadEvent>();
+  const tracker = new SegmentTracker(options);
+  const rate = format.sampleRate || STT_SAMPLE_RATE;
+  let pending = new Float32Array(0);
+  let atMs = 0;
+  let closed = false;
+  // Frames must reach the native detector in push order; each push chains onto
+  // this promise rather than racing a concurrent vadProcess call.
+  let chain = Promise.resolve();
+
+  function append(samples: Float32Array): void {
+    const merged = new Float32Array(pending.length + samples.length);
+    merged.set(pending, 0);
+    merged.set(samples, pending.length);
+    pending = merged;
+  }
+
+  async function drain(): Promise<void> {
+    while (!closed && pending.length >= VAD_FRAME_SAMPLES) {
+      const frame = pending.slice(0, VAD_FRAME_SAMPLES);
+      pending = pending.slice(VAD_FRAME_SAMPLES);
+      const frameMs = durationMsOf(VAD_FRAME_SAMPLES);
+      const isSpeech = await deps.backend.vadProcess(frame);
+      if (closed) return;
+      for (const t of tracker.push(isSpeech, atMs, frameMs)) {
+        if ('ended' in t) events.push({ type: 'speechEnded', timestampMs: t.ended.endMs });
+        else if (t.started !== undefined) events.push({ type: 'speechStarted', timestampMs: t.started });
+      }
+      events.push({ type: 'activity', isSpeech, probability: isSpeech ? 1 : 0, timestampMs: atMs });
+      atMs += frameMs;
+    }
+  }
+
+  function chainNext(step: () => Promise<void>): void {
+    chain = chain.then(step).catch((e) => {
+      if (!closed) events.push({ type: 'failed', error: asSDKException(e) });
+    });
+  }
+
+  return {
+    events,
+    pushFrame(frame) {
+      if (closed) return;
+      let floats = frameToFloat32(frame, format);
+      if (rate !== STT_SAMPLE_RATE) floats = downsample(floats, rate, STT_SAMPLE_RATE);
+      append(floats);
+      chainNext(drain);
+    },
+    flush() {
+      // No partial-result buffer beyond frame alignment: nothing to flush early.
+    },
+    finish() {
+      chainNext(async () => {
+        if (closed) return;
+        const open = tracker.finish();
+        if (open) events.push({ type: 'speechEnded', timestampMs: open.endMs });
+        events.push({ type: 'completed' });
+        events.complete();
+      });
+    },
+    async close() {
+      if (closed) return;
+      closed = true;
+      await deps.backend.vadClose();
+      events.complete();
+    },
+  };
+}
+
 /** Build the `vad` namespace over a backend. */
 export function createVadNamespace(deps: SpeechDeps): VadNamespace {
   async function detect(input: AudioInput, options: VadOptions = {}): Promise<VadResult> {
@@ -533,42 +868,45 @@ export function createVadNamespace(deps: SpeechDeps): VadNamespace {
     };
   }
 
+  async function openStream(format: AudioFormatSpec, options: VadOptions = {}): Promise<VadStream> {
+    deps.requireReady();
+    rejectContainerFormat(format, 'vad.openStream', 'vad.detect');
+    await deps.backend.vadOpen(toNativeVadConfig(options, { sampleRate: STT_SAMPLE_RATE }));
+    return createVadStream(deps, format, options);
+  }
+
   function detectStream(
     input: AsyncIterable<AudioInput>,
     options: VadOptions = {}
   ): AsyncIterableIterator<VadEvent> {
     deps.requireReady();
-    return bridgeStream<VadEvent>(
-      async (sink) => {
-        await deps.backend.vadOpen(toNativeVadConfig(options, { sampleRate: STT_SAMPLE_RATE }));
-        const tracker = new SegmentTracker(options);
-        let atMs = 0;
-        try {
-          for await (const chunk of input) {
-            for (const frame of frames(toMono16k(chunk), VAD_FRAME_SAMPLES)) {
-              const frameMs = durationMsOf(frame.length);
-              const isSpeech = await deps.backend.vadProcess(new Float32Array(frame));
-              sink.push({ type: 'frame', isSpeech, probability: isSpeech ? 1 : 0, atMs });
-              for (const t of tracker.push(isSpeech, atMs, frameMs)) {
-                if ('ended' in t) sink.push({ type: 'speechEnded', atMs, segment: t.ended });
-                else if (t.started !== undefined) {
-                  sink.push({ type: 'speechStarted', atMs: t.started });
-                }
-              }
-              atMs += frameMs;
-            }
-          }
-          const open = tracker.finish();
-          if (open) sink.push({ type: 'speechEnded', atMs, segment: open });
-        } finally {
-          await deps.backend.vadClose();
+    return bridgeStream<VadEvent>(async (sink) => {
+      let stream: VadStream | null = null;
+      let format: AudioFormatSpec | null = null;
+      for await (const chunk of input) {
+        if (!format) {
+          format = chunk.format;
+          rejectContainerFormat(format, 'vad.detectStream', 'vad.detect');
+          stream = await openStream(format, options);
+        } else if (
+          chunk.format.encoding !== format.encoding ||
+          chunk.format.sampleRate !== format.sampleRate ||
+          (chunk.format.channels ?? 1) !== (format.channels ?? 1)
+        ) {
+          throw SDKException.validationFailed({
+            fieldPath: 'audio',
+            message: 'vad.detectStream requires every chunk to share one audio format.',
+          });
         }
-      },
-      () => deps.backend.vadClose()
-    );
+        stream!.pushFrame(frameOfAudioInput(chunk, format));
+      }
+      if (!stream) return;
+      stream.finish();
+      for await (const event of stream.events) sink.push(event);
+    });
   }
 
-  return { detect, detectStream };
+  return { detect, openStream, detectStream };
 }
 
 // ---------------------------------------------------------------------------
@@ -631,9 +969,12 @@ export interface VoiceSession {
   readonly events: AsyncIterableIterator<VoiceEvent>;
   /** Open the microphone and begin the turn loop (renderer only). */
   start(): Promise<void>;
-  /** Speak `text` now, outside the turn loop. */
-  say(text: string): Promise<void>;
-  /** Stop the agent mid-utterance. */
+  /** Speak `text` now, outside the turn loop, returning a handle to it. */
+  say(text: string): Promise<SpeechHandle>;
+  /**
+   * Stop the agent mid-utterance. Awaitable: resolves once the interrupted
+   * `say()`/turn-loop response and its playout have settled.
+   */
   interrupt(): Promise<void>;
   /** Close the microphone and release the pipeline. */
   close(): Promise<void>;
@@ -757,6 +1098,7 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
       let silenceMs = 0;
       let speechMs = 0;
       let turnInFlight = false;
+      let lastSpeechHandle: SpeechHandle | null = null;
 
       const runTurn = async (samples: Float32Array): Promise<void> => {
         turnInFlight = true;
@@ -764,7 +1106,7 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
           emit({ type: 'agentStateChanged', state: AgentState.THINKING });
           const transcription = await deps.stt.transcribe({
             samples,
-            format: { encoding: AudioFormat.PCM, sampleRate: STT_SAMPLE_RATE, channels: 1 },
+            format: { encoding: AudioEncoding.PCM_F32_LE, sampleRate: STT_SAMPLE_RATE, channels: 1 },
           });
           const heard = transcription.text.trim();
           emit({ type: 'userTranscribed', text: heard, isFinal: true });
@@ -783,7 +1125,9 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
           emit({ type: 'agentResponse', text: reply });
           if (reply) {
             emit({ type: 'agentStateChanged', state: AgentState.SPEAKING });
-            await deps.tts.speak(reply, config.tts.voice ? { voice: config.tts.voice } : {});
+            const handle = await deps.tts.speak(reply, config.tts.voice ? { voice: config.tts.voice } : {});
+            lastSpeechHandle = handle;
+            await handle.waitForPlayout();
           }
           emit({ type: 'agentStateChanged', state: AgentState.LISTENING });
         } catch (e) {
@@ -853,8 +1197,10 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
       };
 
       async function interrupt(): Promise<void> {
-        await deps.tts.stop();
-        await deps.llmCancel();
+        const settling: Promise<void>[] = [deps.llmCancel()];
+        if (lastSpeechHandle && !lastSpeechHandle.interrupted) settling.push(lastSpeechHandle.interrupt());
+        else settling.push(deps.tts.stop());
+        await Promise.all(settling);
       }
 
       const session: VoiceSession = {
@@ -880,11 +1226,17 @@ export function createVoiceNamespace(deps: VoiceDeps): VoiceNamespace {
           running = true;
           emit({ type: 'agentStateChanged', state: AgentState.LISTENING });
         },
-        async say(text: string): Promise<void> {
+        async say(text: string): Promise<SpeechHandle> {
           if (closed) throw SDKException.invalidState('voice session is closed');
           emit({ type: 'agentStateChanged', state: AgentState.SPEAKING });
-          await deps.tts.speak(text, config.tts.voice ? { voice: config.tts.voice } : {});
-          emit({ type: 'agentStateChanged', state: running ? AgentState.LISTENING : AgentState.THINKING });
+          const handle = await deps.tts.speak(text, config.tts.voice ? { voice: config.tts.voice } : {});
+          lastSpeechHandle = handle;
+          void handle.waitForPlayout().then(() => {
+            if (!closed) {
+              emit({ type: 'agentStateChanged', state: running ? AgentState.LISTENING : AgentState.THINKING });
+            }
+          });
+          return handle;
         },
         interrupt,
         async close(): Promise<void> {

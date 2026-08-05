@@ -165,7 +165,7 @@ def test_models_state_tracks_the_resident_model(live_sdk) -> None:
     state = ra.models.state()
     assert state.loaded[ModelCategory.LANGUAGE].id == LLM_ID
     assert state.storage_used_bytes > 0
-    ra.models.unload(ModelCategory.LANGUAGE)
+    ra.models.unload_all(ModelCategory.LANGUAGE)
     assert ModelCategory.LANGUAGE not in ra.models.state().loaded
 
 
@@ -264,7 +264,7 @@ requires_voice = pytest.mark.skipif(
 
 @requires_voice
 def test_one_voice_turn_composes_the_namespaces(live_sdk) -> None:
-    """``voice.create_session`` needs the unbound native agent, so a turn is composed here."""
+    """Fallback compose path: stt → llm → tts without the voice-agent handle."""
     transcript = ra.stt.transcribe(_silence(1.0), SttOptions(model=STT_ID)).text
     answer = ra.llm.generate(
         transcript or "Say hello.", LlmOptions(model=LLM_ID, max_output_tokens=32)
@@ -273,7 +273,13 @@ def test_one_voice_turn_composes_the_namespaces(live_sdk) -> None:
     assert audio.sample_rate > 0 and len(audio.data) > 0
 
 
-@requires_native
-def test_voice_sessions_are_reported_as_unavailable(live_sdk) -> None:
-    with pytest.raises(SDKException):
-        ra.voice.create_session(ModelRef(STT_ID), ModelRef(LLM_ID), ModelRef(TTS_ID))
+@requires_voice
+def test_voice_session_processes_a_file_pcm_turn(live_sdk) -> None:
+    """Native ``voice.create_session`` + ``process_turn`` over file PCM (no mic)."""
+    with ra.voice.create_session(
+        ModelRef(STT_ID), ModelRef(LLM_ID), ModelRef(TTS_ID)
+    ) as session:
+        result = session.process_turn(_silence(1.0))
+    assert isinstance(result.transcription, str)
+    assert isinstance(result.response, str)
+    assert result.audio.sample_rate >= 0

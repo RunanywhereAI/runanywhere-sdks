@@ -223,6 +223,20 @@ class SDKException(Exception):
         )
 
     @staticmethod
+    def unsupported_capability(name: str, reason: str) -> "SDKException":
+        """A public v4 operation that is honestly absent on this platform/build.
+
+        Thrown at preflight, before any work starts. The same ``name``/``reason``
+        pair also appears in :func:`runanywhere.capabilities`'s ``unavailable`` list,
+        so callers can discover the gap without triggering the exception first.
+        """
+        return SDKException.of(
+            ErrorCode.FEATURE_NOT_AVAILABLE,
+            f"{name} is not supported: {reason}",
+            category=ErrorCategory.CONFIGURATION,
+        )
+
+    @staticmethod
     def cancelled(message: str | None = None) -> "SDKException":
         return SDKException.of(
             ErrorCode.CANCELLED,

@@ -239,6 +239,20 @@ export class SDKException extends Error {
     }
   }
 
+  /**
+   * Normalize an arbitrary caught value into an `SDKException`. Used at the
+   * boundary of long-lived streams (`SttStream`, `VadStream`, generation
+   * streams) that surface in-flight failures as a typed `failed` event
+   * rather than throwing into the consumer.
+   */
+  static fromUnknown(error: unknown, fallbackMessage = 'Unknown error'): SDKException {
+    if (error instanceof SDKException) return error;
+    if (error instanceof Error) {
+      return SDKException.processingFailed(error.message, error.stack);
+    }
+    return SDKException.processingFailed(String(error ?? fallbackMessage));
+  }
+
   /** Whether the result code indicates success (code === 0). */
   static isSuccess(resultCode: number): boolean {
     return resultCode === 0;
@@ -468,6 +482,31 @@ export class SDKException extends Error {
       `Backend not available for: ${feature}`,
       details,
     );
+  }
+
+  /**
+   * A capability that is declared in the IDL but not packaged/executable on
+   * this platform build. Mirrors the v4 contract's `unsupportedCapability`
+   * preflight failure: `capabilities()` reports the same gap through
+   * `SDKCapabilities.unavailable`, so this exception and that snapshot never
+   * disagree about what a caller can reach.
+   */
+  static unsupportedCapability(feature: string, details?: string): SDKException {
+    const proto: ProtoSDKError = {
+      category: ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
+      code: ProtoErrorCode.ERROR_CODE_CAPABILITY_UNSUPPORTED,
+      cAbiCode: -ProtoErrorCode.ERROR_CODE_CAPABILITY_UNSUPPORTED,
+      message: `Capability not supported: ${feature}`,
+      nestedMessage: details,
+      context: undefined,
+      timestampMs: Date.now(),
+      severity: ProtoErrorSeverity.ERROR_SEVERITY_ERROR,
+      component: componentForCode(-ProtoErrorCode.ERROR_CODE_CAPABILITY_UNSUPPORTED),
+      retryable: false,
+      remediationHint: '',
+      correlationId: '',
+    };
+    return new SDKException(proto);
   }
 
   /**

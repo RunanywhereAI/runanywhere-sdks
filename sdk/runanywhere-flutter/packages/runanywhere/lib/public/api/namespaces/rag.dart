@@ -147,7 +147,7 @@ class RagSession {
   ///
   /// Throws [SDKException] when the session is closed, has no LLM, or
   /// generation fails.
-  Future<RagResult> query(String question, {LlmOptions? options}) async {
+  Future<RagResult> query(String question, {RagQueryOptions? options}) async {
     _requireLive();
     _requireGeneration();
     final result = await DartBridgeRAG.shared.queryAsync(
@@ -164,7 +164,7 @@ class RagSession {
   /// Throws [SDKException] into the consumer when the query fails.
   Stream<RagEvent> queryStream(
     String question, {
-    LlmOptions? options,
+    RagQueryOptions? options,
   }) async* {
     _requireLive();
     _requireGeneration();
@@ -226,18 +226,15 @@ class RagSession {
     }
   }
 
-  rag_pb.RAGQueryOptions _queryOptions(
-    String question,
-    LlmOptions? options, {
-    int? topK,
-  }) {
+  rag_pb.RAGQueryOptions _queryOptions(String question, RagQueryOptions? options) {
     final proto = rag_pb.RAGQueryOptions(
       question: question,
-      retrievalTopK: topK ?? _config.topK,
+      retrievalTopK: options?.retrieval?.topK ?? _config.topK,
     );
-    final threshold = _config.similarityThreshold;
+    final threshold = options?.retrieval?.similarityThreshold ?? _config.similarityThreshold;
     if (threshold != null) proto.similarityThreshold = threshold;
-    if (options != null) proto.generation = options.toProto();
+    final generation = options?.generation;
+    if (generation != null) proto.generation = generation.toProto();
     return proto;
   }
 

@@ -50,6 +50,27 @@ class AudioFormatSpec {
   final int channels;
 }
 
+/// One PCM frame pushed into a live stream opened by `stt.openStream` or
+/// `vad.openStream`. Samples must match the format the stream was opened
+/// with; live streams take raw PCM only.
+class AudioFrame {
+  /// Wrap one PCM frame.
+  const AudioFrame({
+    required this.samples,
+    required this.sampleCount,
+    this.timestampMs,
+  });
+
+  /// Raw PCM bytes in the stream's established encoding.
+  final Uint8List samples;
+
+  /// Sample count carried by [samples].
+  final int sampleCount;
+
+  /// Capture timestamp, when the caller tracks one.
+  final int? timestampMs;
+}
+
 /// Audio handed to `stt`, `vad`, and `diarization`.
 class AudioInput {
   const AudioInput._(this.bytes, this.format);

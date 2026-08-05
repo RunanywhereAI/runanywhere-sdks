@@ -16,6 +16,7 @@ import 'package:runanywhere/public/api/types/events.dart';
 import 'package:runanywhere/public/api/types/inputs.dart';
 import 'package:runanywhere/public/api/types/options.dart';
 import 'package:runanywhere/public/api/types/results.dart';
+import 'package:runanywhere/public/api/types/streams.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
 /// Speech-to-text transcription.
@@ -54,16 +55,158 @@ class SttApi {
     return Transcription.fromProto(result);
   }
 
+  /// Open a live transcription stream. The format is established once;
+  /// every frame pushed afterward carries raw PCM in that format.
+  ///
+  /// ```dart
+  /// final stream = await RunAnywhere.stt.openStream(
+  ///   const AudioFormatSpec(encoding: AudioEncoding.pcm16, sampleRate: 16000));
+  /// stream.events.listen(print);
+  /// ```
+  ///
+  /// Throws [SDKException] when [format] is a container encoding (live
+  /// streams take raw PCM only), no STT model is loaded, or the native
+  /// streaming session cannot start.
+  Future<SttStream> openStream(
+    AudioFormatSpec format, {
+    SttOptions? options,
+  }) async {
+    if (format.encoding == AudioEncoding.container) {
+      throw SDKException.invalidInput(
+        'stt.openStream needs raw PCM (pcm16/float32), not a container format',
+      );
+    }
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    await DartBridge.ensureServicesReady();
+    final current = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(category: _category),
+    );
+    if (!current.found) {
+      throw SDKException.componentNotReady('STT');
+    }
+    final modelId = current.modelId.isNotEmpty
+        ? current.modelId
+        : current.model.id;
+    final modelPath = current.resolvedPath.isNotEmpty
+        ? current.resolvedPath
+        : current.model.localPath;
+    if (modelId.isEmpty || modelPath.isEmpty) {
+      throw SDKException.modelLoadFailed(
+        modelId,
+        'Loaded STT model is missing a resolved path',
+      );
+    }
+    DartBridgeSTT.shared.loadModelForStreaming(
+      path: modelPath,
+      id: modelId,
+      name: current.model.name.isNotEmpty ? current.model.name : modelId,
+    );
+
+    final requestId = 'stt-${DateTime.now().microsecondsSinceEpoch}';
+    final frameController = StreamController<Uint8List>();
+    final eventController = StreamController<TranscriptionEvent>();
+    var announcedStarted = false;
+    var finished = false;
+    var closed = false;
+
+    void announceStarted() {
+      if (announcedStarted) return;
+      announcedStarted = true;
+      if (!eventController.isClosed) {
+        eventController.add(TranscriptionStarted(requestId));
+      }
+    }
+
+    Future<void> runSession() async {
+      var sawTerminal = false;
+      try {
+        final partials = DartBridgeSTT.shared.transcribeSessionStream(
+          frameController.stream,
+          (options ?? SttOptions()).toProto(),
+        );
+        await for (final partial in partials) {
+          if (eventController.isClosed) return;
+          if (partial.isFinal) {
+            sawTerminal = true;
+            eventController.add(
+              TranscriptionFinal(
+                partial.hasFinalOutput()
+                    ? Transcription.fromProto(partial.finalOutput)
+                    : Transcription(text: partial.text),
+              ),
+            );
+            eventController.add(const TranscriptionCompleted());
+            break;
+          }
+          eventController.add(TranscriptionPartial(partial.text));
+        }
+        // Never fabricate a settled transcript: a session that ends
+        // without a final result reports it honestly instead of
+        // synthesizing an empty `TranscriptionFinal`.
+        if (!sawTerminal && !eventController.isClosed) {
+          eventController.add(
+            TranscriptionFailed(
+              SDKException.processingFailed(
+                'Transcription stream ended before a final result',
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (!eventController.isClosed) {
+          eventController.add(
+            TranscriptionFailed(
+              e is SDKException ? e : SDKException.processingFailed('$e'),
+            ),
+          );
+        }
+      } finally {
+        unawaited(eventController.close());
+      }
+    }
+
+    unawaited(runSession());
+
+    return SttStream(
+      events: eventController.stream,
+      pushHandler: (frame) {
+        if (closed || finished) return;
+        announceStarted();
+        if (!frameController.isClosed) frameController.add(frame.samples);
+      },
+      flushHandler: () {
+        // Frames are fed to the native session as they arrive.
+      },
+      finishHandler: () {
+        if (finished || closed) return;
+        finished = true;
+        announceStarted();
+        unawaited(frameController.close());
+      },
+      closeHandler: () async {
+        if (closed) return;
+        closed = true;
+        unawaited(frameController.close());
+        await eventController.close();
+      },
+    );
+  }
+
   /// Transcribe a live [audio] chunk stream, emitting partials then a final.
   ///
-  /// Throws [SDKException] into the consumer when the session cannot start.
+  /// Forwards into [openStream] when every chunk shares one
+  /// [AudioFormatSpec]; a chunk with a different format ends the stream
+  /// with a thrown error.
+  @Deprecated('Use openStream(format, options) and push AudioFrame values')
   Stream<TranscriptionEvent> transcribeStream(
     Stream<AudioInput> audio, {
     SttOptions? options,
   }) {
     final controller = StreamController<TranscriptionEvent>();
     controller.onListen = () {
-      unawaited(_pump(controller, audio, options));
+      unawaited(_pumpDeprecated(controller, audio, options));
     };
     return controller.stream;
   }
@@ -78,70 +221,52 @@ class SttApi {
     return SttState.fromProto(DartBridgeSTT.shared.stateLifecycleProto());
   }
 
-  Future<void> _pump(
+  Future<void> _pumpDeprecated(
     StreamController<TranscriptionEvent> controller,
     Stream<AudioInput> audio,
     SttOptions? options,
   ) async {
+    SttStream? stream;
+    AudioFormatSpec? format;
     try {
-      if (!DartBridge.isInitialized) {
-        throw SDKException.notInitialized();
-      }
-      await DartBridge.ensureServicesReady();
-      final current = await RunAnywhereModelLifecycle.shared.current(
-        model_pb.CurrentModelRequest(category: _category),
-      );
-      if (!current.found) {
-        throw SDKException.componentNotReady('STT');
-      }
-      final modelId = current.modelId.isNotEmpty
-          ? current.modelId
-          : current.model.id;
-      final modelPath = current.resolvedPath.isNotEmpty
-          ? current.resolvedPath
-          : current.model.localPath;
-      if (modelId.isEmpty || modelPath.isEmpty) {
-        throw SDKException.modelLoadFailed(
-          modelId,
-          'Loaded STT model is missing a resolved path',
+      await for (final chunk in audio) {
+        format ??= chunk.format;
+        if (format.encoding == AudioEncoding.container) {
+          throw SDKException.invalidInput(
+            'stt.transcribeStream needs raw PCM chunks; decode container '
+            'audio before streaming it',
+          );
+        }
+        stream ??= await openStream(format, options: options);
+        if (chunk.format.encoding != format.encoding ||
+            chunk.format.sampleRate != format.sampleRate ||
+            chunk.format.channels != format.channels) {
+          throw SDKException.invalidInput(
+            'stt.transcribeStream requires every chunk to share one audio format',
+          );
+        }
+        stream.pushFrame(
+          AudioFrame(samples: chunk.bytes, sampleCount: chunk.bytes.length),
         );
       }
-      DartBridgeSTT.shared.loadModelForStreaming(
-        path: modelPath,
-        id: modelId,
-        name: current.model.name.isNotEmpty ? current.model.name : modelId,
-      );
-
-      controller.add(const TranscriptionStarted());
-      var sawFinal = false;
-      final partials = DartBridgeSTT.shared.transcribeSessionStream(
-        audio.map((chunk) => Uint8List.fromList(chunk.bytes)),
-        (options ?? SttOptions()).toProto(),
-      );
-      await for (final partial in partials) {
+      final opened = stream;
+      if (opened == null) return;
+      opened.finish();
+      await for (final event in opened.events) {
         if (controller.isClosed) break;
-        if (partial.isFinal) {
-          sawFinal = true;
-          controller.add(
-            TranscriptionFinal(
-              partial.hasFinalOutput()
-                  ? Transcription.fromProto(partial.finalOutput)
-                  : Transcription(text: partial.text),
-            ),
-          );
-        } else {
-          controller.add(TranscriptionPartial(partial.text));
-        }
-      }
-      if (!sawFinal && !controller.isClosed) {
-        controller.add(const TranscriptionFinal(Transcription(text: '')));
+        controller.add(event);
       }
     } catch (error, stack) {
-      controller.addError(
-        error is SDKException ? error : SDKException.processingFailed('$error'),
-        stack,
-      );
+      if (!controller.isClosed) {
+        controller.addError(
+          error is SDKException
+              ? error
+              : SDKException.processingFailed('$error'),
+          stack,
+        );
+      }
     } finally {
+      unawaited(stream?.close());
       await controller.close();
     }
   }

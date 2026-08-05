@@ -1,0 +1,238 @@
+// RunAnywhere IDL — v4 public-API wire additions.
+//
+// New messages for LoadedModel placement, live audio stream lifecycle,
+// SpeechHandle, SDK capabilities, structured-output enforcement, and
+// correlated public generation/transcription/download events.
+//
+// Existing telemetry SDKEvent.GenerationEvent remains for breadcrumbs.
+// Public stream consumers project these Public* messages (or idiomatic
+// DTO equivalents) instead of fabricating terminals.
+
+syntax = "proto3";
+
+package runanywhere.v1;
+
+import "errors.proto";
+import "model_types.proto";
+import "token_usage.proto";
+import "tool_calling.proto";
+
+option cc_enable_arenas          = true;
+option java_multiple_files       = true;
+option java_package              = "ai.runanywhere.proto.v1";
+option java_outer_classname      = "PublicApiV4Proto";
+option objc_class_prefix         = "RAV1";
+option csharp_namespace          = "Runanywhere.V1";
+option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
+
+// ---------------------------------------------------------------------------
+// Accelerator / backend placement (LiteRT/ExecuTorch-aligned load options)
+// ---------------------------------------------------------------------------
+
+enum AcceleratorPolicy {
+    ACCELERATOR_POLICY_UNSPECIFIED = 0;
+    ACCELERATOR_POLICY_AUTO        = 1;
+    ACCELERATOR_POLICY_CPU         = 2;
+    ACCELERATOR_POLICY_GPU         = 3;
+    ACCELERATOR_POLICY_NPU         = 4;
+}
+
+message BackendPreference {
+    InferenceFramework backend = 1;
+    bool required              = 2;
+}
+
+message DevicePlacement {
+    string device_id   = 1;
+    string device_name = 2;
+    string device_kind = 3; // cpu | gpu | npu | metal | webgpu | unknown
+}
+
+// Resident ownership handle returned by models.load.
+message LoadedModelInfo {
+    string             model_id            = 1;
+    ModelCategory      category            = 2;
+    optional InferenceFramework requested_backend = 3;
+    InferenceFramework actual_backend      = 4;
+    DevicePlacement    actual_device       = 5;
+    optional string    runtime_version     = 6;
+    optional string    abi_version         = 7;
+    optional string    fallback_reason     = 8;
+    string             resolved_path       = 9;
+    int64              loaded_at_unix_ms   = 10;
+    bool               already_loaded      = 11;
+    repeated string    warnings            = 12;
+    optional SDKError  error               = 13;
+}
+
+// ---------------------------------------------------------------------------
+// Live audio (LiveKit-aligned frame stream)
+// ---------------------------------------------------------------------------
+
+message AudioFormatSpec {
+    AudioEncoding encoding     = 1;
+    int32         sample_rate  = 2;
+    int32         channels     = 3;
+    optional AudioFormat container = 4; // when encoding = CONTAINER
+}
+
+message AudioFrame {
+    bytes  samples       = 1;
+    int32  sample_count  = 2;
+    optional int64 timestamp_ms = 3;
+}
+
+message AudioStreamOpenRequest {
+    string          request_id = 1;
+    AudioFormatSpec format     = 2;
+    map<string, string> metadata = 3;
+}
+
+message SpeechHandleState {
+    string id                 = 1;
+    bool   interrupted        = 2;
+    bool   done               = 3;
+    optional SDKError error   = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Structured-output enforcement (orthogonal to StructuredOutputMode schema kind)
+// ---------------------------------------------------------------------------
+
+enum StructuredEnforcementMode {
+    STRUCTURED_ENFORCEMENT_MODE_UNSPECIFIED     = 0;
+    STRUCTURED_ENFORCEMENT_MODE_CONSTRAINED     = 1; // engine-constrained decoding
+    STRUCTURED_ENFORCEMENT_MODE_VALIDATION_ONLY = 2; // generate then validate
+    STRUCTURED_ENFORCEMENT_MODE_REPAIR          = 3; // validate + repair retries
+}
+
+// ---------------------------------------------------------------------------
+// Capabilities discovery
+// ---------------------------------------------------------------------------
+
+message UnavailableCapability {
+    string name   = 1;
+    string reason = 2;
+}
+
+message ToolCapabilities {
+    bool registry     = 1;
+    bool parallel     = 2;
+    bool cancellation = 3;
+}
+
+message RagCapabilities {
+    bool multi_session = 1;
+    bool persistent    = 2;
+    bool document_listing = 3;
+    bool document_removal = 4;
+}
+
+message StreamingCapabilities {
+    bool llm_token_stream   = 1;
+    bool stt_live_frames    = 2;
+    bool tts_audio_chunks   = 3;
+    bool vad_live_frames    = 4;
+    bool voice_session      = 5;
+}
+
+message SDKCapabilities {
+    repeated string modalities              = 1;
+    repeated InferenceFramework backends    = 2;
+    repeated AudioFormat audio_formats      = 3;
+    StreamingCapabilities streaming         = 4;
+    ToolCapabilities tools                  = 5;
+    RagCapabilities rag                     = 6;
+    repeated UnavailableCapability unavailable = 7;
+    map<string, string> metadata            = 8;
+}
+
+// ---------------------------------------------------------------------------
+// Correlated public generation events
+// ---------------------------------------------------------------------------
+
+enum PublicGenerationEventKind {
+    PUBLIC_GENERATION_EVENT_KIND_UNSPECIFIED          = 0;
+    PUBLIC_GENERATION_EVENT_KIND_STARTED              = 1;
+    PUBLIC_GENERATION_EVENT_KIND_OUTPUT_ITEM_ADDED    = 2;
+    PUBLIC_GENERATION_EVENT_KIND_TEXT_DELTA           = 3;
+    PUBLIC_GENERATION_EVENT_KIND_REASONING_DELTA      = 4;
+    PUBLIC_GENERATION_EVENT_KIND_TOOL_CALL_ADDED      = 5;
+    PUBLIC_GENERATION_EVENT_KIND_TOOL_ARGUMENTS_DELTA = 6;
+    PUBLIC_GENERATION_EVENT_KIND_TOOL_ARGUMENTS_DONE  = 7;
+    PUBLIC_GENERATION_EVENT_KIND_USAGE                = 8;
+    PUBLIC_GENERATION_EVENT_KIND_COMPLETED            = 9;
+    PUBLIC_GENERATION_EVENT_KIND_FAILED               = 10;
+    PUBLIC_GENERATION_EVENT_KIND_CANCELLED            = 11;
+}
+
+message PublicGenerationEvent {
+    PublicGenerationEventKind kind = 1;
+    string request_id              = 2;
+    int64  sequence                = 3;
+    optional string item_id        = 4;
+    optional int32  index          = 5;
+    optional string text           = 6;
+    optional ToolCall tool_call    = 7;
+    optional string arguments_json = 8;
+    optional string arguments_delta = 9;
+    optional TokenUsage usage      = 10;
+    optional string partial_text   = 11;
+    optional string result_json    = 12; // GenerationResult JSON or structured payload
+    optional SDKError error        = 13;
+}
+
+enum PublicDownloadEventKind {
+    PUBLIC_DOWNLOAD_EVENT_KIND_UNSPECIFIED = 0;
+    PUBLIC_DOWNLOAD_EVENT_KIND_STARTED     = 1;
+    PUBLIC_DOWNLOAD_EVENT_KIND_PROGRESS    = 2;
+    PUBLIC_DOWNLOAD_EVENT_KIND_VERIFYING   = 3;
+    PUBLIC_DOWNLOAD_EVENT_KIND_EXTRACTING  = 4;
+    PUBLIC_DOWNLOAD_EVENT_KIND_COMPLETED   = 5;
+    PUBLIC_DOWNLOAD_EVENT_KIND_FAILED      = 6;
+    PUBLIC_DOWNLOAD_EVENT_KIND_CANCELLED   = 7;
+}
+
+message PublicDownloadEvent {
+    PublicDownloadEventKind kind = 1;
+    string operation_id          = 2;
+    int64  sequence              = 3;
+    int64  bytes_done            = 4;
+    int64  bytes_total           = 5;
+    optional string file         = 6;
+    optional float  percent      = 7;
+    optional string model_id     = 8;
+    optional SDKError error      = 9;
+}
+
+enum PublicTranscriptionEventKind {
+    PUBLIC_TRANSCRIPTION_EVENT_KIND_UNSPECIFIED    = 0;
+    PUBLIC_TRANSCRIPTION_EVENT_KIND_STARTED        = 1;
+    PUBLIC_TRANSCRIPTION_EVENT_KIND_SPEECH_STARTED = 2;
+    PUBLIC_TRANSCRIPTION_EVENT_KIND_PARTIAL        = 3;
+    PUBLIC_TRANSCRIPTION_EVENT_KIND_TRANSCRIPT_FINAL = 4;
+    PUBLIC_TRANSCRIPTION_EVENT_KIND_SPEECH_ENDED   = 5;
+    PUBLIC_TRANSCRIPTION_EVENT_KIND_USAGE          = 6;
+    PUBLIC_TRANSCRIPTION_EVENT_KIND_COMPLETED      = 7;
+    PUBLIC_TRANSCRIPTION_EVENT_KIND_FAILED         = 8;
+    PUBLIC_TRANSCRIPTION_EVENT_KIND_CANCELLED      = 9;
+}
+
+message TranscriptAlternative {
+    string text = 1;
+    optional float confidence = 2;
+}
+
+message PublicTranscriptionEvent {
+    PublicTranscriptionEventKind kind = 1;
+    string request_id                 = 2;
+    int64  sequence                   = 3;
+    optional string segment_id        = 4;
+    optional int32  revision          = 5;
+    repeated TranscriptAlternative alternatives = 6;
+    optional string final_text        = 7;
+    optional int64  timestamp_ms      = 8;
+    optional TokenUsage usage         = 9;
+    optional SDKError error           = 10;
+}

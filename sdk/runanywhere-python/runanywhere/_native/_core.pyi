@@ -82,6 +82,69 @@ def load_vad_model(
 ) -> None: ...
 def unload_vad(handle: int) -> None: ...
 
+# ---- LoRA (LlamaCPP) -------------------------------------------------------------------
+def lora_apply(handle: int, adapter_path: str, scale: float | None = ...) -> None: ...
+def lora_remove(handle: int, adapter_path: str) -> None: ...
+def lora_remove_all(handle: int) -> None: ...
+
+# ---- Diarization (ONNX Sortformer) -----------------------------------------------------
+def load_diarization_model(model_path: str, id: str | None = ...) -> int: ...
+def diarize(
+    handle: int,
+    samples: npt.NDArray[np.float32],
+    sample_rate_hz: int | None = ...,
+    threshold: float | None = ...,
+    minimum_duration_ms: int | None = ...,
+    merge_gap_ms: int | None = ...,
+) -> dict[str, Any]: ...
+def unload_diarization_model(handle: int) -> None: ...
+
+# ---- Segmentation (ONNX) ---------------------------------------------------------------
+def load_segmentation_model(model_path: str, id: str | None = ...) -> int: ...
+def segment(
+    handle: int,
+    data: Union[bytes, bytearray, memoryview, npt.NDArray],
+    width: int,
+    height: int,
+    pixel_format: int | None = ...,
+    stride_bytes: int | None = ...,
+    include_diagnostic_rgba: bool | None = ...,
+) -> dict[str, Any]: ...
+def unload_segmentation_model(handle: int) -> None: ...
+
+# ---- Voice agent (file-PCM turn; STT→LLM→TTS) ------------------------------------------
+def create_voice_agent() -> int: ...
+def initialize_voice_agent(
+    handle: int,
+    stt_path: str,
+    llm_path: str,
+    tts_path: str,
+    stt_id: str | None = ...,
+    llm_id: str | None = ...,
+    tts_id: str | None = ...,
+    stt_name: str | None = ...,
+    llm_name: str | None = ...,
+    tts_name: str | None = ...,
+) -> None: ...
+def process_voice_turn(
+    handle: int, pcm16: Union[bytes, bytearray, memoryview, npt.NDArray]
+) -> dict[str, Any]: ...
+def destroy_voice_agent(handle: int) -> None: ...
+
+# ---- Diffusion (present only when built with RAC_HAVE_BACKEND_COREML) ------------------
+def load_diffusion_model(model_path: str, id: str | None = ...) -> int: ...
+def generate_image(
+    handle: int,
+    prompt: str,
+    negative_prompt: str | None = ...,
+    width: int | None = ...,
+    height: int | None = ...,
+    steps: int | None = ...,
+    guidance_scale: float | None = ...,
+    seed: int | None = ...,
+) -> dict[str, Any]: ...
+def unload_diffusion_model(handle: int) -> None: ...
+
 # ---- Model registry --------------------------------------------------------------------
 # Register a model (id -> local_path + framework/category ints) into the global model
 # registry so the RAG session ABI can resolve embedding_model_id / llm_model_id to paths.

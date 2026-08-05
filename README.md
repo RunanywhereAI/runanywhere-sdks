@@ -34,21 +34,23 @@
 
 ## What you can build
 
-Every capability below runs fully on-device, behind one API that is identical on all eight platforms:
+Every capability below runs fully on-device behind one semantic API across the eight SDKs.
+Call `RunAnywhere.capabilities()` (v4) to discover what the current package and device can
+actually execute — enum presence alone does not mean an engine is installed.
 
 - **LLM chat**: Llama, Qwen, Gemma, Phi, LFM, SmolLM, DeepSeek, and more, with token streaming, multi-turn history, and LoRA adapters
-- **Structured output**: JSON constrained by a grammar compiled from your schema, so the result always parses
-- **Tool calling**: grammar-constrained tool calls, parallel calls, and an agent loop
+- **Structured output**: schema-validated JSON; constrained decoding where the engine supports it (`generateStructured` + enforcement mode)
+- **Tool calling**: local function tools with stable call IDs and an agent loop (parallel calls when the engine/capability reports support)
 - **Vision (VLM)**: image understanding, live camera description, and photo Q&A
-- **Computer-use agent (CUA)**: drive a screen with Fara1.5 — the SDK renders the agent prompt and parses each action back with coordinates already scaled to your viewport
-- **Speech-to-Text**: Whisper and Moonshine transcription, streaming and batch
+- **Computer-use action parser (CUA)**: parse Fara1.5-style action strings into viewport-scaled coordinates — not a full autonomous agent framework
+- **Speech-to-Text**: Whisper and Moonshine transcription, batch and live frame streams
 - **Text-to-Speech**: neural voices from Piper, Kokoro, Kitten, MeloTTS, and Magpie
-- **Voice agents**: wake word, VAD, STT, LLM, and TTS in one pipeline, with sentence-streaming playback
+- **Voice agents**: VAD, STT, LLM, and TTS in one pipeline with `SpeechHandle`-scoped playback (wake-word detection is not implemented)
 - **Embeddings**: L2-normalized vectors for search and retrieval
 - **RAG**: local document ingestion and retrieval-augmented answers, with streaming
-- **Image generation**: Stable Diffusion on Core ML, plus inpainting on the Hexagon NPU
+- **Image generation**: Stable Diffusion on Core ML, plus inpainting on the Hexagon NPU (platform/backend gated)
 
-Your code never picks hardware. Engines register what they can run, and the highest-priority engine that fits the device wins: **QHexRT** on the Snapdragon Hexagon NPU, **MLX** on Apple silicon, **llama.cpp** everywhere (Metal on Apple, CUDA on NVIDIA as an opt-in build, WebGPU in the browser), **sherpa + ONNX** for speech and embeddings, and **Core ML** for diffusion, dispatching across CPU, GPU, and the Apple Neural Engine.
+Your code rarely picks hardware. Engines register what they can run, and the highest-priority engine that fits the device wins: **QHexRT** on the Snapdragon Hexagon NPU, **MLX** on Apple silicon, **llama.cpp** everywhere (Metal on Apple, CUDA on NVIDIA as an opt-in build, WebGPU in the browser), **sherpa + ONNX** for speech and embeddings, and **Core ML** for diffusion. LiteRT and ExecuTorch are reserved framework values only — they are not integrated runtimes yet.
 
 ---
 
@@ -435,14 +437,20 @@ All SDKs ship on one version line, currently **0.20.11**, from a single C++ core
 | Speech-to-Text | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Text-to-Speech | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Voice activity detection | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Voice agent pipeline | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| Wake word | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Voice agent pipeline | Yes | Yes | Yes | Yes | Yes | Yes | Stub | Yes |
+| Wake word | No | No | No | No | No | No | No | No |
 | Embeddings | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
-| RAG (with streaming) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | n/a |
+| RAG (with streaming) | Yes | Yes | Yes | Yes | Yes* | Yes | Yes | n/a |
 | Structured output (JSON) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | n/a |
 | Tool calling | Yes | Yes | Yes | Yes | Yes | Yes | Yes | n/a |
-| Image generation (diffusion) | Yes | Yes | Yes | Yes | n/a | n/a | n/a | Yes |
-| LoRA adapters | Yes | Yes | Yes | Yes | Yes | n/a | n/a | Yes |
+| Image generation (diffusion) | Yes | Yes | Yes | Yes | n/a | n/a | Stub | Yes |
+| LoRA adapters | Yes | Yes | Yes | Yes | Yes | Partial | Stub | Yes |
+| Diarization (standalone) | Yes | Yes | Gated | Yes | Yes | n/a | Stub | n/a |
+| Segmentation | Yes | Yes | Gated | Yes | Yes | n/a | Stub | n/a |
+| `capabilities()` discovery | Yes | Yes | Yes | Yes | Yes | Partial | Yes | n/a |
+
+\* Web RAG may be limited to one session per process — check `capabilities().rag.multiSession`.
+`Stub` / `Gated` / `Partial` mean the verb is absent, preflight-fails, or only partially wired; call `capabilities()` for the installed build.
 | Hexagon NPU (QHexRT) | n/a | Yes | Yes | Yes | n/a | n/a | n/a | n/a |
 | MLX (Apple silicon) | Yes | n/a | Yes | Yes | n/a | n/a | n/a | Yes |
 | OpenAI-compatible server | n/a | n/a | n/a | n/a | n/a | n/a | Yes | Yes |

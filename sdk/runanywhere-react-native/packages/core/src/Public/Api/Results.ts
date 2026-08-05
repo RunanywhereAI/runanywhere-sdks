@@ -44,6 +44,7 @@ import type {
   RagStats,
   RankedResult,
   SegmentationResult,
+  StructuredOutputMode,
   StructuredResult,
   SttState,
   Transcription,
@@ -190,7 +191,8 @@ export function synthesizeStreamResult(
 /** Project a structured-output result onto the public structured result. */
 export function toStructuredResult<T>(
   result: StructuredOutputResult,
-  metrics: GenerationResult
+  metrics: GenerationResult,
+  mode: StructuredOutputMode = 'validationOnly'
 ): StructuredResult<T> {
   throwIfFailed(result);
   const raw = result.rawText ?? '';
@@ -211,6 +213,7 @@ export function toStructuredResult<T>(
     value,
     raw: raw.length > 0 ? raw : json,
     valid: parsed && (result.validation?.isValid ?? true),
+    mode,
   };
 }
 

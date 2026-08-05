@@ -1,5 +1,5 @@
 /**
- * Option types of the v3 public API.
+ * Option types of the v4 public API.
  *
  * Every field is optional. Defaults are read from the generated
  * `@runanywhere/proto-ts/convenience/*` helpers, which are produced from the
@@ -19,6 +19,36 @@ import { diarizationOptionsDefaults } from '@runanywhere/proto-ts/convenience/di
 import { rAGConfigurationDefaults } from '@runanywhere/proto-ts/convenience/rag_convenience';
 import { storageDefaults } from '@runanywhere/proto-ts/defaults/pool';
 import type { ImageInput } from './Inputs.js';
+
+/**
+ * Execution backend a model can run on. Mirrors the cross-SDK `Backend`
+ * enum; Web only ever resolves to `onnx`, `llamaCpp`, `builtIn`, or
+ * `unknown` since it has no native ML runtime access.
+ */
+export type Backend =
+  | 'onnx'
+  | 'llamaCpp'
+  | 'mlx'
+  | 'coreml'
+  | 'foundationModels'
+  | 'sherpa'
+  | 'qhexrt'
+  | 'systemTts'
+  | 'builtIn'
+  | 'unknown';
+
+/** Hardware class `LoadOptions.accelerator` requests. */
+export type AcceleratorPolicy = 'auto' | 'cpu' | 'gpu' | 'npu';
+
+/** One ranked backend choice for `LoadOptions.backendPreferences`. */
+export interface BackendPreference {
+  backend: Backend;
+  /** `true` fails the load instead of falling back past this entry. */
+  required?: boolean;
+}
+
+/** Enforcement level `llm.generateStructured` applies to the schema. */
+export type StructuredOutputMode = 'constrained' | 'validationOnly' | 'repair';
 
 /** Whether the model may think before answering, and whether we surface it. */
 export interface ReasoningOptions {
@@ -51,7 +81,12 @@ export type ToolChoice =
   | { kind: 'required' }
   | { kind: 'forced'; name: string };
 
-/** Generation knobs shared by `llm`, `vlm`, and RAG answer generation. */
+/**
+ * Generation knobs shared by `llm`, `vlm`, and RAG answer generation.
+ *
+ * Carries no structured-output schema: `llm.generateStructured` owns schema
+ * configuration directly through its own `schema`/`mode` parameters.
+ */
 export interface LlmOptions {
   /** Model slug; an absent model auto-loads, downloading if needed. */
   model?: string;
@@ -67,7 +102,6 @@ export interface LlmOptions {
   stopSequences?: string[];
   systemPrompt?: string;
   reasoning?: ReasoningOptions;
-  structuredOutput?: StructuredOutput;
   /** Empty uses the tool registry. */
   tools?: ToolDefinition[];
   toolChoice?: ToolChoice;
@@ -167,15 +201,32 @@ export interface RagConfig {
   persistPath?: string;
 }
 
+/** Per-query retrieval overrides of `RagSession.query`/`queryStream`. */
+export interface RagRetrievalOptions {
+  topK?: number;
+  similarityThreshold?: number;
+}
+
+/** Per-query knobs of `RagSession.query`/`queryStream`. */
+export interface RagQueryOptions {
+  retrieval?: RagRetrievalOptions;
+  generation?: LlmOptions;
+}
+
 /** Placement knobs applied when a model is loaded. */
 export interface LoadOptions {
-  /** Engine pin, honored at load time only. */
-  framework?: InferenceFramework;
+  /** Ranked backend choices; the first entry the platform can honor wins. */
+  backendPreferences?: BackendPreference[];
+  /** Hardware class to run on. `'npu'` fails preflight — unsupported on Web. */
+  accelerator?: AcceleratorPolicy;
   contextLength?: number;
   threads?: number;
-  useGpu?: boolean;
   /** Reload even when the model is already resident. */
   forceReload?: boolean;
+  /** @deprecated Use `backendPreferences`; kept as a thin adapter for one release. */
+  framework?: InferenceFramework;
+  /** @deprecated Use `accelerator`; kept as a thin adapter for one release. */
+  useGpu?: boolean;
 }
 
 /** Narrow `models.list` to a subset of the catalog. */

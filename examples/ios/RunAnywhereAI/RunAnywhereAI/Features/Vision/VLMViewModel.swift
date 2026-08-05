@@ -180,18 +180,18 @@ final class VLMViewModel: NSObject {
             var isFirstToken = true
             for try await event in stream {
                 switch event {
-                case .token(let text, let kind):
-                    guard kind == .text, !text.isEmpty else { continue }
+                case .textDelta(_, _, _, _, let text):
+                    guard !text.isEmpty else { continue }
                     if isFirstToken {
                         isFirstToken = false
                         if clearOnFirstToken { self.currentDescription = "" }
                     }
                     self.currentDescription += text
-                case .completed(let result):
+                case .completed(_, let result):
                     self.logger.info(
                         "VLM streaming completed: \(result.outputTokens) tokens, \(result.tokensPerSecond) tok/s"
                     )
-                case .started, .toolCall:
+                default:
                     break
                 }
             }

@@ -85,15 +85,21 @@ public final class VoiceSession: @unchecked Sendable {
     /// Speak `text` now, outside the turn loop.
     ///
     /// - Throws: `SDKException` when no TTS voice is loaded or synthesis fails.
-    public func say(_ text: String) async throws {
-        _ = try await RunAnywhere.speakProto(text: text, options: ttsOptions)
+    @discardableResult
+    public func say(_ text: String) async throws -> SpeechHandle {
+        try await RunAnywhere.speakAndTrack(text: text, options: ttsOptions)
     }
 
-    /// Stop the agent mid-utterance.
-    public func interrupt() {
+    /// Stop the agent mid-utterance and await settlement of playback and any
+    /// in-flight response before returning.
+    public func interrupt() async {
         let driver = state.withLock { $0.driver }
         driver?.stopPlayback()
-        Task { await RunAnywhere.stopSpeech() }
+        if let handle = RunAnywhere.activeSpeechHandleSnapshot() {
+            await handle.interrupt()
+        } else {
+            await RunAnywhere.stopSpeech()
+        }
     }
 
     /// Stop capture, tear down the pipeline, and release native resources.

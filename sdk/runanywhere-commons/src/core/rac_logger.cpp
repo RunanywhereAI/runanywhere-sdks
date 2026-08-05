@@ -147,8 +147,11 @@ void log_to_stderr(rac_log_level_t level, const char* category, const char* mess
                    const rac_log_metadata_t* metadata) {
     const char* const level_str = level_to_string(level);
 
-    // Determine output stream
-    FILE* const stream = (level >= RAC_LOG_ERROR) ? stderr : stdout;
+    // Diagnostics always go to stderr; stdout is reserved for command results
+    // (generated text / JSON). Emitting non-error logs to stdout corrupts the
+    // CLI's machine-readable output and leaks pre-init backend registration
+    // logs into results.
+    FILE* const stream = stderr;
 
     // Print base message
     fprintf(stream, "[RAC][%s][%s] %s", level_str, category, message);

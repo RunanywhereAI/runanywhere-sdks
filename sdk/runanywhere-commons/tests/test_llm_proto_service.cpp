@@ -113,28 +113,40 @@ rac_result_t mock_generate_stream(void* impl, const char* prompt, const rac_llm_
     auto* mock = static_cast<MockLlm*>(impl);
     if (std::strstr(prompt, "hidden-thinking-stream") != nullptr) {
         for (const char* token : {"<think>alpha", "beta", "gamma"}) {
-            if (callback(token, user_data) != RAC_TRUE) {
+            if (callback(token, RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
                 return RAC_ERROR_STREAM_CANCELLED;
             }
         }
         return RAC_SUCCESS;
     }
     if (std::strstr(prompt, "thinking-stream") != nullptr) {
-        if (callback("<think>plan</think>done", user_data) != RAC_TRUE) {
+        if (callback("<think>plan</think>done", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
             return RAC_ERROR_STREAM_CANCELLED;
         }
         return RAC_SUCCESS;
     }
     if (std::strstr(prompt, "structured-stream-json") != nullptr) {
-        if (callback("{\"ok\"", user_data) != RAC_TRUE) {
+        if (callback("{\"ok\"", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
             return RAC_ERROR_STREAM_CANCELLED;
         }
-        if (callback(":true}", user_data) != RAC_TRUE) {
+        if (callback(":true}", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
             return RAC_ERROR_STREAM_CANCELLED;
         }
         return RAC_SUCCESS;
     }
-    if (callback("alpha", user_data) != RAC_TRUE) {
+    // Optional branch that emits a native final+"stop" for tests that need a
+    // genuine producer terminal signal. Default path intentionally does NOT
+    // emit a final so finish_reason stays "unknown" with no native signal.
+    if (std::strstr(prompt, "native-final-stop") != nullptr) {
+        if (callback("alpha", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
+            return RAC_ERROR_STREAM_CANCELLED;
+        }
+        if (callback("", RAC_TRUE, "stop", user_data) != RAC_TRUE) {
+            return RAC_ERROR_STREAM_CANCELLED;
+        }
+        return RAC_SUCCESS;
+    }
+    if (callback("alpha", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
         return RAC_ERROR_STREAM_CANCELLED;
     }
 
@@ -150,7 +162,7 @@ rac_result_t mock_generate_stream(void* impl, const char* prompt, const rac_llm_
         return RAC_ERROR_CANCELLED;
     }
 
-    if (callback("beta", user_data) != RAC_TRUE) {
+    if (callback("beta", RAC_FALSE, nullptr, user_data) != RAC_TRUE) {
         return RAC_ERROR_STREAM_CANCELLED;
     }
     return RAC_SUCCESS;
@@ -388,7 +400,27 @@ int test_stream_terminal_once(rac_model_registry_handle_t registry) {
     CHECK(capture.events.size() == 3, "stream emits two tokens plus terminal");
     std::string finish;
     CHECK(terminal_count(capture, &finish) == 1, "stream emits exactly one terminal event");
-    CHECK(finish == "stop", "stream terminal finish reason is stop");
+    // The mock backend implements rac_llm_service_ops_t::generate_stream
+    // directly (it isn't the real llamacpp/QHexRT adapter), so it never
+    // reports the commons-internal "saw a native is_final" side channel
+    // (rac_llm_stream_report_final_signal(), see rac_llm_service.h).
+    // finish_reason is honestly "unknown" rather than a fabricated "stop"
+    // when there's zero evidence the backend actually finished cleanly.
+    CHECK(finish == "unknown", "stream terminal finish reason is unknown with no native signal");
+    cleanup_environment();
+    return 0;
+}
+
+int test_stream_producer_finish_reason_stop(rac_model_registry_handle_t registry) {
+    CHECK(load_mock_model(registry), "mock lifecycle LLM loads for producer-final stream");
+    std::vector<uint8_t> bytes = generate_request_bytes("native-final-stop please");
+    CapturedStream capture;
+    const rac_result_t rc =
+        rac_llm_generate_stream_proto(bytes.data(), bytes.size(), stream_callback, &capture);
+    CHECK(rc == RAC_SUCCESS, "producer-final stream generation succeeds");
+    std::string finish;
+    CHECK(terminal_count(capture, &finish) == 1, "producer-final stream emits one terminal");
+    CHECK(finish == "stop", "producer finish_reason from widened callback is stop");
     cleanup_environment();
     return 0;
 }
@@ -625,6 +657,7 @@ int main() {
         test_mocked_generation(registry);
         test_empty_generation_skips_structured_validation(registry);
         test_stream_terminal_once(registry);
+        test_stream_producer_finish_reason_stop(registry);
         test_stream_thinking_envelope(registry);
         test_hidden_thinking_counts_toward_length(registry);
         test_structured_generate_proto(registry);

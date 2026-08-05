@@ -168,6 +168,55 @@ public struct AudioInput: Sendable {
             )
         }
     }
+
+    // MARK: Live-stream adapters (deprecated `transcribeStream`/`detectStream`)
+
+    /// The `AudioFormatSpec` this batch chunk would establish for a live
+    /// stream. Only raw PCM inputs can seed a live stream.
+    func liveFormatSpec() throws -> AudioFormatSpec {
+        switch encoding {
+        case .pcm16:
+            return AudioFormatSpec(encoding: .pcmS16Le, sampleRate: sampleRate, channels: channels)
+        case .float32:
+            return AudioFormatSpec(encoding: .pcmF32Le, sampleRate: sampleRate, channels: channels)
+        case .wav, .file:
+            throw SDKException(
+                code: .invalidInput,
+                message: "Live streams need raw PCM; use AudioInput.pcm16 or AudioInput.float32",
+                category: .validation
+            )
+        }
+    }
+
+    /// Whether this chunk shares `format`'s encoding, sample rate, and channels.
+    func matchesLiveFormat(_ format: AudioFormatSpec) -> Bool {
+        guard let mine = try? liveFormatSpec() else { return false }
+        return mine.encoding == format.encoding
+            && mine.sampleRate == format.sampleRate
+            && mine.channels == format.channels
+    }
+
+    /// Wrap this chunk's bytes as one `AudioFrame`, sized in samples for the
+    /// PCM layout `encoding` implies.
+    func toLiveFrame() -> AudioFrame {
+        let bytesPerSample = encoding == .float32 ? 4 : 2
+        return AudioFrame(samples: data, sampleCount: data.count / bytesPerSample)
+    }
+}
+
+/// Reference-type wrapper around an `AsyncStream<AudioInput>` iterator so the
+/// deprecated `transcribeStream`/`detectStream` adapters can advance it from
+/// inside a `Task` closure without capturing a non-`Sendable` mutable `var`.
+final class AudioInputIteratorBox: @unchecked Sendable {
+    private var iterator: AsyncStream<AudioInput>.AsyncIterator
+
+    init(_ stream: AsyncStream<AudioInput>) {
+        self.iterator = stream.makeAsyncIterator()
+    }
+
+    func next() async -> AudioInput? {
+        await iterator.next()
+    }
 }
 
 // MARK: - ImageInput

@@ -9,22 +9,38 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from typing import Any, AsyncIterator, Callable, Iterator, List
+from typing import Any, AsyncIterator, Callable, Dict, Iterator, List, Optional
 
 import numpy as np
 
 from ._streaming import aiter_tokens, iter_tokens
 from .errors import SDKException
-from .results import Synthesis
+from .results import AppliedAdapter, Synthesis
 
 __all__ = [
+    "DiarizationModel",
+    "DiffusionModel",
     "Embedder",
     "LLMModel",
     "STTModel",
+    "SegmentationModel",
     "TTSVoice",
     "Vad",
     "VLMModel",
+    "VoiceAgent",
 ]
+
+# Gap message shared by the LoRA and diarization handle methods below: both bindings are
+# new (native/module.cpp's lora_apply/... and load_diarization_model/diarize/...), so a
+# native _core built before this change simply lacks the attribute — fail with a clear,
+# actionable message instead of an opaque AttributeError.
+def _rebuild_gap(name: str, symbols: str) -> SDKException:
+    return SDKException.unsupported_capability(
+        name,
+        f"this native/_core build predates the {name.split('.')[0]} bindings "
+        f"({symbols} are not exported by native/module.cpp) — rebuild the native extension",
+    )
+
 
 # on_token callback type: called per token; returning False stops the native loop.
 _OnToken = Callable[[str], "bool | None"]
@@ -87,6 +103,9 @@ class LLMModel:
         self._handle = handle
         self._guard = _GenerationGuard()
         self._unloaded = False
+        # rac_llm_component_{load,remove,clear}_lora are write-only (no read-back), so the
+        # applied set is mirrored here — same shape as the Electron addon's g_lora_applied.
+        self._lora_applied: Dict[str, float] = {}
 
     def _ensure_loaded(self) -> None:
         if self._unloaded:
@@ -124,6 +143,35 @@ class LLMModel:
             return
         self._unloaded = True
         self._core.unload_model(self._handle)
+
+    # -- LoRA (LlamaCPP backend only) ----------------------------------------
+    def lora_apply(self, adapter_path: str, scale: Optional[float]) -> None:
+        """Load and apply a LoRA adapter (recreates the context, clears the KV cache)."""
+        self._ensure_loaded()
+        if not hasattr(self._core, "lora_apply"):
+            raise _rebuild_gap("lora.apply", "lora_apply")
+        self._core.lora_apply(self._handle, adapter_path, scale)
+        self._lora_applied[adapter_path] = scale if scale is not None else 1.0
+
+    def lora_remove(self, adapter_path: str) -> None:
+        """Remove one adapter by the path used in :meth:`lora_apply`."""
+        self._ensure_loaded()
+        if not hasattr(self._core, "lora_remove"):
+            raise _rebuild_gap("lora.remove", "lora_remove")
+        self._core.lora_remove(self._handle, adapter_path)
+        self._lora_applied.pop(adapter_path, None)
+
+    def lora_remove_all(self) -> None:
+        """Remove every adapter currently applied."""
+        self._ensure_loaded()
+        if not hasattr(self._core, "lora_remove_all"):
+            raise _rebuild_gap("lora.remove_all", "lora_remove_all")
+        self._core.lora_remove_all(self._handle)
+        self._lora_applied.clear()
+
+    def lora_list(self) -> List[AppliedAdapter]:
+        """The adapters applied via :meth:`lora_apply`, mirrored client-side (no read-back)."""
+        return [AppliedAdapter(id=path, scale=scale) for path, scale in self._lora_applied.items()]
 
 
 class VLMModel:
@@ -280,4 +328,154 @@ class Vad:
         self._core.unload_vad(self._handle)
 
     # The runtime's teardown loop calls unload(); close() is the ergonomic alias.
+    close = unload
+
+
+class DiarizationModel:
+    """A loaded speaker-diarization model handle (offline batch; ONNX Sortformer)."""
+
+    def __init__(self, core: Any, handle: int) -> None:
+        self._core = core
+        self._handle = handle
+        self._unloaded = False
+
+    def diarize(
+        self,
+        samples: np.ndarray,
+        *,
+        sample_rate_hz: int,
+        threshold: Optional[float] = None,
+        minimum_duration_ms: Optional[int] = None,
+        merge_gap_ms: Optional[int] = None,
+    ) -> dict:
+        """Diarize float32 mono samples; returns ``{segments, speaker_count, duration_ms}``."""
+        if not hasattr(self._core, "diarize"):
+            raise _rebuild_gap("diarization.diarize", "load_diarization_model / diarize")
+        return self._core.diarize(
+            self._handle,
+            samples,
+            sample_rate_hz=sample_rate_hz,
+            threshold=threshold,
+            minimum_duration_ms=minimum_duration_ms,
+            merge_gap_ms=merge_gap_ms,
+        )
+
+    def unload(self) -> None:
+        """Release the model. Idempotent."""
+        if self._unloaded:
+            return
+        self._unloaded = True
+        self._core.unload_diarization_model(self._handle)
+
+
+class SegmentationModel:
+    """A loaded semantic-segmentation model handle (offline batch; ONNX)."""
+
+    def __init__(self, core: Any, handle: int) -> None:
+        self._core = core
+        self._handle = handle
+        self._unloaded = False
+
+    def segment(
+        self,
+        data: bytes,
+        *,
+        width: int,
+        height: int,
+        pixel_format: int = 1,
+        stride_bytes: int = 0,
+        include_diagnostic_rgba: bool = False,
+    ) -> dict:
+        """Segment packed RGB/RGBA pixels; returns ``{width, height, class_mask, classes}``."""
+        if not hasattr(self._core, "segment"):
+            raise _rebuild_gap(
+                "segmentation.segment", "load_segmentation_model / segment"
+            )
+        return self._core.segment(
+            self._handle,
+            data,
+            width,
+            height,
+            pixel_format=pixel_format,
+            stride_bytes=stride_bytes or None,
+            include_diagnostic_rgba=include_diagnostic_rgba,
+        )
+
+    def unload(self) -> None:
+        """Release the model. Idempotent."""
+        if self._unloaded:
+            return
+        self._unloaded = True
+        self._core.unload_segmentation_model(self._handle)
+
+
+class DiffusionModel:
+    """A loaded diffusion (text-to-image) model handle — CoreML builds only."""
+
+    def __init__(self, core: Any, handle: int) -> None:
+        self._core = core
+        self._handle = handle
+        self._unloaded = False
+
+    def generate(
+        self,
+        prompt: str,
+        *,
+        negative_prompt: Optional[str] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        steps: Optional[int] = None,
+        guidance_scale: Optional[float] = None,
+        seed: Optional[int] = None,
+    ) -> dict:
+        """Generate an image; returns ``{image_data, width, height, seed, ...}``."""
+        if not hasattr(self._core, "generate_image"):
+            raise _rebuild_gap("images.generate", "load_diffusion_model / generate_image")
+        return self._core.generate_image(
+            self._handle,
+            prompt,
+            negative_prompt=negative_prompt,
+            width=width,
+            height=height,
+            steps=steps,
+            guidance_scale=guidance_scale,
+            seed=seed,
+        )
+
+    def unload(self) -> None:
+        """Release the model. Idempotent."""
+        if self._unloaded:
+            return
+        self._unloaded = True
+        self._core.unload_diffusion_model(self._handle)
+
+
+class VoiceAgent:
+    """A standalone voice-agent handle (file-PCM turns; STT → LLM → TTS)."""
+
+    def __init__(self, core: Any, handle: int) -> None:
+        self._core = core
+        self._handle = handle
+        self._unloaded = False
+
+    def process_turn(self, pcm16: bytes) -> dict:
+        """Run one turn over 16 kHz mono PCM16; returns a decoded result dict."""
+        if not hasattr(self._core, "process_voice_turn"):
+            raise _rebuild_gap(
+                "voice.process_turn", "create_voice_agent / process_voice_turn"
+            )
+        return self._core.process_voice_turn(self._handle, pcm16)
+
+    async def aprocess_turn(self, pcm16: bytes) -> dict:
+        """Async twin of :meth:`process_turn` (runs on the loop's default executor)."""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.process_turn, pcm16)
+
+    def unload(self) -> None:
+        """Release the agent. Idempotent."""
+        if self._unloaded:
+            return
+        self._unloaded = True
+        self._core.destroy_voice_agent(self._handle)
+
     close = unload

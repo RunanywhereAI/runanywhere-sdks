@@ -87,9 +87,14 @@ export const vad = {
                 inSpeech = false;
                 controller.push({ type: 'speechEnded' });
               }
-              controller.push({ type: 'frame', result });
+              controller.push({
+                type: 'activity',
+                isSpeech: result.isSpeech,
+                probability: result.probability,
+              });
             }
             if (inSpeech) controller.push({ type: 'speechEnded' });
+            controller.push({ type: 'completed' });
             controller.finish();
           } catch (error) {
             controller.fail(error);
