@@ -89,8 +89,8 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
         var final: GenerationResult?
         for try await event in events {
             try Task.checkCancellation()
-            if case .completed(let result) = event {
-                final = result
+            if case .completed(let payload) = event {
+                final = payload.result
                 break
             }
         }

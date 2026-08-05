@@ -204,8 +204,12 @@ class VADViewModel: VoiceComponentViewModelBase {
                     case .speechEnded:
                         self.isSpeechDetected = false
                         self.addLogEntry(.speechEnded)
-                    case .frame(let result):
-                        self.isSpeechDetected = result.isSpeech
+                    case .activity(let isSpeech, _, _):
+                        self.isSpeechDetected = isSpeech
+                    case .failed(let error):
+                        self.errorMessage = "VAD failed: \(error.localizedDescription)"
+                    case .completed:
+                        break
                     }
                 }
             } catch {

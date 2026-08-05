@@ -102,21 +102,21 @@ extension LLMViewModel {
 
         for try await event in stream {
             switch event {
-            case .token(let text, _):
+            case .textDelta(_, _, _, _, let text):
                 guard !text.isEmpty else { continue }
                 fullResponse += text
                 // Drop live tokens once superseded (user navigated away).
                 if isCurrentGeneration(generationID) {
                     updateMessageContent(at: messageIndex, content: fullResponse)
                 }
-            case .completed(let result):
+            case .completed(_, let result):
                 if fullResponse.isEmpty, !result.text.isEmpty {
                     fullResponse = result.text
                     if isCurrentGeneration(generationID) {
                         updateMessageContent(at: messageIndex, content: fullResponse)
                     }
                 }
-            case .started, .toolCall:
+            default:
                 break
             }
         }

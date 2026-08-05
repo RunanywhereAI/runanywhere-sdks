@@ -414,14 +414,14 @@ class STTViewModel: VoiceComponentViewModelBase {
         case .started:
             break
 
-        case .partial(let text):
-            let preview = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .partial(_, _, _, _, let alternatives):
+            let preview = (alternatives.first ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             guard !preview.isEmpty else { return }
             transcription = committedTranscription.isEmpty
                 ? preview
                 : committedTranscription + "\n" + preview
 
-        case .final(let result):
+        case .transcriptFinal(_, _, let result):
             let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
             if !text.isEmpty {
                 committedTranscription = committedTranscription.isEmpty
@@ -429,6 +429,9 @@ class STTViewModel: VoiceComponentViewModelBase {
                     : committedTranscription + "\n" + text
             }
             transcription = committedTranscription
+
+        default:
+            break
         }
     }
 
