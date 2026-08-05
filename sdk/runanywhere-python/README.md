@@ -193,8 +193,10 @@ raises rather than being silently ignored.
 - One generation at a time per resident model; a concurrent `generate` raises immediately.
 - One model per category is resident; asking for a different id in the same category swaps it.
 - Prompts, responses, audio, and images never leave the host during inference.
-- `initialize` does no network work: no authentication, device registration, or telemetry.
-  `api_key` and `base_url` are accepted for cross-SDK signature parity and are unused.
+- Pass `api_key` + `base_url` (production) and `initialize` runs the two-phase control-plane
+  handshake — authenticate, then flush telemetry — over the bundled libcurl transport. With no
+  credentials it does no network work. A wheel built without the desktop adapter
+  (`RAC_DESKTOP_ADAPTER=OFF`) has no control plane and ignores both, warning if a key is passed.
 
 ## Support
 

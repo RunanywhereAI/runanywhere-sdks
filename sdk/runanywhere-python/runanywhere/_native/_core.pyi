@@ -20,6 +20,29 @@ def backends() -> list[str]: ...
 def initialize(secure_dir: str, base_dir: str | None = ...) -> None: ...
 def shutdown() -> None: ...
 
+# Desktop control plane (telemetry + auth). Present only on a build with the
+# desktop libcurl transport linked (RAC_DESKTOP_ADAPTER=ON); ``has_control_plane``
+# is the capability flag. ``environment`` is a rac_environment_t (0=dev, 2=prod);
+# ``phase1_bytes`` / ``phase2_bytes`` are serialized SdkInit{Phase1,Phase2}Request;
+# the return is a serialized SdkInitResult (empty on a phase failure).
+has_control_plane: bool
+def device_persistent_id() -> str: ...
+def dev_staging_base_url() -> str: ...
+def configure_control_plane(
+    environment: int,
+    api_key: str,
+    base_url: str,
+    device_id: str,
+    platform: str,
+    sdk_version: str,
+    sdk_binding: str,
+    app_identifier: str,
+    app_name: str,
+    app_version: str,
+    phase1_bytes: bytes,
+    phase2_bytes: bytes,
+) -> bytes: ...
+
 # ---- LLM -------------------------------------------------------------------------------
 def load_model(path: str, id: str | None = ..., name: str | None = ...) -> int: ...
 def generate(

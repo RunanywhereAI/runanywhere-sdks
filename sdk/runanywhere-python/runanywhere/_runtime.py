@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import sys
 import threading
 import uuid
 from typing import Callable, Dict, Optional, Tuple
@@ -46,6 +47,19 @@ def _home() -> str:
     return os.environ.get("RUNANYWHERE_HOME") or os.path.join(
         os.path.expanduser("~"), ".runanywhere"
     )
+
+
+def _os_platform() -> str:
+    """The host OS as the backend's platform enum (macos/linux/windows).
+
+    This is the ``platform`` the control plane validates against — NOT the SDK
+    binding name. The binding ("python") is reported separately as sdk_binding.
+    """
+    if sys.platform.startswith("darwin"):
+        return "macos"
+    if sys.platform.startswith("win"):
+        return "windows"
+    return "linux"
 
 
 # Catalog model types → the category the registry and ModelsState report.
@@ -88,7 +102,14 @@ class Runtime:
         base_url: Optional[str] = None,
         environment: Environment = Environment.PRODUCTION,
     ) -> None:
-        """Bring the native runtime up. Idempotent."""
+        """Bring the native runtime up. Idempotent.
+
+        With a desktop-control-plane build (``RAC_DESKTOP_ADAPTER=ON``), an
+        ``api_key`` + ``base_url`` (or a ``DEVELOPMENT`` environment with a baked
+        staging URL) drives the canonical two-phase init so telemetry + auth reach
+        the backend, mirroring the Swift/Kotlin/rcli bring-up. Without those creds,
+        or on an inference-only build, initialize does no network work.
+        """
         with self._lock:
             if self._core is not None:
                 return
@@ -97,15 +118,100 @@ class Runtime:
             core.initialize(os.path.join(base, "secure"), base)
             self._core = core
             self._environment = environment
-        if api_key or base_url:
-            # Never imply a control plane that is not wired: this SDK performs no auth,
-            # device registration or telemetry (see the bridge gaps in AGENTS.md).
-            _LOG.warning(
-                "runanywhere.initialize: api_key/base_url are accepted for signature parity "
-                "but this SDK has no control-plane client — no auth, device registration or "
-                "telemetry is performed"
-            )
+            self._device_id = None
+            self._configure_control_plane(core, api_key, base_url, environment)
         bus.emit(SdkEvent(kind=SdkEventKind.READY))
+
+    # Environment (public SDKEnvironment: dev=1, prod=3) → rac_environment_t /
+    # SdkInitEnvironment wire values (dev=0, prod=2). Anything unspecified is dev.
+    _RAC_ENV = {Environment.PRODUCTION: 2, Environment.DEVELOPMENT: 0}
+
+    def _configure_control_plane(
+        self,
+        core: object,
+        api_key: Optional[str],
+        base_url: Optional[str],
+        environment: Environment,
+    ) -> None:
+        """Run the desktop two-phase init (telemetry + auth) when creds allow.
+
+        Best-effort: HTTP/auth failures are non-fatal (the SDK stays usable
+        offline), matching commons' Phase-2 contract. Held under ``self._lock``.
+        """
+        if not getattr(core, "has_control_plane", False):
+            if api_key or base_url:
+                _LOG.warning(
+                    "runanywhere.initialize: api_key/base_url supplied but this build has no "
+                    "desktop control plane (RAC_DESKTOP_ADAPTER=OFF) — no auth or telemetry"
+                )
+            return
+
+        is_dev = environment == Environment.DEVELOPMENT
+        eff_base = (base_url or "").strip()
+        if not eff_base and is_dev:
+            eff_base = core.dev_staging_base_url()  # type: ignore[attr-defined]
+        if not eff_base:
+            _LOG.debug("runanywhere: no base URL; telemetry/auth disabled")
+            return
+        if not is_dev and not (api_key or "").strip():
+            _LOG.warning(
+                "runanywhere: production environment requires an api_key; telemetry/auth disabled"
+            )
+            return
+
+        try:
+            from ._proto import sdk_init_pb2 as sdk_init
+        except ImportError:
+            _LOG.warning(
+                "runanywhere: telemetry/auth needs protobuf — install the 'rag' extra "
+                "(pip install 'runanywhere[rag]'); continuing without a control plane"
+            )
+            return
+
+        env_int = self._RAC_ENV.get(environment, 0)
+        proto_env = (
+            sdk_init.SDK_INIT_ENVIRONMENT_PRODUCTION
+            if not is_dev
+            else sdk_init.SDK_INIT_ENVIRONMENT_DEVELOPMENT
+        )
+        version = str(core.version())  # type: ignore[attr-defined]
+        device_id = core.device_persistent_id()  # type: ignore[attr-defined]
+        self._device_id = device_id or None
+        os_platform = _os_platform()
+
+        phase1 = sdk_init.SdkInitPhase1Request(
+            environment=proto_env,
+            api_key=api_key or "",
+            base_url=eff_base,
+            platform=os_platform,
+            sdk_version=version,
+        )
+        if device_id:
+            phase1.device_id = device_id
+        phase2 = sdk_init.SdkInitPhase2Request(
+            flush_telemetry=True,
+            discover_downloaded_models=True,
+            rescan_local_models=True,
+        )
+        try:
+            core.configure_control_plane(  # type: ignore[attr-defined]
+                env_int,
+                api_key or "",
+                eff_base,
+                device_id or "",
+                os_platform,
+                version,
+                "python",
+                "ai.runanywhere.python",
+                "RunAnywhere Python",
+                version,
+                phase1.SerializeToString(),
+                phase2.SerializeToString(),
+            )
+        except SDKException:
+            # Phase-1 envelope/state failures are worth surfacing; network/auth
+            # failures inside Phase 2 do not raise (they come back in the result).
+            _LOG.warning("runanywhere: control-plane init failed", exc_info=True)
 
     def reset(self) -> None:
         """Unload every model, close the native runtime, and forget all state. Idempotent."""

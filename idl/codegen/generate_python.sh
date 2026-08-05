@@ -40,11 +40,13 @@ if ! "${PYTHON_BIN}" -c 'import grpc_tools.protoc' >/dev/null 2>&1; then
   echo "error: ${PYTHON_BIN} is missing grpc_tools.protoc — run: ${PYTHON_BIN} -m pip install 'grpcio-tools==1.71.*'" >&2
   exit 1
 fi
-# rag.proto and its transitive import closure.
+# rag.proto and its transitive import closure, plus sdk_init.proto (two-phase
+# init request/result the desktop bridges serialize for rac_sdk_init_phase*_proto).
 PROTOS=(
   rag.proto
   rac_options.proto
   errors.proto
+  sdk_init.proto
   llm_options.proto
   model_types.proto
   hardware_profile.proto

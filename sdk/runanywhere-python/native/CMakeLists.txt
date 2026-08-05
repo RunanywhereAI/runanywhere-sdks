@@ -85,6 +85,19 @@ else()
                    "${RAC_PROTOBUF_RUNTIME_ENABLED})")
 endif()
 
+# Desktop control plane (telemetry + auth). When the desktop adapter is built
+# into commons (RAC_DESKTOP_ADAPTER=ON), it carries the libcurl HTTP transport
+# that auth/model-assignments/telemetry POST through; commons links CURL::libcurl
+# PUBLIC, so our PRIVATE link on rac_commons inherits it. Tell module.cpp the
+# rac_desktop_* + two-phase-init surface is available.
+if(RAC_DESKTOP_ADAPTER)
+    target_compile_definitions(runanywhere_core PRIVATE RAC_PY_HAVE_DESKTOP)
+    message(STATUS "runanywhere-python: desktop control plane enabled (telemetry + auth)")
+else()
+    message(STATUS "runanywhere-python: desktop control plane OFF "
+                   "(pass -DRAC_DESKTOP_ADAPTER=ON to enable telemetry/auth)")
+endif()
+
 if(MSVC)
     target_link_directories(runanywhere_core PRIVATE "${_ra_bundled_dir}")
     target_link_libraries(runanywhere_core PRIVATE Crypt32)

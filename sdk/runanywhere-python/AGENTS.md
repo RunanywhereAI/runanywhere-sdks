@@ -169,9 +169,13 @@ bring-up, and `reset()` the whole teardown; `is_ready()`, `version()`, `device_i
 no second init phase. The namespaces (`runanywhere.llm`, `.rag`, `.models`, …) are singletons
 created at import time; they hold no native state, so importing them costs nothing.
 
-`api_key` and `base_url` exist for cross-SDK signature parity only. **This SDK has no control
-plane** — no auth, no device registration, no telemetry — and `initialize` logs a warning when
-either is passed. Do not add a fake one.
+`api_key` and `base_url` drive the control plane on a desktop-adapter build
+(`RAC_DESKTOP_ADAPTER=ON`, the default for the wheel): `initialize` runs the two-phase
+handshake — authenticate, then flush telemetry — through the bundled libcurl transport
+(`configure_control_plane` in `native/module.cpp`, mirroring rcli's bootstrap). Keyless, or on
+a build without the desktop adapter, `initialize` does no network work and warns when a key is
+passed with no usable transport. The telemetry HTTP callback is pure C++ over `rac_http_client`
+— it never touches the GIL.
 
 ### The process-wide runtime
 
@@ -413,8 +417,9 @@ every change; they are the bar for review.
 - Document what is actually true today. Do not claim encryption, remote auth, or NPU
   support that is not wired.
   - Secure store: DPAPI on Windows; **plaintext mode-0600 files on POSIX**.
-  - `initialize` does **no** network work: no auth, no device registration, no telemetry.
-    `api_key`/`base_url` are accepted for cross-SDK signature parity and warn when passed.
+  - `initialize` runs the control plane only with credentials on a desktop-adapter build:
+    authenticate + telemetry flush over the bundled libcurl transport. Keyless, or on a build
+    without the adapter, it does no network work; `api_key`/`base_url` map to that handshake.
     The HTTP server's optional Bearer `api_key` is a separate thing, configured on
     `serve()` / the CLI.
   - Desktop wheels report CPU backends (llamacpp/onnx/sherpa). QHexRT/Windows Snapdragon

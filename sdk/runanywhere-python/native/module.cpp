@@ -62,6 +62,24 @@
 #include "rac/features/diffusion/rac_diffusion_types.h"
 #endif
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+// Desktop control plane (telemetry + auth). Compiled only when the desktop
+// adapter — which carries the libcurl HTTP transport — is linked into commons
+// (RAC_PY_HAVE_DESKTOP, set by native/CMakeLists.txt when RAC_DESKTOP_ADAPTER=ON).
+#ifdef RAC_PY_HAVE_DESKTOP
+#include "rac/core/rac_sdk_state.h"
+#include "rac/desktop/rac_desktop.h"
+#include "rac/infrastructure/device/rac_device_identity.h"
+#include "rac/infrastructure/network/rac_dev_config.h"
+#include "rac/infrastructure/network/rac_environment.h"
+#include "rac/infrastructure/network/rac_client_info.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
+#include "rac/infrastructure/network/rac_endpoints.h"
+#include "rac/infrastructure/http/rac_http_client.h"
+#include "rac/infrastructure/http/rac_http_transport.h"
+#include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/lifecycle/rac_sdk_init.h"
+#endif
 // Model registry (RAG resolves embedding/LLM model ids -> local_path via the
 // global registry) + the proto-byte RAG session ABI + its proto-buffer helpers.
 #include "rac/core/rac_error.h"
@@ -120,6 +138,13 @@ namespace {
 // The adapter struct is caller-owned and must outlive rac_shutdown().
 rac_platform_adapter_t g_adapter;
 std::atomic<bool> g_initialized{false};
+
+#ifdef RAC_PY_HAVE_DESKTOP
+// Owns the telemetry manager for the process lifetime so the terminal flush in
+// rac_shutdown() can deliver through our HTTP callback before teardown. Guarded
+// by g_handles_mutex on create/destroy.
+rac_telemetry_manager_t* g_telemetry_manager = nullptr;
+#endif
 
 // Handles are exposed to Python as small integer ids. Each component family
 // uses a distinct rac_*_destroy call, so they live in separate maps.
@@ -385,6 +410,214 @@ void initialize(const std::string& secure_dir, std::optional<std::string> base_d
     }
     g_initialized.store(true);
 }
+
+#ifdef RAC_PY_HAVE_DESKTOP
+// =============================================================================
+// Desktop control plane: telemetry + auth over the libcurl HTTP transport.
+//
+// A behavioral port of rcli's bootstrap (sdk/runanywhere-cli/src/bootstrap.cpp:
+// initialize_sdk_metadata + initialize_telemetry_auth). The desktop adapter
+// linked into commons provides the libcurl transport, so telemetry HTTP is
+// delivered entirely in C++ (rac_http_client_* over the registered transport) —
+// no Python callback, no GIL involvement on the telemetry thread. Phase-1/2
+// proto requests are built in Python (runanywhere/_proto/sdk_init_pb2) and
+// handed in as serialized bytes.
+// =============================================================================
+
+// Delivers a queued telemetry batch over the desktop HTTP transport. Wired via
+// rac_telemetry_manager_set_http_callback (user_data = the manager); reports the
+// outcome back through rac_telemetry_manager_http_complete. Runs on commons'
+// telemetry thread — pure C++, never touches Python state or the GIL.
+void py_telemetry_http_callback(void* user_data, const char* endpoint, const char* json_body,
+                                size_t json_length, rac_bool_t requires_auth) {
+    auto* manager = static_cast<rac_telemetry_manager_t*>(user_data);
+    const char* base_url = rac_state_get_base_url();
+    if (base_url == nullptr || base_url[0] == '\0' ||
+        rac_http_transport_is_registered() != RAC_TRUE) {
+        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                         "telemetry transport unavailable");
+        return;
+    }
+
+    char url[2048] = {};
+    if (rac_build_url(base_url, endpoint, url, sizeof(url)) < 0) {
+        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                         "telemetry URL build failed");
+        return;
+    }
+
+    std::vector<rac_http_header_kv_t> headers;
+    const rac_http_header_kv_t* defaults = nullptr;
+    size_t default_count = 0;
+    if (rac_http_default_headers(&defaults, &default_count) == RAC_SUCCESS && defaults) {
+        headers.assign(defaults, defaults + default_count);
+    }
+    std::string auth_value;
+    if (requires_auth == RAC_TRUE) {
+        const char* token = rac_auth_get_access_token();
+        if (token && token[0] != '\0') {
+            auth_value = std::string("Bearer ") + token;
+            headers.push_back({"Authorization", auth_value.c_str()});
+        }
+    }
+
+    rac_http_client_t* client = nullptr;
+    if (rac_http_client_create(&client) != RAC_SUCCESS) {
+        if (manager) rac_telemetry_manager_http_complete(manager, RAC_FALSE, nullptr,
+                                                         "telemetry client create failed");
+        return;
+    }
+
+    rac_http_request_t request = {};
+    request.method = "POST";
+    request.url = url;
+    request.headers = headers.empty() ? nullptr : headers.data();
+    request.header_count = headers.size();
+    request.body_bytes = reinterpret_cast<const uint8_t*>(json_body);
+    request.body_len = json_length;
+    request.timeout_ms = rac_env_default_http_timeout_ms(rac_state_get_environment());
+    request.follow_redirects = RAC_FALSE;
+
+    rac_http_response_t response = {};
+    const rac_result_t rc = rac_http_request_send(client, &request, &response);
+    rac_http_client_destroy(client);
+
+    const bool ok = rc == RAC_SUCCESS && response.status >= 200 && response.status < 300;
+    std::string body;
+    if (response.body_bytes && response.body_len > 0) {
+        body.assign(reinterpret_cast<const char*>(response.body_bytes), response.body_len);
+    }
+    if (manager) {
+        rac_telemetry_manager_http_complete(manager, ok ? RAC_TRUE : RAC_FALSE,
+                                            body.empty() ? nullptr : body.c_str(),
+                                            ok ? nullptr : "telemetry POST failed");
+    }
+    rac_http_response_free(&response);
+}
+
+// The persistent per-device id commons mints (36-char UUID). Callers pass this
+// as SdkInitPhase1Request.device_id and the telemetry manager device id.
+std::string device_persistent_id() {
+    char device_id[RAC_DEVICE_ID_BUFFER_MIN_SIZE] = {};
+    if (rac_device_get_or_create_persistent_id(device_id, sizeof(device_id)) != RAC_SUCCESS) {
+        return {};
+    }
+    return device_id;
+}
+
+// The baked staging backend URL used by keyless DEVELOPMENT builds; empty when
+// none is configured. Mirrors rcli's dev base-URL fallback.
+std::string dev_staging_base_url() {
+    const char* baked = rac_dev_config_get_staging_base_url();
+    if (baked && rac_dev_config_is_usable_http_url(baked)) return baked;
+    return {};
+}
+
+// Run the full desktop control-plane bring-up: register the libcurl transport,
+// seed runtime state + client info, create the telemetry sink, then drive the
+// canonical two-phase init. `environment` is a rac_environment_t (0=dev, 2=prod).
+// `phase1_bytes` / `phase2_bytes` are serialized SdkInit{Phase1,Phase2}Request.
+// Returns the serialized SdkInitResult from phase 2 (empty on a phase failure).
+// Best-effort: HTTP/auth failures are non-fatal (the SDK stays usable offline),
+// matching commons' Phase-2 contract.
+py::bytes configure_control_plane(int32_t environment, const std::string& api_key,
+                                  const std::string& base_url, const std::string& device_id,
+                                  const std::string& platform, const std::string& sdk_version,
+                                  const std::string& sdk_binding,
+                                  const std::string& app_identifier, const std::string& app_name,
+                                  const std::string& app_version, const std::string& phase1_bytes,
+                                  const std::string& phase2_bytes) {
+    if (!g_initialized.load()) throw std::runtime_error("not initialized");
+    const auto env = static_cast<rac_environment_t>(environment);
+
+    {
+        py::gil_scoped_release release;
+        rac_desktop_http_transport_register();
+    }
+
+    // Runtime state first (the auth/device/telemetry paths read env + creds from
+    // rac_state), then the copied SDK configuration + client info.
+    rac_state_initialize(env, api_key.c_str(), base_url.c_str(), device_id.c_str());
+
+    rac_sdk_config_t sdk_config = {};
+    sdk_config.environment = env;
+    sdk_config.api_key = api_key.c_str();
+    sdk_config.base_url = base_url.c_str();
+    sdk_config.device_id = device_id.c_str();
+    sdk_config.platform = platform.c_str();
+    sdk_config.sdk_version = sdk_version.c_str();
+    sdk_config.client_info.sdk_binding = sdk_binding.c_str();
+    sdk_config.client_info.app_identifier = app_identifier.c_str();
+    sdk_config.client_info.app_name = app_name.c_str();
+    sdk_config.client_info.app_version = app_version.c_str();
+    rac_sdk_init(&sdk_config);
+
+    // Per-run auth (NULL secure storage: tokens aren't persisted across runs,
+    // like rcli). Authentication still runs when Phase 2 expects a key.
+    rac_auth_init(nullptr);
+
+    // Create + register the telemetry sink BEFORE Phase 2 so its flush has a
+    // sink; delivery runs through py_telemetry_http_callback over libcurl. The
+    // terminal batch flushes in rac_shutdown() during teardown.
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        if (!g_telemetry_manager) {
+            g_telemetry_manager = rac_telemetry_manager_create(env, device_id.c_str(),
+                                                               platform.c_str(),
+                                                               sdk_version.c_str());
+            if (g_telemetry_manager) {
+                rac_telemetry_manager_set_http_callback(g_telemetry_manager,
+                                                        py_telemetry_http_callback,
+                                                        g_telemetry_manager);
+                rac_events_set_telemetry_sink(g_telemetry_manager);
+            }
+        }
+    }
+
+    rac_result_t rc;
+    {
+        py::gil_scoped_release release;
+        rac_proto_buffer_t phase1_out;
+        rac_proto_buffer_init(&phase1_out);
+        rc = rac_sdk_init_phase1_proto(reinterpret_cast<const uint8_t*>(phase1_bytes.data()),
+                                       phase1_bytes.size(), &phase1_out);
+        rac_proto_buffer_free(&phase1_out);
+    }
+    if (rc != RAC_SUCCESS) raise_rac_error(rc, "sdk_init_phase1");
+
+    rac_proto_buffer_t phase2_out;
+    rac_proto_buffer_init(&phase2_out);
+    {
+        py::gil_scoped_release release;
+        rc = rac_sdk_init_phase2_proto(reinterpret_cast<const uint8_t*>(phase2_bytes.data()),
+                                       phase2_bytes.size(), &phase2_out);
+    }
+    if (rc != RAC_SUCCESS) {
+        rac_proto_buffer_free(&phase2_out);
+        raise_rac_error(rc, "sdk_init_phase2");
+    }
+    py::bytes result(reinterpret_cast<const char*>(phase2_out.data ? phase2_out.data
+                                                                    : (const uint8_t*)""),
+                     phase2_out.data ? phase2_out.size : 0);
+    rac_proto_buffer_free(&phase2_out);
+    return result;
+}
+
+// Detach + destroy the telemetry manager. Called from shutdown() after
+// rac_shutdown() has flushed the terminal batch through the sink.
+void telemetry_teardown() {
+    rac_telemetry_manager_t* mgr = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_handles_mutex);
+        mgr = g_telemetry_manager;
+        g_telemetry_manager = nullptr;
+    }
+    if (mgr) {
+        rac_events_set_telemetry_sink(nullptr);
+        rac_telemetry_manager_destroy(mgr);
+    }
+}
+#endif  // RAC_PY_HAVE_DESKTOP
 
 // =============================================================================
 // Streaming core — shared by LLM generate + VLM generate_vlm.
@@ -1757,7 +1990,20 @@ void shutdown() {
 #endif
             g_inflight.clear();
         }
+#ifdef RAC_PY_HAVE_DESKTOP
+        // Flush queued telemetry while the HTTP transport is still registered:
+        // rac_shutdown() tears the transport down before its own terminal flush,
+        // which would otherwise drop the last batch ("transport unavailable").
+        {
+            std::lock_guard<std::mutex> lock(g_handles_mutex);
+            if (g_telemetry_manager) rac_events_flush_telemetry_sink();
+        }
+#endif
         rac_shutdown();
+#ifdef RAC_PY_HAVE_DESKTOP
+        // Detach + destroy the telemetry manager after the runtime is down.
+        telemetry_teardown();
+#endif
     }
 }
 
@@ -1843,6 +2089,25 @@ PYBIND11_MODULE(_core, m) {
           "Initialize the runtime: fill the platform adapter, set the base dir, "
           "call rac_init, and register backends once.");
     m.def("shutdown", &shutdown, "Destroy all live handles and shut the runtime down.");
+
+#ifdef RAC_PY_HAVE_DESKTOP
+    // Desktop control plane (telemetry + auth). Present only when the desktop
+    // libcurl transport is linked into commons (RAC_DESKTOP_ADAPTER=ON).
+    m.attr("has_control_plane") = true;
+    m.def("device_persistent_id", &device_persistent_id,
+          "The persistent per-device UUID commons mints.");
+    m.def("dev_staging_base_url", &dev_staging_base_url,
+          "Baked staging backend URL for keyless development (empty when none).");
+    m.def("configure_control_plane", &configure_control_plane, py::arg("environment"),
+          py::arg("api_key"), py::arg("base_url"), py::arg("device_id"), py::arg("platform"),
+          py::arg("sdk_version"), py::arg("sdk_binding"), py::arg("app_identifier"),
+          py::arg("app_name"), py::arg("app_version"), py::arg("phase1_bytes"),
+          py::arg("phase2_bytes"),
+          "Register the libcurl transport, seed state, and run two-phase init "
+          "(telemetry + auth). Returns serialized SdkInitResult bytes.");
+#else
+    m.attr("has_control_plane") = false;
+#endif
 
     // LLM
     m.def("load_model", &load_model, py::arg("path"), py::arg("id") = py::none(),
