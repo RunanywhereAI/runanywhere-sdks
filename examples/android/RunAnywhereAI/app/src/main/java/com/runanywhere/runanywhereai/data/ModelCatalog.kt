@@ -349,6 +349,24 @@ internal object ModelCatalog {
             LANGUAGE,
             1_400_000_000
         ),
+        SingleFileModel(
+            "lfm2.5-2.6b-q4_k_m",
+            "LiquidAI LFM2.5 2.6B Q4_K_M",
+            "https://huggingface.co/LiquidAI/LFM2.5-2.6B-GGUF/resolve/main/LFM2.5-2.6B-Q4_K_M.gguf",
+            LLAMA,
+            LANGUAGE,
+            1_674_000_000,
+            supportsThinking = true
+        ),
+        SingleFileModel(
+            "lfm2.5-2.6b-q8_0",
+            "LiquidAI LFM2.5 2.6B Q8_0",
+            "https://huggingface.co/LiquidAI/LFM2.5-2.6B-GGUF/resolve/main/LFM2.5-2.6B-Q8_0.gguf",
+            LLAMA,
+            LANGUAGE,
+            2_875_000_000,
+            supportsThinking = true
+        ),
     )
 
     private val vlm = listOf(
