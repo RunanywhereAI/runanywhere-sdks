@@ -14,6 +14,8 @@ from runanywhere import (
     ToolDefinition,
 )
 
+from _env import initialize_from_env
+
 DEFAULT_MODEL = "smollm2-135m"
 
 
@@ -103,7 +105,7 @@ def tool_calling(model: str) -> None:
 
 def main() -> int:
     model = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_MODEL
-    ra.initialize()
+    initialize_from_env()
     try:
         print(f"runanywhere {ra.version()} — model {model}")
         ensure(model)

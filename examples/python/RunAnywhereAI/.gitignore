@@ -1,2 +1,5 @@
 .venv/
 __pycache__/
+
+# Local telemetry/backend credentials (mirrors Android local.properties — never commit)
+.env

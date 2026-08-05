@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('appStore', {
   saveSettings: (data) => ipcRenderer.invoke('store:settings:save', data),
   loadCustomModels: () => ipcRenderer.invoke('store:models:load'),
   saveCustomModels: (data) => ipcRenderer.invoke('store:models:save', data),
+  backendConfig: () => ipcRenderer.invoke('app:backend-config'),
   // Modern Electron removed File.path; webUtils.getPathForFile is the replacement.
   getPathForFile: (file) => webUtils.getPathForFile(file),
 });

@@ -6,6 +6,8 @@ import sys
 import runanywhere as ra
 from runanywhere import LlmOptions, ModelRef, RagConfig, RagDocument, RagEventKind
 
+from _env import initialize_from_env
+
 EMBEDDER = "minilm"
 DEFAULT_LLM = "smollm2-135m"
 
@@ -23,7 +25,7 @@ QUESTION = "Does RunAnywhere need a network connection for inference?"
 
 def main() -> int:
     llm_id = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_LLM
-    ra.initialize()
+    initialize_from_env()
     try:
         with ra.rag.open(
             ModelRef(EMBEDDER),
