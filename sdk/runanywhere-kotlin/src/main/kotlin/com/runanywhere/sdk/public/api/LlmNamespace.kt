@@ -148,12 +148,12 @@ public class LlmNamespace internal constructor() {
         val opts = options.orDefault()
         val structuredOutput = StructuredOutput(schema = schema)
         var generation = generateStructuredUnary(prompt, opts, structuredOutput)
-        var parsed = parseStructuredOutput(generation, schema, structuredOutput)
+        var parsed = parseStructuredOutput(generation, structuredOutput)
 
         if (mode == StructuredOutputMode.REPAIR && parsed.validation?.is_valid != true) {
             val repairPrompt = structuredRepairPrompt(prompt, generation.text, schema)
             generation = generateStructuredUnary(repairPrompt, opts, structuredOutput)
-            parsed = parseStructuredOutput(generation, schema, structuredOutput)
+            parsed = parseStructuredOutput(generation, structuredOutput)
         }
 
         return StructuredResult(
@@ -182,7 +182,6 @@ public class LlmNamespace internal constructor() {
 
     private suspend fun parseStructuredOutput(
         generation: GenerationResult,
-        schema: JsonSchema,
         structuredOutput: StructuredOutput,
     ) = withContext(Dispatchers.IO) {
         CppBridgeStructuredOutput.parse(
