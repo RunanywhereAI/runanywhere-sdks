@@ -14,13 +14,22 @@ import Combine
 class ModelListViewModel: ObservableObject {
     static let shared = ModelListViewModel()
 
+    private static let lastLoadedModelKey = "chat.lastLoadedModelID"
+
     @Published var availableModels: [RAModelInfo] = []
-    @Published var currentModel: RAModelInfo?
+    @Published var currentModel: RAModelInfo? {
+        didSet {
+            if let id = currentModel?.id {
+                UserDefaults.standard.set(id, forKey: Self.lastLoadedModelKey)
+            }
+        }
+    }
     @Published var isLoading = false
     @Published var errorMessage: String?
 
     private var cancellables = Set<AnyCancellable>()
     private var attemptedDefaultChatModelLoad = false
+    private var attemptedLastModelLoad = false
 
     // MARK: - Initialization
 
@@ -100,6 +109,7 @@ class ModelListViewModel: ObservableObject {
 
             // Sync currentModel with SDK's current model state
             await syncCurrentModelWithSDK()
+            await loadLastModelIfAvailable()
             await loadDefaultChatModelIfAvailable()
         } catch {
             print("Failed to load models from SDK: \(error)")
@@ -122,6 +132,29 @@ class ModelListViewModel: ObservableObject {
 
     func setCurrentModel(_ model: RAModelInfo?) {
         currentModel = model
+    }
+
+    /// Auto-load the model the user last had loaded, so a relaunch restores the
+    /// chat without a manual pick. Only attempts once per session and only when
+    /// nothing is already loaded and the model is downloaded and ready.
+    func loadLastModelIfAvailable() async {
+        guard !isLoadingModel, currentModel == nil, !attemptedLastModelLoad else { return }
+        attemptedLastModelLoad = true
+
+        guard let lastID = UserDefaults.standard.string(forKey: Self.lastLoadedModelKey),
+              let model = availableModels.first(where: { $0.id == lastID && $0.isAvailableForUse }) else {
+            return
+        }
+
+        isLoadingModel = true
+        defer { isLoadingModel = false }
+
+        do {
+            try await loadModel(model)
+            print("ModelListViewModel: Auto-loaded last model \(model.name)")
+        } catch {
+            print("ModelListViewModel: Failed to auto-load last model: \(error.localizedDescription)")
+        }
     }
 
     func loadDefaultChatModelIfAvailable() async {

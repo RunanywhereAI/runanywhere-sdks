@@ -310,80 +310,58 @@ extension RunAnywhere {
         let resolvedModel = await resolveModelForDownload(model)
         SDKLogger.download.info("Planning download for \(resolvedModel.id)")
 
-        var planRequest = RADownloadPlanRequest()
-        planRequest.modelID = resolvedModel.id
-        planRequest.model = resolvedModel
-        planRequest.resumeExisting = true
-        planRequest.validateExistingBytes = true
-        planRequest.verifyChecksums = !resolvedModel.checksumSha256.isEmpty
-
-        let plan = await planDownload(planRequest)
+        let plan = await planDownload(downloadPlanRequest(for: resolvedModel))
         guard plan.canStart else {
             let message = plan.hasError ? plan.error.message : "Unable to create a download plan"
             SDKLogger.download.error("Download plan rejected for \(resolvedModel.id): \(message)")
-            throw SDKException(
-                code: .downloadFailed,
-                message: message,
-                category: .network
+            throw SDKException(code: .downloadFailed, message: message, category: .network)
+        }
+
+        // Background-eligible transfers stream to their final paths via a
+        // background URLSession that survives app suspension. The commons
+        // start+poll below then finds the files already complete on disk and
+        // finalizes the registry without re-downloading. Non-eligible plans
+        // (extraction, unknown sizes) fall straight through to commons.
+        if BackgroundDownloadCoordinator.shared.shouldHandle(plan) {
+            try await BackgroundDownloadCoordinator.shared.prefetch(
+                plan: plan,
+                model: resolvedModel,
+                onProgress: onProgress
             )
         }
 
-        var startRequest = RADownloadStartRequest()
-        startRequest.modelID = resolvedModel.id
-        startRequest.plan = plan
-        startRequest.resume = plan.canResume
-        startRequest.resumeToken = plan.resumeToken
-        // Commons owns the completion registry mutation: the orchestrator's
-        // self-heal calls rac_model_registry_update_download_status, which
-        // also persists the durable .rac-manifest.binpb sidecar that restores
-        // the entry on the next cold launch.
-        startRequest.updateRegistryOnCompletion = true
+        return try await startAndPollDownload(plan: plan, model: resolvedModel, onProgress: onProgress)
+    }
 
-        let startResult = await CppBridge.Download.shared.start(startRequest)
-        guard startResult.accepted else {
-            let message = startResult.hasError
-                ? startResult.error.message
-                : "The download could not be started"
-            SDKLogger.download.error("Download start rejected for \(resolvedModel.id): \(message)")
-            throw SDKException(
-                code: .downloadFailed,
-                message: message,
-                category: .network
-            )
+    /// Drive the commons start+poll finalize for a model whose files a background
+    /// transfer already placed on disk. Used by the coordinator when the app was
+    /// relaunched to deliver background session events and no caller is awaiting.
+    @discardableResult
+    internal static func finalizeBackgroundDownload(modelID: String) async throws -> RADownloadProgress {
+        guard isReady else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .network)
         }
+        try await ensureServicesReady()
 
-        SDKLogger.download.info(
-            "Download accepted for \(resolvedModel.id) (task=\(startResult.taskID))"
-        )
-
-        if startResult.hasInitialProgress {
-            let progress = startResult.initialProgress
-            if try await reportDownloadProgress(progress, onProgress: onProgress) {
-                return progress
+        var getRequest = RAModelGetRequest()
+        getRequest.modelID = modelID
+        let getResult = await performGet(getRequest)
+        guard getResult.found else {
+            throw SDKException(code: .modelNotFound, message: "Model '\(modelID)' is not registered", category: .validation)
+        }
+        let model = getResult.model
+        let plan = await planDownload(downloadPlanRequest(for: model))
+        guard plan.canStart else {
+            if model.isAvailableForUse {
+                var done = RADownloadProgress()
+                done.modelID = modelID
+                done.state = .completed
+                return done
             }
+            let message = plan.hasError ? plan.error.message : "Unable to finalize download"
+            throw SDKException(code: .downloadFailed, message: message, category: .network)
         }
-
-        var subscribeRequest = RADownloadSubscribeRequest()
-        subscribeRequest.modelID = startResult.modelID.isEmpty ? resolvedModel.id : startResult.modelID
-        subscribeRequest.taskID = startResult.taskID
-
-        // Swift owns the polling loop, so a Swift task cancellation must also
-        // tear down the native download worker — otherwise the commons
-        // download keeps running after the caller's Task ends.
-        do {
-            while true {
-                try Task.checkCancellation()
-                try await Task.sleep(nanoseconds: 250_000_000)
-
-                let progress = await CppBridge.Download.shared.pollProgress(subscribeRequest)
-                if try await reportDownloadProgress(progress, onProgress: onProgress) {
-                    return progress
-                }
-            }
-        } catch is CancellationError {
-            await cancelNativeDownload(taskID: subscribeRequest.taskID, modelID: subscribeRequest.modelID)
-            throw CancellationError()
-        }
+        return try await startAndPollDownload(plan: plan, model: model, onProgress: nil)
     }
 
     /// Stream download progress for a registered model.
@@ -508,6 +486,74 @@ private extension RunAnywhere {
     /// replans as a fresh download), so no Swift-side retry loop is needed.
     static func planDownload(_ request: RADownloadPlanRequest) async -> RADownloadPlanResult {
         await CppBridge.Download.shared.plan(request)
+    }
+
+    static func downloadPlanRequest(for model: RAModelInfo) -> RADownloadPlanRequest {
+        var request = RADownloadPlanRequest()
+        request.modelID = model.id
+        request.model = model
+        request.resumeExisting = true
+        request.validateExistingBytes = true
+        request.verifyChecksums = !model.checksumSha256.isEmpty
+        return request
+    }
+
+    /// Start the commons download worker for `plan` and poll it to a terminal
+    /// state. When a background transfer has already placed the files, the worker
+    /// detects them as complete and finalizes the registry without network I/O.
+    static func startAndPollDownload(
+        plan: RADownloadPlanResult,
+        model: RAModelInfo,
+        onProgress: ((RADownloadProgress) async -> Void)?
+    ) async throws -> RADownloadProgress {
+        var startRequest = RADownloadStartRequest()
+        startRequest.modelID = model.id
+        startRequest.plan = plan
+        startRequest.resume = plan.canResume
+        startRequest.resumeToken = plan.resumeToken
+        // Commons owns the completion registry mutation: the orchestrator's
+        // self-heal calls rac_model_registry_update_download_status, which
+        // also persists the durable .rac-manifest.binpb sidecar that restores
+        // the entry on the next cold launch.
+        startRequest.updateRegistryOnCompletion = true
+
+        let startResult = await CppBridge.Download.shared.start(startRequest)
+        guard startResult.accepted else {
+            let message = startResult.hasError ? startResult.error.message : "The download could not be started"
+            SDKLogger.download.error("Download start rejected for \(model.id): \(message)")
+            throw SDKException(code: .downloadFailed, message: message, category: .network)
+        }
+
+        SDKLogger.download.info("Download accepted for \(model.id) (task=\(startResult.taskID))")
+
+        if startResult.hasInitialProgress {
+            let progress = startResult.initialProgress
+            if try await reportDownloadProgress(progress, onProgress: onProgress) {
+                return progress
+            }
+        }
+
+        var subscribeRequest = RADownloadSubscribeRequest()
+        subscribeRequest.modelID = startResult.modelID.isEmpty ? model.id : startResult.modelID
+        subscribeRequest.taskID = startResult.taskID
+
+        // Swift owns the polling loop, so a Swift task cancellation must also
+        // tear down the native download worker — otherwise the commons
+        // download keeps running after the caller's Task ends.
+        do {
+            while true {
+                try Task.checkCancellation()
+                try await Task.sleep(nanoseconds: 250_000_000)
+
+                let progress = await CppBridge.Download.shared.pollProgress(subscribeRequest)
+                if try await reportDownloadProgress(progress, onProgress: onProgress) {
+                    return progress
+                }
+            }
+        } catch is CancellationError {
+            await cancelNativeDownload(taskID: subscribeRequest.taskID, modelID: subscribeRequest.modelID)
+            throw CancellationError()
+        }
     }
 
     /// Derive a stable model id from a download URL via commons

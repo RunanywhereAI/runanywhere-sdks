@@ -18,6 +18,7 @@ struct ConversationDrawerView: View {
     let onSelectConversation: (Conversation) -> Void
     let onCreateConversation: () -> Void
     let onOpenSettings: () -> Void
+    let onOpenMore: () -> Void
     let onClose: () -> Void
 
     private var filteredConversations: [Conversation] {
@@ -27,7 +28,6 @@ struct ConversationDrawerView: View {
     var body: some View {
         VStack(spacing: 0) {
             drawerHeader
-            newChatButton
             searchField
 
             Text("Recent")
@@ -42,6 +42,7 @@ struct ConversationDrawerView: View {
 
             Divider()
 
+            moreRow
             settingsRow
         }
         .background(AppColors.backgroundPrimary)
@@ -88,42 +89,26 @@ struct ConversationDrawerView: View {
         .padding(.bottom, AppSpacing.mediumLarge)
     }
 
-    private var newChatButton: some View {
-        Button {
-            Haptics.light()
-            onCreateConversation()
-        } label: {
-            HStack(spacing: AppSpacing.smallMedium) {
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .semibold))
-                Text("New chat")
-                    .font(AppTypography.subheadlineSemibold)
-            }
-            .foregroundColor(AppColors.textWhite)
-            .frame(maxWidth: .infinity)
-            .frame(height: 42)
-            .background(
-                Capsule()
-                    .fill(AppColors.primaryAccent)
-                    .shadow(color: AppColors.primaryAccent.opacity(0.3), radius: 6, x: 0, y: 3)
-            )
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, AppSpacing.large)
-        .padding(.bottom, AppSpacing.mediumLarge)
+    private var moreRow: some View {
+        drawerFooterRow(icon: "square.grid.2x2", title: "More", action: onOpenMore)
     }
 
     private var settingsRow: some View {
+        drawerFooterRow(icon: "gearshape.fill", title: "Settings", action: onOpenSettings)
+    }
+
+    private func drawerFooterRow(icon: String, title: String, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.light()
-            onOpenSettings()
+            action()
         } label: {
             HStack(spacing: AppSpacing.mediumLarge) {
-                Image(systemName: "gearshape.fill")
+                Image(systemName: icon)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(AppColors.textSecondary)
+                    .frame(width: 20)
 
-                Text("Settings")
+                Text(title)
                     .font(AppTypography.subheadlineMedium)
                     .foregroundColor(AppColors.textPrimary)
 
@@ -163,9 +148,10 @@ struct ConversationDrawerView: View {
         }
         .padding(.horizontal, AppSpacing.mediumLarge)
         .padding(.vertical, AppSpacing.medium)
-        .background(AppColors.backgroundSecondary)
-        .cornerRadius(AppSpacing.cornerRadiusRegular)
+        .background(AppColors.backgroundGray5)
+        .cornerRadius(AppSpacing.cornerRadiusLarge)
         .padding(.horizontal, AppSpacing.large)
+        .padding(.top, AppSpacing.mediumLarge)
         .padding(.bottom, AppSpacing.mediumLarge)
     }
 
@@ -189,8 +175,8 @@ struct ConversationDrawerView: View {
                     }
                 }
             }
-            .padding(.horizontal, AppSpacing.smallMedium)
-            .padding(.top, AppSpacing.smallMedium)
+            .padding(.horizontal, AppSpacing.xSmall)
+            .padding(.top, AppSpacing.xSmall)
         }
     }
 
@@ -222,39 +208,29 @@ private struct DrawerConversationRow: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: AppSpacing.mediumLarge) {
-                Image(systemName: "message.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(isSelected ? AppColors.primaryAccent : AppColors.textSecondary)
-                    .frame(width: 24, height: 24)
-                    .background(
-                        (isSelected ? AppColors.primaryAccent : AppColors.textSecondary)
-                            .opacity(isSelected ? 0.14 : 0.08)
-                    )
-                    .cornerRadius(AppSpacing.cornerRadiusMedium)
-
                 Text(conversation.title)
                     .font(AppTypography.subheadline)
+                    .fontWeight(isSelected ? .semibold : .regular)
                     .foregroundColor(AppColors.textPrimary)
                     .lineLimit(1)
 
-                Spacer()
+                Spacer(minLength: AppSpacing.smallMedium)
 
-                Menu {
-                    Button(role: .destructive, action: onDelete) {
-                        Label("Delete", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(AppTypography.caption)
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(AppColors.textSecondary)
                         .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Delete chat")
             }
-            .padding(.horizontal, AppSpacing.smallMedium)
+            .padding(.leading, AppSpacing.large)
+            .padding(.trailing, AppSpacing.xSmall)
             .padding(.vertical, AppSpacing.medium)
-            .background(isSelected ? AppColors.primaryAccent.opacity(0.08) : Color.clear)
-            .cornerRadius(AppSpacing.cornerRadiusRegular)
+            .background(isSelected ? AppColors.primaryAccent.opacity(0.10) : Color.clear)
+            .cornerRadius(AppSpacing.cornerRadiusLarge)
         }
         .buttonStyle(.plain)
     }
