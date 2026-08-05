@@ -1239,7 +1239,7 @@ enum ModelCatalogBootstrap {
         // deeper cost no throughput: 38.9 vs 39.1 tok/s.
         await registerLLM(
             id: "lfm2.5-2.6b-ane",
-            name: "LFM2.5 2.6B (Neural Engine)",
+            name: "LFM2.5 2.6B (NeuRT / Neural Engine)",
             // Repo casing is EXACT on purpose. The HF tree API answers 200 for
             // runanywhere/LFM2.5-2.6B_ANE and 307 for the lowercase spelling, so a
             // lowercased id only works if the transport follows redirects.

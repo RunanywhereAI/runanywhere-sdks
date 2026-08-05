@@ -297,7 +297,12 @@ const char* rac_framework_display_name(rac_inference_framework_t framework) {
         case RAC_FRAMEWORK_LLAMACPP:
             return "llama.cpp";
         case RAC_FRAMEWORK_COREML:
-            return "Core ML";
+            // Named for the ENGINE that executes these models, not Apple's framework —
+            // the same convention RAC_FRAMEWORK_QHEXRT already follows by displaying
+            // "QHexRT". The enum tag stays COREML (it is the wire value); only the
+            // human-readable label changes, and it changes here so every SDK — Swift,
+            // Kotlin, Flutter, React Native, Web — inherits it from one place.
+            return "NeuRT";
         case RAC_FRAMEWORK_MLX:
             return "MLX";
         case RAC_FRAMEWORK_FOUNDATION_MODELS:
@@ -451,7 +456,7 @@ const char* inference_framework_display_name_value(rac_inference_framework_t f) 
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return "FluidAudio";
         case RAC_FRAMEWORK_COREML:
-            return "Core ML";
+            return "NeuRT";
         case RAC_FRAMEWORK_MLX:
             return "MLX";
         case RAC_FRAMEWORK_QHEXRT:
