@@ -1,6 +1,8 @@
 #include "catalog/model_ref.h"
 
 #include <cctype>
+#include <cstdint>
+#include <cstdlib>
 #include <dirent.h>
 #include <string>
 #include <sys/stat.h>
@@ -52,16 +54,32 @@ bool is_local_path(const std::string &ref) {
   return ::stat(ref.c_str(), &st) == 0;
 }
 
+// A trailing `/` carries no meaning but would break both the basename split
+// and the `.mlpackage` suffix tests below, so strip it once, here.
+std::string without_trailing_slashes(const std::string &path) {
+  std::string out = path;
+  while (out.size() > 1 && out.back() == '/') {
+    out.pop_back();
+  }
+  return out;
+}
+
 // Derive a stable, collision-free registry id from a bundle path. Using one
 // hardcoded id (as the diffusion path does) is fine for a single model and
 // wrong the moment two bundles are registered in one process — the second
 // silently overwrites the first, and every later load resolves to whichever
 // won.
 std::string id_for_local_path(const std::string &path) {
-  std::string base = path;
-  while (base.size() > 1 && base.back() == '/') {
-    base.pop_back();
+  std::string full = without_trailing_slashes(path);
+  // Canonicalize first so the same bundle spelled differently (relative, `..`,
+  // a symlink) keeps ONE id; the raw path is the fallback when it cannot be
+  // resolved.
+  if (char *resolved = ::realpath(full.c_str(), nullptr)) {
+    full.assign(resolved);
+    ::free(resolved);
   }
+
+  std::string base = full;
   const size_t slash = base.find_last_of('/');
   if (slash != std::string::npos) {
     base.erase(0, slash + 1);
@@ -72,7 +90,20 @@ std::string id_for_local_path(const std::string &path) {
       c = '-';
     }
   }
-  return "local-" + base;
+
+  // The basename alone collides — every `.../model.mlpackage` sanitizes to the
+  // same string — so pin the id to the whole path with an FNV-1a digest.
+  uint64_t hash = 1469598103934665603ULL;
+  for (const unsigned char c : full) {
+    hash ^= c;
+    hash *= 1099511628211ULL;
+  }
+  static constexpr char kHex[] = "0123456789abcdef";
+  std::string digest;
+  for (int shift = 28; shift >= 0; shift -= 4) {
+    digest.push_back(kHex[(hash >> shift) & 0xF]);
+  }
+  return "local-" + base + "-" + digest;
 }
 
 // Best-effort format/framework inference from the bundle layout. Only used when
@@ -95,6 +126,15 @@ void infer_local_kind(const std::string &path,
       *framework = runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
       *format = runanywhere::v1::MODEL_FORMAT_GGUF;
     }
+    return;
+  }
+  // A Core ML package IS a directory, so a ref naming the package itself lands
+  // here too — and its children (Manifest.json, Data/) match nothing in the
+  // scan below. Check the path's own name before descending into it.
+  const std::string self = without_trailing_slashes(path);
+  if (self.ends_with(".mlpackage") || self.ends_with(".mlmodelc")) {
+    *framework = runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
+    *format = runanywhere::v1::MODEL_FORMAT_MLPACKAGE;
     return;
   }
   // A directory holding at least one .mlpackage is an Apple bundle — the shape

@@ -56,6 +56,7 @@ Each invocation builds the complete public backend set for exactly one ABI, enfo
 ├── RABackendLLAMACPP.xcframework
 ├── RABackendONNX.xcframework
 ├── RABackendSherpa.xcframework
+├── RABackendNeuRT.xcframework
 └── RABackendMLX.xcframework
 
 dist/packages/<Framework>-ios-v<version>.zip

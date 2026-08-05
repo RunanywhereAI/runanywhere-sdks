@@ -664,6 +664,17 @@ static std::unordered_set<std::string> manifest_referenced_paths(
     request.url = manifest_url.c_str();
     request.timeout_ms = kTreeRequestTimeoutMs;
     request.follow_redirects = RAC_TRUE;
+    // Same bearer plumbing as fetch_repo_tree: without it a PRIVATE/GATED repo answers 401 here,
+    // the manifest can't be parsed, and the caller falls back to registering the WHOLE folder.
+    const std::string bearer =
+        rac::http::hf_bearer_for_url(manifest_url.c_str(), /*has_auth_header=*/false);
+    rac_http_header_kv_t auth_header{};
+    if (!bearer.empty()) {
+        auth_header.name = "Authorization";
+        auth_header.value = bearer.c_str();
+        request.headers = &auth_header;
+        request.header_count = 1;
+    }
     rac_http_response_t response = {};
     const rac_result_t rc = rac_http_request_send(client, &request, &response);
     rac_http_client_destroy(client);

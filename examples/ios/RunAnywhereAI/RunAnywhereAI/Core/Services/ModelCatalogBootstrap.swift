@@ -1246,6 +1246,15 @@ enum ModelCatalogBootstrap {
             url: "hf.co/runanywhere/LFM2.5-2.6B_ANE/lut8_g32_c6",
             framework: .coreml,
             modality: .language,
+            // Peak RSS, NOT a download-size claim, even though the URL-form
+            // registerModel mirrors memoryRequirement into downloadSizeBytes
+            // (RunAnywhere+Storage.swift). For an HF FOLDER ref commons throws
+            // that mirrored value away and stamps the resolver's live tree
+            // total instead — register_model_from_url.cpp `register_from_hf_folder`,
+            // "prefer the resolver's live folder total" — which is 3_257_702_729 B
+            // (3.03 GiB) for this folder. So the post-finalize size floor
+            // (80% of expected, download_orchestrator.cpp `validate_downloaded_sizes`)
+            // compares against the true total and cannot reject this bundle.
             memoryRequirement: 3_450_000_000,
             supportsThinking: true
         )

@@ -1190,8 +1190,10 @@ std::string version() {
 }
 
 // The engine backends compiled into this build (from the RAC_HAVE_BACKEND_<X> defines the
-// CMake backend loop emits). The plugin registry auto-selects the highest-priority registered
-// backend per modality, so this is what a loaded model can route to on this host.
+// CMake backend loop emits). This is COMPILE-TIME availability only, not proof of registration:
+// an engine's capability_check can still refuse registration at runtime (e.g. neurt returns
+// RAC_ERROR_CAPABILITY_UNSUPPORTED off Apple, RAC_ERROR_BACKEND_UNAVAILABLE in a stub build), in
+// which case it is listed here but nothing routes to it.
 std::vector<std::string> backends() {
     std::vector<std::string> out;
 #ifdef RAC_HAVE_BACKEND_LLAMACPP
@@ -1227,7 +1229,9 @@ PYBIND11_MODULE(_core, m) {
     m.doc() = "RunAnywhere native core (rac_* C ABI bound via pybind11).";
 
     m.def("version", &version, "Return the RunAnywhere SDK version string.");
-    m.def("backends", &backends, "List the engine backends compiled into this build.");
+    m.def("backends", &backends,
+          "List the engine backends compiled into this build (compile-time availability; a "
+          "listed engine may still refuse registration at runtime).");
 
     m.def("initialize", &initialize, py::arg("secure_dir"), py::arg("base_dir") = py::none(),
           "Initialize the runtime: fill the platform adapter, set the base dir, "

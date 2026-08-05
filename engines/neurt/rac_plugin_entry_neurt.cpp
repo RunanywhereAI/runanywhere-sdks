@@ -255,11 +255,16 @@ static const rac_engine_manifest_t k_neurt_manifest = {
 // via `rac_neurt_llm_ops` -> `rac_neurt_core`. NeuRT runs prebuilt Core ML graphs on the Apple
 // Neural Engine; it never compiles a model.
 //
-// Unconditional, because NEURT_ROOT is now a hard requirement of this engine (engines/neurt/
-// CMakeLists.txt FATAL_ERRORs without it) — both modalities are implemented over there. The
-// previous RAC_COREML_HAVE_NEURT guard existed to let the engine build without the neurun checkout;
-// that degrade is gone, and with it the risk of shipping an engine that advertises GENERATE_TEXT
-// and hands back a null op-table.
+// NEURT_ROOT is NOT a hard requirement: without the neurun checkout engines/neurt builds a
+// non-routable shell rather than failing configure, so the engine can be compiled on a CI host
+// that cannot clone the private repo. `RAC_NEURT_ROUTABLE` is what re-establishes the guarantee
+// the old FATAL_ERROR was after — in the stub arm the vtable's llm_ops slot is NULL and
+// capability_check refuses registration, so an engine advertising GENERATE_TEXT can never hand
+// back a null op-table.
+//
+// This declaration is therefore only ODR-used from the routable arm of the vtable below; an
+// `extern` declaration that is never referenced needs no definition, which is what lets the shell
+// link with no neurun symbols at all.
 //
 // The definition must have EXTERNAL linkage on the NeuRT side. A `const` object at namespace scope
 // is internal by default in C++ and `extern "C" { }` does not change that, so without an explicit

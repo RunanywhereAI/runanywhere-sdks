@@ -61,7 +61,9 @@ constexpr ModalitySpec kModalities[] = {
     {"tts", "tts.synthesis.completed", "probe-tts-piper", "sherpa"},
     {"vlm", "vlm.process.completed", "probe-vlm-llava-1.5", "llamacpp"},
     {"rag", "rag.query.completed", "probe-rag-minilm", "llamacpp"},
-    {"imagegen", "imagegen.generate.completed", "probe-imagegen-sd-turbo", "neurt"},
+    // `neurt` is the ENGINE identity; the framework dimension the SDK stamps for
+    // the Apple engine is still `coreml` (RAC_FRAMEWORK_COREML's analytics key).
+    {"imagegen", "imagegen.generate.completed", "probe-imagegen-sd-turbo", "coreml"},
     {"embeddings", "embeddings.embed.completed", "probe-embed-minilm", "onnx"},
     {"vad", "vad.stopped", "probe-vad-silero", "onnx"},
     {"voice", "voice.turn.metrics", "probe-voice-pipeline", "llamacpp"},

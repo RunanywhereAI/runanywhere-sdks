@@ -823,12 +823,24 @@ merge_neurt_backend_slice() {
     # registers, but the ANE GENERATE_TEXT vtable slot cannot resolve at the
     # consumer's link. Nothing in this build reports it: every CMake target
     # compiles, the xcframework packages, and only an executable link fails.
+    # The two private archives exist ONLY in the routable build: without the neurun checkout
+    # engines/neurt builds a non-routable shell and never creates rac_neurt_llm_ops /
+    # rac_neurt_core. Listing them unconditionally makes prepare_archive_input() fail on a
+    # missing file, which is precisely the stub build RAC_ALLOW_NEURT_STUB=1 exists to allow.
+    # Presence is the right test rather than the flag: it stays correct however the build was
+    # configured, and the shell has no unresolved `U _g_neurt_llm_ops` to satisfy because its
+    # vtable slot is NULL.
     local inputs=(
         "${build_root}/engines/neurt/${slice_dir}/librac_backend_neurt.a"
-        "${build_root}/engines/neurt/${slice_dir}/librac_neurt_llm_ops.a"
-        "${build_root}/engines/neurt/${slice_dir}/librac_neurt_core.a"
-        "${build_root}/runtimes/coreml/${slice_dir}/librac_runtime_coreml.a"
     )
+    local _neurt_llm_ops="${build_root}/engines/neurt/${slice_dir}/librac_neurt_llm_ops.a"
+    local _neurt_core="${build_root}/engines/neurt/${slice_dir}/librac_neurt_core.a"
+    if [ -f "${_neurt_llm_ops}" ] && [ -f "${_neurt_core}" ]; then
+        inputs+=("${_neurt_llm_ops}" "${_neurt_core}")
+    else
+        echo "note: NeuRT private archives absent — packaging the non-routable shell slice (${slice_dir})" >&2
+    fi
+    inputs+=("${build_root}/runtimes/coreml/${slice_dir}/librac_runtime_coreml.a")
 
     local prepared=()
     local input
@@ -844,13 +856,18 @@ merge_neurt_backend_macos_slice() {
     local output="$2"
     local arch="$3"
     local scratch_dir="${STAGING_DIR}/prepared/Release-macos/neurt"
-    # Same four-archive merge as the iOS slices — see merge_neurt_backend_slice.
+    # Same merge as the iOS slices, including the routable-only pair — see merge_neurt_backend_slice.
     local inputs=(
         "${build_root}/engines/neurt/librac_backend_neurt.a"
-        "${build_root}/engines/neurt/librac_neurt_llm_ops.a"
-        "${build_root}/engines/neurt/librac_neurt_core.a"
-        "${build_root}/runtimes/coreml/librac_runtime_coreml.a"
     )
+    local _neurt_llm_ops="${build_root}/engines/neurt/librac_neurt_llm_ops.a"
+    local _neurt_core="${build_root}/engines/neurt/librac_neurt_core.a"
+    if [ -f "${_neurt_llm_ops}" ] && [ -f "${_neurt_core}" ]; then
+        inputs+=("${_neurt_llm_ops}" "${_neurt_core}")
+    else
+        echo "note: NeuRT private archives absent — packaging the non-routable shell slice (macos)" >&2
+    fi
+    inputs+=("${build_root}/runtimes/coreml/librac_runtime_coreml.a")
 
     local prepared=()
     local input
