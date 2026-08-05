@@ -15,6 +15,7 @@ from runanywhere import (
     AudioFormat,
     AudioInput,
     ChatMessage,
+    DiarizationOptions,
     EmbedOptions,
     ImageInput,
     LlmOptions,
@@ -26,6 +27,7 @@ from runanywhere import (
     ReasoningOptions,
     Role,
     SDKException,
+    SegmentationOptions,
     SttOptions,
     TtsOptions,
 )
@@ -382,7 +384,7 @@ def handle_stt(args: argparse.Namespace) -> int:
 
 
 def handle_tts(args: argparse.Namespace) -> int:
-    voice = args.voice or DEFAULT_TTS
+    voice = getattr(args, "model", None) or args.voice or DEFAULT_TTS
     try:
         with _Sdk(args):
             audio = ra.tts.synthesize(args.text, TtsOptions(model=voice, format=AudioFormat.WAV))
@@ -492,6 +494,56 @@ def handle_rag(args: argparse.Namespace) -> int:
         output.result(result.answer.strip())
         for match in result.sources:
             output.status(f"  source (score {match.score:.2f}): {match.text[:70]}")
+    return 0
+
+
+# --------------------------------------------------------------------------- diarize / segment
+def handle_diarize(args: argparse.Namespace) -> int:
+    try:
+        with _Sdk(args):
+            result = ra.diarization.diarize(
+                AudioInput.file(args.input), DiarizationOptions(model=args.model or None)
+            )
+    except (SDKException, OSError) as exc:
+        output.error(str(exc))
+        return 1
+    if args.json:
+        output.emit_json(
+            {
+                "speaker_count": result.speaker_count,
+                "segments": [
+                    {"speaker_id": s.speaker_id, "start_ms": s.start_ms, "end_ms": s.end_ms}
+                    for s in result.segments
+                ],
+            }
+        )
+    else:
+        output.table(
+            ["SPEAKER", "START", "END"],
+            [[s.speaker_id, f"{s.start_ms / 1000:.3f}", f"{s.end_ms / 1000:.3f}"] for s in result.segments],
+        )
+    return 0
+
+
+def handle_segment(args: argparse.Namespace) -> int:
+    # The library segments raw RGB only (the SDK ships no image decoder), so the CLI takes
+    # packed 8-bit RGB bytes plus their dimensions.
+    try:
+        with open(args.input, "rb") as handle:
+            pixels = handle.read()
+        with _Sdk(args):
+            result = ra.segmentation.segment(
+                ImageInput.raw_rgb(pixels, args.width, args.height),
+                SegmentationOptions(model=args.model or None),
+            )
+    except (SDKException, OSError) as exc:
+        output.error(str(exc))
+        return 1
+    names = [getattr(c, "name", str(c)) for c in result.classes]
+    if args.json:
+        output.emit_json({"width": result.width, "height": result.height, "classes": names})
+    else:
+        output.result(f"{result.width}x{result.height}, {len(names)} classes: {', '.join(names[:12])}")
     return 0
 
 
@@ -612,6 +664,7 @@ def register(sub, gp: argparse.ArgumentParser) -> None:
 
     tt = add("tts", "synthesize speech (text-to-speech)")
     tt.add_argument("voice", nargs="?")
+    tt.add_argument("-m", "--model", help="voice model (same as the positional; -m for parity with other verbs)")
     tt.add_argument("-t", "--text", required=True)
     tt.add_argument("-o", "--output", required=True)
     tt.set_defaults(handler=handle_tts)
@@ -635,6 +688,18 @@ def register(sub, gp: argparse.ArgumentParser) -> None:
     rg.add_argument("-m", "--model")
     rg.add_argument("--embedder")
     rg.set_defaults(handler=handle_rag)
+
+    dz = add("diarize", "label who spoke when in a WAV")
+    dz.add_argument("-i", "--input", required=True)
+    dz.add_argument("-m", "--model")
+    dz.set_defaults(handler=handle_diarize)
+
+    sg = add("segment", "label every pixel of a raw-RGB image by class")
+    sg.add_argument("-i", "--input", required=True, help="packed 8-bit RGB pixels, row-major")
+    sg.add_argument("--width", type=int, required=True)
+    sg.add_argument("--height", type=int, required=True)
+    sg.add_argument("-m", "--model")
+    sg.set_defaults(handler=handle_segment)
 
     b = add("backends", "list registered inference backends")
     b.set_defaults(handler=handle_backends)
