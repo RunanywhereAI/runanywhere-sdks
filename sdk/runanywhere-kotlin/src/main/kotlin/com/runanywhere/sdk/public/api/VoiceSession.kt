@@ -196,7 +196,7 @@ private fun ProtoVoiceEvent.toVoiceEvent(): VoiceEvent? {
             return VoiceEvent.AgentResponse(token.text)
         }
     }
-        turn_lifecycle?.let { turn ->
+    turn_lifecycle?.let { turn ->
         when (turn.kind) {
             TurnLifecycleEventKind.TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_STARTED ->
                 return VoiceEvent.SpeechStarted()

@@ -50,7 +50,11 @@ class LlmStreamEventsTest {
             )
             val failed = events.last() as GenerationEvent.Failed
             assertEquals("Hello", failed.partial)
-            assertTrue(failed.error.message.orEmpty().contains("terminal event"))
+            assertTrue(
+                failed.error.message
+                    .orEmpty()
+                    .contains("terminal event"),
+            )
         }
 
     @Test
@@ -135,6 +139,10 @@ class LlmStreamEventsTest {
                 events.map { it::class },
             )
             val failed = events.last() as GenerationEvent.Failed
-            assertTrue(failed.error.message.orEmpty().contains("backend crashed"))
+            assertTrue(
+                failed.error.message
+                    .orEmpty()
+                    .contains("backend crashed"),
+            )
         }
 }

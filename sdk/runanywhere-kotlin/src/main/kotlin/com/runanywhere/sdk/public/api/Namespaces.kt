@@ -86,8 +86,21 @@ internal fun sdkCapabilitiesSnapshot(): SDKCapabilities =
     SDKCapabilities(
         modalities =
             setOf(
-                "llm", "vlm", "stt", "tts", "vad", "embeddings", "rerank", "images",
-                "diarization", "segmentation", "voice", "rag", "models", "lora", "cua",
+                "llm",
+                "vlm",
+                "stt",
+                "tts",
+                "vad",
+                "embeddings",
+                "rerank",
+                "images",
+                "diarization",
+                "segmentation",
+                "voice",
+                "rag",
+                "models",
+                "lora",
+                "cua",
             ),
         backends = setOf(Backend.INFERENCE_FRAMEWORK_LLAMA_CPP, Backend.INFERENCE_FRAMEWORK_ONNX),
         audioFormats = setOf(AudioFormat.AUDIO_FORMAT_PCM, AudioFormat.AUDIO_FORMAT_WAV, AudioFormat.AUDIO_FORMAT_PCM_S16LE),
